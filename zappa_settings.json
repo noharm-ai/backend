@@ -1,0 +1,13 @@
+{
+    "dev": {
+        "app_function": "mobile.app",
+        "aws_region": "sa-east-1",
+        "profile_name": "default",
+        "project_name": "project_name",
+        "runtime": "python3.6",
+        "s3_bucket": "lambda",
+        "certificate_arn": "arn:aws:acm:us-east-1",
+        "domain": "api.example.ai",
+        "route53_enabled": true
+    }
+}
