@@ -9,6 +9,8 @@ from config import Config
 app = FlaskAPI(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = Config.MYSQL_CONNECTION_STRING
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_POOL_RECYCLE'] = 299
+app.config['SQLALCHEMY_POOL_TIMEOUT'] = 20
 app.config['JWT_SECRET_KEY'] = Config.SECRET_KEY
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = Config.JWT_ACCESS_TOKEN_EXPIRES
 app.config['JWT_REFRESH_TOKEN_EXPIRES'] = Config.JWT_REFRESH_TOKEN_EXPIRES
@@ -21,6 +23,8 @@ def auth():
     data = request.get_json()
 
     user = User.authenticate(data.get('email'), data.get('password'))
+    db.engine.dispose()
+    
     if user is None:
         return {
           'status': 'error',
@@ -32,6 +36,7 @@ def auth():
 
         return {
           'status': 'success',
+          'userName': user.name,
           'access_token': access_token,
           'refresh_token': refresh_token
         }, status.HTTP_200_OK
@@ -52,6 +57,7 @@ def getPatients():
       user.idHospital, name = request.args.get('name'), order = request.args.get('order'), direction = request.args.get('direction'),\
       limit = request.args.get('limit')
     )
+    db.engine.dispose()
 
     results = []
     for p in patients:
@@ -64,8 +70,11 @@ def getPatients():
           'risk': p[2].description,
           'prescriptionScore': str(p[4])
         })
-    
-    return jsonify(results), status.HTTP_200_OK
+
+    return {
+      'status': 'success',
+      'data': results
+    }, status.HTTP_200_OK
 
 @app.route('/prescription/<int:idPrescription>', methods=['GET'])
 @jwt_required
@@ -76,6 +85,7 @@ def getPrescription(idPrescription):
         return {}, status.HTTP_204_NO_CONTENT
 
     drugs = PrescriptionDrug.findByPrescription(idPrescription)
+    db.engine.dispose()
     
     pDrugs = []
     for pd in drugs:
@@ -85,27 +95,31 @@ def getPrescription(idPrescription):
           'drug': pd[1].name,
           'dose': pd[0].dose,
           'measureUnit': pd[2].description,
-          'frequency': pd[0].frequency,
+          'frequency': pd[5].description,
           'administration': pd[3].description,
           'score': str(pd[4])
         })
     
     return {
-      'idPrescription': prescription[0].id,
-      'idPatient': prescription[1].id,
-      'idHospital': prescription[1].idHospital,
-      'name': prescription[1].name,
-      'date': prescription[0].date.isoformat(),
-      'risk': prescription[2].description,
-      'daysAgo': prescription[3],
-      'prescriptionScore': str(prescription[4]),
-      'prescription': pDrugs
+      'status': 'success',
+      'data': {
+        'idPrescription': prescription[0].id,
+        'idPatient': prescription[1].id,
+        'idHospital': prescription[1].idHospital,
+        'name': prescription[1].name,
+        'date': prescription[0].date.isoformat(),
+        'risk': prescription[2].description,
+        'daysAgo': prescription[3],
+        'prescriptionScore': str(prescription[4]),
+        'prescription': pDrugs
+      }
     }, status.HTTP_200_OK
 
 @app.route("/intervention/reasons", methods=['GET'])
 @jwt_required
 def getInterventionReasons():
     results = InterventionReason.query.order_by(InterventionReason.description).all()
+    db.engine.dispose()
 
     iList = []
     for i in results:
@@ -138,12 +152,15 @@ def createIntervention():
 
     try:
         i.save()
+        db.engine.dispose()
 
         return {
           'status': 'success',
           'data': i.id
         }, status.HTTP_200_OK
     except AssertionError as e:
+      db.engine.dispose()
+
       return {
         'status': 'error',
         'message': str(e)

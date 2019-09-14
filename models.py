@@ -140,22 +140,27 @@ class PrescriptionDrug(db.Model):
     idAdministration = db.Column('via', db.Integer, nullable=True)
 
     def findByPrescription(idPrescription):
+        PrescriptionDrugSub = db.aliased(PrescriptionDrug)
         #TODO: rever calculo do score. considerar hospital, segmento e versao. CRIAR FUNCAO
         score = db.session.query(func.sum(func.ifnull(func.ifnull(Outlier.manualScore, Outlier.score), 4)).label('score'))\
-          .select_from(PrescriptionDrug)\
+          .select_from(PrescriptionDrugSub)\
           .outerjoin(\
             Outlier,\
-            and_(Outlier.idDrug == PrescriptionDrug.idDrug, Outlier.frequency == PrescriptionDrug.frequency, Outlier.dose == PrescriptionDrug.dose)\
+            and_(\
+              Outlier.idDrug == PrescriptionDrugSub.idDrug, Outlier.frequency == PrescriptionDrugSub.frequency,\
+              Outlier.dose == PrescriptionDrugSub.dose
+            )\
           )\
-          .filter(PrescriptionDrug.idPrescription == idPrescription)\
+          .filter(PrescriptionDrug.id == PrescriptionDrugSub.id)\
           .as_scalar()
 
         #TODO: order by
         return db.session\
-          .query(PrescriptionDrug, Drug, MeasureUnit, Administration, score)\
+          .query(PrescriptionDrug, Drug, MeasureUnit, Administration, score, Frequency)\
           .join(Drug, Drug.id == PrescriptionDrug.idDrug)\
           .join(MeasureUnit, MeasureUnit.id == PrescriptionDrug.idMeasureUnit)\
           .join(Administration, Administration.id == PrescriptionDrug.idAdministration)\
+          .join(Frequency, Frequency.id == PrescriptionDrug.frequency)\
           .filter(PrescriptionDrug.idPrescription == idPrescription)\
           .all()
 
@@ -185,6 +190,12 @@ class InterventionReason(db.Model):
     __tablename__ = 'motivointervencao'
 
     id = db.Column("idmotivointerv", db.Integer, primary_key=True)
+    description = db.Column("descricao", db.String, nullable=False)
+
+class Frequency(db.Model):
+    __tablename__ = 'tipofrequencia'
+
+    id = db.Column("idtipofreq", db.Integer, primary_key=True)
     description = db.Column("descricao", db.String, nullable=False)
 
 class Intervention(db.Model):
