@@ -24,7 +24,8 @@ class Prescription(db.Model):
 
     id = db.Column("idprescricao", db.Integer, primary_key=True)
     idPatient = db.Column("idpaciente", db.Integer, nullable=False)
-    idHospital = db.Column("idhospital", db.Integer, nullable=True)
+    idHospital = db.Column("idhospital", db.Integer, nullable=False)
+    idSegment = db.Column("idsegmento", db.Integer, nullable=False)
     date = db.Column("dthr_prescricao", db.DateTime, nullable=False)
     status = db.Column('status', db.Integer, nullable=False)
 
@@ -73,10 +74,13 @@ class Patient(db.Model):
           .filter(Prescription.idHospital == idHospital)\
 
         name = kwargs.get('name', None)
-        
         if (not(name is None)):
           search = "%{}%".format(name)
           q = q.filter(Patient.name.like(search))
+
+        idSegment = kwargs.get('idSegment', None)
+        if (not(idSegment is None)):
+          q = q.filter(Prescription.idSegment == idSegment)
 
         q = q.with_labels().subquery()
 
@@ -242,3 +246,21 @@ class Intervention(db.Model):
 
         db.session.add(self)
         db.session.commit()
+
+class Segment(db.Model):
+    __tablename__ = 'segmento'
+
+    id = db.Column("idsegmento", db.Integer, primary_key=True)
+    idHospital = db.Column("idhospital", db.Integer, nullable=False)
+    description = db.Column("nome", db.String, nullable=False)
+    minAge = db.Column("idade_min", db.Integer, nullable=False)
+    maxAge = db.Column("idade_max", db.Integer, nullable=False)
+    minWeight = db.Column("peso_min", db.Float, nullable=False)
+    maxWeight = db.Column("peso_max", db.Float, nullable=False)
+
+    def findByHospital(idHospital):
+      return db.session\
+          .query(Segment)\
+          .filter(Segment.idHospital == idHospital)\
+          .order_by(asc(Segment.description))\
+          .all()

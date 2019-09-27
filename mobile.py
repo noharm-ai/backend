@@ -3,7 +3,7 @@ from flask_api import FlaskAPI, status, exceptions
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager
 from flask_jwt_extended import (create_access_token, create_refresh_token, jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
-from models import db, User, Patient, Prescription, PrescriptionDrug, InterventionReason, Intervention
+from models import db, User, Patient, Prescription, PrescriptionDrug, InterventionReason, Intervention, Segment
 from config import Config
 
 app = FlaskAPI(__name__)
@@ -54,8 +54,9 @@ def refreshToken():
 def getPatients():
     user = User.find(get_jwt_identity())
     patients = Patient.getPatients(\
-      user.idHospital, name = request.args.get('name'), order = request.args.get('order'), direction = request.args.get('direction'),\
-      limit = request.args.get('limit')
+      user.idHospital, name = request.args.get('name'), order = request.args.get('order'),\
+      direction = request.args.get('direction'), limit = request.args.get('limit'),\
+      idSegment = request.args.get('idSegment')
     )
     db.engine.dispose()
 
@@ -165,6 +166,36 @@ def createIntervention():
         'status': 'error',
         'message': str(e)
       }, status.HTTP_400_BAD_REQUEST
+    except Exception as e:
+      db.engine.dispose()
+
+      return {
+        'status': 'error',
+        'message': 'Server exception'
+      }, status.HTTP_500_INTERNAL_SERVER_ERROR
+
+@app.route("/segments", methods=['GET'])
+@jwt_required
+def getSegments():
+    user = User.find(get_jwt_identity())
+    results = Segment.findByHospital(user.idHospital)
+    db.engine.dispose()
+
+    iList = []
+    for i in results:
+      iList.append({
+        'id': i.id,
+        'description': i.description,
+        'minAge': i.minAge,
+        'maxAge': i.maxAge,
+        'minWeight': i.minWeight,
+        'maxWeight': i.maxWeight
+      })
+
+    return {
+      'status': 'success',
+      'data': iList
+    }, status.HTTP_200_OK
 
 if __name__ == "__main__":
     app.run(debug=True)
