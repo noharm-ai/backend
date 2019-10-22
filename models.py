@@ -54,6 +54,10 @@ class Patient(db.Model):
     idHospital = db.Column("idhospital", db.Integer, nullable=False)
     idRisk = db.Column("idclassrisco", db.Integer, nullable=False)
     name = db.Column('nome', db.String(250), nullable=False)
+    birthdate = db.Column('dt_nascimento', db.DateTime, nullable=True)
+    gender = db.Column('sexo', db.String(1), nullable=True)
+    weight = db.Column('peso', db.Integer, nullable=True)
+    race = db.Column('raca', db.String(45), nullable=True)
 
     def getPatients(idHospital, **kwargs):
         #TODO: rever calculo do score. considerar hospital, segmento e versao. CRIAR FUNCAO
