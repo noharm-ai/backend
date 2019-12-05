@@ -12,6 +12,7 @@ $ pip3 install -r requirements.txt
 ```
 $ python3 mobile.py
 $ curl -X POST -d '{"email":"teste", "password":"1234"}' -H "Content-Type: application/json"  http://127.0.0.1:5000/authenticate
+$ curl -X get http://127.0.0.1:5000/getName?idPatient=1234
 ```
 
 ### Troubleshooting Tips
