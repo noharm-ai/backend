@@ -8,6 +8,9 @@
         "s3_bucket": "lambda",
         "certificate_arn": "arn:aws:acm:us-east-1",
         "domain": "api.example.ai",
-        "route53_enabled": true
+        "route53_enabled": true,
+        "keep_warm": true,
+        "keep_warm_expression": "rate(4 minutes)",
+        "cors" : true
     }
 }
