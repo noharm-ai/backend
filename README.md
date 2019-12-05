@@ -3,9 +3,15 @@ Api for Mobile App
 
 ### 1. Install
 ```
-python3 -m venv env
-source env/bin/activate
-pip3 install -r requirements.txt
+$ python3 -m venv env
+$ source env/bin/activate
+$ pip3 install -r requirements.txt
+```
+
+### 2. Test your Env
+```
+$ python3 mobile.py
+$ curl -X POST -d '{"email":"teste", "password":"1234"}' -H "Content-Type: application/json"  http://127.0.0.1:5000/authenticate
 ```
 
 ### Troubleshooting Tips
