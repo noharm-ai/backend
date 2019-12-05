@@ -18,6 +18,13 @@ app.config['JWT_REFRESH_TOKEN_EXPIRES'] = Config.JWT_REFRESH_TOKEN_EXPIRES
 jwt = JWTManager(app)
 db.init_app(app)
 
+@app.route("/getNome", methods=['POST'])
+def getNome():
+    return {
+      'status': 'error',
+      'message': 'Usuário inválido',
+    }, status.HTTP_200_OK
+
 @app.route("/authenticate", methods=['POST'])
 def auth():
     data = request.get_json()
