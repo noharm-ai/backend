@@ -20,9 +20,11 @@ db.init_app(app)
 
 @app.route("/getName", methods=['GET'])
 def getName():
+    idPatient = request.args.get('idPatient')
+    
     return {
       'status': 'success',
-      'idPatient': '1234567',
+      'idPatient': idPatient,
       'name': 'Fulano da Silva e Santos'
     }, status.HTTP_200_OK
 
