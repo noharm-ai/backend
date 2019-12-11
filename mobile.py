@@ -5,6 +5,7 @@ from flask_jwt_extended import JWTManager
 from flask_jwt_extended import (create_access_token, create_refresh_token, jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
 from models import db, User, Patient, Prescription, PrescriptionDrug, InterventionReason, Intervention, Segment
 from config import Config
+from flask_cors import CORS
 
 app = FlaskAPI(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = Config.MYSQL_CONNECTION_STRING
@@ -18,8 +19,10 @@ app.config['JWT_REFRESH_TOKEN_EXPIRES'] = Config.JWT_REFRESH_TOKEN_EXPIRES
 jwt = JWTManager(app)
 db.init_app(app)
 
+CORS(app)
+
 @app.route("/getName/<int:idPatient>", methods=['GET'])
-def getName():
+def getName(idPatient):
     return {
       'status': 'success',
       'idPatient': idPatient,
