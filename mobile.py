@@ -21,6 +21,13 @@ db.init_app(app)
 
 CORS(app)
 
+@app.route("/getNameUrl", methods=['GET'])
+def getNameUrl():
+    return {
+      'status': 'success',
+      'url': 'https://mobile.noharm.ai/getName/{idPatient}'
+    }, status.HTTP_200_OK
+
 @app.route("/getName/<int:idPatient>", methods=['GET'])
 def getName(idPatient):
     return {
