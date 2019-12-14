@@ -3,247 +3,280 @@ from sqlalchemy import func, text, and_, desc, asc
 
 db = SQLAlchemy()
 
+
+def setSchema(schema):
+    Prescription.setSchema(schema)
+    Patient.setSchema(schema)
+    InterventionReason.setSchema(schema)
+    PrescriptionDrug.setSchema(schema)
+    Outlier.setSchema(schema)
+    Drug.setSchema(schema)
+    MeasureUnit.setSchema(schema)
+    Frequency.setSchema(schema)
+    Segment.setSchema(schema)
+    Department.setSchema(schema)
+
+
+def getAggScore():
+    return db.session.query(func.sum(func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4)).label('score'))\
+        .select_from(PrescriptionDrug)\
+        .outerjoin(Outlier, and_(Outlier.id == PrescriptionDrug.idOutlier))\
+        .filter(PrescriptionDrug.idPrescription == Prescription.id)\
+        .as_scalar()
+
+
 class User(db.Model):
     __tablename__ = 'usuario'
 
     id = db.Column("idusuario", db.Integer, primary_key=True)
-    idHospital = db.Column('idhospital', db.Integer, nullable=False)
     name = db.Column('nome', db.String(250), nullable=False)
-    cpf = db.Column('cpf', db.String(11), nullable=False)
     email = db.Column("email", db.String(254), unique=True, nullable=False)
     password = db.Column('senha', db.String(128), nullable=False)
+    schema = db.Column("schema", db.String, nullable=False)
+    nameUrl = db.Column("getnameurl", db.String, nullable=False)
+    logourl = db.Column("logourl", db.String, nullable=False)
 
     def find(id):
-      return User.query.filter(User.id == id).first()
+        return User.query.filter(User.id == id).first()
 
     def authenticate(email, password):
-      return User.query.filter_by(email = email, password = password).first()
+        return User.query.filter_by(email=email, password=password).first()
+
 
 class Prescription(db.Model):
     __tablename__ = 'prescricao'
 
-    id = db.Column("idprescricao", db.Integer, primary_key=True)
-    idPatient = db.Column("idpaciente", db.Integer, nullable=False)
-    idHospital = db.Column("idhospital", db.Integer, nullable=False)
+    id = db.Column("fkprescricao", db.Integer, primary_key=True)
+    idPatient = db.Column("fkpessoa", db.Integer, nullable=False)
+    idHospital = db.Column("fkhospital", db.Integer, nullable=False)
     idSegment = db.Column("idsegmento", db.Integer, nullable=False)
-    date = db.Column("dthr_prescricao", db.DateTime, nullable=False)
+    date = db.Column("dtprescricao", db.DateTime, nullable=False)
     status = db.Column('status', db.Integer, nullable=False)
 
+    def setSchema(schema):
+        Prescription.__table__.schema = schema
+
     def getPrescription(idPrescription):
-        #TODO: rever calculo do score. considerar hospital, segmento e versao. CRIAR FUNCAO
-        score = db.session.query(func.sum(func.ifnull(func.ifnull(Outlier.manualScore, Outlier.score), 4)).label('score'))\
-          .select_from(PrescriptionDrug)\
-          .outerjoin(\
-            Outlier,\
-            and_(Outlier.idDrug == PrescriptionDrug.idDrug, Outlier.frequency == PrescriptionDrug.frequency, Outlier.dose == PrescriptionDrug.dose)\
-          )\
-          .filter(PrescriptionDrug.idPrescription == Prescription.id)\
-          .as_scalar()
+        score = getAggScore()
 
         return db.session\
-          .query(Prescription, Patient, Risk, func.datediff(func.current_date(), Prescription.date).label('daysAgo'), score)\
-          .join(Patient, and_(Patient.id == Prescription.idPatient))\
-          .join(Risk, Patient.idRisk == Risk.id)\
-          .filter(Prescription.id == idPrescription)\
-          .first()
+            .query(
+                Prescription, Patient,
+                func.trunc((func.extract('epoch', func.current_date(
+                )) - func.extract('epoch', Prescription.date)) / 86400).label('daysAgo'), score
+            )\
+            .join(Patient, and_(Patient.id == Prescription.idPatient))\
+            .filter(Prescription.id == idPrescription)\
+            .first()
+
 
 class Patient(db.Model):
-    __tablename__ = 'paciente'
+    __tablename__ = 'pessoa'
 
-    id = db.Column("idpaciente", db.Integer, primary_key=True)
-    idHospital = db.Column("idhospital", db.Integer, nullable=False)
-    idRisk = db.Column("idclassrisco", db.Integer, nullable=False)
-    name = db.Column('nome', db.String(250), nullable=False)
-    birthdate = db.Column('dt_nascimento', db.DateTime, nullable=True)
+    id = db.Column("fkpessoa", db.Integer, primary_key=True)
+    fkHospital = db.Column("fkhospital", db.Integer, nullable=False)
+    admissionNumber = db.Column('nratendimento', db.Integer, nullable=False)
+    birthdate = db.Column('dtnascimento', db.DateTime, nullable=True)
     gender = db.Column('sexo', db.String(1), nullable=True)
     weight = db.Column('peso', db.Integer, nullable=True)
-    race = db.Column('raca', db.String(45), nullable=True)
+    race = db.Column('cor', db.String, nullable=True)
 
-    def getPatients(idHospital, **kwargs):
-        #TODO: rever calculo do score. considerar hospital, segmento e versao. CRIAR FUNCAO
-        score = db.session.query(func.sum(func.ifnull(func.ifnull(Outlier.manualScore, Outlier.score), 4)).label('score'))\
-          .select_from(PrescriptionDrug)\
-          .outerjoin(\
-            Outlier,\
-            and_(Outlier.idDrug == PrescriptionDrug.idDrug, Outlier.frequency == PrescriptionDrug.frequency, Outlier.dose == PrescriptionDrug.dose)\
-          )\
-          .filter(PrescriptionDrug.idPrescription == Prescription.id)\
-          .as_scalar()
-        
-        #TODO: considerar status da prescricao
+    def setSchema(schema):
+        Patient.__table__.schema = schema
+
+    def getPatients(**kwargs):
+        score = getAggScore()
+
         q = db.session\
-          .query(Prescription, Patient, func.datediff(func.current_date(), Prescription.date).label('daysAgo'), Risk, score.label('score'))\
-          .join(Patient, Patient.id == Prescription.idPatient)\
-          .join(Risk, Patient.idRisk == Risk.id)\
-          .filter(Prescription.idHospital == idHospital)\
+            .query(
+                Prescription, Patient,
+                func.trunc((func.extract('epoch', func.current_date(
+                )) - func.extract('epoch', Prescription.date)) / 86400).label('daysAgo'),
+                score.label('score')
+            )\
+            .join(Patient, Patient.id == Prescription.idPatient)
 
         name = kwargs.get('name', None)
         if (not(name is None)):
-          search = "%{}%".format(name)
-          q = q.filter(Patient.name.like(search))
+            search = "%{}%".format(name)
+            q = q.filter(Patient.name.like(search))
 
         idSegment = kwargs.get('idSegment', None)
         if (not(idSegment is None)):
-          q = q.filter(Prescription.idSegment == idSegment)
+            q = q.filter(Prescription.idSegment == idSegment)
 
         q = q.with_labels().subquery()
 
         prescritionAlias = db.aliased(Prescription, q)
         patientAlias = db.aliased(Patient, q)
-        riskAlias = db.aliased(Risk, q)
 
         wrapper = db.session\
-          .query(prescritionAlias, patientAlias, riskAlias, 'daysAgo', 'score')\
+            .query(prescritionAlias, patientAlias, '"daysAgo"', "score")\
 
         order = kwargs.get('order', 'score')
         if (order != 'score'):
-          if (order == 'date'):
-            order = text('anon_1.prescricao_dthr_prescricao')
-          elif (order == 'name'):
-            order = text('anon_1.paciente_nome')
-          else:
-            order = 'score'
+            if (order == 'date'):
+                order = text('anon_1.prescricao_dthr_prescricao')
+            elif (order == 'name'):
+                order = text('anon_1.paciente_nome')
+            else:
+                order = 'score'
 
         direction = kwargs.get('direction', 'desc')
         if (direction == 'desc'):
-          wrapper = wrapper.order_by(desc(order))
+            wrapper = wrapper.order_by(desc(order))
         else:
-          wrapper = wrapper.order_by(asc(order))
+            wrapper = wrapper.order_by(asc(order))
 
         limit = kwargs.get('limit', 20)
 
         return wrapper.limit(limit).all()
 
+
 class Outlier(db.Model):
     __tablename__ = 'outlier'
 
-    id = db.Column("idOutlier", db.Integer, primary_key=True)
-    idHospital = db.Column("idhospital", db.Integer, nullable=False)
-    idDrug = db.Column("idmedicamento", db.Integer, nullable=False)
-    idMeasureUnit = db.Column("idunidmedida", db.Integer, nullable=False)
+    id = db.Column("idoutlier", db.Integer, primary_key=True)
+    idDrug = db.Column("fkmedicamento", db.Integer, nullable=False)
+    idSegment = db.Column("idsegmento", db.Integer, nullable=False)
     countNum = db.Column("contagem", db.Integer, nullable=True)
-    version = db.Column("versao", db.Integer, nullable=True)
     dose = db.Column("dose", db.Integer, nullable=True)
-    frequency = db.Column("frequencia", db.Integer, nullable=True)
+    frequency = db.Column("frequenciadia", db.Integer, nullable=True)
     score = db.Column("escore", db.Integer, nullable=True)
     manualScore = db.Column("escoremanual", db.Integer, nullable=True)
-    status = db.Column("status", db.Integer, nullable=False)
+    idUser = db.Column("idusuario", db.Integer, nullable=True)
 
-class Risk(db.Model):
-    __tablename__ = 'classificacaorisco'
+    def setSchema(schema):
+        Outlier.__table__.schema = schema
 
-    id = db.Column("idclassrisco", db.Integer, primary_key=True)
-    description = db.Column('descricao', db.String, nullable=False)
 
 class PrescriptionDrug(db.Model):
-    __tablename__ = 'prescricaomedicamento'
+    __tablename__ = 'presmed'
 
     id = db.Column("idpresmed", db.Integer, primary_key=True)
-    idPrescription = db.Column("idprescricao", db.Integer, nullable=False)
-    idDrug = db.Column("idmedicamento", db.Integer, nullable=False)
-    idMeasureUnit = db.Column("idunidmedida", db.Integer, nullable=False)
+    idOutlier = db.Column("idoutlier", db.Integer, nullable=False)
+    idPrescription = db.Column("fkprescricao", db.Integer, nullable=False)
+    idDrug = db.Column("fkmedicamento", db.Integer, nullable=False)
+    idMeasureUnit = db.Column("fkunidademedida", db.Integer, nullable=False)
     dose = db.Column("dose", db.Integer, nullable=False)
-    frequency = db.Column("frequencia", db.Integer, nullable=True)
+    idFrequency = db.Column("fkfrequencia", db.Integer, nullable=True)
     dose = db.Column("dose", db.Integer, nullable=True)
-    idAdministration = db.Column('via', db.Integer, nullable=True)
+    route = db.Column('via', db.String, nullable=True)
+
+    def setSchema(schema):
+        PrescriptionDrug.__table__.schema = schema
 
     def findByPrescription(idPrescription):
-        PrescriptionDrugSub = db.aliased(PrescriptionDrug)
-        #TODO: rever calculo do score. considerar hospital, segmento e versao. CRIAR FUNCAO
-        score = db.session.query(func.sum(func.ifnull(func.ifnull(Outlier.manualScore, Outlier.score), 4)).label('score'))\
-          .select_from(PrescriptionDrugSub)\
-          .outerjoin(\
-            Outlier,\
-            and_(\
-              Outlier.idDrug == PrescriptionDrugSub.idDrug, Outlier.frequency == PrescriptionDrugSub.frequency,\
-              Outlier.dose == PrescriptionDrugSub.dose
-            )\
-          )\
-          .filter(PrescriptionDrug.id == PrescriptionDrugSub.id)\
-          .as_scalar()
+        #PrescriptionDrugSub = db.aliased(PrescriptionDrug)
+        #score = db.session.query(func.sum(func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4)).label('score'))\
+        #    .select_from(PrescriptionDrugSub)\
+        #    .outerjoin(Outlier.idOutlier == PrescriptionDrugSub.idOutlier)\
+        #    .filter(PrescriptionDrug.id == PrescriptionDrugSub.id)\
+        #    .as_scalar()
 
-        #TODO: order by
         return db.session\
-          .query(PrescriptionDrug, Drug, MeasureUnit, Administration, score, Frequency)\
-          .join(Drug, Drug.id == PrescriptionDrug.idDrug)\
-          .join(MeasureUnit, MeasureUnit.id == PrescriptionDrug.idMeasureUnit)\
-          .join(Administration, Administration.id == PrescriptionDrug.idAdministration)\
-          .join(Frequency, Frequency.id == PrescriptionDrug.frequency)\
-          .filter(PrescriptionDrug.idPrescription == idPrescription)\
-          .all()
+            .query(PrescriptionDrug, Drug, MeasureUnit, Frequency, func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4).label('score'))\
+            .join(Outlier, Outlier.id == PrescriptionDrug.idOutlier)\
+            .join(Drug, Drug.id == PrescriptionDrug.idDrug)\
+            .join(MeasureUnit, MeasureUnit.id == PrescriptionDrug.idMeasureUnit)\
+            .join(Frequency, Frequency.id == PrescriptionDrug.idFrequency)\
+            .filter(PrescriptionDrug.idPrescription == idPrescription)\
+            .all()
+
 
 class Drug(db.Model):
     __tablename__ = 'medicamento'
 
-    id = db.Column("idmedicamento", db.Integer, primary_key=True)
-    idMeasureUnit = db.Column("idunidmedida", db.Integer, nullable=False)
-    idHospital = db.Column("idhospital", db.Integer, nullable=False)
+    id = db.Column("fkmedicamento", db.Integer, primary_key=True)
+    idMeasureUnit = db.Column("fkunidademedida", db.Integer, nullable=False)
+    idHospital = db.Column("fkhospital", db.Integer, nullable=False)
     name = db.Column("nome", db.String, nullable=False)
 
+    def setSchema(schema):
+        Drug.__table__.schema = schema
+
+
 class MeasureUnit(db.Model):
-    __tablename__ = 'unidadesmedida'
+    __tablename__ = 'unidademedida'
 
-    id = db.Column("idunidmedida", db.Integer, primary_key=True)
-    idHospital = db.Column("idhospital", db.Integer, nullable=False)
-    description = db.Column("descricao", db.String, nullable=False)
+    id = db.Column("fkunidademedida", db.Integer, primary_key=True)
+    idHospital = db.Column("fkhospital", db.Integer, nullable=False)
+    description = db.Column("nome", db.String, nullable=False)
 
-class Administration(db.Model):
-    __tablename__ = 'viaadministracao'
+    def setSchema(schema):
+        MeasureUnit.__table__.schema = schema
 
-    id = db.Column("idviaadmin", db.Integer, primary_key=True)
-    idHospital = db.Column("idhospital", db.Integer, nullable=False)
-    description = db.Column("descricao", db.String, nullable=False)
 
 class InterventionReason(db.Model):
     __tablename__ = 'motivointervencao'
 
-    id = db.Column("idmotivointerv", db.Integer, primary_key=True)
-    description = db.Column("descricao", db.String, nullable=False)
+    id = db.Column("idmotivointervencao", db.Integer, primary_key=True)
+    description = db.Column("nome", db.String, nullable=False)
+    group = db.Column("tipo", db.String, nullable=True)
+
+    def setSchema(schema):
+        InterventionReason.__table__.schema = schema
+
+    def findAll():
+        return db.session.query(InterventionReason).order_by(InterventionReason.description).all()
+
 
 class Frequency(db.Model):
-    __tablename__ = 'tipofrequencia'
+    __tablename__ = 'frequencia'
 
-    id = db.Column("idtipofreq", db.Integer, primary_key=True)
-    description = db.Column("descricao", db.String, nullable=False)
+    id = db.Column("fkfrequencia", db.Integer, primary_key=True)
+    description = db.Column("nome", db.String, nullable=False)
+
+    def setSchema(schema):
+        Frequency.__table__.schema = schema
+
 
 class Intervention(db.Model):
     __tablename__ = 'intervencao'
 
     id = db.Column("idintervencao", db.Integer, primary_key=True)
     idPrescriptionDrug = db.Column("idpresmed", db.Integer, nullable=False)
-    idPrescription = db.Column("idprescricao", db.Integer, nullable=False)
     idUser = db.Column("idusuario", db.Integer, nullable=False)
-    idDrug = db.Column("idmedicamento", db.Integer, nullable=False)
-    idInterventionReason = db.Column("idmotivointerv", db.Integer, nullable=False)
-    propagation = db.Column("propaga", db.String, nullable=False)
-    observation = db.Column("observacoes", db.String, nullable=True)
+    idInterventionReason = db.Column("idmotivointervencao", db.Integer, nullable=False)
+    propagation = db.Column("boolpropaga", db.String, nullable=False)
+    observation = db.Column("observacao", db.String, nullable=True)
+
+    def setSchema(schema):
+        Intervention.__table__.schema = schema
 
     def validateIntervention(self):
         if self.idPrescriptionDrug is None:
-          raise AssertionError('Medicamento prescrito: preenchimento obrigatório')
+            raise AssertionError(
+                'Medicamento prescrito: preenchimento obrigatório')
 
         if self.idUser is None:
-          raise AssertionError('Usuário responsável: preenchimento obrigatório')
+            raise AssertionError(
+                'Usuário responsável: preenchimento obrigatório')
 
         if self.idInterventionReason is None:
-          raise AssertionError('Motivo intervenção: preenchimento obrigatório')
+            raise AssertionError(
+                'Motivo intervenção: preenchimento obrigatório')
 
         if self.propagation is None:
-          raise AssertionError('Propagação: preenchimento obrigatório')
+            raise AssertionError('Propagação: preenchimento obrigatório')
 
         if self.propagation != 'S' and self.propagation != 'N':
-          raise AssertionError('Propagação: valor deve ser S ou N')
+            raise AssertionError('Propagação: valor deve ser S ou N')
 
         if self.observation is None:
-          raise AssertionError('Observação: preenchimento obrigatório')
+            raise AssertionError('Observação: preenchimento obrigatório')
 
-        prescriptionDrug = PrescriptionDrug.query.filter(PrescriptionDrug.id == self.idPrescriptionDrug).first()
+        prescriptionDrug = PrescriptionDrug.query.filter(
+            PrescriptionDrug.id == self.idPrescriptionDrug).first()
         if (prescriptionDrug is None):
-            raise AssertionError('Medicamento prescrito: identificação inexistente')
+            raise AssertionError(
+                'Medicamento prescrito: identificação inexistente')
 
-        interventionReason = InterventionReason.query.filter(InterventionReason.id == self.idInterventionReason).first()
+        interventionReason = InterventionReason.query.filter(
+            InterventionReason.id == self.idInterventionReason).first()
         if (interventionReason is None):
-            raise AssertionError('Motivo intervenção: identificação inexistente')
+            raise AssertionError(
+                'Motivo intervenção: identificação inexistente')
 
     def save(self):
         self.validateIntervention()
@@ -251,20 +284,34 @@ class Intervention(db.Model):
         db.session.add(self)
         db.session.commit()
 
+
 class Segment(db.Model):
     __tablename__ = 'segmento'
 
     id = db.Column("idsegmento", db.Integer, primary_key=True)
-    idHospital = db.Column("idhospital", db.Integer, nullable=False)
     description = db.Column("nome", db.String, nullable=False)
     minAge = db.Column("idade_min", db.Integer, nullable=False)
     maxAge = db.Column("idade_max", db.Integer, nullable=False)
     minWeight = db.Column("peso_min", db.Float, nullable=False)
     maxWeight = db.Column("peso_max", db.Float, nullable=False)
+    status = db.Column("status", db.Integer, nullable=False)
 
-    def findByHospital(idHospital):
-      return db.session\
-          .query(Segment)\
-          .filter(Segment.idHospital == idHospital)\
-          .order_by(asc(Segment.description))\
-          .all()
+    def setSchema(schema):
+        Segment.__table__.schema = schema
+
+    def findAll():
+        return db.session\
+            .query(Segment)\
+            .order_by(asc(Segment.description))\
+            .all()
+
+
+class Department(db.Model):
+    __tablename__ = 'setor'
+
+    id = db.Column("fksetor", db.Integer, primary_key=True)
+    idHospital = db.Column("fkhospital", db.Integer, nullable=False)
+    name = db.Column("nome", db.String, nullable=False)
+
+    def setSchema(schema):
+        Department.__table__.schema = schema
