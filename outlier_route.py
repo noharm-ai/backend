@@ -31,6 +31,17 @@ class Departments(db.Model):
     idHospital = db.Column("fkhospital", db.Integer, nullable=False)
     name = db.Column("nome", db.String, nullable=False)
 
+class Segment(db.Model):
+    __tablename__ = 'segmento_'
+
+    id = db.Column("idsegmento", db.Integer, primary_key=True)
+    description = db.Column("nome", db.String, nullable=False)
+    minAge = db.Column("idade_min", db.Integer, nullable=False)
+    maxAge = db.Column("idade_max", db.Integer, nullable=False)
+    minWeight = db.Column("peso_min", db.Float, nullable=False)
+    maxWeight = db.Column("peso_max", db.Float, nullable=False)
+    status = db.Column("status", db.Float, nullable=False)
+
 @app.route('/outliers/<int:idSegment>/<int:idDrug>', methods=['GET'])
 def getOutliers(idSegment=1,idDrug=1):
     Outlier.__table__.schema = 'demo'
@@ -124,3 +135,47 @@ def getDepartments():
       'status': 'success',
       'data': results
     }, status.HTTP_200_OK
+
+
+@app.route('/segments', methods=['POST'])
+@app.route('/segments/<int:idSegment>', methods=['PUT'])
+def setSegment(idSegment=None):
+    Segment.__table__.schema = 'demo'
+
+    if request.method == 'POST':
+        s = Segment()
+    elif request.method == 'PUT':
+        s = Segment.query.get(idSegment)
+
+    data = request.get_json()
+    if 'description' in data: s.description = data.get('description', None)
+    if 'minAge' in data: s.minAge = data.get('minAge', None)
+    if 'maxAge' in data: s.maxAge = data.get('maxAge', None)
+    if 'minWeight' in data: s.minWeight = data.get('minWeight', None)
+    if 'maxWeight' in data: s.maxWeight = data.get('maxWeight', None)
+    if 'status' in data: s.status = data.get('status', None)
+
+    if request.method == 'POST':
+    	db.session.add(s)
+
+    try:
+        db.session.commit()
+
+        return {
+          'status': 'success',
+          'data': s.id
+        }, status.HTTP_200_OK
+    except AssertionError as e:
+      db.engine.dispose()
+
+      return {
+        'status': 'error',
+        'message': str(e)
+      }, status.HTTP_400_BAD_REQUEST
+    except Exception as e:
+      db.engine.dispose()
+
+      return {
+        'status': 'error',
+        'message': str(e)
+      }, status.HTTP_500_INTERNAL_SERVER_ERROR
