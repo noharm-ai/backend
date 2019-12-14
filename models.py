@@ -15,6 +15,7 @@ def setSchema(schema):
     Frequency.setSchema(schema)
     Segment.setSchema(schema)
     Department.setSchema(schema)
+    Intervention.setSchema(schema)
 
 
 def getAggScore():
@@ -280,8 +281,9 @@ class Intervention(db.Model):
 
     def save(self):
         self.validateIntervention()
+        if self.id == None:
+            db.session.add(self)
 
-        db.session.add(self)
         db.session.commit()
 
 
