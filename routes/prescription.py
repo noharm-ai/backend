@@ -1,13 +1,13 @@
-from __main__ import app
 from flask_api import status
 from models import db, User, Patient, Prescription, PrescriptionDrug, InterventionReason, Intervention, Segment, setSchema
-from flask import request
+from flask import Blueprint, request
 from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
 
+app_pres = Blueprint('app_pres',__name__)
 
-@app.route("/patients", methods=['GET'])
-@app.route("/prescriptions", methods=['GET'])
+@app_pres.route("/patients", methods=['GET'])
+@app_pres.route("/prescriptions", methods=['GET'])
 @jwt_required
 def getPrescriptions():
     user = User.find(get_jwt_identity())
@@ -40,7 +40,7 @@ def getPrescriptions():
     }, status.HTTP_200_OK
 
 
-@app.route('/prescriptions/<int:idPrescription>', methods=['GET'])
+@app_pres.route('/prescriptions/<int:idPrescription>', methods=['GET'])
 @jwt_required
 def getPrescription(idPrescription):
     user = User.find(get_jwt_identity())
@@ -85,7 +85,7 @@ def getPrescription(idPrescription):
     }, status.HTTP_200_OK
 
 
-@app.route("/intervention/reasons", methods=['GET'])
+@app_pres.route("/intervention/reasons", methods=['GET'])
 @jwt_required
 def getInterventionReasons():
     user = User.find(get_jwt_identity())
@@ -106,8 +106,8 @@ def getInterventionReasons():
     }, status.HTTP_200_OK
 
 
-@app.route('/intervention', methods=['POST'])
-@app.route('/intervention/<int:idIntervention>', methods=['PUT'])
+@app_pres.route('/intervention', methods=['POST'])
+@app_pres.route('/intervention/<int:idIntervention>', methods=['PUT'])
 @jwt_required
 def createIntervention(idIntervention=None):
     user = User.find(get_jwt_identity())

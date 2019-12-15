@@ -6,6 +6,8 @@ from flask_jwt_extended import (jwt_required)
 from models import db, User
 from config import Config
 from flask_cors import CORS
+from routes.authentication import app_auth
+from routes.outlier import app_out
 
 app = FlaskAPI(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = Config.MYSQL_CONNECTION_STRING
@@ -18,10 +20,10 @@ app.config['JWT_REFRESH_TOKEN_EXPIRES'] = Config.JWT_REFRESH_TOKEN_EXPIRES
 
 jwt = JWTManager(app)
 db.init_app(app)
-
 CORS(app)
 
-from routes import segment, prescription, outlier, authentication
+app.register_blueprint(app_auth)
+app.register_blueprint(app_out)
 
 @app.route("/user/name-url", methods=['GET'])
 @jwt_required

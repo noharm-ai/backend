@@ -1,11 +1,12 @@
-from __main__ import app
-from flask import request, url_for, jsonify
+from flask import Blueprint, request, url_for, jsonify
 from flask_api import status
 from models import db, User, setSchema
 from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
 
-@app.route("/authenticate", methods=['POST'])
+app_auth = Blueprint('app_auth',__name__)
+
+@app_auth.route("/authenticate", methods=['POST'])
 def auth():
     data = request.get_json()
 
@@ -29,7 +30,7 @@ def auth():
         }, status.HTTP_200_OK
 
 
-@app.route("/refresh-token", methods=['POST'])
+@app_auth.route("/refresh-token", methods=['POST'])
 @jwt_refresh_token_required
 def refreshToken():
     current_user = get_jwt_identity()

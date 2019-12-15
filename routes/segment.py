@@ -1,12 +1,12 @@
-from __main__ import app
 from flask_api import status
 from models import db, User, Patient, Prescription, PrescriptionDrug, InterventionReason, Intervention, Segment, setSchema
-from flask import request
+from flask import Blueprint, request
 from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
 
+app_seg = Blueprint('app_seg',__name__)
 
-@app.route("/segments", methods=['GET'])
+@app_seg.route("/segments", methods=['GET'])
 @jwt_required
 def getSegments():
     user = User.find(get_jwt_identity())
@@ -31,8 +31,8 @@ def getSegments():
         'data': iList
     }, status.HTTP_200_OK
 
-@app.route('/segments', methods=['POST'])
-@app.route('/segments/<int:idSegment>', methods=['PUT'])
+@app_seg.route('/segments', methods=['POST'])
+@app_seg.route('/segments/<int:idSegment>', methods=['PUT'])
 @jwt_required
 def setSegment(idSegment=None):
     user = User.find(get_jwt_identity())
