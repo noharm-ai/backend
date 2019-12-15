@@ -8,6 +8,8 @@ from config import Config
 from flask_cors import CORS
 from routes.authentication import app_auth
 from routes.outlier import app_out
+from routes.prescription import app_pres
+from routes.segment import app_seg
 
 app = FlaskAPI(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = Config.MYSQL_CONNECTION_STRING
@@ -24,6 +26,8 @@ CORS(app)
 
 app.register_blueprint(app_auth)
 app.register_blueprint(app_out)
+app.register_blueprint(app_pres)
+app.register_blueprint(app_seg)
 
 @app.route("/user/name-url", methods=['GET'])
 @jwt_required
