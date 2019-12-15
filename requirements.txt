@@ -47,3 +47,4 @@ wrapt==1.11.2
 wsgi-request-logger==0.4.6
 zappa==0.48.2
 flask-cors
+psycopg2-binary

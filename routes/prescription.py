@@ -19,6 +19,9 @@ def getPrescriptions():
     )
     db.engine.dispose()
 
+    ## TODO:
+    ## - add lab results
+    ## - add score level counts
     results = []
     for p in patients:
         results.append({
@@ -53,6 +56,8 @@ def getPrescription(idPrescription):
     drugs = PrescriptionDrug.findByPrescription(idPrescription)
     db.engine.dispose()
 
+    ## TODO:
+    ## - add interventions
     pDrugs = []
     for pd in drugs:
         pDrugs.append({

@@ -87,25 +87,3 @@ def getDrugs():
         'status': 'success',
         'data': results
     }, status.HTTP_200_OK
-
-
-@app_out.route('/departments', methods=['GET'])
-@jwt_required
-def getDepartments():
-    user = User.find(get_jwt_identity())
-    setSchema(user.schema)
-    departs = Department.query.all()
-    db.engine.dispose()
-
-    results = []
-    for d in departs:
-        results.append({
-            'idDepartment': d.id,
-            'idHospital': d.idHospital,
-            'name': d.name,
-        })
-
-    return {
-        'status': 'success',
-        'data': results
-    }, status.HTTP_200_OK
