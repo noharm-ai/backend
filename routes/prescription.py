@@ -107,21 +107,24 @@ def getInterventionReasons():
 
 
 @app.route('/intervention', methods=['POST'])
+@app.route('/intervention/<int:idIntervention>', methods=['PUT'])
 @jwt_required
-def createIntervention():
+def createIntervention(idIntervention=None):
     user = User.find(get_jwt_identity())
+    setSchema(user.schema)
     data = request.get_json()
 
-    i = Intervention()
+    if request.method == 'POST':
+        i = Intervention()
+    elif request.method == 'PUT':
+        i = Intervention.query.get(idIntervention)
+
+    i.id = idIntervention
     i.idUser = user.id
     i.idPrescriptionDrug = data.get('idPrescriptionDrug', None)
     i.idInterventionReason = data.get('idInterventionReason', None)
     i.propagation = data.get('propagation', None)
     i.observation = data.get('observation', None)
-
-    #TODO: remover
-    i.idPrescription = 17
-    i.idDrug = 1
 
     try:
         i.save()
@@ -143,5 +146,5 @@ def createIntervention():
 
         return {
             'status': 'error',
-            'message': 'Server exception'
+            'message': str(e)
         }, status.HTTP_500_INTERNAL_SERVER_ERROR
