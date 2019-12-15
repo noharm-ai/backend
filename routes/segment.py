@@ -30,3 +30,54 @@ def getSegments():
         'status': 'success',
         'data': iList
     }, status.HTTP_200_OK
+
+@app.route('/segments', methods=['POST'])
+@app.route('/segments/<int:idSegment>', methods=['PUT'])
+@jwt_required
+def setSegment(idSegment=None):
+    user = User.find(get_jwt_identity())
+    setSchema(user.schema)
+
+    if request.method == 'POST':
+        s = Segment()
+    elif request.method == 'PUT':
+        s = Segment.query.get(idSegment)
+
+    data = request.get_json()
+    if 'description' in data:
+        s.description = data.get('description', None)
+    if 'minAge' in data:
+        s.minAge = data.get('minAge', None)
+    if 'maxAge' in data:
+        s.maxAge = data.get('maxAge', None)
+    if 'minWeight' in data:
+        s.minWeight = data.get('minWeight', None)
+    if 'maxWeight' in data:
+        s.maxWeight = data.get('maxWeight', None)
+    if 'status' in data:
+        s.status = data.get('status', None)
+
+    if request.method == 'POST':
+        db.session.add(s)
+
+    try:
+        db.session.commit()
+
+        return {
+            'status': 'success',
+            'data': s.id
+        }, status.HTTP_200_OK
+    except AssertionError as e:
+        db.engine.dispose()
+
+        return {
+            'status': 'error',
+            'message': str(e)
+        }, status.HTTP_400_BAD_REQUEST
+    except Exception as e:
+        db.engine.dispose()
+
+        return {
+            'status': 'error',
+            'message': str(e)
+        }, status.HTTP_500_INTERNAL_SERVER_ERROR

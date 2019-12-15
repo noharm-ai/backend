@@ -2,8 +2,7 @@ from flask import request, url_for, jsonify
 from flask_api import FlaskAPI, status, exceptions
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager
-from flask_jwt_extended import (create_access_token, create_refresh_token,
-                                jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
+from flask_jwt_extended import (jwt_required)
 from models import db, User
 from config import Config
 from flask_cors import CORS
@@ -22,10 +21,7 @@ db.init_app(app)
 
 CORS(app)
 
-import routes.segment
-import routes.prescription
-import routes.outlier
-import routes.authentication
+from routes import segment, prescription, outlier, authentication
 
 @app.route("/user/name-url", methods=['GET'])
 @jwt_required
