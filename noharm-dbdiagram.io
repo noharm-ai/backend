@@ -80,6 +80,7 @@ Table "prescricao"  [headercolor: #16a085] {
 Table "prescricaoagg"  [headercolor: #16a085] {
   "fkhospital" smallint [default: 1]
   "fksetor" smallint [not null]
+  "idsegmento" smallint [not null]
   "fkmedicamento" bigint [not null]
   "fkunidademedida" varchar(10) [default: NULL]
   "fkfrequencia" integer [default: NULL]
