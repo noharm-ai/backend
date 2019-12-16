@@ -22,12 +22,13 @@ app.config['JWT_REFRESH_TOKEN_EXPIRES'] = Config.JWT_REFRESH_TOKEN_EXPIRES
 
 jwt = JWTManager(app)
 db.init_app(app)
-CORS(app)
 
 app.register_blueprint(app_auth)
 app.register_blueprint(app_out)
 app.register_blueprint(app_pres)
 app.register_blueprint(app_seg)
+
+CORS(app)
 
 @app.route("/user/name-url", methods=['GET'])
 @jwt_required
