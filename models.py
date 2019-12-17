@@ -199,11 +199,12 @@ class PrescriptionDrug(db.Model):
         #    .as_scalar()
 
         return db.session\
-            .query(PrescriptionDrug, Drug, MeasureUnit, Frequency, func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4).label('score'))\
+            .query(PrescriptionDrug, Drug, MeasureUnit, Frequency, Intervention, func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4).label('score'))\
             .join(Outlier, Outlier.id == PrescriptionDrug.idOutlier)\
             .join(Drug, Drug.id == PrescriptionDrug.idDrug)\
             .join(MeasureUnit, MeasureUnit.id == PrescriptionDrug.idMeasureUnit)\
             .join(Frequency, Frequency.id == PrescriptionDrug.idFrequency)\
+            .join(Intervention, Intervention.idPrescriptionDrug == PrescriptionDrug.id)\
             .filter(PrescriptionDrug.idPrescription == idPrescription)\
             .all()
 

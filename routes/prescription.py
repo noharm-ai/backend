@@ -1,5 +1,5 @@
 from flask_api import status
-from models import db, User, Patient, Prescription, PrescriptionDrug, InterventionReason, Intervention, Segment, setSchema
+from models import db, User, Patient, Prescription, PrescriptionDrug, InterventionReason, Intervention, Segment, setSchema, Exams
 from flask import Blueprint, request
 from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
@@ -49,6 +49,13 @@ def getPrescriptions():
     }, status.HTTP_200_OK
 
 
+def getExams(typeExam, idPatient):
+    return db.session.query(Exams.value, Exams.unit)\
+        .select_from(Exams)\
+        .filter(Exams.idPatient == idPatient)\
+        .filter(Exams.typeExam == typeExam)\
+        .order_by(Exams.date.desc()).limit(1).first()
+
 @app_pres.route('/prescriptions/<int:idPrescription>', methods=['GET'])
 @jwt_required
 def getPrescription(idPrescription):
@@ -62,8 +69,10 @@ def getPrescription(idPrescription):
     drugs = PrescriptionDrug.findByPrescription(idPrescription)
     db.engine.dispose()
 
-    ## TODO:
-    ## - add interventions
+    tgo = getExams('TGO', prescription[1].id)
+    tgp = getExams('TGP', prescription[1].id)
+    cr = getExams('CR', prescription[1].id)
+
     pDrugs = []
     for pd in drugs:
         pDrugs.append({
@@ -74,7 +83,14 @@ def getPrescription(idPrescription):
             'measureUnit': pd[2].description,
             'frequency': pd[3].description,
             'route': pd[0].route,
-            'score': str(pd[4])
+            'score': str(pd[5]),
+            'intervention': {
+                'id': pd[4].id,
+                'idPrescriptionDrug': pd[4].idPrescriptionDrug,
+                'idInterventionReason': pd[4].idInterventionReason,
+                'propagation': pd[4].propagation,
+                'observation': pd[4].observation,
+            }
         })
 
     return {
@@ -88,6 +104,11 @@ def getPrescription(idPrescription):
             'gender': prescription[1].gender,
             'weight': prescription[1].weight,
             'race': prescription[1].race,
+            'tgo': str(tgo.value) + ' ' + tgo.unit,
+            'tgp': str(tgp.value) + ' ' + tgp.unit,
+            'mdrd': str(cr.value) + ' ' + cr.unit,
+            'creatinina': str(cr.value) + ' ' + cr.unit,
+            'patientScore': 'High',
             'date': prescription[0].date.isoformat(),
             'daysAgo': prescription[2],
             'prescriptionScore': str(prescription[3]),
