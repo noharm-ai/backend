@@ -12,6 +12,7 @@ app_pres = Blueprint('app_pres',__name__)
 def getPrescriptions():
     user = User.find(get_jwt_identity())
     setSchema(user.schema)
+
     patients = Patient.getPatients(
         name=request.args.get('name'), order=request.args.get('order'),
         direction=request.args.get('direction'), limit=request.args.get('limit'),
@@ -19,9 +20,6 @@ def getPrescriptions():
     )
     db.engine.dispose()
 
-    ## TODO:
-    ## - add lab results
-    ## - add score level counts
     results = []
     for p in patients:
         results.append({
@@ -34,8 +32,16 @@ def getPrescriptions():
             'race': p[1].race,
             'date': p[0].date.isoformat(),
             'daysAgo': p[2],
-            'prescriptionScore': str(p[3])
+            'prescriptionScore': str(p[3]),
+            'scoreOne': str(p[4]),
+            'scoreTwo': str(p[5]),
+            'scoreThree': str(p[6]),
+            'tgo': str(p[7]),
+            'tgp': str(p[8]),
+            'mdrd': str(p[9]),
+            'patientScore': 'High',
         })
+        print(p)
 
     return {
         'status': 'success',

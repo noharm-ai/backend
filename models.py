@@ -3,7 +3,6 @@ from sqlalchemy import func, text, and_, desc, asc
 
 db = SQLAlchemy()
 
-
 def setSchema(schema):
     Prescription.setSchema(schema)
     Patient.setSchema(schema)
@@ -17,14 +16,7 @@ def setSchema(schema):
     Department.setSchema(schema)
     Intervention.setSchema(schema)
     SegmentDepartment.setSchema(schema)
-
-
-def getAggScore():
-    return db.session.query(func.sum(func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4)).label('score'))\
-        .select_from(PrescriptionDrug)\
-        .outerjoin(Outlier, and_(Outlier.id == PrescriptionDrug.idOutlier))\
-        .filter(PrescriptionDrug.idPrescription == Prescription.id)\
-        .as_scalar()
+    Exams.setSchema(schema)
 
 
 class User(db.Model):
@@ -71,6 +63,28 @@ class Prescription(db.Model):
             .filter(Prescription.id == idPrescription)\
             .first()
 
+def getAggScore():
+    return db.session.query(func.sum(func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4)).label('score'))\
+        .select_from(PrescriptionDrug)\
+        .outerjoin(Outlier, and_(Outlier.id == PrescriptionDrug.idOutlier))\
+        .filter(PrescriptionDrug.idPrescription == Prescription.id)\
+        .as_scalar()
+
+def getScoreOne(level):
+    return db.session.query(func.count(func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4)).label('scoreOne'))\
+        .select_from(PrescriptionDrug)\
+        .outerjoin(Outlier, and_(Outlier.id == PrescriptionDrug.idOutlier))\
+        .filter(PrescriptionDrug.idPrescription == Prescription.id)\
+        .filter(func.coalesce(Outlier.manualScore, Outlier.score) == level)\
+        .as_scalar()
+
+def getExams(typeExam):
+    return db.session.query(Exams.value)\
+        .select_from(Exams)\
+        .filter(Exams.idPatient == Prescription.idPatient)\
+        .filter(Exams.typeExam == typeExam)\
+        .order_by(Exams.date.desc()).limit(1)\
+        .as_scalar()
 
 class Patient(db.Model):
     __tablename__ = 'pessoa'
@@ -88,13 +102,20 @@ class Patient(db.Model):
 
     def getPatients(**kwargs):
         score = getAggScore()
+        scoreOne = getScoreOne(1)
+        scoreTwo = getScoreOne(2)
+        scoreThree = getScoreOne(3)
+        tgo = getExams('TGO')
+        tgp = getExams('TGP')
+        cr = getExams('CR')
 
         q = db.session\
             .query(
                 Prescription, Patient,
                 func.trunc((func.extract('epoch', func.current_date(
                 )) - func.extract('epoch', Prescription.date)) / 86400).label('daysAgo'),
-                score.label('score')
+                score.label('score'), scoreOne.label('scoreOne'), scoreTwo.label('scoreTwo'),
+                scoreThree.label('scoreThree'), tgo.label('tgo'), tgp.label('tgp'), cr.label('cr')
             )\
             .join(Patient, Patient.id == Prescription.idPatient)
 
@@ -113,7 +134,8 @@ class Patient(db.Model):
         patientAlias = db.aliased(Patient, q)
 
         wrapper = db.session\
-            .query(prescritionAlias, patientAlias, '"daysAgo"', "score")\
+            .query(prescritionAlias, patientAlias, '"daysAgo"', "score", '"scoreOne"',\
+                     '"scoreTwo"', '"scoreThree"', 'tgo', 'tgp', 'cr')\
 
         order = kwargs.get('order', 'score')
         if (order != 'score'):
@@ -324,7 +346,20 @@ class SegmentDepartment(db.Model):
 
     id = db.Column("idsegmento", db.Integer, primary_key=True)
     idHospital = db.Column("fkhospital", db.Integer, primary_key=True)
-    idDepartment = db.Column("fksetor", db.String, primary_key=True)
+    idDepartment = db.Column("fksetor", db.Integer, primary_key=True)
 
     def setSchema(schema):
         SegmentDepartment.__table__.schema = schema
+
+class Exams(db.Model):
+    __tablename__ = 'exame'
+
+    idExame = db.Column("fkexame", db.Integer, nullable=False)
+    idPatient = db.Column("fkpessoa", db.Integer, primary_key=True)
+    date = db.Column("dtexame", db.DateTime, nullable=False)
+    typeExam = db.Column("tpexame", db.String, nullable=False)
+    value = db.Column("valor", db.Float, nullable=False)
+    unit = db.Column("unidade", db.String, nullable=True)
+
+    def setSchema(schema):
+        Exams.__table__.schema = schema
