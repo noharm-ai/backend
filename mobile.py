@@ -10,9 +10,10 @@ from routes.authentication import app_auth
 from routes.outlier import app_out
 from routes.prescription import app_pres
 from routes.segment import app_seg
+from routes.outlier_generate import app_gen
 
 app = FlaskAPI(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = Config.MYSQL_CONNECTION_STRING
+app.config['SQLALCHEMY_DATABASE_URI'] = Config.POTGRESQL_CONNECTION_STRING
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_POOL_RECYCLE'] = 299
 app.config['SQLALCHEMY_POOL_TIMEOUT'] = 20
@@ -27,6 +28,7 @@ app.register_blueprint(app_auth)
 app.register_blueprint(app_out)
 app.register_blueprint(app_pres)
 app.register_blueprint(app_seg)
+app.register_blueprint(app_gen)
 
 CORS(app)
 
