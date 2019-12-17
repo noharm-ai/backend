@@ -1,5 +1,5 @@
 from flask_api import status
-from models import db, User, Patient, Prescription, PrescriptionDrug, InterventionReason, Intervention, Segment, setSchema
+from models import db, User, Patient, Prescription, PrescriptionDrug, InterventionReason, Intervention, Segment, setSchema, SegmentDepartment, Department
 from flask import Blueprint, request
 from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
@@ -31,6 +31,38 @@ def getSegments():
         'data': iList
     }, status.HTTP_200_OK
 
+@app_seg.route("/segments/<int:idSegment>", methods=['GET'])
+@jwt_required
+def getSegmentsId(idSegment):
+    user = User.find(get_jwt_identity())
+    setSchema(user.schema)
+    
+    s = Segment.query.get(idSegment)
+    departments = SegmentDepartment.query\
+        .filter(SegmentDepartment.id == idSegment)\
+        .all()
+
+    deps = []
+    for d in departments:
+        deps.append({
+            'idHospital': d.idHospital,
+            'idDepartment': d.idDeparment
+        })
+
+    return {
+        'status': 'success',
+        'data': {
+            'id': s.id,
+            'description': s.description,
+            'minAge': s.minAge,
+            'maxAge': s.maxAge,
+            'minWeight': s.minWeight,
+            'maxWeight': s.maxWeight,
+            'status': s.status,
+            'departments': deps
+        }
+    }, status.HTTP_200_OK
+
 @app_seg.route('/segments', methods=['POST'])
 @app_seg.route('/segments/<int:idSegment>', methods=['PUT'])
 @jwt_required
@@ -42,6 +74,8 @@ def setSegment(idSegment=None):
         s = Segment()
     elif request.method == 'PUT':
         s = Segment.query.get(idSegment)
+
+    db.session.query(SegmentDepartment).filter(SegmentDepartment.id == idSegment).delete()
 
     data = request.get_json()
     if 'description' in data:
@@ -56,6 +90,14 @@ def setSegment(idSegment=None):
         s.maxWeight = data.get('maxWeight', None)
     if 'status' in data:
         s.status = data.get('status', None)
+
+    deps = data.get('departments', None)
+    for d in deps:
+        sd = SegmentDepartment()
+        sd.id = idSegment
+        sd.idHospital = d.get('idHospital', None)
+        sd.idDepartment = d.get('idDepartment', None)
+        db.session.add(sd)
 
     if request.method == 'POST':
         db.session.add(s)
@@ -87,6 +129,7 @@ def setSegment(idSegment=None):
 def getDepartments():
     user = User.find(get_jwt_identity())
     setSchema(user.schema)
+    
     departs = Department.query.all()
     db.engine.dispose()
 

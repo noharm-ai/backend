@@ -26,10 +26,23 @@ INSERT INTO demo.hospital (fkhospital, nome) VALUES
 						(1, 'Hospital Demonstração');
 
 INSERT INTO demo.setor (fksetor, nome) VALUES
-						(1, 'Setor Adulto');
+						(1, 'Setor Adulto 1'),
+						(2, 'Setor Adulto 2'),
+						(3, 'Setor Adulto 3'),
+						(4, 'Setor Pediatrico 1'),
+						(5, 'Setor Pediatrico 2'),
+						(6, 'Setor Pediatrico 3'),
+						(7, 'Setor UTI 1'),
+						(8, 'Setor UTI 2'),
+						(9, 'Setor UTI 3');
 
 INSERT INTO demo.segmento (nome) VALUES
 						('Segmento Adulto');
+
+INSERT INTO demo.segmentosetor (idsegmento, fkhospital, fksetor) VALUES
+								(1,1,1),
+								(1,1,2),
+								(1,1,3);
 
 INSERT INTO demo.unidademedida (fkunidademedida, nome) VALUES
 							(1, 'mg'),

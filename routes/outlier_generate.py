@@ -2,7 +2,7 @@ import gzip, requests
 from flask_api import status
 from flask import Blueprint, request
 from multiprocessing import Process
-from models import db
+from models import db, User
 from flask_jwt_extended import (jwt_required)
 from config import Config
 
@@ -35,6 +35,7 @@ def compute_outlier(val,idSegment,schema):
 @jwt_required
 def generateOutliers(idSegment):
     user = User.find(get_jwt_identity())
+    setSchema(user.schema)
 
     processes = []
     for i in range(1,15):

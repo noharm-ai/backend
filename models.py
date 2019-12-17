@@ -16,6 +16,7 @@ def setSchema(schema):
     Segment.setSchema(schema)
     Department.setSchema(schema)
     Intervention.setSchema(schema)
+    SegmentDepartment.setSchema(schema)
 
 
 def getAggScore():
@@ -317,3 +318,13 @@ class Department(db.Model):
 
     def setSchema(schema):
         Department.__table__.schema = schema
+
+class SegmentDepartment(db.Model):
+    __tablename__ = 'segmentosetor'
+
+    id = db.Column("idsegmento", db.Integer, primary_key=True)
+    idHospital = db.Column("fkhospital", db.Integer, primary_key=True)
+    idDepartment = db.Column("fksetor", db.String, primary_key=True)
+
+    def setSchema(schema):
+        SegmentDepartment.__table__.schema = schema
