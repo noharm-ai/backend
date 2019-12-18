@@ -49,3 +49,4 @@ flask-cors
 psycopg2-binary
 pytest
 pytest-flask
+mock

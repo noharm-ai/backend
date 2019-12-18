@@ -2,7 +2,7 @@ from flask import request, url_for, jsonify
 from flask_api import FlaskAPI, status, exceptions
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager
-from flask_jwt_extended import (jwt_required)
+from flask_jwt_extended import (jwt_required, get_jwt_identity)
 from models import db, User
 from config import Config
 from flask_cors import CORS
