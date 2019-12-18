@@ -145,3 +145,28 @@ def getDepartments():
         'status': 'success',
         'data': results
     }, status.HTTP_200_OK
+
+@app_seg.route('/departments/free', methods=['GET'])
+@jwt_required
+def getFreeDepartments():
+    user = User.find(get_jwt_identity())
+    setSchema(user.schema)
+    
+    departs = Department.query\
+                .outerjoin(SegmentDepartment, SegmentDepartment.idDepartment == Department.id)\
+                .filter(SegmentDepartment.id == None)\
+                .all()
+    db.engine.dispose()
+
+    results = []
+    for d in departs:
+        results.append({
+            'idDepartment': d.id,
+            'idHospital': d.idHospital,
+            'name': d.name,
+        })
+
+    return {
+        'status': 'success',
+        'data': results
+    }, status.HTTP_200_OK

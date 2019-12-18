@@ -61,6 +61,7 @@ def getExams(typeExam, idPatient):
 def getPrescription(idPrescription):
     user = User.find(get_jwt_identity())
     setSchema(user.schema)
+    
     prescription = Prescription.getPrescription(idPrescription)
 
     if (prescription is None):
@@ -90,7 +91,7 @@ def getPrescription(idPrescription):
                 'idInterventionReason': pd[4].idInterventionReason,
                 'propagation': pd[4].propagation,
                 'observation': pd[4].observation,
-            }
+            } if pd[4] is not None else ''
         })
 
     return {
@@ -104,9 +105,9 @@ def getPrescription(idPrescription):
             'gender': prescription[1].gender,
             'weight': prescription[1].weight,
             'race': prescription[1].race,
-            'tgo': str(tgo.value) + ' ' + tgo.unit,
-            'tgp': str(tgp.value) + ' ' + tgp.unit,
-            'mdrd': str(cr.value) + ' ' + cr.unit,
+            'tgo': str(tgo.value) + ' ' + tgo.unit if tgo is not None else '',
+            'tgp': str(tgp.value) + ' ' + tgp.unit if tgp is not None else '',
+            'mdrd': str(cr.value) + ' ' + cr.unit if cr is not None else '',
             'creatinina': str(cr.value) + ' ' + cr.unit,
             'patientScore': 'High',
             'date': prescription[0].date.isoformat(),
