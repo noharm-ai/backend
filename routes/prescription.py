@@ -108,7 +108,7 @@ def getPrescription(idPrescription):
             'tgo': str(tgo.value) + ' ' + tgo.unit if tgo is not None else '',
             'tgp': str(tgp.value) + ' ' + tgp.unit if tgp is not None else '',
             'mdrd': str(cr.value) + ' ' + cr.unit if cr is not None else '',
-            'creatinina': str(cr.value) + ' ' + cr.unit,
+            'creatinina': str(cr.value) + ' ' + cr.unit if cr is not None else '',
             'patientScore': 'High',
             'date': prescription[0].date.isoformat(),
             'daysAgo': prescription[2],
