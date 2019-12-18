@@ -339,6 +339,9 @@ class Department(db.Model):
     idHospital = db.Column("fkhospital", db.Integer, nullable=False)
     name = db.Column("nome", db.String, nullable=False)
 
+    def getAll():
+        return Department.query.all()
+
     def setSchema(schema):
         Department.__table__.schema = schema
 

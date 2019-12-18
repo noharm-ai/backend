@@ -130,7 +130,7 @@ def getDepartments():
     user = User.find(get_jwt_identity())
     setSchema(user.schema)
     
-    departs = Department.query.all()
+    departs = Department.getAll()
     db.engine.dispose()
 
     results = []
