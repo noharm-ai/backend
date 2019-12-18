@@ -61,7 +61,7 @@ def getExams(typeExam, idPatient):
 def getPrescription(idPrescription):
     user = User.find(get_jwt_identity())
     setSchema(user.schema)
-    
+
     prescription = Prescription.getPrescription(idPrescription)
 
     if (prescription is None):
@@ -166,6 +166,39 @@ def createIntervention(idIntervention=None):
         return {
             'status': 'success',
             'data': i.id
+        }, status.HTTP_200_OK
+    except AssertionError as e:
+        db.engine.dispose()
+
+        return {
+            'status': 'error',
+            'message': str(e)
+        }, status.HTTP_400_BAD_REQUEST
+    except Exception as e:
+        db.engine.dispose()
+
+        return {
+            'status': 'error',
+            'message': str(e)
+        }, status.HTTP_500_INTERNAL_SERVER_ERROR
+
+@app_pres.route('/prescriptions/<int:idPrescription>', methods=['PUT'])
+@jwt_required
+def setPrescriptionStatus(idPrescription):
+    user = User.find(get_jwt_identity())
+    setSchema(user.schema)
+
+    data = request.get_json()
+
+    p = Prescription.query.get(idPrescription)
+    p.status = data.get('status', None)
+
+    try:
+        db.session.commit()
+
+        return {
+            'status': 'success',
+            'data': p.id
         }, status.HTTP_200_OK
     except AssertionError as e:
         db.engine.dispose()
