@@ -25,7 +25,6 @@ lazy-object-proxy==1.4.2
 MarkupSafe==1.1.1
 mccabe==0.6.1
 mysqlclient==1.4.4
-pkg-resources==0.0.0
 placebo==0.9.0
 PyJWT==1.7.1
 pylint==2.3.1
