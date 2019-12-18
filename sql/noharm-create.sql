@@ -81,8 +81,6 @@ CREATE TABLE demo."presmed" (
   "fkmedicamento" integer NOT NULL,
   "fkunidademedida" varchar(10) DEFAULT NULL,
   "fkfrequencia" integer DEFAULT NULL,
-  "fkhospital" integer DEFAULT NULL,
-  "fksetor" integer DEFAULT NULL,
   "idsegmento" smallint DEFAULT NULL,
   "idoutlier" integer DEFAULT NULL,
   "dose" float DEFAULT NULL,

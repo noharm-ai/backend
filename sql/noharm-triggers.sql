@@ -19,9 +19,8 @@ AS $BODY$BEGIN
         AND o.frequenciadia = NEW.frequenciadia
     );
     NEW.idsegmento = (
-        SELECT s.idsegmento FROM segmentosetor s
-        WHERE s.fksetor = NEW.fksetor
-        AND s.fkhospital = NEW.fkhospital
+        SELECT p.idsegmento FROM demo.prescricao p
+        WHERE p.fkprescricao = NEW.fkprescricao
     );
     RETURN NEW;
 END;$BODY$;
@@ -50,7 +49,7 @@ AS $BODY$BEGIN
                                 WHERE o.idoutlier = pm.idoutlier);
     END IF;
     NEW.idsegmento = (
-        SELECT s.idsegmento FROM segmentosetor s
+        SELECT s.idsegmento FROM demo.segmentosetor s
         WHERE s.fksetor = NEW.fksetor
         AND s.fkhospital = NEW.fkhospital
     );
@@ -75,11 +74,11 @@ CREATE FUNCTION demo.complete_prescricaoagg()
     VOLATILE NOT LEAKPROOF
 AS $BODY$BEGIN
     NEW.frequenciadia := (
-        SELECT f.frequenciadia FROM frequencia f
+        SELECT f.frequenciadia FROM demo.frequencia f
         WHERE f.fkfrequencia = NEW.fkfrequencia
     );
     NEW.idsegmento = (
-        SELECT s.idsegmento FROM segmentosetor s
+        SELECT s.idsegmento FROM demo.segmentosetor s
         WHERE s.fksetor = NEW.fksetor
         AND s.fkhospital = NEW.fkhospital
     );
@@ -126,7 +125,7 @@ CREATE FUNCTION demo.popula_predmed_by_outlier()
     COST 100
     VOLATILE NOT LEAKPROOF
 AS $BODY$BEGIN
-    UPDATE presmed pm
+    UPDATE demo.presmed pm
         SET pm.idoutlier = (
             SELECT o.idoutlier FROM demo.outlier o 
             WHERE o.fkmedicamento = pm.fkmedicamento
@@ -154,7 +153,7 @@ CREATE FUNCTION demo.popula_presmed_by_frequencia()
     COST 100
     VOLATILE NOT LEAKPROOF
 AS $BODY$BEGIN
-    UPDATE presmed pm
+    UPDATE demo.presmed pm
         SET pm.frequenciadia = (
             SELECT f.frequenciadia FROM demo.frequencia f 
             WHERE o.fkfrequencia = pm.fkfrequencia
@@ -180,21 +179,21 @@ CREATE FUNCTION demo.popula_prescricaoagg_by_segmento()
     COST 100
     VOLATILE NOT LEAKPROOF
 AS $BODY$BEGIN
-    UPDATE presmed pm
+    UPDATE demo.presmed pm
         SET pm.idsegmento = (
             SELECT s.idsegmento FROM segmentosetor s
             WHERE s.fksetor = pm.fksetor
             AND s.fkhospital = pm.fkhospital
         )
     WHERE pm.escorefinal IS NULL;
-    UPDATE prescricao p
+    UPDATE demo.prescricao p
         SET p.idsegmento = (
             SELECT s.idsegmento FROM segmentosetor s
             WHERE s.fksetor = p.fksetor
             AND s.fkhospital = p.fkhospital
         )
     WHERE p.status IS NULL;
-    UPDATE prescricaoagg pa
+    UPDATE demo.prescricaoagg pa
         SET pa.idsegmento = (
             SELECT s.idsegmento FROM segmentosetor s
             WHERE s.fksetor = pa.fksetor
