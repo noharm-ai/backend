@@ -1,4 +1,5 @@
 # mobile-api
+[![Build Status](https://travis-ci.org/noharm-ai/mobile-api.svg?branch=master)](https://travis-ci.org/noharm-ai/mobile-api)
 
 Api for Mobile App
 
