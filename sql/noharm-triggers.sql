@@ -9,14 +9,15 @@ CREATE FUNCTION demo.complete_presmed()
     VOLATILE NOT LEAKPROOF
 AS $BODY$BEGIN
     NEW.frequenciadia := (
-        SELECT f.frequenciadia FROM frequencia f
+        SELECT f.frequenciadia FROM demo.frequencia f
         WHERE f.fkfrequencia = NEW.fkfrequencia
     );
     NEW.idoutlier := (
-        SELECT o.idoutlier FROM demo.outlier o 
+        SELECT MAX(o.idoutlier) FROM demo.outlier o 
         WHERE o.fkmedicamento = NEW.fkmedicamento
         AND o.dose = NEW.dose
         AND o.frequenciadia = NEW.frequenciadia
+        AND o.idsegmento = NEW.idsegmento
     );
     NEW.idsegmento = (
         SELECT p.idsegmento FROM demo.prescricao p
@@ -29,7 +30,7 @@ ALTER FUNCTION demo.complete_presmed()
     OWNER TO postgres;
 
 CREATE TRIGGER trg_complete_presmed
-    BEFORE INSERT OR UPDATE 
+    BEFORE INSERT 
     ON demo.presmed
     FOR EACH ROW
     EXECUTE PROCEDURE demo.complete_presmed();
@@ -60,7 +61,7 @@ ALTER FUNCTION demo.complete_prescricao()
     OWNER TO postgres;
 
 CREATE TRIGGER trg_complete_prescricao
-    BEFORE INSERT OR UPDATE 
+    BEFORE INSERT 
     ON demo.prescricao
     FOR EACH ROW
     EXECUTE PROCEDURE demo.complete_prescricao();
@@ -89,7 +90,7 @@ ALTER FUNCTION demo.complete_prescricaoagg()
     OWNER TO postgres;
 
 CREATE TRIGGER trg_complete_prescricaoagg
-    BEFORE INSERT OR UPDATE 
+    BEFORE INSERT 
     ON demo.prescricaoagg
     FOR EACH ROW
     EXECUTE PROCEDURE demo.complete_prescricaoagg();
@@ -110,7 +111,7 @@ ALTER FUNCTION demo.complete_frequencia()
     OWNER TO postgres;
 
 CREATE TRIGGER trg_complete_frequencia
-    BEFORE INSERT OR UPDATE 
+    BEFORE INSERT 
     ON demo.frequencia
     FOR EACH ROW
     EXECUTE PROCEDURE demo.complete_frequencia();
@@ -119,31 +120,32 @@ CREATE TRIGGER trg_complete_frequencia
 -------- UPDATE CHILD TABLES --------
 -------------------------------------
 
-CREATE FUNCTION demo.popula_predmed_by_outlier()
+CREATE FUNCTION demo.popula_presmed_by_outlier()
     RETURNS trigger
     LANGUAGE 'plpgsql'
     COST 100
     VOLATILE NOT LEAKPROOF
 AS $BODY$BEGIN
     UPDATE demo.presmed pm
-        SET pm.idoutlier = (
-            SELECT o.idoutlier FROM demo.outlier o 
+        SET idoutlier = (
+            SELECT MAX(o.idoutlier) FROM demo.outlier o 
             WHERE o.fkmedicamento = pm.fkmedicamento
             AND o.dose = pm.dose
             AND o.frequenciadia = pm.frequenciadia
+            AND o.idsegmento = pm.idsegmento
         )
-    WHERE pm.escorefinal IS NULL;
+    WHERE escorefinal IS NULL;
     RETURN NULL;
 END;$BODY$;
 
-ALTER FUNCTION demo.popula_predmed_by_outlier()
+ALTER FUNCTION demo.popula_presmed_by_outlier()
     OWNER TO postgres;
 
 CREATE TRIGGER trg_popula_presmed_by_outlier
-    AFTER INSERT OR UPDATE 
+    AFTER INSERT 
     ON demo.outlier
     FOR EACH ROW
-    EXECUTE PROCEDURE demo.popula_predmed_by_outlier();
+    EXECUTE PROCEDURE demo.popula_presmed_by_outlier();
 
 --------
 
@@ -166,7 +168,7 @@ ALTER FUNCTION demo.popula_presmed_by_frequencia()
     OWNER TO postgres;
 
 CREATE TRIGGER trg_popula_presmed_by_frequencia
-    AFTER INSERT OR UPDATE 
+    AFTER INSERT 
     ON demo.frequencia
     FOR EACH ROW
     EXECUTE PROCEDURE demo.popula_presmed_by_frequencia();
@@ -181,21 +183,21 @@ CREATE FUNCTION demo.popula_prescricaoagg_by_segmento()
 AS $BODY$BEGIN
     UPDATE demo.presmed pm
         SET pm.idsegmento = (
-            SELECT s.idsegmento FROM segmentosetor s
+            SELECT s.idsegmento FROM demo.segmentosetor s
             WHERE s.fksetor = pm.fksetor
             AND s.fkhospital = pm.fkhospital
         )
     WHERE pm.escorefinal IS NULL;
     UPDATE demo.prescricao p
         SET p.idsegmento = (
-            SELECT s.idsegmento FROM segmentosetor s
+            SELECT s.idsegmento FROM demo.segmentosetor s
             WHERE s.fksetor = p.fksetor
             AND s.fkhospital = p.fkhospital
         )
     WHERE p.status IS NULL;
     UPDATE demo.prescricaoagg pa
         SET pa.idsegmento = (
-            SELECT s.idsegmento FROM segmentosetor s
+            SELECT s.idsegmento FROM demo.segmentosetor s
             WHERE s.fksetor = pa.fksetor
             AND s.fkhospital = pa.fkhospital
         );
