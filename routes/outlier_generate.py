@@ -36,9 +36,9 @@ def compute_outlier(idDrug, idSegment, schema):
     with gzip.GzipFile(fileobj=gz_buffer, mode='wb') as zipped:
         cursor.copy_expert(outputquery, zipped)
 
-    url = Config.DDC_API_URL + 'score'
+    url = Config.DDC_API_URL + '/score'
     files = {'file': gz_buffer.getvalue()}
-    data = {'userid':'hospital'}
+    data = {'userid':'1'}
 
     r = requests.post(url, files=files, data=data)
 
@@ -61,11 +61,9 @@ def compute_outlier(idDrug, idSegment, schema):
     db.session.commit()
 
 @app_gen.route("/segments/<int:idSegment>/outliers/generate", methods=['GET'])
-#@jwt_required
+@jwt_required
 def generateOutliers(idSegment):
-    #user = User.find(get_jwt_identity())
-    user = User()
-    user.schema = 'demo'
+    user = User.find(get_jwt_identity())
     setSchema(user.schema)
 
     processes = []
