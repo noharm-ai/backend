@@ -41,7 +41,7 @@ def generateOutliers(idSegment):
     conn = db.engine.raw_connection()
     cursor = conn.cursor()
 
-    print('Starting...', user.schema, idSegment)
+    print('Init Schema:', user.schema, 'Segment:', idSegment)
 
     query = "INSERT INTO " + user.schema + ".outlier (idsegmento, fkmedicamento, dose, frequenciadia, contagem) \
             SELECT idsegmento, fkmedicamento, dose, frequenciadia, SUM(contagem) \
@@ -81,12 +81,12 @@ def generateOutliers(idSegment):
 
     outliers = Outlier.query.filter(Outlier.idSegment == idSegment).all()
 
-    print('Appending...', user.schema, idSegment)
+    print('Appending Schema:', user.schema, 'Segment:', idSegment)
     new_os = pd.DataFrame()
     for drug in poolDict:
         new_os = new_os.append(poolDict[drug])
 
-    print('Updating...', user.schema, idSegment)
+    print('Updating Schema:', user.schema, 'Segment:', idSegment)
     for o in outliers:
         no = new_os[(new_os['medication']==o.idDrug) & 
                     (new_os['dose']==o.dose) &
@@ -95,7 +95,7 @@ def generateOutliers(idSegment):
             o.score = no['score'].values[0]
             o.countNum = int(no['count'].values[0])
 
-    print('Commiting...', user.schema, idSegment)
+    print('Commiting Schema:', user.schema, 'Segment:', idSegment)
     db.session.commit()
 
     return {
