@@ -1,3 +1,4 @@
+import random
 from flask_api import status
 from models import db, User, Patient, Prescription, PrescriptionDrug, InterventionReason, Intervention, Segment, setSchema, Exams
 from flask import Blueprint, request
@@ -29,7 +30,7 @@ def getPrescriptions():
             'birthdate': p[1].birthdate.isoformat(),
             'gender': p[1].gender,
             'weight': p[1].weight,
-            'race': p[1].race,
+            'skinColor': p[1].skinColor,
             'date': p[0].date.isoformat(),
             'daysAgo': p[2],
             'prescriptionScore': str(p[3]),
@@ -39,9 +40,9 @@ def getPrescriptions():
             'tgo': str(p[7]),
             'tgp': str(p[8]),
             'mdrd': str(p[9]),
-            'patientScore': 'High',
+            'patientScore': 'Alto',
+            'class': random.choice(['green','yellow','red'])
         })
-        print(p)
 
     return {
         'status': 'success',
@@ -98,13 +99,15 @@ def getPrescription(idPrescription):
         'status': 'success',
         'data': {
             'idPrescription': prescription[0].id,
+            'idSegment': prescription[0].idSegment,
             'idPatient': prescription[1].id,
             'name': prescription[1].admissionNumber,
             'admissionNumber': prescription[1].admissionNumber,
             'birthdate': prescription[1].birthdate.isoformat(),
             'gender': prescription[1].gender,
             'weight': prescription[1].weight,
-            'race': prescription[1].race,
+            'class': random.choice(['green','yellow','red']),
+            'skinColor': prescription[1].skinColor,
             'tgo': str(tgo.value) + ' ' + tgo.unit if tgo is not None else '',
             'tgp': str(tgp.value) + ' ' + tgp.unit if tgp is not None else '',
             'mdrd': str(cr.value) + ' ' + cr.unit if cr is not None else '',

@@ -95,7 +95,7 @@ class Patient(db.Model):
     birthdate = db.Column('dtnascimento', db.DateTime, nullable=True)
     gender = db.Column('sexo', db.String(1), nullable=True)
     weight = db.Column('peso', db.Integer, nullable=True)
-    race = db.Column('cor', db.String, nullable=True)
+    skinColor = db.Column('cor', db.String, nullable=True)
 
     def setSchema(schema):
         Patient.__table__.schema = schema
