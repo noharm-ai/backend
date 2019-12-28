@@ -10,7 +10,7 @@ from sqlalchemy import distinct, func
 from math import ceil
 
 app_gen = Blueprint('app_gen',__name__)
-fold_size = 7
+fold_size = 50
 
 def compute_outlier(idDrug, drugsItem, poolDict, fold):
     print('Starting...', fold, idDrug)
@@ -35,6 +35,11 @@ def compute_outlier(idDrug, drugsItem, poolDict, fold):
     print('End...', fold, idDrug)
 
 
+def call_outlier(idSegment, fold, header):
+    url = Config.SELF_API_URL + "/segments/" + str(int(idSegment)) + "/outliers/generate/fold/" + str(fold)
+    print('Calling: ',url)
+    r = requests.get(url, headers=header)
+
 @app_gen.route("/segments/<int:idSegment>/outliers/generate", methods=['GET'])
 @jwt_required
 def callOutliers(idSegment):
@@ -50,7 +55,7 @@ def callOutliers(idSegment):
     print('Init Schema:', user.schema, 'Segment:', idSegment)
 
     query = "INSERT INTO " + user.schema + ".outlier (idsegmento, fkmedicamento, dose, frequenciadia, contagem)\
-            SELECT idsegmento, fkmedicamento, dose, frequenciadia, SUM(contagem)\
+            SELECT idsegmento, fkmedicamento, round(dose*100)/100 as dose, frequenciadia, SUM(contagem)\
             FROM " + user.schema + ".prescricaoagg\
             WHERE idsegmento = " + str(int(idSegment)) + "\
             GROUP BY idsegmento, fkmedicamento, dose, frequenciadia\
@@ -66,10 +71,16 @@ def callOutliers(idSegment):
     folds = ceil(totalCount / fold_size)
     print('Total Count:', totalCount, folds)
 
+    processes = []
     for fold in range(1,folds+1):
-        url = Config.SELF_API_URL + "/segments/" + str(int(idSegment)) + "/outliers/generate/fold/" + str(fold)
-        print('Calling: ',url)
-        r = requests.get(url, headers=header)
+        process = Process(target=call_outlier, args=(idSegment, fold, header,))
+        processes.append(process)
+
+    for process in processes:
+        process.start()
+
+    for process in processes:
+        process.join()
 
     return {
         'status': 'success'
@@ -84,18 +95,16 @@ def generateOutliers(idSegment,fold):
     conn = db.engine.raw_connection()
     cursor = conn.cursor()
 
-    query = "SELECT fkmedicamento as medication, dose, frequenciadia as frequency, SUM(contagem) as count \
-          FROM " + user.schema + ".prescricaoagg \
+    query = "SELECT fkmedicamento as medication, dose, frequenciadia as frequency, contagem as count \
+          FROM " + user.schema + ".outlier \
           WHERE idsegmento = " + str(int(idSegment)) + " \
-          GROUP BY fkmedicamento, dose, frequenciadia\
-          ORDER BY fkmedicamento\
-          LIMIT " + str(fold_size) + " OFFSET " + str((fold-1)*fold_size)
+          AND fkmedicamento IN (\
+              SELECT fkmedicamento FROM " + user.schema + ".outlier\
+              GROUP BY fkmedicamento\
+              ORDER BY fkmedicamento ASC\
+              LIMIT " + str(fold_size) + " OFFSET " + str((fold-1)*fold_size) + ")"
 
     print(query)
-
-    return {
-        'status': 'success'
-    }, status.HTTP_200_OK
 
     outputquery = "COPY ({0}) TO STDOUT WITH CSV HEADER".format(query)
 
@@ -121,14 +130,13 @@ def generateOutliers(idSegment,fold):
 
     outliers = Outlier.query.filter(Outlier.idSegment == idSegment).all()
 
-    print('Appending Schema:', user.schema, 'Segment:', idSegment, 'Fold:', fold)
     new_os = pd.DataFrame()
+    print('Appending Schema:', user.schema, 'Segment:', idSegment, 'Fold:', fold)
     if Config.DDC_API_URL != None:
         for drug in poolDict:
             new_os = new_os.append(poolDict[drug])
 
     print('Updating Schema:', user.schema, 'Segment:', idSegment, 'Fold:', fold)
-
     if Config.DDC_API_URL != None:
         for o in outliers:
             no = new_os[(new_os['medication']==o.idDrug) & 
