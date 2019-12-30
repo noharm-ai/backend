@@ -46,7 +46,7 @@ def getSegmentsId(idSegment):
     for d in departments:
         deps.append({
             'idHospital': d.idHospital,
-            'idDepartment': d.idDeparment
+            'idDepartment': d.idDepartment
         })
 
     return {
