@@ -46,7 +46,8 @@ def getSegmentsId(idSegment):
     for d in departments:
         deps.append({
             'idHospital': d.idHospital,
-            'idDepartment': d.idDepartment
+            'idDepartment': d.idDepartment,
+            'name': d.name,
         })
 
     return {
@@ -91,6 +92,13 @@ def setSegment(idSegment=None):
     if 'status' in data:
         s.status = data.get('status', None)
 
+    if request.method == 'POST':
+        db.session.add(s)
+        db.session.commit()
+
+    print(s.id)
+
+    idSegment = s.id
     deps = data.get('departments', None)
     for d in deps:
         sd = SegmentDepartment()
@@ -98,9 +106,6 @@ def setSegment(idSegment=None):
         sd.idHospital = d.get('idHospital', None)
         sd.idDepartment = d.get('idDepartment', None)
         db.session.add(sd)
-
-    if request.method == 'POST':
-        db.session.add(s)
 
     try:
         db.session.commit()
