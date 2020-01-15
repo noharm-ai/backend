@@ -96,8 +96,6 @@ def setSegment(idSegment=None):
         db.session.add(s)
         db.session.commit()
 
-    print(s.id)
-
     idSegment = s.id
     deps = data.get('departments', None)
     for d in deps:
