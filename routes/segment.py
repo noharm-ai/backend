@@ -38,15 +38,16 @@ def getSegmentsId(idSegment):
     setSchema(user.schema)
     
     s = Segment.query.get(idSegment)
-    departments = SegmentDepartment.query\
-        .filter(SegmentDepartment.id == idSegment)\
-        .all()
+    departments = Department.query\
+                .outerjoin(SegmentDepartment, SegmentDepartment.idDepartment == Department.id)\
+                .filter(SegmentDepartment.id == idSegment)\
+                .all()
 
     deps = []
     for d in departments:
         deps.append({
             'idHospital': d.idHospital,
-            'idDepartment': d.idDepartment,
+            'idDepartment': d.id,
             'name': d.name,
         })
 
