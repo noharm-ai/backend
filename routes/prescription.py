@@ -37,9 +37,17 @@ def getPrescriptions():
             'scoreOne': str(p[4]),
             'scoreTwo': str(p[5]),
             'scoreThree': str(p[6]),
+            'am': 0,
+            'av': 0,
+            'tube': 0,
+            'controlled': 0,
             'tgo': str(p[7]),
             'tgp': str(p[8]),
             'mdrd': str(p[9]),
+            'cg': 0,
+            'k': 0,
+            'na': 0,
+            'rni': 0,
             'patientScore': 'Alto',
             'class': random.choice(['green','yellow','red'])
         })
