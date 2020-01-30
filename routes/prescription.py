@@ -41,6 +41,7 @@ def getPrescriptions():
             'av': 0,
             'tube': 0,
             'controlled': 0,
+            'diff': 0,
             'tgo': str(p[7]),
             'tgp': str(p[8]),
             'mdrd': str(p[9]),
