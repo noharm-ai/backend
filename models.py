@@ -362,7 +362,7 @@ class Exams(db.Model):
     idPatient = db.Column("fkpessoa", db.Integer, primary_key=True)
     date = db.Column("dtexame", db.DateTime, nullable=False)
     typeExam = db.Column("tpexame", db.String, nullable=False)
-    value = db.Column("valor", db.Float, nullable=False)
+    value = db.Column("resultado", db.Float, nullable=False)
     unit = db.Column("unidade", db.String, nullable=True)
 
     def setSchema(schema):

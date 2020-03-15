@@ -50,7 +50,8 @@ def getPrescriptions():
             'na': 0,
             'rni': 0,
             'patientScore': 'Alto',
-            'class': random.choice(['green','yellow','red'])
+            'class': random.choice(['green','yellow','red']),
+            'status': p[0].status,
         })
 
     return {
@@ -125,7 +126,8 @@ def getPrescription(idPrescription):
             'date': prescription[0].date.isoformat(),
             'daysAgo': prescription[2],
             'prescriptionScore': str(prescription[3]),
-            'prescription': pDrugs
+            'prescription': pDrugs,
+            'status': prescription[0].status,
         }
     }, status.HTTP_200_OK
 

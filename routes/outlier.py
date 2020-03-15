@@ -13,6 +13,7 @@ def getOutliers(idSegment=1, idDrug=1):
     setSchema(user.schema)
     outliers = Outlier.query\
         .filter(Outlier.idSegment == idSegment, Outlier.idDrug == idDrug)\
+        .order_by(Outlier.countNum.desc())\
         .all()
     db.engine.dispose()
 
