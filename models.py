@@ -43,6 +43,7 @@ class Prescription(db.Model):
 
     id = db.Column("fkprescricao", db.Integer, primary_key=True)
     idPatient = db.Column("fkpessoa", db.Integer, nullable=False)
+    admissionNumber = db.Column('nratendimento', db.Integer, nullable=True)
     idHospital = db.Column("fkhospital", db.Integer, nullable=False)
     idSegment = db.Column("idsegmento", db.Integer, nullable=False)
     date = db.Column("dtprescricao", db.DateTime, nullable=False)
@@ -118,7 +119,7 @@ class Patient(db.Model):
                 score.label('score'), scoreOne.label('scoreOne'), scoreTwo.label('scoreTwo'),
                 scoreThree.label('scoreThree'), tgo.label('tgo'), tgp.label('tgp'), cr.label('cr')
             )\
-            .join(Patient, Patient.id == Prescription.idPatient)
+            .join(Patient, Patient.admissionNumber == Prescription.admissionNumber)
 
         name = kwargs.get('name', None)
         if (not(name is None)):
@@ -140,20 +141,20 @@ class Patient(db.Model):
             .query(prescritionAlias, patientAlias, '"daysAgo"', "score", '"scoreOne"',\
                      '"scoreTwo"', '"scoreThree"', 'tgo', 'tgp', 'cr')\
 
-        order = kwargs.get('order', 'score')
-        if (order != 'score'):
-            if (order == 'date'):
-                order = text('anon_1.prescricao_dthr_prescricao')
-            elif (order == 'name'):
-                order = text('anon_1.paciente_nome')
-            else:
-                order = 'score'
+        #order = kwargs.get('order', 'score')
+        #if (order != 'score'):
+        #    if (order == 'date'):
+        #        order = text('anon_1.prescricao_dthr_prescricao')
+        #    elif (order == 'name'):
+        #        order = text('anon_1.paciente_nome')
+        #    else:
+        #        order = 'score'
 
-        direction = kwargs.get('direction', 'desc')
-        if (direction == 'desc'):
-            wrapper = wrapper.order_by(desc(order))
-        else:
-            wrapper = wrapper.order_by(asc(order))
+        #direction = kwargs.get('direction', 'desc')
+        #if (direction == 'desc'):
+        #    wrapper = wrapper.order_by(desc(order))
+        #else:
+        #    wrapper = wrapper.order_by(asc(order))
 
         limit = kwargs.get('limit', 20)
 
@@ -180,7 +181,7 @@ class Outlier(db.Model):
 class PrescriptionDrug(db.Model):
     __tablename__ = 'presmed'
 
-    id = db.Column("idpresmed", db.Integer, primary_key=True)
+    id = db.Column("fkpresmed", db.Integer, primary_key=True)
     idOutlier = db.Column("idoutlier", db.Integer, nullable=False)
     idPrescription = db.Column("fkprescricao", db.Integer, nullable=False)
     idDrug = db.Column("fkmedicamento", db.Integer, nullable=False)
@@ -263,7 +264,7 @@ class Intervention(db.Model):
     __tablename__ = 'intervencao'
 
     id = db.Column("idintervencao", db.Integer, primary_key=True)
-    idPrescriptionDrug = db.Column("idpresmed", db.Integer, nullable=False)
+    idPrescriptionDrug = db.Column("fkpresmed", db.Integer, nullable=False)
     idUser = db.Column("idusuario", db.Integer, nullable=False)
     idInterventionReason = db.Column("idmotivointervencao", db.Integer, nullable=False)
     propagation = db.Column("boolpropaga", db.String, nullable=False)
