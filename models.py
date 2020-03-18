@@ -1,5 +1,6 @@
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, text, and_, desc, asc
+from datetime import date, timedelta
 
 db = SQLAlchemy()
 
@@ -127,6 +128,8 @@ class Patient(db.Model):
         idSegment = kwargs.get('idSegment', None)
         if (not(idSegment is None)):
             q = q.filter(Prescription.idSegment == idSegment)
+
+        q = q.filter(Prescription.date > (date.today() - timedelta(days=1)))
 
         q = q.with_labels().subquery()
 

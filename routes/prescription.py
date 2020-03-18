@@ -15,9 +15,8 @@ def getPrescriptions():
     setSchema(user.schema)
 
     patients = Patient.getPatients(
-        name=request.args.get('name'), order=request.args.get('order'),
-        direction=request.args.get('direction'), limit=request.args.get('limit'),
-        idSegment=request.args.get('idSegment')
+        #name=request.args.get('name'), order=request.args.get('order'), direction=request.args.get('direction'), 
+        idSegment=1, limit=200
     )
     db.engine.dispose()
 
