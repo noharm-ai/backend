@@ -1,5 +1,6 @@
 from flask_api import status
 from models import db, User, Patient, Prescription, PrescriptionDrug, InterventionReason, Intervention, Segment, setSchema, Department, Outlier, Drug
+from sqlalchemy import desc, asc
 from flask import Blueprint, request
 from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
@@ -79,6 +80,7 @@ def getDrugs(idSegment=1):
     drugs = Drug.query\
             .join(Outlier, Outlier.idDrug == Drug.id)\
             .filter(Outlier.idSegment == idSegment)\
+            .order_by(asc(Drug.name))\
             .all()
 
     db.engine.dispose()
