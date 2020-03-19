@@ -220,6 +220,9 @@ class Drug(db.Model):
     idMeasureUnit = db.Column("fkunidademedida", db.Integer, nullable=False)
     idHospital = db.Column("fkhospital", db.Integer, nullable=False)
     name = db.Column("nome", db.String, nullable=False)
+    antimicro = db.Column("antimicro", db.String, nullable=True)
+    mav = db.Column("mav", db.String, nullable=True)
+    controlled = db.Column("controlados", db.String, nullable=True)
 
     def setSchema(schema):
         Drug.__table__.schema = schema

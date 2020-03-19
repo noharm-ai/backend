@@ -16,6 +16,8 @@ def getOutliers(idSegment=1, idDrug=1):
         .filter(Outlier.idSegment == idSegment, Outlier.idDrug == idDrug)\
         .order_by(Outlier.countNum.desc())\
         .all()
+    d = Drug.query.get(idDrug)
+
     db.engine.dispose()
 
     results = []
@@ -28,6 +30,9 @@ def getOutliers(idSegment=1, idDrug=1):
             'frequency': o.frequency,
             'score': o.score,
             'manualScore': o.manualScore,
+            'antimicro': d.antimicro,
+            'mav': d.mav,
+            'controlled': d.controlled
         })
 
     return {
@@ -44,7 +49,7 @@ def setManualOutlier(idOutlier):
     user = User.find(get_jwt_identity())
     setSchema(user.schema)
     o = Outlier.query.get(idOutlier)
-    o.idUser = 1
+    o.idUser = user.id
     o.manualScore = data.get('manualScore', None)
 
     try:
@@ -69,6 +74,40 @@ def setManualOutlier(idOutlier):
             'message': str(e)
         }, status.HTTP_500_INTERNAL_SERVER_ERROR
 
+
+@app_out.route('/drugs/<int:idDrug>', methods=['PUT'])
+@jwt_required
+def setDrugClass(idDrug):
+    data = request.get_json()
+
+    user = User.find(get_jwt_identity())
+    setSchema(user.schema)
+    d = Drug.query.get(idDrug)
+    d.antimicro = bool(data.get('antimicro', 0))
+    d.mav = bool(data.get('mav', 0))
+    d.controlled = bool(data.get('controlled', 0))
+
+    try:
+        db.session.commit()
+
+        return {
+            'status': 'success',
+            'data': d.id
+        }, status.HTTP_200_OK
+    except AssertionError as e:
+        db.engine.dispose()
+
+        return {
+            'status': 'error',
+            'message': str(e)
+        }, status.HTTP_400_BAD_REQUEST
+    except Exception as e:
+        db.engine.dispose()
+
+        return {
+            'status': 'error',
+            'message': str(e)
+        }, status.HTTP_500_INTERNAL_SERVER_ERROR
 
 @app_out.route('/drugs', methods=['GET'])
 @app_out.route('/drugs/<int:idSegment>', methods=['GET'])
