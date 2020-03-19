@@ -70,11 +70,17 @@ def setManualOutlier(idOutlier):
 
 
 @app_out.route('/drugs', methods=['GET'])
+@app_out.route('/drugs/<int:idSegment>', methods=['GET'])
 @jwt_required
-def getDrugs():
+def getDrugs(idSegment=1):
     user = User.find(get_jwt_identity())
     setSchema(user.schema)
-    drugs = Drug.query.all()
+
+    drugs = Drug.query\
+            .join(Outlier, Outlier.idDrug == Drug.id)\
+            .filter(Outlier.idSegment == idSegment)\
+            .all()
+
     db.engine.dispose()
 
     results = []
