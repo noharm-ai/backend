@@ -11,6 +11,10 @@ from routes.outlier import app_out
 from routes.prescription import app_pres
 from routes.segment import app_seg
 from routes.outlier_generate import app_gen
+import logging
+
+logging.basicConfig()
+logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
 
 app = FlaskAPI(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = Config.POTGRESQL_CONNECTION_STRING
