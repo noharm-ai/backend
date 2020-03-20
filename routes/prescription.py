@@ -43,7 +43,7 @@ def getPrescriptions(idSegment=1):
             'tgo': str(p[7]),
             'tgp': str(p[8]),
             'mdrd': mdrd_calc(str(p[9]), p[1].birthdate.isoformat(), p[1].gender, p[1].skinColor),
-            'cg': str(p[9]),
+            'cg': cg_calc(str(p[9]), p[1].birthdate.isoformat(), p[1].gender, p[1].weight),
             'k': str(p[10]),
             'na': str(p[11]),
             'mg': str(p[12]),
@@ -62,7 +62,7 @@ def getPrescriptions(idSegment=1):
 # based on https://www.kidney.org/content/mdrd-study-equation
 # eGFR = 175 x (SCr)-1.154 x (age)-0.203 x 0.742 [if female] x 1.212 [if Black]
 def mdrd_calc(cr, birthdate, gender, skinColor):
-    if cr == 'None': return None
+    if cr == 'None' or cr is None or not cr.isnumeric(): return 0
     
     days_in_year = 365.2425
     birthdate = datetime.strptime(birthdate, '%Y-%m-%d')
@@ -73,7 +73,23 @@ def mdrd_calc(cr, birthdate, gender, skinColor):
     if gender == 'F': eGFR *= 0.742
     if skinColor == 'Negra': eGFR *= 1.212
 
-    return eGFR
+    return round(eGFR,2)
+
+# Cockcroft-Gault
+# based on https://www.kidney.org/professionals/KDOQI/gfr_calculatorCoc
+# CCr = {((140–age) x weight)/(72xSCr)} x 0.85 (if female)
+def cg_calc(cr, birthdate, gender, weight):
+    if cr == 'None' or cr is None or not cr.isnumeric(): return 0
+    if weight == 'None' or weight is None or not weight.isnumeric(): return 0
+
+    days_in_year = 365.2425
+    birthdate = datetime.strptime(birthdate, '%Y-%m-%d')
+    age = int ((datetime.today() - birthdate).days / days_in_year)
+
+    ccr = ((140 - age) * float(weight)) / (72 * float(cr))
+    if gender == 'F': ccr *= 1.212
+
+    return round(ccr,2)
 
 
 def getExams(typeExam, idPatient):
@@ -137,6 +153,7 @@ def getPrescription(idPrescription):
             'tgo': str(tgo.value) + ' ' + tgo.unit if tgo is not None else '',
             'tgp': str(tgp.value) + ' ' + tgp.unit if tgp is not None else '',
             'mdrd': mdrd_calc(cr, prescription[1].birthdate.isoformat(), prescription[1].gender, prescription[1].skinColor),
+            'cg': cg_calc(cr, prescription[1].birthdate.isoformat(), prescription[1].gender, prescription[1].weight),
             'creatinina': str(cr.value) + ' ' + cr.unit if cr is not None else '',
             'patientScore': 'High',
             'date': prescription[0].date.isoformat(),
