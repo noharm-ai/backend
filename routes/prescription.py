@@ -2,6 +2,7 @@ import random
 from flask_api import status
 from models import db, User, Patient, Prescription, PrescriptionDrug, InterventionReason, Intervention, Segment, setSchema, Exams
 from flask import Blueprint, request
+from datetime import date, datetime
 from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
 
@@ -41,7 +42,7 @@ def getPrescriptions(idSegment=1):
             'diff': str(p[18]),
             'tgo': str(p[7]),
             'tgp': str(p[8]),
-            'mdrd': str(p[9]),
+            'mdrd': mdrd_calc(str(p[9]), p[1].birthdate.isoformat(), p[1].gender, p[1].skinColor),
             'cg': str(p[9]),
             'k': str(p[10]),
             'na': str(p[11]),
@@ -56,6 +57,23 @@ def getPrescriptions(idSegment=1):
         'status': 'success',
         'data': results
     }, status.HTTP_200_OK
+
+# Modification of Diet in Renal Disease
+# based on https://www.kidney.org/content/mdrd-study-equation
+# eGFR = 175 x (SCr)-1.154 x (age)-0.203 x 0.742 [if female] x 1.212 [if Black]
+def mdrd_calc(cr, birthdate, gender, skinColor):
+    if cr == 'None': return None
+    
+    days_in_year = 365.2425
+    birthdate = datetime.strptime(birthdate, '%Y-%m-%d')
+    age = int ((datetime.today() - birthdate).days / days_in_year)
+
+    eGFR = 175 * (float(cr))**(-1.154) * (age)**(-0.203)
+
+    if gender == 'F': eGFR *= 0.742
+    if skinColor == 'Negra': eGFR *= 1.212
+
+    return eGFR
 
 
 def getExams(typeExam, idPatient):
@@ -118,7 +136,7 @@ def getPrescription(idPrescription):
             'skinColor': prescription[1].skinColor,
             'tgo': str(tgo.value) + ' ' + tgo.unit if tgo is not None else '',
             'tgp': str(tgp.value) + ' ' + tgp.unit if tgp is not None else '',
-            'mdrd': str(cr.value) + ' ' + cr.unit if cr is not None else '',
+            'mdrd': mdrd_calc(cr, prescription[1].birthdate.isoformat(), prescription[1].gender, prescription[1].skinColor),
             'creatinina': str(cr.value) + ' ' + cr.unit if cr is not None else '',
             'patientScore': 'High',
             'date': prescription[0].date.isoformat(),

@@ -122,8 +122,7 @@ def getDrugDiff():
         .filter(pr1.idPatient == Patient.id)\
         .filter(pr1.status == 's')\
         .filter(pr1.id < Prescription.id)\
-        .as_scalar()
-        #.group_by(pd2.idDrug, pd2.dose, pd2.idFrequency).as_scalar() 
+        .as_scalar() 
 
 class Patient(db.Model):
     __tablename__ = 'pessoa'
