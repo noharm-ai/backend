@@ -1,5 +1,5 @@
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import func, text, and_, desc, asc
+from sqlalchemy import func, text, and_, desc, asc, distinct
 from datetime import date, timedelta
 
 db = SQLAlchemy()
@@ -114,14 +114,16 @@ def getDrugDiff():
     pd1 = db.aliased(PrescriptionDrug)
     pr1 = db.aliased(Prescription)
 
-    return db.session.query(func.count(1).label('drugDiff'))\
+    return db.session.query(func.count(distinct(func.concat(pd2.idDrug, pd2.dose, pd2.idFrequency))).label('drugDiff'))\
         .select_from(pd2)\
         .outerjoin(pd1, and_(pd1.idDrug == pd2.idDrug, pd1.dose == pd2.dose, pd1.idFrequency == pd2.idFrequency))\
         .join(pr1, pr1.id == pd1.idPrescription)\
         .filter(pd2.idPrescription == Prescription.id)\
         .filter(pr1.idPatient == Patient.id)\
         .filter(pr1.status == 's')\
+        .filter(pr1.id < Prescription.id)\
         .as_scalar()
+        #.group_by(pd2.idDrug, pd2.dose, pd2.idFrequency).as_scalar() 
 
 class Patient(db.Model):
     __tablename__ = 'pessoa'
