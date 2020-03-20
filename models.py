@@ -88,6 +88,41 @@ def getExams(typeExam):
         .order_by(Exams.date.desc()).limit(1)\
         .as_scalar()
 
+def getDrugClass(typeClass):
+    return db.session.query(func.count(1).label('drugClass'))\
+        .select_from(Drug)\
+        .outerjoin(PrescriptionDrug, and_(Drug.id == PrescriptionDrug.idDrug))\
+        .filter(PrescriptionDrug.idPrescription == Prescription.id)\
+        .filter(typeClass == True)\
+        .as_scalar()
+
+def getDrugRoute(route):
+    return db.session.query(func.count(1).label('drugRoute'))\
+        .select_from(PrescriptionDrug)\
+        .filter(PrescriptionDrug.idPrescription == Prescription.id)\
+        .filter(PrescriptionDrug.route.ilike(route))\
+        .as_scalar()
+
+def getDrugsCount():
+    return db.session.query(func.count(1).label('drugCount'))\
+        .select_from(PrescriptionDrug, Prescription)\
+        .filter(PrescriptionDrug.idPrescription == Prescription.id)\
+        .as_scalar()   
+
+def getDrugDiff():
+    pd2 = db.aliased(PrescriptionDrug)
+    pd1 = db.aliased(PrescriptionDrug)
+    pr1 = db.aliased(Prescription)
+
+    return db.session.query(func.count(1).label('drugDiff'))\
+        .select_from(pd2)\
+        .outerjoin(pd1, and_(pd1.idDrug == pd2.idDrug, pd1.dose == pd2.dose, pd1.idFrequency == pd2.idFrequency))\
+        .join(pr1, pr1.id == pd1.idPrescription)\
+        .filter(pd2.idPrescription == Prescription.id)\
+        .filter(pr1.idPatient == Patient.id)\
+        .filter(pr1.status == 's')\
+        .as_scalar()
+
 class Patient(db.Model):
     __tablename__ = 'pessoa'
 
@@ -110,21 +145,28 @@ class Patient(db.Model):
         tgo = getExams('TGO')
         tgp = getExams('TGP')
         cr = getExams('CR')
+        k = getExams('K')
+        na = getExams('NA')
+        mg = getExams('MG')
+        rni = getExams('PRO')
+        antimicro = getDrugClass(Drug.antimicro)
+        mav = getDrugClass(Drug.mav)
+        controlled = getDrugClass(Drug.controlled)
+        sonda = getDrugRoute("%sonda%")
+        diff = getDrugDiff()
+        count = getDrugsCount()
 
         q = db.session\
             .query(
                 Prescription, Patient,
                 func.trunc((func.extract('epoch', func.current_date(
                 )) - func.extract('epoch', Prescription.date)) / 86400).label('daysAgo'),
-                score.label('score'), scoreOne.label('scoreOne'), scoreTwo.label('scoreTwo'),
-                scoreThree.label('scoreThree'), tgo.label('tgo'), tgp.label('tgp'), cr.label('cr')
+                score.label('score'), scoreOne.label('scoreOne'), scoreTwo.label('scoreTwo'), scoreThree.label('scoreThree'),
+                tgo.label('tgo'), tgp.label('tgp'), cr.label('cr'), k.label('k'), na.label('na'), mg.label('mg'), rni.label('rni'),
+                antimicro.label('antimicro'), mav.label('mav'), controlled.label('controlled'), sonda.label('sonda'),
+                (count - diff).label('diff')
             )\
             .join(Patient, Patient.admissionNumber == Prescription.admissionNumber)
-
-        name = kwargs.get('name', None)
-        if (not(name is None)):
-            search = "%{}%".format(name)
-            q = q.filter(Patient.name.like(search))
 
         idSegment = kwargs.get('idSegment', None)
         if (not(idSegment is None)):
@@ -138,24 +180,12 @@ class Patient(db.Model):
         patientAlias = db.aliased(Patient, q)
 
         wrapper = db.session\
-            .query(prescritionAlias, patientAlias, '"daysAgo"', "score", '"scoreOne"',\
-                     '"scoreTwo"', '"scoreThree"', 'tgo', 'tgp', 'cr')\
+            .query(prescritionAlias, patientAlias,\
+                    '"daysAgo"', 'score', '"scoreOne"', '"scoreTwo"', '"scoreThree"',\
+                    'tgo', 'tgp', 'cr', 'k', 'na', 'mg', 'rni',\
+                    'antimicro', 'mav', 'controlled', 'sonda', 'diff')
 
-        #order = kwargs.get('order', 'score')
-        #if (order != 'score'):
-        #    if (order == 'date'):
-        #        order = text('anon_1.prescricao_dthr_prescricao')
-        #    elif (order == 'name'):
-        #        order = text('anon_1.paciente_nome')
-        #    else:
-        #        order = 'score'
-
-        #direction = kwargs.get('direction', 'desc')
-        #if (direction == 'desc'):
-        #    wrapper = wrapper.order_by(desc(order))
-        #else:
-        #    wrapper = wrapper.order_by(asc(order))
-
+        wrapper = wrapper.order_by(asc(prescritionAlias.date))
         limit = kwargs.get('limit', 20)
 
         return wrapper.limit(limit).all()
@@ -186,7 +216,6 @@ class PrescriptionDrug(db.Model):
     idPrescription = db.Column("fkprescricao", db.Integer, nullable=False)
     idDrug = db.Column("fkmedicamento", db.Integer, nullable=False)
     idMeasureUnit = db.Column("fkunidademedida", db.Integer, nullable=False)
-    dose = db.Column("dose", db.Integer, nullable=False)
     idFrequency = db.Column("fkfrequencia", db.Integer, nullable=True)
     dose = db.Column("dose", db.Integer, nullable=True)
     route = db.Column('via', db.String, nullable=True)
@@ -195,13 +224,6 @@ class PrescriptionDrug(db.Model):
         PrescriptionDrug.__table__.schema = schema
 
     def findByPrescription(idPrescription):
-        #PrescriptionDrugSub = db.aliased(PrescriptionDrug)
-        #score = db.session.query(func.sum(func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4)).label('score'))\
-        #    .select_from(PrescriptionDrugSub)\
-        #    .outerjoin(Outlier.idOutlier == PrescriptionDrugSub.idOutlier)\
-        #    .filter(PrescriptionDrug.id == PrescriptionDrugSub.id)\
-        #    .as_scalar()
-
         return db.session\
             .query(PrescriptionDrug, Drug, MeasureUnit, Frequency, Intervention, func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4).label('score'))\
             .join(Outlier, Outlier.id == PrescriptionDrug.idOutlier)\
@@ -210,6 +232,7 @@ class PrescriptionDrug(db.Model):
             .outerjoin(Frequency, Frequency.id == PrescriptionDrug.idFrequency)\
             .outerjoin(Intervention, Intervention.idPrescriptionDrug == PrescriptionDrug.id)\
             .filter(PrescriptionDrug.idPrescription == idPrescription)\
+            .order_by(asc(Drug.name))\
             .all()
 
 

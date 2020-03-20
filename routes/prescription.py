@@ -9,15 +9,13 @@ app_pres = Blueprint('app_pres',__name__)
 
 @app_pres.route("/patients", methods=['GET'])
 @app_pres.route("/prescriptions", methods=['GET'])
+@app_pres.route("/prescriptions/segments/<int:idSegment>", methods=['GET'])
 @jwt_required
-def getPrescriptions():
+def getPrescriptions(idSegment=1):
     user = User.find(get_jwt_identity())
     setSchema(user.schema)
 
-    patients = Patient.getPatients(
-        #name=request.args.get('name'), order=request.args.get('order'), direction=request.args.get('direction'), 
-        idSegment=1, limit=200
-    )
+    patients = Patient.getPatients(idSegment=idSegment, limit=200)
     db.engine.dispose()
 
     results = []
@@ -36,20 +34,21 @@ def getPrescriptions():
             'scoreOne': str(p[4]),
             'scoreTwo': str(p[5]),
             'scoreThree': str(p[6]),
-            'am': 0,
-            'av': 0,
-            'tube': 0,
-            'controlled': 0,
-            'diff': 0,
+            'am': str(p[14]),
+            'av': str(p[15]),
+            'controlled': str(p[16]),
+            'tube': str(p[17]),
+            'diff': str(p[18]),
             'tgo': str(p[7]),
             'tgp': str(p[8]),
             'mdrd': str(p[9]),
-            'cg': 0,
-            'k': 0,
-            'na': 0,
-            'rni': 0,
+            'cg': str(p[9]),
+            'k': str(p[10]),
+            'na': str(p[11]),
+            'mg': str(p[12]),
+            'rni': str(p[13]),
             'patientScore': 'Alto',
-            'class': random.choice(['green','yellow','red']),
+            'class': 'yellow', #random.choice(['green','yellow','red']),
             'status': p[0].status,
         })
 
