@@ -87,7 +87,7 @@ def cg_calc(cr, birthdate, gender, weight):
     age = int ((datetime.today() - birthdate).days / days_in_year)
 
     ccr = ((140 - age) * float(weight)) / (72 * float(cr))
-    if gender == 'F': ccr *= 1.212
+    if gender == 'F': ccr *= 0.85
 
     return round(ccr,2)
 
