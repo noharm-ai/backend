@@ -58,11 +58,18 @@ def getPrescriptions(idSegment=1):
         'data': results
     }, status.HTTP_200_OK
 
+def is_float(s):
+    try:
+        float(s)
+        return True
+    except:
+        return False
+
 # Modification of Diet in Renal Disease
 # based on https://www.kidney.org/content/mdrd-study-equation
 # eGFR = 175 x (SCr)-1.154 x (age)-0.203 x 0.742 [if female] x 1.212 [if Black]
 def mdrd_calc(cr, birthdate, gender, skinColor):
-    if cr == 'None' or cr is None or not cr.isnumeric(): return 0
+    if cr == 'None' or cr is None or not is_float(cr): return 0
     
     days_in_year = 365.2425
     birthdate = datetime.strptime(birthdate, '%Y-%m-%d')
@@ -79,8 +86,8 @@ def mdrd_calc(cr, birthdate, gender, skinColor):
 # based on https://www.kidney.org/professionals/KDOQI/gfr_calculatorCoc
 # CCr = {((140–age) x weight)/(72xSCr)} x 0.85 (if female)
 def cg_calc(cr, birthdate, gender, weight):
-    if cr == 'None' or cr is None or not cr.isnumeric(): return 0
-    if weight == 'None' or weight is None or not weight.isnumeric(): return 0
+    if cr == 'None' or cr is None or not is_float(cr): return 0
+    if weight == 'None' or weight is None or not is_float(weight): return 0
 
     days_in_year = 365.2425
     birthdate = datetime.strptime(birthdate, '%Y-%m-%d')
