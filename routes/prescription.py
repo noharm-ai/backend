@@ -2,9 +2,9 @@ import random
 from flask_api import status
 from models import db, User, Patient, Prescription, PrescriptionDrug, InterventionReason, Intervention, Segment, setSchema, Exams
 from flask import Blueprint, request
-from datetime import date, datetime
 from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
+from .utils import mdrd_calc, cg_calc
 
 app_pres = Blueprint('app_pres',__name__)
 
@@ -57,47 +57,6 @@ def getPrescriptions(idSegment=1):
         'status': 'success',
         'data': results
     }, status.HTTP_200_OK
-
-def is_float(s):
-    try:
-        float(s)
-        return True
-    except:
-        return False
-
-# Modification of Diet in Renal Disease
-# based on https://www.kidney.org/content/mdrd-study-equation
-# eGFR = 175 x (SCr)-1.154 x (age)-0.203 x 0.742 [if female] x 1.212 [if Black]
-def mdrd_calc(cr, birthdate, gender, skinColor):
-    if cr == 'None' or cr is None or not is_float(cr): return 0
-    
-    days_in_year = 365.2425
-    birthdate = datetime.strptime(birthdate, '%Y-%m-%d')
-    age = int ((datetime.today() - birthdate).days / days_in_year)
-
-    eGFR = 175 * (float(cr))**(-1.154) * (age)**(-0.203)
-
-    if gender == 'F': eGFR *= 0.742
-    if skinColor == 'Negra': eGFR *= 1.212
-
-    return round(eGFR,2)
-
-# Cockcroft-Gault
-# based on https://www.kidney.org/professionals/KDOQI/gfr_calculatorCoc
-# CCr = {((140–age) x weight)/(72xSCr)} x 0.85 (if female)
-def cg_calc(cr, birthdate, gender, weight):
-    if cr == 'None' or cr is None or not is_float(cr): return 0
-    if weight == 'None' or weight is None or not is_float(weight): return 0
-
-    days_in_year = 365.2425
-    birthdate = datetime.strptime(birthdate, '%Y-%m-%d')
-    age = int ((datetime.today() - birthdate).days / days_in_year)
-
-    ccr = ((140 - age) * float(weight)) / (72 * float(cr))
-    if gender == 'F': ccr *= 0.85
-
-    return round(ccr,2)
-
 
 def getExams(typeExam, idPatient):
     return db.session.query(Exams.value, Exams.unit)\
