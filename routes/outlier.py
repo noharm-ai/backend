@@ -141,10 +141,10 @@ def getDrugs(idSegment=1):
         'data': results
     }, status.HTTP_200_OK
 
-def getFactor():
+def getFactor(idDrug):
     return db.session.query(MeasureUnitConvert.factor)\
         .select_from(MeasureUnitConvert)\
-        .filter(MeasureUnitConvert.idDrug == PrescriptionAgg.idDrug)\
+        .filter(MeasureUnitConvert.idDrug == idDrug)\
         .filter(MeasureUnitConvert.idMeasureUnit == PrescriptionAgg.idMeasureUnit)\
         .as_scalar()  
 
@@ -156,7 +156,7 @@ def getUnits(idDrug):
 
     u = db.aliased(MeasureUnit)
     p = db.aliased(PrescriptionAgg)
-    factor = getFactor()
+    factor = getFactor(idDrug)
 
     units = db.session.query(u.id, u.description, func.sum(p.countNum).label('count'), factor.label('factor'))\
             .select_from(u)\
