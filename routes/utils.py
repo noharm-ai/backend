@@ -13,6 +13,9 @@ def is_float(s):
     except:
         return False
 
+def none2zero(s):
+    return s if is_float(s) else 0
+
 # Modification of Diet in Renal Disease
 # based on https://www.kidney.org/content/mdrd-study-equation
 # eGFR = 175 x (SCr)-1.154 x (age)-0.203 x 0.742 [if female] x 1.212 [if Black]

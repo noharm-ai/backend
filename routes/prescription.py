@@ -4,7 +4,7 @@ from models import db, User, Patient, Prescription, PrescriptionDrug, Interventi
 from flask import Blueprint, request
 from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
-from .utils import mdrd_calc, cg_calc
+from .utils import mdrd_calc, cg_calc, none2zero
 
 app_pres = Blueprint('app_pres',__name__)
 
@@ -40,14 +40,14 @@ def getPrescriptions(idSegment=1):
             'controlled': str(p[16]),
             'tube': str(p[17]),
             'diff': str(p[18]),
-            'tgo': str(p[7]),
-            'tgp': str(p[8]),
+            'tgo': none2zero(p[7]),
+            'tgp': none2zero(p[8]),
             'mdrd': mdrd_calc(str(p[9]), p[1].birthdate.isoformat(), p[1].gender, p[1].skinColor),
             'cg': cg_calc(str(p[9]), p[1].birthdate.isoformat(), p[1].gender, p[1].weight),
-            'k': str(p[10]),
-            'na': str(p[11]),
-            'mg': str(p[12]),
-            'rni': str(p[13]),
+            'k': none2zero(p[10]),
+            'na': none2zero(p[11]),
+            'mg': none2zero(p[12]),
+            'rni': none2zero(p[13]),
             'patientScore': 'Alto',
             'class': 'yellow', #random.choice(['green','yellow','red']),
             'status': p[0].status,
