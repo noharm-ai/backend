@@ -5,6 +5,7 @@ from flask import Blueprint, request
 from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
 from .utils import mdrd_calc, cg_calc, none2zero
+from sqlalchemy import func
 
 app_pres = Blueprint('app_pres',__name__)
 
@@ -205,6 +206,7 @@ def setPrescriptionStatus(idPrescription):
 
     p = Prescription.query.get(idPrescription)
     p.status = data.get('status', None)
+    p.update = func.now()
 
     try:
         db.session.commit()

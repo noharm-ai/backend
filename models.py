@@ -50,6 +50,7 @@ class Prescription(db.Model):
     idSegment = db.Column("idsegmento", db.Integer, nullable=False)
     date = db.Column("dtprescricao", db.DateTime, nullable=False)
     status = db.Column('status', db.Integer, nullable=False)
+    update = db.Column("update_at", db.DateTime, nullable=True)
 
     def setSchema(schema):
         Prescription.__table__.schema = schema
