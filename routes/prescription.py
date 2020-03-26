@@ -31,6 +31,7 @@ def getPrescriptions(idSegment=1):
             'weight': p[1].weight,
             'skinColor': p[1].skinColor,
             'date': p[0].date.isoformat(),
+            'department': str(p[19]),
             'daysAgo': p[2],
             'prescriptionScore': str(p[3]),
             'scoreOne': str(p[4]),

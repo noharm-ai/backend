@@ -47,6 +47,7 @@ class Prescription(db.Model):
     idPatient = db.Column("fkpessoa", db.Integer, nullable=False)
     admissionNumber = db.Column('nratendimento', db.Integer, nullable=True)
     idHospital = db.Column("fkhospital", db.Integer, nullable=False)
+    idDepartment = db.Column("fksetor", db.Integer, nullable=False)
     idSegment = db.Column("idsegmento", db.Integer, nullable=False)
     date = db.Column("dtprescricao", db.DateTime, nullable=False)
     status = db.Column('status', db.Integer, nullable=False)
@@ -168,9 +169,11 @@ class Patient(db.Model):
                 score.label('score'), scoreOne.label('scoreOne'), scoreTwo.label('scoreTwo'), scoreThree.label('scoreThree'),
                 tgo.label('tgo'), tgp.label('tgp'), cr.label('cr'), k.label('k'), na.label('na'), mg.label('mg'), rni.label('rni'),
                 antimicro.label('antimicro'), mav.label('mav'), controlled.label('controlled'), sonda.label('sonda'),
-                (count - diff).label('diff')
+                (count - diff).label('diff'),
+                Department.name.label('department')
             )\
-            .join(Patient, Patient.admissionNumber == Prescription.admissionNumber)
+            .join(Patient, Patient.admissionNumber == Prescription.admissionNumber)\
+            .join(Department, Department.id == Prescription.idDepartment)
 
         idSegment = kwargs.get('idSegment', None)
         if (not(idSegment is None)):
@@ -187,7 +190,7 @@ class Patient(db.Model):
             .query(prescritionAlias, patientAlias,\
                     '"daysAgo"', 'score', '"scoreOne"', '"scoreTwo"', '"scoreThree"',\
                     'tgo', 'tgp', 'cr', 'k', 'na', 'mg', 'rni',\
-                    'antimicro', 'mav', 'controlled', 'sonda', 'diff')
+                    'antimicro', 'mav', 'controlled', 'sonda', 'diff', 'department')
 
         wrapper = wrapper.order_by(desc(prescritionAlias.date))
         limit = kwargs.get('limit', 20)
