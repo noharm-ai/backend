@@ -205,8 +205,8 @@ class Outlier(db.Model):
     idDrug = db.Column("fkmedicamento", db.Integer, nullable=False)
     idSegment = db.Column("idsegmento", db.Integer, nullable=False)
     countNum = db.Column("contagem", db.Integer, nullable=True)
-    dose = db.Column("dose", db.Integer, nullable=True)
-    frequency = db.Column("frequenciadia", db.Integer, nullable=True)
+    dose = db.Column("dose", db.Float, nullable=True)
+    frequency = db.Column("frequenciadia", db.Float, nullable=True)
     score = db.Column("escore", db.Integer, nullable=True)
     manualScore = db.Column("escoremanual", db.Integer, nullable=True)
     idUser = db.Column("idusuario", db.Integer, nullable=True)
@@ -223,10 +223,10 @@ class PrescriptionAgg(db.Model):
     idSegment = db.Column("idsegmento", db.Integer, nullable=False)
     idDrug = db.Column("fkmedicamento", db.Integer, primary_key=True)
     idMeasureUnit = db.Column("fkunidademedida", db.Integer, nullable=False)
-    idFrequency = db.Column("fkfrequencia", db.Integer, primary_key=True)
-    dose = db.Column("dose", db.Integer, primary_key=True)
-    doseconv = db.Column("doseconv", db.Integer, nullable=True)
-    frequency = db.Column("frequenciadia", db.Integer, nullable=True)
+    idFrequency = db.Column("fkfrequencia", db.String, primary_key=True)
+    dose = db.Column("dose", db.Float, primary_key=True)
+    doseconv = db.Column("doseconv", db.Float, nullable=True)
+    frequency = db.Column("frequenciadia", db.Float, nullable=True)
     countNum = db.Column("contagem", db.Integer, nullable=True)
 
     def setSchema(schema):
@@ -241,10 +241,12 @@ class PrescriptionDrug(db.Model):
     idPrescription = db.Column("fkprescricao", db.Integer, nullable=False)
     idDrug = db.Column("fkmedicamento", db.Integer, nullable=False)
     idMeasureUnit = db.Column("fkunidademedida", db.Integer, nullable=False)
-    idFrequency = db.Column("fkfrequencia", db.Integer, nullable=True)
-    dose = db.Column("dose", db.Integer, nullable=True)
-    doseconv = db.Column("doseconv", db.Integer, nullable=True)
+    idFrequency = db.Column("fkfrequencia", db.String, nullable=True)
+    dose = db.Column("frequenciadia", db.Float, nullable=True)
+    frequency = db.Column("dose", db.Float, nullable=True)
+    doseconv = db.Column("doseconv", db.Float, nullable=True)
     route = db.Column('via', db.String, nullable=True)
+    observation = db.Column('complemento', db.String, nullable=True)
 
     def setSchema(schema):
         PrescriptionDrug.__table__.schema = schema
@@ -290,7 +292,7 @@ class MeasureUnit(db.Model):
 class MeasureUnitConvert(db.Model):
     __tablename__ = 'unidadeconverte'
 
-    idMeasureUnit = db.Column("fkunidademedidade", db.String, primary_key=True)
+    idMeasureUnit = db.Column("fkunidademedida", db.String, primary_key=True)
     idDrug = db.Column("fkmedicamento", db.Integer, primary_key=True)
     idHospital = db.Column("fkhospital", db.Integer, nullable=False)
     factor = db.Column("fator", db.String, nullable=False)
@@ -315,7 +317,7 @@ class InterventionReason(db.Model):
 class Frequency(db.Model):
     __tablename__ = 'frequencia'
 
-    id = db.Column("fkfrequencia", db.Integer, primary_key=True)
+    id = db.Column("fkfrequencia", db.String, primary_key=True)
     description = db.Column("nome", db.String, nullable=False)
 
     def setSchema(schema):

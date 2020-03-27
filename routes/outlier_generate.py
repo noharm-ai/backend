@@ -55,7 +55,7 @@ def callOutliers(idSegment):
     print('Init Schema:', user.schema, 'Segment:', idSegment)
 
     query = "INSERT INTO " + user.schema + ".outlier (idsegmento, fkmedicamento, dose, frequenciadia, contagem)\
-            SELECT idsegmento, fkmedicamento, round(dose*100)/100 as dose, frequenciadia, SUM(contagem)\
+            SELECT idsegmento, fkmedicamento, dose, frequenciadia, SUM(contagem)\
             FROM " + user.schema + ".prescricaoagg\
             WHERE idsegmento = " + str(int(idSegment)) + "\
             GROUP BY idsegmento, fkmedicamento, dose, frequenciadia\
