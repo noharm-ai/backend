@@ -54,11 +54,11 @@ def callOutliers(idSegment):
 
     print('Init Schema:', user.schema, 'Segment:', idSegment)
 
-    query = "INSERT INTO " + user.schema + ".outlier (idsegmento, fkmedicamento, dose, frequenciadia, contagem)\
-            SELECT idsegmento, fkmedicamento, dose, frequenciadia, SUM(contagem)\
+    query = "INSERT INTO " + user.schema + ".outlier (idsegmento, fkmedicamento, doseconv, frequenciadia, contagem)\
+            SELECT idsegmento, fkmedicamento, doseconv, frequenciadia, SUM(contagem)\
             FROM " + user.schema + ".prescricaoagg\
             WHERE idsegmento = " + str(int(idSegment)) + "\
-            GROUP BY idsegmento, fkmedicamento, dose, frequenciadia\
+            GROUP BY idsegmento, fkmedicamento, doseconv, frequenciadia\
             ON CONFLICT DO nothing;"
 
     result = db.engine.execute(query)
@@ -95,7 +95,7 @@ def generateOutliers(idSegment,fold):
     conn = db.engine.raw_connection()
     cursor = conn.cursor()
 
-    query = "SELECT fkmedicamento as medication, dose, frequenciadia as frequency, contagem as count \
+    query = "SELECT fkmedicamento as medication, doseconv as dose, frequenciadia as frequency, contagem as count \
           FROM " + user.schema + ".outlier \
           WHERE idsegmento = " + str(int(idSegment)) + " \
           AND fkmedicamento IN (\

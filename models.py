@@ -205,7 +205,7 @@ class Outlier(db.Model):
     idDrug = db.Column("fkmedicamento", db.Integer, nullable=False)
     idSegment = db.Column("idsegmento", db.Integer, nullable=False)
     countNum = db.Column("contagem", db.Integer, nullable=True)
-    dose = db.Column("dose", db.Float, nullable=True)
+    dose = db.Column("doseconv", db.Float, nullable=True)
     frequency = db.Column("frequenciadia", db.Float, nullable=True)
     score = db.Column("escore", db.Integer, nullable=True)
     manualScore = db.Column("escoremanual", db.Integer, nullable=True)
