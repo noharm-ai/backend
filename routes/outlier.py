@@ -150,12 +150,15 @@ def getUnits(idDrug):
     u = db.aliased(MeasureUnit)
     p = db.aliased(PrescriptionAgg)
     mu = db.aliased(MeasureUnitConvert)
+    d = db.aliased(Drug)
 
-    units = db.session.query(u.id, u.description, func.sum(p.countNum).label('count'), func.max(mu.factor).label('factor'))\
+    units = db.session.query(u.id, u.description, d.name,
+                            func.sum(p.countNum).label('count'), func.max(mu.factor).label('factor'))\
             .select_from(u)\
             .join(p, and_(p.idMeasureUnit == u.id, p.idDrug == idDrug, p.idSegment == 1))\
+            .join(d, and_(d.id == idDrug))\
             .outerjoin(mu, and_(mu.idMeasureUnit == u.id, mu.idDrug == idDrug))\
-            .group_by(u.id, u.description, p.idMeasureUnit)\
+            .group_by(u.id, u.description, p.idMeasureUnit, d.name)\
             .order_by(asc(u.description))\
             .all()
 
@@ -167,8 +170,9 @@ def getUnits(idDrug):
         results.append({
             'idMeasureUnit': u.id,
             'description': u.description,
-            'fator': u[3] if u[3] != None else 1,
-            'contagem': u[2]
+            'drugName': u[2],
+            'fator': u[4] if u[4] != None else 1,
+            'contagem': u[3]
         })
 
     return {
