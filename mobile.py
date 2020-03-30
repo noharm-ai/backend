@@ -51,7 +51,7 @@ def getName(idPatient):
     return {
         'status': 'success',
         'idPatient': idPatient,
-        'name': 'Fulano ' + str(idPatient)
+        'name': 'Paciente ' + str(idPatient)
     }, status.HTTP_200_OK
 
 

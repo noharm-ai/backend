@@ -29,7 +29,7 @@ def mdrd_calc(cr, birthdate, gender, skinColor):
     if gender == 'F': eGFR *= 0.742
     if skinColor == 'Negra': eGFR *= 1.212
 
-    return round(eGFR,2)
+    return round(eGFR,1)
 
 # Cockcroft-Gault
 # based on https://www.kidney.org/professionals/KDOQI/gfr_calculatorCoc
@@ -43,4 +43,4 @@ def cg_calc(cr, birthdate, gender, weight):
     ccr = ((140 - age) * float(weight)) / (72 * float(cr))
     if gender == 'F': ccr *= 0.85
 
-    return round(ccr,2)
+    return round(ccr,1)

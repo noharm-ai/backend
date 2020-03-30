@@ -1,5 +1,5 @@
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import func, text, and_, desc, asc, distinct
+from sqlalchemy import func, text, and_, or_, desc, asc, distinct
 from datetime import date, timedelta
 
 db = SQLAlchemy()
@@ -76,12 +76,20 @@ def getAggScore():
         .filter(PrescriptionDrug.idPrescription == Prescription.id)\
         .as_scalar()
 
-def getScoreOne(level):
+def getScore(level):
     return db.session.query(func.count(func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4)).label('scoreOne'))\
         .select_from(PrescriptionDrug)\
         .outerjoin(Outlier, and_(Outlier.id == PrescriptionDrug.idOutlier))\
         .filter(PrescriptionDrug.idPrescription == Prescription.id)\
         .filter(func.coalesce(Outlier.manualScore, Outlier.score) == level)\
+        .as_scalar()
+
+def getHighScore():
+    return db.session.query(func.count(func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4)).label('scoreOne'))\
+        .select_from(PrescriptionDrug)\
+        .outerjoin(Outlier, and_(Outlier.id == PrescriptionDrug.idOutlier))\
+        .filter(PrescriptionDrug.idPrescription == Prescription.id)\
+        .filter(or_(func.coalesce(Outlier.manualScore, Outlier.score) == 3, func.coalesce(Outlier.manualScore, Outlier.score) == None))\
         .as_scalar()
 
 def getExams(typeExam):
@@ -144,9 +152,9 @@ class Patient(db.Model):
 
     def getPatients(**kwargs):
         score = getAggScore()
-        scoreOne = getScoreOne(1)
-        scoreTwo = getScoreOne(2)
-        scoreThree = getScoreOne(3)
+        scoreOne = getScore(1)
+        scoreTwo = getScore(2)
+        scoreThree = getHighScore()
         tgo = getExams('TGO')
         tgp = getExams('TGP')
         cr = getExams('CR')
