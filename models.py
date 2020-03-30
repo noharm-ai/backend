@@ -250,8 +250,8 @@ class PrescriptionDrug(db.Model):
     idDrug = db.Column("fkmedicamento", db.Integer, nullable=False)
     idMeasureUnit = db.Column("fkunidademedida", db.Integer, nullable=False)
     idFrequency = db.Column("fkfrequencia", db.String, nullable=True)
-    dose = db.Column("frequenciadia", db.Float, nullable=True)
-    frequency = db.Column("dose", db.Float, nullable=True)
+    dose = db.Column("dose", db.Float, nullable=True)
+    frequency = db.Column("frequenciadia", db.Float, nullable=True)
     doseconv = db.Column("doseconv", db.Float, nullable=True)
     route = db.Column('via', db.String, nullable=True)
     observation = db.Column('complemento', db.String, nullable=True)
@@ -263,7 +263,7 @@ class PrescriptionDrug(db.Model):
         return db.session\
             .query(PrescriptionDrug, Drug, MeasureUnit, Frequency, Intervention, func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4).label('score'))\
             .outerjoin(Outlier, Outlier.id == PrescriptionDrug.idOutlier)\
-            .join(Drug, Drug.id == PrescriptionDrug.idDrug)\
+            .outerjoin(Drug, Drug.id == PrescriptionDrug.idDrug)\
             .outerjoin(MeasureUnit, MeasureUnit.id == PrescriptionDrug.idMeasureUnit)\
             .outerjoin(Frequency, Frequency.id == PrescriptionDrug.idFrequency)\
             .outerjoin(Intervention, Intervention.idPrescriptionDrug == PrescriptionDrug.id)\
