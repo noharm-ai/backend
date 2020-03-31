@@ -90,7 +90,7 @@ def getPrescription(idPrescription):
         pDrugs.append({
             'idPrescriptionDrug': pd[0].id,
             'idDrug': pd[0].idDrug,
-            'drug': pd[1].name,
+            'drug': pd[1].name if pd[1] is not None else 'Medicamento ' + str(pd[0].idDrug),
             'dose': pd[0].dose,
             'measureUnit': pd[2].description,
             'frequency': pd[3].description,

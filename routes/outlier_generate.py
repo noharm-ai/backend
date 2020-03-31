@@ -87,8 +87,9 @@ def callOutliers(idSegment):
     }, status.HTTP_200_OK
 
 @app_gen.route("/segments/<int:idSegment>/outliers/generate/fold/<int:fold>", methods=['GET'])
+@app_gen.route("/segments/<int:idSegment>/outliers/generate/drug/<int:idDrug>", methods=['GET'])
 @jwt_required
-def generateOutliers(idSegment,fold):
+def generateOutliers(idSegment,fold=None,idDrug=None):
     user = User.find(get_jwt_identity())
     setSchema(user.schema)
 
@@ -97,12 +98,28 @@ def generateOutliers(idSegment,fold):
 
     query = "SELECT fkmedicamento as medication, doseconv as dose, frequenciadia as frequency, contagem as count \
           FROM " + user.schema + ".outlier \
-          WHERE idsegmento = " + str(int(idSegment)) + " \
-          AND fkmedicamento IN (\
-              SELECT fkmedicamento FROM " + user.schema + ".outlier\
-              GROUP BY fkmedicamento\
-              ORDER BY fkmedicamento ASC\
-              LIMIT " + str(fold_size) + " OFFSET " + str((fold-1)*fold_size) + ")"
+          WHERE idsegmento = " + str(int(idSegment))
+
+    if fold != None:
+        query += " AND fkmedicamento IN (\
+                  SELECT fkmedicamento FROM " + user.schema + ".outlier\
+                  GROUP BY fkmedicamento\
+                  ORDER BY fkmedicamento ASC\
+                  LIMIT " + str(fold_size) + " OFFSET " + str((fold-1)*fold_size) + ")"
+
+    if idDrug != None:
+        query += " AND fkmedicamento = " + str(int(idDrug))
+
+        queryInsert = "INSERT INTO " + user.schema + ".outlier (idsegmento, fkmedicamento, doseconv, frequenciadia, contagem)\
+                SELECT idsegmento, fkmedicamento, doseconv, frequenciadia, SUM(contagem)\
+                FROM " + user.schema + ".prescricaoagg\
+                WHERE idsegmento = " + str(int(idSegment)) + "\
+                AND fkmedicamento = " + str(int(idDrug)) + "\
+                GROUP BY idsegmento, fkmedicamento, doseconv, frequenciadia\
+                ON CONFLICT DO nothing;"
+
+        result = db.engine.execute(queryInsert)
+        print('RowCount', result.rowcount)
 
     print(query)
 
@@ -131,12 +148,12 @@ def generateOutliers(idSegment,fold):
     outliers = Outlier.query.filter(Outlier.idSegment == idSegment).all()
 
     new_os = pd.DataFrame()
-    print('Appending Schema:', user.schema, 'Segment:', idSegment, 'Fold:', fold)
+    print('Appending Schema:', user.schema, 'Segment:', idSegment, 'Fold:', fold, 'Drug', idDrug)
     if Config.DDC_API_URL != None:
         for drug in poolDict:
             new_os = new_os.append(poolDict[drug])
 
-    print('Updating Schema:', user.schema, 'Segment:', idSegment, 'Fold:', fold)
+    print('Updating Schema:', user.schema, 'Segment:', idSegment, 'Fold:', fold, 'Drug', idDrug)
     if Config.DDC_API_URL != None:
         for o in outliers:
             no = new_os[(new_os['medication']==o.idDrug) & 
