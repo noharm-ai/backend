@@ -4,7 +4,7 @@ from models import db, User, Patient, Prescription, PrescriptionDrug, Interventi
 from flask import Blueprint, request
 from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
-from .utils import mdrd_calc, cg_calc, none2zero
+from .utils import mdrd_calc, cg_calc, none2zero, formatExam
 from sqlalchemy import func
 
 app_pres = Blueprint('app_pres',__name__)
@@ -26,6 +26,7 @@ def getPrescriptions(idSegment=1):
             'idPrescription': p[0].id,
             'idPatient': p[0].idPatient,
             'name': p[1].admissionNumber,
+            'admissionNumber': p[1].admissionNumber,
             'birthdate': p[1].birthdate.isoformat(),
             'gender': p[1].gender,
             'weight': p[1].weight,
@@ -61,7 +62,7 @@ def getPrescriptions(idSegment=1):
     }, status.HTTP_200_OK
 
 def getExams(typeExam, idPatient):
-    return db.session.query(Exams.value, Exams.unit)\
+    return db.session.query(Exams.value, Exams.unit, Exams.date)\
         .select_from(Exams)\
         .filter(Exams.idPatient == idPatient)\
         .filter(Exams.typeExam == typeExam)\
@@ -78,12 +79,16 @@ def getPrescription(idPrescription):
     if (prescription is None):
         return {}, status.HTTP_204_NO_CONTENT
 
-    drugs = PrescriptionDrug.findByPrescription(idPrescription)
+    drugs = PrescriptionDrug.findByPrescription(idPrescription, prescription[1].id)
     db.engine.dispose()
 
     tgo = getExams('TGO', prescription[1].id)
     tgp = getExams('TGP', prescription[1].id)
     cr = getExams('CR', prescription[1].id)
+    k = getExams('K', prescription[1].id)
+    na = getExams('NA', prescription[1].id)
+    mg = getExams('MG', prescription[1].id)
+    rni = getExams('PRO', prescription[1].id)
 
     pDrugs = []
     for pd in drugs:
@@ -96,6 +101,7 @@ def getPrescription(idPrescription):
             'frequency': pd[3].description,
             'route': pd[0].route,
             'score': str(pd[5]),
+            'checked': str(pd[6]),
             'intervention': {
                 'id': pd[4].id,
                 'idPrescriptionDrug': pd[4].idPrescriptionDrug,
@@ -118,11 +124,16 @@ def getPrescription(idPrescription):
             'weight': prescription[1].weight,
             'class': random.choice(['green','yellow','red']),
             'skinColor': prescription[1].skinColor,
-            'tgo': str(tgo.value) + ' ' + tgo.unit if tgo is not None else '',
-            'tgp': str(tgp.value) + ' ' + tgp.unit if tgp is not None else '',
+            'department': prescription[4],
+            'tgo': formatExam(tgo),
+            'tgp': formatExam(tgp),
             'mdrd': mdrd_calc(cr.value, prescription[1].birthdate.isoformat(), prescription[1].gender, prescription[1].skinColor) if cr is not None else '',
             'cg': cg_calc(cr.value, prescription[1].birthdate.isoformat(), prescription[1].gender, prescription[1].weight) if cr is not None else '',
-            'creatinina': str(cr.value) + ' ' + cr.unit if cr is not None else '',
+            'creatinina': formatExam(cr),
+            'k': formatExam(k),
+            'na': formatExam(na),
+            'mg': formatExam(mg),
+            'rni': formatExam(rni),
             'patientScore': 'High',
             'date': prescription[0].date.isoformat(),
             'daysAgo': prescription[2],
@@ -208,6 +219,7 @@ def setPrescriptionStatus(idPrescription):
     p = Prescription.query.get(idPrescription)
     p.status = data.get('status', None)
     p.update = func.now()
+    p.user = user.id
 
     try:
         db.session.commit()

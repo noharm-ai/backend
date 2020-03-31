@@ -52,8 +52,9 @@ def setManualOutlier(idOutlier):
     user = User.find(get_jwt_identity())
     setSchema(user.schema)
     o = Outlier.query.get(idOutlier)
-    o.idUser = user.id
     o.manualScore = data.get('manualScore', None)
+    o.update = func.now()
+    o.user = user.id
 
     try:
         db.session.commit()

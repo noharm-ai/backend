@@ -16,6 +16,13 @@ def is_float(s):
 def none2zero(s):
     return s if is_float(s) else 0
 
+def formatExam(exam):
+    if exam is not None:
+        examDate = exam.date.strftime('%d/%m/%Y %H:%M')
+        return str(exam.value) + ' ' + exam.unit + ' (' +  examDate + ')'
+    else:
+        return ''
+
 # Modification of Diet in Renal Disease
 # based on https://www.kidney.org/content/mdrd-study-equation
 # eGFR = 175 x (SCr)-1.154 x (age)-0.203 x 0.742 [if female] x 1.212 [if Black]

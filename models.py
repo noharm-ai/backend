@@ -52,6 +52,7 @@ class Prescription(db.Model):
     date = db.Column("dtprescricao", db.DateTime, nullable=False)
     status = db.Column('status', db.Integer, nullable=False)
     update = db.Column("update_at", db.DateTime, nullable=True)
+    user = db.Column("update_by", db.Integer, nullable=True)
 
     def setSchema(schema):
         Prescription.__table__.schema = schema
@@ -63,9 +64,11 @@ class Prescription(db.Model):
             .query(
                 Prescription, Patient,
                 func.trunc((func.extract('epoch', func.current_date(
-                )) - func.extract('epoch', Prescription.date)) / 86400).label('daysAgo'), score
+                )) - func.extract('epoch', Prescription.date)) / 86400).label('daysAgo'), score,
+                Department.name.label('department')
             )\
             .join(Patient, and_(Patient.id == Prescription.idPatient))\
+            .join(Department, Department.id == Prescription.idDepartment)\
             .filter(Prescription.id == idPrescription)\
             .first()
 
@@ -217,7 +220,8 @@ class Outlier(db.Model):
     frequency = db.Column("frequenciadia", db.Float, nullable=True)
     score = db.Column("escore", db.Integer, nullable=True)
     manualScore = db.Column("escoremanual", db.Integer, nullable=True)
-    idUser = db.Column("idusuario", db.Integer, nullable=True)
+    update = db.Column("update_at", db.DateTime, nullable=True)
+    user = db.Column("update_by", db.Integer, nullable=True)
 
     def setSchema(schema):
         Outlier.__table__.schema = schema
@@ -240,6 +244,20 @@ class PrescriptionAgg(db.Model):
     def setSchema(schema):
         PrescriptionAgg.__table__.schema = schema
 
+def getDrugChecked(idPrescription, idPatient):
+    pd1 = db.aliased(PrescriptionDrug)
+    pr1 = db.aliased(Prescription)
+
+    return db.session.query(func.count(distinct(func.concat(pd1.idDrug, pd1.dose, pd1.idFrequency))).label('checked'))\
+        .select_from(pd1)\
+        .join(pr1, pr1.id == pd1.idPrescription)\
+        .filter(pr1.idPatient == idPatient)\
+        .filter(pr1.status == 's')\
+        .filter(pr1.id < idPrescription)\
+        .filter(pd1.idDrug == PrescriptionDrug.idDrug)\
+        .filter(pd1.dose == PrescriptionDrug.dose)\
+        .filter(pd1.idFrequency == PrescriptionDrug.idFrequency)\
+        .as_scalar() 
 
 class PrescriptionDrug(db.Model):
     __tablename__ = 'presmed'
@@ -259,9 +277,12 @@ class PrescriptionDrug(db.Model):
     def setSchema(schema):
         PrescriptionDrug.__table__.schema = schema
 
-    def findByPrescription(idPrescription):
+    def findByPrescription(idPrescription, idPatient):
+        drugChecked = getDrugChecked(idPrescription, idPatient)
         return db.session\
-            .query(PrescriptionDrug, Drug, MeasureUnit, Frequency, Intervention, func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4).label('score'))\
+            .query(PrescriptionDrug, Drug, MeasureUnit, Frequency, Intervention, 
+                    func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4).label('score'),
+                    drugChecked.label('checked'))\
             .outerjoin(Outlier, Outlier.id == PrescriptionDrug.idOutlier)\
             .outerjoin(Drug, Drug.id == PrescriptionDrug.idDrug)\
             .outerjoin(MeasureUnit, MeasureUnit.id == PrescriptionDrug.idMeasureUnit)\
