@@ -22,6 +22,9 @@ def getOutliers(idSegment=1, idDrug=1):
 
     db.engine.dispose()
 
+    # TODO:
+    # Remove drug features from outlier list
+    # Change data result structure
     results = []
     if d != None:
         for o in outliers:
