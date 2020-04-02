@@ -23,20 +23,21 @@ def getOutliers(idSegment=1, idDrug=1):
     db.engine.dispose()
 
     results = []
-    for o in outliers:
-        results.append({
-            'idOutlier': o.id,
-            'idDrug': o.idDrug,
-            'countNum': o.countNum,
-            'dose': o.dose,
-            'frequency': o.frequency,
-            'score': o.score,
-            'manualScore': o.manualScore,
-            'antimicro': d.antimicro if d != None else '',
-            'mav': d.mav if d != None else '',
-            'controlled': d.controlled if d != None else '',
-            'idMeasureUnit': d.idMeasureUnit if d != None else ''
-        })
+    if d != None:
+        for o in outliers:
+            results.append({
+                'idOutlier': o.id,
+                'idDrug': o.idDrug,
+                'countNum': o.countNum,
+                'dose': o.dose,
+                'frequency': o.frequency,
+                'score': o.score,
+                'manualScore': o.manualScore,
+                'antimicro': d.antimicro,
+                'mav': d.mav,
+                'controlled': d.controlled,
+                'idMeasureUnit': d.idMeasureUnit
+            })
 
     return {
         'status': 'success',
