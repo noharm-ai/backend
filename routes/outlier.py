@@ -32,10 +32,10 @@ def getOutliers(idSegment=1, idDrug=1):
             'frequency': o.frequency,
             'score': o.score,
             'manualScore': o.manualScore,
-            'antimicro': d.antimicro,
-            'mav': d.mav,
-            'controlled': d.controlled,
-            'idMeasureUnit': d.idMeasureUnit
+            'antimicro': d.antimicro if d != None else '',
+            'mav': d.mav if d != None else '',
+            'controlled': d.controlled if d != None else '',
+            'idMeasureUnit': d.idMeasureUnit if d != None else ''
         })
 
     return {

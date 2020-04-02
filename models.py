@@ -248,15 +248,15 @@ def getDrugChecked(idPrescription, idPatient):
     pd1 = db.aliased(PrescriptionDrug)
     pr1 = db.aliased(Prescription)
 
-    return db.session.query(func.count(distinct(func.concat(pd1.idDrug, pd1.dose, pd1.idFrequency))).label('checked'))\
+    return db.session.query(func.count(distinct(func.concat(pd1.idDrug, pd1.doseconv, pd1.frequency))).label('checked'))\
         .select_from(pd1)\
         .join(pr1, pr1.id == pd1.idPrescription)\
         .filter(pr1.idPatient == idPatient)\
         .filter(pr1.status == 's')\
         .filter(pr1.id < idPrescription)\
         .filter(pd1.idDrug == PrescriptionDrug.idDrug)\
-        .filter(pd1.dose == PrescriptionDrug.dose)\
-        .filter(pd1.idFrequency == PrescriptionDrug.idFrequency)\
+        .filter(pd1.doseconv == PrescriptionDrug.doseconv)\
+        .filter(pd1.frequency == PrescriptionDrug.frequency)\
         .as_scalar() 
 
 class PrescriptionDrug(db.Model):
