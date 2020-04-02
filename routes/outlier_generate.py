@@ -88,8 +88,9 @@ def callOutliers(idSegment):
 
 @app_gen.route("/segments/<int:idSegment>/outliers/generate/fold/<int:fold>", methods=['GET'])
 @app_gen.route("/segments/<int:idSegment>/outliers/generate/drug/<int:idDrug>", methods=['GET'])
+@app_gen.route("/segments/<int:idSegment>/outliers/generate/drug/<int:idDrug>/clean/<int:clean>", methods=['GET'])
 @jwt_required
-def generateOutliers(idSegment,fold=None,idDrug=None):
+def generateOutliers(idSegment,fold=None,idDrug=None,clean=None):
     user = User.find(get_jwt_identity())
     setSchema(user.schema)
 
@@ -110,13 +111,14 @@ def generateOutliers(idSegment,fold=None,idDrug=None):
     if idDrug != None:
         query += " AND fkmedicamento = " + str(int(idDrug))
 
-        queryUpdate = "UPDATE " + user.schema + ".presmed SET idoutlier = NULL WHERE fkmedicamento = " + str(int(idDrug)) + " AND idsegmento = " + str(int(idSegment)) + ";"
-        result = db.engine.execute(queryUpdate)
-        print('RowCount Update Drug', result.rowcount)
+        if clean != None:
+            queryUpdate = "UPDATE " + user.schema + ".presmed SET idoutlier = NULL WHERE fkmedicamento = " + str(int(idDrug)) + " AND idsegmento = " + str(int(idSegment)) + ";"
+            result = db.engine.execute(queryUpdate)
+            print('RowCount Update Drug', result.rowcount)
 
-        queryDelete = "DELETE FROM " + user.schema + ".outlier WHERE fkmedicamento = " + str(int(idDrug)) + " AND idsegmento = " + str(int(idSegment)) + ";"
-        result = db.engine.execute(queryDelete)
-        print('RowCount Delete Drug', result.rowcount)
+            queryDelete = "DELETE FROM " + user.schema + ".outlier WHERE fkmedicamento = " + str(int(idDrug)) + " AND idsegmento = " + str(int(idSegment)) + ";"
+            result = db.engine.execute(queryDelete)
+            print('RowCount Delete Drug', result.rowcount)
 
         queryInsert = "INSERT INTO " + user.schema + ".outlier (idsegmento, fkmedicamento, doseconv, frequenciadia, contagem)\
                 SELECT idsegmento, fkmedicamento, doseconv, frequenciadia, SUM(contagem)\
