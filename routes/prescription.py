@@ -242,3 +242,38 @@ def setPrescriptionStatus(idPrescription):
             'status': 'error',
             'message': str(e)
         }, status.HTTP_500_INTERNAL_SERVER_ERROR
+
+@app_pres.route('/prescriptions/drug/<int:idPrescriptionDrug>', methods=['PUT'])
+@jwt_required
+def setDrugStatus(idPrescriptionDrug):
+    user = User.find(get_jwt_identity())
+    setSchema(user.schema)
+
+    data = request.get_json()
+
+    pd = PrescriptionDrug.query.get(idPrescriptionDrug)
+    pd.status = data.get('status', None)
+    pd.update = func.now()
+    pd.user = user.id
+
+    try:
+        db.session.commit()
+
+        return {
+            'status': 'success',
+            'data': pd.id
+        }, status.HTTP_200_OK
+    except AssertionError as e:
+        db.engine.dispose()
+
+        return {
+            'status': 'error',
+            'message': str(e)
+        }, status.HTTP_400_BAD_REQUEST
+    except Exception as e:
+        db.engine.dispose()
+
+        return {
+            'status': 'error',
+            'message': str(e)
+        }, status.HTTP_500_INTERNAL_SERVER_ERROR

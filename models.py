@@ -50,7 +50,7 @@ class Prescription(db.Model):
     idDepartment = db.Column("fksetor", db.Integer, nullable=False)
     idSegment = db.Column("idsegmento", db.Integer, nullable=False)
     date = db.Column("dtprescricao", db.DateTime, nullable=False)
-    status = db.Column('status', db.Integer, nullable=False)
+    status = db.Column('status', db.String(1), nullable=False)
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.Integer, nullable=True)
 
@@ -273,6 +273,9 @@ class PrescriptionDrug(db.Model):
     doseconv = db.Column("doseconv", db.Float, nullable=True)
     route = db.Column('via', db.String, nullable=True)
     observation = db.Column('complemento', db.String, nullable=True)
+    status = db.Column('status', db.String(1), nullable=False)
+    update = db.Column("update_at", db.DateTime, nullable=True)
+    user = db.Column("update_by", db.Integer, nullable=True)
 
     def setSchema(schema):
         PrescriptionDrug.__table__.schema = schema

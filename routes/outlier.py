@@ -35,16 +35,18 @@ def getOutliers(idSegment=1, idDrug=1):
                 'dose': o.dose,
                 'frequency': o.frequency,
                 'score': o.score,
-                'manualScore': o.manualScore,
-                'antimicro': d.antimicro,
-                'mav': d.mav,
-                'controlled': d.controlled,
-                'idMeasureUnit': d.idMeasureUnit
+                'manualScore': o.manualScore
             })
 
     return {
         'status': 'success',
-        'data': results
+        'data': {
+            'outliers': results,
+            'antimicro': d.antimicro,
+            'mav': d.mav,
+            'controlled': d.controlled,
+            'idMeasureUnit': d.idMeasureUnit
+        }
     }, status.HTTP_200_OK
 
 
