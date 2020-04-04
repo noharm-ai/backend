@@ -102,6 +102,7 @@ def getPrescription(idPrescription):
             'route': pd[0].route,
             'score': str(pd[5]),
             'checked': str(pd[6]),
+            'status': pd[0].status,
             'intervention': {
                 'id': pd[4].id,
                 'idPrescriptionDrug': pd[4].idPrescriptionDrug,
