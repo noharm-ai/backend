@@ -274,6 +274,7 @@ class PrescriptionDrug(db.Model):
     route = db.Column('via', db.String, nullable=True)
     observation = db.Column('complemento', db.String, nullable=True)
     status = db.Column('status', db.String(1), nullable=False)
+    near = db.Column("aprox", db.Boolean, nullable=True)
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.Integer, nullable=True)
 
@@ -303,9 +304,9 @@ class Drug(db.Model):
     idMeasureUnit = db.Column("fkunidademedida", db.String, nullable=False)
     idHospital = db.Column("fkhospital", db.Integer, nullable=False)
     name = db.Column("nome", db.String, nullable=False)
-    antimicro = db.Column("antimicro", db.String, nullable=True)
-    mav = db.Column("mav", db.String, nullable=True)
-    controlled = db.Column("controlados", db.String, nullable=True)
+    antimicro = db.Column("antimicro", db.Boolean, nullable=True)
+    mav = db.Column("mav", db.Boolean, nullable=True)
+    controlled = db.Column("controlados", db.Boolean, nullable=True)
 
     def setSchema(schema):
         Drug.__table__.schema = schema

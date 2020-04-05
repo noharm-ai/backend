@@ -103,6 +103,7 @@ def getPrescription(idPrescription):
             'score': str(pd[5]),
             'checked': str(pd[6]),
             'status': pd[0].status,
+            'near': pd[0].near,
             'intervention': {
                 'id': pd[4].id,
                 'idPrescriptionDrug': pd[4].idPrescriptionDrug,
