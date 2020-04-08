@@ -67,7 +67,7 @@ class Prescription(db.Model):
                 )) - func.extract('epoch', Prescription.date)) / 86400).label('daysAgo'), score,
                 Department.name.label('department')
             )\
-            .join(Patient, and_(Patient.id == Prescription.idPatient))\
+            .join(Patient, Patient.admissionNumber == Prescription.admissionNumber)\
             .join(Department, Department.id == Prescription.idDepartment)\
             .filter(Prescription.id == idPrescription)\
             .first()

@@ -19,12 +19,18 @@ def getOutliers(idSegment=1, idDrug=1):
         .order_by(Outlier.countNum.desc())\
         .all()
     d = Drug.query.get(idDrug)
-
     db.engine.dispose()
 
-    # TODO:
-    # Remove drug features from outlier list
-    # Change data result structure
+    units = getUnits(idDrug) # TODO: Refactor
+    defaultUnit = 'big name for a measure unit'
+    bUnit = False
+    for unit in units[0]['data']:
+        if unit['fator'] == 1 and len(unit['idMeasureUnit']) < len(defaultUnit):
+            defaultUnit = unit['idMeasureUnit']
+            bUnit = True
+
+    if not bUnit: defaultUnit = '';
+
     results = []
     if d != None:
         for o in outliers:
@@ -32,7 +38,7 @@ def getOutliers(idSegment=1, idDrug=1):
                 'idOutlier': o.id,
                 'idDrug': o.idDrug,
                 'countNum': o.countNum,
-                'dose': o.dose,
+                'dose': str(o.dose) + ' ' + str(defaultUnit),
                 'frequency': o.frequency,
                 'score': o.score,
                 'manualScore': o.manualScore
@@ -173,7 +179,6 @@ def getUnits(idDrug):
 
     results = []
     for u in units:
-        print(u)
         results.append({
             'idMeasureUnit': u.id,
             'description': u.description,
