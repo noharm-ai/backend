@@ -1,6 +1,6 @@
 import random
 from flask_api import status
-from models import db, User, Patient, Prescription, PrescriptionDrug, InterventionReason, Intervention, Segment, setSchema, Exams
+from models import db, User, Patient, Prescription, PrescriptionDrug, InterventionReason, Intervention, Segment, setSchema, Exams, PrescriptionPic
 from flask import Blueprint, request
 from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
@@ -13,11 +13,11 @@ app_pres = Blueprint('app_pres',__name__)
 @app_pres.route("/prescriptions", methods=['GET'])
 @app_pres.route("/prescriptions/segments/<int:idSegment>", methods=['GET'])
 @jwt_required
-def getPrescriptions(idSegment=1):
+def getPrescriptions(idSegment=1, idPrescription=None):
     user = User.find(get_jwt_identity())
     setSchema(user.schema)
 
-    patients = Patient.getPatients(idSegment=idSegment, limit=200)
+    patients = Patient.getPatients(idSegment=idSegment, limit=200, idPrescription=idPrescription)
     db.engine.dispose()
 
     results = []
@@ -257,6 +257,15 @@ def setDrugStatus(idPrescriptionDrug):
     pd.status = data.get('status', None)
     pd.update = func.now()
     pd.user = user.id
+
+
+    ppic = PrescriptionPic.query.get(pd.idPrescription)
+    if ppic is None:
+        p, code = getPrescriptions(idSegment=pd.idSegment, idPrescription=pd.idPrescription)
+        ppic = PrescriptionPic()
+        ppic.id = pd.idPrescription
+        ppic.picture = p['data'][0]
+        db.session.add(ppic)
 
     try:
         db.session.commit()

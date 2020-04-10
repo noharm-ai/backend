@@ -1,6 +1,7 @@
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, text, and_, or_, desc, asc, distinct
 from datetime import date, timedelta
+from sqlalchemy.dialects import postgresql
 
 db = SQLAlchemy()
 
@@ -20,6 +21,7 @@ def setSchema(schema):
     Exams.setSchema(schema)
     PrescriptionAgg.setSchema(schema)
     MeasureUnitConvert.setSchema(schema)
+    PrescriptionPic.setSchema(schema)
 
 
 class User(db.Model):
@@ -153,7 +155,7 @@ class Patient(db.Model):
     def setSchema(schema):
         Patient.__table__.schema = schema
 
-    def getPatients(**kwargs):
+    def getPatients(idSegment, limit, idPrescription=None):
         score = getAggScore()
         scoreOne = getScore(1)
         scoreTwo = getScore(2)
@@ -186,9 +188,12 @@ class Patient(db.Model):
             .join(Patient, Patient.admissionNumber == Prescription.admissionNumber)\
             .join(Department, Department.id == Prescription.idDepartment)
 
-        idSegment = kwargs.get('idSegment', None)
         if (not(idSegment is None)):
             q = q.filter(Prescription.idSegment == idSegment)
+
+        if (not(idPrescription is None)):
+            q = q.filter(Prescription.id == idPrescription)
+
 
         q = q.filter(Prescription.date > (date.today() - timedelta(days=1)))
 
@@ -204,7 +209,6 @@ class Patient(db.Model):
                     'antimicro', 'mav', 'controlled', 'sonda', 'diff', 'department')
 
         wrapper = wrapper.order_by(desc(prescritionAlias.date))
-        limit = kwargs.get('limit', 20)
 
         return wrapper.limit(limit).all()
 
@@ -268,6 +272,7 @@ class PrescriptionDrug(db.Model):
     idDrug = db.Column("fkmedicamento", db.Integer, nullable=False)
     idMeasureUnit = db.Column("fkunidademedida", db.Integer, nullable=False)
     idFrequency = db.Column("fkfrequencia", db.String, nullable=True)
+    idSegment = db.Column("idsegmento", db.Integer, nullable=False)
     dose = db.Column("dose", db.Float, nullable=True)
     frequency = db.Column("frequenciadia", db.Float, nullable=True)
     doseconv = db.Column("doseconv", db.Float, nullable=True)
@@ -468,3 +473,12 @@ class Exams(db.Model):
 
     def setSchema(schema):
         Exams.__table__.schema = schema
+
+class PrescriptionPic(db.Model):
+    __tablename__ = 'prescricaofoto'
+
+    id = db.Column("fkprescricao", db.Integer, primary_key=True)
+    picture = db.Column("foto", postgresql.JSON, nullable=False)
+
+    def setSchema(schema):
+        PrescriptionPic.__table__.schema = schema
