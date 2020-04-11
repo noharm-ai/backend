@@ -110,6 +110,7 @@ def generateOutliers(idSegment,fold=None,idDrug=None,clean=None):
 
     if idDrug != None:
         query += " AND fkmedicamento = " + str(int(idDrug))
+        default = "NULL"
 
         if clean != None:
             queryUpdate = "UPDATE " + user.schema + ".presmed SET idoutlier = NULL WHERE fkmedicamento = " + str(int(idDrug)) + " AND idsegmento = " + str(int(idSegment)) + ";"
@@ -120,8 +121,10 @@ def generateOutliers(idSegment,fold=None,idDrug=None,clean=None):
             result = db.engine.execute(queryDelete)
             print('RowCount Delete Drug', result.rowcount)
 
-        queryInsert = "INSERT INTO " + user.schema + ".outlier (idsegmento, fkmedicamento, doseconv, frequenciadia, contagem)\
-                SELECT idsegmento, fkmedicamento, doseconv, frequenciadia, SUM(contagem)\
+            if clean == 0: default = '0';
+
+        queryInsert = "INSERT INTO " + user.schema + ".outlier (idsegmento, fkmedicamento, doseconv, frequenciadia, contagem, escore)\
+                SELECT idsegmento, fkmedicamento, doseconv, frequenciadia, SUM(contagem), " + default + "\
                 FROM " + user.schema + ".prescricaoagg\
                 WHERE idsegmento = " + str(int(idSegment)) + "\
                 AND fkmedicamento = " + str(int(idDrug)) + "\
@@ -130,6 +133,8 @@ def generateOutliers(idSegment,fold=None,idDrug=None,clean=None):
 
         result = db.engine.execute(queryInsert)
         print('RowCount Insert Drug', result.rowcount)
+
+        if clean != None and clean == 0: return { 'status': 'success' }, status.HTTP_200_OK
 
     print(query)
 
