@@ -102,6 +102,7 @@ def getPrescription(idPrescription):
             'route': pd[0].route,
             'score': str(pd[5]),
             'checked': str(pd[6]),
+            'intervened': str(pd[7]),
             'status': pd[0].status,
             'near': pd[0].near,
             'intervention': {

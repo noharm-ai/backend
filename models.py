@@ -248,20 +248,26 @@ class PrescriptionAgg(db.Model):
     def setSchema(schema):
         PrescriptionAgg.__table__.schema = schema
 
-def getDrugChecked(idPrescription, idPatient):
+def getDrugOption(idPrescription, idPatient, option):
     pd1 = db.aliased(PrescriptionDrug)
     pr1 = db.aliased(Prescription)
 
-    return db.session.query(func.count(distinct(func.concat(pd1.idDrug, pd1.doseconv, pd1.frequency))).label('checked'))\
+    
+    query = db.session.query(func.count(distinct(func.concat(pd1.idDrug, pd1.doseconv, pd1.frequency))).label('checked'))\
         .select_from(pd1)\
         .join(pr1, pr1.id == pd1.idPrescription)\
         .filter(pr1.idPatient == idPatient)\
-        .filter(pr1.status == 's')\
         .filter(pr1.id < idPrescription)\
         .filter(pd1.idDrug == PrescriptionDrug.idDrug)\
         .filter(pd1.doseconv == PrescriptionDrug.doseconv)\
         .filter(pd1.frequency == PrescriptionDrug.frequency)\
-        .as_scalar() 
+
+    if option == 'checked':
+        query = query.filter(pr1.status == 's')
+    else:
+        query = query.filter(pd1.status == 's')
+
+    return query.as_scalar() 
 
 class PrescriptionDrug(db.Model):
     __tablename__ = 'presmed'
@@ -287,11 +293,14 @@ class PrescriptionDrug(db.Model):
         PrescriptionDrug.__table__.schema = schema
 
     def findByPrescription(idPrescription, idPatient):
-        drugChecked = getDrugChecked(idPrescription, idPatient)
+        
+        drugChecked = getDrugOption(idPrescription, idPatient, 'checked')
+        drugIntervention = getDrugOption(idPrescription, idPatient, 'intervened')
+
         return db.session\
             .query(PrescriptionDrug, Drug, MeasureUnit, Frequency, Intervention, 
                     func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4).label('score'),
-                    drugChecked.label('checked'))\
+                    drugChecked.label('checked'), drugIntervention.label('intervened'))\
             .outerjoin(Outlier, Outlier.id == PrescriptionDrug.idOutlier)\
             .outerjoin(Drug, Drug.id == PrescriptionDrug.idDrug)\
             .outerjoin(MeasureUnit, MeasureUnit.id == PrescriptionDrug.idMeasureUnit)\
