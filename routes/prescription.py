@@ -76,7 +76,7 @@ def getPrescription(idPrescription):
 
     prescription = Prescription.getPrescription(idPrescription)
 
-    if (prescription is None):
+    if (prescription is None or prescription[1] is None):
         return {}, status.HTTP_204_NO_CONTENT
 
     drugs = PrescriptionDrug.findByPrescription(idPrescription, prescription[1].id)

@@ -70,7 +70,7 @@ class Prescription(db.Model):
                 Department.name.label('department')
             )\
             .join(Patient, Patient.admissionNumber == Prescription.admissionNumber)\
-            .join(Department, Department.id == Prescription.idDepartment)\
+            .outerjoin(Department, Department.id == Prescription.idDepartment)\
             .filter(Prescription.id == idPrescription)\
             .first()
 
@@ -186,7 +186,7 @@ class Patient(db.Model):
                 Department.name.label('department')
             )\
             .join(Patient, Patient.admissionNumber == Prescription.admissionNumber)\
-            .join(Department, Department.id == Prescription.idDepartment)
+            .outerjoin(Department, Department.id == Prescription.idDepartment)
 
         if (not(idSegment is None)):
             q = q.filter(Prescription.idSegment == idSegment)
