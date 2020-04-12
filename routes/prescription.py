@@ -6,6 +6,7 @@ from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
 from .utils import mdrd_calc, cg_calc, none2zero, formatExam
 from sqlalchemy import func
+from datetime import date
 
 app_pres = Blueprint('app_pres',__name__)
 
@@ -22,15 +23,23 @@ def getPrescriptions(idSegment=1, idPrescription=None):
 
     results = []
     for p in patients:
+
+        patient = p[1]
+        if (patient is None):
+            patient = Patient()
+            patient.birthdate = date.today()
+            patient.id = p[0].idPatient
+            patient. admissionNumber = p[0].admissionNumber
+
         results.append({
             'idPrescription': p[0].id,
             'idPatient': p[0].idPatient,
-            'name': p[1].admissionNumber,
-            'admissionNumber': p[1].admissionNumber,
-            'birthdate': p[1].birthdate.isoformat(),
-            'gender': p[1].gender,
-            'weight': p[1].weight,
-            'skinColor': p[1].skinColor,
+            'name': patient.admissionNumber,
+            'admissionNumber': patient.admissionNumber,
+            'birthdate': patient.birthdate.isoformat(),
+            'gender': patient.gender,
+            'weight': patient.weight,
+            'skinColor': patient.skinColor,
             'date': p[0].date.isoformat(),
             'department': str(p[19]),
             'daysAgo': p[2],
@@ -45,8 +54,8 @@ def getPrescriptions(idSegment=1, idPrescription=None):
             'diff': str(p[18]),
             'tgo': none2zero(p[7]),
             'tgp': none2zero(p[8]),
-            'mdrd': mdrd_calc(str(p[9]), p[1].birthdate.isoformat(), p[1].gender, p[1].skinColor),
-            'cg': cg_calc(str(p[9]), p[1].birthdate.isoformat(), p[1].gender, p[1].weight),
+            'mdrd': mdrd_calc(str(p[9]), patient.birthdate.isoformat(), patient.gender, patient.skinColor),
+            'cg': cg_calc(str(p[9]), patient.birthdate.isoformat(), patient.gender, patient.weight),
             'k': none2zero(p[10]),
             'na': none2zero(p[11]),
             'mg': none2zero(p[12]),
@@ -76,19 +85,26 @@ def getPrescription(idPrescription):
 
     prescription = Prescription.getPrescription(idPrescription)
 
-    if (prescription is None or prescription[1] is None):
+    if (prescription is None):
         return {}, status.HTTP_204_NO_CONTENT
 
-    drugs = PrescriptionDrug.findByPrescription(idPrescription, prescription[1].id)
+    patient = prescription[1]
+    if (patient is None):
+        patient = Patient()
+        patient.birthdate = date.today()
+        patient.id = prescription[0].idPatient
+        patient. admissionNumber = prescription[0].admissionNumber
+
+    drugs = PrescriptionDrug.findByPrescription(idPrescription, patient.id)
     db.engine.dispose()
 
-    tgo = getExams('TGO', prescription[1].id)
-    tgp = getExams('TGP', prescription[1].id)
-    cr = getExams('CR', prescription[1].id)
-    k = getExams('K', prescription[1].id)
-    na = getExams('NA', prescription[1].id)
-    mg = getExams('MG', prescription[1].id)
-    rni = getExams('PRO', prescription[1].id)
+    tgo = getExams('TGO', patient.id)
+    tgp = getExams('TGP', patient.id)
+    cr = getExams('CR', patient.id)
+    k = getExams('K', patient.id)
+    na = getExams('NA', patient.id)
+    mg = getExams('MG', patient.id)
+    rni = getExams('PRO', patient.id)
 
     pDrugs = []
     for pd in drugs:
@@ -119,19 +135,19 @@ def getPrescription(idPrescription):
         'data': {
             'idPrescription': prescription[0].id,
             'idSegment': prescription[0].idSegment,
-            'idPatient': prescription[1].id,
+            'idPatient': patient.id,
             'name': prescription[0].admissionNumber,
             'admissionNumber': prescription[0].admissionNumber,
-            'birthdate': prescription[1].birthdate.isoformat(),
-            'gender': prescription[1].gender,
-            'weight': prescription[1].weight,
+            'birthdate': patient.birthdate.isoformat(),
+            'gender': patient.gender,
+            'weight': patient.weight,
             'class': random.choice(['green','yellow','red']),
-            'skinColor': prescription[1].skinColor,
+            'skinColor': patient.skinColor,
             'department': prescription[4],
             'tgo': formatExam(tgo),
             'tgp': formatExam(tgp),
-            'mdrd': mdrd_calc(cr.value, prescription[1].birthdate.isoformat(), prescription[1].gender, prescription[1].skinColor) if cr is not None else '',
-            'cg': cg_calc(cr.value, prescription[1].birthdate.isoformat(), prescription[1].gender, prescription[1].weight) if cr is not None else '',
+            'mdrd': mdrd_calc(cr.value, patient.birthdate.isoformat(), patient.gender, patient.skinColor) if cr is not None else '',
+            'cg': cg_calc(cr.value, patient.birthdate.isoformat(), patient.gender, patient.weight) if cr is not None else '',
             'creatinina': formatExam(cr),
             'k': formatExam(k),
             'na': formatExam(na),

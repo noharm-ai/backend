@@ -30,6 +30,7 @@ def mdrd_calc(cr, birthdate, gender, skinColor):
     if not is_float(cr): return ''
     
     age = data2age(birthdate)
+    if age == 0: return ''
 
     eGFR = 175 * (float(cr))**(-1.154) * (age)**(-0.203)
 
@@ -46,6 +47,7 @@ def cg_calc(cr, birthdate, gender, weight):
     if not is_float(weight): return ''
 
     age = data2age(birthdate)
+    if age == 0: return ''
 
     ccr = ((140 - age) * float(weight)) / (72 * float(cr))
     if gender == 'F': ccr *= 0.85

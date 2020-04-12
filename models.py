@@ -69,7 +69,7 @@ class Prescription(db.Model):
                 )) - func.extract('epoch', Prescription.date)) / 86400).label('daysAgo'), score,
                 Department.name.label('department')
             )\
-            .join(Patient, Patient.admissionNumber == Prescription.admissionNumber)\
+            .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)\
             .outerjoin(Department, Department.id == Prescription.idDepartment)\
             .filter(Prescription.id == idPrescription)\
             .first()
@@ -185,7 +185,7 @@ class Patient(db.Model):
                 (count - diff).label('diff'),
                 Department.name.label('department')
             )\
-            .join(Patient, Patient.admissionNumber == Prescription.admissionNumber)\
+            .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)\
             .outerjoin(Department, Department.id == Prescription.idDepartment)
 
         if (not(idSegment is None)):
