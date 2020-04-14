@@ -3,6 +3,7 @@ from models import db, User, Patient, Prescription, PrescriptionDrug, Interventi
 from flask import Blueprint, request
 from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
+from sqlalchemy import asc
 
 app_seg = Blueprint('app_seg',__name__)
 
@@ -41,6 +42,7 @@ def getSegmentsId(idSegment):
     departments = Department.query\
                 .outerjoin(SegmentDepartment, SegmentDepartment.idDepartment == Department.id)\
                 .filter(SegmentDepartment.id == idSegment)\
+                .order_by(asc(Department.name))\
                 .all()
 
     deps = []

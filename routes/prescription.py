@@ -19,7 +19,7 @@ def getPrescriptions(idSegment=1, idPrescription=None, idDept=None):
     user = User.find(get_jwt_identity())
     setSchema(user.schema)
 
-    patients = Patient.getPatients(idSegment=idSegment, limit=200, idPrescription=idPrescription)
+    patients = Patient.getPatients(idSegment=idSegment, limit=200, idPrescription=idPrescription, idDept=idDept)
     db.engine.dispose()
 
     results = []
@@ -73,21 +73,6 @@ def getPrescriptions(idSegment=1, idPrescription=None, idDept=None):
     }, status.HTTP_200_OK
 
 
-
-@app_pres.route("/departments/<int:idSegment>", methods=['GET'])
-@jwt_required
-def getDepartmentsBySegment(idSegment=1):
-    user = User.find(get_jwt_identity())
-    setSchema(user.schema)
-
-    results =[]
-
-    return {
-        'status': 'success',
-        'data': results
-    }, status.HTTP_200_OK
-
-
 @app_pres.route("/prescriptions/segments/<int:idSegment>/status", methods=['GET'])
 @app_pres.route("/prescriptions/segments/<int:idSegment>/dept/<int:idDept>/status", methods=['GET'])
 @jwt_required
@@ -95,7 +80,15 @@ def getPrescriptionsStatus(idSegment=1, idDept=None):
     user = User.find(get_jwt_identity())
     setSchema(user.schema)
 
-    results =[]
+    patients = Patient.getPatients(idSegment=idSegment, limit=200, idDept=idDept, onlyStatus=True)
+    db.engine.dispose()
+
+    results = []
+    for p in patients:
+        results.append({
+            'idPrescription': p.id,
+            'stauts': p.status
+        })
 
     return {
         'status': 'success',

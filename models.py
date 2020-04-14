@@ -156,7 +156,7 @@ class Patient(db.Model):
     def setSchema(schema):
         Patient.__table__.schema = schema
 
-    def getPatients(idSegment, limit, idPrescription=None):
+    def getPatients(idSegment, limit, idPrescription=None, idDept=None, onlyStatus=False):
         score = getAggScore()
         scoreOne = getScore(1)
         scoreTwo = getScore(2)
@@ -175,41 +175,50 @@ class Patient(db.Model):
         diff = getDrugDiff()
         count = getDrugsCount()
 
-        q = db.session\
-            .query(
-                Prescription, Patient,
-                func.trunc((func.extract('epoch', func.current_date(
-                )) - func.extract('epoch', Prescription.date)) / 86400).label('daysAgo'),
-                score.label('score'), scoreOne.label('scoreOne'), scoreTwo.label('scoreTwo'), scoreThree.label('scoreThree'),
-                tgo.label('tgo'), tgp.label('tgp'), cr.label('cr'), k.label('k'), na.label('na'), mg.label('mg'), rni.label('rni'),
-                antimicro.label('antimicro'), mav.label('mav'), controlled.label('controlled'), sonda.label('sonda'),
-                (count - diff).label('diff'),
-                Department.name.label('department')
-            )\
-            .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)\
-            .outerjoin(Department, Department.id == Prescription.idDepartment)
+        if onlyStatus:
+            q = db.session.query(Prescription)
+        else:
+            q = db.session\
+                .query(
+                    Prescription, Patient,
+                    func.trunc((func.extract('epoch', func.current_date(
+                    )) - func.extract('epoch', Prescription.date)) / 86400).label('daysAgo'),
+                    score.label('score'), scoreOne.label('scoreOne'), scoreTwo.label('scoreTwo'), scoreThree.label('scoreThree'),
+                    tgo.label('tgo'), tgp.label('tgp'), cr.label('cr'), k.label('k'), na.label('na'), mg.label('mg'), rni.label('rni'),
+                    antimicro.label('antimicro'), mav.label('mav'), controlled.label('controlled'), sonda.label('sonda'),
+                    (count - diff).label('diff'),
+                    Department.name.label('department')
+                )\
+                .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)\
+                .outerjoin(Department, Department.id == Prescription.idDepartment)
 
         if (not(idSegment is None)):
             q = q.filter(Prescription.idSegment == idSegment)
 
+        if (not(idDept is None)):
+            q = q.filter(Prescription.idDepartment == idDept)
+
         if (not(idPrescription is None)):
             q = q.filter(Prescription.id == idPrescription)
 
-
         q = q.filter(Prescription.date > (date.today() - timedelta(days=1)))
 
-        q = q.with_labels().subquery()
+        if onlyStatus:
+            wrapper = q
+        else:
+            q = q.with_labels().subquery()
 
-        prescritionAlias = db.aliased(Prescription, q)
-        patientAlias = db.aliased(Patient, q)
+            prescritionAlias = db.aliased(Prescription, q)
+            patientAlias = db.aliased(Patient, q)
 
-        wrapper = db.session\
-            .query(prescritionAlias, patientAlias,\
-                    '"daysAgo"', 'score', '"scoreOne"', '"scoreTwo"', '"scoreThree"',\
-                    'tgo', 'tgp', 'cr', 'k', 'na', 'mg', 'rni',\
-                    'antimicro', 'mav', 'controlled', 'sonda', 'diff', 'department')
+            wrapper = db.session\
+                .query(prescritionAlias, patientAlias,\
+                        '"daysAgo"', 'score', '"scoreOne"', '"scoreTwo"', '"scoreThree"',\
+                        'tgo', 'tgp', 'cr', 'k', 'na', 'mg', 'rni',\
+                        'antimicro', 'mav', 'controlled', 'sonda', 'diff', 'department')
 
-        wrapper = wrapper.order_by(desc(prescritionAlias.date))
+            wrapper = wrapper.order_by(desc(prescritionAlias.date))
+
 
         return wrapper.limit(limit).all()
 
