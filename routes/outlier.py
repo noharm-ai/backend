@@ -113,7 +113,7 @@ def setOutlierNotes(idOutlier):
         obs.dose = o.dose
         obs.frequency = o.frequency
 
-    obs.notes = data.get('notes', 1)
+    obs.notes = data.get('notes', None)
     obs.update = func.now()
     obs.user  = user.id
 
