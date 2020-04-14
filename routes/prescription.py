@@ -51,7 +51,7 @@ def getPrescriptions(idSegment=1, idPrescription=None, idDept=None):
             'am': str(p[14]),
             'av': str(p[15]),
             'controlled': str(p[16]),
-            'np': 0,
+            'np': str(p[20]),
             'tube': str(p[17]),
             'diff': str(p[18]),
             'tgo': none2zero(p[7]),
@@ -63,7 +63,7 @@ def getPrescriptions(idSegment=1, idPrescription=None, idDept=None):
             'mg': none2zero(p[12]),
             'rni': none2zero(p[13]),
             'patientScore': 'Alto',
-            'class': 'yellow', #random.choice(['green','yellow','red']),
+            'class': 'red' if p[3] > 12 else 'orange' if p[3] > 8 else 'yellow' if p[3] > 4 else 'green',
             'status': p[0].status,
         })
 

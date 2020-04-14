@@ -171,6 +171,7 @@ class Patient(db.Model):
         antimicro = getDrugClass(Drug.antimicro)
         mav = getDrugClass(Drug.mav)
         controlled = getDrugClass(Drug.controlled)
+        notdefault = getDrugClass(Drug.notdefault)
         sonda = getDrugRoute("%sonda%")
         diff = getDrugDiff()
         count = getDrugsCount()
@@ -186,8 +187,7 @@ class Patient(db.Model):
                     score.label('score'), scoreOne.label('scoreOne'), scoreTwo.label('scoreTwo'), scoreThree.label('scoreThree'),
                     tgo.label('tgo'), tgp.label('tgp'), cr.label('cr'), k.label('k'), na.label('na'), mg.label('mg'), rni.label('rni'),
                     antimicro.label('antimicro'), mav.label('mav'), controlled.label('controlled'), sonda.label('sonda'),
-                    (count - diff).label('diff'),
-                    Department.name.label('department')
+                    (count - diff).label('diff'), Department.name.label('department'), controlled.label('notdefault')
                 )\
                 .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)\
                 .outerjoin(Department, Department.id == Prescription.idDepartment)
@@ -215,7 +215,7 @@ class Patient(db.Model):
                 .query(prescritionAlias, patientAlias,\
                         '"daysAgo"', 'score', '"scoreOne"', '"scoreTwo"', '"scoreThree"',\
                         'tgo', 'tgp', 'cr', 'k', 'na', 'mg', 'rni',\
-                        'antimicro', 'mav', 'controlled', 'sonda', 'diff', 'department')
+                        'antimicro', 'mav', 'controlled', 'sonda', 'diff', 'department', 'notdefault')
 
             wrapper = wrapper.order_by(desc(prescritionAlias.date))
 
