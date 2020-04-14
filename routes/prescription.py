@@ -13,8 +13,9 @@ app_pres = Blueprint('app_pres',__name__)
 @app_pres.route("/patients", methods=['GET'])
 @app_pres.route("/prescriptions", methods=['GET'])
 @app_pres.route("/prescriptions/segments/<int:idSegment>", methods=['GET'])
+@app_pres.route("/prescriptions/segments/<int:idSegment>/dept/<int:idDept>", methods=['GET'])
 @jwt_required
-def getPrescriptions(idSegment=1, idPrescription=None):
+def getPrescriptions(idSegment=1, idPrescription=None, idDept=None):
     user = User.find(get_jwt_identity())
     setSchema(user.schema)
 
@@ -50,6 +51,7 @@ def getPrescriptions(idSegment=1, idPrescription=None):
             'am': str(p[14]),
             'av': str(p[15]),
             'controlled': str(p[16]),
+            'np': 0,
             'tube': str(p[17]),
             'diff': str(p[18]),
             'tgo': none2zero(p[7]),
@@ -70,12 +72,81 @@ def getPrescriptions(idSegment=1, idPrescription=None):
         'data': results
     }, status.HTTP_200_OK
 
+
+
+@app_pres.route("/departments/<int:idSegment>", methods=['GET'])
+@jwt_required
+def getDepartmentsBySegment(idSegment=1):
+    user = User.find(get_jwt_identity())
+    setSchema(user.schema)
+
+    results =[]
+
+    return {
+        'status': 'success',
+        'data': results
+    }, status.HTTP_200_OK
+
+
+@app_pres.route("/prescriptions/segments/<int:idSegment>/status", methods=['GET'])
+@app_pres.route("/prescriptions/segments/<int:idSegment>/dept/<int:idDept>/status", methods=['GET'])
+@jwt_required
+def getPrescriptionsStatus(idSegment=1, idDept=None):
+    user = User.find(get_jwt_identity())
+    setSchema(user.schema)
+
+    results =[]
+
+    return {
+        'status': 'success',
+        'data': results
+    }, status.HTTP_200_OK
+
+
 def getExams(typeExam, idPatient):
     return db.session.query(Exams.value, Exams.unit, Exams.date)\
         .select_from(Exams)\
         .filter(Exams.idPatient == idPatient)\
         .filter(Exams.typeExam == typeExam)\
         .order_by(Exams.date.desc()).limit(1).first()
+
+def getDrugType(drugList, pDrugs, checked=False, suspended=False):
+    for pd in drugList:
+
+        belong = False
+
+        if checked and (str(pd[6]) == '1' and bool(pd[0].suspended) == False): belong = True;
+        if suspended and (bool(pd[0].suspended) == True): belong = True;
+        if (not checked and not suspended) and (str(pd[6]) == '0' and bool(pd[0].suspended) == False): belong = True;
+
+        if belong:
+            pDrugs.append({
+                'idPrescriptionDrug': pd[0].id,
+                'idDrug': pd[0].idDrug,
+                'drug': pd[1].name if pd[1] is not None else 'Medicamento ' + str(pd[0].idDrug),
+                'dose': pd[0].dose,
+                'measureUnit': pd[2].description,
+                'frequency': pd[3].description,
+                'time': '12h 18h',
+                'obs': pd[0].notes,
+                'period': '5D',
+                'period-dates': ['09/04/2020','10/04/2020','11/04/2020','12/04/2020','13/04/2020'],
+                'route': pd[0].route,
+                'score': str(pd[5]),
+                'checked': str(pd[6]),
+                'intervened': str(pd[7]),
+                'suspended': bool(pd[0].suspended),
+                'status': pd[0].status,
+                'near': pd[0].near,
+                'intervention': {
+                    'id': pd[4].id,
+                    'idPrescriptionDrug': pd[4].idPrescriptionDrug,
+                    'idInterventionReason': pd[4].idInterventionReason,
+                    'propagation': pd[4].propagation,
+                    'observation': pd[4].notes,
+                } if pd[4] is not None else ''
+            })
+    return pDrugs;
 
 @app_pres.route('/prescriptions/<int:idPrescription>', methods=['GET'])
 @jwt_required
@@ -107,28 +178,9 @@ def getPrescription(idPrescription):
     rni = getExams('PRO', patient.id)
 
     pDrugs = []
-    for pd in drugs:
-        pDrugs.append({
-            'idPrescriptionDrug': pd[0].id,
-            'idDrug': pd[0].idDrug,
-            'drug': pd[1].name if pd[1] is not None else 'Medicamento ' + str(pd[0].idDrug),
-            'dose': pd[0].dose,
-            'measureUnit': pd[2].description,
-            'frequency': pd[3].description,
-            'route': pd[0].route,
-            'score': str(pd[5]),
-            'checked': str(pd[6]),
-            'intervened': str(pd[7]),
-            'status': pd[0].status,
-            'near': pd[0].near,
-            'intervention': {
-                'id': pd[4].id,
-                'idPrescriptionDrug': pd[4].idPrescriptionDrug,
-                'idInterventionReason': pd[4].idInterventionReason,
-                'propagation': pd[4].propagation,
-                'observation': pd[4].observation,
-            } if pd[4] is not None else ''
-        })
+    pDrugs = getDrugType(drugs, pDrugs)
+    pDrugs = getDrugType(drugs, pDrugs, checked=True)
+    pDrugs = getDrugType(drugs, pDrugs, suspended=True)
 
     return {
         'status': 'success',
@@ -202,7 +254,7 @@ def createIntervention(idIntervention=None):
     i.idPrescriptionDrug = data.get('idPrescriptionDrug', None)
     i.idInterventionReason = data.get('idInterventionReason', None)
     i.propagation = data.get('propagation', None)
-    i.observation = data.get('observation', None)
+    i.notes = data.get('observation', None)
 
     try:
         i.save()

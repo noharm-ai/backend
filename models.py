@@ -22,6 +22,7 @@ def setSchema(schema):
     PrescriptionAgg.setSchema(schema)
     MeasureUnitConvert.setSchema(schema)
     PrescriptionPic.setSchema(schema)
+    OutlierObs.setSchema(schema)
 
 
 class User(db.Model):
@@ -231,6 +232,21 @@ class Outlier(db.Model):
         Outlier.__table__.schema = schema
 
 
+class OutlierObs(db.Model):
+    __tablename__ = 'outlierobs'
+
+    id = db.Column("idoutlier", db.Integer, primary_key=True)
+    idSegment = db.Column("idsegmento", db.Integer, nullable=False)
+    idDrug = db.Column("fkmedicamento", db.Integer, nullable=False)
+    dose = db.Column("doseconv", db.Float, nullable=True)
+    frequency = db.Column("frequenciadia", db.Float, nullable=True)
+    notes = db.Column('text', db.String, nullable=True)
+    update = db.Column("update_at", db.DateTime, nullable=True)
+    user = db.Column("update_by", db.Integer, nullable=True)
+
+    def setSchema(schema):
+        OutlierObs.__table__.schema = schema
+
 class PrescriptionAgg(db.Model):
     __tablename__ = 'prescricaoagg'
 
@@ -283,9 +299,10 @@ class PrescriptionDrug(db.Model):
     frequency = db.Column("frequenciadia", db.Float, nullable=True)
     doseconv = db.Column("doseconv", db.Float, nullable=True)
     route = db.Column('via', db.String, nullable=True)
-    observation = db.Column('complemento', db.String, nullable=True)
+    notes = db.Column('complemento', db.String, nullable=True)
     status = db.Column('status', db.String(1), nullable=False)
     near = db.Column("aprox", db.Boolean, nullable=True)
+    suspended = db.Column("suspenso", db.Boolean, nullable=True)
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.Integer, nullable=True)
 
@@ -321,6 +338,7 @@ class Drug(db.Model):
     antimicro = db.Column("antimicro", db.Boolean, nullable=True)
     mav = db.Column("mav", db.Boolean, nullable=True)
     controlled = db.Column("controlados", db.Boolean, nullable=True)
+    notdefault = db.Column("naopadronizado", db.Boolean, nullable=True)
 
     def setSchema(schema):
         Drug.__table__.schema = schema
@@ -379,7 +397,7 @@ class Intervention(db.Model):
     idUser = db.Column("idusuario", db.Integer, nullable=False)
     idInterventionReason = db.Column("idmotivointervencao", db.Integer, nullable=False)
     propagation = db.Column("boolpropaga", db.String, nullable=False)
-    observation = db.Column("observacao", db.String, nullable=True)
+    notes = db.Column("observacao", db.String, nullable=True)
 
     def setSchema(schema):
         Intervention.__table__.schema = schema
@@ -403,7 +421,7 @@ class Intervention(db.Model):
         if self.propagation != 'S' and self.propagation != 'N':
             raise AssertionError('Propagação: valor deve ser S ou N')
 
-        if self.observation is None:
+        if self.notes is None:
             raise AssertionError('Observação: preenchimento obrigatório')
 
         prescriptionDrug = PrescriptionDrug.query.filter(

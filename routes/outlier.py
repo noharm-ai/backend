@@ -1,7 +1,7 @@
 from flask_api import status
 from models import db, User, Patient, Prescription, PrescriptionDrug, InterventionReason,\
                     Intervention, Segment, setSchema, Department, Outlier, Drug, PrescriptionAgg,\
-                    MeasureUnit, MeasureUnitConvert
+                    MeasureUnit, MeasureUnitConvert, OutlierObs
 from sqlalchemy import desc, asc, and_, func
 from flask import Blueprint, request
 from flask_jwt_extended import (create_access_token, create_refresh_token,
@@ -14,7 +14,9 @@ app_out = Blueprint('app_out',__name__)
 def getOutliers(idSegment=1, idDrug=1):
     user = User.find(get_jwt_identity())
     setSchema(user.schema)
-    outliers = Outlier.query\
+    outliers = db.session\
+        .query(Outlier, OutlierObs)\
+        .outerjoin(OutlierObs, OutlierObs.id == Outlier.id)\
         .filter(Outlier.idSegment == idSegment, Outlier.idDrug == idDrug)\
         .order_by(Outlier.countNum.desc())\
         .all()
@@ -22,7 +24,7 @@ def getOutliers(idSegment=1, idDrug=1):
     db.engine.dispose()
 
     units = getUnits(idDrug) # TODO: Refactor
-    defaultUnit = 'big name for a measure unit'
+    defaultUnit = 'unlikely big name for a measure unit'
     bUnit = False
     for unit in units[0]['data']:
         if unit['fator'] == 1 and len(unit['idMeasureUnit']) < len(defaultUnit):
@@ -35,13 +37,14 @@ def getOutliers(idSegment=1, idDrug=1):
     if d != None:
         for o in outliers:
             results.append({
-                'idOutlier': o.id,
-                'idDrug': o.idDrug,
-                'countNum': o.countNum,
-                'dose': str(o.dose) + ' ' + str(defaultUnit),
-                'frequency': o.frequency,
-                'score': o.score,
-                'manualScore': o.manualScore
+                'idOutlier': o[0].id,
+                'idDrug': o[0].idDrug,
+                'countNum': o[0].countNum,
+                'dose': str(o[0].dose) + ' ' + str(defaultUnit),
+                'frequency': o[0].frequency,
+                'score': o[0].score,
+                'manualScore': o[0].manualScore,
+                'obs': o[1].notes if o[1] != None else '',
             })
 
     return {
@@ -90,6 +93,54 @@ def setManualOutlier(idOutlier):
             'message': str(e)
         }, status.HTTP_500_INTERNAL_SERVER_ERROR
 
+@app_out.route('/outliers/<int:idOutlier>/obs', methods=['PUT'])
+@jwt_required
+def setOutlierNotes(idOutlier):
+    data = request.get_json()
+    user = User.find(get_jwt_identity())
+    setSchema(user.schema)
+
+    o = Outlier.query.get(idOutlier)
+    obs = OutlierObs.query.get(idOutlier)
+    new = False
+
+    if obs is None:
+        new = True
+        obs = OutlierObs()
+        obs.id = idOutlier
+        obs.idSegment = o.idSegment
+        obs.idDrug = o.idDrug
+        obs.dose = o.dose
+        obs.frequency = o.frequency
+
+    obs.notes = data.get('notes', 1)
+    obs.update = func.now()
+    obs.user  = user.id
+
+    if new: db.session.add(obs)
+
+    try:
+        db.session.commit()
+
+        return {
+            'status': 'success',
+            'data': obs.id
+        }, status.HTTP_200_OK
+    except AssertionError as e:
+        db.engine.dispose()
+
+        return {
+            'status': 'error',
+            'message': str(e)
+        }, status.HTTP_400_BAD_REQUEST
+    except Exception as e:
+        db.engine.dispose()
+
+        return {
+            'status': 'error',
+            'message': str(e)
+        }, status.HTTP_500_INTERNAL_SERVER_ERROR
+
 
 @app_out.route('/drugs/<int:idDrug>', methods=['PUT'])
 @jwt_required
@@ -104,6 +155,7 @@ def setDrugClass(idDrug):
     if 'mav' in data.keys(): d.mav = bool(data.get('mav', 0))
     if 'controlled' in data.keys(): d.controlled = bool(data.get('controlled', 0))
     if 'idMeasureUnit' in data.keys(): d.idMeasureUnit = data.get('idMeasureUnit', None)
+    if 'notdefault' in data.keys(): d.notdefault = data.get('notdefault', 0)
 
     try:
         db.session.commit()
@@ -201,8 +253,6 @@ def setDrugUnit(idDrug, idMeasureUnit):
     setSchema(user.schema)
     u = MeasureUnitConvert.query.get((idMeasureUnit, idDrug))
     new = False
-
-    print('DEBUG: ', u)
 
     if u is None:
         new = True

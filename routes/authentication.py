@@ -25,6 +25,7 @@ def auth():
         return {
             'status': 'success',
             'userName': user.name,
+            'schema': user.schema,
             'access_token': access_token,
             'refresh_token': refresh_token
         }, status.HTTP_200_OK
