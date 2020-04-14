@@ -123,7 +123,7 @@ def getDrugType(drugList, pDrugs, checked=False, suspended=False):
                 'time': '12h 18h',
                 'obs': pd[0].notes,
                 'period': '5D',
-                'period-dates': ['09/04/2020','10/04/2020','11/04/2020','12/04/2020','13/04/2020'],
+                'periodDates': ['09/04/2020','10/04/2020','11/04/2020','12/04/2020','13/04/2020'],
                 'route': pd[0].route,
                 'score': str(pd[5]),
                 'checked': str(pd[6]),
