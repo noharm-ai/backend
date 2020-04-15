@@ -156,7 +156,7 @@ class Patient(db.Model):
     def setSchema(schema):
         Patient.__table__.schema = schema
 
-    def getPatients(idSegment, limit, idPrescription=None, idDept=None, onlyStatus=False):
+    def getPatients(idSegment=None, idDept=None, idPrescription=None, limit=200, onlyStatus=False):
         score = getAggScore()
         scoreOne = getScore(1)
         scoreTwo = getScore(2)

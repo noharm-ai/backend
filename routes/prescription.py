@@ -15,12 +15,18 @@ app_pres = Blueprint('app_pres',__name__)
 @app_pres.route("/prescriptions/segments/<int:idSegment>", methods=['GET'])
 @app_pres.route("/prescriptions/segments/<int:idSegment>/dept/<int:idDept>", methods=['GET'])
 @jwt_required
-def getPrescriptions(idSegment=1, idPrescription=None, idDept=None):
+def getPrescriptions(idSegment=None, idDept=None, idPrescription=None):
     user = User.find(get_jwt_identity())
     setSchema(user.schema)
 
-    patients = Patient.getPatients(idSegment=idSegment, limit=200, idPrescription=idPrescription, idDept=idDept)
+    idSegment = request.args.get('idSegment', idSegment)
+    idDept = request.args.get('idDept', idDept)
+    limit = request.args.get('limit', 200)
+
+    patients = Patient.getPatients(idSegment=idSegment, idDept=idDept, idPrescription=idPrescription, limit=200)
     db.engine.dispose()
+
+    print('idSegment', idSegment, 'idDept', idDept, 'limit', limit)
 
     results = []
     for p in patients:
@@ -126,8 +132,8 @@ def getDrugType(drugList, pDrugs, checked=False, suspended=False):
                 'periodDates': ['09/04/2020','10/04/2020','11/04/2020','12/04/2020','13/04/2020'],
                 'route': pd[0].route,
                 'score': str(pd[5]),
-                'checked': str(pd[6]),
-                'intervened': str(pd[7]),
+                'checked': bool(pd[6]),
+                'intervened': bool(pd[7]),
                 'suspended': bool(pd[0].suspended),
                 'status': pd[0].status,
                 'near': pd[0].near,
