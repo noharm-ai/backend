@@ -273,10 +273,24 @@ class PrescriptionAgg(db.Model):
     def setSchema(schema):
         PrescriptionAgg.__table__.schema = schema
 
+def getDrugHistory(idPrescription, admissionNumber):
+    pd1 = db.aliased(PrescriptionDrug)
+    pr1 = db.aliased(Prescription)
+    
+    query = db.session.query(func.DATE(pr1.date).distinct())\
+        .select_from(pd1)\
+        .join(pr1, pr1.id == pd1.idPrescription)\
+        .filter(pr1.admissionNumber == admissionNumber)\
+        .filter(pr1.id < idPrescription)\
+        .filter(pd1.idDrug == PrescriptionDrug.idDrug)\
+        .order_by(asc(func.DATE(pr1.date)))\
+        .as_scalar()
+
+    return db.session.query(func.array(query))
+
 def getDrugOption(idPrescription, idPatient, option):
     pd1 = db.aliased(PrescriptionDrug)
     pr1 = db.aliased(Prescription)
-
     
     query = db.session.query(func.count(distinct(func.concat(pd1.idDrug, pd1.doseconv, pd1.frequency))).label('checked'))\
         .select_from(pd1)\
@@ -318,20 +332,23 @@ class PrescriptionDrug(db.Model):
     def setSchema(schema):
         PrescriptionDrug.__table__.schema = schema
 
-    def findByPrescription(idPrescription, idPatient):
+    def findByPrescription(idPrescription, admissionNumber):
         
-        drugChecked = getDrugOption(idPrescription, idPatient, 'checked')
-        drugIntervention = getDrugOption(idPrescription, idPatient, 'intervened')
+        drugChecked = getDrugOption(idPrescription, admissionNumber, 'checked')
+        drugIntervention = getDrugOption(idPrescription, admissionNumber, 'intervened')
+        drugHistory = getDrugHistory(idPrescription, admissionNumber)
 
         return db.session\
             .query(PrescriptionDrug, Drug, MeasureUnit, Frequency, Intervention, 
                     func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4).label('score'),
-                    drugChecked.label('checked'), drugIntervention.label('intervened'))\
+                    drugChecked.label('checked'), drugIntervention.label('intervened'),
+                    OutlierObs.notes, drugHistory.label('drugHistory'))\
             .outerjoin(Outlier, Outlier.id == PrescriptionDrug.idOutlier)\
             .outerjoin(Drug, Drug.id == PrescriptionDrug.idDrug)\
             .outerjoin(MeasureUnit, MeasureUnit.id == PrescriptionDrug.idMeasureUnit)\
             .outerjoin(Frequency, Frequency.id == PrescriptionDrug.idFrequency)\
             .outerjoin(Intervention, Intervention.idPrescriptionDrug == PrescriptionDrug.id)\
+            .outerjoin(OutlierObs, OutlierObs.id == Outlier.id)\
             .filter(PrescriptionDrug.idPrescription == idPrescription)\
             .order_by(asc(Drug.name))\
             .all()

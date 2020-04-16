@@ -66,10 +66,34 @@ def setManualOutlier(idOutlier):
 
     user = User.find(get_jwt_identity())
     setSchema(user.schema)
+
     o = Outlier.query.get(idOutlier)
-    o.manualScore = data.get('manualScore', None)
-    o.update = func.now()
-    o.user = user.id
+    manualScore = data.get('manualScore', None)
+    if manualScore:
+        o.manualScore = manualScore
+        o.update = func.now()
+        o.user = user.id
+
+    notes = data.get('obs', None)
+    if notes:
+
+        obs = OutlierObs.query.get(idOutlier)
+        new = False
+
+        if obs is None:
+            new = True
+            obs = OutlierObs()
+            obs.id = idOutlier
+            obs.idSegment = o.idSegment
+            obs.idDrug = o.idDrug
+            obs.dose = o.dose
+            obs.frequency = o.frequency
+
+        obs.notes = notes
+        obs.update = func.now()
+        obs.user  = user.id
+
+        if new: db.session.add(obs)
 
     try:
         db.session.commit()
@@ -77,54 +101,6 @@ def setManualOutlier(idOutlier):
         return {
             'status': 'success',
             'data': o.id
-        }, status.HTTP_200_OK
-    except AssertionError as e:
-        db.engine.dispose()
-
-        return {
-            'status': 'error',
-            'message': str(e)
-        }, status.HTTP_400_BAD_REQUEST
-    except Exception as e:
-        db.engine.dispose()
-
-        return {
-            'status': 'error',
-            'message': str(e)
-        }, status.HTTP_500_INTERNAL_SERVER_ERROR
-
-@app_out.route('/outliers/<int:idOutlier>/obs', methods=['PUT'])
-@jwt_required
-def setOutlierNotes(idOutlier):
-    data = request.get_json()
-    user = User.find(get_jwt_identity())
-    setSchema(user.schema)
-
-    o = Outlier.query.get(idOutlier)
-    obs = OutlierObs.query.get(idOutlier)
-    new = False
-
-    if obs is None:
-        new = True
-        obs = OutlierObs()
-        obs.id = idOutlier
-        obs.idSegment = o.idSegment
-        obs.idDrug = o.idDrug
-        obs.dose = o.dose
-        obs.frequency = o.frequency
-
-    obs.notes = data.get('notes', None)
-    obs.update = func.now()
-    obs.user  = user.id
-
-    if new: db.session.add(obs)
-
-    try:
-        db.session.commit()
-
-        return {
-            'status': 'success',
-            'data': obs.id
         }, status.HTTP_200_OK
     except AssertionError as e:
         db.engine.dispose()

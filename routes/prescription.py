@@ -127,9 +127,10 @@ def getDrugType(drugList, pDrugs, checked=False, suspended=False):
                 'measureUnit': pd[2].description,
                 'frequency': pd[3].description,
                 'time': '12h 18h',
-                'obs': pd[0].notes,
-                'period': '5D',
-                'periodDates': ['09/04/2020','10/04/2020','11/04/2020','12/04/2020','13/04/2020'],
+                'recomendation': pd[0].notes,
+                'obs': str(pd[8]),
+                'period': str(len(pd[9])) + 'D',
+                'periodDates': [d.isoformat() for d in pd[9]],
                 'route': pd[0].route,
                 'score': str(pd[5]),
                 'checked': bool(pd[6]),
@@ -163,9 +164,9 @@ def getPrescription(idPrescription):
         patient = Patient()
         patient.birthdate = date.today()
         patient.id = prescription[0].idPatient
-        patient. admissionNumber = prescription[0].admissionNumber
+        patient.admissionNumber = prescription[0].admissionNumber
 
-    drugs = PrescriptionDrug.findByPrescription(idPrescription, patient.id)
+    drugs = PrescriptionDrug.findByPrescription(idPrescription, patient.admissionNumber)
     db.engine.dispose()
 
     tgo = getExams('TGO', patient.id)
