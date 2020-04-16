@@ -128,7 +128,7 @@ def getDrugType(drugList, pDrugs, checked=False, suspended=False):
                 'frequency': pd[3].description,
                 'time': '12h 18h',
                 'recomendation': pd[0].notes,
-                'obs': str(pd[8]),
+                'obs': pd[8],
                 'period': str(len(pd[9])) + 'D',
                 'periodDates': [d.isoformat() for d in pd[9]],
                 'route': pd[0].route,
@@ -326,7 +326,6 @@ def setDrugStatus(idPrescriptionDrug):
     pd.status = data.get('status', None)
     pd.update = func.now()
     pd.user = user.id
-
 
     ppic = PrescriptionPic.query.get(pd.idPrescription)
     if ppic is None:

@@ -54,6 +54,7 @@ def getOutliers(idSegment=1, idDrug=1):
             'antimicro': d.antimicro,
             'mav': d.mav,
             'controlled': d.controlled,
+            'notdefault': d.notdefault,
             'idMeasureUnit': d.idMeasureUnit
         }
     }, status.HTTP_200_OK
@@ -68,15 +69,14 @@ def setManualOutlier(idOutlier):
     setSchema(user.schema)
 
     o = Outlier.query.get(idOutlier)
-    manualScore = data.get('manualScore', None)
-    if manualScore:
+    if 'manualScore' in data:
+        manualScore = data.get('manualScore', None)
         o.manualScore = manualScore
         o.update = func.now()
         o.user = user.id
 
-    notes = data.get('obs', None)
-    if notes:
-
+    if 'obs' in data:
+        notes = data.get('obs', None)
         obs = OutlierObs.query.get(idOutlier)
         new = False
 
@@ -97,7 +97,7 @@ def setManualOutlier(idOutlier):
 
     try:
         db.session.commit()
-
+        
         return {
             'status': 'success',
             'data': o.id
