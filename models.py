@@ -323,6 +323,7 @@ class PrescriptionDrug(db.Model):
     doseconv = db.Column("doseconv", db.Float, nullable=True)
     route = db.Column('via', db.String, nullable=True)
     notes = db.Column('complemento', db.String, nullable=True)
+    interval = db.Column('horario', db.String, nullable=True)
     status = db.Column('status', db.String(1), nullable=False)
     near = db.Column("aprox", db.Boolean, nullable=True)
     suspended = db.Column("suspenso", db.Boolean, nullable=True)

@@ -26,8 +26,6 @@ def getPrescriptions(idSegment=None, idDept=None, idPrescription=None):
     patients = Patient.getPatients(idSegment=idSegment, idDept=idDept, idPrescription=idPrescription, limit=200)
     db.engine.dispose()
 
-    print('idSegment', idSegment, 'idDept', idDept, 'limit', limit)
-
     results = []
     for p in patients:
 
@@ -79,21 +77,24 @@ def getPrescriptions(idSegment=None, idDept=None, idPrescription=None):
     }, status.HTTP_200_OK
 
 
-@app_pres.route("/prescriptions/segments/<int:idSegment>/status", methods=['GET'])
-@app_pres.route("/prescriptions/segments/<int:idSegment>/dept/<int:idDept>/status", methods=['GET'])
+@app_pres.route("/prescriptions/status", methods=['GET'])
 @jwt_required
 def getPrescriptionsStatus(idSegment=1, idDept=None):
     user = User.find(get_jwt_identity())
     setSchema(user.schema)
 
-    patients = Patient.getPatients(idSegment=idSegment, limit=200, idDept=idDept, onlyStatus=True)
+    idSegment = request.args.get('idSegment', idSegment)
+    idDept = request.args.get('idDept', idDept)
+    limit = request.args.get('limit', 200)
+
+    patients = Patient.getPatients(idSegment=idSegment, limit=limit, idDept=idDept, onlyStatus=True)
     db.engine.dispose()
 
     results = []
     for p in patients:
         results.append({
             'idPrescription': p.id,
-            'stauts': p.status
+            'status': p.status
         })
 
     return {
@@ -126,7 +127,7 @@ def getDrugType(drugList, pDrugs, checked=False, suspended=False):
                 'dose': pd[0].dose,
                 'measureUnit': pd[2].description,
                 'frequency': pd[3].description,
-                'time': '12h 18h',
+                'time': pd[0].interval,
                 'recomendation': pd[0].notes,
                 'obs': pd[8],
                 'period': str(len(pd[9])) + 'D',
