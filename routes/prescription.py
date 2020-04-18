@@ -128,7 +128,7 @@ def getDrugType(drugList, pDrugs, checked=False, suspended=False):
                 'measureUnit': pd[2].description,
                 'frequency': pd[3].description,
                 'time': pd[0].interval,
-                'recomendation': pd[0].notes,
+                'recommendation': pd[0].notes,
                 'obs': pd[8],
                 'period': str(len(pd[9])) + 'D',
                 'periodDates': [d.isoformat() for d in pd[9]],
@@ -182,6 +182,8 @@ def getPrescription(idPrescription):
     pDrugs = getDrugType(drugs, pDrugs)
     pDrugs = getDrugType(drugs, pDrugs, checked=True)
     pDrugs = getDrugType(drugs, pDrugs, suspended=True)
+    pSolution = []
+    pProcedures = []
 
     return {
         'status': 'success',
@@ -211,6 +213,8 @@ def getPrescription(idPrescription):
             'daysAgo': prescription[2],
             'prescriptionScore': str(prescription[3]),
             'prescription': pDrugs,
+            'solution': pSolution,
+            'procedures': pProcedures,
             'status': prescription[0].status,
         }
     }, status.HTTP_200_OK

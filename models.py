@@ -286,16 +286,16 @@ def getDrugHistory(idPrescription, admissionNumber):
         .order_by(asc(func.DATE(pr1.date)))\
         .as_scalar()
 
-    return db.session.query(func.array(query))
+    return func.array(query)
 
-def getDrugOption(idPrescription, idPatient, option):
+def getDrugOption(idPrescription, admissionNumber, option):
     pd1 = db.aliased(PrescriptionDrug)
     pr1 = db.aliased(Prescription)
     
-    query = db.session.query(func.count(distinct(func.concat(pd1.idDrug, pd1.doseconv, pd1.frequency))).label('checked'))\
+    query = db.session.query(func.count(distinct(func.concat(pd1.idDrug, pd1.doseconv, pd1.frequency))).label(option))\
         .select_from(pd1)\
         .join(pr1, pr1.id == pd1.idPrescription)\
-        .filter(pr1.idPatient == idPatient)\
+        .filter(pr1.admissionNumber == admissionNumber)\
         .filter(pr1.id < idPrescription)\
         .filter(pd1.idDrug == PrescriptionDrug.idDrug)\
         .filter(pd1.doseconv == PrescriptionDrug.doseconv)\
