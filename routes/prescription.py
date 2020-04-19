@@ -67,7 +67,7 @@ def getPrescriptions(idSegment=None, idDept=None, idPrescription=None):
             'mg': none2zero(p[12]),
             'rni': none2zero(p[13]),
             'patientScore': 'Alto',
-            'class': 'red' if p[3] > 12 else 'orange' if p[3] > 8 else 'yellow' if p[3] > 4 else 'green',
+            'class': 'yellow', #'red' if p[3] > 12 else 'orange' if p[3] > 8 else 'yellow' if p[3] > 4 else 'green',
             'status': p[0].status,
         })
 
@@ -110,14 +110,15 @@ def getExams(typeExam, idPatient):
         .filter(Exams.typeExam == typeExam)\
         .order_by(Exams.date.desc()).limit(1).first()
 
-def getDrugType(drugList, pDrugs, checked=False, suspended=False):
+def getDrugType(drugList, pDrugs, checked=False, suspended=False, source=None):
     for pd in drugList:
 
         belong = False
 
-        if checked and (str(pd[6]) == '1' and bool(pd[0].suspended) == False): belong = True;
-        if suspended and (bool(pd[0].suspended) == True): belong = True;
-        if (not checked and not suspended) and (str(pd[6]) == '0' and bool(pd[0].suspended) == False): belong = True;
+        if not source is None and pd[0].source != source: continue
+        if checked and (str(pd[6]) == '1' and bool(pd[0].suspendedDate) == False): belong = True
+        if suspended and (bool(pd[0].suspendedDate) == True): belong = True
+        if (not checked and not suspended) and (str(pd[6]) == '0' and bool(pd[0].suspendedDate) == False): belong = True
 
         if belong:
             pDrugs.append({
@@ -134,9 +135,10 @@ def getDrugType(drugList, pDrugs, checked=False, suspended=False):
                 'periodDates': [d.isoformat() for d in pd[9]],
                 'route': pd[0].route,
                 'score': str(pd[5]),
+                'source': pd[0].source,
                 'checked': bool(pd[6]),
                 'intervened': bool(pd[7]),
-                'suspended': bool(pd[0].suspended),
+                'suspended': bool(pd[0].suspendedDate),
                 'status': pd[0].status,
                 'near': pd[0].near,
                 'intervention': {
@@ -147,7 +149,7 @@ def getDrugType(drugList, pDrugs, checked=False, suspended=False):
                     'observation': pd[4].notes,
                 } if pd[4] is not None else ''
             })
-    return pDrugs;
+    return pDrugs
 
 @app_pres.route('/prescriptions/<int:idPrescription>', methods=['GET'])
 @jwt_required
@@ -178,12 +180,17 @@ def getPrescription(idPrescription):
     mg = getExams('MG', patient.id)
     rni = getExams('PRO', patient.id)
 
-    pDrugs = []
-    pDrugs = getDrugType(drugs, pDrugs)
+    pDrugs = getDrugType(drugs, [])
     pDrugs = getDrugType(drugs, pDrugs, checked=True)
     pDrugs = getDrugType(drugs, pDrugs, suspended=True)
-    pSolution = []
-    pProcedures = []
+
+    pSolution = getDrugType(drugs, [], source='Solucoes')
+    pSolution = getDrugType(drugs, pSolution, checked=True, source='Solução')
+    pSolution = getDrugType(drugs, pSolution, suspended=True, source='Solução')
+
+    pProcedures = getDrugType(drugs, [], source='Proced/Exames')
+    pProcedures = getDrugType(drugs, pProcedures, checked=True, source='Proced/Exames')
+    pProcedures = getDrugType(drugs, pProcedures, suspended=True, source='Proced/Exames')
 
     return {
         'status': 'success',
@@ -196,6 +203,7 @@ def getPrescription(idPrescription):
             'birthdate': patient.birthdate.isoformat(),
             'gender': patient.gender,
             'weight': patient.weight,
+            'weightDate': patient.weightDate.isoformat() if patient.weightDate else '',
             'class': random.choice(['green','yellow','red']),
             'skinColor': patient.skinColor,
             'department': prescription[4],
@@ -296,6 +304,14 @@ def setPrescriptionStatus(idPrescription):
     p.status = data.get('status', None)
     p.update = func.now()
     p.user = user.id
+
+    ppic = PrescriptionPic.query.get(p.id)
+    if ppic is None:
+        p, code = getPrescriptions(idSegment=p.idSegment, idPrescription=p.id)
+        ppic = PrescriptionPic()
+        ppic.id = p.id
+        ppic.picture = p['data'][0]
+        db.session.add(ppic)
 
     try:
         db.session.commit()

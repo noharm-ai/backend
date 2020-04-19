@@ -53,6 +53,7 @@ class Prescription(db.Model):
     idDepartment = db.Column("fksetor", db.Integer, nullable=False)
     idSegment = db.Column("idsegmento", db.Integer, nullable=False)
     date = db.Column("dtprescricao", db.DateTime, nullable=False)
+    weight = db.Column('peso', db.Float, nullable=True)
     status = db.Column('status', db.String(1), nullable=False)
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.Integer, nullable=True)
@@ -150,7 +151,8 @@ class Patient(db.Model):
     admissionNumber = db.Column('nratendimento', db.Integer, nullable=False)
     birthdate = db.Column('dtnascimento', db.DateTime, nullable=True)
     gender = db.Column('sexo', db.String(1), nullable=True)
-    weight = db.Column('peso', db.Integer, nullable=True)
+    weight = db.Column('peso', db.Float, nullable=True)
+    weightDate = db.Column('dtpeso', db.DateTime, nullable=True)
     skinColor = db.Column('cor', db.String, nullable=True)
 
     def setSchema(schema):
@@ -281,7 +283,7 @@ def getDrugHistory(idPrescription, admissionNumber):
         .select_from(pd1)\
         .join(pr1, pr1.id == pd1.idPrescription)\
         .filter(pr1.admissionNumber == admissionNumber)\
-        .filter(pr1.id < idPrescription)\
+        .filter(pr1.id <= idPrescription)\
         .filter(pd1.idDrug == PrescriptionDrug.idDrug)\
         .order_by(asc(func.DATE(pr1.date)))\
         .as_scalar()
@@ -324,9 +326,11 @@ class PrescriptionDrug(db.Model):
     route = db.Column('via', db.String, nullable=True)
     notes = db.Column('complemento', db.String, nullable=True)
     interval = db.Column('horario', db.String, nullable=True)
+    source = db.Column('origem', db.String, nullable=True)
+    default = db.Column('padronizado', db.String(1), nullable=False)
     status = db.Column('status', db.String(1), nullable=False)
     near = db.Column("aprox", db.Boolean, nullable=True)
-    suspended = db.Column("suspenso", db.Boolean, nullable=True)
+    suspendedDate = db.Column("dtsuspensao", db.DateTime, nullable=True)
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.Integer, nullable=True)
 
