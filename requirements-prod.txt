@@ -1,0 +1,11 @@
+wheel
+Flask
+Flask-API
+Flask-JWT-Extended
+Flask-SQLAlchemy
+lambda-packages
+Werkzeug==0.16.1
+zappa
+flask-cors
+psycopg2-binary
+pandas
