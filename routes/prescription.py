@@ -115,7 +115,8 @@ def getDrugType(drugList, pDrugs, checked=False, suspended=False, source=None):
 
         belong = False
 
-        if not source is None and pd[0].source != source: continue
+        if pd[0].source is None: pd[0].source = 'Medicamentos'
+        if pd[0].source != source: continue
         if checked and (str(pd[6]) == '1' and bool(pd[0].suspendedDate) == False): belong = True
         if suspended and (bool(pd[0].suspendedDate) == True): belong = True
         if (not checked and not suspended) and (str(pd[6]) == '0' and bool(pd[0].suspendedDate) == False): belong = True
@@ -126,10 +127,10 @@ def getDrugType(drugList, pDrugs, checked=False, suspended=False, source=None):
                 'idDrug': pd[0].idDrug,
                 'drug': pd[1].name if pd[1] is not None else 'Medicamento ' + str(pd[0].idDrug),
                 'dose': pd[0].dose,
-                'measureUnit': pd[2].description,
-                'frequency': pd[3].description,
+                'measureUnit': pd[2].description if pd[2] else '',
+                'frequency': pd[3].description if pd[3] else '',
                 'time': pd[0].interval,
-                'recommendation': pd[0].notes,
+                'recommendation': pd[0].notes if pd[0].notes and len(pd[0].notes.strip()) > 0 else None,
                 'obs': pd[8],
                 'period': str(len(pd[9])) + 'D',
                 'periodDates': [d.isoformat() for d in pd[9]],
@@ -180,11 +181,11 @@ def getPrescription(idPrescription):
     mg = getExams('MG', patient.id)
     rni = getExams('PRO', patient.id)
 
-    pDrugs = getDrugType(drugs, [])
-    pDrugs = getDrugType(drugs, pDrugs, checked=True)
-    pDrugs = getDrugType(drugs, pDrugs, suspended=True)
+    pDrugs = getDrugType(drugs, [], source='Medicamentos')
+    pDrugs = getDrugType(drugs, pDrugs, checked=True, source='Medicamentos')
+    pDrugs = getDrugType(drugs, pDrugs, suspended=True, source='Medicamentos')
 
-    pSolution = getDrugType(drugs, [], source='Solucoes')
+    pSolution = getDrugType(drugs, [], source='Soluções')
     pSolution = getDrugType(drugs, pSolution, checked=True, source='Solução')
     pSolution = getDrugType(drugs, pSolution, suspended=True, source='Solução')
 
