@@ -307,10 +307,10 @@ def setPrescriptionStatus(idPrescription):
 
     ppic = PrescriptionPic.query.get(p.id)
     if ppic is None:
-        p, code = getPrescriptions(idSegment=p.idSegment, idPrescription=p.id)
+        pObj, code = getPrescriptions(idSegment=p.idSegment, idPrescription=p.id)
         ppic = PrescriptionPic()
         ppic.id = p.id
-        ppic.picture = p['data'][0]
+        ppic.picture = pObj['data'][0]
         db.session.add(ppic)
 
     try:
@@ -350,10 +350,10 @@ def setDrugStatus(idPrescriptionDrug):
 
     ppic = PrescriptionPic.query.get(pd.idPrescription)
     if ppic is None:
-        p, code = getPrescriptions(idSegment=pd.idSegment, idPrescription=pd.idPrescription)
+        pObj, code = getPrescriptions(idSegment=pd.idSegment, idPrescription=pd.idPrescription)
         ppic = PrescriptionPic()
         ppic.id = pd.idPrescription
-        ppic.picture = p['data'][0]
+        ppic.picture = pObj['data'][0]
         db.session.add(ppic)
 
     try:

@@ -204,6 +204,7 @@ class Patient(db.Model):
             q = q.filter(Prescription.id == idPrescription)
 
         q = q.filter(Prescription.date > (date.today() - timedelta(days=1)))
+        q = q.order_by(desc(Prescription.date))
 
         if onlyStatus:
             wrapper = q
@@ -218,8 +219,6 @@ class Patient(db.Model):
                         '"daysAgo"', 'score', '"scoreOne"', '"scoreTwo"', '"scoreThree"',\
                         'tgo', 'tgp', 'cr', 'k', 'na', 'mg', 'rni',\
                         'antimicro', 'mav', 'controlled', 'sonda', 'diff', 'department', 'notdefault')
-
-            wrapper = wrapper.order_by(desc(prescritionAlias.date))
 
 
         return wrapper.limit(limit).all()
