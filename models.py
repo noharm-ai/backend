@@ -135,7 +135,11 @@ def getDrugDiff():
 
     return db.session.query(func.count(distinct(func.concat(pd2.idDrug, pd2.dose, pd2.idFrequency))).label('drugDiff'))\
         .select_from(pd2)\
-        .outerjoin(pd1, and_(pd1.idDrug == pd2.idDrug, pd1.doseconv == pd2.doseconv, pd1.frequency == pd2.frequency, pd1.idSegment == pd2.idSegment))\
+        .outerjoin(pd1, and_(pd1.idDrug == pd2.idDrug, 
+                             pd1.doseconv == pd2.doseconv, 
+                             pd1.frequency == pd2.frequency, 
+                             pd1.idSegment == pd2.idSegment,
+                             pd1.finalscore != None))\
         .join(pr1, pr1.id == pd1.idPrescription)\
         .filter(pd2.idPrescription == Prescription.id)\
         .filter(pr1.admissionNumber == Prescription.admissionNumber)\
@@ -328,6 +332,7 @@ class PrescriptionDrug(db.Model):
     source = db.Column('origem', db.String, nullable=True)
     default = db.Column('padronizado', db.String(1), nullable=False)
     status = db.Column('status', db.String(1), nullable=False)
+    finalscore = db.Column('escorefinal', db.Integer, nullable=False)
     near = db.Column("aprox", db.Boolean, nullable=True)
     suspendedDate = db.Column("dtsuspensao", db.DateTime, nullable=True)
     update = db.Column("update_at", db.DateTime, nullable=True)
