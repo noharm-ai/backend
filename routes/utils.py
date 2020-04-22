@@ -19,7 +19,8 @@ def none2zero(s):
 def formatExam(exam):
     if exam is not None:
         examDate = exam.date.strftime('%d/%m/%Y %H:%M')
-        return { 'value' : str(exam.value) + ' ' + exam.unit, 'date' :  examDate }
+        return { 'value' : str(exam.value) + ' ' + exam.unit, 'date' :  examDate,\
+                 'ref': '135 a 145 mEq/L  - Metodo: Eletrodo Seletivo', 'alert': True }
     else:
         return ''
 
