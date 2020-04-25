@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 def data2age(birthdate):
     days_in_year = 365.2425
@@ -22,7 +22,18 @@ def formatExam(exam):
         return { 'value' : str(exam.value) + ' ' + exam.unit, 'date' :  examDate,\
                  'ref': '135 a 145 mEq/L  - Metodo: Eletrodo Seletivo', 'alert': True }
     else:
-        return ''
+        return { 'value' : None, 'date' :  None,\
+                 'ref': '135 a 145 mEq/L  - Metodo: Eletrodo Seletivo', 'alert': True }
+
+def period(dates):
+    if len(dates) > 0:
+        last30 = (datetime.today() - timedelta(days=28))
+        last = datetime.strptime(dates[0].split(' ')[0], '%Y-%m-%d')
+        more = last < last30
+
+        return ('+' if more else '') + str(len(dates))  + 'D'
+    else:
+        return '0D'
 
 # Modification of Diet in Renal Disease
 # based on https://www.kidney.org/content/mdrd-study-equation

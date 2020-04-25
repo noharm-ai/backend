@@ -282,13 +282,14 @@ def getDrugHistory(idPrescription, admissionNumber):
     pd1 = db.aliased(PrescriptionDrug)
     pr1 = db.aliased(Prescription)
     
-    query = db.session.query(func.DATE(pr1.date).distinct())\
+    query = db.session.query(func.concat(func.DATE(pr1.date),' (',pd1.dose,' ',pd1.idMeasureUnit,')'))\
         .select_from(pd1)\
         .join(pr1, pr1.id == pd1.idPrescription)\
         .filter(pr1.admissionNumber == admissionNumber)\
         .filter(pr1.id <= idPrescription)\
         .filter(pd1.idDrug == PrescriptionDrug.idDrug)\
-        .order_by(asc(func.DATE(pr1.date)))\
+        .filter(pr1.date > (date.today() - timedelta(days=30)))\
+        .order_by(asc(pr1.date))\
         .as_scalar()
 
     return func.array(query)
@@ -323,6 +324,7 @@ class PrescriptionDrug(db.Model):
     idMeasureUnit = db.Column("fkunidademedida", db.Integer, nullable=False)
     idFrequency = db.Column("fkfrequencia", db.String, nullable=True)
     idSegment = db.Column("idsegmento", db.Integer, nullable=False)
+
     dose = db.Column("dose", db.Float, nullable=True)
     frequency = db.Column("frequenciadia", db.Float, nullable=True)
     doseconv = db.Column("doseconv", db.Float, nullable=True)
@@ -331,6 +333,15 @@ class PrescriptionDrug(db.Model):
     interval = db.Column('horario', db.String, nullable=True)
     source = db.Column('origem', db.String, nullable=True)
     default = db.Column('padronizado', db.String(1), nullable=False)
+
+    solutionGroup = db.Column('slagrupamento', db.String(1), nullable=False)
+    solutionACM = db.Column('slacm', db.String(1), nullable=False)
+    solutionPhase = db.Column('sletapas', db.String(1), nullable=False)
+    solutionTime = db.Column('slhorafase', db.Float, nullable=True)
+    solutionTotalTime = db.Column('sltempoaplicacao', db.String(1), nullable=False)
+    solutionDose = db.Column('sldosagem', db.Float, nullable=True)
+    solutionUnit = db.Column('sltipodosagem', db.String(3), nullable=False)
+
     status = db.Column('status', db.String(1), nullable=False)
     finalscore = db.Column('escorefinal', db.Integer, nullable=False)
     near = db.Column("aprox", db.Boolean, nullable=True)
@@ -359,7 +370,7 @@ class PrescriptionDrug(db.Model):
             .outerjoin(Intervention, Intervention.idPrescriptionDrug == PrescriptionDrug.id)\
             .outerjoin(OutlierObs, OutlierObs.id == Outlier.id)\
             .filter(PrescriptionDrug.idPrescription == idPrescription)\
-            .order_by(asc(Drug.name))\
+            .order_by(asc(PrescriptionDrug.solutionGroup), asc(Drug.name))\
             .all()
 
 
