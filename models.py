@@ -153,6 +153,7 @@ class Patient(db.Model):
     id = db.Column("fkpessoa", db.Integer, primary_key=True)
     fkHospital = db.Column("fkhospital", db.Integer, nullable=False)
     admissionNumber = db.Column('nratendimento', db.Integer, nullable=False)
+    admissionDate = db.Column('dtinternacao', db.DateTime, nullable=True)
     birthdate = db.Column('dtnascimento', db.DateTime, nullable=True)
     gender = db.Column('sexo', db.String(1), nullable=True)
     weight = db.Column('peso', db.Float, nullable=True)
@@ -281,8 +282,8 @@ class PrescriptionAgg(db.Model):
 def getDrugHistory(idPrescription, admissionNumber):
     pd1 = db.aliased(PrescriptionDrug)
     pr1 = db.aliased(Prescription)
-    
-    query = db.session.query(func.concat(func.DATE(pr1.date),' (',pd1.dose,' ',pd1.idMeasureUnit,')'))\
+
+    query = db.session.query(func.concat(func.to_char(pr1.date, "DD/MM"),' (',pd1.frequency,'x ',pd1.dose,' ',pd1.idMeasureUnit,')'))\
         .select_from(pd1)\
         .join(pr1, pr1.id == pd1.idPrescription)\
         .filter(pr1.admissionNumber == admissionNumber)\

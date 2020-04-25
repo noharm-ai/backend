@@ -4,9 +4,9 @@ from models import db, User, Patient, Prescription, PrescriptionDrug, Interventi
 from flask import Blueprint, request
 from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
-from .utils import mdrd_calc, cg_calc, none2zero, formatExam, period
+from .utils import mdrd_calc, cg_calc, none2zero, formatExam, period, lenghStay, strNone, examAlerts
 from sqlalchemy import func
-from datetime import date
+from datetime import date, datetime
 
 app_pres = Blueprint('app_pres',__name__)
 
@@ -32,19 +32,21 @@ def getPrescriptions(idSegment=None, idDept=None, idPrescription=None):
         patient = p[1]
         if (patient is None):
             patient = Patient()
-            patient.birthdate = date.today()
             patient.id = p[0].idPatient
             patient.admissionNumber = p[0].admissionNumber
+
+        tgo, tgp, mdrd, cg, k, na, mg, rni, totalAlerts = examAlerts(p, patient)
 
         results.append({
             'idPrescription': p[0].id,
             'idPatient': p[0].idPatient,
             'name': patient.admissionNumber,
             'admissionNumber': patient.admissionNumber,
-            'birthdate': patient.birthdate.isoformat(),
+            'birthdate': patient.birthdate.isoformat() if patient.birthdate else '',
             'gender': patient.gender,
             'weight': patient.weight,
             'skinColor': patient.skinColor,
+            'lengthStay': lenghStay(patient.admissionDate),
             'date': p[0].date.isoformat(),
             'department': str(p[19]),
             'daysAgo': p[2],
@@ -58,15 +60,15 @@ def getPrescriptions(idSegment=None, idDept=None, idPrescription=None):
             'np': str(p[20]),
             'tube': str(p[17]),
             'diff': str(p[18]),
-            'alertExams': 6,
-            'tgo': { 'value': none2zero(p[7]), 'alert': True },
-            'tgp': { 'value': none2zero(p[8]), 'alert': True },
-            'mdrd': { 'value': mdrd_calc(str(p[9]), patient.birthdate.isoformat(), patient.gender, patient.skinColor), 'alert': False },
-            'cg': { 'value': cg_calc(str(p[9]), patient.birthdate.isoformat(), patient.gender, patient.weight), 'alert': True },
-            'k': { 'value': none2zero(p[10]), 'alert': False },
-            'na': { 'value': none2zero(p[11]), 'alert': False },
-            'mg': { 'value': none2zero(p[12]), 'alert': True },
-            'rni': { 'value': none2zero(p[13]), 'alert': True },
+            'tgo': tgo,
+            'tgp': tgp,
+            'mdrd': mdrd,
+            'cg': cg,
+            'k': k,
+            'na': na,
+            'mg': mg,
+            'rni': rni,
+            'alertExams': totalAlerts,
             'patientScore': 'Alto',
             'class': 'yellow', #'red' if p[3] > 12 else 'orange' if p[3] > 8 else 'yellow' if p[3] > 4 else 'green',
             'status': p[0].status,
@@ -115,12 +117,15 @@ def getDrugType(drugList, pDrugs, checked=False, suspended=False, source=None):
     for pd in drugList:
 
         belong = False
+        pd6 = pd[6]
 
         if pd[0].source is None: pd[0].source = 'Medicamentos'
+        if pd[0].route is None: pd6 = '1'
+
         if pd[0].source != source: continue
-        if checked and (str(pd[6]) == '1' and bool(pd[0].suspendedDate) == False): belong = True
+        if checked and (str(pd6) == '1' and bool(pd[0].suspendedDate) == False): belong = True
         if suspended and (bool(pd[0].suspendedDate) == True): belong = True
-        if (not checked and not suspended) and (str(pd[6]) == '0' and bool(pd[0].suspendedDate) == False): belong = True
+        if (not checked and not suspended) and (str(pd6) == '0' and bool(pd[0].suspendedDate) == False): belong = True
 
         if belong:
             pDrugs.append({
@@ -142,11 +147,11 @@ def getDrugType(drugList, pDrugs, checked=False, suspended=False, source=None):
                 'periodDates': pd[9],
                 'route': pd[0].route,
                 'grp_solution': pd[0].solutionGroup,
-                'stage': 'ACM' if pd[0].solutionACM == 'S' else str(pd[0].solutionPhase) + ' x '+ str(pd[0].solutionTime) + ' (' + str(pd[0].solutionTotalTime) + ')',
-                'infusion': str(pd[0].solutionDose) + ' ' + str(pd[0].solutionUnit),
+                'stage': 'ACM' if pd[0].solutionACM == 'S' else strNone(pd[0].solutionPhase) + ' x '+ strNone(pd[0].solutionTime) + ' (' + strNone(pd[0].solutionTotalTime) + ')',
+                'infusion': strNone(pd[0].solutionDose) + ' ' + strNone(pd[0].solutionUnit),
                 'score': str(pd[5]),
                 'source': pd[0].source,
-                'checked': bool(pd[6]),
+                'checked': bool(pd6),
                 'intervened': bool(pd[7]),
                 'suspended': bool(pd[0].suspendedDate),
                 'status': pd[0].status,
@@ -175,7 +180,6 @@ def getPrescription(idPrescription):
     patient = prescription[1]
     if (patient is None):
         patient = Patient()
-        patient.birthdate = date.today()
         patient.id = prescription[0].idPatient
         patient.admissionNumber = prescription[0].admissionNumber
 
@@ -210,22 +214,22 @@ def getPrescription(idPrescription):
             'idPatient': patient.id,
             'name': prescription[0].admissionNumber,
             'admissionNumber': prescription[0].admissionNumber,
-            'birthdate': patient.birthdate.isoformat(),
+            'birthdate': patient.birthdate.isoformat() if patient.birthdate else '',
             'gender': patient.gender,
             'weight': patient.weight,
             'weightDate': patient.weightDate.isoformat() if patient.weightDate else '',
             'class': random.choice(['green','yellow','red']),
             'skinColor': patient.skinColor,
             'department': prescription[4],
-            'tgo': formatExam(tgo),
-            'tgp': formatExam(tgp),
-            'mdrd': {'value': mdrd_calc(cr.value, patient.birthdate.isoformat(), patient.gender, patient.skinColor), 'ref': '135 a 145 mEq/L', 'alert': True} if cr is not None else '',
-            'cg': {'value': cg_calc(cr.value, patient.birthdate.isoformat(), patient.gender, patient.weight), 'ref': '135 a 145 mEq/L', 'alert': False} if cr is not None else '',
-            'creatinina': formatExam(cr),
-            'k': formatExam(k),
-            'na': formatExam(na),
-            'mg': formatExam(mg),
-            'rni': formatExam(rni),
+            'tgo': formatExam(tgo, 'tgo'),
+            'tgp': formatExam(tgp, 'tgp'),
+            'mdrd': mdrd_calc(cr.value, patient.birthdate, patient.gender, patient.skinColor) if cr is not None else '',
+            'cg': cg_calc(cr.value, patient.birthdate, patient.gender, patient.weight) if cr is not None else '',
+            'creatinina': formatExam(cr, 'cr'),
+            'k': formatExam(k, 'k'),
+            'na': formatExam(na, 'na'),
+            'mg': formatExam(mg, 'mg'),
+            'rni': formatExam(rni, 'rni'),
             'patientScore': 'High',
             'date': prescription[0].date.isoformat(),
             'daysAgo': prescription[2],

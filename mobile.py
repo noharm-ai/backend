@@ -12,7 +12,9 @@ from routes.prescription import app_pres
 from routes.segment import app_seg
 from routes.outlier_generate import app_gen
 import logging
+import os
 
+os.environ['TZ'] = 'America/Sao_Paulo'
 logging.basicConfig()
 logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
 
