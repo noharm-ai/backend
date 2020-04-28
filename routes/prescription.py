@@ -140,6 +140,8 @@ def getDrugType(drugList, pDrugs, checked=False, suspended=False, source=None):
                 'dose': pd[0].dose,
                 'measureUnit': { 'value': pd[2].id, 'label': pd[2].description } if pd[2] else '',
                 'frequency': { 'value': pd[3].id, 'label': pd[3].description } if pd[3] else '',
+                'dayFrequency': pd[0].frequency,
+                'doseconv': pd[0].doseconv,
                 'time': pd[0].interval,
                 'recommendation': pd[0].notes if pd[0].notes and len(pd[0].notes.strip()) > 0 else None,
                 'obs': pd[8],
