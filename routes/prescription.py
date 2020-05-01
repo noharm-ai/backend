@@ -21,9 +21,10 @@ def getPrescriptions(idSegment=None, idDept=None, idPrescription=None):
 
     idSegment = request.args.get('idSegment', idSegment)
     idDept = request.args.get('idDept', idDept)
-    limit = request.args.get('limit', 200)
+    limit = request.args.get('limit', 250)
+    day = request.args.get('date', date.today())
 
-    patients = Patient.getPatients(idSegment=idSegment, idDept=idDept, idPrescription=idPrescription, limit=200)
+    patients = Patient.getPatients(idSegment=idSegment, idDept=idDept, idPrescription=idPrescription, limit=limit, day=day)
     db.engine.dispose()
 
     results = []
@@ -44,7 +45,7 @@ def getPrescriptions(idSegment=None, idDept=None, idPrescription=None):
             'admissionNumber': patient.admissionNumber,
             'birthdate': patient.birthdate.isoformat() if patient.birthdate else '',
             'gender': patient.gender,
-            'weight': patient.weight,
+            'weight': patient.weight if patient.weight else p[0].weight,
             'skinColor': patient.skinColor,
             'lengthStay': lenghStay(patient.admissionDate),
             'date': p[0].date.isoformat(),
@@ -88,9 +89,10 @@ def getPrescriptionsStatus(idSegment=1, idDept=None):
 
     idSegment = request.args.get('idSegment', idSegment)
     idDept = request.args.get('idDept', idDept)
-    limit = request.args.get('limit', 200)
+    limit = request.args.get('limit', 250)
+    day = request.args.get('date', date.today())
 
-    patients = Patient.getPatients(idSegment=idSegment, limit=limit, idDept=idDept, onlyStatus=True)
+    patients = Patient.getPatients(idSegment=idSegment, idDept=idDept, day=day, limit=limit, onlyStatus=True)
     db.engine.dispose()
 
     results = []
@@ -218,15 +220,15 @@ def getPrescription(idPrescription):
             'admissionNumber': prescription[0].admissionNumber,
             'birthdate': patient.birthdate.isoformat() if patient.birthdate else '',
             'gender': patient.gender,
-            'weight': patient.weight,
-            'weightDate': patient.weightDate.isoformat() if patient.weightDate else '',
+            'weight': patient.weight if patient.weight else prescription[0].weight,
+            'weightDate': patient.weightDate.isoformat() if patient.weight else prescription[0].date.isoformat(),
             'class': random.choice(['green','yellow','red']),
             'skinColor': patient.skinColor,
             'department': prescription[4],
             'tgo': formatExam(tgo, 'tgo'),
             'tgp': formatExam(tgp, 'tgp'),
             'mdrd': mdrd_calc(cr.value, patient.birthdate, patient.gender, patient.skinColor) if cr is not None else '',
-            'cg': cg_calc(cr.value, patient.birthdate, patient.gender, patient.weight) if cr is not None else '',
+            'cg': cg_calc(cr.value, patient.birthdate, patient.gender, patient.weight or prescription[0].weight) if cr is not None else '',
             'creatinina': formatExam(cr, 'cr'),
             'k': formatExam(k, 'k'),
             'na': formatExam(na, 'na'),
@@ -323,7 +325,7 @@ def setPrescriptionStatus(idPrescription):
 
     ppic = PrescriptionPic.query.get(p.id)
     if ppic is None:
-        pObj, code = getPrescriptions(idSegment=p.idSegment, idPrescription=p.id)
+        pObj, code = getPrescriptions(idPrescription=p.id)
         ppic = PrescriptionPic()
         ppic.id = p.id
         ppic.picture = pObj['data'][0]

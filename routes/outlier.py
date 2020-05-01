@@ -23,6 +23,9 @@ def getOutliers(idSegment=1, idDrug=1):
     d = Drug.query.get(idDrug)
     db.engine.dispose()
 
+    frequency = request.args.get('f', None)
+    dose = request.args.get('d', None)
+
     units = getUnits(idDrug) # TODO: Refactor
     defaultUnit = 'unlikely big name for a measure unit'
     bUnit = False
@@ -33,9 +36,12 @@ def getOutliers(idSegment=1, idDrug=1):
 
     if not bUnit: defaultUnit = '';
 
+    newOutlier = True
     results = []
     if d != None:
         for o in outliers:
+            if dose is not None and frequency is not None:
+                if float(dose) == o[0].dose and float(frequency) == o[0].frequency: newOutlier = False
             results.append({
                 'idOutlier': o[0].id,
                 'idDrug': o[0].idDrug,
@@ -45,8 +51,35 @@ def getOutliers(idSegment=1, idDrug=1):
                 'frequency': o[0].frequency,
                 'score': o[0].score,
                 'manualScore': o[0].manualScore,
-                'obs': o[1].notes if o[1] != None else '',
+                'obs': o[1].notes if o[1] != None else ''
             })
+
+    if dose is not None and frequency is not None and newOutlier:
+        o = Outlier()
+        o.idDrug = idDrug
+        o.idSegment = idSegment
+        o.countNum = 1
+        o.dose = float(dose)
+        o.frequency = float(frequency)
+        o.score = 4
+        o.manualScore = None
+        o.update = func.now()
+        o.user = user.id
+
+        db.session.add(o)
+        db.session.commit()
+
+        results.append({
+            'idOutlier': o.id,
+            'idDrug': idDrug,
+            'countNum': 1,
+            'dose': float(dose),
+            'unit': defaultUnit,
+            'frequency': float(frequency),
+            'score': 4,
+            'manualScore': None,
+            'obs': ''
+        })
 
     return {
         'status': 'success',
@@ -79,10 +112,10 @@ def setManualOutlier(idOutlier):
     if 'obs' in data:
         notes = data.get('obs', None)
         obs = OutlierObs.query.get(idOutlier)
-        new = False
+        newObs = False
 
         if obs is None:
-            new = True
+            newObs = True
             obs = OutlierObs()
             obs.id = idOutlier
             obs.idSegment = o.idSegment
@@ -94,7 +127,7 @@ def setManualOutlier(idOutlier):
         obs.update = func.now()
         obs.user  = user.id
 
-        if new: db.session.add(obs)
+        if newObs: db.session.add(obs)
 
     try:
         db.session.commit()

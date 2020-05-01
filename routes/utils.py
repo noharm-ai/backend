@@ -42,7 +42,7 @@ examEmpty = { 'value': None, 'alert': False, 'ref': None }
 def examAlerts(p, patient):
     exams = {'tgo': p[7], 'tgp': p[8], 'k': p[10], 'na': p[11], 'mg': p[12], 'rni': p[13]}
     exams['mdrd'] = mdrd_calc(str(p[9]), patient.birthdate, patient.gender, patient.skinColor)
-    exams['cg'] = cg_calc(str(p[9]), patient.birthdate, patient.gender, patient.weight)
+    exams['cg'] = cg_calc(str(p[9]), patient.birthdate, patient.gender, patient.weight or p[0].weight)
 
     result = {}
     alertCount = 0

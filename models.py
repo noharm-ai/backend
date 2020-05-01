@@ -163,7 +163,7 @@ class Patient(db.Model):
     def setSchema(schema):
         Patient.__table__.schema = schema
 
-    def getPatients(idSegment=None, idDept=None, idPrescription=None, limit=200, onlyStatus=False):
+    def getPatients(idSegment=None, idDept=None, idPrescription=None, limit=250, day=date.today(), onlyStatus=False):
         score = getAggScore()
         scoreOne = getScore(1)
         scoreTwo = getScore(2)
@@ -207,8 +207,9 @@ class Patient(db.Model):
 
         if (not(idPrescription is None)):
             q = q.filter(Prescription.id == idPrescription)
-
-        q = q.filter(Prescription.date > (date.today() - timedelta(days=1)))
+        else:
+            q = q.filter(func.date(Prescription.date) == day)
+            
         q = q.order_by(desc(Prescription.date))
 
         if onlyStatus:
