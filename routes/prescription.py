@@ -221,7 +221,7 @@ def getPrescription(idPrescription):
             'birthdate': patient.birthdate.isoformat() if patient.birthdate else '',
             'gender': patient.gender,
             'weight': patient.weight if patient.weight else prescription[0].weight,
-            'weightDate': patient.weightDate.isoformat() if patient.weight else prescription[0].date.isoformat(),
+            'weightDate': patient.weightDate.isoformat() if patient.weightDate else prescription[0].date.isoformat(),
             'class': random.choice(['green','yellow','red']),
             'skinColor': patient.skinColor,
             'department': prescription[4],
