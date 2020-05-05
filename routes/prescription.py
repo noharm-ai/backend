@@ -203,8 +203,8 @@ def getPrescription(idPrescription):
     pDrugs = getDrugType(drugs, pDrugs, suspended=True, source='Medicamentos')
 
     pSolution = getDrugType(drugs, [], source='Soluções')
-    pSolution = getDrugType(drugs, pSolution, checked=True, source='Solução')
-    pSolution = getDrugType(drugs, pSolution, suspended=True, source='Solução')
+    pSolution = getDrugType(drugs, pSolution, checked=True, source='Soluções')
+    pSolution = getDrugType(drugs, pSolution, suspended=True, source='Soluções')
 
     pProcedures = getDrugType(drugs, [], source='Proced/Exames')
     pProcedures = getDrugType(drugs, pProcedures, checked=True, source='Proced/Exames')
