@@ -115,7 +115,21 @@ def getExams(typeExam, idPatient):
         .filter(Exams.typeExam == typeExam)\
         .order_by(Exams.date.desc()).limit(1).first()
 
-def getDrugType(drugList, pDrugs, checked=False, suspended=False, source=None):
+def getPrevIntervention(idDrug, idPrescription, interventions):
+    result = {}
+    for i in interventions:
+        if i['idDrug'] == idDrug and i['status'] == 's' and i['idPrescription'] < idPrescription:
+            result = i;
+    return result
+
+def getIntervention(idPrescriptionDrug, interventions):
+    result = {}
+    for i in interventions:
+        if i['id'] == idPrescriptionDrug:
+            result = i;
+    return result
+
+def getDrugType(drugList, pDrugs, checked=False, suspended=False, source=None, interventions=[]):
     for pd in drugList:
 
         belong = False
@@ -160,17 +174,8 @@ def getDrugType(drugList, pDrugs, checked=False, suspended=False, source=None):
                 'suspended': bool(pd[0].suspendedDate),
                 'status': pd[0].status,
                 'near': pd[0].near,
-                'intervention': {
-                    'id': pd[4].id,
-                    'idInterventionReason': pd[4].idInterventionReason,
-                    'admissionNumber': pd[4].admissionNumber,
-                    'observation': pd[4].notes,
-                    'type': pd[4].kind,
-                    'cost': pd[4].cost,
-                    'interactions': pd[4].interactions,
-                    'date': pd[4].date.isoformat(),
-                    'status': pd[4].status
-                } if pd[4] is not None else ''
+                'prevIntervention': getPrevIntervention(pd[0].idDrug, pd[0].idPrescription, interventions),
+                'intervention': getIntervention(pd[0].id, interventions)
             })
     return pDrugs
 
@@ -203,17 +208,17 @@ def getPrescription(idPrescription):
     mg = getExams('MG', patient.id)
     rni = getExams('PRO', patient.id)
 
-    pDrugs = getDrugType(drugs, [], source='Medicamentos')
-    pDrugs = getDrugType(drugs, pDrugs, checked=True, source='Medicamentos')
-    pDrugs = getDrugType(drugs, pDrugs, suspended=True, source='Medicamentos')
+    pDrugs = getDrugType(drugs, [], source='Medicamentos', interventions=interventions)
+    pDrugs = getDrugType(drugs, pDrugs, checked=True, source='Medicamentos', interventions=interventions)
+    pDrugs = getDrugType(drugs, pDrugs, suspended=True, source='Medicamentos', interventions=interventions)
 
-    pSolution = getDrugType(drugs, [], source='Soluções')
-    pSolution = getDrugType(drugs, pSolution, checked=True, source='Soluções')
-    pSolution = getDrugType(drugs, pSolution, suspended=True, source='Soluções')
+    pSolution = getDrugType(drugs, [], source='Soluções', interventions=interventions)
+    pSolution = getDrugType(drugs, pSolution, checked=True, source='Soluções', interventions=interventions)
+    pSolution = getDrugType(drugs, pSolution, suspended=True, source='Soluções', interventions=interventions)
 
-    pProcedures = getDrugType(drugs, [], source='Proced/Exames')
-    pProcedures = getDrugType(drugs, pProcedures, checked=True, source='Proced/Exames')
-    pProcedures = getDrugType(drugs, pProcedures, suspended=True, source='Proced/Exames')
+    pProcedures = getDrugType(drugs, [], source='Proced/Exames', interventions=interventions)
+    pProcedures = getDrugType(drugs, pProcedures, checked=True, source='Proced/Exames', interventions=interventions)
+    pProcedures = getDrugType(drugs, pProcedures, suspended=True, source='Proced/Exames', interventions=interventions)
 
     return {
         'status': 'success',

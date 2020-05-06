@@ -66,9 +66,7 @@ class Prescription(db.Model):
 
         return db.session\
             .query(
-                Prescription, Patient,
-                func.trunc((func.extract('epoch', func.current_date(
-                )) - func.extract('epoch', Prescription.date)) / 86400).label('daysAgo'), score,
+                Prescription, Patient, func.trunc(0).label('daysAgo'), score,
                 Department.name.label('department')
             )\
             .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)\
@@ -188,9 +186,7 @@ class Patient(db.Model):
         else:
             q = db.session\
                 .query(
-                    Prescription, Patient,
-                    func.trunc((func.extract('epoch', func.current_date(
-                    )) - func.extract('epoch', Prescription.date)) / 86400).label('daysAgo'),
+                    Prescription, Patient, func.trunc(0).label('daysAgo'),
                     score.label('score'), scoreOne.label('scoreOne'), scoreTwo.label('scoreTwo'), scoreThree.label('scoreThree'),
                     tgo.label('tgo'), tgp.label('tgp'), cr.label('cr'), k.label('k'), na.label('na'), mg.label('mg'), rni.label('rni'),
                     antimicro.label('antimicro'), mav.label('mav'), controlled.label('controlled'), sonda.label('sonda'),
@@ -208,7 +204,7 @@ class Patient(db.Model):
         if (not(idPrescription is None)):
             q = q.filter(Prescription.id == idPrescription)
         else:
-            q = q.filter(func.date(Prescription.date) == day)
+            q = q.filter(func.date(Prescription.date) > day)
             
         q = q.order_by(desc(Prescription.date))
 
@@ -361,15 +357,14 @@ class PrescriptionDrug(db.Model):
         drugHistory = getDrugHistory(idPrescription, admissionNumber)
 
         return db.session\
-            .query(PrescriptionDrug, Drug, MeasureUnit, Frequency, Intervention, 
+            .query(PrescriptionDrug, Drug, MeasureUnit, Frequency, func.trunc(0).label('intervention'), 
                     func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4).label('score'),
-                    drugChecked.label('checked'), drugIntervention.label('intervened'),
+                    drugChecked.label('checked'), func.trunc(0).label('intervened'),
                     OutlierObs.notes, drugHistory.label('drugHistory'))\
             .outerjoin(Outlier, Outlier.id == PrescriptionDrug.idOutlier)\
             .outerjoin(Drug, Drug.id == PrescriptionDrug.idDrug)\
             .outerjoin(MeasureUnit, MeasureUnit.id == PrescriptionDrug.idMeasureUnit)\
             .outerjoin(Frequency, Frequency.id == PrescriptionDrug.idFrequency)\
-            .outerjoin(Intervention, Intervention.id == PrescriptionDrug.id)\
             .outerjoin(OutlierObs, OutlierObs.id == Outlier.id)\
             .filter(PrescriptionDrug.idPrescription == idPrescription)\
             .order_by(asc(PrescriptionDrug.solutionGroup), asc(Drug.name))\
@@ -498,8 +493,9 @@ class Intervention(db.Model):
 
     def findByAdmission(admissionNumber):
         interventions =  db.session\
-            .query(Intervention, PrescriptionDrug.idPrescription)\
+            .query(Intervention, PrescriptionDrug.idPrescription, PrescriptionDrug.idDrug, InterventionReason.description)\
             .join(PrescriptionDrug, Intervention.id == PrescriptionDrug.id)\
+            .join(InterventionReason, Intervention.idInterventionReason == InterventionReason.id)\
             .filter(Intervention.admissionNumber == admissionNumber)\
             .order_by(asc(Intervention.date))\
             .all()
@@ -509,7 +505,9 @@ class Intervention(db.Model):
             result.append({
                 'id': i[0].id,
                 'idInterventionReason': i[0].idInterventionReason,
+                'reasonDescription': i[3],
                 'idPrescription': i[1],
+                'idDrug': i[2],
                 'admissionNumber': i[0].admissionNumber,
                 'observation': i[0].notes,
                 'type': i[0].kind,
