@@ -369,7 +369,7 @@ class PrescriptionDrug(db.Model):
             .outerjoin(Drug, Drug.id == PrescriptionDrug.idDrug)\
             .outerjoin(MeasureUnit, MeasureUnit.id == PrescriptionDrug.idMeasureUnit)\
             .outerjoin(Frequency, Frequency.id == PrescriptionDrug.idFrequency)\
-            .outerjoin(Intervention, Intervention.idPrescriptionDrug == PrescriptionDrug.id)\
+            .outerjoin(Intervention, Intervention.id == PrescriptionDrug.id)\
             .outerjoin(OutlierObs, OutlierObs.id == Outlier.id)\
             .filter(PrescriptionDrug.idPrescription == idPrescription)\
             .order_by(asc(PrescriptionDrug.solutionGroup), asc(Drug.name))\
@@ -440,12 +440,17 @@ class Frequency(db.Model):
 class Intervention(db.Model):
     __tablename__ = 'intervencao'
 
-    id = db.Column("idintervencao", db.Integer, primary_key=True)
-    idPrescriptionDrug = db.Column("fkpresmed", db.Integer, nullable=False)
-    idUser = db.Column("idusuario", db.Integer, nullable=False)
+    id = db.Column("fkpresmed", db.Integer, primary_key=True)
+    admissionNumber = db.Column('nratendimento', db.Integer, nullable=False)
     idInterventionReason = db.Column("idmotivointervencao", db.Integer, nullable=False)
-    propagation = db.Column("boolpropaga", db.String, nullable=False)
+    kind = db.Column('tipo', db.String(1), nullable=True)
+    cost = db.Column("custo", db.Boolean, nullable=True)
     notes = db.Column("observacao", db.String, nullable=True)
+    interactions = db.Column('interacoes', postgresql.ARRAY(db.Integer), nullable=True)
+    date = db.Column("dtintervencao", db.DateTime, nullable=True)
+    status = db.Column('status', db.String(1), nullable=True)
+    update = db.Column("update_at", db.DateTime, nullable=False)
+    user = db.Column("update_by", db.Integer, nullable=False)
 
     def setSchema(schema):
         Intervention.__table__.schema = schema
@@ -490,6 +495,31 @@ class Intervention(db.Model):
             db.session.add(self)
 
         db.session.commit()
+
+    def findByAdmission(admissionNumber):
+        interventions =  db.session\
+            .query(Intervention, PrescriptionDrug.idPrescription)\
+            .join(PrescriptionDrug, Intervention.id == PrescriptionDrug.id)\
+            .filter(Intervention.admissionNumber == admissionNumber)\
+            .order_by(asc(Intervention.date))\
+            .all()
+
+        result = []
+        for i in interventions:
+            result.append({
+                'id': i[0].id,
+                'idInterventionReason': i[0].idInterventionReason,
+                'idPrescription': i[1],
+                'admissionNumber': i[0].admissionNumber,
+                'observation': i[0].notes,
+                'type': i[0].kind,
+                'cost': i[0].cost,
+                'interactions': i[0].interactions,
+                'date': i[0].date.isoformat(),
+                'status': i[0].status
+            })
+
+        return result
 
 
 class Segment(db.Model):

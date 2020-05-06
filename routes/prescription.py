@@ -162,10 +162,14 @@ def getDrugType(drugList, pDrugs, checked=False, suspended=False, source=None):
                 'near': pd[0].near,
                 'intervention': {
                     'id': pd[4].id,
-                    'idPrescriptionDrug': pd[4].idPrescriptionDrug,
                     'idInterventionReason': pd[4].idInterventionReason,
-                    'propagation': pd[4].propagation,
+                    'admissionNumber': pd[4].admissionNumber,
                     'observation': pd[4].notes,
+                    'type': pd[4].kind,
+                    'cost': pd[4].cost,
+                    'interactions': pd[4].interactions,
+                    'date': pd[4].date.isoformat(),
+                    'status': pd[4].status
                 } if pd[4] is not None else ''
             })
     return pDrugs
@@ -188,6 +192,7 @@ def getPrescription(idPrescription):
         patient.admissionNumber = prescription[0].admissionNumber
 
     drugs = PrescriptionDrug.findByPrescription(idPrescription, patient.admissionNumber)
+    interventions = Intervention.findByAdmission(patient.admissionNumber)
     db.engine.dispose()
 
     tgo = getExams('TGO', patient.id)
@@ -241,6 +246,7 @@ def getPrescription(idPrescription):
             'prescription': pDrugs,
             'solution': pSolution,
             'procedures': pProcedures,
+            'interventions': interventions,
             'status': prescription[0].status,
         }
     }, status.HTTP_200_OK
@@ -267,29 +273,37 @@ def getInterventionReasons():
     }, status.HTTP_200_OK
 
 
-@app_pres.route('/intervention', methods=['POST'])
-@app_pres.route('/intervention/<int:idIntervention>', methods=['PUT'])
+@app_pres.route('/intervention/<int:idPrescriptionDrug>', methods=['PUT'])
 @jwt_required
-def createIntervention(idIntervention=None):
+def createIntervention(idPrescriptionDrug=None):
     user = User.find(get_jwt_identity())
     setSchema(user.schema)
     data = request.get_json()
 
-    if request.method == 'POST':
+    newIntervention = False
+    i = Intervention.query.get(idPrescriptionDrug)
+    if i is None:
         i = Intervention()
-    elif request.method == 'PUT':
-        i = Intervention.query.get(idIntervention)
+        i.id = idPrescriptionDrug
+        i.date = func.now()
+        newIntervention = True
 
-    i.id = idIntervention
-    i.idUser = user.id
-    i.idPrescriptionDrug = data.get('idPrescriptionDrug', None)
-    i.idInterventionReason = data.get('idInterventionReason', None)
-    i.propagation = data.get('propagation', None)
-    i.notes = data.get('observation', None)
+    if 'admissionNumber' in data.keys(): i.admissionNumber = data.get('admissionNumber', None)
+    if 'idInterventionReason' in data.keys(): i.idInterventionReason = data.get('idInterventionReason', None)
+    if 'type' in data.keys(): i.kind = data.get('type', None)
+    if 'cost' in data.keys(): i.cost = data.get('cost', None)
+    if 'observation' in data.keys(): i.notes = data.get('observation', None)
+    if 'interactions' in data.keys(): i.interactions = data.get('interactions', None)
+    
+    i.status = data.get('status', 's')
+    i.update = func.now()
+    i.user = user.id
+
+    if newIntervention: db.session.add(i)
+    setDrugStatus(i.id, i.status)
 
     try:
-        i.save()
-        db.engine.dispose()
+        db.session.commit()
 
         return {
             'status': 'success',
@@ -353,16 +367,14 @@ def setPrescriptionStatus(idPrescription):
             'message': str(e)
         }, status.HTTP_500_INTERNAL_SERVER_ERROR
 
-@app_pres.route('/prescriptions/drug/<int:idPrescriptionDrug>', methods=['PUT'])
+@app_pres.route('/prescriptions/drug/<int:idPrescriptionDrug>/<int:drugStatus>', methods=['PUT'])
 @jwt_required
-def setDrugStatus(idPrescriptionDrug):
+def setDrugStatus(idPrescriptionDrug, drugStatus):
     user = User.find(get_jwt_identity())
     setSchema(user.schema)
 
-    data = request.get_json()
-
     pd = PrescriptionDrug.query.get(idPrescriptionDrug)
-    pd.status = data.get('status', None)
+    pd.status = drugStatus
     pd.update = func.now()
     pd.user = user.id
 
