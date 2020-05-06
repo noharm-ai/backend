@@ -70,6 +70,7 @@ def getPrescriptions(idSegment=None, idDept=None, idPrescription=None):
             'mg': mg,
             'rni': rni,
             'alertExams': totalAlerts,
+            'interventions': str(p[21]),
             'patientScore': 'Alto',
             'class': 'yellow', #'red' if p[3] > 12 else 'orange' if p[3] > 8 else 'yellow' if p[3] > 4 else 'green',
             'status': p[0].status,

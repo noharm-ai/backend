@@ -124,7 +124,14 @@ def getDrugsCount():
     return db.session.query(func.count(1).label('drugCount'))\
         .select_from(PrescriptionDrug, Prescription)\
         .filter(PrescriptionDrug.idPrescription == Prescription.id)\
-        .as_scalar()   
+        .as_scalar()
+
+def getPendingInterventions():
+    return db.session.query(func.count(1).label('pendingInterventions'))\
+        .select_from(Intervention)\
+        .filter(Intervention.admissionNumber == Prescription.admissionNumber)\
+        .filter(Intervention.status == 's')\
+        .as_scalar() 
 
 def getDrugDiff():
     pd2 = db.aliased(PrescriptionDrug)
@@ -180,6 +187,7 @@ class Patient(db.Model):
         sonda = getDrugRoute("%sonda%")
         diff = getDrugDiff()
         count = getDrugsCount()
+        interventions = getPendingInterventions()
 
         if onlyStatus:
             q = db.session.query(Prescription)
@@ -190,7 +198,8 @@ class Patient(db.Model):
                     score.label('score'), scoreOne.label('scoreOne'), scoreTwo.label('scoreTwo'), scoreThree.label('scoreThree'),
                     tgo.label('tgo'), tgp.label('tgp'), cr.label('cr'), k.label('k'), na.label('na'), mg.label('mg'), rni.label('rni'),
                     antimicro.label('antimicro'), mav.label('mav'), controlled.label('controlled'), sonda.label('sonda'),
-                    (count - diff).label('diff'), Department.name.label('department'), notdefault.label('notdefault')
+                    (count - diff).label('diff'), Department.name.label('department'), notdefault.label('notdefault'),
+                    interventions.label('interventions')
                 )\
                 .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)\
                 .outerjoin(Department, Department.id == Prescription.idDepartment)
@@ -204,7 +213,7 @@ class Patient(db.Model):
         if (not(idPrescription is None)):
             q = q.filter(Prescription.id == idPrescription)
         else:
-            q = q.filter(func.date(Prescription.date) > day)
+            q = q.filter(func.date(Prescription.date) == day)
             
         q = q.order_by(desc(Prescription.date))
 
@@ -220,7 +229,8 @@ class Patient(db.Model):
                 .query(prescritionAlias, patientAlias,\
                         '"daysAgo"', 'score', '"scoreOne"', '"scoreTwo"', '"scoreThree"',\
                         'tgo', 'tgp', 'cr', 'k', 'na', 'mg', 'rni',\
-                        'antimicro', 'mav', 'controlled', 'sonda', 'diff', 'department', 'notdefault')
+                        'antimicro', 'mav', 'controlled', 'sonda', 'diff', 'department',\
+                        'notdefault', 'interventions')
 
 
         return wrapper.limit(limit).all()
