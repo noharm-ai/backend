@@ -502,10 +502,14 @@ class Intervention(db.Model):
         db.session.commit()
 
     def findByAdmission(admissionNumber):
+        reason = db.session.query(InterventionReason.description)\
+                .select_from(InterventionReason)\
+                .filter(InterventionReason.id == func.any(Intervention.idInterventionReason))\
+                .limit(1).as_scalar()
+
         interventions =  db.session\
-            .query(Intervention, PrescriptionDrug.idPrescription, PrescriptionDrug.idDrug, InterventionReason.description)\
+            .query(Intervention, PrescriptionDrug.idPrescription, PrescriptionDrug.idDrug, reason.label('reason'))\
             .join(PrescriptionDrug, Intervention.id == PrescriptionDrug.id)\
-            .join(InterventionReason, Intervention.idInterventionReason == InterventionReason.id)\
             .filter(Intervention.admissionNumber == admissionNumber)\
             .order_by(asc(Intervention.date))\
             .all()
