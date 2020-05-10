@@ -119,7 +119,7 @@ def getExams(typeExam, idPatient):
 def getPrevIntervention(idDrug, idPrescription, interventions):
     result = {}
     for i in interventions:
-        if i['idDrug'] == idDrug and i['status'] == 's' and i['idPrescription'] < idPrescription:
+        if i['idDrug'] == idDrug and i['idPrescription'] < idPrescription:
             if 'id' in result.keys() and result['id'] > i['id']: continue
             result = i;
     return result
@@ -296,7 +296,7 @@ def createIntervention(idPrescriptionDrug=None):
 
     if 'admissionNumber' in data.keys(): i.admissionNumber = data.get('admissionNumber', None)
     if 'idInterventionReason' in data.keys(): i.idInterventionReason = data.get('idInterventionReason', None)
-    if 'type' in data.keys(): i.kind = data.get('type', None)
+    if 'error' in data.keys(): i.error = data.get('error', None)
     if 'cost' in data.keys(): i.cost = data.get('cost', None)
     if 'observation' in data.keys(): i.notes = data.get('observation', None)
     if 'interactions' in data.keys(): i.interactions = data.get('interactions', None)

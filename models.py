@@ -127,10 +127,14 @@ def getDrugsCount():
         .as_scalar()
 
 def getPendingInterventions():
+    pd3 = db.aliased(PrescriptionDrug)
+
     return db.session.query(func.count(1).label('pendingInterventions'))\
         .select_from(Intervention)\
+        .join(pd3, Intervention.id == pd3.id)\
         .filter(Intervention.admissionNumber == Prescription.admissionNumber)\
         .filter(Intervention.status == 's')\
+        .filter(pd3.idPrescription < Prescription.id)\
         .as_scalar() 
 
 def getDrugDiff():
@@ -448,7 +452,7 @@ class Intervention(db.Model):
     id = db.Column("fkpresmed", db.Integer, primary_key=True)
     admissionNumber = db.Column('nratendimento', db.Integer, nullable=False)
     idInterventionReason = db.Column("idmotivointervencao", db.Integer, nullable=False)
-    kind = db.Column('tipo', db.String(1), nullable=True)
+    error = db.Column('erro', db.Boolean, nullable=True)
     cost = db.Column("custo", db.Boolean, nullable=True)
     notes = db.Column("observacao", db.String, nullable=True)
     interactions = db.Column('interacoes', postgresql.ARRAY(db.Integer), nullable=True)
@@ -527,7 +531,7 @@ class Intervention(db.Model):
                 'drugName': i[4] if i[4] is not None else 'Medicamento ' + str(i[2]),
                 'admissionNumber': i[0].admissionNumber,
                 'observation': i[0].notes,
-                'type': i[0].kind,
+                'error': i[0].error,
                 'cost': i[0].cost,
                 'interactions': i[0].interactions,
                 'date': i[0].date.isoformat(),
