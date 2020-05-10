@@ -423,7 +423,7 @@ class InterventionReason(db.Model):
 
     id = db.Column("idmotivointervencao", db.Integer, primary_key=True)
     description = db.Column("nome", db.String, nullable=False)
-    group = db.Column("tipo", db.String, nullable=True)
+    #group = db.Column("tipo", db.String, nullable=True)
 
     def setSchema(schema):
         InterventionReason.__table__.schema = schema
@@ -507,9 +507,11 @@ class Intervention(db.Model):
                 .filter(InterventionReason.id == func.any(Intervention.idInterventionReason))\
                 .limit(1).as_scalar()
 
-        interventions =  db.session\
-            .query(Intervention, PrescriptionDrug.idPrescription, PrescriptionDrug.idDrug, reason.label('reason'))\
+        interventions = db.session\
+            .query(Intervention, PrescriptionDrug.idPrescription, PrescriptionDrug.idDrug, 
+                    reason.label('reason'), Drug.name)\
             .join(PrescriptionDrug, Intervention.id == PrescriptionDrug.id)\
+            .outerjoin(Drug, Drug.id == PrescriptionDrug.idDrug)\
             .filter(Intervention.admissionNumber == admissionNumber)\
             .order_by(asc(Intervention.date))\
             .all()
@@ -522,6 +524,7 @@ class Intervention(db.Model):
                 'reasonDescription': i[3],
                 'idPrescription': i[1],
                 'idDrug': i[2],
+                'drugName': i[4] if i[4] is not None else 'Medicamento ' + str(i[2]),
                 'admissionNumber': i[0].admissionNumber,
                 'observation': i[0].notes,
                 'type': i[0].kind,

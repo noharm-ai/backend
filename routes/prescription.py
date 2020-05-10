@@ -120,6 +120,7 @@ def getPrevIntervention(idDrug, idPrescription, interventions):
     result = {}
     for i in interventions:
         if i['idDrug'] == idDrug and i['status'] == 's' and i['idPrescription'] < idPrescription:
+            if 'id' in result.keys() and result['id'] > i['id']: continue
             result = i;
     return result
 
@@ -148,7 +149,6 @@ def getDrugType(drugList, pDrugs, checked=False, suspended=False, source=None, i
             pDrugs.append({
                 'idPrescriptionDrug': pd[0].id,
                 'idDrug': pd[0].idDrug,
-                'drug': pd[1].name if pd[1] is not None else 'Medicamento ' + str(pd[0].idDrug),
                 'drug': pd[1].name if pd[1] is not None else 'Medicamento ' + str(pd[0].idDrug),
                 'np': pd[1].notdefault if pd[1] is not None else False,
                 'am': pd[1].antimicro if pd[1] is not None else False,
@@ -252,7 +252,7 @@ def getPrescription(idPrescription):
             'prescription': pDrugs,
             'solution': pSolution,
             'procedures': pProcedures,
-            'interventions': interventions,
+            'interventions': [i for i in interventions if i['idPrescription'] < idPrescription],
             'status': prescription[0].status,
         }
     }, status.HTTP_200_OK
