@@ -6,6 +6,7 @@ from sqlalchemy import desc, asc, and_, func
 from flask import Blueprint, request
 from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
+from .utils import freqValue
 
 app_out = Blueprint('app_out',__name__)
 
@@ -48,7 +49,7 @@ def getOutliers(idSegment=1, idDrug=1):
                 'countNum': o[0].countNum,
                 'dose': o[0].dose,
                 'unit': defaultUnit,
-                'frequency': o[0].frequency,
+                'frequency': freqValue(o[0].frequency),
                 'score': o[0].score,
                 'manualScore': o[0].manualScore,
                 'obs': o[1].notes if o[1] != None else ''
@@ -89,6 +90,10 @@ def getOutliers(idSegment=1, idDrug=1):
             'mav': d.mav,
             'controlled': d.controlled,
             'notdefault': d.notdefault,
+            'maxDose': d.maxDose,
+            'kidney': d.kidney,
+            'liver': d.liver,
+            'elderly': d.elderly,
             'idMeasureUnit': d.idMeasureUnit
         }
     }, status.HTTP_200_OK
@@ -166,6 +171,10 @@ def setDrugClass(idDrug):
     if 'controlled' in data.keys(): d.controlled = bool(data.get('controlled', 0))
     if 'idMeasureUnit' in data.keys(): d.idMeasureUnit = data.get('idMeasureUnit', None)
     if 'notdefault' in data.keys(): d.notdefault = data.get('notdefault', 0)
+    if 'maxDose' in data.keys(): d.maxDose = data.get('maxDose', None)
+    if 'kidney' in data.keys(): d.kidney = data.get('kidney', None)
+    if 'liver' in data.keys(): d.liver = data.get('liver', 0)
+    if 'elderly' in data.keys(): d.elderly = data.get('elderly', 0)
 
     try:
         db.session.commit()

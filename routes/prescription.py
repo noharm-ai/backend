@@ -4,7 +4,7 @@ from models import db, User, Patient, Prescription, PrescriptionDrug, Interventi
 from flask import Blueprint, request
 from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
-from .utils import mdrd_calc, cg_calc, none2zero, formatExam, period, lenghStay, strNone, examAlerts
+from .utils import mdrd_calc, cg_calc, none2zero, formatExam, period, lenghStay, strNone, examAlerts, timeValue
 from sqlalchemy import func
 from datetime import date, datetime
 
@@ -36,7 +36,7 @@ def getPrescriptions(idSegment=None, idDept=None, idPrescription=None):
             patient.id = p[0].idPatient
             patient.admissionNumber = p[0].admissionNumber
 
-        tgo, tgp, mdrd, cg, k, na, mg, rni, totalAlerts = examAlerts(p, patient)
+        tgo, tgp, mdrd, cg, k, na, mg, rni, pcr, ckd, totalAlerts = examAlerts(p, patient)
 
         results.append({
             'idPrescription': p[0].id,
@@ -69,6 +69,8 @@ def getPrescriptions(idSegment=None, idDept=None, idPrescription=None):
             'na': na,
             'mg': mg,
             'rni': rni,
+            'pcr': pcr,
+            'ckd': ckd,
             'alertExams': totalAlerts,
             'interventions': str(p[21]),
             'patientScore': 'Alto',
@@ -131,14 +133,13 @@ def getIntervention(idPrescriptionDrug, interventions):
             result = i;
     return result
 
-def getDrugType(drugList, pDrugs, checked=False, suspended=False, source=None, interventions=[]):
+def getDrugType(drugList, pDrugs, checked=False, suspended=False, route=False, source=None, interventions=[]):
     for pd in drugList:
 
         belong = False
         pd6 = pd[6]
 
         if pd[0].source is None: pd[0].source = 'Medicamentos'
-        if pd[0].route is None: pd6 = '1'
 
         if pd[0].source != source: continue
         if checked and (str(pd6) == '1' and bool(pd[0].suspendedDate) == False): belong = True
@@ -159,7 +160,7 @@ def getDrugType(drugList, pDrugs, checked=False, suspended=False, source=None, i
                 'frequency': { 'value': pd[3].id, 'label': pd[3].description } if pd[3] else '',
                 'dayFrequency': pd[0].frequency,
                 'doseconv': pd[0].doseconv,
-                'time': pd[0].interval,
+                'time': timeValue(pd[0].interval),
                 'recommendation': pd[0].notes if pd[0].notes and len(pd[0].notes.strip()) > 0 else None,
                 'obs': pd[8],
                 'period': period(pd[9]),
@@ -179,6 +180,11 @@ def getDrugType(drugList, pDrugs, checked=False, suspended=False, source=None, i
                 'intervention': getIntervention(pd[0].id, interventions)
             })
     return pDrugs
+
+def sortRoute(pDrugs):
+    result = [p for p in pDrugs if p['route'] is not None]
+    result.extend([p for p in pDrugs if p['route'] is None])
+    return result
 
 @app_pres.route('/prescriptions/<int:idPrescription>', methods=['GET'])
 @jwt_required
@@ -208,10 +214,12 @@ def getPrescription(idPrescription):
     na = getExams('NA', patient.id)
     mg = getExams('MG', patient.id)
     rni = getExams('PRO', patient.id)
+    pcr = getExams('PCRU', patient.id)
 
     pDrugs = getDrugType(drugs, [], source='Medicamentos', interventions=interventions)
     pDrugs = getDrugType(drugs, pDrugs, checked=True, source='Medicamentos', interventions=interventions)
     pDrugs = getDrugType(drugs, pDrugs, suspended=True, source='Medicamentos', interventions=interventions)
+    pDrugs = sortRoute(pDrugs)
 
     pSolution = getDrugType(drugs, [], source='Soluções', interventions=interventions)
     pSolution = getDrugType(drugs, pSolution, checked=True, source='Soluções', interventions=interventions)
@@ -240,11 +248,13 @@ def getPrescription(idPrescription):
             'tgp': formatExam(tgp, 'tgp'),
             'mdrd': mdrd_calc(cr.value, patient.birthdate, patient.gender, patient.skinColor) if cr is not None else '',
             'cg': cg_calc(cr.value, patient.birthdate, patient.gender, patient.weight or prescription[0].weight) if cr is not None else '',
+            'ckd': mdrd_calc(cr.value, patient.birthdate, patient.gender, patient.skinColor) if cr is not None else '',
             'creatinina': formatExam(cr, 'cr'),
             'k': formatExam(k, 'k'),
             'na': formatExam(na, 'na'),
             'mg': formatExam(mg, 'mg'),
             'rni': formatExam(rni, 'rni'),
+            'pcr': formatExam(pcr, 'pcr'),
             'patientScore': 'High',
             'date': prescription[0].date.isoformat(),
             'daysAgo': prescription[2],

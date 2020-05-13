@@ -184,6 +184,7 @@ class Patient(db.Model):
         na = getExams('NA')
         mg = getExams('MG')
         rni = getExams('PRO')
+        pcr = getExams('PCRU')
         antimicro = getDrugClass(Drug.antimicro)
         mav = getDrugClass(Drug.mav)
         controlled = getDrugClass(Drug.controlled)
@@ -203,7 +204,7 @@ class Patient(db.Model):
                     tgo.label('tgo'), tgp.label('tgp'), cr.label('cr'), k.label('k'), na.label('na'), mg.label('mg'), rni.label('rni'),
                     antimicro.label('antimicro'), mav.label('mav'), controlled.label('controlled'), sonda.label('sonda'),
                     (count - diff).label('diff'), Department.name.label('department'), notdefault.label('notdefault'),
-                    interventions.label('interventions')
+                    interventions.label('interventions'), pcr.label('pcr')
                 )\
                 .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)\
                 .outerjoin(Department, Department.id == Prescription.idDepartment)
@@ -234,7 +235,7 @@ class Patient(db.Model):
                         '"daysAgo"', 'score', '"scoreOne"', '"scoreTwo"', '"scoreThree"',\
                         'tgo', 'tgp', 'cr', 'k', 'na', 'mg', 'rni',\
                         'antimicro', 'mav', 'controlled', 'sonda', 'diff', 'department',\
-                        'notdefault', 'interventions')
+                        'notdefault', 'interventions', 'pcr')
 
 
         return wrapper.limit(limit).all()
@@ -396,6 +397,10 @@ class Drug(db.Model):
     mav = db.Column("mav", db.Boolean, nullable=True)
     controlled = db.Column("controlados", db.Boolean, nullable=True)
     notdefault = db.Column("naopadronizado", db.Boolean, nullable=True)
+    maxDose = db.Column("dosemaxima", db.Integer, nullable=True)
+    kidney = db.Column("renal", db.Integer, nullable=True)
+    liver = db.Column("hepatico", db.Boolean, nullable=True)
+    elderly = db.Column("idoso", db.Boolean, nullable=True)
 
     def setSchema(schema):
         Drug.__table__.schema = schema
@@ -509,23 +514,31 @@ class Intervention(db.Model):
         reason = db.session.query(InterventionReason.description)\
                 .select_from(InterventionReason)\
                 .filter(InterventionReason.id == func.any(Intervention.idInterventionReason))\
-                .limit(1).as_scalar()
+                .as_scalar()
+
+        dr1 = db.aliased(Drug)
+        interactions = db.session.query(dr1.name)\
+                .select_from(dr1)\
+                .filter(dr1.id == func.any(Intervention.interactions))\
+                .as_scalar()
 
         interventions = db.session\
             .query(Intervention, PrescriptionDrug.idPrescription, PrescriptionDrug.idDrug, 
-                    reason.label('reason'), Drug.name)\
+                    func.array(reason).label('reason'), Drug.name, 
+                    func.array(interactions).label('interactions'))\
             .join(PrescriptionDrug, Intervention.id == PrescriptionDrug.id)\
             .outerjoin(Drug, Drug.id == PrescriptionDrug.idDrug)\
             .filter(Intervention.admissionNumber == admissionNumber)\
+            .filter(Intervention.status.in_(['s','a','n','x']))\
             .order_by(asc(Intervention.date))\
             .all()
 
-        result = []
+        intervBuffer = []
         for i in interventions:
-            result.append({
+            intervBuffer.append({
                 'id': i[0].id,
                 'idInterventionReason': i[0].idInterventionReason,
-                'reasonDescription': i[3],
+                'reasonDescription': (', ').join(i[3]),
                 'idPrescription': i[1],
                 'idDrug': i[2],
                 'drugName': i[4] if i[4] is not None else 'Medicamento ' + str(i[2]),
@@ -533,10 +546,15 @@ class Intervention(db.Model):
                 'observation': i[0].notes,
                 'error': i[0].error,
                 'cost': i[0].cost,
-                'interactions': i[0].interactions,
+                'interactionsDescription': (', ').join(i[5]),
+                'interactions': i[5],
                 'date': i[0].date.isoformat(),
                 'status': i[0].status
             })
+
+        result = [i for i in intervBuffer if i['status'] != 's']
+        result.extend([i for i in intervBuffer if i['status'] == 's'])
+
 
         return result
 
