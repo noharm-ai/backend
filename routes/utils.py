@@ -44,20 +44,20 @@ def strNone(s):
     return '' if s is None else str(s)
 
 examsRef = {
-    'tgo': { 'min': 0,   'max': 37,  'ref': 'até 37 U/L - Método: Cinético optimizado UV' },
-    'tgp': { 'min': 0,   'max': 41,  'ref': 'até 41 U/L - Método: Cinético optimizado UV' },
-    'k':   { 'min': 3.5, 'max': 5,   'ref': '3,5 a 5,O mEq/L - Método: Eletrodo Seletivo' },
-    'na':  { 'min': 135, 'max': 145, 'ref': '135 a 145 mEq/L - Método: Eletrodo Seletivo' },
-    'mg':  { 'min': 1.7, 'max': 2.5, 'ref': '1,7 a 2,5 mg/dl - Método: Clorofosfonazo III 1' },
-    'rni': { 'min': 0,   'max': 999, 'ref': 'até 1,3 - Método: Coagulométrico automatizado ACL TOP 550' },
-    'cr':  { 'min': 0.5, 'max': 1.2, 'ref': 'Nas mulheres, entre 0,5 a 1,1 mg/dL.\nNos homens, entre 0,6 a 1,2 mg/dL' },
+    'tgo': { 'min': 0,   'max': 34,  'ref': 'até 34 U/L - Método: Cinético optimizado UV' },
+    'tgp': { 'min': 10,  'max': 49,  'ref': '10 a 49 U/L - Método: Cinético optimizado UV' },
+    'k':   { 'min': 3.5, 'max': 5.5, 'ref': '3,5 a 5,5 mEq/L - Método: Eletrodo Seletivo' },
+    'na':  { 'min': 132, 'max': 146, 'ref': '132 a 146 mEq/L - Método: Eletrodo Seletivo' },
+    'mg':  { 'min': 1.3, 'max': 2.7, 'ref': '1,3 a 2,7 mg/dl - Método: Clorofosfonazo III 1' },
+    'rni': { 'min': 0,   'max': 1.3, 'ref': 'até 1,3 - Método: Coagulométrico automatizado ACL TOP 550' },
+    'cr':  { 'min': 0.3, 'max': 1.3, 'ref': '0,3 a 1,3 mg/dL (IFCC)' },
     'pcr': { 'min': 0,   'max': 3,   'ref': 'até 3,0 mg/L' },
 }
 
 examEmpty = { 'value': None, 'alert': False, 'ref': None }
 
 def examAlerts(p, patient):
-    exams = {'tgo': p[7], 'tgp': p[8], 'k': p[10], 'na': p[11], 'mg': p[12], 'rni': p[13], 'pcr': p[22]}
+    exams = {'tgo': p[7], 'tgp': p[8], 'cr': p[9], 'k': p[10], 'na': p[11], 'mg': p[12], 'rni': p[13], 'pcr': p[22]}
     exams['mdrd'] = mdrd_calc(str(p[9]), patient.birthdate, patient.gender, patient.skinColor)
     exams['cg'] = cg_calc(str(p[9]), patient.birthdate, patient.gender, patient.weight or p[0].weight)
     exams['ckd'] = ckd_calc(str(p[9]), patient.birthdate, patient.gender, patient.skinColor)
@@ -79,7 +79,7 @@ def examAlerts(p, patient):
                 alertCount += int(alert)
                 result[e] = { 'value': value, 'alert': alert }
 
-    return result['tgo'], result['tgp'], result['mdrd'], result['cg'],\
+    return result['tgo'], result['tgp'], result['cr'], result['mdrd'], result['cg'],\
             result['k'], result['na'], result['mg'], result['rni'],\
             result['pcr'], result['ckd'], alertCount
 
@@ -88,7 +88,7 @@ def formatExam(exam, type):
         examDate = exam.date.strftime('%d/%m/%Y %H:%M')
         ref = examsRef[type]
         alert = not (exam.value >= ref['min'] and exam.value <= ref['max'] )
-        return { 'value': str(exam.value) + ' ' + exam.unit, 'alert': alert,\
+        return { 'value': str(exam.value) + ' ' + strNone(exam.unit), 'alert': alert,\
                       'date' :  examDate, 'ref': ref['ref']}
     else:
         examEmpty['date'] = None

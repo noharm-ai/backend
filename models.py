@@ -547,7 +547,7 @@ class Intervention(db.Model):
                 'error': i[0].error,
                 'cost': i[0].cost,
                 'interactionsDescription': (', ').join(i[5]),
-                'interactions': i[5],
+                'interactions': i[0].interactions,
                 'date': i[0].date.isoformat(),
                 'status': i[0].status
             })

@@ -4,7 +4,7 @@ from models import db, User, Patient, Prescription, PrescriptionDrug, Interventi
 from flask import Blueprint, request
 from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
-from .utils import mdrd_calc, cg_calc, none2zero, formatExam, period, lenghStay, strNone, examAlerts, timeValue
+from .utils import mdrd_calc, cg_calc, ckd_calc, none2zero, formatExam, period, lenghStay, strNone, examAlerts, timeValue
 from sqlalchemy import func
 from datetime import date, datetime
 
@@ -36,7 +36,7 @@ def getPrescriptions(idSegment=None, idDept=None, idPrescription=None):
             patient.id = p[0].idPatient
             patient.admissionNumber = p[0].admissionNumber
 
-        tgo, tgp, mdrd, cg, k, na, mg, rni, pcr, ckd, totalAlerts = examAlerts(p, patient)
+        tgo, tgp, cr, mdrd, cg, k, na, mg, rni, pcr, ckd, totalAlerts = examAlerts(p, patient)
 
         results.append({
             'idPrescription': p[0].id,
@@ -63,6 +63,7 @@ def getPrescriptions(idSegment=None, idDept=None, idPrescription=None):
             'diff': str(p[18]),
             'tgo': tgo,
             'tgp': tgp,
+            'cr': cr,
             'mdrd': mdrd,
             'cg': cg,
             'k': k,
@@ -248,7 +249,7 @@ def getPrescription(idPrescription):
             'tgp': formatExam(tgp, 'tgp'),
             'mdrd': mdrd_calc(cr.value, patient.birthdate, patient.gender, patient.skinColor) if cr is not None else '',
             'cg': cg_calc(cr.value, patient.birthdate, patient.gender, patient.weight or prescription[0].weight) if cr is not None else '',
-            'ckd': mdrd_calc(cr.value, patient.birthdate, patient.gender, patient.skinColor) if cr is not None else '',
+            'ckd': ckd_calc(cr.value, patient.birthdate, patient.gender, patient.skinColor) if cr is not None else '',
             'creatinina': formatExam(cr, 'cr'),
             'k': formatExam(k, 'k'),
             'na': formatExam(na, 'na'),
