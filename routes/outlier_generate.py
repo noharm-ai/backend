@@ -57,7 +57,7 @@ def callOutliers(idSegment):
     query = "INSERT INTO " + user.schema + ".outlier (idsegmento, fkmedicamento, doseconv, frequenciadia, contagem)\
             SELECT idsegmento, fkmedicamento, doseconv, frequenciadia, SUM(contagem)\
             FROM " + user.schema + ".prescricaoagg\
-            WHERE idsegmento = " + str(int(idSegment)) + "\
+            WHERE idsegmento = " + str(int(idSegment)) + " and frequenciadia is not null\
             GROUP BY idsegmento, fkmedicamento, doseconv, frequenciadia\
             ON CONFLICT DO nothing;"
 
@@ -127,7 +127,7 @@ def generateOutliers(idSegment,fold=None,idDrug=None,clean=None):
                 SELECT idsegmento, fkmedicamento, doseconv, frequenciadia, SUM(contagem), " + default + "\
                 FROM " + user.schema + ".prescricaoagg\
                 WHERE idsegmento = " + str(int(idSegment)) + "\
-                AND fkmedicamento = " + str(int(idDrug)) + "\
+                AND fkmedicamento = " + str(int(idDrug)) + " and frequenciadia is not null\
                 GROUP BY idsegmento, fkmedicamento, doseconv, frequenciadia\
                 ON CONFLICT DO nothing;"
 

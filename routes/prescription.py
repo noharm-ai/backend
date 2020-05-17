@@ -143,6 +143,7 @@ def getDrugType(drugList, pDrugs, checked=False, suspended=False, route=False, s
         if pd[0].source is None: pd[0].source = 'Medicamentos'
 
         if pd[0].source != source: continue
+        if source == 'Soluções': belong = True
         if checked and (str(pd6) == '1' and bool(pd[0].suspendedDate) == False): belong = True
         if suspended and (bool(pd[0].suspendedDate) == True): belong = True
         if (not checked and not suspended) and (str(pd6) == '0' and bool(pd[0].suspendedDate) == False): belong = True
@@ -223,8 +224,8 @@ def getPrescription(idPrescription):
     pDrugs = sortRoute(pDrugs)
 
     pSolution = getDrugType(drugs, [], source='Soluções', interventions=interventions)
-    pSolution = getDrugType(drugs, pSolution, checked=True, source='Soluções', interventions=interventions)
-    pSolution = getDrugType(drugs, pSolution, suspended=True, source='Soluções', interventions=interventions)
+    #pSolution = getDrugType(drugs, pSolution, checked=True, source='Soluções', interventions=interventions)
+    #pSolution = getDrugType(drugs, pSolution, suspended=True, source='Soluções', interventions=interventions)
 
     pProcedures = getDrugType(drugs, [], source='Proced/Exames', interventions=interventions)
     pProcedures = getDrugType(drugs, pProcedures, checked=True, source='Proced/Exames', interventions=interventions)
