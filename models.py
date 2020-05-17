@@ -375,12 +375,11 @@ class PrescriptionDrug(db.Model):
             .query(PrescriptionDrug, Drug, MeasureUnit, Frequency, func.trunc(0).label('intervention'), 
                     func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4).label('score'),
                     drugChecked.label('checked'), func.trunc(0).label('intervened'),
-                    OutlierObs.notes, drugHistory.label('drugHistory'))\
+                    func.trunc(0).label('notes'), drugHistory.label('drugHistory'))\
             .outerjoin(Outlier, Outlier.id == PrescriptionDrug.idOutlier)\
             .outerjoin(Drug, Drug.id == PrescriptionDrug.idDrug)\
             .outerjoin(MeasureUnit, MeasureUnit.id == PrescriptionDrug.idMeasureUnit)\
             .outerjoin(Frequency, Frequency.id == PrescriptionDrug.idFrequency)\
-            .outerjoin(OutlierObs, OutlierObs.id == Outlier.id)\
             .filter(PrescriptionDrug.idPrescription == idPrescription)\
             .order_by(asc(PrescriptionDrug.solutionGroup), asc(Drug.name))\
             .all()
@@ -552,9 +551,8 @@ class Intervention(db.Model):
                 'status': i[0].status
             })
 
-        result = [i for i in intervBuffer if i['status'] != 's']
-        result.extend([i for i in intervBuffer if i['status'] == 's'])
-
+        result = [i for i in intervBuffer if i['status'] == 's']
+        result.extend([i for i in intervBuffer if i['status'] != 's'])
 
         return result
 

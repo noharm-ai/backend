@@ -61,7 +61,7 @@ def getOutliers(idSegment=1, idDrug=1):
         o.idSegment = idSegment
         o.countNum = 1
         o.dose = float(dose)
-        o.frequency = freqValue(float(frequency))
+        o.frequency = float(frequency)
         o.score = 4
         o.manualScore = None
         o.update = func.now()
@@ -76,7 +76,7 @@ def getOutliers(idSegment=1, idDrug=1):
             'countNum': 1,
             'dose': float(dose),
             'unit': defaultUnit,
-            'frequency': float(frequency),
+            'frequency': freqValue(float(frequency)),
             'score': 4,
             'manualScore': None,
             'obs': ''
