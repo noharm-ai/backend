@@ -19,7 +19,7 @@ def getOutliers(idSegment=1, idDrug=1):
         .query(Outlier, OutlierObs)\
         .outerjoin(OutlierObs, OutlierObs.id == Outlier.id)\
         .filter(Outlier.idSegment == idSegment, Outlier.idDrug == idDrug)\
-        .order_by(Outlier.countNum.desc())\
+        .order_by(Outlier.countNum.desc(), Outlier.frequency.asc())\
         .all()
     d = Drug.query.get(idDrug)
     db.engine.dispose()
