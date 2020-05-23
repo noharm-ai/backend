@@ -6,7 +6,7 @@ from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
 from .utils import mdrd_calc, cg_calc, ckd_calc, none2zero, formatExam,\
                     period, lenghStay, strNone, examAlerts, timeValue,\
-                    data2age, weightDate
+                    data2age, weightDate, examEmpty
 from sqlalchemy import func
 from datetime import date, datetime
 
@@ -152,7 +152,7 @@ def getDrugType(drugList, pDrugs, source, interventions, exams=None, checked=Fal
             if pd[1].maxDose and pd[1].maxDose < (pd[0].doseconv * pd[0].frequency):
                 alerts.append('Dose diária prescrita ('+str(int(pd[0].doseconv * pd[0].frequency))+') maior que a máxima ('+str(pd[1].maxDose)+') usualmente recomendada (considerada a dose diária máxima independente da indicação')
 
-            if pd[1].kidney and pd[1].kidney > exams['ckd']['value']:
+            if pd[1].kidney and exams['ckd']['value'] and pd[1].kidney > exams['ckd']['value']:
                 alerts.append('Medicamento deve sofrer ajuste de dose, já que a função renal do paciente ('+ str(exams['ckd']['value']) +' mL/min) está abaixo de '+ str(pd[1].kidney) +' mL/min')
 
             if pd[1].liver and (exams['tgp']['alert'] or exams['tgo']['alert']):
@@ -236,9 +236,9 @@ def getPrescription(idPrescription):
     exams = {
         'tgo': formatExam(tgo, 'tgo'),
         'tgp': formatExam(tgp, 'tgp'),
-        'mdrd': mdrd_calc(cr.value, patient.birthdate, patient.gender, patient.skinColor) if cr is not None else '',
-        'cg': cg_calc(cr.value, patient.birthdate, patient.gender, patient.weight or prescription[0].weight) if cr is not None else '',
-        'ckd': ckd_calc(cr.value, patient.birthdate, patient.gender, patient.skinColor) if cr is not None else '',
+        'mdrd': mdrd_calc(cr.value, patient.birthdate, patient.gender, patient.skinColor) if cr is not None else examEmpty,
+        'cg': cg_calc(cr.value, patient.birthdate, patient.gender, patient.weight or prescription[0].weight) if cr is not None else examEmpty,
+        'ckd': ckd_calc(cr.value, patient.birthdate, patient.gender, patient.skinColor) if cr is not None else examEmpty,
         'creatinina': formatExam(cr, 'cr'),
         'k': formatExam(k, 'k'),
         'na': formatExam(na, 'na'),
