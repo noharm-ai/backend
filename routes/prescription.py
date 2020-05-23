@@ -4,23 +4,24 @@ from models import db, User, Patient, Prescription, PrescriptionDrug, Interventi
 from flask import Blueprint, request
 from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
-from .utils import mdrd_calc, cg_calc, ckd_calc, none2zero, formatExam, period, lenghStay, strNone, examAlerts, timeValue
+from .utils import mdrd_calc, cg_calc, ckd_calc, none2zero, formatExam,\
+                    period, lenghStay, strNone, examAlerts, timeValue,\
+                    data2age, weightDate
 from sqlalchemy import func
 from datetime import date, datetime
 
 app_pres = Blueprint('app_pres',__name__)
 
-@app_pres.route("/patients", methods=['GET'])
 @app_pres.route("/prescriptions", methods=['GET'])
-@app_pres.route("/prescriptions/segments/<int:idSegment>", methods=['GET'])
-@app_pres.route("/prescriptions/segments/<int:idSegment>/dept/<int:idDept>", methods=['GET'])
 @jwt_required
-def getPrescriptions(idSegment=None, idDept=None, idPrescription=None):
+def getPrescriptions(idPrescription=None):
     user = User.find(get_jwt_identity())
     setSchema(user.schema)
 
-    idSegment = request.args.get('idSegment', idSegment)
-    idDept = request.args.get('idDept', idDept)
+    print(request.args)
+
+    idSegment = request.args.get('idSegment', None)
+    idDept = request.args.getlist('idDept[]')
     limit = request.args.get('limit', 250)
     day = request.args.get('date', date.today())
 
@@ -87,12 +88,12 @@ def getPrescriptions(idSegment=None, idDept=None, idPrescription=None):
 
 @app_pres.route("/prescriptions/status", methods=['GET'])
 @jwt_required
-def getPrescriptionsStatus(idSegment=1, idDept=None):
+def getPrescriptionsStatus():
     user = User.find(get_jwt_identity())
     setSchema(user.schema)
 
-    idSegment = request.args.get('idSegment', idSegment)
-    idDept = request.args.get('idDept', idDept)
+    idSegment = request.args.get('idSegment', None)
+    idDept = request.args.getlist('idDept[]')
     limit = request.args.get('limit', 250)
     day = request.args.get('date', date.today())
 
@@ -134,19 +135,31 @@ def getIntervention(idPrescriptionDrug, interventions):
             result = i;
     return result
 
-def getDrugType(drugList, pDrugs, checked=False, suspended=False, route=False, source=None, interventions=[]):
+def getDrugType(drugList, pDrugs, source, interventions, exams=None, checked=False, suspended=False, route=False):
     for pd in drugList:
 
         belong = False
-        pd6 = pd[6]
 
         if pd[0].source is None: pd[0].source = 'Medicamentos'
-
         if pd[0].source != source: continue
         if source == 'Soluções': belong = True
-        if checked and (str(pd6) == '1' and bool(pd[0].suspendedDate) == False): belong = True
+        if checked and bool(pd[0].checked) == True and bool(pd[0].suspendedDate) == False: belong = True
         if suspended and (bool(pd[0].suspendedDate) == True): belong = True
-        if (not checked and not suspended) and (str(pd6) == '0' and bool(pd[0].suspendedDate) == False): belong = True
+        if (not checked and not suspended) and (bool(pd[0].checked) == False and bool(pd[0].suspendedDate) == False): belong = True
+
+        alerts = []
+        if exams:
+            if pd[1].maxDose and pd[1].maxDose < (pd[0].doseconv * pd[0].frequency):
+                alerts.append('Dose diária prescrita ('+str(int(pd[0].doseconv * pd[0].frequency))+') maior que a máxima ('+str(pd[1].maxDose)+') usualmente recomendada (considerada a dose diária máxima independente da indicação')
+
+            if pd[1].kidney and pd[1].kidney > exams['ckd']['value']:
+                alerts.append('Medicamento deve sofrer ajuste de dose, já que a função renal do paciente ('+ str(exams['ckd']['value']) +' mL/min) está abaixo de '+ str(pd[1].kidney) +' mL/min')
+
+            if pd[1].liver and (exams['tgp']['alert'] or exams['tgo']['alert']):
+                alerts.append('Medicamento com necessidade de ajuste de posologia ou contraindicado para paciente com função hepática reduzida.')
+
+            if pd[1].elderly and exams['age'] > 60:
+                alerts.append('Medicamento potencialmente inapropriado para idosos, independente das comorbidades do paciente.')
 
         if belong:
             pDrugs.append({
@@ -164,22 +177,23 @@ def getDrugType(drugList, pDrugs, checked=False, suspended=False, route=False, s
                 'doseconv': pd[0].doseconv,
                 'time': timeValue(pd[0].interval),
                 'recommendation': pd[0].notes if pd[0].notes and len(pd[0].notes.strip()) > 0 else None,
-                'obs': pd[8],
-                'period': period(pd[9]),
-                'periodDates': pd[9],
+                'obs': None,
+                'period': str(pd[0].period) + 'D' if pd[0].period else '',
+                'periodDates': [],
                 'route': pd[0].route,
                 'grp_solution': pd[0].solutionGroup,
                 'stage': 'ACM' if pd[0].solutionACM == 'S' else strNone(pd[0].solutionPhase) + ' x '+ strNone(pd[0].solutionTime) + ' (' + strNone(pd[0].solutionTotalTime) + ')',
                 'infusion': strNone(pd[0].solutionDose) + ' ' + strNone(pd[0].solutionUnit),
                 'score': str(pd[5]),
                 'source': pd[0].source,
-                'checked': bool(pd6),
-                'intervened': bool(pd[7]),
+                'checked': bool(pd[0].checked),
+                'intervened': None,
                 'suspended': bool(pd[0].suspendedDate),
                 'status': pd[0].status,
                 'near': pd[0].near,
                 'prevIntervention': getPrevIntervention(pd[0].idDrug, pd[0].idPrescription, interventions),
-                'intervention': getIntervention(pd[0].id, interventions)
+                'intervention': getIntervention(pd[0].id, interventions),
+                'alerts': alerts
             })
     return pDrugs
 
@@ -209,6 +223,7 @@ def getPrescription(idPrescription):
     interventions = Intervention.findByAdmission(patient.admissionNumber)
     db.engine.dispose()
 
+    # TODO: Refactor Query
     tgo = getExams('TGO', patient.id)
     tgp = getExams('TGP', patient.id)
     cr = getExams('CR', patient.id)
@@ -218,22 +233,40 @@ def getPrescription(idPrescription):
     rni = getExams('PRO', patient.id)
     pcr = getExams('PCRU', patient.id)
 
-    pDrugs = getDrugType(drugs, [], source='Medicamentos', interventions=interventions)
-    pDrugs = getDrugType(drugs, pDrugs, checked=True, source='Medicamentos', interventions=interventions)
-    pDrugs = getDrugType(drugs, pDrugs, suspended=True, source='Medicamentos', interventions=interventions)
+    exams = {
+        'tgo': formatExam(tgo, 'tgo'),
+        'tgp': formatExam(tgp, 'tgp'),
+        'mdrd': mdrd_calc(cr.value, patient.birthdate, patient.gender, patient.skinColor) if cr is not None else '',
+        'cg': cg_calc(cr.value, patient.birthdate, patient.gender, patient.weight or prescription[0].weight) if cr is not None else '',
+        'ckd': ckd_calc(cr.value, patient.birthdate, patient.gender, patient.skinColor) if cr is not None else '',
+        'creatinina': formatExam(cr, 'cr'),
+        'k': formatExam(k, 'k'),
+        'na': formatExam(na, 'na'),
+        'mg': formatExam(mg, 'mg'),
+        'rni': formatExam(rni, 'rni'),
+        'pcr': formatExam(pcr, 'pcr'),
+        'age': data2age(patient.birthdate.isoformat() if patient.birthdate else datetime.today()),
+    }
+
+    pDrugs = []
+    pDrugs = getDrugType(drugs, [], 'Medicamentos', interventions, exams=exams)
+    pDrugs = getDrugType(drugs, pDrugs, 'Medicamentos', interventions, checked=True, exams=exams)
+    pDrugs = getDrugType(drugs, pDrugs, 'Medicamentos', interventions, suspended=True, exams=exams)
     pDrugs = sortRoute(pDrugs)
 
-    pSolution = getDrugType(drugs, [], source='Soluções', interventions=interventions)
+    pSolution = []
+    pSolution = getDrugType(drugs, [], 'Soluções', interventions)
     #pSolution = getDrugType(drugs, pSolution, checked=True, source='Soluções', interventions=interventions)
     #pSolution = getDrugType(drugs, pSolution, suspended=True, source='Soluções', interventions=interventions)
 
-    pProcedures = getDrugType(drugs, [], source='Proced/Exames', interventions=interventions)
-    pProcedures = getDrugType(drugs, pProcedures, checked=True, source='Proced/Exames', interventions=interventions)
-    pProcedures = getDrugType(drugs, pProcedures, suspended=True, source='Proced/Exames', interventions=interventions)
+    pProcedures = []
+    pProcedures = getDrugType(drugs, [], 'Proced/Exames', interventions)
+    pProcedures = getDrugType(drugs, pProcedures, 'Proced/Exames', interventions, checked=True)
+    pProcedures = getDrugType(drugs, pProcedures, 'Proced/Exames', interventions, suspended=True)
 
     return {
         'status': 'success',
-        'data': {
+        'data': dict(exams, **{
             'idPrescription': prescription[0].id,
             'idSegment': prescription[0].idSegment,
             'idPatient': patient.id,
@@ -242,21 +275,10 @@ def getPrescription(idPrescription):
             'birthdate': patient.birthdate.isoformat() if patient.birthdate else '',
             'gender': patient.gender,
             'weight': patient.weight if patient.weight else prescription[0].weight,
-            'weightDate': patient.weightDate.isoformat() if patient.weightDate else prescription[0].date.isoformat(),
+            'weightDate': weightDate(patient, prescription[0]),
             'class': random.choice(['green','yellow','red']),
             'skinColor': patient.skinColor,
             'department': prescription[4],
-            'tgo': formatExam(tgo, 'tgo'),
-            'tgp': formatExam(tgp, 'tgp'),
-            'mdrd': mdrd_calc(cr.value, patient.birthdate, patient.gender, patient.skinColor) if cr is not None else '',
-            'cg': cg_calc(cr.value, patient.birthdate, patient.gender, patient.weight or prescription[0].weight) if cr is not None else '',
-            'ckd': ckd_calc(cr.value, patient.birthdate, patient.gender, patient.skinColor) if cr is not None else '',
-            'creatinina': formatExam(cr, 'cr'),
-            'k': formatExam(k, 'k'),
-            'na': formatExam(na, 'na'),
-            'mg': formatExam(mg, 'mg'),
-            'rni': formatExam(rni, 'rni'),
-            'pcr': formatExam(pcr, 'pcr'),
             'patientScore': 'High',
             'date': prescription[0].date.isoformat(),
             'daysAgo': prescription[2],
@@ -266,7 +288,7 @@ def getPrescription(idPrescription):
             'procedures': pProcedures,
             'interventions': [i for i in interventions if i['idPrescription'] < idPrescription],
             'status': prescription[0].status,
-        }
+        })
     }, status.HTTP_200_OK
 
 
@@ -303,7 +325,7 @@ def createIntervention(idPrescriptionDrug=None):
     if i is None:
         i = Intervention()
         i.id = idPrescriptionDrug
-        i.date = func.now()
+        i.date = datetime.today()
         newIntervention = True
 
     if 'admissionNumber' in data.keys(): i.admissionNumber = data.get('admissionNumber', None)
@@ -314,7 +336,7 @@ def createIntervention(idPrescriptionDrug=None):
     if 'interactions' in data.keys(): i.interactions = data.get('interactions', None)
     
     i.status = data.get('status', 's')
-    i.update = func.now()
+    i.update = datetime.today()
     i.user = user.id
 
     if newIntervention: db.session.add(i)
@@ -352,7 +374,7 @@ def setPrescriptionStatus(idPrescription):
 
     p = Prescription.query.get(idPrescription)
     p.status = data.get('status', None)
-    p.update = func.now()
+    p.update = datetime.today()
     p.user = user.id
 
     ppic = PrescriptionPic.query.get(p.id)
@@ -393,12 +415,12 @@ def setDrugStatus(idPrescriptionDrug, drugStatus):
 
     pd = PrescriptionDrug.query.get(idPrescriptionDrug)
     pd.status = drugStatus
-    pd.update = func.now()
+    pd.update = datetime.today()
     pd.user = user.id
 
     ppic = PrescriptionPic.query.get(pd.idPrescription)
     if ppic is None:
-        pObj, code = getPrescriptions(idSegment=pd.idSegment, idPrescription=pd.idPrescription)
+        pObj, code = getPrescriptions(idPrescription=pd.idPrescription)
         ppic = PrescriptionPic()
         ppic.id = pd.idPrescription
         ppic.picture = pObj['data'][0]
@@ -425,3 +447,17 @@ def setDrugStatus(idPrescriptionDrug, drugStatus):
             'status': 'error',
             'message': str(e)
         }, status.HTTP_500_INTERNAL_SERVER_ERROR
+
+@app_pres.route("/prescriptions/drug/<int:idPrescriptionDrug>/period", methods=['GET'])
+@jwt_required
+def getDrugPeriod(idPrescriptionDrug):
+    user = User.find(get_jwt_identity())
+    setSchema(user.schema)
+
+    results = PrescriptionDrug.findByPrescriptionDrug(idPrescriptionDrug)
+    db.engine.dispose()
+
+    return {
+        'status': 'success',
+        'data': results[0][1]
+    }, status.HTTP_200_OK

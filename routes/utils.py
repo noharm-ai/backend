@@ -14,6 +14,17 @@ def lenghStay(admissionDate):
     days = int ((datetime.today() - admissionDate).days)
     return days
 
+def weightDate(patient, prescription):
+    if patient.weight:
+        if not patient.weightDate or (data2age(patient.weightDate.isoformat()) > 10):
+            return patient.admissionDate.isoformat()
+        else:
+            return patient.weightDate.isoformat()
+    elif prescription.weight:
+        return prescription.date.isoformat()
+    else:
+        return None
+
 def is_float(s):
     try:
         float(s)

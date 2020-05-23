@@ -239,7 +239,7 @@ def getUnits(idDrug):
     units = db.session.query(u.id, u.description, d.name,
                             func.sum(p.countNum).label('count'), func.max(mu.factor).label('factor'))\
             .select_from(u)\
-            .join(p, and_(p.idMeasureUnit == u.id, p.idDrug == idDrug, p.idSegment == 1))\
+            .join(p, and_(p.idMeasureUnit == u.id, p.idDrug == idDrug))\
             .join(d, and_(d.id == idDrug))\
             .outerjoin(mu, and_(mu.idMeasureUnit == u.id, mu.idDrug == idDrug))\
             .group_by(u.id, u.description, p.idMeasureUnit, d.name)\

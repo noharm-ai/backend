@@ -35,6 +35,7 @@ class User(db.Model):
     schema = db.Column("schema", db.String, nullable=False)
     nameUrl = db.Column("getnameurl", db.String, nullable=False)
     logourl = db.Column("logourl", db.String, nullable=False)
+    reports = db.Column("relatorios", postgresql.JSON, nullable=False)
 
     def find(id):
         return User.query.filter(User.id == id).first()
@@ -124,36 +125,24 @@ def getDrugsCount():
     return db.session.query(func.count(1).label('drugCount'))\
         .select_from(PrescriptionDrug, Prescription)\
         .filter(PrescriptionDrug.idPrescription == Prescription.id)\
+        .filter(PrescriptionDrug.route != None)\
         .as_scalar()
 
 def getPendingInterventions():
-    pd3 = db.aliased(PrescriptionDrug)
-
     return db.session.query(func.count(1).label('pendingInterventions'))\
         .select_from(Intervention)\
-        .join(pd3, Intervention.id == pd3.id)\
+        .join(PrescriptionDrug, Intervention.id == PrescriptionDrug.id)\
         .filter(Intervention.admissionNumber == Prescription.admissionNumber)\
         .filter(Intervention.status == 's')\
-        .filter(pd3.idPrescription < Prescription.id)\
+        .filter(PrescriptionDrug.idPrescription < Prescription.id)\
         .as_scalar() 
 
 def getDrugDiff():
-    pd2 = db.aliased(PrescriptionDrug)
-    pd1 = db.aliased(PrescriptionDrug)
-    pr1 = db.aliased(Prescription)
-
-    return db.session.query(func.count(distinct(func.concat(pd2.idDrug, pd2.dose, pd2.idFrequency))).label('drugDiff'))\
-        .select_from(pd2)\
-        .outerjoin(pd1, and_(pd1.idDrug == pd2.idDrug, 
-                             pd1.doseconv == pd2.doseconv, 
-                             pd1.frequency == pd2.frequency, 
-                             pd1.idSegment == pd2.idSegment,
-                             pd1.finalscore != None))\
-        .join(pr1, pr1.id == pd1.idPrescription)\
-        .filter(pd2.idPrescription == Prescription.id)\
-        .filter(pr1.admissionNumber == Prescription.admissionNumber)\
-        .filter(pr1.status == 's')\
-        .filter(pr1.id < Prescription.id)\
+    return db.session.query(func.count(1).label('drugDiff'))\
+        .select_from(PrescriptionDrug, Prescription)\
+        .filter(PrescriptionDrug.idPrescription == Prescription.id)\
+        .filter(PrescriptionDrug.route != None)\
+        .filter(PrescriptionDrug.checked == True)\
         .as_scalar() 
 
 class Patient(db.Model):
@@ -172,7 +161,7 @@ class Patient(db.Model):
     def setSchema(schema):
         Patient.__table__.schema = schema
 
-    def getPatients(idSegment=None, idDept=None, idPrescription=None, limit=250, day=date.today(), onlyStatus=False):
+    def getPatients(idSegment=None, idDept=[], idPrescription=None, limit=250, day=date.today(), onlyStatus=False):
         score = getAggScore()
         scoreOne = getScore(1)
         scoreTwo = getScore(2)
@@ -212,8 +201,8 @@ class Patient(db.Model):
         if (not(idSegment is None)):
             q = q.filter(Prescription.idSegment == idSegment)
 
-        if (not(idDept is None)):
-            q = q.filter(Prescription.idDepartment == idDept)
+        if (len(idDept)>0):
+            q = q.filter(Prescription.idDepartment.in_(idDept))
 
         if (not(idPrescription is None)):
             q = q.filter(Prescription.id == idPrescription)
@@ -299,33 +288,13 @@ def getDrugHistory(idPrescription, admissionNumber):
         .select_from(pd1)\
         .join(pr1, pr1.id == pd1.idPrescription)\
         .filter(pr1.admissionNumber == admissionNumber)\
-        .filter(pr1.id <= idPrescription)\
+        .filter(pr1.id < idPrescription)\
         .filter(pd1.idDrug == PrescriptionDrug.idDrug)\
         .filter(pr1.date > (date.today() - timedelta(days=30)))\
         .order_by(asc(pr1.date))\
         .as_scalar()
 
     return func.array(query)
-
-def getDrugOption(idPrescription, admissionNumber, option):
-    pd1 = db.aliased(PrescriptionDrug)
-    pr1 = db.aliased(Prescription)
-    
-    query = db.session.query(func.count(distinct(func.concat(pd1.idDrug, pd1.doseconv, pd1.frequency))).label(option))\
-        .select_from(pd1)\
-        .join(pr1, pr1.id == pd1.idPrescription)\
-        .filter(pr1.admissionNumber == admissionNumber)\
-        .filter(pr1.id < idPrescription)\
-        .filter(pd1.idDrug == PrescriptionDrug.idDrug)\
-        .filter(pd1.doseconv == PrescriptionDrug.doseconv)\
-        .filter(pd1.frequency == PrescriptionDrug.frequency)\
-
-    if option == 'checked':
-        query = query.filter(pr1.status == 's')
-    else:
-        query = query.filter(pd1.status == 's')
-
-    return query.as_scalar() 
 
 class PrescriptionDrug(db.Model):
     __tablename__ = 'presmed'
@@ -345,20 +314,22 @@ class PrescriptionDrug(db.Model):
     notes = db.Column('complemento', db.String, nullable=True)
     interval = db.Column('horario', db.String, nullable=True)
     source = db.Column('origem', db.String, nullable=True)
-    default = db.Column('padronizado', db.String(1), nullable=False)
+    default = db.Column('padronizado', db.String(1), nullable=True)
 
-    solutionGroup = db.Column('slagrupamento', db.String(1), nullable=False)
-    solutionACM = db.Column('slacm', db.String(1), nullable=False)
-    solutionPhase = db.Column('sletapas', db.String(1), nullable=False)
+    solutionGroup = db.Column('slagrupamento', db.String(1), nullable=True)
+    solutionACM = db.Column('slacm', db.String(1), nullable=True)
+    solutionPhase = db.Column('sletapas', db.String(1), nullable=True)
     solutionTime = db.Column('slhorafase', db.Float, nullable=True)
-    solutionTotalTime = db.Column('sltempoaplicacao', db.String(1), nullable=False)
+    solutionTotalTime = db.Column('sltempoaplicacao', db.String(1), nullable=True)
     solutionDose = db.Column('sldosagem', db.Float, nullable=True)
-    solutionUnit = db.Column('sltipodosagem', db.String(3), nullable=False)
+    solutionUnit = db.Column('sltipodosagem', db.String(3), nullable=True)
 
     status = db.Column('status', db.String(1), nullable=False)
-    finalscore = db.Column('escorefinal', db.Integer, nullable=False)
+    finalscore = db.Column('escorefinal', db.Integer, nullable=True)
     near = db.Column("aprox", db.Boolean, nullable=True)
     suspendedDate = db.Column("dtsuspensao", db.DateTime, nullable=True)
+    checked = db.Column("checado", db.Boolean, nullable=True)
+    period = db.Column("periodo", db.Integer, nullable=True)
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.Integer, nullable=True)
 
@@ -366,16 +337,10 @@ class PrescriptionDrug(db.Model):
         PrescriptionDrug.__table__.schema = schema
 
     def findByPrescription(idPrescription, admissionNumber):
-        
-        drugChecked = getDrugOption(idPrescription, admissionNumber, 'checked')
-        drugIntervention = getDrugOption(idPrescription, admissionNumber, 'intervened')
-        drugHistory = getDrugHistory(idPrescription, admissionNumber)
 
         return db.session\
             .query(PrescriptionDrug, Drug, MeasureUnit, Frequency, func.trunc(0).label('intervention'), 
-                    func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4).label('score'),
-                    drugChecked.label('checked'), func.trunc(0).label('intervened'),
-                    func.trunc(0).label('notes'), drugHistory.label('drugHistory'))\
+                    func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4).label('score'))\
             .outerjoin(Outlier, Outlier.id == PrescriptionDrug.idOutlier)\
             .outerjoin(Drug, Drug.id == PrescriptionDrug.idDrug)\
             .outerjoin(MeasureUnit, MeasureUnit.id == PrescriptionDrug.idMeasureUnit)\
@@ -384,6 +349,16 @@ class PrescriptionDrug(db.Model):
             .order_by(asc(PrescriptionDrug.solutionGroup), asc(Drug.name))\
             .all()
 
+    def findByPrescriptionDrug(idPrescriptionDrug):
+        pd = PrescriptionDrug.query.get(idPrescriptionDrug)
+        p = Prescription.query.get(pd.idPrescription)
+
+        drugHistory = getDrugHistory(p.id, p.admissionNumber)
+
+        return db.session\
+            .query(PrescriptionDrug, drugHistory.label('drugHistory'))\
+            .filter(PrescriptionDrug.id == idPrescriptionDrug)\
+            .all()
 
 class Drug(db.Model):
     __tablename__ = 'medicamento'

@@ -47,6 +47,15 @@ def getNameUrl():
         'url': user.nameUrl
     }, status.HTTP_200_OK 
 
+@app.route("/reports", methods=['GET'])
+@jwt_required
+def getReports():
+    user = User.find(get_jwt_identity())
+
+    return {
+        'status': 'success',
+        'reports': user.reports
+    }, status.HTTP_200_OK 
 
 @app.route("/patient-name/<int:idPatient>", methods=['GET'])
 def getName(idPatient):
