@@ -245,7 +245,7 @@ def getPrescription(idPrescription):
         'mg': formatExam(mg, 'mg'),
         'rni': formatExam(rni, 'rni'),
         'pcr': formatExam(pcr, 'pcr'),
-        'age': data2age(patient.birthdate.isoformat() if patient.birthdate else datetime.today()),
+        'age': data2age(patient.birthdate.isoformat() if patient.birthdate else date.today().isoformat()),
     }
 
     pDrugs = []
