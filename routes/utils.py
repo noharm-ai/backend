@@ -49,7 +49,7 @@ def freqValue(freq):
     else: return freq
 
 def none2zero(s):
-    return s if is_float(s) else ''
+    return s if is_float(s) else 0
 
 def strNone(s):
     return '' if s is None else str(s)

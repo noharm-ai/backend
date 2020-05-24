@@ -52,7 +52,7 @@ def getPrescriptions(idPrescription=None):
             'date': p[0].date.isoformat(),
             'department': str(p[19]),
             'daysAgo': p[2],
-            'prescriptionScore': str(p[3]),
+            'prescriptionScore': none2zero(p[3]),
             'scoreOne': str(p[4]),
             'scoreTwo': str(p[5]),
             'scoreThree': str(p[6]),
@@ -147,13 +147,15 @@ def getDrugType(drugList, pDrugs, source, interventions, exams=None, checked=Fal
         if suspended and (bool(pd[0].suspendedDate) == True): belong = True
         if (not checked and not suspended) and (bool(pd[0].checked) == False and bool(pd[0].suspendedDate) == False): belong = True
 
+        pdFrequency = 1 if pd[0].frequency in [33,44,99] else pd[0].frequency
+
         alerts = []
         if exams:
-            if pd[1].maxDose and pd[1].maxDose < (pd[0].doseconv * pd[0].frequency):
-                alerts.append('Dose diária prescrita ('+str(int(pd[0].doseconv * pd[0].frequency))+') maior que a máxima ('+str(pd[1].maxDose)+') usualmente recomendada (considerada a dose diária máxima independente da indicação')
+            if pd[1].maxDose and pd[1].maxDose < (pd[0].doseconv * pdFrequency):
+                alerts.append('Dose diária prescrita (' + str(int(pd[0].doseconv * pdFrequency)) + ') maior que a dose de alerta (' + str(pd[1].maxDose) + ') usualmente recomendada (considerada a dose diária máxima independente da indicação.')
 
             if pd[1].kidney and exams['ckd']['value'] and pd[1].kidney > exams['ckd']['value']:
-                alerts.append('Medicamento deve sofrer ajuste de dose, já que a função renal do paciente ('+ str(exams['ckd']['value']) +' mL/min) está abaixo de '+ str(pd[1].kidney) +' mL/min')
+                alerts.append('Medicamento deve sofrer ajuste de posologia, já que a função renal do paciente (' + str(exams['ckd']['value']) + ' mL/min) está abaixo de ' + str(pd[1].kidney) + ' mL/min.')
 
             if pd[1].liver and (exams['tgp']['alert'] or exams['tgo']['alert']):
                 alerts.append('Medicamento com necessidade de ajuste de posologia ou contraindicado para paciente com função hepática reduzida.')
@@ -292,20 +294,26 @@ def getPrescription(idPrescription):
     }, status.HTTP_200_OK
 
 
+def sortReasons(e):
+  return e['description']
+
 @app_pres.route("/intervention/reasons", methods=['GET'])
 @jwt_required
 def getInterventionReasons():
     user = User.find(get_jwt_identity())
     setSchema(user.schema)
+    
     results = InterventionReason.findAll()
     db.engine.dispose()
 
     iList = []
     for i in results:
         iList.append({
-            'id': i.id,
-            'description': i.description
+            'id': i[0].id,
+            'description': i[1] + ' - ' +  i[0].description if i[1] else i[0].description
         })
+
+    iList.sort(key=sortReasons)
 
     return {
         'status': 'success',

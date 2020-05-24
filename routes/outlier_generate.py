@@ -55,10 +55,10 @@ def callOutliers(idSegment):
     print('Init Schema:', user.schema, 'Segment:', idSegment)
 
     query = "INSERT INTO " + user.schema + ".outlier (idsegmento, fkmedicamento, doseconv, frequenciadia, contagem)\
-            SELECT idsegmento, fkmedicamento, doseconv, frequenciadia, SUM(contagem)\
+            SELECT idsegmento, fkmedicamento, ROUND(doseconv::numeric,2) as doseconv, frequenciadia, SUM(contagem)\
             FROM " + user.schema + ".prescricaoagg\
-            WHERE idsegmento = " + str(int(idSegment)) + " and frequenciadia is not null\
-            GROUP BY idsegmento, fkmedicamento, doseconv, frequenciadia\
+            WHERE idsegmento = " + str(int(idSegment)) + " and frequenciadia is not null and doseconv is not null\
+            GROUP BY idsegmento, fkmedicamento, ROUND(doseconv::numeric,2), frequenciadia\
             ON CONFLICT DO nothing;"
 
     result = db.engine.execute(query)
@@ -72,9 +72,12 @@ def callOutliers(idSegment):
     print('Total Count:', totalCount, folds)
 
     processes = []
+    processesUrl = []
     for fold in range(1,folds+1):
         process = Process(target=call_outlier, args=(idSegment, fold, header,))
+        processUrl = Config.SELF_API_URL + "/segments/" + str(int(idSegment)) + "/outliers/generate/fold/" + str(fold)
         processes.append(process)
+        processesUrl.append(processUrl)
 
     for process in processes:
         process.start()
@@ -83,7 +86,8 @@ def callOutliers(idSegment):
         process.join()
 
     return {
-        'status': 'success'
+        'status': 'success',
+        'data' : processesUrl
     }, status.HTTP_200_OK
 
 @app_gen.route("/segments/<int:idSegment>/outliers/generate/fold/<int:fold>", methods=['GET'])
@@ -104,6 +108,7 @@ def generateOutliers(idSegment,fold=None,idDrug=None,clean=None):
     if fold != None:
         query += " AND fkmedicamento IN (\
                   SELECT fkmedicamento FROM " + user.schema + ".outlier\
+                  WHERE idsegmento = " + str(int(idSegment))+ "\
                   GROUP BY fkmedicamento\
                   ORDER BY fkmedicamento ASC\
                   LIMIT " + str(fold_size) + " OFFSET " + str((fold-1)*fold_size) + ")"
@@ -124,11 +129,11 @@ def generateOutliers(idSegment,fold=None,idDrug=None,clean=None):
             if clean == 0: default = '0';
 
         queryInsert = "INSERT INTO " + user.schema + ".outlier (idsegmento, fkmedicamento, doseconv, frequenciadia, contagem, escore)\
-                SELECT idsegmento, fkmedicamento, doseconv, frequenciadia, SUM(contagem), " + default + "\
+                SELECT idsegmento, fkmedicamento, ROUND(doseconv::numeric,2) as doseconv, frequenciadia, SUM(contagem), " + default + "\
                 FROM " + user.schema + ".prescricaoagg\
                 WHERE idsegmento = " + str(int(idSegment)) + "\
-                AND fkmedicamento = " + str(int(idDrug)) + " and frequenciadia is not null\
-                GROUP BY idsegmento, fkmedicamento, doseconv, frequenciadia\
+                AND fkmedicamento = " + str(int(idDrug)) + " and frequenciadia is not null and doseconv is not null\
+                GROUP BY idsegmento, fkmedicamento, ROUND(doseconv::numeric,2), frequenciadia\
                 ON CONFLICT DO nothing;"
 
         result = db.engine.execute(queryInsert)
@@ -160,7 +165,11 @@ def generateOutliers(idSegment,fold=None,idDrug=None,clean=None):
     for process in processes:
         process.join()
 
-    outliers = Outlier.query.filter(Outlier.idSegment == idSegment).all()
+    idDrugs = drugs['medication'].unique().astype(float)
+    outliers = Outlier.query\
+               .filter(Outlier.idSegment == idSegment)\
+               .filter(Outlier.idDrug.in_(idDrugs))\
+               .all()
 
     new_os = pd.DataFrame()
     print('Appending Schema:', user.schema, 'Segment:', idSegment, 'Fold:', fold, 'Drug', idDrug)

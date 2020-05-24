@@ -80,6 +80,7 @@ def getAggScore():
         .select_from(PrescriptionDrug)\
         .outerjoin(Outlier, and_(Outlier.id == PrescriptionDrug.idOutlier))\
         .filter(PrescriptionDrug.idPrescription == Prescription.id)\
+        .filter(PrescriptionDrug.route != None)\
         .as_scalar()
 
 def getScore(level):
@@ -87,6 +88,7 @@ def getScore(level):
         .select_from(PrescriptionDrug)\
         .outerjoin(Outlier, and_(Outlier.id == PrescriptionDrug.idOutlier))\
         .filter(PrescriptionDrug.idPrescription == Prescription.id)\
+        .filter(PrescriptionDrug.route != None)\
         .filter(func.coalesce(Outlier.manualScore, Outlier.score) == level)\
         .as_scalar()
 
@@ -95,6 +97,7 @@ def getHighScore():
         .select_from(PrescriptionDrug)\
         .outerjoin(Outlier, and_(Outlier.id == PrescriptionDrug.idOutlier))\
         .filter(PrescriptionDrug.idPrescription == Prescription.id)\
+        .filter(PrescriptionDrug.route != None)\
         .filter(or_(func.coalesce(Outlier.manualScore, Outlier.score) == 3, func.coalesce(Outlier.manualScore, Outlier.score) == None))\
         .as_scalar()
 
@@ -406,13 +409,18 @@ class InterventionReason(db.Model):
 
     id = db.Column("idmotivointervencao", db.Integer, primary_key=True)
     description = db.Column("nome", db.String, nullable=False)
-    #group = db.Column("tipo", db.String, nullable=True)
+    mamy = db.Column("idmotivomae", db.Integer, nullable=False)
 
     def setSchema(schema):
         InterventionReason.__table__.schema = schema
 
     def findAll():
-        return db.session.query(InterventionReason).order_by(InterventionReason.description).all()
+        im = db.aliased(InterventionReason)
+
+        return db.session.query(InterventionReason, im.description)\
+                .outerjoin(im, im.id == InterventionReason.mamy)\
+                .order_by(InterventionReason.description)\
+                .all()
 
 
 class Frequency(db.Model):
