@@ -205,10 +205,16 @@ def getDrugs(idSegment=1):
     user = User.find(get_jwt_identity())
     setSchema(user.schema)
 
+    qDrug = request.args.get('q', None)
+
     drugs = Drug.query\
             .join(Outlier, Outlier.idDrug == Drug.id)\
-            .filter(Outlier.idSegment == idSegment)\
-            .order_by(asc(Drug.name))\
+            .filter(Outlier.idSegment == idSegment)
+
+    if qDrug:
+        drugs = drugs.filter(Drug.name.ilike("%"+str(qDrug)+"%"))
+
+    drugs = drugs.order_by(asc(Drug.name))\
             .all()
 
     db.engine.dispose()

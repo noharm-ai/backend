@@ -10,7 +10,10 @@ app_auth = Blueprint('app_auth',__name__)
 def auth():
     data = request.get_json()
 
-    user = User.authenticate(data.get('email'), data.get('password'))
+    email = data.get('email', None)
+    password = data.get('password', None)
+
+    user = User.authenticate(email, password)
     db.engine.dispose()
 
     if user is None:
@@ -26,6 +29,7 @@ def auth():
             'status': 'success',
             'userName': user.name,
             'schema': user.schema,
+            'roles': ['admin'] if user.id == 2 else [],
             'access_token': access_token,
             'refresh_token': refresh_token
         }, status.HTTP_200_OK

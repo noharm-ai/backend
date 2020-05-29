@@ -11,6 +11,7 @@ from routes.outlier import app_out
 from routes.prescription import app_pres
 from routes.segment import app_seg
 from routes.outlier_generate import app_gen
+from routes.intervention import app_itrv
 import logging
 import os
 
@@ -34,6 +35,7 @@ app.register_blueprint(app_out)
 app.register_blueprint(app_pres)
 app.register_blueprint(app_seg)
 app.register_blueprint(app_gen)
+app.register_blueprint(app_itrv)
 
 CORS(app)
 
@@ -42,20 +44,32 @@ CORS(app)
 def getNameUrl():
     user = User.find(get_jwt_identity())
 
-    return {
-        'status': 'success',
-        'url': user.nameUrl
-    }, status.HTTP_200_OK 
+    if user: 
+        return {
+            'status': 'success',
+            'url': user.nameUrl
+        }, status.HTTP_200_OK 
+    else:
+        return {
+            'status': 'error',
+            'message': 'HTTP_401_UNAUTHORIZED'
+        }, status.HTTP_401_UNAUTHORIZED
 
 @app.route("/reports", methods=['GET'])
 @jwt_required
 def getReports():
     user = User.find(get_jwt_identity())
 
-    return {
-        'status': 'success',
-        'reports': user.reports
-    }, status.HTTP_200_OK 
+    if user: 
+        return {
+            'status': 'success',
+            'reports': user.reports
+        }, status.HTTP_200_OK 
+    else:
+        return {
+            'status': 'error',
+            'message': 'HTTP_401_UNAUTHORIZED'
+        }, status.HTTP_401_UNAUTHORIZED
 
 @app.route("/patient-name/<int:idPatient>", methods=['GET'])
 def getName(idPatient):

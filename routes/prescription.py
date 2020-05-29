@@ -46,7 +46,7 @@ def getPrescriptions(idPrescription=None):
             'admissionNumber': patient.admissionNumber,
             'birthdate': patient.birthdate.isoformat() if patient.birthdate else '',
             'gender': patient.gender,
-            'weight': patient.weight if patient.weight else p[0].weight,
+            'weight': p[0].weight if p[0].weight else patient.weight,
             'skinColor': patient.skinColor,
             'lengthStay': lenghStay(patient.admissionDate),
             'date': p[0].date.isoformat(),
@@ -222,7 +222,7 @@ def getPrescription(idPrescription):
         patient.admissionNumber = prescription[0].admissionNumber
 
     drugs = PrescriptionDrug.findByPrescription(idPrescription, patient.admissionNumber)
-    interventions = Intervention.findByAdmission(patient.admissionNumber)
+    interventions = Intervention.findAll(admissionNumber=patient.admissionNumber)
     db.engine.dispose()
 
     # TODO: Refactor Query
@@ -239,7 +239,7 @@ def getPrescription(idPrescription):
         'tgo': formatExam(tgo, 'tgo'),
         'tgp': formatExam(tgp, 'tgp'),
         'mdrd': mdrd_calc(cr.value, patient.birthdate, patient.gender, patient.skinColor) if cr is not None else examEmpty,
-        'cg': cg_calc(cr.value, patient.birthdate, patient.gender, patient.weight or prescription[0].weight) if cr is not None else examEmpty,
+        'cg': cg_calc(cr.value, patient.birthdate, patient.gender, prescription[0].weight or patient.weight) if cr is not None else examEmpty,
         'ckd': ckd_calc(cr.value, patient.birthdate, patient.gender, patient.skinColor) if cr is not None else examEmpty,
         'creatinina': formatExam(cr, 'cr'),
         'k': formatExam(k, 'k'),
@@ -276,7 +276,7 @@ def getPrescription(idPrescription):
             'admissionNumber': prescription[0].admissionNumber,
             'birthdate': patient.birthdate.isoformat() if patient.birthdate else '',
             'gender': patient.gender,
-            'weight': patient.weight if patient.weight else prescription[0].weight,
+            'weight': prescription[0].weight or patient.weight,
             'weightDate': weightDate(patient, prescription[0]),
             'class': random.choice(['green','yellow','red']),
             'skinColor': patient.skinColor,
@@ -292,85 +292,6 @@ def getPrescription(idPrescription):
             'status': prescription[0].status,
         })
     }, status.HTTP_200_OK
-
-
-def sortReasons(e):
-  return e['description']
-
-@app_pres.route("/intervention/reasons", methods=['GET'])
-@jwt_required
-def getInterventionReasons():
-    user = User.find(get_jwt_identity())
-    setSchema(user.schema)
-    
-    results = InterventionReason.findAll()
-    db.engine.dispose()
-
-    iList = []
-    for i in results:
-        iList.append({
-            'id': i[0].id,
-            'description': i[1] + ' - ' +  i[0].description if i[1] else i[0].description
-        })
-
-    iList.sort(key=sortReasons)
-
-    return {
-        'status': 'success',
-        'data': iList
-    }, status.HTTP_200_OK
-
-
-@app_pres.route('/intervention/<int:idPrescriptionDrug>', methods=['PUT'])
-@jwt_required
-def createIntervention(idPrescriptionDrug=None):
-    user = User.find(get_jwt_identity())
-    setSchema(user.schema)
-    data = request.get_json()
-
-    newIntervention = False
-    i = Intervention.query.get(idPrescriptionDrug)
-    if i is None:
-        i = Intervention()
-        i.id = idPrescriptionDrug
-        i.date = datetime.today()
-        newIntervention = True
-
-    if 'admissionNumber' in data.keys(): i.admissionNumber = data.get('admissionNumber', None)
-    if 'idInterventionReason' in data.keys(): i.idInterventionReason = data.get('idInterventionReason', None)
-    if 'error' in data.keys(): i.error = data.get('error', None)
-    if 'cost' in data.keys(): i.cost = data.get('cost', None)
-    if 'observation' in data.keys(): i.notes = data.get('observation', None)
-    if 'interactions' in data.keys(): i.interactions = data.get('interactions', None)
-    
-    i.status = data.get('status', 's')
-    i.update = datetime.today()
-    i.user = user.id
-
-    if newIntervention: db.session.add(i)
-    setDrugStatus(i.id, i.status)
-
-    try:
-        db.session.commit()
-
-        return {
-            'status': 'success',
-            'data': i.id
-        }, status.HTTP_200_OK
-    except AssertionError as e:
-        db.engine.dispose()
-
-        return {
-            'status': 'error',
-            'message': str(e)
-        }, status.HTTP_400_BAD_REQUEST
-    except Exception as e:
-        db.engine.dispose()
-
-        return {
-            'status': 'error',
-            'message': str(e)
-        }, status.HTTP_500_INTERNAL_SERVER_ERROR
 
 @app_pres.route('/prescriptions/<int:idPrescription>', methods=['PUT'])
 @jwt_required
@@ -399,47 +320,6 @@ def setPrescriptionStatus(idPrescription):
         return {
             'status': 'success',
             'data': p.id
-        }, status.HTTP_200_OK
-    except AssertionError as e:
-        db.engine.dispose()
-
-        return {
-            'status': 'error',
-            'message': str(e)
-        }, status.HTTP_400_BAD_REQUEST
-    except Exception as e:
-        db.engine.dispose()
-
-        return {
-            'status': 'error',
-            'message': str(e)
-        }, status.HTTP_500_INTERNAL_SERVER_ERROR
-
-@app_pres.route('/prescriptions/drug/<int:idPrescriptionDrug>/<int:drugStatus>', methods=['PUT'])
-@jwt_required
-def setDrugStatus(idPrescriptionDrug, drugStatus):
-    user = User.find(get_jwt_identity())
-    setSchema(user.schema)
-
-    pd = PrescriptionDrug.query.get(idPrescriptionDrug)
-    pd.status = drugStatus
-    pd.update = datetime.today()
-    pd.user = user.id
-
-    ppic = PrescriptionPic.query.get(pd.idPrescription)
-    if ppic is None:
-        pObj, code = getPrescriptions(idPrescription=pd.idPrescription)
-        ppic = PrescriptionPic()
-        ppic.id = pd.idPrescription
-        ppic.picture = pObj['data'][0]
-        db.session.add(ppic)
-
-    try:
-        db.session.commit()
-
-        return {
-            'status': 'success',
-            'data': pd.id
         }, status.HTTP_200_OK
     except AssertionError as e:
         db.engine.dispose()

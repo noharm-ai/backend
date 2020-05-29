@@ -2,6 +2,7 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, text, and_, or_, desc, asc, distinct
 from datetime import date, timedelta
 from sqlalchemy.dialects import postgresql
+from routes.utils import timeValue, interactionsList
 
 db = SQLAlchemy()
 
@@ -492,43 +493,60 @@ class Intervention(db.Model):
 
         db.session.commit()
 
-    def findByAdmission(admissionNumber):
+    def findAll(admissionNumber=None,userId=None):
         reason = db.session.query(InterventionReason.description)\
                 .select_from(InterventionReason)\
                 .filter(InterventionReason.id == func.any(Intervention.idInterventionReason))\
                 .as_scalar()
 
+        splitStr = '!?'
         dr1 = db.aliased(Drug)
-        interactions = db.session.query(dr1.name)\
+        interactions = db.session.query(func.concat(dr1.name, splitStr, dr1.id))\
                 .select_from(dr1)\
                 .filter(dr1.id == func.any(Intervention.interactions))\
                 .as_scalar()
 
         interventions = db.session\
-            .query(Intervention, PrescriptionDrug.idPrescription, PrescriptionDrug.idDrug, 
+            .query(Intervention, PrescriptionDrug, 
                     func.array(reason).label('reason'), Drug.name, 
-                    func.array(interactions).label('interactions'))\
+                    func.array(interactions).label('interactions'),
+                    MeasureUnit, Frequency)\
             .join(PrescriptionDrug, Intervention.id == PrescriptionDrug.id)\
             .outerjoin(Drug, Drug.id == PrescriptionDrug.idDrug)\
-            .filter(Intervention.admissionNumber == admissionNumber)\
-            .filter(Intervention.status.in_(['s','a','n','x']))\
-            .order_by(asc(Intervention.date))\
+            .outerjoin(MeasureUnit, MeasureUnit.id == PrescriptionDrug.idMeasureUnit)\
+            .outerjoin(Frequency, Frequency.id == PrescriptionDrug.idFrequency)
+
+        if admissionNumber:
+            interventions = interventions.filter(Intervention.admissionNumber == admissionNumber)
+        if userId:
+            interventions = interventions.filter(Intervention.user == userId)\
+                            .filter(Intervention.date > (date.today() - timedelta(days=30)))
+
+        interventions = interventions.filter(Intervention.status.in_(['s','a','n','x']))\
+            .order_by(desc(Intervention.date))\
             .all()
 
         intervBuffer = []
         for i in interventions:
             intervBuffer.append({
                 'id': i[0].id,
+                'idSegment': i[1].idSegment,
                 'idInterventionReason': i[0].idInterventionReason,
-                'reasonDescription': (', ').join(i[3]),
-                'idPrescription': i[1],
-                'idDrug': i[2],
-                'drugName': i[4] if i[4] is not None else 'Medicamento ' + str(i[2]),
+                'reasonDescription': (', ').join(i[2]),
+                'idPrescription': i[1].idPrescription,
+                'idDrug': i[1].idDrug,
+                'drugName': i[3] if i[3] is not None else 'Medicamento ' + str(i[1].idDrug),
+                'dose': i[1].dose,
+                'measureUnit': { 'value': i[5].id, 'label': i[5].description } if i[5] else '',
+                'frequency': { 'value': i[6].id, 'label': i[6].description } if i[6] else '',
+                'time': timeValue(i[1].interval),
+                'route': i[1].route,
                 'admissionNumber': i[0].admissionNumber,
                 'observation': i[0].notes,
                 'error': i[0].error,
                 'cost': i[0].cost,
-                'interactionsDescription': (', ').join(i[5]),
+                'interactionsDescription': (', ').join([ d.split(splitStr)[0] for d in i[4] ] ),
+                'interactionsList': interactionsList(i[4], splitStr),
                 'interactions': i[0].interactions,
                 'date': i[0].date.isoformat(),
                 'status': i[0].status

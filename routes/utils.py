@@ -4,6 +4,7 @@ def data2age(birthdate):
     if birthdate is None: return ''
 
     days_in_year = 365.2425
+    birthdate = birthdate.split('T')[0]
     birthdate = datetime.strptime(birthdate, '%Y-%m-%d')
     age = int ((datetime.today() - birthdate).days / days_in_year)
     return age
@@ -15,13 +16,13 @@ def lenghStay(admissionDate):
     return days
 
 def weightDate(patient, prescription):
-    if patient.weight:
+    if prescription.weight:
+        return prescription.date.isoformat()
+    elif patient.weight:
         if not patient.weightDate or (data2age(patient.weightDate.isoformat()) > 10):
             return patient.admissionDate.isoformat()
         else:
             return patient.weightDate.isoformat()
-    elif prescription.weight:
-        return prescription.date.isoformat()
     else:
         return None
 
@@ -37,10 +38,12 @@ def timeValue(time):
     if not is_float(numeric): return str(time).strip()
     else:
       timeList = str(time).strip().split(' ')
-      if len(timeList) > 1:
+      if len(timeList) == 1:
+        return 'Às ' + str(time).strip() + ' Horas'
+      elif len(timeList) < 6:
         return 'às ' + ('h, às ').join(timeList) + 'h'
       else:
-        return 'Às ' + str(time).strip() + ' Horas'
+        return time
 
 def freqValue(freq):
     if freq == 33: return 'SN'
@@ -53,6 +56,14 @@ def none2zero(s):
 
 def strNone(s):
     return '' if s is None else str(s)
+
+def interactionsList(drugList, splitStr):
+    result = []
+    for d in drugList:
+        part = d.split(splitStr)
+        result.append({'name': part[0], 'idDrug': part[1]})
+
+    return result
 
 examsRef = {
     'tgo': { 'min': 0,   'max': 34,  'ref': 'até 34 U/L - Método: Cinético optimizado UV' },
@@ -70,7 +81,7 @@ examEmpty = { 'value': None, 'alert': False, 'ref': None }
 def examAlerts(p, patient):
     exams = {'tgo': p[7], 'tgp': p[8], 'cr': p[9], 'k': p[10], 'na': p[11], 'mg': p[12], 'rni': p[13], 'pcr': p[22]}
     exams['mdrd'] = mdrd_calc(str(p[9]), patient.birthdate, patient.gender, patient.skinColor)
-    exams['cg'] = cg_calc(str(p[9]), patient.birthdate, patient.gender, patient.weight or p[0].weight)
+    exams['cg'] = cg_calc(str(p[9]), patient.birthdate, patient.gender, p[0].weight or patient.weight)
     exams['ckd'] = ckd_calc(str(p[9]), patient.birthdate, patient.gender, patient.skinColor)
 
     result = {}
