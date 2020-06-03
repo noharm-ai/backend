@@ -1,6 +1,7 @@
 import random
 from flask_api import status
-from models import db, User, Patient, Prescription, PrescriptionDrug, InterventionReason, Intervention, Segment, setSchema, Exams, PrescriptionPic
+from models import db, User, Patient, Prescription, PrescriptionDrug, InterventionReason,\
+                    Intervention, Segment, setSchema, Exams, PrescriptionPic, DrugAttributes
 from flask import Blueprint, request
 from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
@@ -150,17 +151,17 @@ def getDrugType(drugList, pDrugs, source, interventions, exams=None, checked=Fal
         pdFrequency = 1 if pd[0].frequency in [33,44,99] else pd[0].frequency
 
         alerts = []
-        if exams:
-            if pd[1].maxDose and pd[1].maxDose < (pd[0].doseconv * pdFrequency):
-                alerts.append('Dose diária prescrita (' + str(int(pd[0].doseconv * pdFrequency)) + ') maior que a dose de alerta (' + str(pd[1].maxDose) + ') usualmente recomendada (considerada a dose diária máxima independente da indicação.')
+        if exams and pd[6]:
+            if pd[6].maxDose and pd[6].maxDose < (pd[0].doseconv * pdFrequency):
+                alerts.append('Dose diária prescrita (' + str(int(pd[0].doseconv * pdFrequency)) + ') maior que a dose de alerta (' + str(pd[6].maxDose) + ') usualmente recomendada (considerada a dose diária máxima independente da indicação.')
 
-            if pd[1].kidney and exams['ckd']['value'] and pd[1].kidney > exams['ckd']['value']:
-                alerts.append('Medicamento deve sofrer ajuste de posologia, já que a função renal do paciente (' + str(exams['ckd']['value']) + ' mL/min) está abaixo de ' + str(pd[1].kidney) + ' mL/min.')
+            if pd[6].kidney and exams['ckd']['value'] and pd[6].kidney > exams['ckd']['value']:
+                alerts.append('Medicamento deve sofrer ajuste de posologia, já que a função renal do paciente (' + str(exams['ckd']['value']) + ' mL/min) está abaixo de ' + str(pd[6].kidney) + ' mL/min.')
 
-            if pd[1].liver and (exams['tgp']['alert'] or exams['tgo']['alert']):
-                alerts.append('Medicamento com necessidade de ajuste de posologia ou contraindicado para paciente com função hepática reduzida.')
+            if pd[6].liver and (exams['tgp']['value'] > pd[6].liver or exams['tgo']['value'] > pd[6].liver):
+                alerts.append('Medicamento com necessidade de ajuste de posologia ou contraindicado, já que para paciente com função hepática do paciente está reduzida (acima de ' + pd[6].liver + ').')
 
-            if pd[1].elderly and exams['age'] > 60:
+            if pd[6].elderly and exams['age'] > 60:
                 alerts.append('Medicamento potencialmente inapropriado para idosos, independente das comorbidades do paciente.')
 
         if belong:
@@ -168,10 +169,10 @@ def getDrugType(drugList, pDrugs, source, interventions, exams=None, checked=Fal
                 'idPrescriptionDrug': pd[0].id,
                 'idDrug': pd[0].idDrug,
                 'drug': pd[1].name if pd[1] is not None else 'Medicamento ' + str(pd[0].idDrug),
-                'np': pd[1].notdefault if pd[1] is not None else False,
-                'am': pd[1].antimicro if pd[1] is not None else False,
-                'av': pd[1].mav if pd[1] is not None else False,
-                'c': pd[1].controlled if pd[1] is not None else False,
+                'np': pd[6].notdefault if pd[6] is not None else False,
+                'am': pd[6].antimicro if pd[6] is not None else False,
+                'av': pd[6].mav if pd[6] is not None else False,
+                'c': pd[6].controlled if pd[6] is not None else False,
                 'dose': pd[0].dose,
                 'measureUnit': { 'value': pd[2].id, 'label': pd[2].description } if pd[2] else '',
                 'frequency': { 'value': pd[3].id, 'label': pd[3].description } if pd[3] else '',
@@ -271,6 +272,7 @@ def getPrescription(idPrescription):
         'data': dict(exams, **{
             'idPrescription': prescription[0].id,
             'idSegment': prescription[0].idSegment,
+            'segmentName': prescription[5],
             'idPatient': patient.id,
             'name': prescription[0].admissionNumber,
             'admissionNumber': prescription[0].admissionNumber,

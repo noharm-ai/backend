@@ -1,7 +1,7 @@
 from flask_api import status
 from models import db, User, Patient, Prescription, PrescriptionDrug, InterventionReason,\
                     Intervention, Segment, setSchema, Department, Outlier, Drug, PrescriptionAgg,\
-                    MeasureUnit, MeasureUnitConvert, OutlierObs
+                    MeasureUnit, MeasureUnitConvert, OutlierObs, DrugAttributes
 from sqlalchemy import desc, asc, and_, func
 from flask import Blueprint, request
 from flask_jwt_extended import (create_access_token, create_refresh_token,
@@ -22,7 +22,10 @@ def getOutliers(idSegment=1, idDrug=1):
         .order_by(Outlier.countNum.desc(), Outlier.frequency.asc())\
         .all()
     d = Drug.query.get(idDrug)
+    drugAttr = DrugAttributes.query.get((idDrug,idSegment))
     db.engine.dispose()
+
+    if drugAttr is None: drugAttr = DrugAttributes()
 
     frequency = request.args.get('f', None)
     dose = request.args.get('d', None)
@@ -86,14 +89,16 @@ def getOutliers(idSegment=1, idDrug=1):
         'status': 'success',
         'data': {
             'outliers': results,
-            'antimicro': d.antimicro,
-            'mav': d.mav,
-            'controlled': d.controlled,
-            'notdefault': d.notdefault,
-            'maxDose': d.maxDose,
-            'kidney': d.kidney,
-            'liver': d.liver,
-            'elderly': d.elderly,
+            'antimicro': drugAttr.antimicro,
+            'mav': drugAttr.mav,
+            'controlled': drugAttr.controlled,
+            'notdefault': drugAttr.notdefault,
+            'maxDose': drugAttr.maxDose,
+            'kidney': drugAttr.kidney,
+            'liver': drugAttr.liver,
+            'elderly': drugAttr.elderly,
+            'division': drugAttr.division,
+            'useWeight': drugAttr.useWeight,
             'idMeasureUnit': d.idMeasureUnit
         }
     }, status.HTTP_200_OK
@@ -164,24 +169,37 @@ def setDrugClass(idDrug):
 
     user = User.find(get_jwt_identity())
     setSchema(user.schema)
-    d = Drug.query.get(idDrug)
 
-    if 'antimicro' in data.keys(): d.antimicro = bool(data.get('antimicro', 0))
-    if 'mav' in data.keys(): d.mav = bool(data.get('mav', 0))
-    if 'controlled' in data.keys(): d.controlled = bool(data.get('controlled', 0))
-    if 'idMeasureUnit' in data.keys(): d.idMeasureUnit = data.get('idMeasureUnit', None)
-    if 'notdefault' in data.keys(): d.notdefault = data.get('notdefault', 0)
-    if 'maxDose' in data.keys(): d.maxDose = data.get('maxDose', None)
-    if 'kidney' in data.keys(): d.kidney = data.get('kidney', None)
-    if 'liver' in data.keys(): d.liver = data.get('liver', 0)
-    if 'elderly' in data.keys(): d.elderly = data.get('elderly', 0)
+    idSegment = data.get('idSegment', 1)
+    drugAttr = DrugAttributes.query.get((idDrug,idSegment))
+
+    newDrugAttr = False
+    if drugAttr is None:
+        newDrugAttr = True
+        drugAttr = DrugAttributes()
+        drugAttr.idDrug = idDrug
+        drugAttr.idSegment = idSegment
+
+    if 'antimicro' in data.keys(): drugAttr.antimicro = bool(data.get('antimicro', 0))
+    if 'mav' in data.keys(): drugAttr.mav = bool(data.get('mav', 0))
+    if 'controlled' in data.keys(): drugAttr.controlled = bool(data.get('controlled', 0))
+    if 'idMeasureUnit' in data.keys(): drugAttr.idMeasureUnit = data.get('idMeasureUnit', None)
+    if 'notdefault' in data.keys(): drugAttr.notdefault = data.get('notdefault', 0)
+    if 'maxDose' in data.keys(): drugAttr.maxDose = data.get('maxDose', None)
+    if 'kidney' in data.keys(): drugAttr.kidney = data.get('kidney', None)
+    if 'liver' in data.keys(): drugAttr.liver = data.get('liver', None)
+    if 'elderly' in data.keys(): drugAttr.elderly = data.get('elderly', 0)
+    if 'division' in data.keys(): drugAttr.division = data.get('division', None)
+    if 'useWeight' in data.keys(): drugAttr.useWeight = data.get('useWeight', 0)
+
+    if newDrugAttr: db.session.add(drugAttr)
 
     try:
         db.session.commit()
 
         return {
             'status': 'success',
-            'data': d.id
+            'data': drugAttr.idDrug
         }, status.HTTP_200_OK
     except AssertionError as e:
         db.engine.dispose()

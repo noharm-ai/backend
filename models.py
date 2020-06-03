@@ -24,6 +24,7 @@ def setSchema(schema):
     MeasureUnitConvert.setSchema(schema)
     PrescriptionPic.setSchema(schema)
     OutlierObs.setSchema(schema)
+    DrugAttributes.setSchema(schema)
 
 
 class User(db.Model):
@@ -69,10 +70,11 @@ class Prescription(db.Model):
         return db.session\
             .query(
                 Prescription, Patient, func.trunc(0).label('daysAgo'), score,
-                Department.name.label('department')
+                Department.name.label('department'), Segment.description
             )\
             .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)\
             .outerjoin(Department, Department.id == Prescription.idDepartment)\
+            .outerjoin(Segment, Segment.id == Prescription.idSegment)\
             .filter(Prescription.id == idPrescription)\
             .first()
 
@@ -112,8 +114,8 @@ def getExams(typeExam):
 
 def getDrugClass(typeClass):
     return db.session.query(func.count(1).label('drugClass'))\
-        .select_from(Drug)\
-        .outerjoin(PrescriptionDrug, and_(Drug.id == PrescriptionDrug.idDrug))\
+        .select_from(DrugAttributes)\
+        .outerjoin(PrescriptionDrug, and_(DrugAttributes.idDrug == PrescriptionDrug.idDrug, DrugAttributes.idSegment == PrescriptionDrug.idSegment))\
         .filter(PrescriptionDrug.idPrescription == Prescription.id)\
         .filter(typeClass == True)\
         .as_scalar()
@@ -178,10 +180,10 @@ class Patient(db.Model):
         mg = getExams('MG')
         rni = getExams('PRO')
         pcr = getExams('PCRU')
-        antimicro = getDrugClass(Drug.antimicro)
-        mav = getDrugClass(Drug.mav)
-        controlled = getDrugClass(Drug.controlled)
-        notdefault = getDrugClass(Drug.notdefault)
+        antimicro = getDrugClass(DrugAttributes.antimicro)
+        mav = getDrugClass(DrugAttributes.mav)
+        controlled = getDrugClass(DrugAttributes.controlled)
+        notdefault = getDrugClass(DrugAttributes.notdefault)
         sonda = getDrugRoute("%sonda%")
         diff = getDrugDiff()
         count = getDrugsCount()
@@ -211,7 +213,7 @@ class Patient(db.Model):
         if (not(idPrescription is None)):
             q = q.filter(Prescription.id == idPrescription)
         else:
-            q = q.filter(func.date(Prescription.date) == day)
+            q = q.filter(func.date(Prescription.date) > day)
             
         q = q.order_by(desc(Prescription.date))
 
@@ -344,11 +346,13 @@ class PrescriptionDrug(db.Model):
 
         return db.session\
             .query(PrescriptionDrug, Drug, MeasureUnit, Frequency, func.trunc(0).label('intervention'), 
-                    func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4).label('score'))\
+                    func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4).label('score'),
+                    DrugAttributes)\
             .outerjoin(Outlier, Outlier.id == PrescriptionDrug.idOutlier)\
             .outerjoin(Drug, Drug.id == PrescriptionDrug.idDrug)\
             .outerjoin(MeasureUnit, MeasureUnit.id == PrescriptionDrug.idMeasureUnit)\
             .outerjoin(Frequency, Frequency.id == PrescriptionDrug.idFrequency)\
+            .outerjoin(DrugAttributes, and_(DrugAttributes.idDrug == PrescriptionDrug.idDrug, DrugAttributes.idSegment == PrescriptionDrug.idSegment))\
             .filter(PrescriptionDrug.idPrescription == idPrescription)\
             .order_by(asc(PrescriptionDrug.solutionGroup), asc(Drug.name))\
             .all()
@@ -371,18 +375,28 @@ class Drug(db.Model):
     idMeasureUnit = db.Column("fkunidademedida", db.String, nullable=False)
     idHospital = db.Column("fkhospital", db.Integer, nullable=False)
     name = db.Column("nome", db.String, nullable=False)
+
+    def setSchema(schema):
+        Drug.__table__.schema = schema
+
+class DrugAttributes(db.Model):
+    __tablename__ = 'medatributos'
+
+    idDrug = db.Column("fkmedicamento", db.Integer, primary_key=True)
+    idSegment = db.Column("idsegmento", db.Integer, primary_key=True)
     antimicro = db.Column("antimicro", db.Boolean, nullable=True)
     mav = db.Column("mav", db.Boolean, nullable=True)
     controlled = db.Column("controlados", db.Boolean, nullable=True)
     notdefault = db.Column("naopadronizado", db.Boolean, nullable=True)
     maxDose = db.Column("dosemaxima", db.Integer, nullable=True)
     kidney = db.Column("renal", db.Integer, nullable=True)
-    liver = db.Column("hepatico", db.Boolean, nullable=True)
+    liver = db.Column("hepatico", db.Integer, nullable=True)
     elderly = db.Column("idoso", db.Boolean, nullable=True)
+    division = db.Column("divisor", db.Integer, nullable=True)
+    useWeight = db.Column("usapeso", db.Boolean, nullable=True)
 
     def setSchema(schema):
-        Drug.__table__.schema = schema
-
+        DrugAttributes.__table__.schema = schema
 
 class MeasureUnit(db.Model):
     __tablename__ = 'unidademedida'

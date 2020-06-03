@@ -67,7 +67,7 @@ def interactionsList(drugList, splitStr):
 
 examsRef = {
     'tgo': { 'min': 0,   'max': 34,  'ref': 'até 34 U/L - Método: Cinético optimizado UV' },
-    'tgp': { 'min': 10,  'max': 49,  'ref': '10 a 49 U/L - Método: Cinético optimizado UV' },
+    'tgp': { 'min': 0,   'max': 49,  'ref': '10 a 49 U/L - Método: Cinético optimizado UV' },
     'k':   { 'min': 3.5, 'max': 5.5, 'ref': '3,5 a 5,5 mEq/L - Método: Eletrodo Seletivo' },
     'na':  { 'min': 132, 'max': 146, 'ref': '132 a 146 mEq/L - Método: Eletrodo Seletivo' },
     'mg':  { 'min': 1.3, 'max': 2.7, 'ref': '1,3 a 2,7 mg/dl - Método: Clorofosfonazo III 1' },
