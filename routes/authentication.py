@@ -29,7 +29,7 @@ def auth():
             'status': 'success',
             'userName': user.name,
             'schema': user.schema,
-            'roles': ['admin'] if user.id == 2 else [],
+            'roles': ['admin'] if user.id in [1,2,11] else [],
             'access_token': access_token,
             'refresh_token': refresh_token
         }, status.HTTP_200_OK

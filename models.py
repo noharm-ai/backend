@@ -213,7 +213,7 @@ class Patient(db.Model):
         if (not(idPrescription is None)):
             q = q.filter(Prescription.id == idPrescription)
         else:
-            q = q.filter(func.date(Prescription.date) > day)
+            q = q.filter(func.date(Prescription.date) == day)
             
         q = q.order_by(desc(Prescription.date))
 
@@ -533,12 +533,10 @@ class Intervention(db.Model):
         if admissionNumber:
             interventions = interventions.filter(Intervention.admissionNumber == admissionNumber)
         if userId:
-            interventions = interventions.filter(Intervention.user == userId)\
-                            .filter(Intervention.date > (date.today() - timedelta(days=30)))
+            interventions = interventions.filter(Intervention.user == userId)
 
         interventions = interventions.filter(Intervention.status.in_(['s','a','n','x']))\
-            .order_by(desc(Intervention.date))\
-            .all()
+                                     .order_by(desc(Intervention.date)).all()
 
         intervBuffer = []
         for i in interventions:
