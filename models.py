@@ -392,7 +392,7 @@ class DrugAttributes(db.Model):
     kidney = db.Column("renal", db.Integer, nullable=True)
     liver = db.Column("hepatico", db.Integer, nullable=True)
     elderly = db.Column("idoso", db.Boolean, nullable=True)
-    division = db.Column("divisor", db.Integer, nullable=True)
+    division = db.Column("divisor", db.Float, nullable=True)
     useWeight = db.Column("usapeso", db.Boolean, nullable=True)
 
     def setSchema(schema):
