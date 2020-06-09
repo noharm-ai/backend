@@ -7,7 +7,7 @@ from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
 from .utils import mdrd_calc, cg_calc, ckd_calc, none2zero, formatExam,\
                     period, lenghStay, strNone, examAlerts, timeValue,\
-                    data2age, weightDate, examEmpty, is_float
+                    data2age, weightDate, examEmpty, is_float, examsName
 from sqlalchemy import func
 from datetime import date, datetime
 
@@ -114,10 +114,10 @@ def getPrescriptionsStatus():
     }, status.HTTP_200_OK
 
 
-def getExams(typeExam, idPatient):
+def getExams(typeExam, admissionNumber):
     return db.session.query(Exams.value, Exams.unit, Exams.date)\
         .select_from(Exams)\
-        .filter(Exams.idPatient == idPatient)\
+        .filter(Exams.admissionNumber == admissionNumber)\
         .filter(Exams.typeExam == typeExam)\
         .order_by(Exams.date.desc()).limit(1).first()
 
@@ -174,6 +174,7 @@ def getDrugType(drugList, pDrugs, source, interventions, exams=None, checked=Fal
                 'am': pd[6].antimicro if pd[6] is not None else False,
                 'av': pd[6].mav if pd[6] is not None else False,
                 'c': pd[6].controlled if pd[6] is not None else False,
+                'useWeight': pd[6].useWeight if pd[6] is not None else False,
                 'dose': pd[0].dose,
                 'measureUnit': { 'value': pd[2].id, 'label': pd[2].description } if pd[2] else '',
                 'frequency': { 'value': pd[3].id, 'label': pd[3].description } if pd[3] else '',
@@ -228,14 +229,14 @@ def getPrescription(idPrescription):
     db.engine.dispose()
 
     # TODO: Refactor Query
-    tgo = getExams('TGO', patient.id)
-    tgp = getExams('TGP', patient.id)
-    cr = getExams('CR', patient.id)
-    k = getExams('K', patient.id)
-    na = getExams('NA', patient.id)
-    mg = getExams('MG', patient.id)
-    rni = getExams('PRO', patient.id)
-    pcr = getExams('PCRU', patient.id)
+    tgo = getExams('TGO', patient.admissionNumber)
+    tgp = getExams('TGP', patient.admissionNumber)
+    cr = getExams('CR', patient.admissionNumber)
+    k = getExams('K', patient.admissionNumber)
+    na = getExams('NA', patient.admissionNumber)
+    mg = getExams('MG', patient.admissionNumber)
+    rni = getExams('PRO', patient.admissionNumber)
+    pcr = getExams('PCRU', patient.admissionNumber)
 
     exams = {
         'tgo': formatExam(tgo, 'tgo'),
@@ -281,6 +282,8 @@ def getPrescription(idPrescription):
             'gender': patient.gender,
             'weight': prescription[0].weight or patient.weight,
             'weightDate': weightDate(patient, prescription[0]),
+            'bed': prescription[0].bed,
+            'record': prescription[0].record,
             'class': random.choice(['green','yellow','red']),
             'skinColor': patient.skinColor,
             'department': prescription[4],
@@ -351,4 +354,57 @@ def getDrugPeriod(idPrescriptionDrug):
     return {
         'status': 'success',
         'data': results[0][1]
+    }, status.HTTP_200_OK
+
+def historyExam(typeExam, examsList):
+    results = []
+    for e in examsList:
+        if e.typeExam == typeExam:
+            item = formatExam(e, e.typeExam.lower())
+            del(item['ref'])
+            results.append(item)
+    return results
+
+@app_pres.route("/exams/<int:admissionNumber>", methods=['GET'])
+@jwt_required
+def getExamsbyAdmission(admissionNumber):
+    user = User.find(get_jwt_identity())
+    setSchema(user.schema)
+
+    examsList = Exams.findByAdmission(admissionNumber)
+    db.engine.dispose()
+
+    perc = {
+        'h_conleuc': {
+            'total' : 1,
+            'relation': ['h_conlinfoc', 'h_conmono', 'h_coneos', 'h_conbaso', 'h_consegm']
+        }
+    }
+
+    results = {}
+    typeExams = []
+    for e in examsList:
+        if not e.typeExam in typeExams and e.typeExam.lower() in examsName:
+            key = e.typeExam.lower()
+            item = formatExam(e, e.typeExam.lower())
+            item['name'] = examsName[e.typeExam.lower()]
+            item['val'] = e.value
+            item['perc'] = None
+            item['history'] = historyExam(e.typeExam, examsList)
+            results[key] = item
+            typeExams.append(e.typeExam)
+            if key in perc:
+                perc[key]['total'] = e.value
+
+    for p in perc:
+        total = perc[p]['total']
+        for r in perc[p]['relation']:
+            if r in results:
+                val = results[r]['val']
+                results[r]['perc'] = round((val*100)/total,1)
+
+
+    return {
+        'status': 'success',
+        'data': results
     }, status.HTTP_200_OK

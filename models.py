@@ -58,6 +58,8 @@ class Prescription(db.Model):
     date = db.Column("dtprescricao", db.DateTime, nullable=False)
     weight = db.Column('peso', db.Float, nullable=True)
     status = db.Column('status', db.String(1), nullable=False)
+    bed = db.Column('leito', db.String(16), nullable=True)
+    record = db.Column('prontuario', db.Integer, nullable=True)
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.Integer, nullable=True)
 
@@ -107,7 +109,7 @@ def getHighScore():
 def getExams(typeExam):
     return db.session.query(Exams.value)\
         .select_from(Exams)\
-        .filter(Exams.idPatient == Prescription.idPatient)\
+        .filter(Exams.admissionNumber == Prescription.admissionNumber)\
         .filter(Exams.typeExam == typeExam)\
         .order_by(Exams.date.desc()).limit(1)\
         .as_scalar()
@@ -617,15 +619,22 @@ class SegmentDepartment(db.Model):
 class Exams(db.Model):
     __tablename__ = 'exame'
 
-    idExame = db.Column("fkexame", db.Integer, nullable=False)
-    idPatient = db.Column("fkpessoa", db.Integer, primary_key=True)
+    idExame = db.Column("fkexame", db.Integer, primary_key=True)
+    idPatient = db.Column("fkpessoa", db.Integer, nullable=False)
+    admissionNumber = db.Column('nratendimento', db.Integer, nullable=False)
     date = db.Column("dtexame", db.DateTime, nullable=False)
-    typeExam = db.Column("tpexame", db.String, nullable=False)
+    typeExam = db.Column("tpexame", db.String, primary_key=True)
     value = db.Column("resultado", db.Float, nullable=False)
     unit = db.Column("unidade", db.String, nullable=True)
 
     def setSchema(schema):
         Exams.__table__.schema = schema
+
+    def findByAdmission(admissionNumber):
+        return db.session.query(Exams)\
+                         .filter(Exams.admissionNumber == admissionNumber)\
+                         .order_by(asc(Exams.typeExam),desc(Exams.date))\
+                         .all()
 
 class PrescriptionPic(db.Model):
     __tablename__ = 'prescricaofoto'

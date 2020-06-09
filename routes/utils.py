@@ -65,6 +65,35 @@ def interactionsList(drugList, splitStr):
 
     return result
 
+examsName = {
+    'tgo': 'Transaminase Glutâmico-Pxalacética',
+    'tgp': 'Transaminase Glutâmico-Pirúvica',
+    'k':   'Potássio',
+    'na':  'Sódio',
+    'mg':  'Magnésio',
+    'rni': 'Razão de Normatização Internacional',
+    'pro': 'Razão de Normatização Internacional',
+    'cr':  'Creatinina',
+    'pcr': 'Proteína C Reativa',
+    'mdrd':'Modification of Diet in Renal Disease',
+    'cg':  'Cockcroft-Gault',
+    'ckd': 'Chronic Kidney Disease Epidemiology',
+    'h_plt': 'Plaquetas',
+    'h_vcm': 'V.C.M.',
+    'h_rdw': 'R.D.W.',
+    'h_conmono': 'Monócitos',
+    'h_coneos': 'Eosinófilos',
+    'h_hcm': 'H.C.M.',
+    'h_chcm': 'C.H.C.M.',
+    'h_conlinfoc': 'Linfócitos',
+    'h_conbaso': 'Basófilos',
+    'h_hematoc': 'Hematócrito',
+    'h_hemogl': 'Hemoglobina',
+    'h_eritr': 'Eritócitos',
+    'h_conleuc': 'Leucóticos',
+    'h_consegm': 'Neutrófitos',
+}
+
 examsRef = {
     'tgo': { 'min': 0,   'max': 34,  'ref': 'até 34 U/L - Método: Cinético optimizado UV' },
     'tgp': { 'min': 0,   'max': 49,  'ref': '10 a 49 U/L - Método: Cinético optimizado UV' },
@@ -72,8 +101,23 @@ examsRef = {
     'na':  { 'min': 132, 'max': 146, 'ref': '132 a 146 mEq/L - Método: Eletrodo Seletivo' },
     'mg':  { 'min': 1.3, 'max': 2.7, 'ref': '1,3 a 2,7 mg/dl - Método: Clorofosfonazo III 1' },
     'rni': { 'min': 0,   'max': 1.3, 'ref': 'até 1,3 - Método: Coagulométrico automatizado ACL TOP 550' },
+    'pro': { 'min': 0,   'max': 1.3, 'ref': 'até 1,3 - Método: Coagulométrico automatizado ACL TOP 550' },
     'cr':  { 'min': 0.3, 'max': 1.3, 'ref': '0,3 a 1,3 mg/dL (IFCC)' },
     'pcr': { 'min': 0,   'max': 3,   'ref': 'até 3,0 mg/L' },
+    'h_plt':        { 'min': 150000, 'max': 440000},
+    'h_vcm':        { 'min': 80,     'max': 98},
+    'h_rdw':        { 'min': 0,      'max': 15},
+    'h_hcm':        { 'min': 28,     'max': 32},
+    'h_chcm':       { 'min': 32,     'max': 36},
+    'h_hematoc':    { 'min': 39,     'max': 53},
+    'h_hemogl':     { 'min': 12.8,   'max': 17.8},
+    'h_eritr':      { 'min': 4.5,    'max': 6.1},
+    'h_conleuc':    { 'min': 3600,   'max': 11000},
+    'h_conlinfoc':  { 'min': 1000,   'max': 4500},
+    'h_conmono':    { 'min': 100,    'max': 1000},
+    'h_coneos':     { 'min': 0,      'max': 500},
+    'h_conbaso':    { 'min': 0,      'max': 220},
+    'h_consegm':    { 'min': 1500,   'max': 7000},
 }
 
 examEmpty = { 'value': None, 'alert': False, 'ref': None }
@@ -108,8 +152,16 @@ def examAlerts(p, patient):
 def formatExam(exam, type):
     if exam is not None:
         examDate = exam.date.strftime('%d/%m/%Y %H:%M')
-        ref = examsRef[type]
-        alert = not (exam.value >= ref['min'] and exam.value <= ref['max'] )
+
+        if type in examsRef:
+            ref = examsRef[type]
+            alert = not (exam.value >= ref['min'] and exam.value <= ref['max'] )
+            if not 'ref' in ref:
+                ref['ref'] = 'de ' + str(ref['min']).replace('.',',') + ' a ' + str(ref['max']).replace('.',',')
+        else:
+            ref = {'ref' : ''}
+            alert = False
+
         return { 'value': str(exam.value) + ' ' + strNone(exam.unit), 'alert': alert,\
                       'date' :  examDate, 'ref': ref['ref']}
     else:
