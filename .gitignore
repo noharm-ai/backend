@@ -111,5 +111,5 @@ examples/example.csv.gz
 examples/example.class
 results.csv.gz
 results.csv
-zappa_setting.json
+zappa_settings.json
 config.py
