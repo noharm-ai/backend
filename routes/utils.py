@@ -1,3 +1,4 @@
+from flask_api import status
 from datetime import date, datetime, timedelta
 
 def data2age(birthdate):
@@ -14,17 +15,6 @@ def lenghStay(admissionDate):
 
     days = int ((datetime.today() - admissionDate).days)
     return days
-
-def weightDate(patient, prescription):
-    if prescription.weight:
-        return prescription.date.isoformat()
-    elif patient.weight:
-        if not patient.weightDate or (data2age(patient.weightDate.isoformat()) > 10):
-            return patient.admissionDate.isoformat()
-        else:
-            return patient.weightDate.isoformat()
-    else:
-        return None
 
 def is_float(s):
     try:
@@ -66,18 +56,19 @@ def interactionsList(drugList, splitStr):
     return result
 
 examsName = {
-    'tgo': 'Transaminase Glutâmico-Pxalacética',
-    'tgp': 'Transaminase Glutâmico-Pirúvica',
+    'tgo': 'TGO',
+    'tgp': 'TGP',
     'k':   'Potássio',
     'na':  'Sódio',
     'mg':  'Magnésio',
-    'rni': 'Razão de Normatização Internacional',
-    'pro': 'Razão de Normatização Internacional',
+    'rni': 'RNI',
+    'pro': 'RNI',
     'cr':  'Creatinina',
     'pcr': 'Proteína C Reativa',
-    'mdrd':'Modification of Diet in Renal Disease',
-    'cg':  'Cockcroft-Gault',
-    'ckd': 'Chronic Kidney Disease Epidemiology',
+    'mdrd':'MDRD',
+    'cg':  'CG',
+    'ckd': 'CKD-EPI',
+    'pcru': 'PCR',
     'h_plt': 'Plaquetas',
     'h_vcm': 'V.C.M.',
     'h_rdw': 'R.D.W.',
@@ -104,6 +95,7 @@ examsRef = {
     'pro': { 'min': 0,   'max': 1.3, 'ref': 'até 1,3 - Método: Coagulométrico automatizado ACL TOP 550' },
     'cr':  { 'min': 0.3, 'max': 1.3, 'ref': '0,3 a 1,3 mg/dL (IFCC)' },
     'pcr': { 'min': 0,   'max': 3,   'ref': 'até 3,0 mg/L' },
+    'pcru':{ 'min': 0,   'max': 3,   'ref': 'até 3,0 mg/L' },
     'h_plt':        { 'min': 150000, 'max': 440000},
     'h_vcm':        { 'min': 80,     'max': 98},
     'h_rdw':        { 'min': 0,      'max': 15},
@@ -125,7 +117,7 @@ examEmpty = { 'value': None, 'alert': False, 'ref': None }
 def examAlerts(p, patient):
     exams = {'tgo': p[7], 'tgp': p[8], 'cr': p[9], 'k': p[10], 'na': p[11], 'mg': p[12], 'rni': p[13], 'pcr': p[22]}
     exams['mdrd'] = mdrd_calc(str(p[9]), patient.birthdate, patient.gender, patient.skinColor)
-    exams['cg'] = cg_calc(str(p[9]), patient.birthdate, patient.gender, p[0].weight or patient.weight)
+    exams['cg'] = cg_calc(str(p[9]), patient.birthdate, patient.gender, patient.weight)
     exams['ckd'] = ckd_calc(str(p[9]), patient.birthdate, patient.gender, patient.skinColor)
 
     result = {}
@@ -157,7 +149,7 @@ def formatExam(exam, type):
             ref = examsRef[type]
             alert = not (exam.value >= ref['min'] and exam.value <= ref['max'] )
             if not 'ref' in ref:
-                ref['ref'] = 'de ' + str(ref['min']).replace('.',',') + ' a ' + str(ref['max']).replace('.',',')
+                ref['ref'] = 'de ' + str(ref['min']) + ' a ' + str(ref['max']) + ' ' + strNone(exam.unit) 
         else:
             ref = {'ref' : ''}
             alert = False
@@ -235,3 +227,27 @@ def ckd_calc(cr, birthdate, gender, skinColor):
     eGFR = s * (float(cr)/g)**(e) * (0.993)**(age)
 
     return { 'value': round(eGFR,1), 'ref': 'maior que 50 mL/min', 'alert': (eGFR < 50) }
+
+
+def tryCommit(db, record):
+    try:
+        db.session.commit()
+
+        return {
+            'status': 'success',
+            'data': record.id
+        }, status.HTTP_200_OK
+    except AssertionError as e:
+        db.engine.dispose()
+
+        return {
+            'status': 'error',
+            'message': str(e)
+        }, status.HTTP_400_BAD_REQUEST
+    except Exception as e:
+        db.engine.dispose()
+
+        return {
+            'status': 'error',
+            'message': str(e)
+        }, status.HTTP_500_INTERNAL_SERVER_ERROR

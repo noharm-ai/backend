@@ -7,7 +7,7 @@ from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
 from .utils import mdrd_calc, cg_calc, ckd_calc, none2zero, formatExam,\
                     period, lenghStay, strNone, examAlerts, timeValue,\
-                    data2age, weightDate, examEmpty, is_float, examsName
+                    data2age, examEmpty, is_float, examsName, tryCommit
 from sqlalchemy import func
 from datetime import date, datetime
 
@@ -23,10 +23,11 @@ def getPrescriptions(idPrescription=None):
 
     idSegment = request.args.get('idSegment', None)
     idDept = request.args.getlist('idDept[]')
+    idDrug = request.args.getlist('idDrug[]')
     limit = request.args.get('limit', 250)
     day = request.args.get('date', date.today())
 
-    patients = Patient.getPatients(idSegment=idSegment, idDept=idDept, idPrescription=idPrescription, limit=limit, day=day)
+    patients = Patient.getPatients(idSegment=idSegment, idDept=idDept, idDrug=idDrug, idPrescription=idPrescription, limit=limit, day=day)
     db.engine.dispose()
 
     results = []
@@ -47,7 +48,7 @@ def getPrescriptions(idPrescription=None):
             'admissionNumber': patient.admissionNumber,
             'birthdate': patient.birthdate.isoformat() if patient.birthdate else '',
             'gender': patient.gender,
-            'weight': p[0].weight if p[0].weight else patient.weight,
+            'weight': patient.weight,
             'skinColor': patient.skinColor,
             'lengthStay': lenghStay(patient.admissionDate),
             'date': p[0].date.isoformat(),
@@ -95,10 +96,11 @@ def getPrescriptionsStatus():
 
     idSegment = request.args.get('idSegment', None)
     idDept = request.args.getlist('idDept[]')
+    idDrug = request.args.getlist('idDrug[]')
     limit = request.args.get('limit', 250)
     day = request.args.get('date', date.today())
 
-    patients = Patient.getPatients(idSegment=idSegment, idDept=idDept, day=day, limit=limit, onlyStatus=True)
+    patients = Patient.getPatients(idSegment=idSegment, idDept=idDept, idDrug=idDrug, day=day, limit=limit, onlyStatus=True)
     db.engine.dispose()
 
     results = []
@@ -242,7 +244,7 @@ def getPrescription(idPrescription):
         'tgo': formatExam(tgo, 'tgo'),
         'tgp': formatExam(tgp, 'tgp'),
         'mdrd': mdrd_calc(cr.value, patient.birthdate, patient.gender, patient.skinColor) if cr is not None else examEmpty,
-        'cg': cg_calc(cr.value, patient.birthdate, patient.gender, prescription[0].weight or patient.weight) if cr is not None else examEmpty,
+        'cg': cg_calc(cr.value, patient.birthdate, patient.gender, patient.weight) if cr is not None else examEmpty,
         'ckd': ckd_calc(cr.value, patient.birthdate, patient.gender, patient.skinColor) if cr is not None else examEmpty,
         'creatinina': formatExam(cr, 'cr'),
         'k': formatExam(k, 'k'),
@@ -280,8 +282,8 @@ def getPrescription(idPrescription):
             'admissionNumber': prescription[0].admissionNumber,
             'birthdate': patient.birthdate.isoformat() if patient.birthdate else '',
             'gender': patient.gender,
-            'weight': prescription[0].weight or patient.weight,
-            'weightDate': weightDate(patient, prescription[0]),
+            'weight': patient.weight,
+            'weightDate': patient.weightDate,
             'bed': prescription[0].bed,
             'record': prescription[0].record,
             'class': random.choice(['green','yellow','red']),
@@ -320,27 +322,7 @@ def setPrescriptionStatus(idPrescription):
         ppic.picture = pObj['data'][0]
         db.session.add(ppic)
 
-    try:
-        db.session.commit()
-
-        return {
-            'status': 'success',
-            'data': p.id
-        }, status.HTTP_200_OK
-    except AssertionError as e:
-        db.engine.dispose()
-
-        return {
-            'status': 'error',
-            'message': str(e)
-        }, status.HTTP_400_BAD_REQUEST
-    except Exception as e:
-        db.engine.dispose()
-
-        return {
-            'status': 'error',
-            'message': str(e)
-        }, status.HTTP_500_INTERNAL_SERVER_ERROR
+    return tryCommit(db, p)
 
 @app_pres.route("/prescriptions/drug/<int:idPrescriptionDrug>/period", methods=['GET'])
 @jwt_required
@@ -403,8 +385,36 @@ def getExamsbyAdmission(admissionNumber):
                 val = results[r]['val']
                 results[r]['perc'] = round((val*100)/total,1)
 
-
     return {
         'status': 'success',
         'data': results
     }, status.HTTP_200_OK
+
+
+@app_pres.route('/patient/<int:admissionNumber>', methods=['POST'])
+@jwt_required
+def setPatientData(admissionNumber):
+    user = User.find(get_jwt_identity())
+    setSchema(user.schema)
+    data = request.get_json()
+
+    p = Patient.findByAdmission(admissionNumber)
+
+    if 'weight' in data.keys(): 
+        p.weight = data.get('weight')
+        p.weightDate = datetime.today()
+
+    returnJson = tryCommit(db, p)
+
+    if 'idPrescription' in data.keys():
+        idPrescription = data.get('idPrescription')
+
+        query = "INSERT INTO " + user.schema + ".presmed \
+                    SELECT *\
+                    FROM " + user.schema + ".presmed\
+                    WHERE fkprescricao = " + str(int(idPrescription)) + ";"
+
+        result = db.engine.execute(query)
+        print('Update Presmed:', result.rowcount)  
+
+    return returnJson

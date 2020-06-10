@@ -84,14 +84,6 @@ def setSegment(idSegment=None):
     data = request.get_json()
     if 'description' in data:
         s.description = data.get('description', None)
-    if 'minAge' in data:
-        s.minAge = data.get('minAge', None)
-    if 'maxAge' in data:
-        s.maxAge = data.get('maxAge', None)
-    if 'minWeight' in data:
-        s.minWeight = data.get('minWeight', None)
-    if 'maxWeight' in data:
-        s.maxWeight = data.get('maxWeight', None)
     if 'status' in data:
         s.status = data.get('status', None)
 

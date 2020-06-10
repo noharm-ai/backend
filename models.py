@@ -56,7 +56,6 @@ class Prescription(db.Model):
     idDepartment = db.Column("fksetor", db.Integer, nullable=False)
     idSegment = db.Column("idsegmento", db.Integer, nullable=False)
     date = db.Column("dtprescricao", db.DateTime, nullable=False)
-    weight = db.Column('peso', db.Float, nullable=True)
     status = db.Column('status', db.String(1), nullable=False)
     bed = db.Column('leito', db.String(16), nullable=True)
     record = db.Column('prontuario', db.Integer, nullable=True)
@@ -86,6 +85,7 @@ def getAggScore():
         .outerjoin(Outlier, and_(Outlier.id == PrescriptionDrug.idOutlier))\
         .filter(PrescriptionDrug.idPrescription == Prescription.id)\
         .filter(PrescriptionDrug.route != None)\
+        .filter(PrescriptionDrug.suspendedDate is None)\
         .as_scalar()
 
 def getScore(level):
@@ -94,6 +94,7 @@ def getScore(level):
         .outerjoin(Outlier, and_(Outlier.id == PrescriptionDrug.idOutlier))\
         .filter(PrescriptionDrug.idPrescription == Prescription.id)\
         .filter(PrescriptionDrug.route != None)\
+        .filter(PrescriptionDrug.suspendedDate is None)\
         .filter(func.coalesce(Outlier.manualScore, Outlier.score) == level)\
         .as_scalar()
 
@@ -103,6 +104,7 @@ def getHighScore():
         .outerjoin(Outlier, and_(Outlier.id == PrescriptionDrug.idOutlier))\
         .filter(PrescriptionDrug.idPrescription == Prescription.id)\
         .filter(PrescriptionDrug.route != None)\
+        .filter(PrescriptionDrug.suspendedDate is None)\
         .filter(or_(func.coalesce(Outlier.manualScore, Outlier.score) == 3, func.coalesce(Outlier.manualScore, Outlier.score) == None))\
         .as_scalar()
 
@@ -119,6 +121,8 @@ def getDrugClass(typeClass):
         .select_from(DrugAttributes)\
         .outerjoin(PrescriptionDrug, and_(DrugAttributes.idDrug == PrescriptionDrug.idDrug, DrugAttributes.idSegment == PrescriptionDrug.idSegment))\
         .filter(PrescriptionDrug.idPrescription == Prescription.id)\
+        .filter(PrescriptionDrug.route != None)\
+        .filter(PrescriptionDrug.suspendedDate is None)\
         .filter(typeClass == True)\
         .as_scalar()
 
@@ -126,6 +130,8 @@ def getDrugRoute(route):
     return db.session.query(func.count(1).label('drugRoute'))\
         .select_from(PrescriptionDrug)\
         .filter(PrescriptionDrug.idPrescription == Prescription.id)\
+        .filter(PrescriptionDrug.route != None)\
+        .filter(PrescriptionDrug.suspendedDate is None)\
         .filter(PrescriptionDrug.route.ilike(route))\
         .as_scalar()
 
@@ -134,6 +140,7 @@ def getDrugsCount():
         .select_from(PrescriptionDrug, Prescription)\
         .filter(PrescriptionDrug.idPrescription == Prescription.id)\
         .filter(PrescriptionDrug.route != None)\
+        .filter(PrescriptionDrug.suspendedDate is None)\
         .as_scalar()
 
 def getPendingInterventions():
@@ -150,8 +157,17 @@ def getDrugDiff():
         .select_from(PrescriptionDrug, Prescription)\
         .filter(PrescriptionDrug.idPrescription == Prescription.id)\
         .filter(PrescriptionDrug.route != None)\
+        .filter(PrescriptionDrug.suspendedDate is None)\
         .filter(PrescriptionDrug.checked == True)\
         .as_scalar() 
+
+def getDrugList():
+    query = db.session.query(PrescriptionDrug.idDrug)\
+        .select_from(PrescriptionDrug)\
+        .filter(PrescriptionDrug.idPrescription == Prescription.id)\
+        .as_scalar()
+
+    return func.array(query)
 
 class Patient(db.Model):
     __tablename__ = 'pessoa'
@@ -169,7 +185,12 @@ class Patient(db.Model):
     def setSchema(schema):
         Patient.__table__.schema = schema
 
-    def getPatients(idSegment=None, idDept=[], idPrescription=None, limit=250, day=date.today(), onlyStatus=False):
+    def findByAdmission(admissionNumber):
+        return db.session.query(Patient)\
+                         .filter(Patient.admissionNumber == admissionNumber)\
+                         .one()
+
+    def getPatients(idSegment=None, idDept=[], idDrug=[], idPrescription=None, limit=250, day=date.today(), onlyStatus=False):
         score = getAggScore()
         scoreOne = getScore(1)
         scoreTwo = getScore(2)
@@ -212,10 +233,15 @@ class Patient(db.Model):
         if (len(idDept)>0):
             q = q.filter(Prescription.idDepartment.in_(idDept))
 
+        if (len(idDrug)>0):
+            drugList = getDrugList()
+            idDrug = list(map(int, idDrug))
+            q = q.filter(postgresql.array(idDrug).overlap(drugList))
+
         if (not(idPrescription is None)):
             q = q.filter(Prescription.id == idPrescription)
         else:
-            q = q.filter(func.date(Prescription.date) == day)
+            q = q.filter(func.date(Prescription.date) > day)
             
         q = q.order_by(desc(Prescription.date))
 
