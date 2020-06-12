@@ -241,7 +241,7 @@ class Patient(db.Model):
         if (not(idPrescription is None)):
             q = q.filter(Prescription.id == idPrescription)
         else:
-            q = q.filter(func.date(Prescription.date) > day)
+            q = q.filter(func.date(Prescription.date) == day)
             
         q = q.order_by(desc(Prescription.date))
 

@@ -58,10 +58,10 @@ def getSegmentsId(idSegment):
         'data': {
             'id': s.id,
             'description': s.description,
-            'minAge': s.minAge,
-            'maxAge': s.maxAge,
-            'minWeight': s.minWeight,
-            'maxWeight': s.maxWeight,
+            'minAge': None,
+            'maxAge': None,
+            'minWeight': None,
+            'maxWeight': None,
             'status': s.status,
             'departments': deps
         }

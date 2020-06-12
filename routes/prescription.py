@@ -161,7 +161,7 @@ def getDrugType(drugList, pDrugs, source, interventions, exams=None, checked=Fal
                 alerts.append('Medicamento deve sofrer ajuste de posologia, já que a função renal do paciente (' + str(exams['ckd']['value']) + ' mL/min) está abaixo de ' + str(pd[6].kidney) + ' mL/min.')
 
             if pd[6].liver:
-                if (exams['tgp']['value'] and float(exams['tgp']['value'].split(' ')[0]) > pd[6].liver) or (exams['tgo']['value'] and float(exams['tgo']['value'].split(' ')[0]) > pd[6].liver):
+                if (exams['tgp']['value'] and float(exams['tgp']['value']) > pd[6].liver) or (exams['tgo']['value'] and float(exams['tgo']['value']) > pd[6].liver):
                     alerts.append('Medicamento com necessidade de ajuste de posologia ou contraindicado, já que para paciente com função hepática do paciente está reduzida (acima de ' + str(pd[6].liver) + ' U/L).')
 
             if pd[6].elderly and exams['age'] > 60:
@@ -370,7 +370,6 @@ def getExamsbyAdmission(admissionNumber):
             key = e.typeExam.lower()
             item = formatExam(e, e.typeExam.lower())
             item['name'] = examsName[e.typeExam.lower()]
-            item['val'] = e.value
             item['perc'] = None
             item['history'] = historyExam(e.typeExam, examsList)
             results[key] = item
@@ -382,7 +381,7 @@ def getExamsbyAdmission(admissionNumber):
         total = perc[p]['total']
         for r in perc[p]['relation']:
             if r in results:
-                val = results[r]['val']
+                val = results[r]['value']
                 results[r]['perc'] = round((val*100)/total,1)
 
     return {

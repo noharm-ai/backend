@@ -143,19 +143,18 @@ def examAlerts(p, patient):
 
 def formatExam(exam, type):
     if exam is not None:
-        examDate = exam.date.strftime('%d/%m/%Y %H:%M')
-
         if type in examsRef:
             ref = examsRef[type]
             alert = not (exam.value >= ref['min'] and exam.value <= ref['max'] )
             if not 'ref' in ref:
                 ref['ref'] = 'de ' + str(ref['min']) + ' a ' + str(ref['max']) + ' ' + strNone(exam.unit) 
         else:
-            ref = {'ref' : ''}
+            ref = {'ref' : None, 'min': None , 'max': None}
             alert = False
 
-        return { 'value': str(exam.value) + ' ' + strNone(exam.unit), 'alert': alert,\
-                      'date' :  examDate, 'ref': ref['ref']}
+        return { 'value': str(exam.value), 'unit': strNone(exam.unit), 'alert': alert,\
+                 'date' : exam.date.isoformat(), 'ref': ref['ref'],
+                 'min': ref['min'], 'max': ref['max']}
     else:
         examEmpty['date'] = None
         return examEmpty

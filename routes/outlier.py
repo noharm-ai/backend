@@ -224,6 +224,7 @@ def getDrugs(idSegment=1):
     setSchema(user.schema)
 
     qDrug = request.args.get('q', None)
+    idDrug = request.args.getlist('idDrug[]')
 
     drugs = Drug.query\
             .join(Outlier, Outlier.idDrug == Drug.id)\
@@ -231,6 +232,9 @@ def getDrugs(idSegment=1):
 
     if qDrug:
         drugs = drugs.filter(Drug.name.ilike("%"+str(qDrug)+"%"))
+
+    if (len(idDrug)>0):
+        drugs = drugs.filter(Drug.id.in_(idDrug))
 
     drugs = drugs.order_by(asc(Drug.name))\
             .all()
