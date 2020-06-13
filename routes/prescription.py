@@ -1,4 +1,4 @@
-import random
+import random, copy
 from flask_api import status
 from models import db, User, Patient, Prescription, PrescriptionDrug, InterventionReason,\
                     Intervention, Segment, setSchema, Exams, PrescriptionPic, DrugAttributes
@@ -363,7 +363,7 @@ def getExamsbyAdmission(admissionNumber):
         }
     }
 
-    results = {}
+    bufferList = {}
     typeExams = []
     for e in examsList:
         if not e.typeExam in typeExams and e.typeExam.lower() in examsName:
@@ -372,17 +372,24 @@ def getExamsbyAdmission(admissionNumber):
             item['name'] = examsName[e.typeExam.lower()]
             item['perc'] = None
             item['history'] = historyExam(e.typeExam, examsList)
-            results[key] = item
+            bufferList[key] = item
             typeExams.append(e.typeExam)
             if key in perc:
-                perc[key]['total'] = e.value
+                perc[key]['total'] = float(e.value)
 
     for p in perc:
         total = perc[p]['total']
         for r in perc[p]['relation']:
-            if r in results:
-                val = results[r]['value']
-                results[r]['perc'] = round((val*100)/total,1)
+            if r in bufferList:
+                val = bufferList[r]['value']
+                bufferList[r]['perc'] = round((val*100)/total,1)
+
+    results = copy.deepcopy(examsName)
+    for e in examsName:
+        if e in bufferList:
+            results[e] = bufferList[e]
+        else:
+            del(results[e])
 
     return {
         'status': 'success',

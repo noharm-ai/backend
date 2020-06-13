@@ -1,5 +1,5 @@
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import func, text, and_, or_, desc, asc, distinct
+from sqlalchemy import func, text, and_, or_, desc, asc, distinct, cast
 from datetime import date, timedelta
 from sqlalchemy.dialects import postgresql
 from routes.utils import timeValue, interactionsList
@@ -85,7 +85,7 @@ def getAggScore():
         .outerjoin(Outlier, and_(Outlier.id == PrescriptionDrug.idOutlier))\
         .filter(PrescriptionDrug.idPrescription == Prescription.id)\
         .filter(PrescriptionDrug.route != None)\
-        .filter(PrescriptionDrug.suspendedDate is None)\
+        .filter(PrescriptionDrug.suspendedDate == None)\
         .as_scalar()
 
 def getScore(level):
@@ -94,7 +94,7 @@ def getScore(level):
         .outerjoin(Outlier, and_(Outlier.id == PrescriptionDrug.idOutlier))\
         .filter(PrescriptionDrug.idPrescription == Prescription.id)\
         .filter(PrescriptionDrug.route != None)\
-        .filter(PrescriptionDrug.suspendedDate is None)\
+        .filter(PrescriptionDrug.suspendedDate == None)\
         .filter(func.coalesce(Outlier.manualScore, Outlier.score) == level)\
         .as_scalar()
 
@@ -104,7 +104,7 @@ def getHighScore():
         .outerjoin(Outlier, and_(Outlier.id == PrescriptionDrug.idOutlier))\
         .filter(PrescriptionDrug.idPrescription == Prescription.id)\
         .filter(PrescriptionDrug.route != None)\
-        .filter(PrescriptionDrug.suspendedDate is None)\
+        .filter(PrescriptionDrug.suspendedDate == None)\
         .filter(or_(func.coalesce(Outlier.manualScore, Outlier.score) == 3, func.coalesce(Outlier.manualScore, Outlier.score) == None))\
         .as_scalar()
 
@@ -122,7 +122,7 @@ def getDrugClass(typeClass):
         .outerjoin(PrescriptionDrug, and_(DrugAttributes.idDrug == PrescriptionDrug.idDrug, DrugAttributes.idSegment == PrescriptionDrug.idSegment))\
         .filter(PrescriptionDrug.idPrescription == Prescription.id)\
         .filter(PrescriptionDrug.route != None)\
-        .filter(PrescriptionDrug.suspendedDate is None)\
+        .filter(PrescriptionDrug.suspendedDate == None)\
         .filter(typeClass == True)\
         .as_scalar()
 
@@ -131,7 +131,7 @@ def getDrugRoute(route):
         .select_from(PrescriptionDrug)\
         .filter(PrescriptionDrug.idPrescription == Prescription.id)\
         .filter(PrescriptionDrug.route != None)\
-        .filter(PrescriptionDrug.suspendedDate is None)\
+        .filter(PrescriptionDrug.suspendedDate == None)\
         .filter(PrescriptionDrug.route.ilike(route))\
         .as_scalar()
 
@@ -140,7 +140,7 @@ def getDrugsCount():
         .select_from(PrescriptionDrug, Prescription)\
         .filter(PrescriptionDrug.idPrescription == Prescription.id)\
         .filter(PrescriptionDrug.route != None)\
-        .filter(PrescriptionDrug.suspendedDate is None)\
+        .filter(PrescriptionDrug.suspendedDate == None)\
         .as_scalar()
 
 def getPendingInterventions():
@@ -157,12 +157,12 @@ def getDrugDiff():
         .select_from(PrescriptionDrug, Prescription)\
         .filter(PrescriptionDrug.idPrescription == Prescription.id)\
         .filter(PrescriptionDrug.route != None)\
-        .filter(PrescriptionDrug.suspendedDate is None)\
+        .filter(PrescriptionDrug.suspendedDate == None)\
         .filter(PrescriptionDrug.checked == True)\
         .as_scalar() 
 
 def getDrugList():
-    query = db.session.query(PrescriptionDrug.idDrug)\
+    query = db.session.query(cast(PrescriptionDrug.idDrug,db.Integer))\
         .select_from(PrescriptionDrug)\
         .filter(PrescriptionDrug.idPrescription == Prescription.id)\
         .as_scalar()

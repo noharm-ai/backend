@@ -56,33 +56,33 @@ def interactionsList(drugList, splitStr):
     return result
 
 examsName = {
+    'cr':  'Creatinina',
+    'mdrd':'MDRD',
+    'cg':  'CG',
+    'ckd': 'CKD-EPI',
+    'pcru': 'PCR',
+    'pcr': 'PCR',
+    'rni': 'RNI',
+    'pro': 'RNI',
     'tgo': 'TGO',
     'tgp': 'TGP',
     'k':   'Potássio',
     'na':  'Sódio',
     'mg':  'Magnésio',
-    'rni': 'RNI',
-    'pro': 'RNI',
-    'cr':  'Creatinina',
-    'pcr': 'Proteína C Reativa',
-    'mdrd':'MDRD',
-    'cg':  'CG',
-    'ckd': 'CKD-EPI',
-    'pcru': 'PCR',
-    'h_plt': 'Plaquetas',
-    'h_vcm': 'V.C.M.',
-    'h_rdw': 'R.D.W.',
-    'h_conmono': 'Monócitos',
-    'h_coneos': 'Eosinófilos',
-    'h_hcm': 'H.C.M.',
-    'h_chcm': 'C.H.C.M.',
-    'h_conlinfoc': 'Linfócitos',
-    'h_conbaso': 'Basófilos',
+    'h_eritr': 'Eritócitos',
     'h_hematoc': 'Hematócrito',
     'h_hemogl': 'Hemoglobina',
-    'h_eritr': 'Eritócitos',
+    'h_plt': 'Plaquetas',
+    'h_vcm': 'V.C.M.',
+    'h_hcm': 'H.C.M.',
+    'h_chcm': 'C.H.C.M.',
+    'h_rdw': 'R.D.W.',
     'h_conleuc': 'Leucóticos',
+    'h_conbaso': 'Basófilos',
+    'h_coneos': 'Eosinófilos',
     'h_consegm': 'Neutrófitos',
+    'h_conlinfoc': 'Linfócitos',
+    'h_conmono': 'Monócitos',
 }
 
 examsRef = {
@@ -152,7 +152,7 @@ def formatExam(exam, type):
             ref = {'ref' : None, 'min': None , 'max': None}
             alert = False
 
-        return { 'value': str(exam.value), 'unit': strNone(exam.unit), 'alert': alert,\
+        return { 'value': float(exam.value), 'unit': strNone(exam.unit), 'alert': alert,\
                  'date' : exam.date.isoformat(), 'ref': ref['ref'],
                  'min': ref['min'], 'max': ref['max']}
     else:
