@@ -36,7 +36,7 @@ def getPrescriptions(idPrescription=None):
         patient = p[1]
         if (patient is None):
             patient = Patient()
-            patient.id = p[0].idPatient
+            patient.idPatient = p[0].idPatient
             patient.admissionNumber = p[0].admissionNumber
 
         tgo, tgp, cr, mdrd, cg, k, na, mg, rni, pcr, ckd, totalAlerts = examAlerts(p, patient)
@@ -223,7 +223,7 @@ def getPrescription(idPrescription):
     patient = prescription[1]
     if (patient is None):
         patient = Patient()
-        patient.id = prescription[0].idPatient
+        patient.idPatient = prescription[0].idPatient
         patient.admissionNumber = prescription[0].admissionNumber
 
     drugs = PrescriptionDrug.findByPrescription(idPrescription, patient.admissionNumber)
@@ -277,7 +277,7 @@ def getPrescription(idPrescription):
             'idPrescription': prescription[0].id,
             'idSegment': prescription[0].idSegment,
             'segmentName': prescription[5],
-            'idPatient': patient.id,
+            'idPatient': patient.idPatient,
             'name': prescription[0].admissionNumber,
             'admissionNumber': prescription[0].admissionNumber,
             'birthdate': patient.birthdate.isoformat() if patient.birthdate else '',
@@ -322,7 +322,7 @@ def setPrescriptionStatus(idPrescription):
         ppic.picture = pObj['data'][0]
         db.session.add(ppic)
 
-    return tryCommit(db, p)
+    return tryCommit(db, p.id)
 
 @app_pres.route("/prescriptions/drug/<int:idPrescriptionDrug>/period", methods=['GET'])
 @jwt_required
@@ -410,7 +410,7 @@ def setPatientData(admissionNumber):
         p.weight = data.get('weight')
         p.weightDate = datetime.today()
 
-    returnJson = tryCommit(db, p)
+    returnJson = tryCommit(db, p.admissionNumber)
 
     if 'idPrescription' in data.keys():
         idPrescription = data.get('idPrescription')

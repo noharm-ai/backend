@@ -172,9 +172,9 @@ def getDrugList():
 class Patient(db.Model):
     __tablename__ = 'pessoa'
 
-    id = db.Column("fkpessoa", db.Integer, primary_key=True)
+    idPatient = db.Column("fkpessoa", db.Integer, nullable=False)
     fkHospital = db.Column("fkhospital", db.Integer, nullable=False)
-    admissionNumber = db.Column('nratendimento', db.Integer, nullable=False)
+    admissionNumber = db.Column('nratendimento', db.Integer, primary_key=True)
     admissionDate = db.Column('dtinternacao', db.DateTime, nullable=True)
     birthdate = db.Column('dtnascimento', db.DateTime, nullable=True)
     gender = db.Column('sexo', db.String(1), nullable=True)

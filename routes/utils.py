@@ -228,13 +228,13 @@ def ckd_calc(cr, birthdate, gender, skinColor):
     return { 'value': round(eGFR,1), 'ref': 'maior que 50 mL/min', 'alert': (eGFR < 50) }
 
 
-def tryCommit(db, record):
+def tryCommit(db, recId):
     try:
         db.session.commit()
 
         return {
             'status': 'success',
-            'data': record.id
+            'data': recId
         }, status.HTTP_200_OK
     except AssertionError as e:
         db.engine.dispose()
