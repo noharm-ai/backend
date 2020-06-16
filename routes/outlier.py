@@ -1,7 +1,7 @@
 from flask_api import status
 from models import db, User, Patient, Prescription, PrescriptionDrug, InterventionReason,\
                     Intervention, Segment, setSchema, Department, Outlier, Drug, PrescriptionAgg,\
-                    MeasureUnit, MeasureUnitConvert, Notes, DrugAttributes, Relation
+                    MeasureUnit, MeasureUnitConvert, Notes, DrugAttributes, Relation, Substance
 from sqlalchemy import desc, asc, and_, func
 from flask import Blueprint, request
 from flask_jwt_extended import (create_access_token, create_refresh_token,
@@ -336,3 +336,25 @@ def setDrugUnit(idDrug, idMeasureUnit):
             'status': 'error',
             'message': str(e)
         }, status.HTTP_500_INTERNAL_SERVER_ERROR
+
+@app_out.route('/substance', methods=['GET'])
+@jwt_required
+def getSubstance():
+    user = User.find(get_jwt_identity())
+    setSchema(user.schema)
+
+    drugs = Substance.query.order_by(asc(Substance.name)).all()
+
+    db.engine.dispose()
+
+    results = []
+    for d in drugs:
+        results.append({
+            'sctid': d.id,
+            'name': d.name,
+        })
+
+    return {
+        'status': 'success',
+        'data': results
+    }, status.HTTP_200_OK
