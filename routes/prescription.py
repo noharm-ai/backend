@@ -1,7 +1,8 @@
 import random, copy
 from flask_api import status
 from models import db, User, Patient, Prescription, PrescriptionDrug, InterventionReason,\
-                    Intervention, Segment, setSchema, Exams, PrescriptionPic, DrugAttributes
+                    Intervention, Segment, setSchema, Exams, PrescriptionPic, DrugAttributes,\
+                    Notes
 from flask import Blueprint, request
 from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
@@ -200,7 +201,8 @@ def getDrugType(drugList, pDrugs, source, interventions, exams=None, checked=Fal
                 'near': pd[0].near,
                 'prevIntervention': getPrevIntervention(pd[0].idDrug, pd[0].idPrescription, interventions),
                 'intervention': getIntervention(pd[0].id, interventions),
-                'alerts': alerts
+                'alerts': alerts,
+                'notes': pd[7]
             })
     return pDrugs
 
@@ -322,7 +324,7 @@ def setPrescriptionStatus(idPrescription):
         ppic.picture = pObj['data'][0]
         db.session.add(ppic)
 
-    return tryCommit(db, p.id)
+    return tryCommit(db, idPrescription)
 
 @app_pres.route("/prescriptions/drug/<int:idPrescriptionDrug>/period", methods=['GET'])
 @jwt_required
@@ -410,7 +412,7 @@ def setPatientData(admissionNumber):
         p.weight = data.get('weight')
         p.weightDate = datetime.today()
 
-    returnJson = tryCommit(db, p.admissionNumber)
+    returnJson = tryCommit(db, admissionNumber)
 
     if 'idPrescription' in data.keys():
         idPrescription = data.get('idPrescription')
@@ -424,3 +426,28 @@ def setPatientData(admissionNumber):
         print('Update Presmed:', result.rowcount)  
 
     return returnJson
+
+@app_pres.route('/prescriptions/drug/<int:idPrescriptionDrug>/notes', methods=['PUT'])
+@jwt_required
+def setPrescriptionDrugNote(idPrescriptionDrug):
+    data = request.get_json()
+    user = User.find(get_jwt_identity())
+    setSchema(user.schema)
+
+    if 'obs' in data:
+        notes = data.get('obs', None)
+        obs = Notes.query.get((0, idPrescriptionDrug))
+        newObs = False
+
+        if obs is None:
+            newObs = True
+            obs = Notes()
+            obs.idPrescriptionDrug = idPrescriptionDrug
+
+        obs.notes = notes
+        obs.update = func.now()
+        obs.user  = user.id
+
+        if newObs: db.session.add(obs)
+
+    return tryCommit(db, idPrescriptionDrug)

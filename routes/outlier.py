@@ -1,7 +1,7 @@
 from flask_api import status
 from models import db, User, Patient, Prescription, PrescriptionDrug, InterventionReason,\
                     Intervention, Segment, setSchema, Department, Outlier, Drug, PrescriptionAgg,\
-                    MeasureUnit, MeasureUnitConvert, OutlierObs, DrugAttributes
+                    MeasureUnit, MeasureUnitConvert, Notes, DrugAttributes, Relation
 from sqlalchemy import desc, asc, and_, func
 from flask import Blueprint, request
 from flask_jwt_extended import (create_access_token, create_refresh_token,
@@ -16,13 +16,18 @@ def getOutliers(idSegment=1, idDrug=1):
     user = User.find(get_jwt_identity())
     setSchema(user.schema)
     outliers = db.session\
-        .query(Outlier, OutlierObs)\
-        .outerjoin(OutlierObs, OutlierObs.id == Outlier.id)\
+        .query(Outlier, Notes)\
+        .outerjoin(Notes, Notes.idOutlier == Outlier.id)\
         .filter(Outlier.idSegment == idSegment, Outlier.idDrug == idDrug)\
         .order_by(Outlier.countNum.desc(), Outlier.frequency.asc())\
         .all()
     d = Drug.query.get(idDrug)
     drugAttr = DrugAttributes.query.get((idDrug,idSegment))
+    
+    relations = []
+    if d.sctid:
+        relations = Relation.findBySctid(d.sctid)
+
     db.engine.dispose()
 
     if drugAttr is None: drugAttr = DrugAttributes()
@@ -99,7 +104,8 @@ def getOutliers(idSegment=1, idDrug=1):
             'elderly': drugAttr.elderly,
             'division': drugAttr.division,
             'useWeight': drugAttr.useWeight,
-            'idMeasureUnit': d.idMeasureUnit
+            'idMeasureUnit': d.idMeasureUnit,
+            'relations': relations
         }
     }, status.HTTP_200_OK
 
@@ -121,13 +127,13 @@ def setManualOutlier(idOutlier):
 
     if 'obs' in data:
         notes = data.get('obs', None)
-        obs = OutlierObs.query.get(idOutlier)
+        obs = Notes.query.get((idOutlier,0))
         newObs = False
 
         if obs is None:
             newObs = True
-            obs = OutlierObs()
-            obs.id = idOutlier
+            obs = Notes()
+            obs.idOutlier = idOutlier
             obs.idSegment = o.idSegment
             obs.idDrug = o.idDrug
             obs.dose = o.dose
@@ -230,14 +236,11 @@ def getDrugs(idSegment=1):
             .join(Outlier, Outlier.idDrug == Drug.id)\
             .filter(Outlier.idSegment == idSegment)
 
-    if qDrug:
-        drugs = drugs.filter(Drug.name.ilike("%"+str(qDrug)+"%"))
+    if qDrug: drugs = drugs.filter(Drug.name.ilike("%"+str(qDrug)+"%"))
 
-    if (len(idDrug)>0):
-        drugs = drugs.filter(Drug.id.in_(idDrug))
+    if (len(idDrug)>0): drugs = drugs.filter(Drug.id.in_(idDrug))
 
-    drugs = drugs.order_by(asc(Drug.name))\
-            .all()
+    drugs = drugs.order_by(asc(Drug.name)).all()
 
     db.engine.dispose()
 

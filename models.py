@@ -23,7 +23,7 @@ def setSchema(schema):
     PrescriptionAgg.setSchema(schema)
     MeasureUnitConvert.setSchema(schema)
     PrescriptionPic.setSchema(schema)
-    OutlierObs.setSchema(schema)
+    Notes.setSchema(schema)
     DrugAttributes.setSchema(schema)
 
 
@@ -44,6 +44,43 @@ class User(db.Model):
 
     def authenticate(email, password):
         return User.query.filter_by(email=email, password=password).first()
+
+class Substance(db.Model):
+    __tablename__ = 'substancia'
+
+    id = db.Column("sctid", db.Integer, primary_key=True)
+    name = db.Column('nome', db.String(255), nullable=False)
+
+class Relation(db.Model):
+    __tablename__ = 'relacao'
+
+    sctida = db.Column("sctida", db.Integer, primary_key=True)
+    sctidb = db.Column("sctidb", db.Integer, primary_key=True)
+    kind = db.Column('tprelacao', db.String(2), primary_key=True)
+    text = db.Column('texto', db.String, nullable=True)
+
+    def findBySctid(sctid):
+        SubstA = db.aliased(Substance)
+        SubstB = db.aliased(Substance)
+
+        relations = db.session.query(Relation, SubstA.name, SubstB.name)\
+                    .outerjoin(SubstA, SubstA.id == Relation.sctida)\
+                    .outerjoin(SubstB, SubstB.id == Relation.sctidb)\
+                    .filter(or_(Relation.sctida == sctid, Relation.sctidb == sctid))\
+                    .all()
+
+        results = []
+        for r in relations:
+            results.append({
+                'sctidA': r[0].sctida,
+                'nameA': r[1],
+                'sctidB': r[0].sctidb,
+                'nameB': r[2],
+                'type': r[0].kind,
+                'text': r[0].text
+            })
+
+        return results
 
 
 class Prescription(db.Model):
@@ -282,10 +319,11 @@ class Outlier(db.Model):
         Outlier.__table__.schema = schema
 
 
-class OutlierObs(db.Model):
-    __tablename__ = 'outlierobs'
+class Notes(db.Model):
+    __tablename__ = 'observacao'
 
-    id = db.Column("idoutlier", db.Integer, primary_key=True)
+    idOutlier = db.Column("idoutlier", db.Integer, primary_key=True)
+    idPrescriptionDrug = db.Column("fkpresmed", db.Integer, primary_key=True)
     idSegment = db.Column("idsegmento", db.Integer, nullable=False)
     idDrug = db.Column("fkmedicamento", db.Integer, nullable=False)
     dose = db.Column("doseconv", db.Float, nullable=True)
@@ -295,7 +333,7 @@ class OutlierObs(db.Model):
     user = db.Column("update_by", db.Integer, nullable=True)
 
     def setSchema(schema):
-        OutlierObs.__table__.schema = schema
+        Notes.__table__.schema = schema
 
 class PrescriptionAgg(db.Model):
     __tablename__ = 'prescricaoagg'
@@ -375,9 +413,10 @@ class PrescriptionDrug(db.Model):
         return db.session\
             .query(PrescriptionDrug, Drug, MeasureUnit, Frequency, func.trunc(0).label('intervention'), 
                     func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4).label('score'),
-                    DrugAttributes)\
+                    DrugAttributes, Notes.notes)\
             .outerjoin(Outlier, Outlier.id == PrescriptionDrug.idOutlier)\
             .outerjoin(Drug, Drug.id == PrescriptionDrug.idDrug)\
+            .outerjoin(Notes, Notes.idPrescriptionDrug == PrescriptionDrug.idDrug)\
             .outerjoin(MeasureUnit, MeasureUnit.id == PrescriptionDrug.idMeasureUnit)\
             .outerjoin(Frequency, Frequency.id == PrescriptionDrug.idFrequency)\
             .outerjoin(DrugAttributes, and_(DrugAttributes.idDrug == PrescriptionDrug.idDrug, DrugAttributes.idSegment == PrescriptionDrug.idSegment))\
@@ -403,6 +442,7 @@ class Drug(db.Model):
     idMeasureUnit = db.Column("fkunidademedida", db.String, nullable=False)
     idHospital = db.Column("fkhospital", db.Integer, nullable=False)
     name = db.Column("nome", db.String, nullable=False)
+    sctid = db.Column("sctid", db.Integer, nullable=True)
 
     def setSchema(schema):
         Drug.__table__.schema = schema
