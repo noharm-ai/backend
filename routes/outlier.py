@@ -21,12 +21,17 @@ def getOutliers(idSegment=1, idDrug=1):
         .filter(Outlier.idSegment == idSegment, Outlier.idDrug == idDrug)\
         .order_by(Outlier.countNum.desc(), Outlier.frequency.asc())\
         .all()
-    d = Drug.query.get(idDrug)
+    d = db.session\
+        .query(Drug, Substance.name)\
+        .outerjoin(Substance, Substance.id == Drug.sctid)\
+        .filter(Drug.id == idDrug)\
+        .one()
+
     drugAttr = DrugAttributes.query.get((idDrug,idSegment))
     
     relations = []
-    if d.sctid:
-        relations = Relation.findBySctid(d.sctid)
+    if d[0].sctid:
+        relations = Relation.findBySctid(d[0].sctid, user.id)
 
     db.engine.dispose()
 
@@ -47,7 +52,7 @@ def getOutliers(idSegment=1, idDrug=1):
 
     newOutlier = True
     results = []
-    if d != None:
+    if d[0] != None:
         for o in outliers:
             if dose is not None and frequency is not None:
                 if float(dose) == o[0].dose and float(frequency) == o[0].frequency: newOutlier = False
@@ -104,8 +109,16 @@ def getOutliers(idSegment=1, idDrug=1):
             'elderly': drugAttr.elderly,
             'division': drugAttr.division,
             'useWeight': drugAttr.useWeight,
-            'idMeasureUnit': d.idMeasureUnit,
-            'relations': relations
+            'idMeasureUnit': d[0].idMeasureUnit,
+            'sctidA': d[0].sctid,
+            'sctNameA': d[1],
+            'relations': relations,
+            'relationTypes': [
+                { 'dm' : 'Duplicidade Medicamentosa'},
+                { 'dt' : 'Duplicidade Terapêutica'},
+                { 'it' : 'Interação Medicamentosa'},
+                { 'iy' : 'Imcompatibilidade em Y'},
+            ]
         }
     }, status.HTTP_200_OK
 

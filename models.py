@@ -58,8 +58,11 @@ class Relation(db.Model):
     sctidb = db.Column("sctidb", db.Integer, primary_key=True)
     kind = db.Column('tprelacao', db.String(2), primary_key=True)
     text = db.Column('texto', db.String, nullable=True)
+    active = db.Column("ativo", db.Boolean, nullable=True)
+    update = db.Column("update_at", db.DateTime, nullable=True)
+    user = db.Column("update_by", db.Integer, nullable=True)
 
-    def findBySctid(sctid):
+    def findBySctid(sctid, userId):
         SubstA = db.aliased(Substance)
         SubstB = db.aliased(Substance)
 
@@ -71,13 +74,20 @@ class Relation(db.Model):
 
         results = []
         for r in relations:
+            if r[0].sctida == sctid:
+                sctidB = r[0].sctidb
+                nameB = r[2]
+            else:
+                sctidB = r[0].sctida
+                nameB = r[1]
+
             results.append({
-                'sctidA': r[0].sctida,
-                'nameA': r[1],
-                'sctidB': r[0].sctidb,
-                'nameB': r[2],
+                'sctidB': sctidB,
+                'nameB': nameB,
                 'type': r[0].kind,
-                'text': r[0].text
+                'text': r[0].text,  
+                'active': r[0].active, 
+                'editable': bool(r[0].user == userId)
             })
 
         return results

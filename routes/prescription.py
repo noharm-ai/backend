@@ -427,7 +427,7 @@ def setPatientData(admissionNumber):
 
     return returnJson
 
-@app_pres.route('/prescriptions/drug/<int:idPrescriptionDrug>/notes', methods=['PUT'])
+@app_pres.route('/prescriptions/drug/<int:idPrescriptionDrug>', methods=['PUT'])
 @jwt_required
 def setPrescriptionDrugNote(idPrescriptionDrug):
     data = request.get_json()
