@@ -334,6 +334,7 @@ class Notes(db.Model):
 
     idOutlier = db.Column("idoutlier", db.Integer, primary_key=True)
     idPrescriptionDrug = db.Column("fkpresmed", db.Integer, primary_key=True)
+    admissionNumber = db.Column('nratendimento', db.Integer, nullable=False)
     idSegment = db.Column("idsegmento", db.Integer, nullable=False)
     idDrug = db.Column("fkmedicamento", db.Integer, nullable=False)
     dose = db.Column("doseconv", db.Float, nullable=True)
@@ -378,6 +379,18 @@ def getDrugHistory(idPrescription, admissionNumber):
 
     return func.array(query)
 
+def getPrevNotes(admissionNumber):
+    prevNotes = db.aliased(Notes)
+
+    return db.session.query(prevNotes.notes)\
+            .select_from(prevNotes)\
+            .filter(prevNotes.admissionNumber == admissionNumber)\
+            .filter(prevNotes.idDrug == PrescriptionDrug.idDrug)\
+            .filter(prevNotes.idPrescriptionDrug != PrescriptionDrug.id)\
+            .order_by(desc(prevNotes.update))\
+            .limit(1)\
+            .as_scalar()
+
 class PrescriptionDrug(db.Model):
     __tablename__ = 'presmed'
 
@@ -419,14 +432,15 @@ class PrescriptionDrug(db.Model):
         PrescriptionDrug.__table__.schema = schema
 
     def findByPrescription(idPrescription, admissionNumber):
+        prevNotes = getPrevNotes(admissionNumber)
 
         return db.session\
             .query(PrescriptionDrug, Drug, MeasureUnit, Frequency, func.trunc(0).label('intervention'), 
                     func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4).label('score'),
-                    DrugAttributes, Notes.notes)\
+                    DrugAttributes, Notes.notes, prevNotes.label('prevNotes'))\
             .outerjoin(Outlier, Outlier.id == PrescriptionDrug.idOutlier)\
             .outerjoin(Drug, Drug.id == PrescriptionDrug.idDrug)\
-            .outerjoin(Notes, Notes.idPrescriptionDrug == PrescriptionDrug.idDrug)\
+            .outerjoin(Notes, Notes.idPrescriptionDrug == PrescriptionDrug.id)\
             .outerjoin(MeasureUnit, MeasureUnit.id == PrescriptionDrug.idMeasureUnit)\
             .outerjoin(Frequency, Frequency.id == PrescriptionDrug.idFrequency)\
             .outerjoin(DrugAttributes, and_(DrugAttributes.idDrug == PrescriptionDrug.idDrug, DrugAttributes.idSegment == PrescriptionDrug.idSegment))\

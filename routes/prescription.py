@@ -202,7 +202,8 @@ def getDrugType(drugList, pDrugs, source, interventions, exams=None, checked=Fal
                 'prevIntervention': getPrevIntervention(pd[0].idDrug, pd[0].idPrescription, interventions),
                 'intervention': getIntervention(pd[0].id, interventions),
                 'alerts': alerts,
-                'notes': pd[7]
+                'notes': pd[7],
+                'prevNotes': pd[8]
             })
     return pDrugs
 
@@ -434,20 +435,24 @@ def setPrescriptionDrugNote(idPrescriptionDrug):
     user = User.find(get_jwt_identity())
     setSchema(user.schema)
 
-    if 'obs' in data:
-        notes = data.get('obs', None)
-        obs = Notes.query.get((0, idPrescriptionDrug))
+    if 'notes' in data:
+        notes = data.get('notes', None)
+        idDrug = data.get('idDrug', None)
+        admissionNumber = data.get('admissionNumber', None)
+        note = Notes.query.get((0, idPrescriptionDrug))
         newObs = False
 
-        if obs is None:
+        if note is None:
             newObs = True
-            obs = Notes()
-            obs.idPrescriptionDrug = idPrescriptionDrug
+            note = Notes()
+            note.idPrescriptionDrug = idPrescriptionDrug
 
-        obs.notes = notes
-        obs.update = func.now()
-        obs.user  = user.id
+        note.idDrug = idDrug
+        note.admissionNumber = admissionNumber
+        note.notes = notes
+        note.update = func.now()
+        note.user  = user.id
 
-        if newObs: db.session.add(obs)
+        if newObs: db.session.add(note)
 
     return tryCommit(db, idPrescriptionDrug)

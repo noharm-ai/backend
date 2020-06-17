@@ -6,7 +6,7 @@ from sqlalchemy import desc, asc, and_, func
 from flask import Blueprint, request
 from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
-from .utils import freqValue
+from .utils import freqValue, tryCommit
 
 app_out = Blueprint('app_out',__name__)
 
@@ -158,27 +158,7 @@ def setManualOutlier(idOutlier):
 
         if newObs: db.session.add(obs)
 
-    try:
-        db.session.commit()
-        
-        return {
-            'status': 'success',
-            'data': o.id
-        }, status.HTTP_200_OK
-    except AssertionError as e:
-        db.engine.dispose()
-
-        return {
-            'status': 'error',
-            'message': str(e)
-        }, status.HTTP_400_BAD_REQUEST
-    except Exception as e:
-        db.engine.dispose()
-
-        return {
-            'status': 'error',
-            'message': str(e)
-        }, status.HTTP_500_INTERNAL_SERVER_ERROR
+    return tryCommit(db, idOutlier)
 
 
 @app_out.route('/drugs/<int:idDrug>', methods=['PUT'])
@@ -213,27 +193,8 @@ def setDrugClass(idDrug):
 
     if newDrugAttr: db.session.add(drugAttr)
 
-    try:
-        db.session.commit()
+    return tryCommit(db, idDrug)
 
-        return {
-            'status': 'success',
-            'data': drugAttr.idDrug
-        }, status.HTTP_200_OK
-    except AssertionError as e:
-        db.engine.dispose()
-
-        return {
-            'status': 'error',
-            'message': str(e)
-        }, status.HTTP_400_BAD_REQUEST
-    except Exception as e:
-        db.engine.dispose()
-
-        return {
-            'status': 'error',
-            'message': str(e)
-        }, status.HTTP_500_INTERNAL_SERVER_ERROR
 
 @app_out.route('/drugs', methods=['GET'])
 @app_out.route('/drugs/<int:idSegment>', methods=['GET'])
@@ -328,27 +289,7 @@ def setDrugUnit(idDrug, idMeasureUnit):
 
     if new: db.session.add(u)
 
-    try:
-        db.session.commit()
-
-        return {
-            'status': 'success',
-            'data': u.idMeasureUnit
-        }, status.HTTP_200_OK
-    except AssertionError as e:
-        db.engine.dispose()
-
-        return {
-            'status': 'error',
-            'message': str(e)
-        }, status.HTTP_400_BAD_REQUEST
-    except Exception as e:
-        db.engine.dispose()
-
-        return {
-            'status': 'error',
-            'message': str(e)
-        }, status.HTTP_500_INTERNAL_SERVER_ERROR
+    return tryCommit(db, idMeasureUnit)
 
 @app_out.route('/substance', methods=['GET'])
 @jwt_required
@@ -371,3 +312,30 @@ def getSubstance():
         'status': 'success',
         'data': results
     }, status.HTTP_200_OK
+
+
+@app_out.route('/relation/<int:sctidA>/<int:sctidB>/<string:kind>', methods=['PUT'])
+@jwt_required
+def setRelation(sctidA,sctidB,kind):
+    data = request.get_json()
+    user = User.find(get_jwt_identity())
+
+    relation = Relation.query.get((sctidA,sctidB,kind))
+
+    newRelation = False
+    if relation is None:
+        newRelation = True
+        relation = Relation()
+        relation.sctida = sctidA
+        relation.sctidb = sctidB
+        relation.kind = kind
+
+    if 'text' in data.keys(): relation.text = data.get('text', None)
+    if 'active' in data.keys(): relation.active = bool(data.get('active', False))
+
+    relation.update = func.now()
+    relation.user  = user.id
+
+    if newRelation: db.session.add(relation)
+
+    return tryCommit(db, sctidA)
