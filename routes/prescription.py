@@ -2,7 +2,7 @@ import random, copy
 from flask_api import status
 from models import db, User, Patient, Prescription, PrescriptionDrug, InterventionReason,\
                     Intervention, Segment, setSchema, Exams, PrescriptionPic, DrugAttributes,\
-                    Notes
+                    Notes, Relation
 from flask import Blueprint, request
 from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
@@ -139,7 +139,7 @@ def getIntervention(idPrescriptionDrug, interventions):
             result = i;
     return result
 
-def getDrugType(drugList, pDrugs, source, interventions, exams=None, checked=False, suspended=False, route=False):
+def getDrugType(drugList, pDrugs, source, interventions, relations, exams=None, checked=False, suspended=False, route=False):
     for pd in drugList:
 
         belong = False
@@ -171,10 +171,14 @@ def getDrugType(drugList, pDrugs, source, interventions, exams=None, checked=Fal
 
             if pd[6].useWeight and exams['weight'] > 0:
                 doseWeight = str(round(pd[0].dose / float(exams['weight']),2))
-                if pd[2].id: doseWeight += ' ' + pd[2].id
+                if pd[2].id: doseWeight += ' ' + str(pd[2].id) + '/Kg'
 
         if pd[0].alergy == 'S':
-            alerts.append('Paciente alérgico ao medicamento.')
+            alerts.append('Paciente alérgico a este medicamento.')
+
+        if pd[0].id in relations:
+            relation = relations[pd[0].id]
+            alerts.append(relation.text)            
 
         if belong:
             pDrugs.append({
@@ -239,6 +243,7 @@ def getPrescription(idPrescription):
 
     drugs = PrescriptionDrug.findByPrescription(idPrescription, patient.admissionNumber)
     interventions = Intervention.findAll(admissionNumber=patient.admissionNumber)
+    relations = Relation.findByPrescription(idPrescription)
     db.engine.dispose()
 
     # TODO: Refactor Query
@@ -268,20 +273,20 @@ def getPrescription(idPrescription):
     }
 
     pDrugs = []
-    pDrugs = getDrugType(drugs, [], 'Medicamentos', interventions, exams=exams)
-    pDrugs = getDrugType(drugs, pDrugs, 'Medicamentos', interventions, checked=True, exams=exams)
-    pDrugs = getDrugType(drugs, pDrugs, 'Medicamentos', interventions, suspended=True, exams=exams)
+    pDrugs = getDrugType(drugs, [], 'Medicamentos', interventions, relations, exams=exams)
+    pDrugs = getDrugType(drugs, pDrugs, 'Medicamentos', interventions, relations, checked=True, exams=exams)
+    pDrugs = getDrugType(drugs, pDrugs, 'Medicamentos', interventions, relations, suspended=True, exams=exams)
     pDrugs = sortRoute(pDrugs)
 
     pSolution = []
-    pSolution = getDrugType(drugs, [], 'Soluções', interventions)
+    pSolution = getDrugType(drugs, [], 'Soluções', interventions, relations)
     #pSolution = getDrugType(drugs, pSolution, checked=True, source='Soluções', interventions=interventions)
     #pSolution = getDrugType(drugs, pSolution, suspended=True, source='Soluções', interventions=interventions)
 
     pProcedures = []
-    pProcedures = getDrugType(drugs, [], 'Proced/Exames', interventions)
-    pProcedures = getDrugType(drugs, pProcedures, 'Proced/Exames', interventions, checked=True)
-    pProcedures = getDrugType(drugs, pProcedures, 'Proced/Exames', interventions, suspended=True)
+    pProcedures = getDrugType(drugs, [], 'Proced/Exames', interventions, relations)
+    pProcedures = getDrugType(drugs, pProcedures, 'Proced/Exames', interventions, relations, checked=True)
+    pProcedures = getDrugType(drugs, pProcedures, 'Proced/Exames', interventions, relations, suspended=True)
 
     return {
         'status': 'success',

@@ -93,6 +93,27 @@ class Relation(db.Model):
 
         return results
 
+    def findByPrescription(idPrescription):
+        pd1 = db.aliased(PrescriptionDrug)
+        pd2 = db.aliased(PrescriptionDrug)
+        m1 = db.aliased(Drug)
+        m2 = db.aliased(Drug)
+
+        relations = db.session\
+            .query(pd1, Relation)\
+            .join(pd2, and_(pd2.idPrescription == pd1.idPrescription, pd2.id != pd1.id))\
+            .join(m1, m1.id == pd1.idDrug)\
+            .join(m2, m2.id == pd2.idDrug)\
+            .join(Relation, and_(Relation.sctida == m1.sctid, Relation.sctidb == m2.sctid))\
+            .filter(PrescriptionDrug.idPrescription == idPrescription)\
+            .all()
+
+        results = {}
+        for r in relations:
+            results[r[0].id] = r[1]
+
+        return results
+
 
 class Prescription(db.Model):
     __tablename__ = 'prescricao'

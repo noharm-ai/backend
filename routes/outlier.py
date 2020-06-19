@@ -321,6 +321,8 @@ def setRelation(sctidA,sctidB,kind):
     user = User.find(get_jwt_identity())
 
     relation = Relation.query.get((sctidA,sctidB,kind))
+    if relation is None:
+        relation = Relation.query.get((sctidB,sctidA,kind))
 
     newRelation = False
     if relation is None:
