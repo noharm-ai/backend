@@ -329,6 +329,7 @@ def setRelation(sctidA,sctidB,kind):
         relation.sctida = sctidA
         relation.sctidb = sctidB
         relation.kind = kind
+        relation.creator  = user.id
 
     if 'text' in data.keys(): relation.text = data.get('text', None)
     if 'active' in data.keys(): relation.active = bool(data.get('active', False))

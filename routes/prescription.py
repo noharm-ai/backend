@@ -154,6 +154,7 @@ def getDrugType(drugList, pDrugs, source, interventions, exams=None, checked=Fal
         pdFrequency = 1 if pd[0].frequency in [33,44,99] else pd[0].frequency
 
         alerts = []
+        doseWeight = None
         if exams and pd[6]:
             if pd[6].maxDose and pd[6].maxDose < (pd[0].doseconv * pdFrequency):
                 alerts.append('Dose diária prescrita (' + str(int(pd[0].doseconv * pdFrequency)) + ') maior que a dose de alerta (' + str(pd[6].maxDose) + ') usualmente recomendada (considerada a dose diária máxima independente da indicação.')
@@ -168,6 +169,13 @@ def getDrugType(drugList, pDrugs, source, interventions, exams=None, checked=Fal
             if pd[6].elderly and exams['age'] > 60:
                 alerts.append('Medicamento potencialmente inapropriado para idosos, independente das comorbidades do paciente.')
 
+            if pd[6].useWeight and exams['weight'] > 0:
+                doseWeight = str(round(pd[0].dose / float(exams['weight']),2))
+                if pd[2].id: doseWeight += ' ' + pd[2].id
+
+        if pd[0].alergy == 'S':
+            alerts.append('Paciente alérgico ao medicamento.')
+
         if belong:
             pDrugs.append({
                 'idPrescriptionDrug': pd[0].id,
@@ -177,7 +185,7 @@ def getDrugType(drugList, pDrugs, source, interventions, exams=None, checked=Fal
                 'am': pd[6].antimicro if pd[6] is not None else False,
                 'av': pd[6].mav if pd[6] is not None else False,
                 'c': pd[6].controlled if pd[6] is not None else False,
-                'useWeight': pd[6].useWeight if pd[6] is not None else False,
+                'doseWeight': doseWeight,
                 'dose': pd[0].dose,
                 'measureUnit': { 'value': pd[2].id, 'label': pd[2].description } if pd[2] else '',
                 'frequency': { 'value': pd[3].id, 'label': pd[3].description } if pd[3] else '',
@@ -256,6 +264,7 @@ def getPrescription(idPrescription):
         'rni': formatExam(rni, 'rni'),
         'pcr': formatExam(pcr, 'pcr'),
         'age': data2age(patient.birthdate.isoformat() if patient.birthdate else date.today().isoformat()),
+        'weight': patient.weight,
     }
 
     pDrugs = []

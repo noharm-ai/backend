@@ -61,6 +61,7 @@ class Relation(db.Model):
     active = db.Column("ativo", db.Boolean, nullable=True)
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.Integer, nullable=True)
+    creator = db.Column("create_by", db.Integer, nullable=True)
 
     def findBySctid(sctid, userId):
         SubstA = db.aliased(Substance)
@@ -87,7 +88,7 @@ class Relation(db.Model):
                 'type': r[0].kind,
                 'text': r[0].text,  
                 'active': r[0].active, 
-                'editable': bool(r[0].user == userId)
+                'editable': bool(r[0].creator == userId)
             })
 
         return results
@@ -410,6 +411,7 @@ class PrescriptionDrug(db.Model):
     interval = db.Column('horario', db.String, nullable=True)
     source = db.Column('origem', db.String, nullable=True)
     default = db.Column('padronizado', db.String(1), nullable=True)
+    alergy = db.Column('alergia', db.String(1), nullable=True)
 
     solutionGroup = db.Column('slagrupamento', db.String(1), nullable=True)
     solutionACM = db.Column('slacm', db.String(1), nullable=True)
