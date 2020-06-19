@@ -116,14 +116,6 @@ def getPrescriptionsStatus():
         'data': results
     }, status.HTTP_200_OK
 
-
-def getExams(typeExam, admissionNumber):
-    return db.session.query(Exams.value, Exams.unit, Exams.date)\
-        .select_from(Exams)\
-        .filter(Exams.admissionNumber == admissionNumber)\
-        .filter(Exams.typeExam == typeExam)\
-        .order_by(Exams.date.desc()).limit(1).first()
-
 def getPrevIntervention(idDrug, idPrescription, interventions):
     result = {}
     for i in interventions:
@@ -159,11 +151,11 @@ def getDrugType(drugList, pDrugs, source, interventions, relations, exams=None, 
             if pd[6].maxDose and pd[6].maxDose < (pd[0].doseconv * pdFrequency):
                 alerts.append('Dose diária prescrita (' + str(int(pd[0].doseconv * pdFrequency)) + ') maior que a dose de alerta (' + str(pd[6].maxDose) + ') usualmente recomendada (considerada a dose diária máxima independente da indicação.')
 
-            if pd[6].kidney and exams['ckd']['value'] and pd[6].kidney > exams['ckd']['value']:
+            if pd[6].kidney and 'ckd' in exams and exams['ckd']['value'] and pd[6].kidney > exams['ckd']['value']:
                 alerts.append('Medicamento deve sofrer ajuste de posologia, já que a função renal do paciente (' + str(exams['ckd']['value']) + ' mL/min) está abaixo de ' + str(pd[6].kidney) + ' mL/min.')
 
             if pd[6].liver:
-                if (exams['tgp']['value'] and float(exams['tgp']['value']) > pd[6].liver) or (exams['tgo']['value'] and float(exams['tgo']['value']) > pd[6].liver):
+                if ('tgp' in exams and exams['tgp']['value'] and float(exams['tgp']['value']) > pd[6].liver) or ('tgo' in exams and exams['tgo']['value'] and float(exams['tgo']['value']) > pd[6].liver):
                     alerts.append('Medicamento com necessidade de ajuste de posologia ou contraindicado, já que para paciente com função hepática do paciente está reduzida (acima de ' + str(pd[6].liver) + ' U/L).')
 
             if pd[6].elderly and exams['age'] > 60:
@@ -246,31 +238,17 @@ def getPrescription(idPrescription):
     relations = Relation.findByPrescription(idPrescription)
     db.engine.dispose()
 
-    # TODO: Refactor Query
-    tgo = getExams('TGO', patient.admissionNumber)
-    tgp = getExams('TGP', patient.admissionNumber)
-    cr = getExams('CR', patient.admissionNumber)
-    k = getExams('K', patient.admissionNumber)
-    na = getExams('NA', patient.admissionNumber)
-    mg = getExams('MG', patient.admissionNumber)
-    rni = getExams('PRO', patient.admissionNumber)
-    pcr = getExams('PCRU', patient.admissionNumber)
+    exams = Exams.findLatestByAdmission(patient.admissionNumber)
 
-    exams = {
-        'tgo': formatExam(tgo, 'tgo'),
-        'tgp': formatExam(tgp, 'tgp'),
-        'mdrd': mdrd_calc(cr.value, patient.birthdate, patient.gender, patient.skinColor) if cr is not None else examEmpty,
-        'cg': cg_calc(cr.value, patient.birthdate, patient.gender, patient.weight) if cr is not None else examEmpty,
-        'ckd': ckd_calc(cr.value, patient.birthdate, patient.gender, patient.skinColor) if cr is not None else examEmpty,
-        'creatinina': formatExam(cr, 'cr'),
-        'k': formatExam(k, 'k'),
-        'na': formatExam(na, 'na'),
-        'mg': formatExam(mg, 'mg'),
-        'rni': formatExam(rni, 'rni'),
-        'pcr': formatExam(pcr, 'pcr'),
+    if 'cr' in exams:
+        exams['mdrd'] = mdrd_calc(exams['cr']['value'], patient.birthdate, patient.gender, patient.skinColor)
+        exams['cg'] = cg_calc(exams['cr']['value'], patient.birthdate, patient.gender, patient.weight)
+        exams['ckd'] = ckd_calc(exams['cr']['value'], patient.birthdate, patient.gender, patient.skinColor)
+
+    exams = dict(exams, **{
         'age': data2age(patient.birthdate.isoformat() if patient.birthdate else date.today().isoformat()),
         'weight': patient.weight,
-    }
+    })
 
     pDrugs = []
     pDrugs = getDrugType(drugs, [], 'Medicamentos', interventions, relations, exams=exams)

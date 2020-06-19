@@ -6,6 +6,7 @@ from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
 from datetime import date, datetime
 from .prescription import getPrescriptions
+from .utils import tryCommit
 
 app_itrv = Blueprint('app_itrv',__name__)
 
@@ -28,27 +29,7 @@ def setDrugStatus(idPrescriptionDrug, drugStatus):
         ppic.picture = pObj['data'][0]
         db.session.add(ppic)
 
-    try:
-        db.session.commit()
-
-        return {
-            'status': 'success',
-            'data': pd.id
-        }, status.HTTP_200_OK
-    except AssertionError as e:
-        db.engine.dispose()
-
-        return {
-            'status': 'error',
-            'message': str(e)
-        }, status.HTTP_400_BAD_REQUEST
-    except Exception as e:
-        db.engine.dispose()
-
-        return {
-            'status': 'error',
-            'message': str(e)
-        }, status.HTTP_500_INTERNAL_SERVER_ERROR
+    return tryCommit(db, idPrescriptionDrug)
 
 @app_itrv.route('/intervention/<int:idPrescriptionDrug>', methods=['PUT'])
 @jwt_required
@@ -78,29 +59,9 @@ def createIntervention(idPrescriptionDrug=None):
 
     if newIntervention: db.session.add(i)
 
-    setDrugStatus(i.id, i.status)
+    setDrugStatus(idPrescriptionDrug, i.status)
 
-    try:
-        db.session.commit()
-
-        return {
-            'status': 'success',
-            'data': i.id
-        }, status.HTTP_200_OK
-    except AssertionError as e:
-        db.engine.dispose()
-
-        return {
-            'status': 'error',
-            'message': str(e)
-        }, status.HTTP_400_BAD_REQUEST
-    except Exception as e:
-        db.engine.dispose()
-
-        return {
-            'status': 'error',
-            'message': str(e)
-        }, status.HTTP_500_INTERNAL_SERVER_ERROR
+    return tryCommit(db, idPrescriptionDrug)
 
 def sortReasons(e):
   return e['description']

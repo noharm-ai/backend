@@ -100,27 +100,7 @@ def setSegment(idSegment=None):
         sd.idDepartment = d.get('idDepartment', None)
         db.session.add(sd)
 
-    try:
-        db.session.commit()
-
-        return {
-            'status': 'success',
-            'data': s.id
-        }, status.HTTP_200_OK
-    except AssertionError as e:
-        db.engine.dispose()
-
-        return {
-            'status': 'error',
-            'message': str(e)
-        }, status.HTTP_400_BAD_REQUEST
-    except Exception as e:
-        db.engine.dispose()
-
-        return {
-            'status': 'error',
-            'message': str(e)
-        }, status.HTTP_500_INTERNAL_SERVER_ERROR
+    return tryCommit(db, idSegment)
 
 @app_seg.route('/departments', methods=['GET'])
 @jwt_required

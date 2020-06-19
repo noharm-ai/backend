@@ -2,7 +2,7 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, text, and_, or_, desc, asc, distinct, cast
 from datetime import date, timedelta
 from sqlalchemy.dialects import postgresql
-from routes.utils import timeValue, interactionsList
+from routes.utils import timeValue, interactionsList, formatExam
 
 db = SQLAlchemy()
 
@@ -748,6 +748,25 @@ class Exams(db.Model):
                          .filter(Exams.admissionNumber == admissionNumber)\
                          .order_by(asc(Exams.typeExam),desc(Exams.date))\
                          .all()
+
+    def findLatestByAdmission(admissionNumber):
+        examLatest = db.session.query(Exams.typeExam.label('typeExam'), func.max(Exams.date).label('date'))\
+                      .select_from(Exams)\
+                      .filter(Exams.admissionNumber == admissionNumber)\
+                      .group_by(Exams.typeExam)\
+                      .subquery()
+
+        el = db.aliased(examLatest)
+
+        results = Exams.query\
+                .join(el, and_(Exams.typeExam == el.c.typeExam, Exams.date == el.c.date))\
+                .filter(Exams.admissionNumber == admissionNumber)
+
+        exams = {}
+        for e in results:
+            exams[e.typeExam.lower()] = formatExam(e,e.typeExam.lower())
+
+        return exams
 
 class PrescriptionPic(db.Model):
     __tablename__ = 'prescricaofoto'
