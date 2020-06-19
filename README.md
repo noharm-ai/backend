@@ -1,5 +1,7 @@
 # backend
 [![Build Status](https://travis-ci.org/noharm-ai/backend.svg?branch=master)](https://travis-ci.org/noharm-ai/backend)
+[![Maintainability](https://api.codeclimate.com/v1/badges/a2baa2e03c1661cd70cd/maintainability)](https://codeclimate.com/github/noharm-ai/backend/maintainability)
+[![Test Coverage](https://api.codeclimate.com/v1/badges/a2baa2e03c1661cd70cd/test_coverage)](https://codeclimate.com/github/noharm-ai/backend/test_coverage)
 
 Api for Mobile App
 
