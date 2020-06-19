@@ -4,7 +4,8 @@ python:
 # command to install dependencies
 install:
   - pip install -q -r requirements.txt
+before_script:
+  - python -m pylint ./routes/
 # command to run tests
 script:
-  - python -m pylint ./routes/
   - python -m pytest -v
