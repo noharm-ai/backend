@@ -6,7 +6,7 @@ from sqlalchemy import desc, asc, and_, func
 from flask import Blueprint, request
 from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
-from .utils import freqValue, tryCommit
+from .utils import freqValue, tryCommit, typeRelations
 
 app_out = Blueprint('app_out',__name__)
 
@@ -118,7 +118,8 @@ def getOutliers(idSegment=1, idDrug=1):
                 { 'dt' : 'Duplicidade Terapêutica'},
                 { 'it' : 'Interação Medicamentosa'},
                 { 'iy' : 'Imcompatibilidade em Y'},
-            ]
+            ],
+            'typeRelations' : typeRelations
         }
     }, status.HTTP_200_OK
 

@@ -2,7 +2,7 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, text, and_, or_, desc, asc, distinct, cast
 from datetime import date, timedelta
 from sqlalchemy.dialects import postgresql
-from routes.utils import timeValue, interactionsList, formatExam, strNone
+from routes.utils import timeValue, interactionsList, formatExam, strNone, typeRelations
 import unicodedata
 
 db = SQLAlchemy()
@@ -58,7 +58,7 @@ def remove_accents(input_str):
     return only_ascii
 
 def sortRelations(r):
-  return remove_accents(r['nameB'].lower())
+  return remove_accents(r['nameB'])
 
 class Relation(db.Model):
     __tablename__ = 'relacao'
@@ -93,7 +93,7 @@ class Relation(db.Model):
 
             results.append({
                 'sctidB': sctidB,
-                'nameB': nameB,
+                'nameB': nameB.upper(),
                 'type': r[0].kind,
                 'text': r[0].text,  
                 'active': r[0].active, 
@@ -122,7 +122,8 @@ class Relation(db.Model):
 
         results = {}
         for r in relations:
-            results[r[0].id] = strNone(r[1].text) + ' (' + strNone(r[2]) + ' e ' + strNone(r[3]) + ')'
+            results[r[0].id] = typeRelations[r[1].kind] + ': '
+            results[r[0].id] += strNone(r[1].text) + ' (' + strNone(r[2]) + ' e ' + strNone(r[3]) + ')'
 
         return results
 

@@ -55,6 +55,12 @@ def interactionsList(drugList, splitStr):
 
     return result
 
+typeRelations = {}
+typeRelations['dm'] = 'Duplicidade Medicamentosa'
+typeRelations['dt'] = 'Duplicidade Terapêutica'
+typeRelations['it'] = 'Interação Medicamentosa'
+typeRelations['iy'] = 'Imcompatibilidade em Y'
+
 examsName = {
     'cr':  'Creatinina',
     'mdrd':'MDRD',
