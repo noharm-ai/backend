@@ -169,8 +169,7 @@ def getDrugType(drugList, pDrugs, source, interventions, relations, exams=None, 
             alerts.append('Paciente alérgico a este medicamento.')
 
         if pd[0].id in relations:
-            relation = relations[pd[0].id]
-            alerts.append(relation.text)            
+            alerts.append(relations[pd[0].id])            
 
         if belong:
             pDrugs.append({

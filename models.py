@@ -2,7 +2,8 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, text, and_, or_, desc, asc, distinct, cast
 from datetime import date, timedelta
 from sqlalchemy.dialects import postgresql
-from routes.utils import timeValue, interactionsList, formatExam
+from routes.utils import timeValue, interactionsList, formatExam, strNone
+import unicodedata
 
 db = SQLAlchemy()
 
@@ -51,6 +52,14 @@ class Substance(db.Model):
     id = db.Column("sctid", db.Integer, primary_key=True)
     name = db.Column('nome', db.String(255), nullable=False)
 
+def remove_accents(input_str):
+    nfkd_form = unicodedata.normalize('NFKD', input_str)
+    only_ascii = nfkd_form.encode('ASCII', 'ignore')
+    return only_ascii
+
+def sortRelations(r):
+  return remove_accents(r['nameB'].lower())
+
 class Relation(db.Model):
     __tablename__ = 'relacao'
 
@@ -91,6 +100,8 @@ class Relation(db.Model):
                 'editable': bool(r[0].creator == userId)
             })
 
+        results.sort(key=sortRelations)
+
         return results
 
     def findByPrescription(idPrescription):
@@ -100,17 +111,18 @@ class Relation(db.Model):
         m2 = db.aliased(Drug)
 
         relations = db.session\
-            .query(pd1, Relation)\
+            .query(pd1, Relation, m1.name, m2.name)\
             .join(pd2, and_(pd2.idPrescription == pd1.idPrescription, pd2.id != pd1.id))\
             .join(m1, m1.id == pd1.idDrug)\
             .join(m2, m2.id == pd2.idDrug)\
             .join(Relation, and_(Relation.sctida == m1.sctid, Relation.sctidb == m2.sctid))\
-            .filter(PrescriptionDrug.idPrescription == idPrescription)\
+            .filter(pd1.idPrescription == idPrescription)\
+            .filter(Relation.active == True)\
             .all()
 
         results = {}
         for r in relations:
-            results[r[0].id] = r[1]
+            results[r[0].id] = strNone(r[1].text) + ' (' + strNone(r[2]) + ' e ' + strNone(r[3]) + ')'
 
         return results
 
