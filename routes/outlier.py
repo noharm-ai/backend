@@ -113,13 +113,7 @@ def getOutliers(idSegment=1, idDrug=1):
             'sctidA': d[0].sctid,
             'sctNameA': d[1],
             'relations': relations,
-            'relationTypes': [
-                { 'dm' : 'Duplicidade Medicamentosa'},
-                { 'dt' : 'Duplicidade Terapêutica'},
-                { 'it' : 'Interação Medicamentosa'},
-                { 'iy' : 'Imcompatibilidade em Y'},
-            ],
-            'typeRelations' : typeRelations
+            'relationTypes' : [{'key': t, 'value': typeRelations[t]} for t in typeRelations]
         }
     }, status.HTTP_200_OK
 
