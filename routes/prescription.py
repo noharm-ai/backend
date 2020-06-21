@@ -403,6 +403,8 @@ def setPatientData(admissionNumber):
     if 'weight' in data.keys(): 
         p.weight = data.get('weight')
         p.weightDate = datetime.today()
+        p.update = func.now()
+        p.user  = user.id
 
     returnJson = tryCommit(db, admissionNumber)
 

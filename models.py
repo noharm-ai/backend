@@ -2,8 +2,7 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, text, and_, or_, desc, asc, distinct, cast
 from datetime import date, timedelta
 from sqlalchemy.dialects import postgresql
-from routes.utils import timeValue, interactionsList, formatExam, strNone, typeRelations
-import unicodedata
+from routes.utils import timeValue, interactionsList, formatExam, strNone, typeRelations, sortRelations
 
 db = SQLAlchemy()
 
@@ -51,14 +50,6 @@ class Substance(db.Model):
 
     id = db.Column("sctid", db.Integer, primary_key=True)
     name = db.Column('nome', db.String(255), nullable=False)
-
-def remove_accents(input_str):
-    nfkd_form = unicodedata.normalize('NFKD', input_str)
-    only_ascii = nfkd_form.encode('ASCII', 'ignore')
-    return only_ascii
-
-def sortRelations(r):
-  return remove_accents(r['nameB'])
 
 class Relation(db.Model):
     __tablename__ = 'relacao'
@@ -263,6 +254,8 @@ class Patient(db.Model):
     weight = db.Column('peso', db.Float, nullable=True)
     weightDate = db.Column('dtpeso', db.DateTime, nullable=True)
     skinColor = db.Column('cor', db.String, nullable=True)
+    update = db.Column("update_at", db.DateTime, nullable=True)
+    user = db.Column("update_by", db.Integer, nullable=True)
 
     def setSchema(schema):
         Patient.__table__.schema = schema

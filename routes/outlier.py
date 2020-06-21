@@ -6,7 +6,7 @@ from sqlalchemy import desc, asc, and_, func
 from flask import Blueprint, request
 from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
-from .utils import freqValue, tryCommit, typeRelations
+from .utils import freqValue, tryCommit, typeRelations, sortSubstance
 
 app_out = Blueprint('app_out',__name__)
 
@@ -300,8 +300,10 @@ def getSubstance():
     for d in drugs:
         results.append({
             'sctid': d.id,
-            'name': d.name,
+            'name': d.name.upper(),
         })
+
+    results.sort(key=sortSubstance)
 
     return {
         'status': 'success',
