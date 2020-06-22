@@ -113,8 +113,13 @@ class Relation(db.Model):
 
         results = {}
         for r in relations:
-            results[r[0].id] = typeRelations[r[1].kind] + ': '
-            results[r[0].id] += strNone(r[1].text) + ' (' + strNone(r[2]) + ' e ' + strNone(r[3]) + ')'
+            alert = typeRelations[r[1].kind] + ': '
+            alert += strNone(r[1].text) + ' (' + strNone(r[2]) + ' e ' + strNone(r[3]) + ')'
+
+            if r[0].id in results:
+                results[r[0].id].append(alert)
+            else:
+                results[r[0].id] = [alert]
 
         return results
 
