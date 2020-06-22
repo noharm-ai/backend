@@ -112,14 +112,22 @@ class Relation(db.Model):
             .all()
 
         results = {}
+        pairs = []
         for r in relations:
+            key = str(r[1].sctida) + '-' + str(r[1].sctidb)
+            if key in pairs: 
+                continue;
+
             alert = typeRelations[r[1].kind] + ': '
             alert += strNone(r[1].text) + ' (' + strNone(r[2]) + ' e ' + strNone(r[3]) + ')'
 
-            if r[0].id in results:
+            if r[0].id in results: 
                 results[r[0].id].append(alert)
             else:
                 results[r[0].id] = [alert]
+
+            if (r[1].sctida == r[1].sctidb): 
+                pairs.append(key)
 
         return results
 
