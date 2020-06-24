@@ -6,7 +6,7 @@ from sqlalchemy import desc, asc, and_, func
 from flask import Blueprint, request
 from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
-from .utils import freqValue, tryCommit, typeRelations, sortSubstance
+from .utils import freqValue, tryCommit, typeRelations, sortSubstance, strNone
 
 app_out = Blueprint('app_out',__name__)
 
@@ -111,7 +111,7 @@ def getOutliers(idSegment=1, idDrug=1):
             'useWeight': drugAttr.useWeight,
             'idMeasureUnit': d[0].idMeasureUnit,
             'sctidA': d[0].sctid,
-            'sctNameA': d[1],
+            'sctNameA': strNone(d[1]).upper(),
             'relations': relations,
             'relationTypes' : [{'key': t, 'value': typeRelations[t]} for t in typeRelations]
         }

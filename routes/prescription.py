@@ -161,7 +161,7 @@ def getDrugType(drugList, pDrugs, source, interventions, relations, exams=None, 
             if pd[6].elderly and exams['age'] > 60:
                 alerts.append('Medicamento potencialmente inapropriado para idosos, independente das comorbidades do paciente.')
 
-            if pd[6].useWeight and exams['weight'] > 0:
+            if pd[6].useWeight and none2zero(exams['weight']) > 0:
                 doseWeight = str(round(pd[0].dose / float(exams['weight']),2))
                 if pd[2].id: doseWeight += ' ' + str(pd[2].id) + '/Kg'
 
@@ -272,7 +272,7 @@ def getPrescription(idPrescription):
             'idPrescription': prescription[0].id,
             'idSegment': prescription[0].idSegment,
             'segmentName': prescription[5],
-            'idPatient': patient.idPatient,
+            'idPatient': prescription[0].idPatient,
             'name': prescription[0].admissionNumber,
             'admissionNumber': prescription[0].admissionNumber,
             'birthdate': patient.birthdate.isoformat() if patient.birthdate else '',

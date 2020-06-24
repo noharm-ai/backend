@@ -2,7 +2,8 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, text, and_, or_, desc, asc, distinct, cast
 from datetime import date, timedelta
 from sqlalchemy.dialects import postgresql
-from routes.utils import timeValue, interactionsList, formatExam, strNone, typeRelations, sortRelations
+from routes.utils import timeValue, interactionsList, formatExam, strNone, typeRelations,\
+                         sortRelations, strNone
 
 db = SQLAlchemy()
 
@@ -84,7 +85,7 @@ class Relation(db.Model):
 
             results.append({
                 'sctidB': sctidB,
-                'nameB': nameB.upper(),
+                'nameB': strNone(nameB).upper(),
                 'type': r[0].kind,
                 'text': r[0].text,  
                 'active': r[0].active, 
