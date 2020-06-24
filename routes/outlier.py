@@ -142,6 +142,7 @@ def setManualOutlier(idOutlier):
             newObs = True
             obs = Notes()
             obs.idOutlier = idOutlier
+            obs.idPrescriptionDrug = 0
             obs.idSegment = o.idSegment
             obs.idDrug = o.idDrug
             obs.dose = o.dose

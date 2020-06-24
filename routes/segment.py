@@ -1,9 +1,13 @@
 from flask_api import status
-from models import db, User, Patient, Prescription, PrescriptionDrug, InterventionReason, Intervention, Segment, setSchema, SegmentDepartment, Department
+from models import db, User, Patient, Prescription, PrescriptionDrug, InterventionReason,\
+                    Intervention, Segment, setSchema, SegmentDepartment, Department,\
+                    Exams, SegmentExam
 from flask import Blueprint, request
 from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
-from sqlalchemy import asc
+from sqlalchemy import asc, func
+from .utils import tryCommit
+from datetime import date, timedelta
 
 app_seg = Blueprint('app_seg',__name__)
 
@@ -20,10 +24,6 @@ def getSegments():
         iList.append({
             'id': i.id,
             'description': i.description,
-            'minAge': i.minAge,
-            'maxAge': i.maxAge,
-            'minWeight': i.minWeight,
-            'maxWeight': i.maxWeight,
             'status': i.status
         })
 
@@ -44,6 +44,10 @@ def getSegmentsId(idSegment):
                 .filter(SegmentDepartment.id == idSegment)\
                 .order_by(asc(Department.name))\
                 .all()
+    segExams = SegmentExam.query\
+                .filter(SegmentExam.idSegment == idSegment)\
+                .order_by(asc(SegmentExam.typeExam))\
+                .all()
 
     deps = []
     for d in departments:
@@ -53,52 +57,73 @@ def getSegmentsId(idSegment):
             'name': d.name,
         })
 
+    exams = []
+    for e in segExams:
+        exams.append({
+            'type': e.typeExam,
+            'initials': e.initials,
+            'name': e.name,
+            'min': e.min,
+            'max': e.max,
+            'ref': e.ref,
+            'header': e.header,
+            'active': e.active
+        })
+
     return {
         'status': 'success',
         'data': {
             'id': s.id,
             'description': s.description,
-            'minAge': None,
-            'maxAge': None,
-            'minWeight': None,
-            'maxWeight': None,
             'status': s.status,
-            'departments': deps
+            'departments': deps,
+            'exams': exams
         }
     }, status.HTTP_200_OK
 
-@app_seg.route('/segments', methods=['POST'])
 @app_seg.route('/segments/<int:idSegment>', methods=['PUT'])
 @jwt_required
 def setSegment(idSegment=None):
     user = User.find(get_jwt_identity())
     setSchema(user.schema)
-
-    if request.method == 'POST':
-        s = Segment()
-    elif request.method == 'PUT':
-        s = Segment.query.get(idSegment)
-
-    db.session.query(SegmentDepartment).filter(SegmentDepartment.id == idSegment).delete()
-
     data = request.get_json()
+
+    s = Segment.query.get(idSegment)
+    
     if 'description' in data:
         s.description = data.get('description', None)
     if 'status' in data:
         s.status = data.get('status', None)
 
-    if request.method == 'POST':
-        db.session.add(s)
-        db.session.commit()
-
     idSegment = s.id
-    deps = data.get('departments', None)
-    for d in deps:
-        sd = SegmentDepartment()
-        sd.id = idSegment
-        sd.idHospital = d.get('idHospital', None)
-        sd.idDepartment = d.get('idDepartment', None)
-        db.session.add(sd)
+    deps_new = data.get('departments', None)
+
+    if deps_new:
+
+        deps_old = SegmentDepartment.query\
+                .filter(SegmentDepartment.id == idSegment)\
+                .all()
+
+        deps_idx = {}
+        for d in deps_old:
+            deps_idx[int(d.idDepartment)] = 1
+
+        for d in deps_new:
+            sd = SegmentDepartment()
+            sd.id = idSegment
+            sd.idHospital = d.get('idHospital', 1)
+            sd.idDepartment = d.get('idDepartment', 0)
+            
+            if not sd.idDepartment in deps_idx:
+                db.session.add(sd)
+            else:
+                del(deps_idx[sd.idDepartment])
+
+        for d in deps_idx:
+            db.session.query(SegmentDepartment)\
+                .filter(SegmentDepartment.id == idSegment)\
+                .filter(SegmentDepartment.idDepartment == d)\
+                .delete()
 
     return tryCommit(db, idSegment)
 
@@ -148,3 +173,57 @@ def getFreeDepartments():
         'status': 'success',
         'data': results
     }, status.HTTP_200_OK
+
+@app_seg.route('/segments/exams/types', methods=['GET'])
+@jwt_required
+def getCodes():
+    user = User.find(get_jwt_identity())
+    setSchema(user.schema)
+
+    typesExam = db.session.query(Exams.typeExam)\
+                .filter(Exams.date > (date.today() - timedelta(days=360)))\
+                .group_by(Exams.typeExam)\
+                .order_by(asc(Exams.typeExam)).all()
+
+    db.engine.dispose()
+
+    results = []
+    for t in typesExam:
+        results.append(t[0])
+
+    return {
+        'status': 'success',
+        'data': { 'types': results}
+    }, status.HTTP_200_OK
+
+
+@app_seg.route('/segments/<int:idSegment>/exams/<string:typeExam>', methods=['PUT'])
+@jwt_required
+def setExams(idSegment, typeExam):
+    user = User.find(get_jwt_identity())
+    setSchema(user.schema)
+    data = request.get_json()
+
+    segExam = SegmentExam.query.get((idSegment,typeExam))
+
+    newSegExam = False
+    if segExam is None:
+        newSegExam = True
+        segExam = SegmentExam()
+        segExam.idSegment = idSegment
+        segExam.typeExam = typeExam
+
+    if 'initials' in data.keys(): segExam.initials = data.get('initials', None)
+    if 'name' in data.keys(): segExam.name = data.get('name', None)
+    if 'min' in data.keys(): segExam.min = data.get('min', None)
+    if 'max' in data.keys(): segExam.max = data.get('max', None)
+    if 'ref' in data.keys(): segExam.ref = data.get('ref', None)
+    if 'header' in data.keys(): segExam.header = data.get('header', None)
+    if 'active' in data.keys(): segExam.active = bool(data.get('active', False))
+
+    segExam.update = func.now()
+    segExam.user  = user.id
+
+    if newSegExam: db.session.add(segExam)
+
+    return tryCommit(db, typeExam)

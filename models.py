@@ -26,6 +26,7 @@ def setSchema(schema):
     PrescriptionPic.setSchema(schema)
     Notes.setSchema(schema)
     DrugAttributes.setSchema(schema)
+    SegmentExam.setSchema(schema)
 
 
 class User(db.Model):
@@ -710,10 +711,6 @@ class Segment(db.Model):
 
     id = db.Column("idsegmento", db.Integer, primary_key=True)
     description = db.Column("nome", db.String, nullable=False)
-    minAge = db.Column("idade_min", db.Integer, nullable=False)
-    maxAge = db.Column("idade_max", db.Integer, nullable=False)
-    minWeight = db.Column("peso_min", db.Float, nullable=False)
-    maxWeight = db.Column("peso_max", db.Float, nullable=False)
     status = db.Column("status", db.Integer, nullable=False)
 
     def setSchema(schema):
@@ -724,6 +721,24 @@ class Segment(db.Model):
             .query(Segment)\
             .order_by(asc(Segment.description))\
             .all()
+
+class SegmentExam(db.Model):
+    __tablename__ = 'segmentoexame'
+
+    idSegment = db.Column("idsegmento", db.Integer, primary_key=True)
+    typeExam = db.Column("tpexame", db.String(100), primary_key=True)
+    initials = db.Column("abrev", db.String(50), nullable=False)
+    name = db.Column("nome", db.String(250), nullable=False)
+    min = db.Column("min", db.Integer, nullable=False)
+    max = db.Column("max", db.Integer, nullable=False)
+    ref = db.Column("referencia", db.String(250), nullable=False)
+    header = db.Column("posicao", db.Integer, nullable=False)
+    active = db.Column("ativo", db.Boolean, nullable=False)
+    update = db.Column("update_at", db.DateTime, nullable=False)
+    user = db.Column("update_by", db.Integer, nullable=False)
+
+    def setSchema(schema):
+        SegmentExam.__table__.schema = schema
 
 
 class Department(db.Model):

@@ -440,6 +440,7 @@ def setPrescriptionDrugNote(idPrescriptionDrug):
             newObs = True
             note = Notes()
             note.idPrescriptionDrug = idPrescriptionDrug
+            note.idOutlier = 0
 
         note.idDrug = idDrug
         note.admissionNumber = admissionNumber
