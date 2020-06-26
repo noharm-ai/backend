@@ -234,6 +234,8 @@ def getUnits(idDrug):
     user = User.find(get_jwt_identity())
     setSchema(user.schema)
 
+    idSegment = request.args.get('idSegment', 1)
+
     u = db.aliased(MeasureUnit)
     p = db.aliased(PrescriptionAgg)
     mu = db.aliased(MeasureUnitConvert)
@@ -244,7 +246,8 @@ def getUnits(idDrug):
             .select_from(u)\
             .join(p, and_(p.idMeasureUnit == u.id, p.idDrug == idDrug))\
             .join(d, and_(d.id == idDrug))\
-            .outerjoin(mu, and_(mu.idMeasureUnit == u.id, mu.idDrug == idDrug))\
+            .outerjoin(mu, and_(mu.idMeasureUnit == u.id, mu.idDrug == idDrug, mu.idSegment == p.idSegment))\
+            .filter(p.idSegment == idSegment)\
             .group_by(u.id, u.description, p.idMeasureUnit, d.name)\
             .order_by(asc(u.description))\
             .all()

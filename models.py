@@ -258,17 +258,18 @@ def getDrugList():
     return func.array(query)
 
 def findLatestExams():
-    examLatest = db.session.query(Exams.typeExam.label('typeExam'), func.max(Exams.date).label('date'))\
-                  .filter(Exams.admissionNumber == Prescription.admissionNumber)\
-                  .group_by(Exams.typeExam)\
+    latest = db.session.query(Exams.admissionNumber.label('admissionNumber'),\
+                                  Exams.typeExam.label('typeExam'),\
+                                  func.max(Exams.date).label('date'))\
+                  .select_from(Exams)\
+                  .group_by(Exams.typeExam, Exams.admissionNumber)\
                   .subquery()
-
-    el = db.aliased(examLatest)
 
     results = db.session.query(func.concat(Exams.typeExam, '|',Exams.value))\
             .select_from(Exams)\
-            .join(el, and_(Exams.typeExam == el.c.typeExam, Exams.date == el.c.date))\
-            .filter(Exams.admissionNumber == Prescription.admissionNumber)
+            .join(latest, and_(Exams.typeExam == latest.c.typeExam, Exams.date == latest.c.date))\
+            .filter(Exams.admissionNumber == Prescription.admissionNumber)\
+            .filter(latest.c.admissionNumber == Prescription.admissionNumber)
 
     return func.array(results.label('examsResults'))
 
@@ -349,28 +350,11 @@ class Patient(db.Model):
         if (not(idPrescription is None)):
             q = q.filter(Prescription.id == idPrescription)
         else:
-            q = q.filter(func.date(Prescription.date) > day)
+            q = q.filter(func.date(Prescription.date) < day)
             
         q = q.order_by(desc(Prescription.date))
 
-        if onlyStatus:
-            wrapper = q
-        else:
-            q = q.with_labels().subquery()
-
-            prescritionAlias = db.aliased(Prescription, q)
-            patientAlias = db.aliased(Patient, q)
-            examsAlias = db.aliased(lastExams, q)
-
-            wrapper = db.session\
-                .query(prescritionAlias, patientAlias,\
-                        '"daysAgo"', 'score', '"scoreOne"', '"scoreTwo"', '"scoreThree"',\
-                        'tgo', 'tgp', 'cr', 'k', 'na', 'mg', 'rni',\
-                        'antimicro', 'mav', 'controlled', 'sonda', 'diff', 'department',\
-                        'notdefault', 'interventions', 'pcr', 'lastexams')
-
-
-        return wrapper.limit(limit).all()
+        return q.limit(limit).all()
 
 
 class Outlier(db.Model):
@@ -570,7 +554,7 @@ class MeasureUnitConvert(db.Model):
 
     idMeasureUnit = db.Column("fkunidademedida", db.String, primary_key=True)
     idDrug = db.Column("fkmedicamento", db.Integer, primary_key=True)
-    idHospital = db.Column("fkhospital", db.Integer, nullable=False)
+    idSegment = db.Column("idsegmento", db.Integer, nullable=False)
     factor = db.Column("fator", db.String, nullable=False)
 
     def setSchema(schema):

@@ -11,6 +11,15 @@ def data2age(birthdate):
     age = int ((datetime.today() - birthdate).days / days_in_year)
     return age
 
+def data2month(birthdate):
+    if birthdate is None: return ''
+
+    month_in_year = 12
+    birthdate = birthdate.split('T')[0]
+    birthdate = datetime.strptime(birthdate, '%Y-%m-%d')
+    age = int ((datetime.today() - birthdate).months / month_in_year)
+    return age
+
 def lenghStay(admissionDate):
     if admissionDate is None: return ''
 
@@ -26,7 +35,7 @@ def is_float(s):
 
 def timeValue(time):
     numeric = str(time).strip().replace(' ','')
-    if not is_float(numeric): return str(time).strip()
+    if not is_float(numeric): return strNone(time).strip()
     else:
       timeList = str(time).strip().split(' ')
       if len(timeList) == 1:
@@ -72,6 +81,7 @@ typeRelations['dm'] = 'Duplicidade Medicamentosa'
 typeRelations['dt'] = 'Duplicidade Terapêutica'
 typeRelations['it'] = 'Interação Medicamentosa'
 typeRelations['iy'] = 'Incompatibilidade em Y'
+typeRelations['rx'] = 'Reatividade Cruzada'
 
 examsNameX = {
     'cr':  'Creatinina',
@@ -180,49 +190,68 @@ def examAlertsList(exams, patient, segExams):
             })
 
             if ref.name.lower() == 'creatinina':
-                valueMDRD = mdrd_calc(value, patient.birthdate, patient.gender, patient.skinColor)
-                results.append({
-                    'key': 'mdrd',
-                    'value': valueMDRD
-                })
-                alertCount += int(valueMDRD['alert'])
+                if data2age(patient.birthdate.isoformat()) > 17:
+                    valueMDRD = mdrd_calc(value, patient.birthdate, patient.gender, patient.skinColor)
+                    results.append({
+                        'key': 'mdrd',
+                        'value': valueMDRD
+                    })
+                    alertCount += int(valueMDRD['alert'])
 
-                valueCG = cg_calc(value, patient.birthdate, patient.gender, patient.weight)
-                results.append({
-                    'key': 'cg',
-                    'value': valueCG
-                })
-                alertCount += int(valueCG['alert'])
+                    valueCG = cg_calc(value, patient.birthdate, patient.gender, patient.weight)
+                    results.append({
+                        'key': 'cg',
+                        'value': valueCG
+                    })
+                    alertCount += int(valueCG['alert'])
 
-                valueCKD = ckd_calc(value, patient.birthdate, patient.gender, patient.skinColor)
-                results.append({
-                    'key': 'ckd',
-                    'value': valueCKD
-                })
-                alertCount += int(valueCKD['alert'])
+                    valueCKD = ckd_calc(value, patient.birthdate, patient.gender, patient.skinColor)
+                    results.append({
+                        'key': 'ckd',
+                        'value': valueCKD
+                    })
+                    alertCount += int(valueCKD['alert'])
+                else:
+                    valueSWRTZ2 = schwartz2_calc(value, patient.height)
+                    results.append({
+                        'key': 'swrtz2',
+                        'value': valueSWRTZ2
+                    })
+                    alertCount += int(valueSWRTZ2['alert'])
 
         else:
+            examTypeEmpty = dict(examEmpty, **{'initials': ref.initials, 'name': ref.name})
             results.append({
                 'key': typeExam.lower(),
-                'value': examEmpty
+                'value': examTypeEmpty
             })
             if ref.name.lower() == 'creatinina':
-                results.append({
-                    'key': 'mdrd',
-                    'value': examEmpty
-                })
-                results.append({
-                    'key': 'cg',
-                    'value': examEmpty
-                })
-                results.append({
-                    'key': 'ckd',
-                    'value': examEmpty
-                })
+                if data2age(patient.birthdate.isoformat()) > 17:
+                    results.append({
+                        'key': 'mdrd',
+                        'value': dict(examEmpty, **{'initials': 'MDRD', 'name': 'MDRD'})
+                    })
+                    results.append({
+                        'key': 'cg',
+                        'value': dict(examEmpty, **{'initials': 'CG', 'name': 'CG'})
+                    })
+                    results.append({
+                        'key': 'ckd',
+                        'value': dict(examEmpty, **{'initials': 'CKD', 'name': 'CKD'})
+                    })
+                else:
+                    results.append({
+                        'key': 'swrtz2',
+                        'value': dict(examEmpty, **{'initials': 'Schwartz 2', 'name': 'Schwartz 2'})
+                    })
+
         if len(results) == 8:
             break
 
     return results, alertCount
+
+class refEmpty():
+    ref = initials = min = max = name = ''
 
 def formatExam(exam, typeExam, segExam):
     if exam is not None:
@@ -230,7 +259,9 @@ def formatExam(exam, typeExam, segExam):
             ref = segExam[typeExam]
             alert = not (exam.value >= ref.min and exam.value <= ref.max )
         else:
-            ref = {'ref' : None, 'min': None , 'max': None}
+            ref = refEmpty()
+            ref.name = typeExam
+            ref.initials = typeExam
             alert = False
 
         return { 'value': float(exam.value), 'unit': strNone(exam.unit), 'alert': alert,\
@@ -256,11 +287,11 @@ def period(tuples):
 # based on https://www.kidney.org/content/mdrd-study-equation
 # eGFR = 175 x (SCr)-1.154 x (age)-0.203 x 0.742 [if female] x 1.212 [if Black]
 def mdrd_calc(cr, birthdate, gender, skinColor):
-    if not is_float(cr): return examEmpty
-    if birthdate is None: return examEmpty 
+    if not is_float(cr): return dict(examEmpty, **{'initials': 'MDRD', 'name': 'MDRD'})
+    if birthdate is None: return dict(examEmpty, **{'initials': 'MDRD', 'name': 'MDRD'})
     
     age = data2age(birthdate.isoformat())
-    if age == 0: return examEmpty
+    if age == 0: return dict(examEmpty, **{'initials': 'MDRD', 'name': 'MDRD'})
 
     eGFR = 175 * (float(cr))**(-1.154) * (age)**(-0.203)
 
@@ -268,34 +299,34 @@ def mdrd_calc(cr, birthdate, gender, skinColor):
     if skinColor == 'Negra': eGFR *= 1.212
 
 
-    return { 'value': round(eGFR,1), 'ref': 'maior que 50 mL/min', 
+    return { 'value': round(eGFR,1), 'ref': 'maior que 50 mL/min', 'unit': 'mL/min',
              'alert': (eGFR < 50), 'name': 'Modification of Diet in Renal Disease', 'initials': 'MDRD' }
 
 # Cockcroft-Gault
 # based on https://www.kidney.org/professionals/KDOQI/gfr_calculatorCoc
 # CCr = {((140–age) x weight)/(72xSCr)} x 0.85 (if female)
 def cg_calc(cr, birthdate, gender, weight):
-    if not is_float(cr): return examEmpty
-    if not is_float(weight): return examEmpty
-    if birthdate is None: return examEmpty
+    if not is_float(cr): return dict(examEmpty, **{'initials': 'CG', 'name': 'CG'})
+    if not is_float(weight): return dict(examEmpty, **{'initials': 'CG', 'name': 'CG'})
+    if birthdate is None: return dict(examEmpty, **{'initials': 'CG', 'name': 'CG'})
 
     age = data2age(birthdate.isoformat())
-    if age == 0: return examEmpty
+    if age == 0: return dict(examEmpty, **{'initials': 'CG', 'name': 'CG'})
 
     ccr = ((140 - age) * float(weight)) / (72 * float(cr))
     if gender == 'F': ccr *= 0.85
 
-    return { 'value': round(ccr,1), 'ref': 'maior que 50 mL/min', 
+    return { 'value': round(ccr,1), 'ref': 'maior que 50 mL/min', 'unit': 'mL/min',
              'alert': (ccr < 50), 'name': 'Cockcroft-Gault', 'initials': 'CG'}
 
 # Chronic Kidney Disease Epidemiology Collaboration
 # based on https://www.kidney.org/professionals/kdoqi/gfr_calculator
 def ckd_calc(cr, birthdate, gender, skinColor):
-    if not is_float(cr): return examEmpty
-    if birthdate is None: return examEmpty
+    if not is_float(cr): return dict(examEmpty, **{'initials': 'CKD', 'name': 'CKD'})
+    if birthdate is None: return dict(examEmpty, **{'initials': 'CKD', 'name': 'CKD'})
 
     age = data2age(birthdate.isoformat())
-    if age == 0: return examEmpty
+    if age == 0: return dict(examEmpty, **{'initials': 'CKD', 'name': 'CKD'})
 
     if gender == 'F':
         g = 0.7
@@ -308,9 +339,19 @@ def ckd_calc(cr, birthdate, gender, skinColor):
 
     eGFR = s * (float(cr)/g)**(e) * (0.993)**(age)
 
-    return { 'value': round(eGFR,1), 'ref': 'maior que 50 mL/min', 
+    return { 'value': round(eGFR,1), 'ref': 'maior que 50 mL/min', 'unit': 'mL/min',
              'alert': (eGFR < 50), 'name': 'Chronic Kidney Disease Epidemiology' , 'initials': 'CKD'}
 
+# Schwartz (2) Formula
+# based on https://link.springer.com/article/10.1007%2Fs00467-014-3002-5
+def schwartz2_calc(cr, height):
+    if not is_float(cr): return dict(examEmpty, **{'initials': 'Schwartz 2', 'name': 'Schwartz 2'})
+    if not is_float(height): return dict(examEmpty, **{'initials': 'Schwartz 2', 'name': 'Schwartz 2'})
+
+    eGFR = (0.413 * height) / cr
+
+    return { 'value': round(eGFR,1), 'ref': 'maior que 75 mL/min por 1.73 m²', 'unit': 'mL/min',
+             'alert': (eGFR < 75), 'name': 'Schwartz 2' , 'initials': 'Schwartz 2'}
 
 def tryCommit(db, recId):
     try:

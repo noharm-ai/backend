@@ -6,7 +6,7 @@ from models import db, User, Patient, Prescription, PrescriptionDrug, Interventi
 from flask import Blueprint, request
 from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
-from .utils import mdrd_calc, cg_calc, ckd_calc, none2zero, formatExam,\
+from .utils import mdrd_calc, cg_calc, ckd_calc, none2zero, formatExam, schwartz2_calc,\
                     period, lenghStay, strNone, examAlerts, timeValue,\
                     data2age, examEmpty, is_float, tryCommit, examAlertsList
 from sqlalchemy import func
@@ -242,6 +242,7 @@ def getPrescription(idPrescription):
     db.engine.dispose()
 
     exams = Exams.findLatestByAdmission(patient.admissionNumber, prescription[0].idSegment)
+    age = data2age(patient.birthdate.isoformat() if patient.birthdate else date.today().isoformat())
 
     if 'cr' in exams:
         exams['mdrd'] = mdrd_calc(exams['cr']['value'], patient.birthdate, patient.gender, patient.skinColor)
@@ -252,15 +253,21 @@ def getPrescription(idPrescription):
     for e in exams:
         examsJson.append({'key': e, 'value': exams[e]})
         if e == 'cr':
-            examsJson.append({'key': 'mdrd', 'value': exams['mdrd']})
-            examsJson.append({'key': 'cg', 'value': exams['cg']})
-            examsJson.append({'key': 'ckd', 'value': exams['ckd']})
-        if len(examsJson) == 8: 
+            print('age', age)
+            if age > 17:
+                examsJson.append({'key': 'mdrd', 'value': exams['mdrd']})
+                examsJson.append({'key': 'cg', 'value': exams['cg']})
+                examsJson.append({'key': 'ckd', 'value': exams['ckd']})
+            else:
+                swrtz2 = schwartz2_calc(exams['cr']['value'], patient.height)
+                examsJson.append({'key': 'swrtz2', 'value': swrtz2})
+
+        if len(examsJson) == 10: 
             break
 
     exams = dict(exams, **{
+        'age': age,
         'exams': examsJson,
-        'age': data2age(patient.birthdate.isoformat() if patient.birthdate else date.today().isoformat()),
         'weight': patient.weight,
     })
 
@@ -293,7 +300,7 @@ def getPrescription(idPrescription):
             'gender': patient.gender,
             'height': patient.height,
             'weight': patient.weight,
-            'weightChange': bool(patient.user),
+            'weightUser': bool(patient.user),
             'weightDate': patient.weightDate,
             'bed': prescription[0].bed,
             'record': prescription[0].record,
