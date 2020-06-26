@@ -71,9 +71,9 @@ typeRelations = {}
 typeRelations['dm'] = 'Duplicidade Medicamentosa'
 typeRelations['dt'] = 'Duplicidade Terapêutica'
 typeRelations['it'] = 'Interação Medicamentosa'
-typeRelations['iy'] = 'Imcompatibilidade em Y'
+typeRelations['iy'] = 'Incompatibilidade em Y'
 
-examsName = {
+examsNameX = {
     'cr':  'Creatinina',
     'mdrd':'MDRD',
     'cg':  'CG',
@@ -103,7 +103,7 @@ examsName = {
     'h_conmono': 'Monócitos',
 }
 
-examsRef = {
+examsRefX = {
     'tgo': { 'min': 0,   'max': 34,  'ref': 'até 34 U/L - Método: Cinético optimizado UV' },
     'tgp': { 'min': 0,   'max': 49,  'ref': '10 a 49 U/L - Método: Cinético optimizado UV' },
     'k':   { 'min': 3.5, 'max': 5.5, 'ref': '3,5 a 5,5 mEq/L - Método: Eletrodo Seletivo' },
@@ -130,7 +130,7 @@ examsRef = {
     'h_consegm':    { 'min': 1500,   'max': 7000},
 }
 
-examEmpty = { 'value': None, 'alert': False, 'ref': None }
+examEmpty = { 'value': None, 'alert': False, 'ref': None, 'name': None }
 
 def examAlerts(p, patient):
     exams = {'tgo': p[7], 'tgp': p[8], 'cr': p[9], 'k': p[10], 'na': p[11], 'mg': p[12], 'rni': p[13], 'pcr': p[22]}
@@ -150,7 +150,7 @@ def examAlerts(p, patient):
                 result[e] = value
                 alertCount += int(value['alert'])
             else:            
-                ref = examsRef[e]
+                ref = examsRefX[e]
                 alert = not (value >= ref['min'] and value <= ref['max'] )
                 alertCount += int(alert)
                 result[e] = { 'value': value, 'alert': alert }
@@ -159,20 +159,83 @@ def examAlerts(p, patient):
             result['k'], result['na'], result['mg'], result['rni'],\
             result['pcr'], result['ckd'], alertCount
 
-def formatExam(exam, type):
+def examAlertsList(exams, patient, segExams):
+    valueExams = {}
+    for e in exams:
+        typeExam, value = e.split('|')
+        valueExams[typeExam.lower()] = value
+
+    results = []
+    alertCount = 0
+    for typeExam in segExams:
+        ref = segExams[typeExam]
+
+        if typeExam.lower() in valueExams:
+            value = float(valueExams[typeExam.lower()])
+            alert = not (value >= ref.min and value <= ref.max)
+            alertCount += int(alert)
+            results.append({
+                'key': typeExam.lower(),
+                'value': { 'value':value, 'ref':ref.ref , 'alert':alert, 'name':ref.name }
+            })
+
+            if ref.name.lower() == 'creatinina':
+                valueMDRD = mdrd_calc(value, patient.birthdate, patient.gender, patient.skinColor)
+                results.append({
+                    'key': 'mdrd',
+                    'value': valueMDRD
+                })
+                alertCount += int(valueMDRD['alert'])
+
+                valueCG = cg_calc(value, patient.birthdate, patient.gender, patient.weight)
+                results.append({
+                    'key': 'cg',
+                    'value': valueCG
+                })
+                alertCount += int(valueCG['alert'])
+
+                valueCKD = ckd_calc(value, patient.birthdate, patient.gender, patient.skinColor)
+                results.append({
+                    'key': 'ckd',
+                    'value': valueCKD
+                })
+                alertCount += int(valueCKD['alert'])
+
+        else:
+            results.append({
+                'key': typeExam.lower(),
+                'value': examEmpty
+            })
+            if ref.name.lower() == 'creatinina':
+                results.append({
+                    'key': 'mdrd',
+                    'value': examEmpty
+                })
+                results.append({
+                    'key': 'cg',
+                    'value': examEmpty
+                })
+                results.append({
+                    'key': 'ckd',
+                    'value': examEmpty
+                })
+        if len(results) == 8:
+            break
+
+    return results, alertCount
+
+def formatExam(exam, typeExam, segExam):
     if exam is not None:
-        if type in examsRef:
-            ref = examsRef[type]
-            alert = not (exam.value >= ref['min'] and exam.value <= ref['max'] )
-            if not 'ref' in ref:
-                ref['ref'] = 'de ' + str(ref['min']) + ' a ' + str(ref['max']) + ' ' + strNone(exam.unit) 
+        if typeExam in segExam:
+            ref = segExam[typeExam]
+            alert = not (exam.value >= ref.min and exam.value <= ref.max )
         else:
             ref = {'ref' : None, 'min': None , 'max': None}
             alert = False
 
         return { 'value': float(exam.value), 'unit': strNone(exam.unit), 'alert': alert,\
-                 'date' : exam.date.isoformat(), 'ref': ref['ref'],
-                 'min': ref['min'], 'max': ref['max']}
+                 'date' : exam.date.isoformat(), 'ref': ref.ref, 'initials': ref.initials,
+                 'min': ref.min, 'max': ref.max, 'name': ref.name }
     else:
         examEmpty['date'] = None
         return examEmpty
@@ -205,7 +268,8 @@ def mdrd_calc(cr, birthdate, gender, skinColor):
     if skinColor == 'Negra': eGFR *= 1.212
 
 
-    return { 'value': round(eGFR,1), 'ref': 'maior que 50 mL/min', 'alert': (eGFR < 50) }
+    return { 'value': round(eGFR,1), 'ref': 'maior que 50 mL/min', 
+             'alert': (eGFR < 50), 'name': 'Modification of Diet in Renal Disease', 'initials': 'MDRD' }
 
 # Cockcroft-Gault
 # based on https://www.kidney.org/professionals/KDOQI/gfr_calculatorCoc
@@ -221,7 +285,8 @@ def cg_calc(cr, birthdate, gender, weight):
     ccr = ((140 - age) * float(weight)) / (72 * float(cr))
     if gender == 'F': ccr *= 0.85
 
-    return { 'value': round(ccr,1), 'ref': 'maior que 50 mL/min', 'alert': (ccr < 50) }
+    return { 'value': round(ccr,1), 'ref': 'maior que 50 mL/min', 
+             'alert': (ccr < 50), 'name': 'Cockcroft-Gault', 'initials': 'CG'}
 
 # Chronic Kidney Disease Epidemiology Collaboration
 # based on https://www.kidney.org/professionals/kdoqi/gfr_calculator
@@ -243,7 +308,8 @@ def ckd_calc(cr, birthdate, gender, skinColor):
 
     eGFR = s * (float(cr)/g)**(e) * (0.993)**(age)
 
-    return { 'value': round(eGFR,1), 'ref': 'maior que 50 mL/min', 'alert': (eGFR < 50) }
+    return { 'value': round(eGFR,1), 'ref': 'maior que 50 mL/min', 
+             'alert': (eGFR < 50), 'name': 'Chronic Kidney Disease Epidemiology' , 'initials': 'CKD'}
 
 
 def tryCommit(db, recId):

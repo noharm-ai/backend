@@ -2,13 +2,13 @@ import random, copy
 from flask_api import status
 from models import db, User, Patient, Prescription, PrescriptionDrug, InterventionReason,\
                     Intervention, Segment, setSchema, Exams, PrescriptionPic, DrugAttributes,\
-                    Notes, Relation
+                    Notes, Relation, SegmentExam
 from flask import Blueprint, request
 from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
 from .utils import mdrd_calc, cg_calc, ckd_calc, none2zero, formatExam,\
                     period, lenghStay, strNone, examAlerts, timeValue,\
-                    data2age, examEmpty, is_float, examsName, tryCommit
+                    data2age, examEmpty, is_float, tryCommit, examAlertsList
 from sqlalchemy import func
 from datetime import date, datetime
 
@@ -22,12 +22,13 @@ def getPrescriptions(idPrescription=None):
 
     print(request.args)
 
-    idSegment = request.args.get('idSegment', None)
+    idSegment = request.args.get('idSegment', 1)
     idDept = request.args.getlist('idDept[]')
     idDrug = request.args.getlist('idDrug[]')
     limit = request.args.get('limit', 250)
     day = request.args.get('date', date.today())
 
+    segExams = SegmentExam.refDict(idSegment)
     patients = Patient.getPatients(idSegment=idSegment, idDept=idDept, idDrug=idDrug, idPrescription=idPrescription, limit=limit, day=day)
     db.engine.dispose()
 
@@ -41,6 +42,7 @@ def getPrescriptions(idPrescription=None):
             patient.admissionNumber = p[0].admissionNumber
 
         tgo, tgp, cr, mdrd, cg, k, na, mg, rni, pcr, ckd, totalAlerts = examAlerts(p, patient)
+        exams, totalAlerts = examAlertsList(p[23], patient, segExams)
 
         results.append({
             'idPrescription': p[0].id,
@@ -65,6 +67,7 @@ def getPrescriptions(idPrescription=None):
             'np': str(p[20]),
             'tube': str(p[17]),
             'diff': str(p[18]),
+            'exams': exams,
             'tgo': tgo,
             'tgp': tgp,
             'cr': cr,
@@ -238,14 +241,25 @@ def getPrescription(idPrescription):
     relations = Relation.findByPrescription(idPrescription)
     db.engine.dispose()
 
-    exams = Exams.findLatestByAdmission(patient.admissionNumber)
+    exams = Exams.findLatestByAdmission(patient.admissionNumber, prescription[0].idSegment)
 
     if 'cr' in exams:
         exams['mdrd'] = mdrd_calc(exams['cr']['value'], patient.birthdate, patient.gender, patient.skinColor)
         exams['cg'] = cg_calc(exams['cr']['value'], patient.birthdate, patient.gender, patient.weight)
         exams['ckd'] = ckd_calc(exams['cr']['value'], patient.birthdate, patient.gender, patient.skinColor)
 
+    examsJson = []
+    for e in exams:
+        examsJson.append({'key': e, 'value': exams[e]})
+        if e == 'cr':
+            examsJson.append({'key': 'mdrd', 'value': exams['mdrd']})
+            examsJson.append({'key': 'cg', 'value': exams['cg']})
+            examsJson.append({'key': 'ckd', 'value': exams['ckd']})
+        if len(examsJson) == 8: 
+            break
+
     exams = dict(exams, **{
+        'exams': examsJson,
         'age': data2age(patient.birthdate.isoformat() if patient.birthdate else date.today().isoformat()),
         'weight': patient.weight,
     })
@@ -277,7 +291,9 @@ def getPrescription(idPrescription):
             'admissionNumber': prescription[0].admissionNumber,
             'birthdate': patient.birthdate.isoformat() if patient.birthdate else '',
             'gender': patient.gender,
+            'height': patient.height,
             'weight': patient.weight,
+            'weightChange': bool(patient.user),
             'weightDate': patient.weightDate,
             'bed': prescription[0].bed,
             'record': prescription[0].record,
@@ -333,11 +349,11 @@ def getDrugPeriod(idPrescriptionDrug):
         'data': results[0][1]
     }, status.HTTP_200_OK
 
-def historyExam(typeExam, examsList):
+def historyExam(typeExam, examsList, segExam):
     results = []
     for e in examsList:
         if e.typeExam == typeExam:
-            item = formatExam(e, e.typeExam.lower())
+            item = formatExam(e, e.typeExam.lower(), segExam)
             del(item['ref'])
             results.append(item)
     return results
@@ -348,7 +364,9 @@ def getExamsbyAdmission(admissionNumber):
     user = User.find(get_jwt_identity())
     setSchema(user.schema)
 
+    idSegment = request.args.get('idSegment', 1)
     examsList = Exams.findByAdmission(admissionNumber)
+    segExam = SegmentExam.refDict(idSegment)
     db.engine.dispose()
 
     perc = {
@@ -361,12 +379,12 @@ def getExamsbyAdmission(admissionNumber):
     bufferList = {}
     typeExams = []
     for e in examsList:
-        if not e.typeExam in typeExams and e.typeExam.lower() in examsName:
+        if not e.typeExam in typeExams and e.typeExam.lower() in segExam:
             key = e.typeExam.lower()
-            item = formatExam(e, e.typeExam.lower())
-            item['name'] = examsName[e.typeExam.lower()]
+            item = formatExam(e, e.typeExam.lower(), segExam)
+            item['name'] = segExam[e.typeExam.lower()].name
             item['perc'] = None
-            item['history'] = historyExam(e.typeExam, examsList)
+            item['history'] = historyExam(e.typeExam, examsList, segExam)
             bufferList[key] = item
             typeExams.append(e.typeExam)
             if key in perc:
@@ -379,8 +397,8 @@ def getExamsbyAdmission(admissionNumber):
                 val = bufferList[r]['value']
                 bufferList[r]['perc'] = round((val*100)/total,1)
 
-    results = copy.deepcopy(examsName)
-    for e in examsName:
+    results = copy.deepcopy(segExam)
+    for e in segExam:
         if e in bufferList:
             results[e] = bufferList[e]
         else:
@@ -403,6 +421,7 @@ def setPatientData(admissionNumber):
 
     if 'weight' in data.keys(): 
         p.weight = data.get('weight')
+        p.height = data.get('height')
         p.weightDate = datetime.today()
         p.update = func.now()
         p.user  = user.id

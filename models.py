@@ -257,6 +257,21 @@ def getDrugList():
 
     return func.array(query)
 
+def findLatestExams():
+    examLatest = db.session.query(Exams.typeExam.label('typeExam'), func.max(Exams.date).label('date'))\
+                  .filter(Exams.admissionNumber == Prescription.admissionNumber)\
+                  .group_by(Exams.typeExam)\
+                  .subquery()
+
+    el = db.aliased(examLatest)
+
+    results = db.session.query(func.concat(Exams.typeExam, '|',Exams.value))\
+            .select_from(Exams)\
+            .join(el, and_(Exams.typeExam == el.c.typeExam, Exams.date == el.c.date))\
+            .filter(Exams.admissionNumber == Prescription.admissionNumber)
+
+    return func.array(results.label('examsResults'))
+
 class Patient(db.Model):
     __tablename__ = 'pessoa'
 
@@ -267,6 +282,7 @@ class Patient(db.Model):
     birthdate = db.Column('dtnascimento', db.DateTime, nullable=True)
     gender = db.Column('sexo', db.String(1), nullable=True)
     weight = db.Column('peso', db.Float, nullable=True)
+    height = db.Column('altura', db.Float, nullable=True)
     weightDate = db.Column('dtpeso', db.DateTime, nullable=True)
     skinColor = db.Column('cor', db.String, nullable=True)
     update = db.Column("update_at", db.DateTime, nullable=True)
@@ -293,6 +309,7 @@ class Patient(db.Model):
         mg = getExams('MG')
         rni = getExams('PRO')
         pcr = getExams('PCRU')
+        lastExams = findLatestExams()
         antimicro = getDrugClass(DrugAttributes.antimicro)
         mav = getDrugClass(DrugAttributes.mav)
         controlled = getDrugClass(DrugAttributes.controlled)
@@ -312,7 +329,8 @@ class Patient(db.Model):
                     tgo.label('tgo'), tgp.label('tgp'), cr.label('cr'), k.label('k'), na.label('na'), mg.label('mg'), rni.label('rni'),
                     antimicro.label('antimicro'), mav.label('mav'), controlled.label('controlled'), sonda.label('sonda'),
                     (count - diff).label('diff'), Department.name.label('department'), notdefault.label('notdefault'),
-                    interventions.label('interventions'), pcr.label('pcr')
+                    interventions.label('interventions'), pcr.label('pcr'), 
+                    lastExams.label('lastexams')
                 )\
                 .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)\
                 .outerjoin(Department, Department.id == Prescription.idDepartment)
@@ -331,7 +349,7 @@ class Patient(db.Model):
         if (not(idPrescription is None)):
             q = q.filter(Prescription.id == idPrescription)
         else:
-            q = q.filter(func.date(Prescription.date) == day)
+            q = q.filter(func.date(Prescription.date) > day)
             
         q = q.order_by(desc(Prescription.date))
 
@@ -342,13 +360,14 @@ class Patient(db.Model):
 
             prescritionAlias = db.aliased(Prescription, q)
             patientAlias = db.aliased(Patient, q)
+            examsAlias = db.aliased(lastExams, q)
 
             wrapper = db.session\
                 .query(prescritionAlias, patientAlias,\
                         '"daysAgo"', 'score', '"scoreOne"', '"scoreTwo"', '"scoreThree"',\
                         'tgo', 'tgp', 'cr', 'k', 'na', 'mg', 'rni',\
                         'antimicro', 'mav', 'controlled', 'sonda', 'diff', 'department',\
-                        'notdefault', 'interventions', 'pcr')
+                        'notdefault', 'interventions', 'pcr', 'lastexams')
 
 
         return wrapper.limit(limit).all()
@@ -530,6 +549,8 @@ class DrugAttributes(db.Model):
     elderly = db.Column("idoso", db.Boolean, nullable=True)
     division = db.Column("divisor", db.Float, nullable=True)
     useWeight = db.Column("usapeso", db.Boolean, nullable=True)
+    idMeasureUnit = db.Column("fkunidademedida", db.String(10), nullable=True)
+    amount = db.Column("concentracao", db.Integer, nullable=True)
 
     def setSchema(schema):
         DrugAttributes.__table__.schema = schema
@@ -729,16 +750,29 @@ class SegmentExam(db.Model):
     typeExam = db.Column("tpexame", db.String(100), primary_key=True)
     initials = db.Column("abrev", db.String(50), nullable=False)
     name = db.Column("nome", db.String(250), nullable=False)
-    min = db.Column("min", db.Integer, nullable=False)
-    max = db.Column("max", db.Integer, nullable=False)
+    min = db.Column("min", db.Float, nullable=False)
+    max = db.Column("max", db.Float, nullable=False)
     ref = db.Column("referencia", db.String(250), nullable=False)
-    header = db.Column("posicao", db.Integer, nullable=False)
+    order = db.Column("posicao", db.Integer, nullable=False)
     active = db.Column("ativo", db.Boolean, nullable=False)
     update = db.Column("update_at", db.DateTime, nullable=False)
     user = db.Column("update_by", db.Integer, nullable=False)
 
     def setSchema(schema):
         SegmentExam.__table__.schema = schema
+
+    def refDict(idSegment):
+        exams =  SegmentExam.query\
+                    .filter(SegmentExam.idSegment == idSegment)\
+                    .filter(SegmentExam.active == True)\
+                    .order_by(asc(SegmentExam.order))\
+                    .all()
+
+        results = {}
+        for e in exams:
+            results[e.typeExam.lower()] = e
+
+        return results
 
 
 class Department(db.Model):
@@ -784,7 +818,7 @@ class Exams(db.Model):
                          .order_by(asc(Exams.typeExam),desc(Exams.date))\
                          .all()
 
-    def findLatestByAdmission(admissionNumber):
+    def findLatestByAdmission(admissionNumber, idSegment):
         examLatest = db.session.query(Exams.typeExam.label('typeExam'), func.max(Exams.date).label('date'))\
                       .select_from(Exams)\
                       .filter(Exams.admissionNumber == admissionNumber)\
@@ -797,9 +831,20 @@ class Exams(db.Model):
                 .join(el, and_(Exams.typeExam == el.c.typeExam, Exams.date == el.c.date))\
                 .filter(Exams.admissionNumber == admissionNumber)
 
+        segExam = SegmentExam.refDict(idSegment)
+
         exams = {}
+        for e in segExam:
+            examEmpty = { 'value': None, 'alert': False, 'ref': None, 'name': None, 'unit': None }
+            examEmpty['date'] = None
+            examEmpty['min'] = segExam[e].min
+            examEmpty['max'] = segExam[e].max
+            examEmpty['name'] = segExam[e].name
+            examEmpty['initials'] = segExam[e].initials
+            exams[e.lower()] = examEmpty
+
         for e in results:
-            exams[e.typeExam.lower()] = formatExam(e,e.typeExam.lower())
+            exams[e.typeExam.lower()] = formatExam(e, e.typeExam.lower(), segExam)
 
         return exams
 

@@ -46,7 +46,7 @@ def getSegmentsId(idSegment):
                 .all()
     segExams = SegmentExam.query\
                 .filter(SegmentExam.idSegment == idSegment)\
-                .order_by(asc(SegmentExam.typeExam))\
+                .order_by(asc(SegmentExam.order))\
                 .all()
 
     deps = []
@@ -60,13 +60,13 @@ def getSegmentsId(idSegment):
     exams = []
     for e in segExams:
         exams.append({
-            'type': e.typeExam,
+            'type': e.typeExam.lower(),
             'initials': e.initials,
             'name': e.name,
             'min': e.min,
             'max': e.max,
             'ref': e.ref,
-            'header': e.header,
+            'order': e.order,
             'active': e.active
         })
 
@@ -98,32 +98,32 @@ def setSegment(idSegment=None):
     idSegment = s.id
     deps_new = data.get('departments', None)
 
+    deps_old = SegmentDepartment.query\
+            .filter(SegmentDepartment.id == idSegment)\
+            .all()
+
+    deps_idx = {}
+    for d in deps_old:
+        deps_idx[int(d.idDepartment)] = 1
+
     if deps_new:
-
-        deps_old = SegmentDepartment.query\
-                .filter(SegmentDepartment.id == idSegment)\
-                .all()
-
-        deps_idx = {}
-        for d in deps_old:
-            deps_idx[int(d.idDepartment)] = 1
-
         for d in deps_new:
             sd = SegmentDepartment()
             sd.id = idSegment
-            sd.idHospital = d.get('idHospital', 1)
-            sd.idDepartment = d.get('idDepartment', 0)
+            sd.idHospital = 1
+            sd.idDepartment = d
             
             if not sd.idDepartment in deps_idx:
                 db.session.add(sd)
             else:
                 del(deps_idx[sd.idDepartment])
 
-        for d in deps_idx:
-            db.session.query(SegmentDepartment)\
-                .filter(SegmentDepartment.id == idSegment)\
-                .filter(SegmentDepartment.idDepartment == d)\
-                .delete()
+    for d in deps_idx:
+        print('delete', d)
+        db.session.query(SegmentDepartment)\
+            .filter(SegmentDepartment.id == idSegment)\
+            .filter(SegmentDepartment.idDepartment == d)\
+            .delete()
 
     return tryCommit(db, idSegment)
 
@@ -189,7 +189,7 @@ def getCodes():
 
     results = []
     for t in typesExam:
-        results.append(t[0])
+        results.append(t[0].lower())
 
     return {
         'status': 'success',
@@ -218,7 +218,7 @@ def setExams(idSegment, typeExam):
     if 'min' in data.keys(): segExam.min = data.get('min', None)
     if 'max' in data.keys(): segExam.max = data.get('max', None)
     if 'ref' in data.keys(): segExam.ref = data.get('ref', None)
-    if 'header' in data.keys(): segExam.header = data.get('header', None)
+    if 'order' in data.keys(): segExam.order = data.get('order', None)
     if 'active' in data.keys(): segExam.active = bool(data.get('active', False))
 
     segExam.update = func.now()
