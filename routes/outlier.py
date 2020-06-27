@@ -272,11 +272,12 @@ def getUnits(idDrug):
 @app_out.route('/drugs/<int:idDrug>/convertunit/<string:idMeasureUnit>', methods=['POST'])
 @jwt_required
 def setDrugUnit(idDrug, idMeasureUnit):
-    data = request.get_json()
-
     user = User.find(get_jwt_identity())
     setSchema(user.schema)
-    u = MeasureUnitConvert.query.get((idMeasureUnit, idDrug))
+    data = request.get_json()
+
+    idSegment = request.args.get('idSegment', 1)
+    u = MeasureUnitConvert.query.get((idMeasureUnit, idDrug, idSegment))
     new = False
 
     if u is None:
@@ -284,7 +285,7 @@ def setDrugUnit(idDrug, idMeasureUnit):
         u = MeasureUnitConvert()
         u.idMeasureUnit = idMeasureUnit
         u.idDrug = idDrug
-        u.idHospital = 1
+        u.idSegment = idSegment
 
     u.factor = data.get('fator', 1)
 

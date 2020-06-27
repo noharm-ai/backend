@@ -141,6 +141,10 @@ examsRefX = {
 }
 
 examEmpty = { 'value': None, 'alert': False, 'ref': None, 'name': None }
+mdrdEmpty = dict(examEmpty, **{'initials': 'MDRD', 'name': 'Modification of Diet in Renal Disease'})
+cgEmpty = dict(examEmpty, **{'initials': 'CG', 'name': 'Cockcroft-Gault'})
+ckdEmpty = dict(examEmpty, **{'initials': 'CKD', 'name': 'Chronic Kidney Disease Epidemiology'})
+swrtz2Empty = dict(examEmpty, **{'initials': 'Schwartz 2', 'name': 'Schwartz 2'})
 
 def examAlerts(p, patient):
     exams = {'tgo': p[7], 'tgp': p[8], 'cr': p[9], 'k': p[10], 'na': p[11], 'mg': p[12], 'rni': p[13], 'pcr': p[22]}
@@ -186,7 +190,7 @@ def examAlertsList(exams, patient, segExams):
             alertCount += int(alert)
             results.append({
                 'key': typeExam.lower(),
-                'value': { 'value':value, 'ref':ref.ref , 'alert':alert, 'name':ref.name }
+                'value': { 'value':value, 'ref':ref.ref , 'alert':alert, 'name':ref.name, 'initials': ref.initials }
             })
 
             if ref.name.lower() == 'creatinina':
@@ -229,11 +233,11 @@ def examAlertsList(exams, patient, segExams):
                 if data2age(patient.birthdate.isoformat()) > 17:
                     results.append({
                         'key': 'mdrd',
-                        'value': dict(examEmpty, **{'initials': 'MDRD', 'name': 'MDRD'})
+                        'value': mdrdEmpty
                     })
                     results.append({
                         'key': 'cg',
-                        'value': dict(examEmpty, **{'initials': 'CG', 'name': 'CG'})
+                        'value': cgEmpty
                     })
                     results.append({
                         'key': 'ckd',
@@ -287,11 +291,11 @@ def period(tuples):
 # based on https://www.kidney.org/content/mdrd-study-equation
 # eGFR = 175 x (SCr)-1.154 x (age)-0.203 x 0.742 [if female] x 1.212 [if Black]
 def mdrd_calc(cr, birthdate, gender, skinColor):
-    if not is_float(cr): return dict(examEmpty, **{'initials': 'MDRD', 'name': 'MDRD'})
-    if birthdate is None: return dict(examEmpty, **{'initials': 'MDRD', 'name': 'MDRD'})
+    if not is_float(cr): return mdrdEmpty
+    if birthdate is None: return mdrdEmpty
     
     age = data2age(birthdate.isoformat())
-    if age == 0: return dict(examEmpty, **{'initials': 'MDRD', 'name': 'MDRD'})
+    if age == 0: return mdrdEmpty
 
     eGFR = 175 * (float(cr))**(-1.154) * (age)**(-0.203)
 
@@ -306,12 +310,12 @@ def mdrd_calc(cr, birthdate, gender, skinColor):
 # based on https://www.kidney.org/professionals/KDOQI/gfr_calculatorCoc
 # CCr = {((140–age) x weight)/(72xSCr)} x 0.85 (if female)
 def cg_calc(cr, birthdate, gender, weight):
-    if not is_float(cr): return dict(examEmpty, **{'initials': 'CG', 'name': 'CG'})
-    if not is_float(weight): return dict(examEmpty, **{'initials': 'CG', 'name': 'CG'})
-    if birthdate is None: return dict(examEmpty, **{'initials': 'CG', 'name': 'CG'})
+    if not is_float(cr): return cgEmpty
+    if not is_float(weight): return cgEmpty
+    if birthdate is None: return cgEmpty
 
     age = data2age(birthdate.isoformat())
-    if age == 0: return dict(examEmpty, **{'initials': 'CG', 'name': 'CG'})
+    if age == 0: return cgEmpty
 
     ccr = ((140 - age) * float(weight)) / (72 * float(cr))
     if gender == 'F': ccr *= 0.85
@@ -322,11 +326,11 @@ def cg_calc(cr, birthdate, gender, weight):
 # Chronic Kidney Disease Epidemiology Collaboration
 # based on https://www.kidney.org/professionals/kdoqi/gfr_calculator
 def ckd_calc(cr, birthdate, gender, skinColor):
-    if not is_float(cr): return dict(examEmpty, **{'initials': 'CKD', 'name': 'CKD'})
-    if birthdate is None: return dict(examEmpty, **{'initials': 'CKD', 'name': 'CKD'})
+    if not is_float(cr): return ckdEmpty
+    if birthdate is None: return ckdEmpty
 
     age = data2age(birthdate.isoformat())
-    if age == 0: return dict(examEmpty, **{'initials': 'CKD', 'name': 'CKD'})
+    if age == 0: return ckdEmpty
 
     if gender == 'F':
         g = 0.7
@@ -345,8 +349,8 @@ def ckd_calc(cr, birthdate, gender, skinColor):
 # Schwartz (2) Formula
 # based on https://link.springer.com/article/10.1007%2Fs00467-014-3002-5
 def schwartz2_calc(cr, height):
-    if not is_float(cr): return dict(examEmpty, **{'initials': 'Schwartz 2', 'name': 'Schwartz 2'})
-    if not is_float(height): return dict(examEmpty, **{'initials': 'Schwartz 2', 'name': 'Schwartz 2'})
+    if not is_float(cr): return swrtz2Empty
+    if not is_float(height): return swrtz2Empty
 
     eGFR = (0.413 * height) / cr
 
