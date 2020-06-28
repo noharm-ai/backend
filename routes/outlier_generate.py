@@ -10,7 +10,7 @@ from sqlalchemy import distinct, func
 from math import ceil
 
 app_gen = Blueprint('app_gen',__name__)
-fold_size = 50
+fold_size = 25
 
 def compute_outlier(idDrug, drugsItem, poolDict, fold):
     print('Starting...', fold, idDrug)

@@ -40,7 +40,7 @@ def getOutliers(idSegment=1, idDrug=1):
     frequency = request.args.get('f', None)
     dose = request.args.get('d', None)
 
-    units = getUnits(idDrug) # TODO: Refactor
+    units = getUnits(idDrug, idSegment) # TODO: Refactor
     defaultUnit = 'unlikely big name for a measure unit'
     bUnit = False
     for unit in units[0]['data']:
@@ -230,11 +230,11 @@ def getDrugs(idSegment=1):
 
 @app_out.route('/drugs/<int:idDrug>/units', methods=['GET'])
 @jwt_required
-def getUnits(idDrug):
+def getUnits(idDrug, idSegment=1):
     user = User.find(get_jwt_identity())
     setSchema(user.schema)
 
-    idSegment = request.args.get('idSegment', 1)
+    idSegment = request.args.get('idSegment', idSegment)
 
     u = db.aliased(MeasureUnit)
     p = db.aliased(PrescriptionAgg)
@@ -276,7 +276,7 @@ def setDrugUnit(idDrug, idMeasureUnit):
     setSchema(user.schema)
     data = request.get_json()
 
-    idSegment = request.args.get('idSegment', 1)
+    idSegment = data.get('idSegment', 1)
     u = MeasureUnitConvert.query.get((idMeasureUnit, idDrug, idSegment))
     new = False
 
