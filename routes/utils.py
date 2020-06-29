@@ -354,8 +354,8 @@ def schwartz2_calc(cr, height):
 
     eGFR = (0.413 * height) / cr
 
-    return { 'value': round(eGFR,1), 'ref': 'maior que 75 mL/min por 1.73 m²', 'unit': 'mL/min',
-             'alert': (eGFR < 75), 'name': 'Schwartz 2' , 'initials': 'Schwartz 2'}
+    return { 'value': round(eGFR,1), 'ref': 'maior que 90 mL/min por 1.73 m²', 'unit': 'mL/min',
+             'alert': (eGFR < 90), 'name': 'Schwartz 2' , 'initials': 'Schwartz 2'}
 
 def tryCommit(db, recId):
     try:
