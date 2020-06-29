@@ -20,9 +20,7 @@ def getPrescriptions(idPrescription=None):
     user = User.find(get_jwt_identity())
     setSchema(user.schema)
 
-    print(request.args)
-
-    idSegment = request.args.get('idSegment', 1)
+    idSegment = request.args.get('idSegment', None)
     idDept = request.args.getlist('idDept[]')
     idDrug = request.args.getlist('idDrug[]')
     limit = request.args.get('limit', 250)

@@ -230,24 +230,12 @@ def examAlertsList(exams, patient, segExams):
                 'value': examTypeEmpty
             })
             if ref.name.lower() == 'creatinina':
-                if data2age(patient.birthdate.isoformat()) > 17:
-                    results.append({
-                        'key': 'mdrd',
-                        'value': mdrdEmpty
-                    })
-                    results.append({
-                        'key': 'cg',
-                        'value': cgEmpty
-                    })
-                    results.append({
-                        'key': 'ckd',
-                        'value': dict(examEmpty, **{'initials': 'CKD', 'name': 'CKD'})
-                    })
+                if patient.birthdate is None or data2age(patient.birthdate.isoformat()) > 17:
+                    results.append({ 'key': 'mdrd', 'value': mdrdEmpty })
+                    results.append({ 'key': 'cg', 'value': cgEmpty })
+                    results.append({ 'key': 'ckd', 'value': ckdEmpty })
                 else:
-                    results.append({
-                        'key': 'swrtz2',
-                        'value': dict(examEmpty, **{'initials': 'Schwartz 2', 'name': 'Schwartz 2'})
-                    })
+                    results.append({ 'key': 'swrtz2', 'value': swrtz2Empty })
 
         if len(results) == 8:
             break
