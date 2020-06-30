@@ -7,7 +7,7 @@ from flask import Blueprint, request
 from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
 from .utils import mdrd_calc, cg_calc, ckd_calc, none2zero, formatExam, schwartz2_calc,\
-                    period, lenghStay, strNone, examAlerts, timeValue,\
+                    period, lenghStay, strNone, timeValue,\
                     data2age, examEmpty, is_float, tryCommit, examAlertsList
 from sqlalchemy import func
 from datetime import date, datetime
@@ -39,7 +39,6 @@ def getPrescriptions(idPrescription=None):
             patient.idPatient = p[0].idPatient
             patient.admissionNumber = p[0].admissionNumber
 
-        tgo, tgp, cr, mdrd, cg, k, na, mg, rni, pcr, ckd, totalAlerts = examAlerts(p, patient)
         exams, totalAlerts = examAlertsList(p[23], patient, segExams)
 
         results.append({
@@ -54,7 +53,7 @@ def getPrescriptions(idPrescription=None):
             'lengthStay': lenghStay(patient.admissionDate),
             'date': p[0].date.isoformat(),
             'department': str(p[19]),
-            'daysAgo': p[2],
+            'daysAgo': 0,
             'prescriptionScore': none2zero(p[3]),
             'scoreOne': str(p[4]),
             'scoreTwo': str(p[5]),
@@ -66,21 +65,10 @@ def getPrescriptions(idPrescription=None):
             'tube': str(p[17]),
             'diff': str(p[18]),
             'exams': exams,
-            'tgo': tgo,
-            'tgp': tgp,
-            'cr': cr,
-            'mdrd': mdrd,
-            'cg': cg,
-            'k': k,
-            'na': na,
-            'mg': mg,
-            'rni': rni,
-            'pcr': pcr,
-            'ckd': ckd,
             'alertExams': totalAlerts,
             'interventions': str(p[21]),
             'patientScore': 'Alto',
-            'class': 'yellow', #'red' if p[3] > 12 else 'orange' if p[3] > 8 else 'yellow' if p[3] > 4 else 'green',
+            'class': 'yellow',
             'status': p[0].status,
         })
 
@@ -117,105 +105,131 @@ def getPrescriptionsStatus():
         'data': results
     }, status.HTTP_200_OK
 
-def getPrevIntervention(idDrug, idPrescription, interventions):
-    result = {}
-    for i in interventions:
-        if i['idDrug'] == idDrug and i['idPrescription'] < idPrescription:
-            if 'id' in result.keys() and result['id'] > i['id']: continue
-            result = i;
-    return result
+class DrugList():
 
-def getIntervention(idPrescriptionDrug, interventions):
-    result = {}
-    for i in interventions:
-        if i['id'] == idPrescriptionDrug:
-            result = i;
-    return result
+    def __init__(self, drugList, interventions, relations, exams):
+        self.drugList = drugList
+        self.interventions = interventions
+        self.relations = relations
+        self.exams = exams
 
-def getDrugType(drugList, pDrugs, source, interventions, relations, exams=None, checked=False, suspended=False, route=False):
-    for pd in drugList:
+    def getPrevIntervention(self, idDrug, idPrescription):
+        result = {}
+        for i in self.interventions:
+            if i['idDrug'] == idDrug and i['idPrescription'] < idPrescription:
+                if 'id' in result.keys() and result['id'] > i['id']: continue
+                result = i;
+        return result
 
-        belong = False
+    def getIntervention(self, idPrescriptionDrug):
+        result = {}
+        for i in self.interventions:
+            if i['id'] == idPrescriptionDrug:
+                result = i;
+        return result
 
-        if pd[0].source is None: pd[0].source = 'Medicamentos'
-        if pd[0].source != source: continue
-        if source == 'Soluções': belong = True
-        if checked and bool(pd[0].checked) == True and bool(pd[0].suspendedDate) == False: belong = True
-        if suspended and (bool(pd[0].suspendedDate) == True): belong = True
-        if (not checked and not suspended) and (bool(pd[0].checked) == False and bool(pd[0].suspendedDate) == False): belong = True
+    def getDrugType(self, pDrugs, source, checked=False, suspended=False, route=False):
+        for pd in self.drugList:
 
-        pdFrequency = 1 if pd[0].frequency in [33,44,99] else pd[0].frequency
+            belong = False
 
-        alerts = []
-        doseWeight = None
-        if exams and pd[6]:
-            if pd[6].maxDose and pd[6].maxDose < (pd[0].doseconv * pdFrequency):
-                alerts.append('Dose diária prescrita (' + str(int(pd[0].doseconv * pdFrequency)) + ') maior que a dose de alerta (' + str(pd[6].maxDose) + ') usualmente recomendada (considerada a dose diária máxima independente da indicação.')
+            if pd[0].source is None: pd[0].source = 'Medicamentos'
+            if pd[0].source != source: continue
+            if source == 'Soluções': belong = True
+            if checked and bool(pd[0].checked) == True and bool(pd[0].suspendedDate) == False: belong = True
+            if suspended and (bool(pd[0].suspendedDate) == True): belong = True
+            if (not checked and not suspended) and (bool(pd[0].checked) == False and bool(pd[0].suspendedDate) == False): belong = True
 
-            if pd[6].kidney and 'ckd' in exams and exams['ckd']['value'] and pd[6].kidney > exams['ckd']['value']:
-                alerts.append('Medicamento deve sofrer ajuste de posologia, já que a função renal do paciente (' + str(exams['ckd']['value']) + ' mL/min) está abaixo de ' + str(pd[6].kidney) + ' mL/min.')
+            pdFrequency = 1 if pd[0].frequency in [33,44,99] else pd[0].frequency
 
-            if pd[6].liver:
-                if ('tgp' in exams and exams['tgp']['value'] and float(exams['tgp']['value']) > pd[6].liver) or ('tgo' in exams and exams['tgo']['value'] and float(exams['tgo']['value']) > pd[6].liver):
-                    alerts.append('Medicamento com necessidade de ajuste de posologia ou contraindicado, já que para paciente com função hepática do paciente está reduzida (acima de ' + str(pd[6].liver) + ' U/L).')
+            alerts = []
+            doseWeight = None
+            if self.exams and pd[6]:
+                if pd[6].maxDose and pd[6].maxDose < (pd[0].doseconv * pdFrequency):
+                    alerts.append('Dose diária prescrita (' + str(int(pd[0].doseconv * pdFrequency)) + ') maior que a dose de alerta (' + str(pd[6].maxDose) + ') usualmente recomendada (considerada a dose diária máxima independente da indicação.')
 
-            if pd[6].elderly and exams['age'] > 60:
-                alerts.append('Medicamento potencialmente inapropriado para idosos, independente das comorbidades do paciente.')
+                if pd[6].kidney and 'ckd' in self.exams and self.exams['ckd']['value'] and pd[6].kidney > self.exams['ckd']['value']:
+                    alerts.append('Medicamento deve sofrer ajuste de posologia, já que a função renal do paciente (' + str(exams['ckd']['value']) + ' mL/min) está abaixo de ' + str(pd[6].kidney) + ' mL/min.')
 
-            if pd[6].useWeight and none2zero(exams['weight']) > 0:
-                doseWeight = str(round(pd[0].dose / float(exams['weight']),2))
-                if pd[2].id: doseWeight += ' ' + str(pd[2].id) + '/Kg'
+                if pd[6].liver:
+                    if ('tgp' in self.exams and self.exams['tgp']['value'] and float(self.exams['tgp']['value']) > pd[6].liver) or ('tgo' in self.exams and self.exams['tgo']['value'] and float(self.exams['tgo']['value']) > pd[6].liver):
+                        alerts.append('Medicamento com necessidade de ajuste de posologia ou contraindicado, já que para paciente com função hepática do paciente está reduzida (acima de ' + str(pd[6].liver) + ' U/L).')
 
-        if pd[0].alergy == 'S':
-            alerts.append('Paciente alérgico a este medicamento.')
+                if pd[6].elderly and self.exams['age'] > 60:
+                    alerts.append('Medicamento potencialmente inapropriado para idosos, independente das comorbidades do paciente.')
 
-        if pd[0].id in relations:
-            for a in relations[pd[0].id]:
-                alerts.append(a)            
+                if pd[6].useWeight and none2zero(self.exams['weight']) > 0:
+                    doseWeight = str(round(pd[0].dose / float(self.exams['weight']),2))
+                    if pd[2].id: doseWeight += ' ' + str(pd[2].id) + '/Kg'
 
-        if belong:
-            pDrugs.append({
-                'idPrescriptionDrug': pd[0].id,
-                'idDrug': pd[0].idDrug,
-                'drug': pd[1].name if pd[1] is not None else 'Medicamento ' + str(pd[0].idDrug),
-                'np': pd[6].notdefault if pd[6] is not None else False,
-                'am': pd[6].antimicro if pd[6] is not None else False,
-                'av': pd[6].mav if pd[6] is not None else False,
-                'c': pd[6].controlled if pd[6] is not None else False,
-                'doseWeight': doseWeight,
-                'dose': pd[0].dose,
-                'measureUnit': { 'value': pd[2].id, 'label': pd[2].description } if pd[2] else '',
-                'frequency': { 'value': pd[3].id, 'label': pd[3].description } if pd[3] else '',
-                'dayFrequency': pd[0].frequency,
-                'doseconv': pd[0].doseconv,
-                'time': timeValue(pd[0].interval),
-                'recommendation': pd[0].notes if pd[0].notes and len(pd[0].notes.strip()) > 0 else None,
-                'obs': None,
-                'period': str(pd[0].period) + 'D' if pd[0].period else '',
-                'periodDates': [],
-                'route': pd[0].route,
-                'grp_solution': pd[0].solutionGroup,
-                'stage': 'ACM' if pd[0].solutionACM == 'S' else strNone(pd[0].solutionPhase) + ' x '+ strNone(pd[0].solutionTime) + ' (' + strNone(pd[0].solutionTotalTime) + ')',
-                'infusion': strNone(pd[0].solutionDose) + ' ' + strNone(pd[0].solutionUnit),
-                'score': str(pd[5]),
-                'source': pd[0].source,
-                'checked': bool(pd[0].checked),
-                'intervened': None,
-                'suspended': bool(pd[0].suspendedDate),
-                'status': pd[0].status,
-                'near': pd[0].near,
-                'prevIntervention': getPrevIntervention(pd[0].idDrug, pd[0].idPrescription, interventions),
-                'intervention': getIntervention(pd[0].id, interventions),
-                'alerts': alerts,
-                'notes': pd[7],
-                'prevNotes': pd[8]
-            })
-    return pDrugs
+            if pd[0].alergy == 'S':
+                alerts.append('Paciente alérgico a este medicamento.')
 
-def sortRoute(pDrugs):
-    result = [p for p in pDrugs if p['route'] is not None]
-    result.extend([p for p in pDrugs if p['route'] is None])
-    return result
+            if pd[0].id in self.relations:
+                for a in self.relations[pd[0].id]:
+                    alerts.append(a)            
+
+            if belong:
+                pDrugs.append({
+                    'idPrescriptionDrug': pd[0].id,
+                    'idDrug': pd[0].idDrug,
+                    'drug': pd[1].name if pd[1] is not None else 'Medicamento ' + str(pd[0].idDrug),
+                    'np': pd[6].notdefault if pd[6] is not None else False,
+                    'am': pd[6].antimicro if pd[6] is not None else False,
+                    'av': pd[6].mav if pd[6] is not None else False,
+                    'c': pd[6].controlled if pd[6] is not None else False,
+                    'doseWeight': doseWeight,
+                    'dose': pd[0].dose,
+                    'measureUnit': { 'value': pd[2].id, 'label': pd[2].description } if pd[2] else '',
+                    'frequency': { 'value': pd[3].id, 'label': pd[3].description } if pd[3] else '',
+                    'dayFrequency': pd[0].frequency,
+                    'doseconv': pd[0].doseconv,
+                    'time': timeValue(pd[0].interval),
+                    'recommendation': pd[0].notes if pd[0].notes and len(pd[0].notes.strip()) > 0 else None,
+                    'obs': None,
+                    'period': str(pd[0].period) + 'D' if pd[0].period else '',
+                    'periodDates': [],
+                    'route': pd[0].route,
+                    'grp_solution': pd[0].solutionGroup,
+                    'stage': 'ACM' if pd[0].solutionACM == 'S' else strNone(pd[0].solutionPhase) + ' x '+ strNone(pd[0].solutionTime) + ' (' + strNone(pd[0].solutionTotalTime) + ')',
+                    'infusion': strNone(pd[0].solutionDose) + ' ' + strNone(pd[0].solutionUnit),
+                    'score': str(pd[5]),
+                    'source': pd[0].source,
+                    'checked': bool(pd[0].checked),
+                    'intervened': None,
+                    'suspended': bool(pd[0].suspendedDate),
+                    'status': pd[0].status,
+                    'near': pd[0].near,
+                    'prevIntervention': self.getPrevIntervention(pd[0].idDrug, pd[0].idPrescription),
+                    'intervention': self.getIntervention(pd[0].id),
+                    'alerts': alerts,
+                    'notes': pd[7],
+                    'prevNotes': pd[8]
+                })
+        return pDrugs
+
+    def sortRoute(self, pDrugs):
+        result = [p for p in pDrugs if p['route'] is not None]
+        result.extend([p for p in pDrugs if p['route'] is None])
+        return result
+
+    def getInfusionList(self):
+        result = {}
+        for pd in self.drugList:
+            if pd[0].solutionGroup:
+                if not pd[0].solutionGroup in result:
+                    result[pd[0].solutionGroup] = {'totalVol' : 0, 'amount': 0, 'vol': 0, 'speed': 0, 'unit': 'mg'}
+
+                if pd[6] and pd[6].amount:
+                    result[pd[0].solutionGroup]['vol'] += pd[0].dose
+                    result[pd[0].solutionGroup]['amount'] = pd[6].amount
+                    result[pd[0].solutionGroup]['unit'] = pd[6].amountUnit
+                
+                result[pd[0].solutionGroup]['speed'] = pd[0].solutionDose
+                result[pd[0].solutionGroup]['totalVol'] += pd[0].dose
+
+        return result
+
 
 @app_pres.route('/prescriptions/<int:idPrescription>', methods=['GET'])
 @jwt_required
@@ -265,29 +279,26 @@ def getPrescription(idPrescription):
 
     exams = dict(exams, **{
         'age': age,
-        'exams': examsJson,
         'weight': patient.weight,
     })
 
-    pDrugs = []
-    pDrugs = getDrugType(drugs, [], 'Medicamentos', interventions, relations, exams=exams)
-    pDrugs = getDrugType(drugs, pDrugs, 'Medicamentos', interventions, relations, checked=True, exams=exams)
-    pDrugs = getDrugType(drugs, pDrugs, 'Medicamentos', interventions, relations, suspended=True, exams=exams)
-    pDrugs = sortRoute(pDrugs)
+    drugList = DrugList(drugs, interventions, relations, exams)
 
-    pSolution = []
-    pSolution = getDrugType(drugs, [], 'Soluções', interventions, relations)
-    #pSolution = getDrugType(drugs, pSolution, checked=True, source='Soluções', interventions=interventions)
-    #pSolution = getDrugType(drugs, pSolution, suspended=True, source='Soluções', interventions=interventions)
+    pDrugs = drugList.getDrugType([], 'Medicamentos')
+    pDrugs = drugList.getDrugType(pDrugs, 'Medicamentos', checked=True)
+    pDrugs = drugList.getDrugType(pDrugs, 'Medicamentos', suspended=True)
+    pDrugs = drugList.sortRoute(pDrugs)
 
-    pProcedures = []
-    pProcedures = getDrugType(drugs, [], 'Proced/Exames', interventions, relations)
-    pProcedures = getDrugType(drugs, pProcedures, 'Proced/Exames', interventions, relations, checked=True)
-    pProcedures = getDrugType(drugs, pProcedures, 'Proced/Exames', interventions, relations, suspended=True)
+    pSolution = drugList.getDrugType([], 'Soluções')
+    pInfusion = drugList.getInfusionList()
+
+    pProcedures = drugList.getDrugType([], 'Proced/Exames')
+    pProcedures = drugList.getDrugType(pProcedures, 'Proced/Exames', checked=True)
+    pProcedures = drugList.getDrugType(pProcedures, 'Proced/Exames', suspended=True)
 
     return {
         'status': 'success',
-        'data': dict(exams, **{
+        'data': {
             'idPrescription': prescription[0].id,
             'idSegment': prescription[0].idSegment,
             'segmentName': prescription[5],
@@ -295,6 +306,7 @@ def getPrescription(idPrescription):
             'name': prescription[0].admissionNumber,
             'admissionNumber': prescription[0].admissionNumber,
             'birthdate': patient.birthdate.isoformat() if patient.birthdate else '',
+            'age': age,
             'gender': patient.gender,
             'height': patient.height,
             'weight': patient.weight,
@@ -312,9 +324,11 @@ def getPrescription(idPrescription):
             'prescription': pDrugs,
             'solution': pSolution,
             'procedures': pProcedures,
+            'infusion': [{'key': i, 'value': pInfusion[i]} for i in pInfusion],
             'interventions': [i for i in interventions if i['idPrescription'] < idPrescription],
+            'exams': examsJson,
             'status': prescription[0].status,
-        })
+        }
     }, status.HTTP_200_OK
 
 @app_pres.route('/prescriptions/<int:idPrescription>', methods=['PUT'])
@@ -428,7 +442,7 @@ def setPatientData(admissionNumber):
         p.weight = data.get('weight')
         p.height = data.get('height')
         p.weightDate = datetime.today()
-        p.update = func.now()
+        p.update = datetime.today()
         p.user  = user.id
 
     returnJson = tryCommit(db, admissionNumber)
@@ -469,7 +483,7 @@ def setPrescriptionDrugNote(idPrescriptionDrug):
         note.idDrug = idDrug
         note.admissionNumber = admissionNumber
         note.notes = notes
-        note.update = func.now()
+        note.update = datetime.today()
         note.user  = user.id
 
         if newObs: db.session.add(note)

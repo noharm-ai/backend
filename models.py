@@ -196,14 +196,6 @@ def getHighScore():
         .filter(or_(func.coalesce(Outlier.manualScore, Outlier.score) == 3, func.coalesce(Outlier.manualScore, Outlier.score) == None))\
         .as_scalar()
 
-def getExams(typeExam):
-    return db.session.query(Exams.value)\
-        .select_from(Exams)\
-        .filter(Exams.admissionNumber == Prescription.admissionNumber)\
-        .filter(Exams.typeExam == typeExam)\
-        .order_by(Exams.date.desc()).limit(1)\
-        .as_scalar()
-
 def getDrugClass(typeClass):
     return db.session.query(func.count(1).label('drugClass'))\
         .select_from(DrugAttributes)\
@@ -302,14 +294,6 @@ class Patient(db.Model):
         scoreOne = getScore(1)
         scoreTwo = getScore(2)
         scoreThree = getHighScore()
-        tgo = getExams('TGO')
-        tgp = getExams('TGP')
-        cr = getExams('CR')
-        k = getExams('K')
-        na = getExams('NA')
-        mg = getExams('MG')
-        rni = getExams('PRO')
-        pcr = getExams('PCRU')
         lastExams = findLatestExams()
         antimicro = getDrugClass(DrugAttributes.antimicro)
         mav = getDrugClass(DrugAttributes.mav)
@@ -325,12 +309,12 @@ class Patient(db.Model):
         else:
             q = db.session\
                 .query(
-                    Prescription, Patient, func.trunc(0).label('daysAgo'),
+                    Prescription, Patient, '0',
                     score.label('score'), scoreOne.label('scoreOne'), scoreTwo.label('scoreTwo'), scoreThree.label('scoreThree'),
-                    tgo.label('tgo'), tgp.label('tgp'), cr.label('cr'), k.label('k'), na.label('na'), mg.label('mg'), rni.label('rni'),
+                    '0', '0', '0', '0', '0', '0', '0',
                     antimicro.label('antimicro'), mav.label('mav'), controlled.label('controlled'), sonda.label('sonda'),
                     (count - diff).label('diff'), Department.name.label('department'), notdefault.label('notdefault'),
-                    interventions.label('interventions'), pcr.label('pcr'), 
+                    interventions.label('interventions'), '0', 
                     lastExams.label('lastexams')
                 )\
                 .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)\
@@ -482,7 +466,7 @@ class PrescriptionDrug(db.Model):
         prevNotes = getPrevNotes(admissionNumber)
 
         return db.session\
-            .query(PrescriptionDrug, Drug, MeasureUnit, Frequency, func.trunc(0).label('intervention'), 
+            .query(PrescriptionDrug, Drug, MeasureUnit, Frequency, '0', 
                     func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4).label('score'),
                     DrugAttributes, Notes.notes, prevNotes.label('prevNotes'))\
             .outerjoin(Outlier, Outlier.id == PrescriptionDrug.idOutlier)\
@@ -535,6 +519,9 @@ class DrugAttributes(db.Model):
     useWeight = db.Column("usapeso", db.Boolean, nullable=True)
     idMeasureUnit = db.Column("fkunidademedida", db.String(10), nullable=True)
     amount = db.Column("concentracao", db.Integer, nullable=True)
+    #amountUnit = db.Column("concentracaounidade", db.String(3), nullable=True)
+    #whiteList = db.Column("linhabranca", db.Boolean, nullable=True)
+
 
     def setSchema(schema):
         DrugAttributes.__table__.schema = schema

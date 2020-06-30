@@ -7,7 +7,7 @@ from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
 from sqlalchemy import asc, func
 from .utils import tryCommit
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 app_seg = Blueprint('app_seg',__name__)
 
@@ -221,7 +221,7 @@ def setExams(idSegment, typeExam):
     if 'order' in data.keys(): segExam.order = data.get('order', None)
     if 'active' in data.keys(): segExam.active = bool(data.get('active', False))
 
-    segExam.update = func.now()
+    segExam.update = datetime.today()
     segExam.user  = user.id
 
     if newSegExam: db.session.add(segExam)

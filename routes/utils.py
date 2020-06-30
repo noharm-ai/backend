@@ -83,95 +83,11 @@ typeRelations['it'] = 'Interação Medicamentosa'
 typeRelations['iy'] = 'Incompatibilidade em Y'
 typeRelations['rx'] = 'Reatividade Cruzada'
 
-examsNameX = {
-    'cr':  'Creatinina',
-    'mdrd':'MDRD',
-    'cg':  'CG',
-    'ckd': 'CKD-EPI',
-    'pcru': 'PCR',
-    'pcr': 'PCR',
-    'rni': 'RNI',
-    'pro': 'RNI',
-    'tgo': 'TGO',
-    'tgp': 'TGP',
-    'k':   'Potássio',
-    'na':  'Sódio',
-    'mg':  'Magnésio',
-    'h_eritr': 'Eritócitos',
-    'h_hematoc': 'Hematócrito',
-    'h_hemogl': 'Hemoglobina',
-    'h_plt': 'Plaquetas',
-    'h_vcm': 'V.C.M.',
-    'h_hcm': 'H.C.M.',
-    'h_chcm': 'C.H.C.M.',
-    'h_rdw': 'R.D.W.',
-    'h_conleuc': 'Leucóticos',
-    'h_conbaso': 'Basófilos',
-    'h_coneos': 'Eosinófilos',
-    'h_consegm': 'Neutrófitos',
-    'h_conlinfoc': 'Linfócitos',
-    'h_conmono': 'Monócitos',
-}
-
-examsRefX = {
-    'tgo': { 'min': 0,   'max': 34,  'ref': 'até 34 U/L - Método: Cinético optimizado UV' },
-    'tgp': { 'min': 0,   'max': 49,  'ref': '10 a 49 U/L - Método: Cinético optimizado UV' },
-    'k':   { 'min': 3.5, 'max': 5.5, 'ref': '3,5 a 5,5 mEq/L - Método: Eletrodo Seletivo' },
-    'na':  { 'min': 132, 'max': 146, 'ref': '132 a 146 mEq/L - Método: Eletrodo Seletivo' },
-    'mg':  { 'min': 1.3, 'max': 2.7, 'ref': '1,3 a 2,7 mg/dl - Método: Clorofosfonazo III 1' },
-    'rni': { 'min': 0,   'max': 1.3, 'ref': 'até 1,3 - Método: Coagulométrico automatizado ACL TOP 550' },
-    'pro': { 'min': 0,   'max': 1.3, 'ref': 'até 1,3 - Método: Coagulométrico automatizado ACL TOP 550' },
-    'cr':  { 'min': 0.3, 'max': 1.3, 'ref': '0,3 a 1,3 mg/dL (IFCC)' },
-    'pcr': { 'min': 0,   'max': 3,   'ref': 'até 3,0 mg/L' },
-    'pcru':{ 'min': 0,   'max': 3,   'ref': 'até 3,0 mg/L' },
-    'h_plt':        { 'min': 150000, 'max': 440000},
-    'h_vcm':        { 'min': 80,     'max': 98},
-    'h_rdw':        { 'min': 0,      'max': 15},
-    'h_hcm':        { 'min': 28,     'max': 32},
-    'h_chcm':       { 'min': 32,     'max': 36},
-    'h_hematoc':    { 'min': 39,     'max': 53},
-    'h_hemogl':     { 'min': 12.8,   'max': 17.8},
-    'h_eritr':      { 'min': 4.5,    'max': 6.1},
-    'h_conleuc':    { 'min': 3600,   'max': 11000},
-    'h_conlinfoc':  { 'min': 1000,   'max': 4500},
-    'h_conmono':    { 'min': 100,    'max': 1000},
-    'h_coneos':     { 'min': 0,      'max': 500},
-    'h_conbaso':    { 'min': 0,      'max': 220},
-    'h_consegm':    { 'min': 1500,   'max': 7000},
-}
-
 examEmpty = { 'value': None, 'alert': False, 'ref': None, 'name': None }
 mdrdEmpty = dict(examEmpty, **{'initials': 'MDRD', 'name': 'Modification of Diet in Renal Disease'})
 cgEmpty = dict(examEmpty, **{'initials': 'CG', 'name': 'Cockcroft-Gault'})
 ckdEmpty = dict(examEmpty, **{'initials': 'CKD', 'name': 'Chronic Kidney Disease Epidemiology'})
 swrtz2Empty = dict(examEmpty, **{'initials': 'Schwartz 2', 'name': 'Schwartz 2'})
-
-def examAlerts(p, patient):
-    exams = {'tgo': p[7], 'tgp': p[8], 'cr': p[9], 'k': p[10], 'na': p[11], 'mg': p[12], 'rni': p[13], 'pcr': p[22]}
-    exams['mdrd'] = mdrd_calc(str(p[9]), patient.birthdate, patient.gender, patient.skinColor)
-    exams['cg'] = cg_calc(str(p[9]), patient.birthdate, patient.gender, patient.weight)
-    exams['ckd'] = ckd_calc(str(p[9]), patient.birthdate, patient.gender, patient.skinColor)
-
-    result = {}
-    alertCount = 0
-    for e in exams:
-        value = exams[e]
-        
-        if value is None: 
-            result[e] = examEmpty
-        else:
-            if e in ['mdrd', 'cg', 'ckd']:
-                result[e] = value
-                alertCount += int(value['alert'])
-            else:            
-                ref = examsRefX[e]
-                alert = not (value >= ref['min'] and value <= ref['max'] )
-                alertCount += int(alert)
-                result[e] = { 'value': value, 'alert': alert }
-
-    return result['tgo'], result['tgp'], result['cr'], result['mdrd'], result['cg'],\
-            result['k'], result['na'], result['mg'], result['rni'],\
-            result['pcr'], result['ckd'], alertCount
 
 def examAlertsList(exams, patient, segExams):
     valueExams = {}

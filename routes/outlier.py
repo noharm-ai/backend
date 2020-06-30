@@ -7,6 +7,7 @@ from flask import Blueprint, request
 from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
 from .utils import freqValue, tryCommit, typeRelations, sortSubstance, strNone
+from datetime import datetime
 
 app_out = Blueprint('app_out',__name__)
 
@@ -77,7 +78,7 @@ def getOutliers(idSegment=1, idDrug=1):
         o.frequency = float(frequency)
         o.score = 4
         o.manualScore = None
-        o.update = func.now()
+        o.update = datetime.today()
         o.user = user.id
 
         db.session.add(o)
@@ -109,8 +110,10 @@ def getOutliers(idSegment=1, idDrug=1):
             'elderly': drugAttr.elderly,
             'division': drugAttr.division,
             'useWeight': drugAttr.useWeight,
-            'idMeasureUnit': drugAttr.idMeasureUnit,
+            'idMeasureUnit': drugAttr.idMeasureUnit or defaultUnit,
             'amount': drugAttr.amount,
+            #'amountUnit': drugAttr.amountUnit,
+            #'whiteList': drugAttr.whiteList,
             'sctidA': d[0].sctid,
             'sctNameA': strNone(d[1]).upper(),
             'relations': relations,
@@ -131,7 +134,7 @@ def setManualOutlier(idOutlier):
     if 'manualScore' in data:
         manualScore = data.get('manualScore', None)
         o.manualScore = manualScore
-        o.update = func.now()
+        o.update = datetime.today()
         o.user = user.id
 
     if 'obs' in data:
@@ -150,7 +153,7 @@ def setManualOutlier(idOutlier):
             obs.frequency = o.frequency
 
         obs.notes = notes
-        obs.update = func.now()
+        obs.update = datetime.today()
         obs.user  = user.id
 
         if newObs: db.session.add(obs)
@@ -188,6 +191,8 @@ def setDrugClass(idDrug):
     if 'division' in data.keys(): drugAttr.division = data.get('division', None)
     if 'useWeight' in data.keys(): drugAttr.useWeight = data.get('useWeight', 0)
     if 'amount' in data.keys(): drugAttr.amount = data.get('amount', 0)
+    if 'amountUnit' in data.keys(): drugAttr.amountUnit = data.get('amount', None)
+    if 'whiteList' in data.keys(): drugAttr.whiteList = data.get('amount', None)
 
     if newDrugAttr: db.session.add(drugAttr)
 
@@ -340,7 +345,7 @@ def setRelation(sctidA,sctidB,kind):
     if 'text' in data.keys(): relation.text = data.get('text', None)
     if 'active' in data.keys(): relation.active = bool(data.get('active', False))
 
-    relation.update = func.now()
+    relation.update = datetime.today()
     relation.user  = user.id
 
     if newRelation: db.session.add(relation)
