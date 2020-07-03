@@ -153,9 +153,6 @@ def examAlertsList(exams, patient, segExams):
                 else:
                     results.append({ 'key': 'swrtz2', 'value': swrtz2Empty })
 
-        if len(results) == 8:
-            break
-
     return results, alertCount
 
 class refEmpty():

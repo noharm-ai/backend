@@ -73,9 +73,9 @@ def getSegmentsId(idSegment):
     return {
         'status': 'success',
         'data': {
-            'id': s.id,
-            'description': s.description,
-            'status': s.status,
+            'id': s.id if s else None,
+            'description': s.description if s else None,
+            'status': s.status if s else None,
             'departments': deps,
             'exams': exams
         }

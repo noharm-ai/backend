@@ -64,7 +64,7 @@ def getPrescriptions(idPrescription=None):
             'np': str(p[20]),
             'tube': str(p[17]),
             'diff': str(p[18]),
-            'exams': exams,
+            'exams': exams[:7],
             'alertExams': totalAlerts,
             'interventions': str(p[21]),
             'patientScore': 'Alto',
@@ -132,7 +132,6 @@ class DrugList():
         for pd in self.drugList:
 
             belong = False
-
             if pd[0].source is None: pd[0].source = 'Medicamentos'
             if pd[0].source != source: continue
             if source == 'Soluções': belong = True
@@ -149,7 +148,7 @@ class DrugList():
                     alerts.append('Dose diária prescrita (' + str(int(pd[0].doseconv * pdFrequency)) + ') maior que a dose de alerta (' + str(pd[6].maxDose) + ') usualmente recomendada (considerada a dose diária máxima independente da indicação.')
 
                 if pd[6].kidney and 'ckd' in self.exams and self.exams['ckd']['value'] and pd[6].kidney > self.exams['ckd']['value']:
-                    alerts.append('Medicamento deve sofrer ajuste de posologia, já que a função renal do paciente (' + str(exams['ckd']['value']) + ' mL/min) está abaixo de ' + str(pd[6].kidney) + ' mL/min.')
+                    alerts.append('Medicamento deve sofrer ajuste de posologia, já que a função renal do paciente (' + str(self.exams['ckd']['value']) + ' mL/min) está abaixo de ' + str(pd[6].kidney) + ' mL/min.')
 
                 if pd[6].liver:
                     if ('tgp' in self.exams and self.exams['tgp']['value'] and float(self.exams['tgp']['value']) > pd[6].liver) or ('tgo' in self.exams and self.exams['tgo']['value'] and float(self.exams['tgo']['value']) > pd[6].liver):
@@ -178,6 +177,7 @@ class DrugList():
                     'am': pd[6].antimicro if pd[6] is not None else False,
                     'av': pd[6].mav if pd[6] is not None else False,
                     'c': pd[6].controlled if pd[6] is not None else False,
+                    'whiteList': pd[6].whiteList if pd[6] is not None else None,
                     'doseWeight': doseWeight,
                     'dose': pd[0].dose,
                     'measureUnit': { 'value': pd[2].id, 'label': pd[2].description } if pd[2] else '',
@@ -193,7 +193,7 @@ class DrugList():
                     'grp_solution': pd[0].solutionGroup,
                     'stage': 'ACM' if pd[0].solutionACM == 'S' else strNone(pd[0].solutionPhase) + ' x '+ strNone(pd[0].solutionTime) + ' (' + strNone(pd[0].solutionTotalTime) + ')',
                     'infusion': strNone(pd[0].solutionDose) + ' ' + strNone(pd[0].solutionUnit),
-                    'score': str(pd[5]),
+                    'score': '0' if pd[6] is not None and pd[6].whiteList else str(pd[5]),
                     'source': pd[0].source,
                     'checked': bool(pd[0].checked),
                     'intervened': None,
@@ -208,9 +208,9 @@ class DrugList():
                 })
         return pDrugs
 
-    def sortRoute(self, pDrugs):
-        result = [p for p in pDrugs if p['route'] is not None]
-        result.extend([p for p in pDrugs if p['route'] is None])
+    def sortWhiteList(self, pDrugs):
+        result = [p for p in pDrugs if p['whiteList'] is None]
+        result.extend([p for p in pDrugs if p['whiteList']])
         return result
 
     def getInfusionList(self):
@@ -287,7 +287,7 @@ def getPrescription(idPrescription):
     pDrugs = drugList.getDrugType([], 'Medicamentos')
     pDrugs = drugList.getDrugType(pDrugs, 'Medicamentos', checked=True)
     pDrugs = drugList.getDrugType(pDrugs, 'Medicamentos', suspended=True)
-    pDrugs = drugList.sortRoute(pDrugs)
+    pDrugs = drugList.sortWhiteList(pDrugs)
 
     pSolution = drugList.getDrugType([], 'Soluções')
     pInfusion = drugList.getInfusionList()
@@ -438,12 +438,16 @@ def setPatientData(admissionNumber):
 
     p = Patient.findByAdmission(admissionNumber)
 
-    if 'weight' in data.keys(): 
-        p.weight = data.get('weight')
-        p.height = data.get('height')
+    weight = data.get('weight', None)
+    if weight: 
         p.weightDate = datetime.today()
-        p.update = datetime.today()
+        p.weight = weight
         p.user  = user.id
+
+    height = data.get('height', None)
+    if height: p.height = height
+    
+    p.update = datetime.today()
 
     returnJson = tryCommit(db, admissionNumber)
 

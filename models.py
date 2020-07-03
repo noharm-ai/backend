@@ -171,8 +171,9 @@ def getAggScore():
     return db.session.query(func.sum(func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4)).label('score'))\
         .select_from(PrescriptionDrug)\
         .outerjoin(Outlier, and_(Outlier.id == PrescriptionDrug.idOutlier))\
+        .outerjoin(DrugAttributes, and_(DrugAttributes.idDrug == PrescriptionDrug.idDrug, DrugAttributes.idSegment == PrescriptionDrug.idSegment))\
         .filter(PrescriptionDrug.idPrescription == Prescription.id)\
-        .filter(PrescriptionDrug.route != None)\
+        .filter(DrugAttributes.whiteList == None)\
         .filter(PrescriptionDrug.suspendedDate == None)\
         .as_scalar()
 
@@ -180,8 +181,9 @@ def getScore(level):
     return db.session.query(func.count(func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4)).label('scoreOne'))\
         .select_from(PrescriptionDrug)\
         .outerjoin(Outlier, and_(Outlier.id == PrescriptionDrug.idOutlier))\
+        .outerjoin(DrugAttributes, and_(DrugAttributes.idDrug == PrescriptionDrug.idDrug, DrugAttributes.idSegment == PrescriptionDrug.idSegment))\
         .filter(PrescriptionDrug.idPrescription == Prescription.id)\
-        .filter(PrescriptionDrug.route != None)\
+        .filter(DrugAttributes.whiteList == None)\
         .filter(PrescriptionDrug.suspendedDate == None)\
         .filter(func.coalesce(Outlier.manualScore, Outlier.score) == level)\
         .as_scalar()
@@ -190,8 +192,9 @@ def getHighScore():
     return db.session.query(func.count(func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4)).label('scoreOne'))\
         .select_from(PrescriptionDrug)\
         .outerjoin(Outlier, and_(Outlier.id == PrescriptionDrug.idOutlier))\
+        .outerjoin(DrugAttributes, and_(DrugAttributes.idDrug == PrescriptionDrug.idDrug, DrugAttributes.idSegment == PrescriptionDrug.idSegment))\
         .filter(PrescriptionDrug.idPrescription == Prescription.id)\
-        .filter(PrescriptionDrug.route != None)\
+        .filter(DrugAttributes.whiteList == None)\
         .filter(PrescriptionDrug.suspendedDate == None)\
         .filter(or_(func.coalesce(Outlier.manualScore, Outlier.score) == 3, func.coalesce(Outlier.manualScore, Outlier.score) == None))\
         .as_scalar()
@@ -201,7 +204,7 @@ def getDrugClass(typeClass):
         .select_from(DrugAttributes)\
         .outerjoin(PrescriptionDrug, and_(DrugAttributes.idDrug == PrescriptionDrug.idDrug, DrugAttributes.idSegment == PrescriptionDrug.idSegment))\
         .filter(PrescriptionDrug.idPrescription == Prescription.id)\
-        .filter(PrescriptionDrug.route != None)\
+        .filter(DrugAttributes.whiteList == None)\
         .filter(PrescriptionDrug.suspendedDate == None)\
         .filter(typeClass == True)\
         .as_scalar()
@@ -209,8 +212,9 @@ def getDrugClass(typeClass):
 def getDrugRoute(route):
     return db.session.query(func.count(1).label('drugRoute'))\
         .select_from(PrescriptionDrug)\
+        .outerjoin(DrugAttributes, and_(DrugAttributes.idDrug == PrescriptionDrug.idDrug, DrugAttributes.idSegment == PrescriptionDrug.idSegment))\
         .filter(PrescriptionDrug.idPrescription == Prescription.id)\
-        .filter(PrescriptionDrug.route != None)\
+        .filter(DrugAttributes.whiteList == None)\
         .filter(PrescriptionDrug.suspendedDate == None)\
         .filter(PrescriptionDrug.route.ilike(route))\
         .as_scalar()
@@ -218,8 +222,9 @@ def getDrugRoute(route):
 def getDrugsCount():
     return db.session.query(func.count(1).label('drugCount'))\
         .select_from(PrescriptionDrug, Prescription)\
+        .outerjoin(DrugAttributes, and_(DrugAttributes.idDrug == PrescriptionDrug.idDrug, DrugAttributes.idSegment == PrescriptionDrug.idSegment))\
         .filter(PrescriptionDrug.idPrescription == Prescription.id)\
-        .filter(PrescriptionDrug.route != None)\
+        .filter(DrugAttributes.whiteList == None)\
         .filter(PrescriptionDrug.suspendedDate == None)\
         .as_scalar()
 
@@ -235,8 +240,9 @@ def getPendingInterventions():
 def getDrugDiff():
     return db.session.query(func.count(1).label('drugDiff'))\
         .select_from(PrescriptionDrug, Prescription)\
+        .outerjoin(DrugAttributes, and_(DrugAttributes.idDrug == PrescriptionDrug.idDrug, DrugAttributes.idSegment == PrescriptionDrug.idSegment))\
         .filter(PrescriptionDrug.idPrescription == Prescription.id)\
-        .filter(PrescriptionDrug.route != None)\
+        .filter(DrugAttributes.whiteList == None)\
         .filter(PrescriptionDrug.suspendedDate == None)\
         .filter(PrescriptionDrug.checked == True)\
         .as_scalar() 
@@ -519,8 +525,8 @@ class DrugAttributes(db.Model):
     useWeight = db.Column("usapeso", db.Boolean, nullable=True)
     idMeasureUnit = db.Column("fkunidademedida", db.String(10), nullable=True)
     amount = db.Column("concentracao", db.Integer, nullable=True)
-    #amountUnit = db.Column("concentracaounidade", db.String(3), nullable=True)
-    #whiteList = db.Column("linhabranca", db.Boolean, nullable=True)
+    amountUnit = db.Column("concentracaounidade", db.String(3), nullable=True)
+    whiteList = db.Column("linhabranca", db.Boolean, nullable=True)
 
 
     def setSchema(schema):

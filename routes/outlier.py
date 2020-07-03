@@ -112,8 +112,8 @@ def getOutliers(idSegment=1, idDrug=1):
             'useWeight': drugAttr.useWeight,
             'idMeasureUnit': drugAttr.idMeasureUnit or defaultUnit,
             'amount': drugAttr.amount,
-            #'amountUnit': drugAttr.amountUnit,
-            #'whiteList': drugAttr.whiteList,
+            'amountUnit': drugAttr.amountUnit,
+            'whiteList': drugAttr.whiteList,
             'sctidA': d[0].sctid,
             'sctNameA': strNone(d[1]).upper(),
             'relations': relations,
@@ -191,8 +191,10 @@ def setDrugClass(idDrug):
     if 'division' in data.keys(): drugAttr.division = data.get('division', None)
     if 'useWeight' in data.keys(): drugAttr.useWeight = data.get('useWeight', 0)
     if 'amount' in data.keys(): drugAttr.amount = data.get('amount', 0)
-    if 'amountUnit' in data.keys(): drugAttr.amountUnit = data.get('amount', None)
-    if 'whiteList' in data.keys(): drugAttr.whiteList = data.get('amount', None)
+    if 'amountUnit' in data.keys(): drugAttr.amountUnit = data.get('amountUnit', None)
+    if 'whiteList' in data.keys(): 
+        drugAttr.whiteList = data.get('whiteList', None)
+        if not drugAttr.whiteList: drugAttr.whiteList = None
 
     if newDrugAttr: db.session.add(drugAttr)
 
