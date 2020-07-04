@@ -140,13 +140,12 @@ class DrugList():
             if (not checked and not suspended) and (bool(pd[0].checked) == False and bool(pd[0].suspendedDate) == False): belong = True
 
             pdFrequency = 1 if pd[0].frequency in [33,44,99] else pd[0].frequency
+            pdDoseconv = pd[0].doseconv * pdFrequency
+            pdUnit = strNone(pd[2].id) if pd[2] else ''
+            doseWeight = None
 
             alerts = []
-            doseWeight = None
             if self.exams and pd[6]:
-                if pd[6].maxDose and pd[6].maxDose < (pd[0].doseconv * pdFrequency):
-                    alerts.append('Dose diária prescrita (' + str(int(pd[0].doseconv * pdFrequency)) + ') maior que a dose de alerta (' + str(pd[6].maxDose) + ') usualmente recomendada (considerada a dose diária máxima independente da indicação.')
-
                 if pd[6].kidney and 'ckd' in self.exams and self.exams['ckd']['value'] and pd[6].kidney > self.exams['ckd']['value']:
                     alerts.append('Medicamento deve sofrer ajuste de posologia, já que a função renal do paciente (' + str(self.exams['ckd']['value']) + ' mL/min) está abaixo de ' + str(pd[6].kidney) + ' mL/min.')
 
@@ -158,8 +157,11 @@ class DrugList():
                     alerts.append('Medicamento potencialmente inapropriado para idosos, independente das comorbidades do paciente.')
 
                 if pd[6].useWeight and none2zero(self.exams['weight']) > 0:
-                    doseWeight = str(round(pd[0].dose / float(self.exams['weight']),2))
-                    if pd[2].id: doseWeight += ' ' + str(pd[2].id) + '/Kg'
+                    doseWeight = round(pd[0].dose / float(self.exams['weight']),2)
+                    pdDoseconv = doseWeight * pdFrequency
+
+                if pd[6].maxDose and pd[6].maxDose < pdDoseconv:
+                    alerts.append('Dose diária prescrita (' + str(int(pdDoseconv)) + ') maior que a dose de alerta (' + str(pd[6].maxDose) + ') usualmente recomendada (considerada a dose diária máxima independente da indicação.')
 
             if pd[0].alergy == 'S':
                 alerts.append('Paciente alérgico a este medicamento.')
@@ -178,7 +180,7 @@ class DrugList():
                     'av': pd[6].mav if pd[6] is not None else False,
                     'c': pd[6].controlled if pd[6] is not None else False,
                     'whiteList': pd[6].whiteList if pd[6] is not None else None,
-                    'doseWeight': doseWeight,
+                    'doseWeight': str(doseWeight) + ' ' + pdUnit + '/Kg' if doseWeight else None,
                     'dose': pd[0].dose,
                     'measureUnit': { 'value': pd[2].id, 'label': pd[2].description } if pd[2] else '',
                     'frequency': { 'value': pd[3].id, 'label': pd[3].description } if pd[3] else '',
