@@ -111,6 +111,7 @@ class Relation(db.Model):
             .join(Relation, and_(Relation.sctida == m1.sctid, Relation.sctidb == m2.sctid))\
             .filter(pd1.idPrescription == idPrescription)\
             .filter(Relation.active == True)\
+            .filter(Relation.kind.in_(['it','dt','dm']))\
             .all()
 
         results = {}
@@ -524,7 +525,7 @@ class DrugAttributes(db.Model):
     division = db.Column("divisor", db.Float, nullable=True)
     useWeight = db.Column("usapeso", db.Boolean, nullable=True)
     idMeasureUnit = db.Column("fkunidademedida", db.String(10), nullable=True)
-    amount = db.Column("concentracao", db.Integer, nullable=True)
+    amount = db.Column("concentracao", db.Float, nullable=True)
     amountUnit = db.Column("concentracaounidade", db.String(3), nullable=True)
     whiteList = db.Column("linhabranca", db.Boolean, nullable=True)
 
