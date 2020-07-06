@@ -223,7 +223,7 @@ class DrugList():
                     result[pd[0].solutionGroup] = {'totalVol' : 0, 'amount': 0, 'vol': 0, 'speed': 0, 'unit': 'mg'}
 
                 if pd[6] and pd[6].amount:
-                    result[pd[0].solutionGroup]['vol'] += pd[0].dose
+                    result[pd[0].solutionGroup]['vol'] = pd[0].dose
                     result[pd[0].solutionGroup]['amount'] = pd[6].amount
                     result[pd[0].solutionGroup]['unit'] = pd[6].amountUnit
                 
