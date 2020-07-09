@@ -12,6 +12,7 @@ from routes.prescription import app_pres
 from routes.segment import app_seg
 from routes.outlier_generate import app_gen
 from routes.intervention import app_itrv
+from routes.static import app_stc
 import logging
 import os
 
@@ -36,6 +37,7 @@ app.register_blueprint(app_pres)
 app.register_blueprint(app_seg)
 app.register_blueprint(app_gen)
 app.register_blueprint(app_itrv)
+app.register_blueprint(app_stc)
 
 CORS(app)
 
