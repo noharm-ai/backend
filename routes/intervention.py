@@ -1,11 +1,10 @@
 import random
 from flask_api import status
-from models import db, User, PrescriptionDrug, InterventionReason, Intervention, setSchema, PrescriptionPic
+from models import db, User, PrescriptionDrug, InterventionReason, Intervention, setSchema
 from flask import Blueprint, request
 from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
 from datetime import date, datetime
-from .prescription import getPrescriptions
 from .utils import tryCommit
 
 app_itrv = Blueprint('app_itrv',__name__)
@@ -20,14 +19,6 @@ def setDrugStatus(idPrescriptionDrug, drugStatus):
     pd.status = drugStatus
     pd.update = datetime.today()
     pd.user = user.id
-
-    ppic = PrescriptionPic.query.get(pd.idPrescription)
-    if ppic is None:
-        pObj, code = getPrescriptions(idPrescription=pd.idPrescription)
-        ppic = PrescriptionPic()
-        ppic.id = pd.idPrescription
-        ppic.picture = pObj['data'][0]
-        db.session.add(ppic)
 
     return tryCommit(db, idPrescriptionDrug)
 

@@ -23,7 +23,6 @@ def setSchema(schema):
     Exams.setSchema(schema)
     PrescriptionAgg.setSchema(schema)
     MeasureUnitConvert.setSchema(schema)
-    PrescriptionPic.setSchema(schema)
     Notes.setSchema(schema)
     DrugAttributes.setSchema(schema)
     SegmentExam.setSchema(schema)
@@ -148,6 +147,7 @@ class Prescription(db.Model):
     status = db.Column('status', db.String(1), nullable=False)
     bed = db.Column('leito', db.String(16), nullable=True)
     record = db.Column('prontuario', db.Integer, nullable=True)
+    features = db.Column('indicadores', postgresql.JSON, nullable=True)
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.Integer, nullable=True)
 
@@ -296,7 +296,7 @@ class Patient(db.Model):
                          .filter(Patient.admissionNumber == admissionNumber)\
                          .one()
 
-    def getPatients(idSegment=None, idDept=[], idDrug=[], idPrescription=None, limit=250, day=date.today(), onlyStatus=False):
+    def getPatients(idSegment=None, idDept=[], idDrug=[], limit=250, day=date.today(), onlyStatus=False):
         score = getAggScore()
         scoreOne = getScore(1)
         scoreTwo = getScore(2)
@@ -316,13 +316,13 @@ class Patient(db.Model):
         else:
             q = db.session\
                 .query(
-                    Prescription, Patient, '0',
-                    score.label('score'), scoreOne.label('scoreOne'), scoreTwo.label('scoreTwo'), scoreThree.label('scoreThree'),
-                    '0', '0', '0', '0', '0', '0', '0',
-                    antimicro.label('antimicro'), mav.label('mav'), controlled.label('controlled'), sonda.label('sonda'),
-                    (count - diff).label('diff'), Department.name.label('department'), notdefault.label('notdefault'),
-                    interventions.label('interventions'), '0', 
-                    lastExams.label('lastexams')
+                    Prescription, Patient, Department.name.label('department'),
+                    #score.label('score'), scoreOne.label('scoreOne'), scoreTwo.label('scoreTwo'), scoreThree.label('scoreThree'),
+                    #'0', '0', '0', '0', '0', '0', '0',
+                    #antimicro.label('antimicro'), mav.label('mav'), controlled.label('controlled'), sonda.label('sonda'),
+                    #(count - diff).label('diff'), Department.name.label('department'), notdefault.label('notdefault'),
+                    #interventions.label('interventions'), '0', 
+                    #lastExams.label('lastexams')
                 )\
                 .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)\
                 .outerjoin(Department, Department.id == Prescription.idDepartment)
@@ -338,10 +338,7 @@ class Patient(db.Model):
             idDrug = list(map(int, idDrug))
             q = q.filter(postgresql.array(idDrug).overlap(drugList))
 
-        if (not(idPrescription is None)):
-            q = q.filter(Prescription.id == idPrescription)
-        else:
-            q = q.filter(func.date(Prescription.date) == day)
+        q = q.filter(func.date(Prescription.date) == day)
             
         q = q.order_by(desc(Prescription.date))
 
@@ -473,8 +470,7 @@ class PrescriptionDrug(db.Model):
         prevNotes = getPrevNotes(admissionNumber)
 
         return db.session\
-            .query(PrescriptionDrug, Drug, MeasureUnit, Frequency, '0', 
-                    func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4).label('score'),
+            .query(PrescriptionDrug, Drug, MeasureUnit, Frequency, '0', '0',
                     DrugAttributes, Notes.notes, prevNotes.label('prevNotes'))\
             .outerjoin(Outlier, Outlier.id == PrescriptionDrug.idOutlier)\
             .outerjoin(Drug, Drug.id == PrescriptionDrug.idDrug)\
@@ -825,12 +821,3 @@ class Exams(db.Model):
             exams[e.typeExam.lower()] = formatExam(e, e.typeExam.lower(), segExam)
 
         return exams
-
-class PrescriptionPic(db.Model):
-    __tablename__ = 'prescricaofoto'
-
-    id = db.Column("fkprescricao", db.Integer, primary_key=True)
-    picture = db.Column("foto", postgresql.JSON, nullable=False)
-
-    def setSchema(schema):
-        PrescriptionPic.__table__.schema = schema

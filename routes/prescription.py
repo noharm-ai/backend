@@ -1,7 +1,7 @@
 import random, copy
 from flask_api import status
 from models import db, User, Patient, Prescription, PrescriptionDrug, InterventionReason,\
-                    Intervention, Segment, setSchema, Exams, PrescriptionPic, DrugAttributes,\
+                    Intervention, Segment, setSchema, Exams, DrugAttributes,\
                     Notes, Relation, SegmentExam
 from flask import Blueprint, request
 from flask_jwt_extended import (create_access_token, create_refresh_token,
@@ -16,7 +16,7 @@ app_pres = Blueprint('app_pres',__name__)
 
 @app_pres.route("/prescriptions", methods=['GET'])
 @jwt_required
-def getPrescriptions(idPrescription=None):
+def getPrescriptions():
     user = User.find(get_jwt_identity())
     setSchema(user.schema)
 
@@ -27,7 +27,7 @@ def getPrescriptions(idPrescription=None):
     day = request.args.get('date', date.today())
 
     segExams = SegmentExam.refDict(idSegment)
-    patients = Patient.getPatients(idSegment=idSegment, idDept=idDept, idDrug=idDrug, idPrescription=idPrescription, limit=limit, day=day)
+    patients = Patient.getPatients(idSegment=idSegment, idDept=idDept, idDrug=idDrug, limit=limit, day=day)
     db.engine.dispose()
 
     results = []
@@ -39,9 +39,16 @@ def getPrescriptions(idPrescription=None):
             patient.idPatient = p[0].idPatient
             patient.admissionNumber = p[0].admissionNumber
 
-        exams, totalAlerts = examAlertsList(p[23], patient, segExams)
+        #exams, totalAlerts = examAlertsList(p[23], patient, segExams)
+        featuresNames = ['alerts','prescriptionScore','scoreOne','scoreTwo','scoreThree',\
+                        'am','av','controlled','np','tube','diff','alertExams','interventions']
+        features = {}
+        if p[0].features:
+            for f in featuresNames:
+                features[f] = p[0].features[f] if f in p[0].features else 0
 
-        results.append({
+
+        results.append(dict(features, **{
             'idPrescription': p[0].id,
             'idPatient': p[0].idPatient,
             'name': patient.admissionNumber,
@@ -52,25 +59,10 @@ def getPrescriptions(idPrescription=None):
             'skinColor': patient.skinColor,
             'lengthStay': lenghStay(patient.admissionDate),
             'date': p[0].date.isoformat(),
-            'department': str(p[19]),
-            'daysAgo': 0,
-            'prescriptionScore': none2zero(p[3]),
-            'scoreOne': str(p[4]),
-            'scoreTwo': str(p[5]),
-            'scoreThree': str(p[6]),
-            'am': str(p[14]),
-            'av': str(p[15]),
-            'controlled': str(p[16]),
-            'np': str(p[20]),
-            'tube': str(p[17]),
-            'diff': str(p[18]),
-            'exams': exams[:7],
-            'alertExams': totalAlerts,
-            'interventions': str(p[21]),
-            'patientScore': 'Alto',
+            'department': str(p[2]),
             'class': 'yellow',
             'status': p[0].status,
-        })
+        }))
 
     return {
         'status': 'success',
@@ -235,9 +227,15 @@ class DrugList():
 
 @app_pres.route('/prescriptions/<int:idPrescription>', methods=['GET'])
 @jwt_required
-def getPrescription(idPrescription):
-    user = User.find(get_jwt_identity())
-    setSchema(user.schema)
+def getPrescriptionAuth(idPrescription):
+    return getPrescription(idPrescription)
+
+def getPrescription(idPrescription, schema=None):
+    if schema:
+        setSchema(schema)
+    else:
+        user = User.find(get_jwt_identity())
+        setSchema(user.schema)
 
     prescription = Prescription.getPrescription(idPrescription)
 
@@ -259,25 +257,25 @@ def getPrescription(idPrescription):
     age = data2age(patient.birthdate.isoformat() if patient.birthdate else date.today().isoformat())
 
     if 'cr' in exams:
-        exams['mdrd'] = mdrd_calc(exams['cr']['value'], patient.birthdate, patient.gender, patient.skinColor)
-        exams['cg'] = cg_calc(exams['cr']['value'], patient.birthdate, patient.gender, patient.weight)
-        exams['ckd'] = ckd_calc(exams['cr']['value'], patient.birthdate, patient.gender, patient.skinColor)
+        if age > 17:
+            exams['mdrd'] = mdrd_calc(exams['cr']['value'], patient.birthdate, patient.gender, patient.skinColor)
+            exams['cg'] = cg_calc(exams['cr']['value'], patient.birthdate, patient.gender, patient.weight)
+            exams['ckd'] = ckd_calc(exams['cr']['value'], patient.birthdate, patient.gender, patient.skinColor)
+        else:
+            exams['swrtz2'] = schwartz2_calc(exams['cr']['value'], patient.height)
 
     examsJson = []
+    alertExams = 0
     for e in exams:
         examsJson.append({'key': e, 'value': exams[e]})
         if e == 'cr':
-            print('age', age)
             if age > 17:
                 examsJson.append({'key': 'mdrd', 'value': exams['mdrd']})
                 examsJson.append({'key': 'cg', 'value': exams['cg']})
                 examsJson.append({'key': 'ckd', 'value': exams['ckd']})
             else:
-                swrtz2 = schwartz2_calc(exams['cr']['value'], patient.height)
-                examsJson.append({'key': 'swrtz2', 'value': swrtz2})
-
-        if len(examsJson) == 10: 
-            break
+                examsJson.append({'key': 'swrtz2', 'value': exams['swrtz2']})
+        alertExams += int(exams[e]['alert'])
 
     exams = dict(exams, **{
         'age': age,
@@ -308,10 +306,10 @@ def getPrescription(idPrescription):
             'name': prescription[0].admissionNumber,
             'admissionNumber': prescription[0].admissionNumber,
             'birthdate': patient.birthdate.isoformat() if patient.birthdate else '',
-            'age': age,
             'gender': patient.gender,
             'height': patient.height,
             'weight': patient.weight,
+            'age': age,
             'weightUser': bool(patient.user),
             'weightDate': patient.weightDate,
             'bed': prescription[0].bed,
@@ -321,14 +319,15 @@ def getPrescription(idPrescription):
             'department': prescription[4],
             'patientScore': 'High',
             'date': prescription[0].date.isoformat(),
-            'daysAgo': prescription[2],
-            'prescriptionScore': str(prescription[3]),
+            #'daysAgo': prescription[2],
+            #'prescriptionScore': str(prescription[3]),
             'prescription': pDrugs,
             'solution': pSolution,
             'procedures': pProcedures,
             'infusion': [{'key': i, 'value': pInfusion[i]} for i in pInfusion],
             'interventions': [i for i in interventions if i['idPrescription'] < idPrescription],
-            'exams': examsJson,
+            'alertExams': alertExams,
+            'exams': examsJson[:9],
             'status': prescription[0].status,
         }
     }, status.HTTP_200_OK
@@ -345,14 +344,6 @@ def setPrescriptionStatus(idPrescription):
     p.status = data.get('status', None)
     p.update = datetime.today()
     p.user = user.id
-
-    ppic = PrescriptionPic.query.get(p.id)
-    if ppic is None:
-        pObj, code = getPrescriptions(idPrescription=p.id)
-        ppic = PrescriptionPic()
-        ppic.id = p.id
-        ppic.picture = pObj['data'][0]
-        db.session.add(ppic)
 
     return tryCommit(db, idPrescription)
 

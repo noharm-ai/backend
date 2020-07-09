@@ -204,7 +204,7 @@ def mdrd_calc(cr, birthdate, gender, skinColor):
     if skinColor == 'Negra': eGFR *= 1.212
 
 
-    return { 'value': round(eGFR,1), 'ref': 'maior que 50 mL/min', 'unit': 'mL/min',
+    return { 'value': round(eGFR,1), 'ref': 'maior que 50 ml/min/1.73', 'unit': 'ml/min/1.73',
              'alert': (eGFR < 50), 'name': 'Modification of Diet in Renal Disease', 'initials': 'MDRD' }
 
 # Cockcroft-Gault
@@ -244,7 +244,7 @@ def ckd_calc(cr, birthdate, gender, skinColor):
 
     eGFR = s * (float(cr)/g)**(e) * (0.993)**(age)
 
-    return { 'value': round(eGFR,1), 'ref': 'maior que 50 mL/min', 'unit': 'mL/min',
+    return { 'value': round(eGFR,1), 'ref': 'maior que 50 ml/min/1.73', 'unit': 'ml/min/1.73',
              'alert': (eGFR < 50), 'name': 'Chronic Kidney Disease Epidemiology' , 'initials': 'CKD'}
 
 # Schwartz (2) Formula
@@ -255,7 +255,7 @@ def schwartz2_calc(cr, height):
 
     eGFR = (0.413 * height) / cr
 
-    return { 'value': round(eGFR,1), 'ref': 'maior que 90 mL/min por 1.73 m²', 'unit': 'mL/min',
+    return { 'value': round(eGFR,1), 'ref': 'maior que 90 mL/min por 1.73 m²', 'unit': 'mL/min/1.73m²',
              'alert': (eGFR < 90), 'name': 'Schwartz 2' , 'initials': 'Schwartz 2'}
 
 def tryCommit(db, recId):
