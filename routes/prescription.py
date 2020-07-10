@@ -8,7 +8,7 @@ from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
 from .utils import mdrd_calc, cg_calc, ckd_calc, none2zero, formatExam, schwartz2_calc,\
                     period, lenghStay, strNone, timeValue,\
-                    data2age, examEmpty, is_float, tryCommit, examAlertsList
+                    data2age, examEmpty, is_float, tryCommit
 from sqlalchemy import func
 from datetime import date, datetime
 
@@ -26,7 +26,6 @@ def getPrescriptions():
     limit = request.args.get('limit', 250)
     day = request.args.get('date', date.today())
 
-    segExams = SegmentExam.refDict(idSegment)
     patients = Patient.getPatients(idSegment=idSegment, idDept=idDept, idDrug=idDrug, limit=limit, day=day)
     db.engine.dispose()
 
@@ -39,7 +38,6 @@ def getPrescriptions():
             patient.idPatient = p[0].idPatient
             patient.admissionNumber = p[0].admissionNumber
 
-        #exams, totalAlerts = examAlertsList(p[23], patient, segExams)
         featuresNames = ['alerts','prescriptionScore','scoreOne','scoreTwo','scoreThree',\
                         'am','av','controlled','np','tube','diff','alertExams','interventions']
         features = {}
@@ -134,16 +132,17 @@ class DrugList():
             pdFrequency = 1 if pd[0].frequency in [33,44,99] else pd[0].frequency
             pdDoseconv = pd[0].doseconv * pdFrequency
             pdUnit = strNone(pd[2].id) if pd[2] else ''
+            pdWhiteList = bool(pd[6].whiteList) if pd[6] is not None else False
             doseWeight = None
 
             alerts = []
             if self.exams and pd[6]:
                 if pd[6].kidney and 'ckd' in self.exams and self.exams['ckd']['value'] and pd[6].kidney > self.exams['ckd']['value']:
-                    alerts.append('Medicamento deve sofrer ajuste de posologia, já que a função renal do paciente (' + str(self.exams['ckd']['value']) + ' mL/min) está abaixo de ' + str(pd[6].kidney) + ' mL/min.')
+                    alerts.append('Medicamento deve sofrer ajuste de posologia ou contraindicado, já que a função renal do paciente (' + str(self.exams['ckd']['value']) + ' mL/min) está abaixo de ' + str(pd[6].kidney) + ' mL/min.')
 
                 if pd[6].liver:
                     if ('tgp' in self.exams and self.exams['tgp']['value'] and float(self.exams['tgp']['value']) > pd[6].liver) or ('tgo' in self.exams and self.exams['tgo']['value'] and float(self.exams['tgo']['value']) > pd[6].liver):
-                        alerts.append('Medicamento com necessidade de ajuste de posologia ou contraindicado, já que para paciente com função hepática do paciente está reduzida (acima de ' + str(pd[6].liver) + ' U/L).')
+                        alerts.append('Medicamento deve sofre de ajuste de posologia ou contraindicado, já que a função hepática do paciente está reduzida (acima de ' + str(pd[6].liver) + ' U/L).')
 
                 if pd[6].elderly and self.exams['age'] > 60:
                     alerts.append('Medicamento potencialmente inapropriado para idosos, independente das comorbidades do paciente.')
@@ -171,7 +170,7 @@ class DrugList():
                     'am': pd[6].antimicro if pd[6] is not None else False,
                     'av': pd[6].mav if pd[6] is not None else False,
                     'c': pd[6].controlled if pd[6] is not None else False,
-                    'whiteList': pd[6].whiteList if pd[6] is not None else None,
+                    'whiteList': pdWhiteList,
                     'doseWeight': str(doseWeight) + ' ' + pdUnit + '/Kg' if doseWeight else None,
                     'dose': pd[0].dose,
                     'measureUnit': { 'value': pd[2].id, 'label': pd[2].description } if pd[2] else '',
@@ -187,7 +186,7 @@ class DrugList():
                     'grp_solution': pd[0].solutionGroup,
                     'stage': 'ACM' if pd[0].solutionACM == 'S' else strNone(pd[0].solutionPhase) + ' x '+ strNone(pd[0].solutionTime) + ' (' + strNone(pd[0].solutionTotalTime) + ')',
                     'infusion': strNone(pd[0].solutionDose) + ' ' + strNone(pd[0].solutionUnit),
-                    'score': '0' if pd[6] is not None and pd[6].whiteList else str(pd[5]),
+                    'score': str(pd[5]) if not pdWhiteList else '0',
                     'source': pd[0].source,
                     'checked': bool(pd[0].checked),
                     'intervened': None,
@@ -203,7 +202,7 @@ class DrugList():
         return pDrugs
 
     def sortWhiteList(self, pDrugs):
-        result = [p for p in pDrugs if p['whiteList'] is None]
+        result = [p for p in pDrugs if p['whiteList'] is False]
         result.extend([p for p in pDrugs if p['whiteList']])
         return result
 
@@ -253,28 +252,13 @@ def getPrescription(idPrescription, schema=None):
     relations = Relation.findByPrescription(idPrescription)
     db.engine.dispose()
 
-    exams = Exams.findLatestByAdmission(patient.admissionNumber, prescription[0].idSegment)
+    exams = Exams.findLatestByAdmission(patient, prescription[0].idSegment)
     age = data2age(patient.birthdate.isoformat() if patient.birthdate else date.today().isoformat())
-
-    if 'cr' in exams:
-        if age > 17:
-            exams['mdrd'] = mdrd_calc(exams['cr']['value'], patient.birthdate, patient.gender, patient.skinColor)
-            exams['cg'] = cg_calc(exams['cr']['value'], patient.birthdate, patient.gender, patient.weight)
-            exams['ckd'] = ckd_calc(exams['cr']['value'], patient.birthdate, patient.gender, patient.skinColor)
-        else:
-            exams['swrtz2'] = schwartz2_calc(exams['cr']['value'], patient.height)
 
     examsJson = []
     alertExams = 0
     for e in exams:
         examsJson.append({'key': e, 'value': exams[e]})
-        if e == 'cr':
-            if age > 17:
-                examsJson.append({'key': 'mdrd', 'value': exams['mdrd']})
-                examsJson.append({'key': 'cg', 'value': exams['cg']})
-                examsJson.append({'key': 'ckd', 'value': exams['ckd']})
-            else:
-                examsJson.append({'key': 'swrtz2', 'value': exams['swrtz2']})
         alertExams += int(exams[e]['alert'])
 
     exams = dict(exams, **{
@@ -309,6 +293,7 @@ def getPrescription(idPrescription, schema=None):
             'gender': patient.gender,
             'height': patient.height,
             'weight': patient.weight,
+            'observation': prescription[6],
             'age': age,
             'weightUser': bool(patient.user),
             'weightDate': patient.weightDate,
@@ -319,8 +304,6 @@ def getPrescription(idPrescription, schema=None):
             'department': prescription[4],
             'patientScore': 'High',
             'date': prescription[0].date.isoformat(),
-            #'daysAgo': prescription[2],
-            #'prescriptionScore': str(prescription[3]),
             'prescription': pDrugs,
             'solution': pSolution,
             'procedures': pProcedures,
@@ -439,6 +422,9 @@ def setPatientData(admissionNumber):
 
     height = data.get('height', None)
     if height: p.height = height
+
+    observation = data.get('observation', None)
+    if observation: p.observation = observation
     
     p.update = datetime.today()
 
@@ -452,8 +438,7 @@ def setPatientData(admissionNumber):
                     FROM " + user.schema + ".presmed\
                     WHERE fkprescricao = " + str(int(idPrescription)) + ";"
 
-        result = db.engine.execute(query)
-        print('Update Presmed:', result.rowcount)  
+        result = db.engine.execute(query) 
 
     return returnJson
 

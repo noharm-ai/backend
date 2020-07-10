@@ -1,9 +1,12 @@
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, text, and_, or_, desc, asc, distinct, cast
+from sqlalchemy.orm import deferred
 from datetime import date, timedelta
 from sqlalchemy.dialects import postgresql
 from routes.utils import timeValue, interactionsList, formatExam, strNone, typeRelations,\
-                         sortRelations, strNone
+                         sortRelations, strNone, mdrd_calc, cg_calc, ckd_calc, schwartz2_calc,\
+                         data2age
+from datetime import date
 
 db = SQLAlchemy()
 
@@ -155,98 +158,16 @@ class Prescription(db.Model):
         Prescription.__table__.schema = schema
 
     def getPrescription(idPrescription):
-        score = getAggScore()
-
         return db.session\
             .query(
-                Prescription, Patient, func.trunc(0).label('daysAgo'), score,
-                Department.name.label('department'), Segment.description
+                Prescription, Patient, '0', '0',
+                Department.name.label('department'), Segment.description, Patient.observation
             )\
             .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)\
             .outerjoin(Department, Department.id == Prescription.idDepartment)\
             .outerjoin(Segment, Segment.id == Prescription.idSegment)\
             .filter(Prescription.id == idPrescription)\
             .first()
-
-def getAggScore():
-    return db.session.query(func.sum(func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4)).label('score'))\
-        .select_from(PrescriptionDrug)\
-        .outerjoin(Outlier, and_(Outlier.id == PrescriptionDrug.idOutlier))\
-        .outerjoin(DrugAttributes, and_(DrugAttributes.idDrug == PrescriptionDrug.idDrug, DrugAttributes.idSegment == PrescriptionDrug.idSegment))\
-        .filter(PrescriptionDrug.idPrescription == Prescription.id)\
-        .filter(DrugAttributes.whiteList == None)\
-        .filter(PrescriptionDrug.suspendedDate == None)\
-        .as_scalar()
-
-def getScore(level):
-    return db.session.query(func.count(func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4)).label('scoreOne'))\
-        .select_from(PrescriptionDrug)\
-        .outerjoin(Outlier, and_(Outlier.id == PrescriptionDrug.idOutlier))\
-        .outerjoin(DrugAttributes, and_(DrugAttributes.idDrug == PrescriptionDrug.idDrug, DrugAttributes.idSegment == PrescriptionDrug.idSegment))\
-        .filter(PrescriptionDrug.idPrescription == Prescription.id)\
-        .filter(DrugAttributes.whiteList == None)\
-        .filter(PrescriptionDrug.suspendedDate == None)\
-        .filter(func.coalesce(Outlier.manualScore, Outlier.score) == level)\
-        .as_scalar()
-
-def getHighScore():
-    return db.session.query(func.count(func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4)).label('scoreOne'))\
-        .select_from(PrescriptionDrug)\
-        .outerjoin(Outlier, and_(Outlier.id == PrescriptionDrug.idOutlier))\
-        .outerjoin(DrugAttributes, and_(DrugAttributes.idDrug == PrescriptionDrug.idDrug, DrugAttributes.idSegment == PrescriptionDrug.idSegment))\
-        .filter(PrescriptionDrug.idPrescription == Prescription.id)\
-        .filter(DrugAttributes.whiteList == None)\
-        .filter(PrescriptionDrug.suspendedDate == None)\
-        .filter(or_(func.coalesce(Outlier.manualScore, Outlier.score) == 3, func.coalesce(Outlier.manualScore, Outlier.score) == None))\
-        .as_scalar()
-
-def getDrugClass(typeClass):
-    return db.session.query(func.count(1).label('drugClass'))\
-        .select_from(DrugAttributes)\
-        .outerjoin(PrescriptionDrug, and_(DrugAttributes.idDrug == PrescriptionDrug.idDrug, DrugAttributes.idSegment == PrescriptionDrug.idSegment))\
-        .filter(PrescriptionDrug.idPrescription == Prescription.id)\
-        .filter(DrugAttributes.whiteList == None)\
-        .filter(PrescriptionDrug.suspendedDate == None)\
-        .filter(typeClass == True)\
-        .as_scalar()
-
-def getDrugRoute(route):
-    return db.session.query(func.count(1).label('drugRoute'))\
-        .select_from(PrescriptionDrug)\
-        .outerjoin(DrugAttributes, and_(DrugAttributes.idDrug == PrescriptionDrug.idDrug, DrugAttributes.idSegment == PrescriptionDrug.idSegment))\
-        .filter(PrescriptionDrug.idPrescription == Prescription.id)\
-        .filter(DrugAttributes.whiteList == None)\
-        .filter(PrescriptionDrug.suspendedDate == None)\
-        .filter(PrescriptionDrug.route.ilike(route))\
-        .as_scalar()
-
-def getDrugsCount():
-    return db.session.query(func.count(1).label('drugCount'))\
-        .select_from(PrescriptionDrug, Prescription)\
-        .outerjoin(DrugAttributes, and_(DrugAttributes.idDrug == PrescriptionDrug.idDrug, DrugAttributes.idSegment == PrescriptionDrug.idSegment))\
-        .filter(PrescriptionDrug.idPrescription == Prescription.id)\
-        .filter(DrugAttributes.whiteList == None)\
-        .filter(PrescriptionDrug.suspendedDate == None)\
-        .as_scalar()
-
-def getPendingInterventions():
-    return db.session.query(func.count(1).label('pendingInterventions'))\
-        .select_from(Intervention)\
-        .join(PrescriptionDrug, Intervention.id == PrescriptionDrug.id)\
-        .filter(Intervention.admissionNumber == Prescription.admissionNumber)\
-        .filter(Intervention.status == 's')\
-        .filter(PrescriptionDrug.idPrescription < Prescription.id)\
-        .as_scalar() 
-
-def getDrugDiff():
-    return db.session.query(func.count(1).label('drugDiff'))\
-        .select_from(PrescriptionDrug, Prescription)\
-        .outerjoin(DrugAttributes, and_(DrugAttributes.idDrug == PrescriptionDrug.idDrug, DrugAttributes.idSegment == PrescriptionDrug.idSegment))\
-        .filter(PrescriptionDrug.idPrescription == Prescription.id)\
-        .filter(DrugAttributes.whiteList == None)\
-        .filter(PrescriptionDrug.suspendedDate == None)\
-        .filter(PrescriptionDrug.checked == True)\
-        .as_scalar() 
 
 def getDrugList():
     query = db.session.query(cast(PrescriptionDrug.idDrug,db.Integer))\
@@ -255,22 +176,6 @@ def getDrugList():
         .as_scalar()
 
     return func.array(query)
-
-def findLatestExams():
-    latest = db.session.query(Exams.admissionNumber.label('admissionNumber'),\
-                                  Exams.typeExam.label('typeExam'),\
-                                  func.max(Exams.date).label('date'))\
-                  .select_from(Exams)\
-                  .group_by(Exams.typeExam, Exams.admissionNumber)\
-                  .subquery()
-
-    results = db.session.query(func.concat(Exams.typeExam, '|',Exams.value))\
-            .select_from(Exams)\
-            .join(latest, and_(Exams.typeExam == latest.c.typeExam, Exams.date == latest.c.date))\
-            .filter(Exams.admissionNumber == Prescription.admissionNumber)\
-            .filter(latest.c.admissionNumber == Prescription.admissionNumber)
-
-    return func.array(results.label('examsResults'))
 
 class Patient(db.Model):
     __tablename__ = 'pessoa'
@@ -284,6 +189,7 @@ class Patient(db.Model):
     weight = db.Column('peso', db.Float, nullable=True)
     height = db.Column('altura', db.Float, nullable=True)
     weightDate = db.Column('dtpeso', db.DateTime, nullable=True)
+    observation = deferred(db.Column('anotacao', db.String, nullable=True))
     skinColor = db.Column('cor', db.String, nullable=True)
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.Integer, nullable=True)
@@ -297,33 +203,11 @@ class Patient(db.Model):
                          .one()
 
     def getPatients(idSegment=None, idDept=[], idDrug=[], limit=250, day=date.today(), onlyStatus=False):
-        score = getAggScore()
-        scoreOne = getScore(1)
-        scoreTwo = getScore(2)
-        scoreThree = getHighScore()
-        lastExams = findLatestExams()
-        antimicro = getDrugClass(DrugAttributes.antimicro)
-        mav = getDrugClass(DrugAttributes.mav)
-        controlled = getDrugClass(DrugAttributes.controlled)
-        notdefault = getDrugClass(DrugAttributes.notdefault)
-        sonda = getDrugRoute("%sonda%")
-        diff = getDrugDiff()
-        count = getDrugsCount()
-        interventions = getPendingInterventions()
-
         if onlyStatus:
             q = db.session.query(Prescription)
         else:
             q = db.session\
-                .query(
-                    Prescription, Patient, Department.name.label('department'),
-                    #score.label('score'), scoreOne.label('scoreOne'), scoreTwo.label('scoreTwo'), scoreThree.label('scoreThree'),
-                    #'0', '0', '0', '0', '0', '0', '0',
-                    #antimicro.label('antimicro'), mav.label('mav'), controlled.label('controlled'), sonda.label('sonda'),
-                    #(count - diff).label('diff'), Department.name.label('department'), notdefault.label('notdefault'),
-                    #interventions.label('interventions'), '0', 
-                    #lastExams.label('lastexams')
-                )\
+                .query(Prescription, Patient, Department.name.label('department'))\
                 .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)\
                 .outerjoin(Department, Department.id == Prescription.idDepartment)
 
@@ -338,8 +222,7 @@ class Patient(db.Model):
             idDrug = list(map(int, idDrug))
             q = q.filter(postgresql.array(idDrug).overlap(drugList))
 
-        q = q.filter(func.date(Prescription.date) == day)
-            
+        q = q.filter(func.date(Prescription.date) > day)
         q = q.order_by(desc(Prescription.date))
 
         return q.limit(limit).all()
@@ -470,7 +353,8 @@ class PrescriptionDrug(db.Model):
         prevNotes = getPrevNotes(admissionNumber)
 
         return db.session\
-            .query(PrescriptionDrug, Drug, MeasureUnit, Frequency, '0', '0',
+            .query(PrescriptionDrug, Drug, MeasureUnit, Frequency, '0',\
+                    func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4).label('score'),
                     DrugAttributes, Notes.notes, prevNotes.label('prevNotes'))\
             .outerjoin(Outlier, Outlier.id == PrescriptionDrug.idOutlier)\
             .outerjoin(Drug, Drug.id == PrescriptionDrug.idDrug)\
@@ -792,10 +676,10 @@ class Exams(db.Model):
                          .order_by(asc(Exams.typeExam),desc(Exams.date))\
                          .all()
 
-    def findLatestByAdmission(admissionNumber, idSegment):
+    def findLatestByAdmission(patient, idSegment):
         examLatest = db.session.query(Exams.typeExam.label('typeExam'), func.max(Exams.date).label('date'))\
                       .select_from(Exams)\
-                      .filter(Exams.admissionNumber == admissionNumber)\
+                      .filter(Exams.admissionNumber == patient.admissionNumber)\
                       .group_by(Exams.typeExam)\
                       .subquery()
 
@@ -803,7 +687,7 @@ class Exams(db.Model):
 
         results = Exams.query\
                 .join(el, and_(Exams.typeExam == el.c.typeExam, Exams.date == el.c.date))\
-                .filter(Exams.admissionNumber == admissionNumber)
+                .filter(Exams.admissionNumber == patient.admissionNumber)
 
         segExam = SegmentExam.refDict(idSegment)
 
@@ -817,7 +701,15 @@ class Exams(db.Model):
             examEmpty['initials'] = segExam[e].initials
             exams[e.lower()] = examEmpty
 
+        age = data2age(patient.birthdate.isoformat() if patient.birthdate else date.today().isoformat())
         for e in results:
             exams[e.typeExam.lower()] = formatExam(e, e.typeExam.lower(), segExam)
+            if 'cr' in exams:
+                if age > 17:
+                    exams['mdrd'] = mdrd_calc(exams['cr']['value'], patient.birthdate, patient.gender, patient.skinColor)
+                    exams['cg'] = cg_calc(exams['cr']['value'], patient.birthdate, patient.gender, patient.weight)
+                    exams['ckd'] = ckd_calc(exams['cr']['value'], patient.birthdate, patient.gender, patient.skinColor)
+                else:
+                    exams['swrtz2'] = schwartz2_calc(exams['cr']['value'], patient.height)
 
         return exams
