@@ -40,10 +40,13 @@ def getPrescriptions():
 
         featuresNames = ['alerts','prescriptionScore','scoreOne','scoreTwo','scoreThree',\
                         'am','av','controlled','np','tube','diff','alertExams','interventions']
-        features = {}
+                        
+        features = {'processed':True}
         if p[0].features:
             for f in featuresNames:
                 features[f] = p[0].features[f] if f in p[0].features else 0
+        else:
+            features['processed'] = False
 
 
         results.append(dict(features, **{
@@ -179,7 +182,6 @@ class DrugList():
                     'doseconv': pd[0].doseconv,
                     'time': timeValue(pd[0].interval),
                     'recommendation': pd[0].notes if pd[0].notes and len(pd[0].notes.strip()) > 0 else None,
-                    'obs': None,
                     'period': str(pd[0].period) + 'D' if pd[0].period else '',
                     'periodDates': [],
                     'route': pd[0].route,
@@ -189,7 +191,6 @@ class DrugList():
                     'score': str(pd[5]) if not pdWhiteList else '0',
                     'source': pd[0].source,
                     'checked': bool(pd[0].checked),
-                    'intervened': None,
                     'suspended': bool(pd[0].suspendedDate),
                     'status': pd[0].status,
                     'near': pd[0].near,

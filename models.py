@@ -222,7 +222,7 @@ class Patient(db.Model):
             idDrug = list(map(int, idDrug))
             q = q.filter(postgresql.array(idDrug).overlap(drugList))
 
-        q = q.filter(func.date(Prescription.date) > day)
+        q = q.filter(func.date(Prescription.date) == day)
         q = q.order_by(desc(Prescription.date))
 
         return q.limit(limit).all()
