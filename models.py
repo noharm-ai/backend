@@ -29,7 +29,9 @@ def setSchema(schema):
     Notes.setSchema(schema)
     DrugAttributes.setSchema(schema)
     SegmentExam.setSchema(schema)
-
+    Relation.setSchema()
+    Substance.setSchema()
+    User.setSchema()
 
 class User(db.Model):
     __tablename__ = 'usuario'
@@ -43,6 +45,9 @@ class User(db.Model):
     logourl = db.Column("logourl", db.String, nullable=False)
     reports = db.Column("relatorios", postgresql.JSON, nullable=False)
 
+    def setSchema():
+        User.__table__.schema = 'public'
+
     def find(id):
         return User.query.filter(User.id == id).first()
 
@@ -55,6 +60,9 @@ class Substance(db.Model):
     id = db.Column("sctid", db.Integer, primary_key=True)
     name = db.Column('nome', db.String(255), nullable=False)
 
+    def setSchema():
+        Substance.__table__.schema = 'public'
+
 class Relation(db.Model):
     __tablename__ = 'relacao'
 
@@ -66,6 +74,9 @@ class Relation(db.Model):
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.Integer, nullable=True)
     creator = db.Column("create_by", db.Integer, nullable=True)
+
+    def setSchema():
+        Relation.__table__.schema = 'public'
 
     def findBySctid(sctid, userId):
         SubstA = db.aliased(Substance)

@@ -197,7 +197,6 @@ def tryCommit(db, recId):
         db.session.commit()
         db.session.close()
         db.session.remove()
-        db.engine.dispose()
 
         return {
             'status': 'success',
@@ -206,7 +205,7 @@ def tryCommit(db, recId):
     except AssertionError as e:
         db.session.rollback()
         db.session.close()
-        db.engine.dispose()
+        db.session.remove()
 
         return {
             'status': 'error',
@@ -215,7 +214,7 @@ def tryCommit(db, recId):
     except Exception as e:
         db.session.rollback()
         db.session.close()
-        db.engine.dispose()
+        db.session.remove()
 
         return {
             'status': 'error',
