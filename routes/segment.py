@@ -17,7 +17,6 @@ def getSegments():
     user = User.find(get_jwt_identity())
     setSchema(user.schema)
     results = Segment.findAll()
-    db.engine.dispose()
 
     iList = []
     for i in results:
@@ -134,7 +133,6 @@ def getDepartments():
     setSchema(user.schema)
     
     departs = Department.getAll()
-    db.engine.dispose()
 
     results = []
     for d in departs:
@@ -159,7 +157,6 @@ def getFreeDepartments():
                 .outerjoin(SegmentDepartment, SegmentDepartment.idDepartment == Department.id)\
                 .filter(SegmentDepartment.id == None)\
                 .all()
-    db.engine.dispose()
 
     results = []
     for d in departs:
@@ -184,8 +181,6 @@ def getCodes():
                 .filter(Exams.date > (date.today() - timedelta(days=360)))\
                 .group_by(Exams.typeExam)\
                 .order_by(asc(Exams.typeExam)).all()
-
-    db.engine.dispose()
 
     results = []
     for t in typesExam:

@@ -66,5 +66,5 @@ def setDrugStatus(schema, idPrescription):
         'alertExams': exams,
         'interventions': interventions,
     }
-
+    
     return tryCommit(db, idPrescription)

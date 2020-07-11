@@ -195,12 +195,17 @@ def schwartz2_calc(cr, height):
 def tryCommit(db, recId):
     try:
         db.session.commit()
+        db.session.close()
+        db.session.remove()
+        db.engine.dispose()
 
         return {
             'status': 'success',
             'data': recId
         }, status.HTTP_200_OK
     except AssertionError as e:
+        db.session.rollback()
+        db.session.close()
         db.engine.dispose()
 
         return {
@@ -208,6 +213,8 @@ def tryCommit(db, recId):
             'message': str(e)
         }, status.HTTP_400_BAD_REQUEST
     except Exception as e:
+        db.session.rollback()
+        db.session.close()
         db.engine.dispose()
 
         return {

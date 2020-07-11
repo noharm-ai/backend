@@ -64,7 +64,6 @@ def getInterventionReasons():
     setSchema(user.schema)
     
     results = InterventionReason.findAll()
-    db.engine.dispose()
 
     iList = []
     for i in results:
@@ -87,7 +86,6 @@ def getInterventions():
     setSchema(user.schema)
     
     results = Intervention.findAll(userId=user.id)
-    db.engine.dispose()
 
     return {
         'status': 'success',

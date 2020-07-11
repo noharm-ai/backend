@@ -14,7 +14,6 @@ def auth():
     password = data.get('password', None)
 
     user = User.authenticate(email, password)
-    db.engine.dispose()
 
     if user is None:
         return {

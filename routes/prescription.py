@@ -27,7 +27,6 @@ def getPrescriptions():
     day = request.args.get('date', date.today())
 
     patients = Patient.getPatients(idSegment=idSegment, idDept=idDept, idDrug=idDrug, limit=limit, day=day)
-    db.engine.dispose()
 
     results = []
     for p in patients:
@@ -84,7 +83,6 @@ def getPrescriptionsStatus():
     day = request.args.get('date', date.today())
 
     patients = Patient.getPatients(idSegment=idSegment, idDept=idDept, idDrug=idDrug, day=day, limit=limit, onlyStatus=True)
-    db.engine.dispose()
 
     results = []
     for p in patients:
@@ -251,7 +249,6 @@ def getPrescription(idPrescription, schema=None):
     drugs = PrescriptionDrug.findByPrescription(idPrescription, patient.admissionNumber)
     interventions = Intervention.findAll(admissionNumber=patient.admissionNumber)
     relations = Relation.findByPrescription(idPrescription)
-    db.engine.dispose()
 
     exams = Exams.findLatestByAdmission(patient, prescription[0].idSegment)
     age = data2age(patient.birthdate.isoformat() if patient.birthdate else date.today().isoformat())
@@ -338,7 +335,6 @@ def getDrugPeriod(idPrescriptionDrug):
     setSchema(user.schema)
 
     results = PrescriptionDrug.findByPrescriptionDrug(idPrescriptionDrug)
-    db.engine.dispose()
 
     return {
         'status': 'success',
@@ -363,7 +359,6 @@ def getExamsbyAdmission(admissionNumber):
     idSegment = request.args.get('idSegment', 1)
     examsList = Exams.findByAdmission(admissionNumber)
     segExam = SegmentExam.refDict(idSegment)
-    db.engine.dispose()
 
     perc = {
         'h_conleuc': {

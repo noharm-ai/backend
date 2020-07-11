@@ -34,8 +34,6 @@ def getOutliers(idSegment=1, idDrug=1):
     if d[0].sctid:
         relations = Relation.findBySctid(d[0].sctid, user.id)
 
-    db.engine.dispose()
-
     if drugAttr is None: drugAttr = DrugAttributes()
 
     frequency = request.args.get('f', None)
@@ -221,8 +219,6 @@ def getDrugs(idSegment=1):
 
     drugs = drugs.order_by(asc(Drug.name)).all()
 
-    db.engine.dispose()
-
     results = []
     for d in drugs:
         results.append({
@@ -258,8 +254,6 @@ def getUnits(idDrug, idSegment=1):
             .group_by(u.id, u.description, p.idMeasureUnit, d.name)\
             .order_by(asc(u.description))\
             .all()
-
-    db.engine.dispose()
 
     results = []
     for u in units:
@@ -307,8 +301,6 @@ def getSubstance():
     setSchema(user.schema)
 
     drugs = Substance.query.order_by(asc(Substance.name)).all()
-
-    db.engine.dispose()
 
     results = []
     for d in drugs:
