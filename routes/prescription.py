@@ -143,7 +143,7 @@ class DrugList():
 
                 if pd[6].liver:
                     if ('tgp' in self.exams and self.exams['tgp']['value'] and float(self.exams['tgp']['value']) > pd[6].liver) or ('tgo' in self.exams and self.exams['tgo']['value'] and float(self.exams['tgo']['value']) > pd[6].liver):
-                        alerts.append('Medicamento deve sofre de ajuste de posologia ou contraindicado, já que a função hepática do paciente está reduzida (acima de ' + str(pd[6].liver) + ' U/L).')
+                        alerts.append('Medicamento deve sofre ajuste de posologia ou contraindicado, já que a função hepática do paciente está reduzida (acima de ' + str(pd[6].liver) + ' U/L).')
 
                 if pd[6].elderly and self.exams['age'] > 60:
                     alerts.append('Medicamento potencialmente inapropriado para idosos, independente das comorbidades do paciente.')

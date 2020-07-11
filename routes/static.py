@@ -3,11 +3,12 @@ from flask_api import status
 from models import db, setSchema, Prescription, Exams
 from .prescription import getPrescription
 from .utils import tryCommit, strNone
+from random import random 
 
 app_stc = Blueprint('app_stc',__name__)
 
 @app_stc.route('/static/<string:schema>/prescription/<int:idPrescription>', methods=['GET'])
-def setDrugStatus(schema, idPrescription):
+def computePrescription(schema, idPrescription):
     result = db.engine.execute('SELECT schema_name FROM information_schema.schemata')
 
     schemaExists = False
