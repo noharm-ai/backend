@@ -1,6 +1,6 @@
 import pytest, json
 from mobile import app
-from models import User
+from models.main import User
 from unittest.mock import patch
 from flask_jwt_extended import (create_access_token)
 
