@@ -80,7 +80,7 @@ def getOutliers(idSegment=1, idDrug=1):
         o.user = user.id
 
         db.session.add(o)
-        db.session.commit()
+        db.session.flush()
 
         results.append({
             'idOutlier': o.id,
@@ -94,7 +94,7 @@ def getOutliers(idSegment=1, idDrug=1):
             'obs': ''
         })
 
-    return {
+    returnJson = {
         'status': 'success',
         'data': {
             'outliers': results,
@@ -117,7 +117,10 @@ def getOutliers(idSegment=1, idDrug=1):
             'relations': relations,
             'relationTypes' : [{'key': t, 'value': typeRelations[t]} for t in typeRelations]
         }
-    }, status.HTTP_200_OK
+    }
+
+    tryCommit(db, idDrug)
+    return returnJson, status.HTTP_200_OK
 
 
 @app_out.route('/outliers/<int:idOutlier>', methods=['PUT'])
