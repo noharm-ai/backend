@@ -9,8 +9,8 @@ def dep_getall():
 	dep.name = 'dep'
 	return [dep, dep]
 
-@patch('models.User.find', side_effect=user_find)
-@patch('models.Department.getAll', side_effect=dep_getall)
+@patch('models.main.User.find', side_effect=user_find)
+@patch('models.appendix.Department.getAll', side_effect=dep_getall)
 def test_get_departments(user, department, client):
 	response = client.get('/departments', headers=make_headers(access_token))
 	data = json.loads(response.data)
@@ -26,8 +26,8 @@ def seg_getall():
 	seg.description = 'descript'
 	return [seg, seg, seg]
 
-@patch('models.User.find', side_effect=user_find)
-@patch('models.Segment.findAll', side_effect=seg_getall)
+@patch('models.main.User.find', side_effect=user_find)
+@patch('models.segment.Segment.findAll', side_effect=seg_getall)
 def test_get_segments(user, segments, client):
 	response = client.get('/segments', headers=make_headers(access_token))
 	data = json.loads(response.data)
