@@ -11,6 +11,7 @@ from datetime import date
 db = SQLAlchemy()
 
 def setSchema(schema):
+    db.session.close()
     db.session.connection(execution_options={'schema_translate_map': {None: schema}})
 
 class User(db.Model):
@@ -525,6 +526,7 @@ class Intervention(db.Model):
         result.extend([i for i in intervBuffer if i['status'] != 's'])
 
         return result
+
 
 class Segment(db.Model):
     __tablename__ = 'segmento'
