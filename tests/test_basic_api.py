@@ -12,7 +12,7 @@ def test_no_auth(client):
 	
 	assert response.status_code == 401
 
-@patch('models.User.find', side_effect=user_find)
+@patch('models.main.User.find', side_effect=user_find)
 def test_name_url(user, client):
 	response = client.get('/user/name-url', headers=make_headers(access_token))
 	data = json.loads(response.data)
