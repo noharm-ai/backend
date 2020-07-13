@@ -11,7 +11,6 @@ from datetime import date
 db = SQLAlchemy()
 
 def setSchema(schema):
-    db.session.close()
     db.session.connection(execution_options={'schema_translate_map': {None: schema}})
 
 class User(db.Model):
@@ -28,7 +27,8 @@ class User(db.Model):
     reports = db.Column("relatorios", postgresql.JSON, nullable=False)
 
     def find(id):
-        return User.query.filter(User.id == id).first()
+        db_session = db.create_scoped_session()
+        return db_session.query(User).filter(User.id == id).first()
 
     def authenticate(email, password):
         return User.query.filter_by(email=email, password=password).first()
