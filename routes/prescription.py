@@ -103,7 +103,7 @@ class DrugList():
             if (not checked and not suspended) and (bool(pd[0].checked) == False and bool(pd[0].suspendedDate) == False): belong = True
 
             pdFrequency = 1 if pd[0].frequency in [33,44,99] else pd[0].frequency
-            pdDoseconv = pd[0].doseconv * pdFrequency
+            pdDoseconv = none2zero(pd[0].doseconv) * none2zero(pdFrequency)
             pdUnit = strNone(pd[2].id) if pd[2] else ''
             pdWhiteList = bool(pd[6].whiteList) if pd[6] is not None else False
             doseWeight = None
