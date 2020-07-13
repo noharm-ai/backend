@@ -1,5 +1,6 @@
 from conftest import *
-from models import Department, Segment
+from models.appendix import Department
+from models.segment import Segment
 
 def dep_getall():
 	dep = Department()
