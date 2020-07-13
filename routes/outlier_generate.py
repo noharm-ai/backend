@@ -2,7 +2,9 @@ import gzip, requests, io
 from flask_api import status
 from flask import Blueprint, request
 from multiprocessing import Process, Manager
-from models import db, User, setSchema, Outlier
+from models.main import *
+from models.appendix import *
+from models.prescription import *
 from flask_jwt_extended import (jwt_required, get_jwt_identity, get_raw_jwt, create_access_token)
 from config import Config
 import pandas as pd

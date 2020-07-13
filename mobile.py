@@ -3,7 +3,7 @@ from flask_api import FlaskAPI, status, exceptions
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager
 from flask_jwt_extended import (jwt_required, get_jwt_identity)
-from models import db, User
+from models.main import db, User
 from config import Config
 from flask_cors import CORS
 from routes.authentication import app_auth
@@ -27,6 +27,7 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = { "pool_recycle" : 500, "pool_pre_ping
 app.config['JWT_SECRET_KEY'] = Config.SECRET_KEY
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = Config.JWT_ACCESS_TOKEN_EXPIRES
 app.config['JWT_REFRESH_TOKEN_EXPIRES'] = Config.JWT_REFRESH_TOKEN_EXPIRES
+
 
 jwt = JWTManager(app)
 db.init_app(app)

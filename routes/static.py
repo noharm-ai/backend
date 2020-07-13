@@ -1,6 +1,7 @@
 from flask import Blueprint
 from flask_api import status
-from models import db, setSchema, Prescription, Exams
+from models.main import *
+from models.prescription import *
 from .prescription import getPrescription
 from .utils import tryCommit, strNone
 from random import random 

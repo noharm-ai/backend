@@ -1,7 +1,6 @@
 from flask_api import status
-from models import db, User, Patient, Prescription, PrescriptionDrug, InterventionReason,\
-                    Intervention, Segment, setSchema, Department, Outlier, Drug, PrescriptionAgg,\
-                    MeasureUnit, MeasureUnitConvert, Notes, DrugAttributes, Relation, Substance
+from models.main import *
+from models.prescription import *
 from sqlalchemy import desc, asc, and_, func
 from flask import Blueprint, request
 from flask_jwt_extended import (create_access_token, create_refresh_token,
@@ -16,6 +15,7 @@ app_out = Blueprint('app_out',__name__)
 def getOutliers(idSegment=1, idDrug=1):
     user = User.find(get_jwt_identity())
     setSchema(user.schema)
+
     outliers = db.session\
         .query(Outlier, Notes)\
         .outerjoin(Notes, Notes.idOutlier == Outlier.id)\
@@ -124,7 +124,6 @@ def getOutliers(idSegment=1, idDrug=1):
 @jwt_required
 def setManualOutlier(idOutlier):
     data = request.get_json()
-
     user = User.find(get_jwt_identity())
     setSchema(user.schema)
 
@@ -163,7 +162,6 @@ def setManualOutlier(idOutlier):
 @jwt_required
 def setDrugClass(idDrug):
     data = request.get_json()
-
     user = User.find(get_jwt_identity())
     setSchema(user.schema)
 
@@ -273,9 +271,9 @@ def getUnits(idDrug, idSegment=1):
 @app_out.route('/drugs/<int:idDrug>/convertunit/<string:idMeasureUnit>', methods=['POST'])
 @jwt_required
 def setDrugUnit(idDrug, idMeasureUnit):
+    data = request.get_json()
     user = User.find(get_jwt_identity())
     setSchema(user.schema)
-    data = request.get_json()
 
     idSegment = data.get('idSegment', 1)
     u = MeasureUnitConvert.query.get((idMeasureUnit, idDrug, idSegment))

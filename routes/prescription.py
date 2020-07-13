@@ -1,14 +1,13 @@
 import random, copy
 from flask_api import status
-from models import db, User, Patient, Prescription, PrescriptionDrug, InterventionReason,\
-                    Intervention, Segment, setSchema, Exams, DrugAttributes,\
-                    Notes, Relation, SegmentExam
+from models.main import *
+from models.appendix import *
+from models.segment import *
+from models.prescription import *
 from flask import Blueprint, request
 from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
-from .utils import mdrd_calc, cg_calc, ckd_calc, none2zero, formatExam, schwartz2_calc,\
-                    period, lenghStay, strNone, timeValue,\
-                    data2age, examEmpty, is_float, tryCommit
+from .utils import *
 from sqlalchemy import func
 from datetime import date, datetime
 
@@ -63,33 +62,6 @@ def getPrescriptions():
             'class': 'yellow',
             'status': p[0].status,
         }))
-
-    return {
-        'status': 'success',
-        'data': results
-    }, status.HTTP_200_OK
-
-
-@app_pres.route("/prescriptions/status", methods=['GET'])
-@jwt_required
-def getPrescriptionsStatus():
-    user = User.find(get_jwt_identity())
-    setSchema(user.schema)
-
-    idSegment = request.args.get('idSegment', None)
-    idDept = request.args.getlist('idDept[]')
-    idDrug = request.args.getlist('idDrug[]')
-    limit = request.args.get('limit', 250)
-    day = request.args.get('date', date.today())
-
-    patients = Patient.getPatients(idSegment=idSegment, idDept=idDept, idDrug=idDrug, day=day, limit=limit, onlyStatus=True)
-
-    results = []
-    for p in patients:
-        results.append({
-            'idPrescription': p.id,
-            'status': p.status
-        })
 
     return {
         'status': 'success',
@@ -248,7 +220,7 @@ def getPrescription(idPrescription, schema=None):
 
     drugs = PrescriptionDrug.findByPrescription(idPrescription, patient.admissionNumber)
     interventions = Intervention.findAll(admissionNumber=patient.admissionNumber)
-    relations = Relation.findByPrescription(idPrescription)
+    relations = Prescription.findRelation(idPrescription)
 
     exams = Exams.findLatestByAdmission(patient, prescription[0].idSegment)
     age = data2age(patient.birthdate.isoformat() if patient.birthdate else date.today().isoformat())
@@ -316,10 +288,9 @@ def getPrescription(idPrescription, schema=None):
 @app_pres.route('/prescriptions/<int:idPrescription>', methods=['PUT'])
 @jwt_required
 def setPrescriptionStatus(idPrescription):
+    data = request.get_json()
     user = User.find(get_jwt_identity())
     setSchema(user.schema)
-
-    data = request.get_json()
 
     p = Prescription.query.get(idPrescription)
     p.status = data.get('status', None)
