@@ -74,7 +74,8 @@ class Exams(db.Model):
                 .filter(Exams.admissionNumber == patient.admissionNumber)
 
         segExam = SegmentExam.refDict(idSegment)
-
+        age = data2age(patient.birthdate.isoformat() if patient.birthdate else date.today().isoformat())
+        
         exams = {}
         for e in segExam:
             examEmpty = { 'value': None, 'alert': False, 'ref': None, 'name': None, 'unit': None }
@@ -84,8 +85,12 @@ class Exams(db.Model):
             examEmpty['name'] = segExam[e].name
             examEmpty['initials'] = segExam[e].initials
             exams[e.lower()] = examEmpty
+            if e.lower() == 'cr':
+                if age > 17:
+                    exams['mdrd'] = exams['cg'] = exams['ckd'] = examEmpty
+                else:
+                    exams['swrtz2'] = examEmpty
 
-        age = data2age(patient.birthdate.isoformat() if patient.birthdate else date.today().isoformat())
         for e in results:
             exams[e.typeExam.lower()] = formatExam(e, e.typeExam.lower(), segExam)
             if 'cr' in exams:
