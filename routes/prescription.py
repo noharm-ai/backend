@@ -424,8 +424,6 @@ def setPatientData(admissionNumber):
     
     p.update = datetime.today()
 
-    returnJson = tryCommit(db, admissionNumber)
-
     if 'idPrescription' in data.keys():
         idPrescription = data.get('idPrescription')
 
@@ -434,9 +432,10 @@ def setPatientData(admissionNumber):
                     FROM " + user.schema + ".presmed\
                     WHERE fkprescricao = " + str(int(idPrescription)) + ";"
 
+        print(query)
         result = db.engine.execute(query) 
 
-    return returnJson
+    return tryCommit(db, admissionNumber)
 
 @app_pres.route('/prescriptions/drug/<int:idPrescriptionDrug>', methods=['PUT'])
 @jwt_required

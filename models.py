@@ -11,30 +11,11 @@ from datetime import date
 db = SQLAlchemy()
 
 def setSchema(schema):
-    Prescription.setSchema(schema)
-    Patient.setSchema(schema)
-    InterventionReason.setSchema(schema)
-    PrescriptionDrug.setSchema(schema)
-    Outlier.setSchema(schema)
-    Drug.setSchema(schema)
-    MeasureUnit.setSchema(schema)
-    Frequency.setSchema(schema)
-    Segment.setSchema(schema)
-    Department.setSchema(schema)
-    Intervention.setSchema(schema)
-    SegmentDepartment.setSchema(schema)
-    Exams.setSchema(schema)
-    PrescriptionAgg.setSchema(schema)
-    MeasureUnitConvert.setSchema(schema)
-    Notes.setSchema(schema)
-    DrugAttributes.setSchema(schema)
-    SegmentExam.setSchema(schema)
-    Relation.setSchema()
-    Substance.setSchema()
-    User.setSchema()
+    db.session.connection(execution_options={'schema_translate_map': {None: schema}})
 
 class User(db.Model):
     __tablename__ = 'usuario'
+    __table_args__ = {'schema':'public'}
 
     id = db.Column("idusuario", db.Integer, primary_key=True)
     name = db.Column('nome', db.String(250), nullable=False)
@@ -45,9 +26,6 @@ class User(db.Model):
     logourl = db.Column("logourl", db.String, nullable=False)
     reports = db.Column("relatorios", postgresql.JSON, nullable=False)
 
-    def setSchema():
-        User.__table__.schema = 'public'
-
     def find(id):
         return User.query.filter(User.id == id).first()
 
@@ -56,15 +34,14 @@ class User(db.Model):
 
 class Substance(db.Model):
     __tablename__ = 'substancia'
+    __table_args__ = {'schema':'public'}
 
     id = db.Column("sctid", db.Integer, primary_key=True)
     name = db.Column('nome', db.String(255), nullable=False)
 
-    def setSchema():
-        Substance.__table__.schema = 'public'
-
 class Relation(db.Model):
     __tablename__ = 'relacao'
+    __table_args__ = {'schema':'public'}
 
     sctida = db.Column("sctida", db.Integer, primary_key=True)
     sctidb = db.Column("sctidb", db.Integer, primary_key=True)
@@ -74,9 +51,6 @@ class Relation(db.Model):
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.Integer, nullable=True)
     creator = db.Column("create_by", db.Integer, nullable=True)
-
-    def setSchema():
-        Relation.__table__.schema = 'public'
 
     def findBySctid(sctid, userId):
         SubstA = db.aliased(Substance)
@@ -165,9 +139,6 @@ class Prescription(db.Model):
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.Integer, nullable=True)
 
-    def setSchema(schema):
-        Prescription.__table__.schema = schema
-
     def getPrescription(idPrescription):
         return db.session\
             .query(
@@ -204,9 +175,6 @@ class Patient(db.Model):
     skinColor = db.Column('cor', db.String, nullable=True)
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.Integer, nullable=True)
-
-    def setSchema(schema):
-        Patient.__table__.schema = schema
 
     def findByAdmission(admissionNumber):
         return db.session.query(Patient)\
@@ -253,10 +221,6 @@ class Outlier(db.Model):
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.Integer, nullable=True)
 
-    def setSchema(schema):
-        Outlier.__table__.schema = schema
-
-
 class Notes(db.Model):
     __tablename__ = 'observacao'
 
@@ -271,9 +235,6 @@ class Notes(db.Model):
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.Integer, nullable=True)
 
-    def setSchema(schema):
-        Notes.__table__.schema = schema
-
 class PrescriptionAgg(db.Model):
     __tablename__ = 'prescricaoagg'
 
@@ -287,9 +248,6 @@ class PrescriptionAgg(db.Model):
     doseconv = db.Column("doseconv", db.Float, nullable=True)
     frequency = db.Column("frequenciadia", db.Float, nullable=True)
     countNum = db.Column("contagem", db.Integer, nullable=True)
-
-    def setSchema(schema):
-        PrescriptionAgg.__table__.schema = schema
 
 def getDrugHistory(idPrescription, admissionNumber):
     pd1 = db.aliased(PrescriptionDrug)
@@ -357,9 +315,6 @@ class PrescriptionDrug(db.Model):
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.Integer, nullable=True)
 
-    def setSchema(schema):
-        PrescriptionDrug.__table__.schema = schema
-
     def findByPrescription(idPrescription, admissionNumber):
         prevNotes = getPrevNotes(admissionNumber)
 
@@ -397,9 +352,6 @@ class Drug(db.Model):
     name = db.Column("nome", db.String, nullable=False)
     sctid = db.Column("sctid", db.Integer, nullable=True)
 
-    def setSchema(schema):
-        Drug.__table__.schema = schema
-
 class DrugAttributes(db.Model):
     __tablename__ = 'medatributos'
 
@@ -420,19 +372,12 @@ class DrugAttributes(db.Model):
     amountUnit = db.Column("concentracaounidade", db.String(3), nullable=True)
     whiteList = db.Column("linhabranca", db.Boolean, nullable=True)
 
-
-    def setSchema(schema):
-        DrugAttributes.__table__.schema = schema
-
 class MeasureUnit(db.Model):
     __tablename__ = 'unidademedida'
 
     id = db.Column("fkunidademedida", db.String, primary_key=True)
     idHospital = db.Column("fkhospital", db.Integer, nullable=False)
     description = db.Column("nome", db.String, nullable=False)
-
-    def setSchema(schema):
-        MeasureUnit.__table__.schema = schema
 
 class MeasureUnitConvert(db.Model):
     __tablename__ = 'unidadeconverte'
@@ -442,18 +387,12 @@ class MeasureUnitConvert(db.Model):
     idSegment = db.Column("idsegmento", db.Integer, primary_key=True)
     factor = db.Column("fator", db.String, nullable=False)
 
-    def setSchema(schema):
-        MeasureUnitConvert.__table__.schema = schema
-
 class InterventionReason(db.Model):
     __tablename__ = 'motivointervencao'
 
     id = db.Column("idmotivointervencao", db.Integer, primary_key=True)
     description = db.Column("nome", db.String, nullable=False)
     mamy = db.Column("idmotivomae", db.Integer, nullable=False)
-
-    def setSchema(schema):
-        InterventionReason.__table__.schema = schema
 
     def findAll():
         im = db.aliased(InterventionReason)
@@ -463,16 +402,11 @@ class InterventionReason(db.Model):
                 .order_by(InterventionReason.description)\
                 .all()
 
-
 class Frequency(db.Model):
     __tablename__ = 'frequencia'
 
     id = db.Column("fkfrequencia", db.String, primary_key=True)
     description = db.Column("nome", db.String, nullable=False)
-
-    def setSchema(schema):
-        Frequency.__table__.schema = schema
-
 
 class Intervention(db.Model):
     __tablename__ = 'intervencao'
@@ -488,9 +422,6 @@ class Intervention(db.Model):
     status = db.Column('status', db.String(1), nullable=True)
     update = db.Column("update_at", db.DateTime, nullable=False)
     user = db.Column("update_by", db.Integer, nullable=False)
-
-    def setSchema(schema):
-        Intervention.__table__.schema = schema
 
     def validateIntervention(self):
         if self.idPrescriptionDrug is None:
@@ -595,16 +526,12 @@ class Intervention(db.Model):
 
         return result
 
-
 class Segment(db.Model):
     __tablename__ = 'segmento'
 
     id = db.Column("idsegmento", db.Integer, primary_key=True)
     description = db.Column("nome", db.String, nullable=False)
     status = db.Column("status", db.Integer, nullable=False)
-
-    def setSchema(schema):
-        Segment.__table__.schema = schema
 
     def findAll():
         return db.session\
@@ -626,9 +553,6 @@ class SegmentExam(db.Model):
     active = db.Column("ativo", db.Boolean, nullable=False)
     update = db.Column("update_at", db.DateTime, nullable=False)
     user = db.Column("update_by", db.Integer, nullable=False)
-
-    def setSchema(schema):
-        SegmentExam.__table__.schema = schema
 
     def refDict(idSegment):
         exams =  SegmentExam.query\
@@ -654,18 +578,12 @@ class Department(db.Model):
     def getAll():
         return Department.query.all()
 
-    def setSchema(schema):
-        Department.__table__.schema = schema
-
 class SegmentDepartment(db.Model):
     __tablename__ = 'segmentosetor'
 
     id = db.Column("idsegmento", db.Integer, primary_key=True)
     idHospital = db.Column("fkhospital", db.Integer, primary_key=True)
     idDepartment = db.Column("fksetor", db.Integer, primary_key=True)
-
-    def setSchema(schema):
-        SegmentDepartment.__table__.schema = schema
 
 class Exams(db.Model):
     __tablename__ = 'exame'
@@ -677,9 +595,6 @@ class Exams(db.Model):
     typeExam = db.Column("tpexame", db.String, primary_key=True)
     value = db.Column("resultado", db.Float, nullable=False)
     unit = db.Column("unidade", db.String, nullable=True)
-
-    def setSchema(schema):
-        Exams.__table__.schema = schema
 
     def findByAdmission(admissionNumber):
         return db.session.query(Exams)\
