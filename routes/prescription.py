@@ -91,7 +91,7 @@ class DrugList():
                 result = i;
         return result
 
-    def getDrugType(self, pDrugs, source, checked=False, suspended=False, route=False):
+    def getDrugType(self, pDrugs, source, checked=False, suspended=False):
         for pd in self.drugList:
 
             belong = False
@@ -198,15 +198,11 @@ class DrugList():
 @app_pres.route('/prescriptions/<int:idPrescription>', methods=['GET'])
 @jwt_required
 def getPrescriptionAuth(idPrescription):
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
     return getPrescription(idPrescription)
 
-def getPrescription(idPrescription, schema=None):
-    if schema:
-        dbSession.setSchema(schema)
-    else:
-        user = User.find(get_jwt_identity())
-        dbSession.setSchema(user.schema)
-
+def getPrescription(idPrescription):
     prescription = Prescription.getPrescription(idPrescription)
 
     if (prescription is None):
@@ -264,6 +260,7 @@ def getPrescription(idPrescription, schema=None):
             'height': patient.height,
             'weight': patient.weight,
             'observation': prescription[6],
+            'notes': prescription[7],
             'age': age,
             'weightUser': bool(patient.user),
             'weightDate': patient.weightDate,
@@ -280,7 +277,7 @@ def getPrescription(idPrescription, schema=None):
             'infusion': [{'key': i, 'value': pInfusion[i]} for i in pInfusion],
             'interventions': [i for i in interventions if i['idPrescription'] < idPrescription],
             'alertExams': alertExams,
-            'exams': examsJson[:9],
+            'exams': examsJson[:10],
             'status': prescription[0].status,
         }
     }, status.HTTP_200_OK
@@ -293,7 +290,8 @@ def setPrescriptionStatus(idPrescription):
     dbSession.setSchema(user.schema)
 
     p = Prescription.query.get(idPrescription)
-    p.status = data.get('status', None)
+    if 'status' in data.keys(): p.status = data.get('status', None)
+    if 'notes' in data.keys(): p.notes = data.get('notes', None)
     p.update = datetime.today()
     p.user = user.id
 
@@ -382,17 +380,13 @@ def setPatientData(admissionNumber):
     p = Patient.findByAdmission(admissionNumber)
 
     weight = data.get('weight', None)
-    if weight: 
+    if weight and weight != p.weight: 
         p.weightDate = datetime.today()
         p.weight = weight
         p.user  = user.id
 
-    height = data.get('height', None)
-    if height: p.height = height
-
-    observation = data.get('observation', None)
-    if observation: p.observation = observation
-    
+    if 'height' in data.keys(): p.height = data.get('height', None)
+    if 'observation' in data.keys(): p.observation = data.get('observation', None)
     p.update = datetime.today()
 
     if 'idPrescription' in data.keys():

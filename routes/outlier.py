@@ -53,18 +53,20 @@ def getOutliers(idSegment=1, idDrug=1):
     results = []
     for o in outliers:
         if dose is not None and frequency is not None:
-            if float(dose) == o[0].dose and float(frequency) == o[0].frequency: newOutlier = False
-            results.append({
-                'idOutlier': o[0].id,
-                'idDrug': o[0].idDrug,
-                'countNum': o[0].countNum,
-                'dose': o[0].dose,
-                'unit': defaultUnit,
-                'frequency': freqValue(o[0].frequency),
-                'score': o[0].score,
-                'manualScore': o[0].manualScore,
-                'obs': o[1].notes if o[1] != None else ''
-            })
+            if float(dose) == o[0].dose and float(frequency) == o[0].frequency: 
+                newOutlier = False
+
+        results.append({
+            'idOutlier': o[0].id,
+            'idDrug': o[0].idDrug,
+            'countNum': o[0].countNum,
+            'dose': o[0].dose,
+            'unit': defaultUnit,
+            'frequency': freqValue(o[0].frequency),
+            'score': o[0].score,
+            'manualScore': o[0].manualScore,
+            'obs': o[1].notes if o[1] != None else ''
+        })
 
     if dose is not None and frequency is not None and newOutlier:
         o = Outlier()

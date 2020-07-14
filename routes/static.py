@@ -24,7 +24,7 @@ def computePrescription(schema, idPrescription):
     if (p is None):
         return {}, status.HTTP_204_NO_CONTENT
 
-    result, stat = getPrescription(idPrescription, schema)
+    result, stat = getPrescription(idPrescription)
 
     drugList = result['data']['prescription']
     drugList.extend(result['data']['solution'])

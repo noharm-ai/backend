@@ -18,6 +18,7 @@ class Prescription(db.Model):
     bed = db.Column('leito', db.String(16), nullable=True)
     record = db.Column('prontuario', db.Integer, nullable=True)
     features = db.Column('indicadores', postgresql.JSON, nullable=True)
+    notes = deferred(db.Column('evolucao', db.String, nullable=True))
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.Integer, nullable=True)
 
@@ -25,7 +26,8 @@ class Prescription(db.Model):
         return db.session\
             .query(
                 Prescription, Patient, '0', '0',
-                Department.name.label('department'), Segment.description, Patient.observation
+                Department.name.label('department'), Segment.description, 
+                Patient.observation, Prescription.notes
             )\
             .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)\
             .outerjoin(Department, Department.id == Prescription.idDepartment)\
@@ -233,47 +235,6 @@ class Intervention(db.Model):
     status = db.Column('status', db.String(1), nullable=True)
     update = db.Column("update_at", db.DateTime, nullable=False)
     user = db.Column("update_by", db.Integer, nullable=False)
-
-    def validateIntervention(self):
-        if self.idPrescriptionDrug is None:
-            raise AssertionError(
-                'Medicamento prescrito: preenchimento obrigatório')
-
-        if self.idUser is None:
-            raise AssertionError(
-                'Usuário responsável: preenchimento obrigatório')
-
-        if self.idInterventionReason is None:
-            raise AssertionError(
-                'Motivo intervenção: preenchimento obrigatório')
-
-        if self.propagation is None:
-            raise AssertionError('Propagação: preenchimento obrigatório')
-
-        if self.propagation != 'S' and self.propagation != 'N':
-            raise AssertionError('Propagação: valor deve ser S ou N')
-
-        if self.notes is None:
-            raise AssertionError('Observação: preenchimento obrigatório')
-
-        prescriptionDrug = PrescriptionDrug.query.filter(
-            PrescriptionDrug.id == self.idPrescriptionDrug).first()
-        if (prescriptionDrug is None):
-            raise AssertionError(
-                'Medicamento prescrito: identificação inexistente')
-
-        interventionReason = InterventionReason.query.filter(
-            InterventionReason.id == self.idInterventionReason).first()
-        if (interventionReason is None):
-            raise AssertionError(
-                'Motivo intervenção: identificação inexistente')
-
-    def save(self):
-        self.validateIntervention()
-        if self.id == None:
-            db.session.add(self)
-
-        db.session.commit()
 
     def findAll(admissionNumber=None,userId=None):
         reason = db.session.query(InterventionReason.description)\
