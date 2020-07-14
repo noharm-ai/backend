@@ -6,8 +6,9 @@ from routes.utils import *
 
 db = SQLAlchemy()
 
-def setSchema(schema):
-    db.session.connection(execution_options={'schema_translate_map': {None: schema}})
+class dbSession():
+    def setSchema(schema):
+        db.session.connection(execution_options={'schema_translate_map': {None: schema}})
 
 class User(db.Model):
     __tablename__ = 'usuario'

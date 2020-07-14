@@ -14,7 +14,7 @@ app_out = Blueprint('app_out',__name__)
 @jwt_required
 def getOutliers(idSegment=1, idDrug=1):
     user = User.find(get_jwt_identity())
-    setSchema(user.schema)
+    dbSession.setSchema(user.schema)
 
     outliers = db.session\
         .query(Outlier, Notes)\
@@ -128,7 +128,7 @@ def getOutliers(idSegment=1, idDrug=1):
 def setManualOutlier(idOutlier):
     data = request.get_json()
     user = User.find(get_jwt_identity())
-    setSchema(user.schema)
+    dbSession.setSchema(user.schema)
 
     o = Outlier.query.get(idOutlier)
     if 'manualScore' in data:
@@ -166,7 +166,7 @@ def setManualOutlier(idOutlier):
 def setDrugClass(idDrug):
     data = request.get_json()
     user = User.find(get_jwt_identity())
-    setSchema(user.schema)
+    dbSession.setSchema(user.schema)
 
     idSegment = data.get('idSegment', 1)
     drugAttr = DrugAttributes.query.get((idDrug,idSegment))
@@ -205,7 +205,7 @@ def setDrugClass(idDrug):
 @jwt_required
 def getDrugs(idSegment=1):
     user = User.find(get_jwt_identity())
-    setSchema(user.schema)
+    dbSession.setSchema(user.schema)
 
     qDrug = request.args.get('q', None)
     idDrug = request.args.getlist('idDrug[]')
@@ -236,7 +236,7 @@ def getDrugs(idSegment=1):
 @jwt_required
 def getUnits(idDrug, idSegment=1):
     user = User.find(get_jwt_identity())
-    setSchema(user.schema)
+    dbSession.setSchema(user.schema)
 
     idSegment = request.args.get('idSegment', idSegment)
 
@@ -276,7 +276,7 @@ def getUnits(idDrug, idSegment=1):
 def setDrugUnit(idDrug, idMeasureUnit):
     data = request.get_json()
     user = User.find(get_jwt_identity())
-    setSchema(user.schema)
+    dbSession.setSchema(user.schema)
 
     idSegment = data.get('idSegment', 1)
     u = MeasureUnitConvert.query.get((idMeasureUnit, idDrug, idSegment))
@@ -299,7 +299,7 @@ def setDrugUnit(idDrug, idMeasureUnit):
 @jwt_required
 def getSubstance():
     user = User.find(get_jwt_identity())
-    setSchema(user.schema)
+    dbSession.setSchema(user.schema)
 
     drugs = Substance.query.order_by(asc(Substance.name)).all()
 

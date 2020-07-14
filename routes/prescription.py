@@ -17,7 +17,7 @@ app_pres = Blueprint('app_pres',__name__)
 @jwt_required
 def getPrescriptions():
     user = User.find(get_jwt_identity())
-    setSchema(user.schema)
+    dbSession.setSchema(user.schema)
 
     idSegment = request.args.get('idSegment', None)
     idDept = request.args.getlist('idDept[]')
@@ -202,10 +202,10 @@ def getPrescriptionAuth(idPrescription):
 
 def getPrescription(idPrescription, schema=None):
     if schema:
-        setSchema(schema)
+        dbSession.setSchema(schema)
     else:
         user = User.find(get_jwt_identity())
-        setSchema(user.schema)
+        dbSession.setSchema(user.schema)
 
     prescription = Prescription.getPrescription(idPrescription)
 
@@ -290,7 +290,7 @@ def getPrescription(idPrescription, schema=None):
 def setPrescriptionStatus(idPrescription):
     data = request.get_json()
     user = User.find(get_jwt_identity())
-    setSchema(user.schema)
+    dbSession.setSchema(user.schema)
 
     p = Prescription.query.get(idPrescription)
     p.status = data.get('status', None)
@@ -303,7 +303,7 @@ def setPrescriptionStatus(idPrescription):
 @jwt_required
 def getDrugPeriod(idPrescriptionDrug):
     user = User.find(get_jwt_identity())
-    setSchema(user.schema)
+    dbSession.setSchema(user.schema)
 
     results = PrescriptionDrug.findByPrescriptionDrug(idPrescriptionDrug)
 
@@ -325,7 +325,7 @@ def historyExam(typeExam, examsList, segExam):
 @jwt_required
 def getExamsbyAdmission(admissionNumber):
     user = User.find(get_jwt_identity())
-    setSchema(user.schema)
+    dbSession.setSchema(user.schema)
 
     idSegment = request.args.get('idSegment', 1)
     examsList = Exams.findByAdmission(admissionNumber)
@@ -376,7 +376,7 @@ def getExamsbyAdmission(admissionNumber):
 @jwt_required
 def setPatientData(admissionNumber):
     user = User.find(get_jwt_identity())
-    setSchema(user.schema)
+    dbSession.setSchema(user.schema)
     data = request.get_json()
 
     p = Patient.findByAdmission(admissionNumber)
@@ -413,7 +413,7 @@ def setPatientData(admissionNumber):
 def setPrescriptionDrugNote(idPrescriptionDrug):
     data = request.get_json()
     user = User.find(get_jwt_identity())
-    setSchema(user.schema)
+    dbSession.setSchema(user.schema)
 
     if 'notes' in data:
         notes = data.get('notes', None)

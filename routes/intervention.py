@@ -15,7 +15,7 @@ app_itrv = Blueprint('app_itrv',__name__)
 @jwt_required
 def setDrugStatus(idPrescriptionDrug, drugStatus):
     user = User.find(get_jwt_identity())
-    setSchema(user.schema)
+    dbSession.setSchema(user.schema)
 
     pd = PrescriptionDrug.query.get(idPrescriptionDrug)
     pd.status = drugStatus
@@ -28,7 +28,7 @@ def setDrugStatus(idPrescriptionDrug, drugStatus):
 @jwt_required
 def createIntervention(idPrescriptionDrug=None):
     user = User.find(get_jwt_identity())
-    setSchema(user.schema)
+    dbSession.setSchema(user.schema)
     data = request.get_json()
 
     newIntervention = False
@@ -63,7 +63,7 @@ def sortReasons(e):
 @jwt_required
 def getInterventionReasons():
     user = User.find(get_jwt_identity())
-    setSchema(user.schema)
+    dbSession.setSchema(user.schema)
     
     results = InterventionReason.findAll()
 
@@ -85,7 +85,7 @@ def getInterventionReasons():
 @jwt_required
 def getInterventions():
     user = User.find(get_jwt_identity())
-    setSchema(user.schema)
+    dbSession.setSchema(user.schema)
     
     results = Intervention.findAll(userId=user.id)
 

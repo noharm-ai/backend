@@ -15,7 +15,7 @@ app_seg = Blueprint('app_seg',__name__)
 @jwt_required
 def getSegments():
     user = User.find(get_jwt_identity())
-    setSchema(user.schema)
+    dbSession.setSchema(user.schema)
     results = Segment.findAll()
 
     iList = []
@@ -35,7 +35,7 @@ def getSegments():
 @jwt_required
 def getSegmentsId(idSegment):
     user = User.find(get_jwt_identity())
-    setSchema(user.schema)
+    dbSession.setSchema(user.schema)
     
     s = Segment.query.get(idSegment)
     departments = Department.query\
@@ -84,7 +84,7 @@ def getSegmentsId(idSegment):
 @jwt_required
 def setSegment(idSegment=None):
     user = User.find(get_jwt_identity())
-    setSchema(user.schema)
+    dbSession.setSchema(user.schema)
     data = request.get_json()
 
     s = Segment.query.get(idSegment)
@@ -130,7 +130,7 @@ def setSegment(idSegment=None):
 @jwt_required
 def getDepartments():
     user = User.find(get_jwt_identity())
-    setSchema(user.schema)
+    dbSession.setSchema(user.schema)
     
     departs = Department.getAll()
 
@@ -151,7 +151,7 @@ def getDepartments():
 @jwt_required
 def getFreeDepartments():
     user = User.find(get_jwt_identity())
-    setSchema(user.schema)
+    dbSession.setSchema(user.schema)
     
     departs = Department.query\
                 .outerjoin(SegmentDepartment, SegmentDepartment.idDepartment == Department.id)\
@@ -175,7 +175,7 @@ def getFreeDepartments():
 @jwt_required
 def getCodes():
     user = User.find(get_jwt_identity())
-    setSchema(user.schema)
+    dbSession.setSchema(user.schema)
 
     typesExam = db.session.query(Exams.typeExam)\
                 .filter(Exams.date > (date.today() - timedelta(days=360)))\
@@ -196,7 +196,7 @@ def getCodes():
 @jwt_required
 def setExams(idSegment, typeExam):
     user = User.find(get_jwt_identity())
-    setSchema(user.schema)
+    dbSession.setSchema(user.schema)
     data = request.get_json()
 
     segExam = SegmentExam.query.get((idSegment,typeExam))

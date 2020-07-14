@@ -19,7 +19,7 @@ def computePrescription(schema, idPrescription):
     if not schemaExists:
     	return {}, status.HTTP_204_NO_CONTENT
 
-    setSchema(schema)
+    dbSession.setSchema(schema)
     p = Prescription.query.get(idPrescription)
     if (p is None):
         return {}, status.HTTP_204_NO_CONTENT

@@ -1,6 +1,6 @@
 from flask import Blueprint, request, url_for, jsonify
 from flask_api import status
-from models.main import db, User, setSchema
+from models.main import *
 from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
 

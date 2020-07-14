@@ -46,7 +46,7 @@ def call_outlier(idSegment, fold, header):
 @jwt_required
 def callOutliers(idSegment):
     user = User.find(get_jwt_identity())
-    setSchema(user.schema)
+    dbSession.setSchema(user.schema)
 
     auth_token = create_access_token(get_jwt_identity())
     header = {'Authorization': 'Bearer ' + auth_token}
@@ -98,7 +98,7 @@ def callOutliers(idSegment):
 @jwt_required
 def generateOutliers(idSegment,fold=None,idDrug=None,clean=None):
     user = User.find(get_jwt_identity())
-    setSchema(user.schema)
+    dbSession.setSchema(user.schema)
 
     conn = db.engine.raw_connection()
     cursor = conn.cursor()
