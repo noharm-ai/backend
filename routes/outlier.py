@@ -51,10 +51,9 @@ def getOutliers(idSegment=1, idDrug=1):
 
     newOutlier = True
     results = []
-    if d and d[0] != None:
-        for o in outliers:
-            if dose is not None and frequency is not None:
-                if float(dose) == o[0].dose and float(frequency) == o[0].frequency: newOutlier = False
+    for o in outliers:
+        if dose is not None and frequency is not None:
+            if float(dose) == o[0].dose and float(frequency) == o[0].frequency: newOutlier = False
             results.append({
                 'idOutlier': o[0].id,
                 'idDrug': o[0].idDrug,
