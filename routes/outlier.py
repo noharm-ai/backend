@@ -26,12 +26,12 @@ def getOutliers(idSegment=1, idDrug=1):
         .query(Drug, Substance.name)\
         .outerjoin(Substance, Substance.id == Drug.sctid)\
         .filter(Drug.id == idDrug)\
-        .one()
+        .first()
 
     drugAttr = DrugAttributes.query.get((idDrug,idSegment))
     
     relations = []
-    if d[0].sctid:
+    if d and d[0].sctid:
         relations = Relation.findBySctid(d[0].sctid, user.id)
 
     if drugAttr is None: drugAttr = DrugAttributes()
@@ -51,7 +51,7 @@ def getOutliers(idSegment=1, idDrug=1):
 
     newOutlier = True
     results = []
-    if d[0] != None:
+    if d and d[0] != None:
         for o in outliers:
             if dose is not None and frequency is not None:
                 if float(dose) == o[0].dose and float(frequency) == o[0].frequency: newOutlier = False
@@ -112,8 +112,8 @@ def getOutliers(idSegment=1, idDrug=1):
             'amount': drugAttr.amount,
             'amountUnit': drugAttr.amountUnit,
             'whiteList': drugAttr.whiteList,
-            'sctidA': d[0].sctid,
-            'sctNameA': strNone(d[1]).upper(),
+            'sctidA': d[0].sctid if d else '',
+            'sctNameA': strNone(d[1]).upper() if d else '',
             'relations': relations,
             'relationTypes' : [{'key': t, 'value': typeRelations[t]} for t in typeRelations]
         }
