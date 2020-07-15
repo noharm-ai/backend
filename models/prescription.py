@@ -102,14 +102,11 @@ class Patient(db.Model):
                          .filter(Patient.admissionNumber == admissionNumber)\
                          .one()
 
-    def getPatients(idSegment=None, idDept=[], idDrug=[], limit=250, day=date.today(), onlyStatus=False):
-        if onlyStatus:
-            q = db.session.query(Prescription)
-        else:
-            q = db.session\
-                .query(Prescription, Patient, Department.name.label('department'))\
-                .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)\
-                .outerjoin(Department, Department.id == Prescription.idDepartment)
+    def getPatients(idSegment=None, idDept=[], idDrug=[], day=date.today()):
+        q = db.session\
+            .query(Prescription, Patient, Department.name.label('department'))\
+            .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)\
+            .outerjoin(Department, Department.id == Prescription.idDepartment)
 
         if (not(idSegment is None)):
             q = q.filter(Prescription.idSegment == idSegment)
@@ -125,7 +122,7 @@ class Patient(db.Model):
         q = q.filter(func.date(Prescription.date) == day)
         q = q.order_by(desc(Prescription.date))
 
-        return q.limit(limit).all()
+        return q.limit(500).all()
 
 def getDrugHistory(idPrescription, admissionNumber):
     pd1 = db.aliased(PrescriptionDrug)

@@ -25,7 +25,7 @@ def getPrescriptions():
     limit = request.args.get('limit', 250)
     day = request.args.get('date', date.today())
 
-    patients = Patient.getPatients(idSegment=idSegment, idDept=idDept, idDrug=idDrug, limit=limit, day=day)
+    patients = Patient.getPatients(idSegment=idSegment, idDept=idDept, idDrug=idDrug, day=day)
 
     results = []
     for p in patients:
