@@ -120,7 +120,7 @@ class Patient(db.Model):
             idDrug = list(map(int, idDrug))
             q = q.filter(postgresql.array(idDrug).overlap(drugList))
 
-        if pending:
+        if bool(int(none2zero(pending))):
             q = q.filter(Prescription.status == '0')
 
         if endDate is None: endDate = startDate
