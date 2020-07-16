@@ -42,16 +42,22 @@ class Prescription(db.Model):
         m1 = db.aliased(Drug)
         m2 = db.aliased(Drug)
 
-        relations = db.session\
-            .query(pd1, Relation, m1.name, m2.name)\
+        relation = db.session\
+            .query(pd1.id, Relation, m1.name, m2.name)\
             .join(pd2, and_(pd2.idPrescription == pd1.idPrescription, pd2.id != pd1.id))\
             .join(m1, m1.id == pd1.idDrug)\
             .join(m2, m2.id == pd2.idDrug)\
             .join(Relation, and_(Relation.sctida == m1.sctid, Relation.sctidb == m2.sctid))\
             .filter(pd1.idPrescription == idPrescription)\
-            .filter(Relation.active == True)\
-            .filter(Relation.kind.in_(['it','dt','dm']))\
-            .all()
+            .filter(Relation.active == True)
+            
+        interaction = relation.filter(Relation.kind.in_(['it','dt','dm']))
+
+        incompatible = relation.filter(Relation.kind.in_(['iy']))\
+                        .filter(pd1.route.in_(['Intravenosa infusao','Infusão Contínua', 'Intravenosa bolus']))\
+                        .filter(pd2.route.in_(['Intravenosa infusao','Infusão Contínua', 'Intravenosa bolus']))
+
+        relations = interaction.union(incompatible).all()
 
         results = {}
         pairs = []
@@ -63,10 +69,10 @@ class Prescription(db.Model):
             alert = typeRelations[r[1].kind] + ': '
             alert += strNone(r[1].text) + ' (' + strNone(r[2]) + ' e ' + strNone(r[3]) + ')'
 
-            if r[0].id in results: 
-                results[r[0].id].append(alert)
+            if r[0] in results: 
+                results[r[0]].append(alert)
             else:
-                results[r[0].id] = [alert]
+                results[r[0]] = [alert]
 
             if (r[1].sctida == r[1].sctidb): 
                 pairs.append(key)
