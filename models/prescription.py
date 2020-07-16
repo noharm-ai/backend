@@ -2,6 +2,7 @@ from .main import *
 from .appendix import *
 from .segment import *
 from routes.utils import *
+from datetime import datetime
 from sqlalchemy.orm import deferred
 
 class Prescription(db.Model):
@@ -102,7 +103,7 @@ class Patient(db.Model):
                          .filter(Patient.admissionNumber == admissionNumber)\
                          .one()
 
-    def getPatients(idSegment=None, idDept=[], idDrug=[], day=date.today()):
+    def getPatients(idSegment=None, idDept=[], idDrug=[], startDate=date.today(), endDate=None, pending=False):
         q = db.session\
             .query(Prescription, Patient, Department.name.label('department'))\
             .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)\
@@ -119,7 +120,14 @@ class Patient(db.Model):
             idDrug = list(map(int, idDrug))
             q = q.filter(postgresql.array(idDrug).overlap(drugList))
 
-        q = q.filter(func.date(Prescription.date) == day)
+        if pending:
+            q = q.filter(Prescription.status == '0')
+
+        if endDate is None: endDate = startDate
+
+        q = q.filter(func.date(Prescription.date) >= validate(startDate))
+        q = q.filter(func.date(Prescription.date) <= validate(endDate))
+
         q = q.order_by(desc(Prescription.date))
 
         return q.limit(500).all()

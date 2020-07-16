@@ -20,6 +20,12 @@ def data2month(birthdate):
     age = int ((datetime.today() - birthdate).months / month_in_year)
     return age
 
+def validate(date_text):
+    try:
+        return datetime.strptime(date_text, '%Y-%m-%d').date()
+    except ValueError:
+        return date.today()
+
 def lenghStay(admissionDate):
     if admissionDate is None: return ''
 

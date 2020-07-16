@@ -22,10 +22,11 @@ def getPrescriptions():
     idSegment = request.args.get('idSegment', None)
     idDept = request.args.getlist('idDept[]')
     idDrug = request.args.getlist('idDrug[]')
-    limit = request.args.get('limit', 250)
-    day = request.args.get('date', date.today())
+    startDate = request.args.get('startDate', str(date.today()))
+    endDate = request.args.get('endDate', None)
+    pending = request.args.get('pending', False)
 
-    patients = Patient.getPatients(idSegment=idSegment, idDept=idDept, idDrug=idDrug, day=day)
+    patients = Patient.getPatients(idSegment=idSegment, idDept=idDept, idDrug=idDrug, startDate=startDate, endDate=endDate, pending=pending)
 
     results = []
     for p in patients:
