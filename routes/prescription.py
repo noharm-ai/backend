@@ -271,7 +271,7 @@ def getPrescription(idPrescription):
             'class': random.choice(['green','yellow','red']),
             'skinColor': patient.skinColor,
             'department': prescription[4],
-            'lastDepartment': lastDept,
+            'lastDepartment': lastDept[0] if lastDept else 'Paciente novo',
             'patientScore': 'High',
             'date': prescription[0].date.isoformat(),
             'prescription': pDrugs,
