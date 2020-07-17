@@ -215,6 +215,7 @@ def getPrescription(idPrescription):
         patient.idPatient = prescription[0].idPatient
         patient.admissionNumber = prescription[0].admissionNumber
 
+    lastDept = Prescription.lastDeptbyAdmission(idPrescription, patient.admissionNumber)
     drugs = PrescriptionDrug.findByPrescription(idPrescription, patient.admissionNumber)
     interventions = Intervention.findAll(admissionNumber=patient.admissionNumber)
     relations = Prescription.findRelation(idPrescription)
@@ -270,6 +271,7 @@ def getPrescription(idPrescription):
             'class': random.choice(['green','yellow','red']),
             'skinColor': patient.skinColor,
             'department': prescription[4],
+            'lastDepartment': lastDept,
             'patientScore': 'High',
             'date': prescription[0].date.isoformat(),
             'prescription': pDrugs,
@@ -304,7 +306,14 @@ def getDrugPeriod(idPrescriptionDrug):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
 
-    results = PrescriptionDrug.findByPrescriptionDrug(idPrescriptionDrug)
+    future = request.args.get('future', None)
+    results, admissionHistory = PrescriptionDrug.findByPrescriptionDrug(idPrescriptionDrug, future)
+
+    if future and len(results[0][1]) == 0:
+        if admissionHistory:
+            results[0][1].append('Não há prescrição posterior para esse Medicamento')
+        else:
+            results[0][1].append('Não há prescrição posterior para esse Paciente')
 
     return {
         'status': 'success',

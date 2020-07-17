@@ -4,6 +4,7 @@ from .segment import *
 from routes.utils import *
 from datetime import datetime
 from sqlalchemy.orm import deferred
+from sqlalchemy import case
 
 class Prescription(db.Model):
     __tablename__ = 'prescricao'
@@ -22,6 +23,21 @@ class Prescription(db.Model):
     notes = deferred(db.Column('evolucao', db.String, nullable=True))
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.Integer, nullable=True)
+
+    def getFuturePrescription(idPrescription, admissionNumber):
+        return db.session.query(Prescription)\
+            .filter(Prescription.admissionNumber == admissionNumber)\
+            .filter(Prescription.id > idPrescription)\
+            .first()
+
+    def lastDeptbyAdmission(idPrescription, admissionNumber):
+        return db.session.query(Department.name)\
+            .select_from(Prescription)\
+            .outerjoin(Department, Department.id == Prescription.idDepartment)\
+            .filter(Prescription.admissionNumber == admissionNumber)\
+            .filter(Prescription.id < idPrescription)\
+            .order_by(desc(Prescription.date))\
+            .first()
 
     def getPrescription(idPrescription):
         return db.session\
@@ -148,7 +164,24 @@ def getDrugHistory(idPrescription, admissionNumber):
         .filter(pr1.admissionNumber == admissionNumber)\
         .filter(pr1.id < idPrescription)\
         .filter(pd1.idDrug == PrescriptionDrug.idDrug)\
+        .filter(pd1.suspendedDate == None)\
         .filter(pr1.date > (date.today() - timedelta(days=30)))\
+        .order_by(asc(pr1.date))\
+        .as_scalar()
+
+    return func.array(query)
+
+def getDrugFuture(idPrescription, admissionNumber):
+    pd1 = db.aliased(PrescriptionDrug)
+    pr1 = db.aliased(Prescription)
+
+    query = db.session.query(func.concat(func.to_char(pr1.date, "DD/MM"),' (',pd1.frequency,'x ',pd1.dose,' ',pd1.idMeasureUnit,') via ',pd1.route))\
+        .select_from(pd1)\
+        .join(pr1, pr1.id == pd1.idPrescription)\
+        .filter(pr1.admissionNumber == admissionNumber)\
+        .filter(pr1.id > idPrescription)\
+        .filter(pd1.idDrug == PrescriptionDrug.idDrug)\
+        .filter(pd1.suspendedDate == None)\
         .order_by(asc(pr1.date))\
         .as_scalar()
 
@@ -221,16 +254,21 @@ class PrescriptionDrug(db.Model):
             .order_by(asc(PrescriptionDrug.solutionGroup), asc(Drug.name))\
             .all()
 
-    def findByPrescriptionDrug(idPrescriptionDrug):
+    def findByPrescriptionDrug(idPrescriptionDrug, future):
         pd = PrescriptionDrug.query.get(idPrescriptionDrug)
         p = Prescription.query.get(pd.idPrescription)
 
-        drugHistory = getDrugHistory(p.id, p.admissionNumber)
+        admissionHistory = None
+        if future:
+            drugHistory = getDrugFuture(p.id, p.admissionNumber)
+            admissionHistory = Prescription.getFuturePrescription(p.id, p.admissionNumber)
+        else:
+            drugHistory = getDrugHistory(p.id, p.admissionNumber)
 
         return db.session\
             .query(PrescriptionDrug, drugHistory.label('drugHistory'))\
             .filter(PrescriptionDrug.id == idPrescriptionDrug)\
-            .all()
+            .all() , admissionHistory
 
 class Intervention(db.Model):
     __tablename__ = 'intervencao'
@@ -248,8 +286,16 @@ class Intervention(db.Model):
     user = db.Column("update_by", db.Integer, nullable=False)
 
     def findAll(admissionNumber=None,userId=None):
-        reason = db.session.query(InterventionReason.description)\
+        mReasion = db.aliased(InterventionReason)
+        descript = case([(
+                            mReasion.description != None,
+                            func.concat(mReasion.description, ' - ',InterventionReason.description)
+                        ),],
+                        else_=InterventionReason.description)
+
+        reason = db.session.query(descript)\
                 .select_from(InterventionReason)\
+                .outerjoin(mReasion, mReasion.id == InterventionReason.mamy)\
                 .filter(InterventionReason.id == func.any(Intervention.idInterventionReason))\
                 .as_scalar()
 
