@@ -263,6 +263,8 @@ def getPrescription(idPrescription):
             'weight': patient.weight,
             'observation': prescription[6],
             'notes': prescription[7],
+            'alert': prescription[8],
+            'alertExpire': patient.alertExpire.isoformat() if patient.alertExpire else '',
             'age': age,
             'weightUser': bool(patient.user),
             'weightDate': patient.weightDate,
@@ -393,10 +395,17 @@ def setPatientData(admissionNumber):
     if weight and weight != p.weight: 
         p.weightDate = datetime.today()
         p.weight = weight
-        p.user  = user.id
+        p.user = user.id
+
+    alertExpire = data.get('alertExpire', None)
+    if alertExpire and alertExpire != p.alertExpire: 
+        p.alert = data.get('alert', None)
+        p.alertExpire = alertExpire
+        p.alertDate = datetime.today()
 
     if 'height' in data.keys(): p.height = data.get('height', None)
     if 'observation' in data.keys(): p.observation = data.get('observation', None)
+
     p.update = datetime.today()
 
     if 'idPrescription' in data.keys():

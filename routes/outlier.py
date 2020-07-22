@@ -196,6 +196,11 @@ def setDrugClass(idDrug):
         drugAttr.whiteList = data.get('whiteList', None)
         if not drugAttr.whiteList: drugAttr.whiteList = None
 
+    if 'sctid' in data.keys(): 
+        drug = Drug.query.get(idDrug)
+        if drug is not None:
+            drug.sctid = data.get('sctid')
+
     if newDrugAttr: db.session.add(drugAttr)
 
     return tryCommit(db, idDrug)
@@ -295,55 +300,3 @@ def setDrugUnit(idDrug, idMeasureUnit):
     if new: db.session.add(u)
 
     return tryCommit(db, idMeasureUnit)
-
-@app_out.route('/substance', methods=['GET'])
-@jwt_required
-def getSubstance():
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
-
-    drugs = Substance.query.order_by(asc(Substance.name)).all()
-
-    results = []
-    for d in drugs:
-        results.append({
-            'sctid': d.id,
-            'name': d.name.upper(),
-        })
-
-    results.sort(key=sortSubstance)
-
-    return {
-        'status': 'success',
-        'data': results
-    }, status.HTTP_200_OK
-
-
-@app_out.route('/relation/<int:sctidA>/<int:sctidB>/<string:kind>', methods=['PUT'])
-@jwt_required
-def setRelation(sctidA,sctidB,kind):
-    data = request.get_json()
-    user = User.find(get_jwt_identity())
-
-    relation = Relation.query.get((sctidA,sctidB,kind))
-    if relation is None:
-        relation = Relation.query.get((sctidB,sctidA,kind))
-
-    newRelation = False
-    if relation is None:
-        newRelation = True
-        relation = Relation()
-        relation.sctida = sctidA
-        relation.sctidb = sctidB
-        relation.kind = kind
-        relation.creator  = user.id
-
-    if 'text' in data.keys(): relation.text = data.get('text', None)
-    if 'active' in data.keys(): relation.active = bool(data.get('active', False))
-
-    relation.update = datetime.today()
-    relation.user  = user.id
-
-    if newRelation: db.session.add(relation)
-
-    return tryCommit(db, sctidA)

@@ -44,7 +44,7 @@ class Prescription(db.Model):
             .query(
                 Prescription, Patient, '0', '0',
                 Department.name.label('department'), Segment.description, 
-                Patient.observation, Prescription.notes
+                Patient.observation, Prescription.notes, Patient.alert
             )\
             .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)\
             .outerjoin(Department, Department.id == Prescription.idDepartment)\
@@ -119,6 +119,9 @@ class Patient(db.Model):
     skinColor = db.Column('cor', db.String, nullable=True)
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.Integer, nullable=True)
+    alert = deferred(db.Column('alertatexto', db.String, nullable=True))
+    alertDate = db.Column("alertadata", db.DateTime, nullable=True)
+    alertExpire = db.Column("alertavigencia", db.DateTime, nullable=True)
 
     def findByAdmission(admissionNumber):
         return db.session.query(Patient)\
