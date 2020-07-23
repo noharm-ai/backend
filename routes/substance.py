@@ -48,6 +48,20 @@ def setSubstance(idSubstance):
 
     return tryCommit(db, idSubstance)
 
+@app_sub.route('/substance/<int:idSubstance>/relation', methods=['GET'])
+@jwt_required
+def getRelations(idSubstance):
+    data = request.get_json()
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+
+    relations = Relation.findBySctid(idSubstance, user.id)
+
+    return {
+        'status': 'success',
+        'data': relations
+    }, status.HTTP_200_OK
+
 @app_sub.route('/relation/<int:sctidA>/<int:sctidB>/<string:kind>', methods=['PUT'])
 @jwt_required
 def setRelation(sctidA,sctidB,kind):
