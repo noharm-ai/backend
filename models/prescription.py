@@ -52,7 +52,7 @@ class Prescription(db.Model):
             .filter(Prescription.id == idPrescription)\
             .first()
 
-    def findRelation(idPrescription):
+    def findRelation(idPrescription, admissionNumber):
         pd1 = db.aliased(PrescriptionDrug)
         pd2 = db.aliased(PrescriptionDrug)
         m1 = db.aliased(Drug)
@@ -73,7 +73,30 @@ class Prescription(db.Model):
                         .filter(pd1.route.in_(['Intravenosa infusao','Infusão Contínua', 'Intravenosa bolus']))\
                         .filter(pd2.route.in_(['Intravenosa infusao','Infusão Contínua', 'Intravenosa bolus']))
 
-        relations = interaction.union(incompatible).all()
+        admissionAlergy = db.session.query(PrescriptionDrug.idDrug.label('idDrug'), func.min(PrescriptionDrug.id).label('id') )\
+                      .select_from(PrescriptionDrug)\
+                      .join(Prescription, Prescription.id == PrescriptionDrug.idPrescription)\
+                      .filter(Prescription.admissionNumber == admissionNumber)\
+                      .filter(PrescriptionDrug.alergy == 'S')\
+                      .group_by(PrescriptionDrug.idDrug)\
+                      .subquery()
+
+        al = db.aliased(admissionAlergy)
+
+        xreactivity = db.session\
+            .query(pd1.id, Relation, m1.name, m2.name)\
+            .join(al, al.c.id != pd1.id)\
+            .join(m1, m1.id == pd1.idDrug)\
+            .join(m2, m2.id == al.c.idDrug)\
+            .join(Relation, or_(
+                                and_(Relation.sctida == m1.sctid, Relation.sctidb == m2.sctid),
+                                and_(Relation.sctida == m2.sctid, Relation.sctidb == m1.sctid),
+                            ))\
+            .filter(pd1.idPrescription == idPrescription)\
+            .filter(Relation.active == True)\
+            .filter(Relation.kind.in_(['rx']))
+
+        relations = interaction.union(incompatible).union(xreactivity).all()
 
         results = {}
         pairs = []
