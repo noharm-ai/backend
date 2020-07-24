@@ -32,4 +32,5 @@ jobs:
       - name: deploy dev
         if: github.event_name == 'push'
         run: |
-          zappa update dev
+          echo ${{ secrets.ZAPPA_SETTINGS }} > zappa_settings.json 
+          zappa update dev --quiet
