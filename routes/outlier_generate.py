@@ -94,7 +94,6 @@ def callOutliers(idSegment):
 
 @app_gen.route("/segments/<int:idSegment>/outliers/generate/fold/<int:fold>", methods=['GET'])
 @app_gen.route("/segments/<int:idSegment>/outliers/generate/drug/<int:idDrug>", methods=['GET'])
-@app_gen.route("/segments/<int:idSegment>/outliers/generate/drug/<int:idDrug>/clean/<int:clean>", methods=['GET'])
 @jwt_required
 def generateOutliers(idSegment,fold=None,idDrug=None,clean=None):
     user = User.find(get_jwt_identity())
@@ -195,3 +194,45 @@ def generateOutliers(idSegment,fold=None,idDrug=None,clean=None):
     return {
         'status': 'success'
     }, status.HTTP_200_OK
+
+@app_gen.route("/segments/<int:idSegment>/outliers/generate/drug/<int:idDrug>/clean/<int:clean>", methods=['POST'])
+@jwt_required
+def outlierWizard(idSegment, idDrug, clean):
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+    data = request.get_json()
+
+    division = data.get('division', None)
+    useWeight = data.get('useWeight', None)
+    measureUnitList = data.get('measureUnitList')
+
+    if measureUnitList:
+        for m in measureUnitList:
+            setDrugUnit(idDrug, m['idMeasureUnit'], idSegment, m['fator'])
+
+    drugAttr = DrugAttributes.query.get((idDrug,idSegment))
+    if 'division' in data.keys(): drugAttr.division = data.get('division', None)
+    if 'useWeight' in data.keys(): drugAttr.useWeight = data.get('useWeight', False)
+
+    db.session.commit()
+
+    generateOutliers(idSegment, idDrug, clean)
+
+    return {
+        'status': 'success'
+    }, status.HTTP_200_OK
+
+def setDrugUnit(idDrug, idMeasureUnit, idSegment, factor):
+    u = MeasureUnitConvert.query.get((idMeasureUnit, idDrug, idSegment))
+    new = False
+
+    if u is None:
+        new = True
+        u = MeasureUnitConvert()
+        u.idMeasureUnit = idMeasureUnit
+        u.idDrug = idDrug
+        u.idSegment = idSegment
+
+    u.factor = factor
+
+    if new: db.session.add(u)
