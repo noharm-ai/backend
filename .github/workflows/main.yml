@@ -32,7 +32,7 @@ jobs:
           python-version: 3.8
       - run: |
           pip install pipenv
-          pipenv install -q -r requirements-prod.txt
+          pipenv install -r requirements-prod.txt
       - name: deploy dev
         if: github.event_name == 'push'
         run: |
