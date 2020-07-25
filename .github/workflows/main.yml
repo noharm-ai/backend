@@ -28,8 +28,7 @@ jobs:
         with:
           python-version: 3.8
       - name: config zappa
-        run: |
-          echo '${{ secrets.ZAPPA_SETTINGS }}' > zappa_settings.json 
+        run: echo '${{ secrets.ZAPPA_SETTINGS }}' > zappa_settings.json 
       - name: config python
         run: |
           python -m pip install --upgrade pip
@@ -40,5 +39,4 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         if: github.event_name == 'push'
-        run: |
-          pipenv run zappa update dev
+        run: pipenv run zappa update dev
