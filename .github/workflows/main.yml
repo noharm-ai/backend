@@ -31,13 +31,10 @@ jobs:
         with:
           python-version: 3.8
       - run: |
-          python3.8 -m venv deploy-env
-          source deploy-env/bin/activate
-          pip install -q -r requirements-prod.txt
-          pip install zappa
+          pip install pipenv
+          pipenv install -q -r requirements-prod.txt
       - name: deploy dev
         if: github.event_name == 'push'
         run: |
-          source deploy-env/bin/activate
           echo ${{ secrets.ZAPPA_SETTINGS }} > zappa_settings.json 
-          zappa update dev --quiet
+          pipenv run zappa update dev --quiet
