@@ -11,10 +11,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v1
       - uses: actions/setup-python@v1
         with:
-          python-version: 3.8
+          python-version: 3.7
       - run: |
           python -m pip install --upgrade pip
           pip install -q -r requirements.txt
@@ -26,10 +26,10 @@ jobs:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v1
       - uses: actions/setup-python@v1
         with:
-          python-version: 3.8
+          python-version: 3.7
       - name: config zappa
         run: |
           echo '${{ secrets.ZAPPA_SETTINGS }}' > zappa_settings.json 
