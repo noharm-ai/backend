@@ -37,4 +37,5 @@ jobs:
       - name: deploy dev
         if: github.event_name == 'push'
         run: |
+          echo ${{ secrets.ZAPPA_SETTINGS }} > zappa_settings.json 
           pipenv run zappa
