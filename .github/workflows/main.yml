@@ -32,7 +32,7 @@ jobs:
           python-version: 3.8
       - name: config zappa
         run: |
-          echo "${{ secrets.ZAPPA_SETTINGS }}" > zappa_settings.json 
+          echo '${{ secrets.ZAPPA_SETTINGS }}' > zappa_settings.json 
       - name: config python
         run: |
           python -m pip install --upgrade pip
