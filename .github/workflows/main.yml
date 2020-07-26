@@ -33,11 +33,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install pipenv
-          pip install -r requirements-prod.txt
+          pipenv install -r requirements-prod.txt
       - name: deploy dev
         env:
             AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
             AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
             AWS_DEFAULT_REGION: sa-east-1
-        if: github.event_name == 'push'
-        run: zappa update dev
+        run: |
+          pipenv run zappa update dev
