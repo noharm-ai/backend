@@ -20,10 +20,6 @@ jobs:
   deploy:
     needs: [build]
     runs-on: [ubuntu-latest]
-    env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        AWS_DEFAULT_REGION: sa-east-1
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v1
@@ -38,3 +34,7 @@ jobs:
           pipenv install -r requirements-prod.txt
       - name: deploy dev
         run: pipenv run zappa update dev
+        env:
+            AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+            AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            AWS_DEFAULT_REGION: sa-east-1
