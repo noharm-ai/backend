@@ -25,16 +25,18 @@ jobs:
       - uses: actions/setup-python@v1
         with:
           python-version: 3.8
-      - name: config zappa
-        run: echo '${{ secrets.ZAPPA_SETTINGS }}' > zappa_settings.json 
       - name: config python
         run: |
           python -m pip install --upgrade pip
           pip install pipenv
           pipenv install -r requirements-prod.txt
+      - name: config zappa
+        run: |
+          echo '${{ secrets.ZAPPA_SETTINGS }}' > zappa_settings.json 
+          mkdir ~/.aws/ 
+          echo "[default]
+          aws_access_key_id = ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key = ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          region = sa-east-1" > ~/.aws/credentials 
       - name: deploy dev
         run: pipenv run zappa update dev
-        env:
-            AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-            AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-            AWS_DEFAULT_REGION: sa-east-1
