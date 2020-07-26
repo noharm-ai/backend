@@ -38,7 +38,7 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: sa-east-1
       - name: Test AWS Credentials
-        run: aws s3 ls
+        run: aws sts get-caller-identity
       - name: config zappa
         run: echo '${{ secrets.ZAPPA_SETTINGS }}' > zappa_settings.json 
       - name: config python
