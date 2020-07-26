@@ -28,7 +28,7 @@ class User(db.Model):
         return db_session.query(User).filter(User.id == id).first()
 
     def authenticate(email, password):
-        return User.query.filter_by(email=email, password=password).first()
+        return User.query.filter_by(email=email, password=func.md5(password)).first()
 
 class Substance(db.Model):
     __tablename__ = 'substancia'
