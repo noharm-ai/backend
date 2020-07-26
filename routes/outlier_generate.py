@@ -203,7 +203,7 @@ def outlierWizard(idSegment, idDrug, clean):
     data = request.get_json()
 
     division = data.get('division', None)
-    useWeight = data.get('useWeight', None)
+    useWeight = data.get('useWeight', False)
     measureUnitList = data.get('measureUnitList')
 
     if measureUnitList:
@@ -211,12 +211,22 @@ def outlierWizard(idSegment, idDrug, clean):
             setDrugUnit(idDrug, m['idMeasureUnit'], idSegment, m['fator'])
 
     drugAttr = DrugAttributes.query.get((idDrug,idSegment))
-    if 'division' in data.keys(): drugAttr.division = data.get('division', None)
-    if 'useWeight' in data.keys(): drugAttr.useWeight = data.get('useWeight', False)
+
+    newDrugAttr = False
+    if drugAttr is None:
+        newDrugAttr = True
+        drugAttr = DrugAttributes()
+        drugAttr.idDrug = idDrug
+        drugAttr.idSegment = idSegment
+
+    drugAttr.division = division
+    drugAttr.useWeight = useWeight
+
+    if newDrugAttr: db.session.add(drugAttr)
 
     db.session.commit()
 
-    generateOutliers(idSegment, idDrug, clean)
+    generateOutliers(idSegment, None, idDrug, clean)
 
     return {
         'status': 'success'
