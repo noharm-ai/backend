@@ -91,6 +91,20 @@ class Drug(db.Model):
     name = db.Column("nome", db.String, nullable=False)
     sctid = db.Column("sctid", db.Integer, nullable=True)
 
+    def getBySegment(idSegment, qDrug=None, idDrug=None):
+        segDrubs = db.session.query(Outlier.idDrug.label('idDrug'))\
+                      .filter(Outlier.idSegment == idSegment)\
+                      .group_by(Outlier.idDrug)\
+                      .subquery()
+
+        drugs = Drug.query.filter(Drug.id.in_(segDrubs))
+
+        if qDrug: drugs = drugs.filter(Drug.name.ilike("%"+str(qDrug)+"%"))
+
+        if (len(idDrug)>0): drugs = drugs.filter(Drug.id.in_(idDrug))
+
+        return drugs.order_by(asc(Drug.name)).all()
+
 class DrugAttributes(db.Model):
     __tablename__ = 'medatributos'
 

@@ -216,15 +216,7 @@ def getDrugs(idSegment=1):
     qDrug = request.args.get('q', None)
     idDrug = request.args.getlist('idDrug[]')
 
-    drugs = Drug.query\
-            .join(Outlier, Outlier.idDrug == Drug.id)\
-            .filter(Outlier.idSegment == idSegment)
-
-    if qDrug: drugs = drugs.filter(Drug.name.ilike("%"+str(qDrug)+"%"))
-
-    if (len(idDrug)>0): drugs = drugs.filter(Drug.id.in_(idDrug))
-
-    drugs = drugs.order_by(asc(Drug.name)).all()
+    drugs = Drug.getBySegment(idSegment, qDrug, idDrug)
 
     results = []
     for d in drugs:
