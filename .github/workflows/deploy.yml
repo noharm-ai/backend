@@ -26,4 +26,4 @@ jobs:
           aws_secret_access_key = ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           region = sa-east-1" > ~/.aws/credentials 
       - name: deploy dev
-        run: pipenv run zappa update dev 
+        run: pipenv run zappa update dev -q
