@@ -201,6 +201,9 @@ def setDrugClass(idDrug):
         if drug is not None:
             drug.sctid = data.get('sctid')
 
+    drugAttr.update = datetime.today()
+    drugAttr.user  = user.id
+
     if newDrugAttr: db.session.add(drugAttr)
 
     return tryCommit(db, idDrug)

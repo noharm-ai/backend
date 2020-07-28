@@ -221,6 +221,8 @@ def outlierWizard(idSegment, idDrug, clean):
 
     drugAttr.division = division
     drugAttr.useWeight = useWeight
+    drugAttr.update = datetime.today()
+    drugAttr.user  = user.id
 
     if newDrugAttr: db.session.add(drugAttr)
 

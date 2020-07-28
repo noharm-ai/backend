@@ -390,12 +390,14 @@ def setPatientData(admissionNumber):
     data = request.get_json()
 
     p = Patient.findByAdmission(admissionNumber)
+    updateWeight = False
 
     weight = data.get('weight', None)
     if weight and weight != p.weight: 
         p.weightDate = datetime.today()
         p.weight = weight
         p.user = user.id
+        updateWeight = True
 
     alertExpire = data.get('alertExpire', None)
     if alertExpire and alertExpire != p.alertExpire: 
@@ -408,7 +410,7 @@ def setPatientData(admissionNumber):
 
     p.update = datetime.today()
 
-    if 'idPrescription' in data.keys():
+    if 'idPrescription' in data.keys() and updateWeight:
         idPrescription = data.get('idPrescription')
 
         query = "INSERT INTO " + user.schema + ".presmed \
@@ -416,8 +418,7 @@ def setPatientData(admissionNumber):
                     FROM " + user.schema + ".presmed\
                     WHERE fkprescricao = " + str(int(idPrescription)) + ";"
 
-        print(query)
-        result = db.engine.execute(query) 
+        db.engine.execute(query) 
 
     return tryCommit(db, admissionNumber)
 
@@ -450,3 +451,30 @@ def setPrescriptionDrugNote(idPrescriptionDrug):
         if newObs: db.session.add(note)
 
     return tryCommit(db, idPrescriptionDrug)
+
+@app_pres.route('/prescriptions/<int:idPrescription>/update', methods=['GET'])
+@jwt_required
+def getPrescriptionUpdate(idPrescription):
+    data = request.get_json()
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+
+    results = Prescription.shouldUpdate(idPrescription)
+
+    refresh = False
+    if len(results) > 0:
+        refresh = True
+
+        query = "INSERT INTO " + user.schema + ".presmed \
+                    SELECT *\
+                    FROM " + user.schema + ".presmed\
+                    WHERE fkprescricao = " + str(int(idPrescription)) + ";"
+
+        db.engine.execute(query)
+
+        tryCommit(db, idPrescription)
+
+    return {
+        'status': 'success',
+        'data': refresh
+    }, status.HTTP_200_OK

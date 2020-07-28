@@ -52,6 +52,15 @@ class Prescription(db.Model):
             .filter(Prescription.id == idPrescription)\
             .first()
 
+    def shouldUpdate(idPrescription):
+        return db.session\
+            .query(DrugAttributes.update)\
+            .select_from(PrescriptionDrug)\
+            .join(DrugAttributes, and_(DrugAttributes.idDrug == PrescriptionDrug.idDrug, DrugAttributes.idSegment == PrescriptionDrug.idSegment))\
+            .filter(PrescriptionDrug.idPrescription == idPrescription)\
+            .filter(DrugAttributes.update > (datetime.today() - timedelta(minutes=5)) )\
+            .all()
+
     def findRelation(idPrescription, admissionNumber):
         pd1 = db.aliased(PrescriptionDrug)
         pd2 = db.aliased(PrescriptionDrug)
