@@ -86,7 +86,6 @@ class Drug(db.Model):
     __tablename__ = 'medicamento'
 
     id = db.Column("fkmedicamento", db.Integer, primary_key=True)
-    idMeasureUnit = db.Column("fkunidademedida", db.String, nullable=False)
     idHospital = db.Column("fkhospital", db.Integer, nullable=False)
     name = db.Column("nome", db.String, nullable=False)
     sctid = db.Column("sctid", db.Integer, nullable=True)
