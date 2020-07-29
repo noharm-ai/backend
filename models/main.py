@@ -91,9 +91,9 @@ class Drug(db.Model):
     sctid = db.Column("sctid", db.Integer, nullable=True)
 
     def getBySegment(idSegment, qDrug=None, idDrug=None):
-        segDrubs = db.session.query(Outlier.idDrug.label('idDrug'))\
-                      .filter(Outlier.idSegment == idSegment)\
-                      .group_by(Outlier.idDrug)\
+        segDrubs = db.session.query(PrescriptionAgg.idDrug.label('idDrug'))\
+                      .filter(PrescriptionAgg.idSegment == idSegment)\
+                      .group_by(PrescriptionAgg.idDrug)\
                       .subquery()
 
         drugs = Drug.query.filter(Drug.id.in_(segDrubs))
