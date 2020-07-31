@@ -216,10 +216,7 @@ def getPrescription(idPrescription):
     prescription = Prescription.getPrescription(idPrescription)
 
     if (prescription is None):
-        return {
-            'status': 'error',
-            'message': 'Prescrição Inexistente!'
-        }, status.HTTP_400_BAD_REQUEST
+        return { 'status': 'error', 'message': 'Prescrição Inexistente!' }, status.HTTP_400_BAD_REQUEST
 
     patient = prescription[1]
     if (patient is None):
@@ -307,6 +304,9 @@ def setPrescriptionStatus(idPrescription):
     dbSession.setSchema(user.schema)
 
     p = Prescription.query.get(idPrescription)
+    if (p is None):
+        return { 'status': 'error', 'message': 'Prescrição Inexistente!' }, status.HTTP_400_BAD_REQUEST
+
     if 'status' in data.keys(): p.status = data.get('status', None)
     if 'notes' in data.keys(): p.notes = data.get('notes', None)
     p.update = datetime.today()

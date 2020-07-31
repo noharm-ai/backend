@@ -17,12 +17,12 @@ def computePrescription(schema, idPrescription):
     	if r[0] == schema: schemaExists = True
 
     if not schemaExists:
-    	return {}, status.HTTP_204_NO_CONTENT
+    	return { 'status': 'error', 'message': 'Schema Inexistente!' }, status.HTTP_400_BAD_REQUEST
 
     dbSession.setSchema(schema)
     p = Prescription.query.get(idPrescription)
     if (p is None):
-        return {}, status.HTTP_204_NO_CONTENT
+        return { 'status': 'error', 'message': 'Prescrição Inexistente!' }, status.HTTP_400_BAD_REQUEST
 
     result, stat = getPrescription(idPrescription)
 
