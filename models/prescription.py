@@ -58,7 +58,7 @@ class Prescription(db.Model):
             .select_from(PrescriptionDrug)\
             .join(DrugAttributes, and_(DrugAttributes.idDrug == PrescriptionDrug.idDrug, DrugAttributes.idSegment == PrescriptionDrug.idSegment))\
             .filter(PrescriptionDrug.idPrescription == idPrescription)\
-            .filter(DrugAttributes.update > (datetime.today() - timedelta(minutes=5)) )\
+            .filter(DrugAttributes.update > (datetime.today() - timedelta(minutes=1)) )\
             .all()
 
     def findRelation(idPrescription, admissionNumber):
@@ -79,8 +79,8 @@ class Prescription(db.Model):
         interaction = relation.filter(Relation.kind.in_(['it','dt','dm']))
 
         incompatible = relation.filter(Relation.kind.in_(['iy']))\
-                        .filter(pd1.route.in_(['Intravenosa infusao','Infusão Contínua', 'Intravenosa bolus']))\
-                        .filter(pd2.route.in_(['Intravenosa infusao','Infusão Contínua', 'Intravenosa bolus']))
+                        .filter(pd1.route.in_(['Intravenosa infusao','Infusão Contínua']))\
+                        .filter(pd2.route.in_(['Intravenosa infusao','Infusão Contínua']))
 
         admissionAlergy = db.session.query(PrescriptionDrug.idDrug.label('idDrug'), func.min(PrescriptionDrug.id).label('id') )\
                       .select_from(PrescriptionDrug)\

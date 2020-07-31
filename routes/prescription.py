@@ -107,7 +107,7 @@ class DrugList():
             pdDoseconv = none2zero(pd[0].doseconv) * none2zero(pdFrequency)
             pdUnit = strNone(pd[2].id) if pd[2] else ''
             pdWhiteList = bool(pd[6].whiteList) if pd[6] is not None else False
-            doseWeight = None
+            doseWeightStr = None
 
             alerts = []
             if self.exams and pd[6]:
@@ -124,6 +124,10 @@ class DrugList():
                 if pd[6].useWeight and none2zero(self.exams['weight']) > 0:
                     doseWeight = round(pd[0].dose / float(self.exams['weight']),2)
                     pdDoseconv = doseWeight * pdFrequency
+                    doseWeightStr = str(doseWeight) + ' ' + pdUnit + '/Kg'
+
+                    if pd[6].idMeasureUnit != None and pd[6].idMeasureUnit != pdUnit:
+                        doseWeightStr += ' ou ' + str(pdDoseconv) + ' ' + str(pd[6].idMeasureUnit) + '/Kg'
 
                 if pd[6].maxDose and pd[6].maxDose < pdDoseconv:
                     alerts.append('Dose diária prescrita (' + str(int(pdDoseconv)) + ') maior que a dose de alerta (' + str(pd[6].maxDose) + ') usualmente recomendada (considerada a dose diária máxima independente da indicação.')
@@ -145,7 +149,7 @@ class DrugList():
                     'av': pd[6].mav if pd[6] is not None else False,
                     'c': pd[6].controlled if pd[6] is not None else False,
                     'whiteList': pdWhiteList,
-                    'doseWeight': str(doseWeight) + ' ' + pdUnit + '/Kg' if doseWeight else None,
+                    'doseWeight': doseWeightStr,
                     'dose': pd[0].dose,
                     'measureUnit': { 'value': pd[2].id, 'label': pd[2].description } if pd[2] else '',
                     'frequency': { 'value': pd[3].id, 'label': pd[3].description } if pd[3] else '',
@@ -183,15 +187,20 @@ class DrugList():
         for pd in self.drugList:
             if pd[0].solutionGroup:
                 if not pd[0].solutionGroup in result:
-                    result[pd[0].solutionGroup] = {'totalVol' : 0, 'amount': 0, 'vol': 0, 'speed': 0, 'unit': 'mg'}
+                    result[pd[0].solutionGroup] = {'totalVol' : 0, 'amount': 0, 'vol': 0, 'speed': 0, 'unit': 'ml'}
+
+                pdDose = pd[0].dose
 
                 if pd[6] and pd[6].amount:
-                    result[pd[0].solutionGroup]['vol'] = pd[0].dose
+                    result[pd[0].solutionGroup]['vol'] = pdDose
                     result[pd[0].solutionGroup]['amount'] = pd[6].amount
                     result[pd[0].solutionGroup]['unit'] = pd[6].amountUnit
+
+                    if pd[2].id.lower() != 'ml' and pd[2].id.lower() == pd[6].amountUnit.lower():
+                        result[pd[0].solutionGroup]['vol'] = pdDose = round(pd[0].dose / pd[6].amount,2)
                 
                 result[pd[0].solutionGroup]['speed'] = pd[0].solutionDose
-                result[pd[0].solutionGroup]['totalVol'] += pd[0].dose
+                result[pd[0].solutionGroup]['totalVol'] += pdDose
 
         return result
 
@@ -207,7 +216,10 @@ def getPrescription(idPrescription):
     prescription = Prescription.getPrescription(idPrescription)
 
     if (prescription is None):
-        return {}, status.HTTP_204_NO_CONTENT
+        return {
+            'status': 'error',
+            'message': 'Prescrição Inexistente!'
+        }, status.HTTP_400_BAD_REQUEST
 
     patient = prescription[1]
     if (patient is None):
