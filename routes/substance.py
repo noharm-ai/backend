@@ -2,6 +2,7 @@ from models.main import *
 from models.prescription import *
 from flask import Blueprint, request
 from flask_jwt_extended import (jwt_required, get_jwt_identity)
+from .utils import tryCommit
 
 app_sub = Blueprint('app_sub',__name__)
 

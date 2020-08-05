@@ -14,6 +14,7 @@ from routes.outlier_generate import app_gen
 from routes.intervention import app_itrv
 from routes.static import app_stc
 from routes.substance import app_sub
+from routes.memory import app_mem
 import logging
 import os
 
@@ -41,6 +42,7 @@ app.register_blueprint(app_gen)
 app.register_blueprint(app_itrv)
 app.register_blueprint(app_stc)
 app.register_blueprint(app_sub)
+app.register_blueprint(app_mem)
 
 CORS(app)
 

@@ -1,4 +1,5 @@
 from .main import db
+from sqlalchemy.dialects import postgresql
 
 class Department(db.Model):
     __tablename__ = 'setor'
@@ -66,3 +67,12 @@ class Notes(db.Model):
     notes = db.Column('text', db.String, nullable=True)
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.Integer, nullable=True)
+
+class Memory(db.Model):
+    __tablename__ = 'memoria'
+
+    key = db.Column("idmemoria", db.Integer, primary_key=True, autoincrement=True)
+    kind = db.Column("tipo", db.String(100), nullable=False)
+    value = db.Column("valor", postgresql.JSON, nullable=False)
+    update = db.Column("update_at", db.DateTime, nullable=False)
+    user = db.Column("update_by", db.Integer, nullable=False)
