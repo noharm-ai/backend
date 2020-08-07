@@ -90,7 +90,7 @@ def getName(idPatient):
 def getVersion():
     return {
         'status': 'success',
-        'data': 'v1.19-beta.1'
+        'data': 'v1.19-beta.2'
     }, status.HTTP_200_OK
 
 if __name__ == "__main__":
