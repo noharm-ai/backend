@@ -38,9 +38,9 @@ def createIntervention(idPrescriptionDrug=None):
         i = Intervention()
         i.id = idPrescriptionDrug
         i.date = datetime.today()
-        newIntervention = True
         i.update = datetime.today()
         i.user = user.id
+        newIntervention = True
 
     if 'admissionNumber' in data.keys(): i.admissionNumber = data.get('admissionNumber', None)
     if 'idInterventionReason' in data.keys(): i.idInterventionReason = data.get('idInterventionReason', None)
@@ -55,7 +55,14 @@ def createIntervention(idPrescriptionDrug=None):
 
     #setDrugStatus(idPrescriptionDrug, i.status)
 
-    return tryCommit(db, idPrescriptionDrug)
+    db.session.commit()
+    db.session.close()
+    db.session.remove()
+
+    return {
+        'status': 'success',
+        'data': idPrescriptionDrug
+    }, status.HTTP_200_OK
 
 def sortReasons(e):
   return e['description']
