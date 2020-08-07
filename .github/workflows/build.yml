@@ -25,7 +25,7 @@ jobs:
           pip install -q -r requirements.txt
       - name: Run Python Tests
         run: python -m pytest -v
-      - name: Setup PostgeSQL
+      - name: Setup PostgreSQL
         run: |
           git clone https://github.com/noharm-ai/database
           psql -h localhost -U postgres -d noharm -a -f database/noharm-create.sql -v ON_ERROR_STOP=1
