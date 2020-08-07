@@ -1,0 +1,41 @@
+name: Deploy Development
+on:
+  push:
+    branches: [ develop ] 
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v1
+        with:
+          python-version: 3.8
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -q -r requirements.txt
+          python -m pytest -v
+  deploy:
+    needs: [build]
+    runs-on: [ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v1
+        with:
+          python-version: 3.8
+      - name: config python
+        run: |
+          python -m pip install --upgrade pip
+          pip install pipenv
+          pipenv install -r requirements-prod.txt --skip-lock
+      - name: config zappa
+        run: |
+          echo '${{ secrets.ZAPPA_TEST_SETTINGS }}' > zappa_settings.json 
+          echo '${{ secrets.PYTHON_TEST_CONFIG }}' > config.py
+          mkdir ~/.aws/ 
+          echo "[default]
+          aws_access_key_id = ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key = ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          region = sa-east-1" > ~/.aws/credentials 
+      - name: deploy dev
+        run: pipenv run zappa update test -q
