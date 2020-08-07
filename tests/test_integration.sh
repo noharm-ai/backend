@@ -2,13 +2,7 @@
 
 HOST=("localhost:5000")
 printf "Authenticating..."
-TOKEN=$(curl -X POST -d '{"email":"demo@noharm.ai", "password":"demo"}' -H "Content-Type: application/json" ${HOST}/authenticate | jq -r '.access_token')
-
-SEGMENT=1
-DRUG=51284
-PRESCRIPTION=20381587
-PRESCRIPTIONDRUG=203815876
-ADMISSION=12832489
+TOKEN=$(curl -X POST -d '{"email":"demo", "password":"demo"}' -H "Content-Type: application/json" ${HOST}/authenticate | jq -r '.access_token')
 
 SEGMENT=1
 DRUG=5
