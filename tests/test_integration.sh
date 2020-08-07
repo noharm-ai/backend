@@ -1,7 +1,7 @@
 #!/bin/bash
 
 HOST=("localhost:5000")
-printf "Authenticating..."
+printf "Authenticating...\n"
 TOKEN=$(curl -X POST -d '{"email":"demo", "password":"demo"}' -H "Content-Type: application/json" ${HOST}/authenticate | jq -r '.access_token')
 
 SEGMENT=1
