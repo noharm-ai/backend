@@ -18,9 +18,10 @@ def setDrugStatus(idPrescriptionDrug, drugStatus):
     dbSession.setSchema(user.schema)
 
     pd = PrescriptionDrug.query.get(idPrescriptionDrug)
-    pd.status = drugStatus
-    pd.update = datetime.today()
-    pd.user = user.id
+    if pd is not None:
+        pd.status = drugStatus
+        pd.update = datetime.today()
+        pd.user = user.id
 
     return tryCommit(db, idPrescriptionDrug)
 

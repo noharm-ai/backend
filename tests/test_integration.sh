@@ -68,7 +68,7 @@ EXITSUM+=$?
 printf "\n"
 
 LINK=("intervention/${PRESCRIPTIONDRUG}")
-DATA=('{ "status": "s", "admissionNumber": 12832489}')
+DATA=('{ "status": "s", "admissionNumber": 5}')
 COMMAND=("curl --fail -X PUT -H 'Accept: application/json' -H 'Authorization: Bearer ${TOKEN}' -H 'Content-Type: application/json' ${HOST}/${LINK} -d '${DATA}'")
 printf "${LINK} "
 bash -c "${COMMAND}"
