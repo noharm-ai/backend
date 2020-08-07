@@ -53,7 +53,7 @@ def createIntervention(idPrescriptionDrug=None):
 
     if newIntervention: db.session.add(i)
 
-    setDrugStatus(idPrescriptionDrug, i.status)
+    #setDrugStatus(idPrescriptionDrug, i.status)
 
     return tryCommit(db, idPrescriptionDrug)
 
