@@ -51,5 +51,6 @@ def setSubstance(idMemory=None):
 
     if newMem: 
         db.session.add(mem)
+        db.session.flush()
 
     return tryCommit(db, mem.key)
