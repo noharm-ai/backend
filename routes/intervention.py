@@ -18,9 +18,10 @@ def setDrugStatus(idPrescriptionDrug, drugStatus):
     dbSession.setSchema(user.schema)
 
     pd = PrescriptionDrug.query.get(idPrescriptionDrug)
-    pd.status = drugStatus
-    pd.update = datetime.today()
-    pd.user = user.id
+    if pd is not None:
+        pd.status = drugStatus
+        pd.update = datetime.today()
+        pd.user = user.id
 
     return tryCommit(db, idPrescriptionDrug)
 
@@ -37,9 +38,9 @@ def createIntervention(idPrescriptionDrug=None):
         i = Intervention()
         i.id = idPrescriptionDrug
         i.date = datetime.today()
-        newIntervention = True
         i.update = datetime.today()
         i.user = user.id
+        newIntervention = True
 
     if 'admissionNumber' in data.keys(): i.admissionNumber = data.get('admissionNumber', None)
     if 'idInterventionReason' in data.keys(): i.idInterventionReason = data.get('idInterventionReason', None)

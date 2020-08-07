@@ -86,6 +86,12 @@ def getName(idPatient):
         'name': 'Paciente ' + str(idPatient)
     }, status.HTTP_200_OK
 
+@app.route("/version", methods=['GET'])
+def getVersion():
+    return {
+        'status': 'success',
+        'data': 'v1.19-beta'
+    }, status.HTTP_200_OK
 
 if __name__ == "__main__":
     app.run(debug=True)
