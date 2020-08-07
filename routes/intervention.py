@@ -51,18 +51,11 @@ def createIntervention(idPrescriptionDrug=None):
     
     i.status = data.get('status', 's')
 
-    if newIntervention: db.session.add(i)
+    #if newIntervention: db.session.add(i)
 
     #setDrugStatus(idPrescriptionDrug, i.status)
 
-    db.session.commit()
-    db.session.close()
-    db.session.remove()
-
-    return {
-        'status': 'success',
-        'data': idPrescriptionDrug
-    }, status.HTTP_200_OK
+    return tryCommit(db, idPrescriptionDrug)
 
 def sortReasons(e):
   return e['description']
