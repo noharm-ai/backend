@@ -1,10 +1,22 @@
-name: Deploy
+name: Deploy Development
 on:
   push:
-    branches: [master]
+    branches: [ develop ] 
 
 jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v1
+        with:
+          python-version: 3.8
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -q -r requirements.txt
+          python -m pytest -v
   deploy:
+    needs: [build]
     runs-on: [ubuntu-latest]
     steps:
       - uses: actions/checkout@v2
