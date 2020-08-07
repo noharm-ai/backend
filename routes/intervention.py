@@ -51,7 +51,7 @@ def createIntervention(idPrescriptionDrug=None):
     
     i.status = data.get('status', 's')
 
-    if newIntervention: db.session.add(i)
+    if newIntervention: dbi.session.add(i)
 
     setDrugStatus(idPrescriptionDrug, i.status)
 
