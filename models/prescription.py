@@ -241,7 +241,7 @@ class PrescriptionDrug(db.Model):
     idOutlier = db.Column("idoutlier", db.Integer, nullable=False)
     idPrescription = db.Column("fkprescricao", db.Integer, nullable=False)
     idDrug = db.Column("fkmedicamento", db.Integer, nullable=False)
-    idMeasureUnit = db.Column("fkunidademedida", db.Integer, nullable=False)
+    idMeasureUnit = db.Column("fkunidademedida", db.String, nullable=False)
     idFrequency = db.Column("fkfrequencia", db.String, nullable=True)
     idSegment = db.Column("idsegmento", db.Integer, nullable=False)
 
