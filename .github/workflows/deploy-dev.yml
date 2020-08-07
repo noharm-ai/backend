@@ -30,7 +30,7 @@ jobs:
           pipenv install -r requirements-prod.txt --skip-lock
       - name: config zappa
         run: |
-          echo '${{ secrets.ZAPPA_SETTINGS }}' > zappa_settings.json 
+          echo '${{ secrets.ZAPPA_DEV_SETTINGS }}' > zappa_settings.json 
           echo '${{ secrets.PYTHON_DEV_CONFIG }}' > config.py
           mkdir ~/.aws/ 
           echo "[default]
