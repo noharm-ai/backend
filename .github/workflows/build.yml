@@ -19,14 +19,20 @@ jobs:
       - uses: actions/setup-python@v1
         with:
           python-version: 3.8
+      - name: Run Python Tests
+        run: |
+          python -m pip install --upgrade pip
+          pip install -q -r requirements.txt
+          python -m pytest -v
       - name: Setup PostgeSQL
         run: |
           git clone https://github.com/noharm-ai/database
           psql -h localhost -U postgres -d noharm -a -f database/noharm-create.sql -v ON_ERROR_STOP=1
           psql -h localhost -U postgres -d noharm -a -f database/noharm-triggers.sql -v ON_ERROR_STOP=1
           psql -h localhost -U postgres -d noharm -a -f database/noharm-insert.sql -v ON_ERROR_STOP=1
-      - name: Run Python Tests
+      - name: Setup Application
         run: |
-          python -m pip install --upgrade pip
-          pip install -q -r requirements.txt
-          python -m pytest -v
+          python mobile.py
+          sleep 10
+      - name: Run Integration Test
+        run: ./tests/test_integration.sh
