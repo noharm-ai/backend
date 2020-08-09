@@ -79,8 +79,8 @@ class Prescription(db.Model):
         interaction = relation.filter(Relation.kind.in_(['it','dt','dm']))
 
         incompatible = relation.filter(Relation.kind.in_(['iy']))\
-                        .filter(pd1.route.in_(['Intravenosa infusao','Infusão Contínua']))\
-                        .filter(pd2.route.in_(['Intravenosa infusao','Infusão Contínua']))
+                        .filter(pd1.route.in_(['Intravenosa infusao','Infusão Contínua','IV']))\
+                        .filter(pd2.route.in_(['Intravenosa infusao','Infusão Contínua','IV']))
 
         admissionAlergy = db.session.query(PrescriptionDrug.idDrug.label('idDrug'), func.min(PrescriptionDrug.id).label('id') )\
                       .select_from(PrescriptionDrug)\
@@ -241,7 +241,7 @@ class PrescriptionDrug(db.Model):
     idOutlier = db.Column("idoutlier", db.Integer, nullable=False)
     idPrescription = db.Column("fkprescricao", db.Integer, nullable=False)
     idDrug = db.Column("fkmedicamento", db.Integer, nullable=False)
-    idMeasureUnit = db.Column("fkunidademedida", db.Integer, nullable=False)
+    idMeasureUnit = db.Column("fkunidademedida", db.String, nullable=False)
     idFrequency = db.Column("fkfrequencia", db.String, nullable=True)
     idSegment = db.Column("idsegmento", db.Integer, nullable=False)
 

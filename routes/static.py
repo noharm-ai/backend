@@ -14,10 +14,10 @@ def computePrescription(schema, idPrescription):
 
     schemaExists = False
     for r in result:
-    	if r[0] == schema: schemaExists = True
+        if r[0] == schema: schemaExists = True
 
     if not schemaExists:
-    	return { 'status': 'error', 'message': 'Schema Inexistente!' }, status.HTTP_400_BAD_REQUEST
+        return { 'status': 'error', 'message': 'Schema Inexistente!' }, status.HTTP_400_BAD_REQUEST
 
     dbSession.setSchema(schema)
     p = Prescription.query.get(idPrescription)
@@ -33,28 +33,29 @@ def computePrescription(schema, idPrescription):
     alerts = pScore = score1 = score2 = score3 = 0
     am = av = control = np = tube = diff = 0
     for d in drugList: 
-    	if d['whiteList'] or d['suspended']: continue
+        if d['whiteList'] or d['suspended']: continue
 
-    	alerts += len(d['alerts'])
-    	pScore += int(d['score'])
-    	score1 += int(d['score'] == '1')
-    	score2 += int(d['score'] == '2')
-    	score3 += int(int(d['score']) > 2)
-    	am += int(d['am']) if not d['am'] is None else 0
-    	av += int(d['av']) if not d['av'] is None else 0
-    	np += int(d['np']) if not d['np'] is None else 0
-    	control += int(d['c']) if not d['c'] is None else 0
-    	diff += int(not d['checked'])
-    	tube += int('sonda' in strNone(d['route']).lower())
+        alerts += len(d['alerts'])
+        pScore += int(d['score'])
+        score1 += int(d['score'] == '1')
+        score2 += int(d['score'] == '2')
+        score3 += int(int(d['score']) > 2)
+        am += int(d['am']) if not d['am'] is None else 0
+        av += int(d['av']) if not d['av'] is None else 0
+        np += int(d['np']) if not d['np'] is None else 0
+        control += int(d['c']) if not d['c'] is None else 0
+        diff += int(not d['checked'])
+        tubes = ['sonda', 'sg', 'se']
+        tube += int(any(t in strNone(d['route']).lower() for t in tubes))
 
     interventions = 0
     for i in result['data']['interventions']:
-    	interventions += int(i['status'] == 's')
+        interventions += int(i['status'] == 's')
 
     exams = result['data']['alertExams']
 
     p.features = {
-    	'alerts': alerts,
+        'alerts': alerts,
         'prescriptionScore': pScore,
         'scoreOne': score1,
         'scoreTwo': score2,
