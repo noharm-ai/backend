@@ -284,6 +284,7 @@ def getPrescription(idPrescription):
             'lastDepartment': lastDept[0] if lastDept else None,
             'patientScore': 'High',
             'date': prescription[0].date.isoformat(),
+            'expire': prescription[0].expire.isoformat() if prescription[0].expire else None,
             'prescription': pDrugs,
             'solution': pSolution,
             'procedures': pProcedures,
@@ -292,6 +293,7 @@ def getPrescription(idPrescription):
             'alertExams': alertExams,
             'exams': examsJson[:10],
             'status': prescription[0].status,
+            'prescriber': prescription[9]
         }
     }, status.HTTP_200_OK
 
