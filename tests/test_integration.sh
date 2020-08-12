@@ -3,7 +3,7 @@ declare -i EXITSUM=0
 
 HOST=("localhost:5000")
 printf "Authenticating...\n"
-TOKEN=$(curl -X POST -d '{"email":"demo@noharm.ai", "password":"demo"}' -H "Content-Type: application/json" ${HOST}/authenticate | jq -r '.access_token')
+TOKEN=$(curl -X POST -d '{"email":"demo", "password":"demo"}' -H "Content-Type: application/json" ${HOST}/authenticate | jq -r '.access_token')
 EXITSUM+=$?
 
 SEGMENT=1
