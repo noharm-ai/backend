@@ -3,7 +3,7 @@ declare -i EXITSUM=0
 
 HOST=("localhost:5000")
 printf "Authenticating...\n"
-TOKEN=$(curl -X POST -d '{"email":"demo", "password":"demo"}' -H "Content-Type: application/json" ${HOST}/authenticate | jq -r '.access_token')
+TOKEN=$(curl -X POST -d '{"email":"demo@noharm.ai", "password":"demo"}' -H "Content-Type: application/json" ${HOST}/authenticate | jq -r '.access_token')
 EXITSUM+=$?
 
 SEGMENT=1
@@ -28,6 +28,14 @@ do
   EXITSUM+=$?
   printf "\n"
 done
+
+LINK=("prescriptions/404")
+COMMAND=("-H 'Accept: application/json' -H 'Authorization: Bearer ${TOKEN}' '${HOST}/${LINK}'")
+printf "${LINK} "
+bash -c "curl ${COMMAND}"
+STATUSCODE=$(bash -c "curl --silent --output /dev/null --write-out '%{http_code}' ${COMMAND}")
+if [[ ${STATUSCODE} -ne 400 ]]; then EXITSUM+=22; fi;
+printf "\n"
 
 LINK=("drugs/${DRUG}")
 DATA=('{ "idSegment": 1, "mav": true }')
@@ -54,6 +62,15 @@ printf "${LINK} "
 bash -c "curl ${COMMAND}"
 bash -c "curl --silent --fail ${COMMAND} > /dev/null"
 EXITSUM+=$?
+printf "\n"
+
+LINK=("patient/404")
+DATA=('{ "height": 15}')
+COMMAND=("-X POST -H 'Accept: application/json' -H 'Authorization: Bearer ${TOKEN}' -H 'Content-Type: application/json' ${HOST}/${LINK} -d '${DATA}'")
+printf "${LINK} "
+bash -c "curl ${COMMAND}"
+STATUSCODE=$(bash -c "curl --silent --output /dev/null --write-out '%{http_code}' ${COMMAND}")
+if [[ ${STATUSCODE} -ne 400 ]]; then EXITSUM+=22; fi;
 printf "\n"
 
 LINK=("prescriptions/drug/${PRESCRIPTIONDRUG}")

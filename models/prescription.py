@@ -161,7 +161,7 @@ class Patient(db.Model):
     def findByAdmission(admissionNumber):
         return db.session.query(Patient)\
                          .filter(Patient.admissionNumber == admissionNumber)\
-                         .one()
+                         .first()
 
     def getPatients(idSegment=None, idDept=[], idDrug=[], startDate=date.today(), endDate=None, pending=False):
         q = db.session\

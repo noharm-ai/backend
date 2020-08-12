@@ -403,8 +403,10 @@ def setPatientData(admissionNumber):
     data = request.get_json()
 
     p = Patient.findByAdmission(admissionNumber)
-    updateWeight = False
+    if (p is None):
+        return { 'status': 'error', 'message': 'Paciente Inexistente!' }, status.HTTP_400_BAD_REQUEST
 
+    updateWeight = False
     weight = data.get('weight', None)
     if weight and weight != p.weight: 
         p.weightDate = datetime.today()
