@@ -182,7 +182,7 @@ def getCodes():
                 .group_by(Exams.typeExam)\
                 .order_by(asc(Exams.typeExam)).all()
 
-    results = []
+    results = ['mdrd','ckd','cg','swrtz2']
     for t in typesExam:
         results.append(t[0].lower())
 
