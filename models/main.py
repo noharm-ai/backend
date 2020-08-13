@@ -28,6 +28,10 @@ class User(db.Model):
     def authenticate(email, password):
         return User.query.filter_by(email=email, password=func.md5(password)).first()
 
+    def permission(user):
+        roles = user.config['roles'] if 'roles' in user.config else []
+        return ('admin' not in roles)
+
 class Substance(db.Model):
     __tablename__ = 'substancia'
     __table_args__ = {'schema':'public'}

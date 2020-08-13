@@ -313,7 +313,7 @@ def setPrescriptionStatus(idPrescription):
     p.update = datetime.today()
     p.user = user.id
 
-    return tryCommit(db, idPrescription)
+    return tryCommit(db, idPrescription, User.permission(user))
 
 @app_pres.route("/prescriptions/drug/<int:idPrescriptionDrug>/period", methods=['GET'])
 @jwt_required
@@ -435,7 +435,7 @@ def setPatientData(admissionNumber):
 
         db.engine.execute(query) 
 
-    return tryCommit(db, admissionNumber)
+    return tryCommit(db, admissionNumber, User.permission(user))
 
 @app_pres.route('/prescriptions/drug/<int:idPrescriptionDrug>', methods=['PUT'])
 @jwt_required

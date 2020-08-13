@@ -198,7 +198,13 @@ def schwartz2_calc(cr, height):
     return { 'value': round(eGFR,1), 'ref': 'maior que 90 mL/min por 1.73 m²', 'unit': 'mL/min/1.73m²',
              'alert': (eGFR < 90), 'name': 'Schwartz 2' , 'initials': 'Schwartz 2'}
 
-def tryCommit(db, recId):
+def tryCommit(db, recId, allow=True):
+    if not allow:
+        return {
+            'status': 'error',
+            'message': 'Usuário não autorizado',
+        }, status.HTTP_401_UNAUTHORIZED
+
     try:
         db.session.commit()
         db.session.close()
