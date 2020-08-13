@@ -56,7 +56,7 @@ def getRelations(idSubstance):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
 
-    relations = Relation.findBySctid(idSubstance, user.id)
+    relations = Relation.findBySctid(idSubstance, user)
 
     return {
         'status': 'success',
@@ -80,7 +80,7 @@ def setRelation(sctidA,sctidB,kind):
         relation.sctida = sctidA
         relation.sctidb = sctidB
         relation.kind = kind
-        relation.creator  = user.id
+        relation.creator = user.id
 
     if 'text' in data.keys(): relation.text = data.get('text', None)
     if 'active' in data.keys(): relation.active = bool(data.get('active', False))

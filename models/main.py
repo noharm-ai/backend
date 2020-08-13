@@ -52,7 +52,7 @@ class Relation(db.Model):
     user = db.Column("update_by", db.Integer, nullable=True)
     creator = db.Column("create_by", db.Integer, nullable=True)
 
-    def findBySctid(sctid, userId):
+    def findBySctid(sctid, user):
         SubstA = db.aliased(Substance)
         SubstB = db.aliased(Substance)
 
@@ -77,7 +77,7 @@ class Relation(db.Model):
                 'type': r[0].kind,
                 'text': r[0].text,  
                 'active': r[0].active, 
-                'editable': bool(r[0].creator == userId)
+                'editable': bool(r[0].creator == user.id) or (not User.permission(user)),
             })
 
         results.sort(key=sortRelations)
