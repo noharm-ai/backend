@@ -110,7 +110,7 @@ if [[ ${STATUSCODE} -ne 400 ]]; then EXITSUM+=22; fi;
 printf "\n"
 
 LINK=("prescriptions/drug/${PRESCRIPTIONDRUG}")
-DATA=('{ "notes": "some notes"}')
+DATA=('{ "notes": "some notes", "admissionNumber": 5}')
 COMMAND=("-X PUT -H 'Accept: application/json' -H 'Authorization: Bearer ${TOKEN}' -H 'Content-Type: application/json' ${HOST}/${LINK} -d '${DATA}'")
 printf "${LINK} "
 bash -c "curl ${COMMAND}"
