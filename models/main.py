@@ -19,9 +19,7 @@ class User(db.Model):
     email = db.Column("email", db.String(254), unique=True, nullable=False)
     password = db.Column('senha', db.String(128), nullable=False)
     schema = db.Column("schema", db.String, nullable=False)
-    nameUrl = db.Column("getnameurl", db.String, nullable=False)
-    logourl = db.Column("logourl", db.String, nullable=False)
-    reports = db.Column("relatorios", postgresql.JSON, nullable=False)
+    config = db.Column("config", postgresql.JSON, nullable=False)
 
     def find(id):
         db_session = db.create_scoped_session()
