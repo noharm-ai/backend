@@ -30,7 +30,7 @@ class User(db.Model):
 
     def permission(user):
         roles = user.config['roles'] if 'roles' in user.config else []
-        return ('admin' not in roles)
+        return ('suporte' not in roles)
 
 class Substance(db.Model):
     __tablename__ = 'substancia'
