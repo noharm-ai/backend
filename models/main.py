@@ -19,9 +19,7 @@ class User(db.Model):
     email = db.Column("email", db.String(254), unique=True, nullable=False)
     password = db.Column('senha', db.String(128), nullable=False)
     schema = db.Column("schema", db.String, nullable=False)
-    nameUrl = db.Column("getnameurl", db.String, nullable=False)
-    logourl = db.Column("logourl", db.String, nullable=False)
-    reports = db.Column("relatorios", postgresql.JSON, nullable=False)
+    config = db.Column("config", postgresql.JSON, nullable=False)
 
     def find(id):
         db_session = db.create_scoped_session()
@@ -29,6 +27,10 @@ class User(db.Model):
 
     def authenticate(email, password):
         return User.query.filter_by(email=email, password=func.md5(password)).first()
+
+    def permission(user):
+        roles = user.config['roles'] if 'roles' in user.config else []
+        return ('suporte' not in roles)
 
 class Substance(db.Model):
     __tablename__ = 'substancia'
@@ -50,7 +52,7 @@ class Relation(db.Model):
     user = db.Column("update_by", db.Integer, nullable=True)
     creator = db.Column("create_by", db.Integer, nullable=True)
 
-    def findBySctid(sctid, userId):
+    def findBySctid(sctid, user):
         SubstA = db.aliased(Substance)
         SubstB = db.aliased(Substance)
 
@@ -75,7 +77,7 @@ class Relation(db.Model):
                 'type': r[0].kind,
                 'text': r[0].text,  
                 'active': r[0].active, 
-                'editable': bool(r[0].creator == userId)
+                'editable': bool(r[0].creator == user.id) or (not User.permission(user)),
             })
 
         results.sort(key=sortRelations)

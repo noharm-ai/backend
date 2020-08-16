@@ -32,7 +32,7 @@ def getOutliers(idSegment=1, idDrug=1):
     
     relations = []
     if d and d[0].sctid:
-        relations = Relation.findBySctid(d[0].sctid, user.id)
+        relations = Relation.findBySctid(d[0].sctid, user)
 
     if drugAttr is None: drugAttr = DrugAttributes()
 

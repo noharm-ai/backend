@@ -40,6 +40,8 @@ class SegmentExam(db.Model):
         results = {}
         for e in exams:
             results[e.typeExam.lower()] = e
+            if e.initials.lower() == 'creatinina':
+                results['cr'] = e
 
         return results
 
@@ -84,21 +86,30 @@ class Exams(db.Model):
             examEmpty['max'] = segExam[e].max
             examEmpty['name'] = segExam[e].name
             examEmpty['initials'] = segExam[e].initials
-            exams[e.lower()] = examEmpty
-            if e.lower() == 'cr':
-                if age > 17:
-                    exams['mdrd'] = exams['cg'] = exams['ckd'] = examEmpty
-                else:
-                    exams['swrtz2'] = examEmpty
+            if segExam[e].initials.lower() == 'creatinina':
+                exams['cr'] = examEmpty
+            else:
+                exams[e.lower()] = examEmpty
 
         for e in results:
-            exams[e.typeExam.lower()] = formatExam(e, e.typeExam.lower(), segExam)
+            
+            if e.typeExam.lower() not in ['mdrd','ckd','cg','swrtz2']:
+                exams[e.typeExam.lower()] = formatExam(e, e.typeExam.lower(), segExam)
+            
+            if e.typeExam.lower() in segExam and segExam[e.typeExam.lower()].initials.lower() == 'creatinina':
+                exams['cr'] = formatExam(e, e.typeExam.lower(), segExam)
+                del(exams[e.typeExam.lower()])
+
             if 'cr' in exams:
                 if age > 17:
-                    exams['mdrd'] = mdrd_calc(exams['cr']['value'], patient.birthdate, patient.gender, patient.skinColor)
-                    exams['cg'] = cg_calc(exams['cr']['value'], patient.birthdate, patient.gender, patient.weight)
-                    exams['ckd'] = ckd_calc(exams['cr']['value'], patient.birthdate, patient.gender, patient.skinColor)
+                    if 'mdrd' in exams:
+                        exams['mdrd'] = mdrd_calc(exams['cr']['value'], patient.birthdate, patient.gender, patient.skinColor)
+                    if 'cg' in exams:
+                        exams['cg'] = cg_calc(exams['cr']['value'], patient.birthdate, patient.gender, patient.weight)
+                    if 'ckd' in exams:
+                        exams['ckd'] = ckd_calc(exams['cr']['value'], patient.birthdate, patient.gender, patient.skinColor)
                 else:
-                    exams['swrtz2'] = schwartz2_calc(exams['cr']['value'], patient.height)
+                    if 'swrtz2' in exams:
+                        exams['swrtz2'] = schwartz2_calc(exams['cr']['value'], patient.height)
 
         return exams

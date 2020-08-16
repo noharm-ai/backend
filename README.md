@@ -1,5 +1,7 @@
 # backend
-[![Build Status](https://travis-ci.org/noharm-ai/backend.svg?branch=master)](https://travis-ci.org/noharm-ai/backend)
+![Build](https://github.com/noharm-ai/backend/workflows/Build/badge.svg)
+[![Issues](https://img.shields.io/github/issues-raw/tterb/PlayMusic.svg?maxAge=25000)](https://github.com/noharm-ai/backend/issues)  
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Maintainability](https://api.codeclimate.com/v1/badges/a2baa2e03c1661cd70cd/maintainability)](https://codeclimate.com/github/noharm-ai/backend/maintainability)
 [![Test Coverage](https://api.codeclimate.com/v1/badges/a2baa2e03c1661cd70cd/test_coverage)](https://codeclimate.com/github/noharm-ai/backend/test_coverage)
 

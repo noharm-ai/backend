@@ -54,7 +54,7 @@ def getNameUrl():
     if user: 
         return {
             'status': 'success',
-            'url': user.nameUrl
+            'url': user.config['getnameurl'] if 'getnameurl' in user.config else 'http://localhost/{idPatient}',
         }, status.HTTP_200_OK 
     else:
         return {
@@ -70,7 +70,7 @@ def getReports():
     if user: 
         return {
             'status': 'success',
-            'reports': user.reports
+            'reports': user.config['reports'] if 'reports' in user.config else '',
         }, status.HTTP_200_OK 
     else:
         return {
@@ -90,7 +90,7 @@ def getName(idPatient):
 def getVersion():
     return {
         'status': 'success',
-        'data': 'v1.19-beta'
+        'data': 'v1.20-beta'
     }, status.HTTP_200_OK
 
 if __name__ == "__main__":

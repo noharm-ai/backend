@@ -16,11 +16,13 @@ class Prescription(db.Model):
     idDepartment = db.Column("fksetor", db.Integer, nullable=False)
     idSegment = db.Column("idsegmento", db.Integer, nullable=False)
     date = db.Column("dtprescricao", db.DateTime, nullable=False)
+    expire = db.Column("dtvigencia", db.DateTime, nullable=False)
     status = db.Column('status', db.String(1), nullable=False)
     bed = db.Column('leito', db.String(16), nullable=True)
     record = db.Column('prontuario', db.Integer, nullable=True)
     features = db.Column('indicadores', postgresql.JSON, nullable=True)
     notes = deferred(db.Column('evolucao', db.String, nullable=True))
+    prescriber = deferred(db.Column('prescritor', db.String, nullable=True))
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.Integer, nullable=True)
 
@@ -44,7 +46,8 @@ class Prescription(db.Model):
             .query(
                 Prescription, Patient, '0', '0',
                 Department.name.label('department'), Segment.description, 
-                Patient.observation, Prescription.notes, Patient.alert
+                Patient.observation, Prescription.notes, Patient.alert,
+                Prescription.prescriber
             )\
             .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)\
             .outerjoin(Department, Department.id == Prescription.idDepartment)\
@@ -158,7 +161,7 @@ class Patient(db.Model):
     def findByAdmission(admissionNumber):
         return db.session.query(Patient)\
                          .filter(Patient.admissionNumber == admissionNumber)\
-                         .one()
+                         .first()
 
     def getPatients(idSegment=None, idDept=[], idDrug=[], startDate=date.today(), endDate=None, pending=False):
         q = db.session\

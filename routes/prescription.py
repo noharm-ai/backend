@@ -284,6 +284,7 @@ def getPrescription(idPrescription):
             'lastDepartment': lastDept[0] if lastDept else None,
             'patientScore': 'High',
             'date': prescription[0].date.isoformat(),
+            'expire': prescription[0].expire.isoformat() if prescription[0].expire else None,
             'prescription': pDrugs,
             'solution': pSolution,
             'procedures': pProcedures,
@@ -292,6 +293,7 @@ def getPrescription(idPrescription):
             'alertExams': alertExams,
             'exams': examsJson[:10],
             'status': prescription[0].status,
+            'prescriber': prescription[9]
         }
     }, status.HTTP_200_OK
 
@@ -311,7 +313,7 @@ def setPrescriptionStatus(idPrescription):
     p.update = datetime.today()
     p.user = user.id
 
-    return tryCommit(db, idPrescription)
+    return tryCommit(db, idPrescription, User.permission(user))
 
 @app_pres.route("/prescriptions/drug/<int:idPrescriptionDrug>/period", methods=['GET'])
 @jwt_required
@@ -401,8 +403,10 @@ def setPatientData(admissionNumber):
     data = request.get_json()
 
     p = Patient.findByAdmission(admissionNumber)
-    updateWeight = False
+    if (p is None):
+        return { 'status': 'error', 'message': 'Paciente Inexistente!' }, status.HTTP_400_BAD_REQUEST
 
+    updateWeight = False
     weight = data.get('weight', None)
     if weight and weight != p.weight: 
         p.weightDate = datetime.today()
@@ -431,7 +435,7 @@ def setPatientData(admissionNumber):
 
         db.engine.execute(query) 
 
-    return tryCommit(db, admissionNumber)
+    return tryCommit(db, admissionNumber, User.permission(user))
 
 @app_pres.route('/prescriptions/drug/<int:idPrescriptionDrug>', methods=['PUT'])
 @jwt_required
@@ -461,7 +465,7 @@ def setPrescriptionDrugNote(idPrescriptionDrug):
 
         if newObs: db.session.add(note)
 
-    return tryCommit(db, idPrescriptionDrug)
+    return tryCommit(db, idPrescriptionDrug, User.permission(user))
 
 @app_pres.route('/prescriptions/<int:idPrescription>/update', methods=['GET'])
 @jwt_required
