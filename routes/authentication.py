@@ -28,7 +28,7 @@ def auth():
             'status': 'success',
             'userName': user.name,
             'schema': user.schema,
-            'roles': user.config['roles'] if 'roles' in user.config else [],
+            'roles': user.config['roles'] if user.config and 'roles' in user.config else [],
             'access_token': access_token,
             'refresh_token': refresh_token
         }, status.HTTP_200_OK

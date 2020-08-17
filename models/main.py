@@ -29,7 +29,7 @@ class User(db.Model):
         return User.query.filter_by(email=email, password=func.md5(password)).first()
 
     def permission(user):
-        roles = user.config['roles'] if 'roles' in user.config else []
+        roles = user.config['roles'] if user.config and 'roles' in user.config else []
         return ('suporte' not in roles)
 
 class Substance(db.Model):
