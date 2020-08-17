@@ -70,7 +70,7 @@ def getReports():
     if user: 
         return {
             'status': 'success',
-            'reports': user.config['reports'] if user.config and 'reports' in user.config else '[]',
+            'reports': user.config['reports'] if user.config and 'reports' in user.config else [],
         }, status.HTTP_200_OK 
     else:
         return {
