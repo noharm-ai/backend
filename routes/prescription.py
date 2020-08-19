@@ -276,11 +276,12 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
     return {
         'status': 'success',
         'data': {
-            'idPrescription': prescription[0].id,
+            'idPrescription': str(prescription[0].id),
             'idSegment': prescription[0].idSegment,
             'segmentName': prescription[5],
             'idPatient': prescription[0].idPatient,
             'name': prescription[0].admissionNumber,
+            'agg': prescription[0].agg,
             'admissionNumber': prescription[0].admissionNumber,
             'birthdate': patient.birthdate.isoformat() if patient.birthdate else '',
             'gender': patient.gender,
