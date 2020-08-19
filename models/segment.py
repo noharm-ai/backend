@@ -39,9 +39,10 @@ class SegmentExam(db.Model):
 
         results = {}
         for e in exams:
-            results[e.typeExam.lower()] = e
             if e.initials.lower() == 'creatinina':
                 results['cr'] = e
+            else:
+                results[e.typeExam.lower()] = e
 
         return results
 
@@ -88,8 +89,6 @@ class Exams(db.Model):
             examEmpty['initials'] = segExam[e].initials
             if segExam[e].initials.lower() == 'creatinina':
                 exams['cr'] = examEmpty
-            else:
-                exams[e.lower()] = examEmpty
 
         for e in results:
             
@@ -97,7 +96,6 @@ class Exams(db.Model):
                 exams[e.typeExam.lower()] = formatExam(e, e.typeExam.lower(), segExam)
             
             if e.typeExam.lower() in segExam and segExam[e.typeExam.lower()].initials.lower() == 'creatinina':
-                del(exams[e.typeExam.lower()])
                 exams['cr'] = formatExam(e, e.typeExam.lower(), segExam)
 
         if 'cr' in exams:

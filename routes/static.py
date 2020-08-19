@@ -24,7 +24,7 @@ def computePrescription(schema, idPrescription):
     if (p is None):
         return { 'status': 'error', 'message': 'Prescrição Inexistente!' }, status.HTTP_400_BAD_REQUEST
 
-    result, stat = getPrescription(idPrescription)
+    result, stat = getPrescription(idPrescription=idPrescription)
 
     drugList = result['data']['prescription']
     drugList.extend(result['data']['solution'])
