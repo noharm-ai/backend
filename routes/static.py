@@ -4,6 +4,7 @@ from models.main import *
 from models.prescription import *
 from .prescription import getPrescription
 from .utils import tryCommit, strNone
+from datetime import date
 from random import random 
 
 app_stc = Blueprint('app_stc',__name__)
@@ -27,10 +28,41 @@ def computePrescription(schema, idPrescription):
     resultPresc, stat = getPrescription(idPrescription=idPrescription)
     p.features = getFeatures(resultPresc)
     
+    newPrescAgg = False
+    PrescAggID = genAggID(p)
+    pAgg = Prescription.query.get(PrescAggID)
+    if (pAgg is None):
+        pAgg = Prescription()
+        pAgg.id = PrescAggID
+        pAgg.idPatient = p.idPatient
+        pAgg.admissionNumber = p.admissionNumber
+        pAgg.date = date(p.date.year, p.date.month, p.date.day)
+        pAgg.agg = True
+        newPrescAgg = True
+
+    resultAgg, stat = getPrescription(admissionNumber=p.admissionNumber, aggDate=pAgg.date)
+
+    pAgg.idHospital = p.idHospital
+    pAgg.idDepartment = p.idDepartment
+    pAgg.idSegment = p.idSegment
+    pAgg.bed = p.bed
+    pAgg.record = p.record
+    pAgg.prescriber = 'Prescrição Agregada'
+    pAgg.features = getFeatures(resultAgg)
+
+    if newPrescAgg: db.session.add(pAgg)
+
     return tryCommit(db, idPrescription)
 
+def genAggID(p):
+    id = (p.date.year - 2000) * 100000000000000000
+    id += p.date.month *          1000000000000000
+    id += p.date.day *              10000000000000
+    id += p.admissionNumber
+    return id
+
 def getFeatures(result):
-    
+
     drugList = result['data']['prescription']
     drugList.extend(result['data']['solution'])
     drugList.extend(result['data']['procedures'])

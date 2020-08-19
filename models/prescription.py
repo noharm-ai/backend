@@ -16,7 +16,7 @@ class Prescription(db.Model):
     idDepartment = db.Column("fksetor", db.Integer, nullable=False)
     idSegment = db.Column("idsegmento", db.Integer, nullable=False)
     date = db.Column("dtprescricao", db.DateTime, nullable=False)
-    expire = db.Column("dtvigencia", db.DateTime, nullable=False)
+    expire = db.Column("dtvigencia", db.DateTime, nullable=True)
     status = db.Column('status', db.String(1), nullable=False)
     bed = db.Column('leito', db.String(16), nullable=True)
     record = db.Column('prontuario', db.Integer, nullable=True)
