@@ -50,7 +50,7 @@ def getPrescriptions():
 
 
         results.append(dict(features, **{
-            'idPrescription': p[0].id,
+            'idPrescription': str(p[0].id),
             'idPatient': p[0].idPatient,
             'name': patient.admissionNumber,
             'admissionNumber': patient.admissionNumber,
@@ -160,7 +160,7 @@ class DrugList():
                     'period': str(pd[0].period) + 'D' if pd[0].period else '',
                     'periodDates': [],
                     'route': pd[0].route,
-                    'grp_solution': pd[0].solutionGroup,
+                    'grp_solution': pd[0].idPrescription + none2zero(pd[0].solutionGroup),
                     'stage': 'ACM' if pd[0].solutionACM == 'S' else strNone(pd[0].solutionPhase) + ' x '+ strNone(pd[0].solutionTime) + ' (' + strNone(pd[0].solutionTotalTime) + ')',
                     'infusion': strNone(pd[0].solutionDose) + ' ' + strNone(pd[0].solutionUnit),
                     'score': str(pd[5]) if not pdWhiteList else '0',
@@ -186,21 +186,24 @@ class DrugList():
         result = {}
         for pd in self.drugList:
             if pd[0].solutionGroup:
-                if not pd[0].solutionGroup in result:
-                    result[pd[0].solutionGroup] = {'totalVol' : 0, 'amount': 0, 'vol': 0, 'speed': 0, 'unit': 'ml'}
+                
+                pdGroup = pd[0].idPrescription + none2zero(pd[0].solutionGroup)
+
+                if not pdGroup in result:
+                    result[pdGroup] = {'totalVol' : 0, 'amount': 0, 'vol': 0, 'speed': 0, 'unit': 'ml'}
 
                 pdDose = pd[0].dose
 
                 if pd[6] and pd[6].amount:
-                    result[pd[0].solutionGroup]['vol'] = pdDose
-                    result[pd[0].solutionGroup]['amount'] = pd[6].amount
-                    result[pd[0].solutionGroup]['unit'] = pd[6].amountUnit
+                    result[pdGroup]['vol'] = pdDose
+                    result[pdGroup]['amount'] = pd[6].amount
+                    result[pdGroup]['unit'] = pd[6].amountUnit
 
                     if pd[2].id.lower() != 'ml' and pd[2].id.lower() == pd[6].amountUnit.lower():
-                        result[pd[0].solutionGroup]['vol'] = pdDose = round(pd[0].dose / pd[6].amount,2)
+                        result[pdGroup]['vol'] = pdDose = round(pd[0].dose / pd[6].amount,2)
                 
-                result[pd[0].solutionGroup]['speed'] = pd[0].solutionDose
-                result[pd[0].solutionGroup]['totalVol'] += pdDose
+                result[pdGroup]['speed'] = pd[0].solutionDose
+                result[pdGroup]['totalVol'] += pdDose
 
         return result
 
@@ -210,15 +213,16 @@ class DrugList():
 def getPrescriptionAuth(idPrescription):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
-    return getPrescription(idPrescription=idPrescription)
 
-@app_pres.route('/admission/<int:admissionNumber>/<int:year>/<int:month>/<int:day>', methods=['GET'])
-@jwt_required
-def getAdmissionAuth(admissionNumber, year, month, day):
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
-    aggDate = date(year, month, day)
-    return getPrescription(admissionNumber=admissionNumber, aggDate=aggDate)
+    p = Prescription.getPrescription(idPrescription)
+
+    if (p is None):
+        return { 'status': 'error', 'message': 'Prescrição Inexistente!' }, status.HTTP_400_BAD_REQUEST
+
+    if p[0].agg:
+        return getPrescription(idPrescription=idPrescription, admissionNumber=p[0].admissionNumber, aggDate=p[0].date)
+    else:
+        return getPrescription(idPrescription=idPrescription)
 
 def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
     
@@ -326,7 +330,7 @@ def setPrescriptionStatus(idPrescription):
     p.update = datetime.today()
     p.user = user.id
 
-    return tryCommit(db, idPrescription, User.permission(user))
+    return tryCommit(db, str(idPrescription), User.permission(user))
 
 @app_pres.route("/prescriptions/drug/<int:idPrescriptionDrug>/period", methods=['GET'])
 @jwt_required
@@ -398,7 +402,7 @@ def getPrescriptionUpdate(idPrescription):
 
         db.engine.execute(query)
 
-        tryCommit(db, idPrescription)
+        tryCommit(db, str(idPrescription))
 
     return {
         'status': 'success',
