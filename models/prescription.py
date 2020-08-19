@@ -204,7 +204,7 @@ class Patient(db.Model):
         if bool(int(none2zero(agg))):
             q = q.filter(Prescription.agg == True)
         else:
-            q = q.filter(Prescription.agg is None)
+            q = q.filter(Prescription.agg == None)
 
         if endDate is None: endDate = startDate
 

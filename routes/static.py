@@ -24,8 +24,13 @@ def computePrescription(schema, idPrescription):
     if (p is None):
         return { 'status': 'error', 'message': 'Prescrição Inexistente!' }, status.HTTP_400_BAD_REQUEST
 
-    result, stat = getPrescription(idPrescription=idPrescription)
+    resultPresc, stat = getPrescription(idPrescription=idPrescription)
+    p.features = getFeatures(resultPresc)
+    
+    return tryCommit(db, idPrescription)
 
+def getFeatures(result):
+    
     drugList = result['data']['prescription']
     drugList.extend(result['data']['solution'])
     drugList.extend(result['data']['procedures'])
@@ -54,7 +59,7 @@ def computePrescription(schema, idPrescription):
 
     exams = result['data']['alertExams']
 
-    p.features = {
+    return {
         'alerts': alerts,
         'prescriptionScore': pScore,
         'scoreOne': score1,
@@ -69,5 +74,3 @@ def computePrescription(schema, idPrescription):
         'alertExams': exams,
         'interventions': interventions,
     }
-    
-    return tryCommit(db, idPrescription)
