@@ -37,7 +37,6 @@ def computePrescription(schema, idPrescription):
         pAgg.idPatient = p.idPatient
         pAgg.admissionNumber = p.admissionNumber
         pAgg.date = date(p.date.year, p.date.month, p.date.day)
-        pAgg.agg = True
         newPrescAgg = True
 
     resultAgg, stat = getPrescription(admissionNumber=p.admissionNumber, aggDate=pAgg.date)
@@ -48,6 +47,7 @@ def computePrescription(schema, idPrescription):
     pAgg.bed = p.bed
     pAgg.record = p.record
     pAgg.prescriber = 'Prescrição Agregada'
+    pAgg.agg = True
     pAgg.features = getFeatures(resultAgg)
 
     if newPrescAgg: db.session.add(pAgg)
