@@ -3,7 +3,8 @@ from flask_api import FlaskAPI, status, exceptions
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager
 from flask_jwt_extended import (jwt_required, get_jwt_identity)
-from models.main import db, User
+from models.main import db, User, dbSession
+from models.appendix import Memory
 from config import Config
 from flask_cors import CORS
 from routes.authentication import app_auth
@@ -52,11 +53,12 @@ CORS(app)
 @jwt_required
 def getNameUrl():
     user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
 
     if user: 
         return {
             'status': 'success',
-            'url': user.config['getnameurl'] if user.config and 'getnameurl' in user.config else 'http://localhost/{idPatient}',
+            'url': Memory.getMem('getnameurl', 'http://localhost/{idPatient}'),
         }, status.HTTP_200_OK 
     else:
         return {
@@ -68,11 +70,12 @@ def getNameUrl():
 @jwt_required
 def getReports():
     user = User.find(get_jwt_identity())
-
+    dbSession.setSchema(user.schema)
+    
     if user: 
         return {
             'status': 'success',
-            'reports': user.config['reports'] if user.config and 'reports' in user.config else [],
+            'reports': Memory.getMem('reports', []),
         }, status.HTTP_200_OK 
     else:
         return {

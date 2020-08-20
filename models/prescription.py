@@ -236,7 +236,7 @@ def getDrugFuture(idPrescription, admissionNumber):
     pd1 = db.aliased(PrescriptionDrug)
     pr1 = db.aliased(Prescription)
 
-    query = db.session.query(func.concat(func.to_char(pr1.date, "DD/MM"),' (',pd1.frequency,'x ',pd1.dose,' ',pd1.idMeasureUnit,') via ',pd1.route))\
+    query = db.session.query(func.concat(pr1.id,' = ',func.to_char(pr1.date, "DD/MM"),' (',pd1.frequency,'x ',pd1.dose,' ',pd1.idMeasureUnit,') via ',pd1.route,'; '))\
         .select_from(pd1)\
         .join(pr1, pr1.id == pd1.idPrescription)\
         .filter(pr1.admissionNumber == admissionNumber)\

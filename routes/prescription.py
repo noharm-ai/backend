@@ -348,9 +348,16 @@ def getDrugPeriod(idPrescriptionDrug):
         else:
             results[0][1].append('Não há prescrição posterior para esse Paciente')
 
+    periodList = results[0][1]
+    for i, p in enumerate(periodList):
+        p = p.replace('33x','SNx')
+        p = p.replace('44x','ACMx')
+        p = p.replace('99x','N/Dx')
+        periodList[i] = p
+
     return {
         'status': 'success',
-        'data': results[0][1]
+        'data': periodList
     }, status.HTTP_200_OK
 
 @app_pres.route('/prescriptions/drug/<int:idPrescriptionDrug>', methods=['PUT'])

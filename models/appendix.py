@@ -76,3 +76,7 @@ class Memory(db.Model):
     value = db.Column("valor", postgresql.JSON, nullable=False)
     update = db.Column("update_at", db.DateTime, nullable=False)
     user = db.Column("update_by", db.Integer, nullable=False)
+
+    def getMem(kind, default):
+        mem = Memory.query.filter_by(kind=kind).first()
+        return mem.value if mem else default

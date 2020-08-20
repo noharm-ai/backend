@@ -48,6 +48,7 @@ def computePrescription(schema, idPrescription):
     pAgg.record = p.record
     pAgg.prescriber = 'Prescrição Agregada'
     pAgg.agg = True
+    pAgg.status = 0
     pAgg.features = getFeatures(resultAgg)
 
     if newPrescAgg: db.session.add(pAgg)
