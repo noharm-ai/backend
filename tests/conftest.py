@@ -12,7 +12,6 @@ def make_headers(jwt):
 
 def user_find(id):
 	user = User()
-	user.config = { "getnameurl" : "patient-name" }
 	user.schema = "demo"
 	return user
 

@@ -19,4 +19,4 @@ def test_name_url(user, client):
 
 	assert response.status_code == 200
 	assert data['status'] == 'success'
-	assert data['url'] == 'patient-name'
+	assert data['url'] == 'http://localhost/{idPatient}'
