@@ -15,6 +15,9 @@ def user_find(id):
 	user.schema = "demo"
 	return user
 
+def setSchema(schema):
+	return schema
+
 @pytest.fixture
 def client():
     client = app.test_client()
