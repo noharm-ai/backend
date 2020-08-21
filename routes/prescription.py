@@ -72,11 +72,12 @@ def getPrescriptions():
 
 class DrugList():
 
-    def __init__(self, drugList, interventions, relations, exams):
+    def __init__(self, drugList, interventions, relations, exams, agg):
         self.drugList = drugList
         self.interventions = interventions
         self.relations = relations
         self.exams = exams
+        self.agg = agg
 
     def getPrevIntervention(self, idDrug, idPrescription):
         result = {}
@@ -165,7 +166,7 @@ class DrugList():
                     'infusion': strNone(pd[0].solutionDose) + ' ' + strNone(pd[0].solutionUnit),
                     'score': str(pd[5]) if not pdWhiteList else '0',
                     'source': pd[0].source,
-                    'checked': bool(pd[0].checked),
+                    'checked': bool(pd[0].checked or (self.agg and pd[9] == 's')),
                     'suspended': bool(pd[0].suspendedDate),
                     'status': pd[0].status,
                     'near': pd[0].near,
@@ -259,7 +260,7 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
         'weight': patient.weight,
     })
 
-    drugList = DrugList(drugs, interventions, relations, exams)
+    drugList = DrugList(drugs, interventions, relations, exams, aggDate is not None)
 
     pDrugs = drugList.getDrugType([], 'Medicamentos')
     pDrugs = drugList.getDrugType(pDrugs, 'Medicamentos', checked=True)
@@ -326,7 +327,18 @@ def setPrescriptionStatus(idPrescription):
     if (p is None):
         return { 'status': 'error', 'message': 'Prescrição Inexistente!' }, status.HTTP_400_BAD_REQUEST
 
-    if 'status' in data.keys(): p.status = data.get('status', None)
+    if 'status' in data.keys(): 
+        p.status = data.get('status', None)
+        if p.agg:
+            db.session.query(Prescription)\
+                      .filter(Prescription.admissionNumber == p.admissionNumber)\
+                      .filter(func.date(Prescription.date) == func.date(p.date))\
+                      .update({
+                        'status': p.status,
+                        'update': datetime.today(),
+                        'user': user.id
+                      }, synchronize_session='fetch')
+
     if 'notes' in data.keys(): p.notes = data.get('notes', None)
     p.update = datetime.today()
     p.user = user.id

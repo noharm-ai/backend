@@ -71,8 +71,12 @@ class Prescription(db.Model):
             .query(DrugAttributes.update)\
             .select_from(PrescriptionDrug)\
             .join(DrugAttributes, and_(DrugAttributes.idDrug == PrescriptionDrug.idDrug, DrugAttributes.idSegment == PrescriptionDrug.idSegment))\
+            .join(Outlier, Outlier.id == PrescriptionDrug.idOutlier)\
             .filter(PrescriptionDrug.idPrescription == idPrescription)\
-            .filter(DrugAttributes.update > (datetime.today() - timedelta(minutes=1)) )\
+            .filter(or_(
+                        DrugAttributes.update > (datetime.today() - timedelta(minutes=3)),
+                        Outlier.update > (datetime.today() - timedelta(minutes=3))
+                    ))\
             .all()
 
     def findRelation(idPrescription, admissionNumber, aggDate=None):
@@ -304,20 +308,21 @@ class PrescriptionDrug(db.Model):
         q = db.session\
             .query(PrescriptionDrug, Drug, MeasureUnit, Frequency, '0',\
                     func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4).label('score'),
-                    DrugAttributes, Notes.notes, prevNotes.label('prevNotes'))\
+                    DrugAttributes, Notes.notes, prevNotes.label('prevNotes'), Prescription.status)\
             .outerjoin(Outlier, Outlier.id == PrescriptionDrug.idOutlier)\
             .outerjoin(Drug, Drug.id == PrescriptionDrug.idDrug)\
             .outerjoin(Notes, Notes.idPrescriptionDrug == PrescriptionDrug.id)\
             .outerjoin(MeasureUnit, MeasureUnit.id == PrescriptionDrug.idMeasureUnit)\
             .outerjoin(Frequency, Frequency.id == PrescriptionDrug.idFrequency)\
             .outerjoin(DrugAttributes, and_(DrugAttributes.idDrug == PrescriptionDrug.idDrug, DrugAttributes.idSegment == PrescriptionDrug.idSegment))\
+            .outerjoin(Prescription, Prescription.id == PrescriptionDrug.idPrescription)\
         
         if aggDate is None:
             q = q.filter(PrescriptionDrug.idPrescription == idPrescription)
         else:
-            q = q.outerjoin(Prescription, Prescription.id == PrescriptionDrug.idPrescription)\
-                 .filter(Prescription.admissionNumber == admissionNumber)\
-                 .filter(func.date(Prescription.date) == aggDate)
+            q = q.filter(Prescription.admissionNumber == admissionNumber)\
+                 .filter(func.date(Prescription.date) == aggDate)\
+                 .filter(Prescription.agg == None)
         
         return q.order_by(asc(PrescriptionDrug.solutionGroup), asc(Drug.name)).all()
 
