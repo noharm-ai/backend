@@ -1,4 +1,4 @@
-import random, copy
+import random
 from flask_api import status
 from models.main import *
 from models.appendix import *
@@ -25,8 +25,9 @@ def getPrescriptions():
     startDate = request.args.get('startDate', str(date.today()))
     endDate = request.args.get('endDate', None)
     pending = request.args.get('pending', 0)
+    agg = request.args.get('agg', 0)
 
-    patients = Patient.getPatients(idSegment=idSegment, idDept=idDept, idDrug=idDrug, startDate=startDate, endDate=endDate, pending=pending)
+    patients = Patient.getPatients(idSegment=idSegment, idDept=idDept, idDrug=idDrug, startDate=startDate, endDate=endDate, pending=pending, agg=agg)
 
     results = []
     for p in patients:
@@ -49,7 +50,7 @@ def getPrescriptions():
 
 
         results.append(dict(features, **{
-            'idPrescription': p[0].id,
+            'idPrescription': str(p[0].id),
             'idPatient': p[0].idPatient,
             'name': patient.admissionNumber,
             'admissionNumber': patient.admissionNumber,
@@ -71,11 +72,12 @@ def getPrescriptions():
 
 class DrugList():
 
-    def __init__(self, drugList, interventions, relations, exams):
+    def __init__(self, drugList, interventions, relations, exams, agg):
         self.drugList = drugList
         self.interventions = interventions
         self.relations = relations
         self.exams = exams
+        self.agg = agg
 
     def getPrevIntervention(self, idDrug, idPrescription):
         result = {}
@@ -129,7 +131,7 @@ class DrugList():
                         doseWeightStr += ' ou ' + str(pd[0].doseconv) + ' ' + str(pd[6].idMeasureUnit) + '/Kg (faixa arredondada)'
 
                 if pd[6].maxDose and pd[6].maxDose < pdDoseconv:
-                    alerts.append('Dose diária prescrita (' + str(int(pdDoseconv)) + ') maior que a dose de alerta (' + str(pd[6].maxDose) + ') usualmente recomendada (considerada a dose diária máxima independente da indicação.')
+                    alerts.append('Dose diária prescrita (' + str(int(pdDoseconv)) + ') maior que a dose de alerta (' + str(pd[6].maxDose) + ') usualmente recomendada (considerada a dose diária independente da indicação).')
 
             if pd[0].alergy == 'S':
                 alerts.append('Paciente alérgico a este medicamento.')
@@ -159,12 +161,12 @@ class DrugList():
                     'period': str(pd[0].period) + 'D' if pd[0].period else '',
                     'periodDates': [],
                     'route': pd[0].route,
-                    'grp_solution': pd[0].solutionGroup,
+                    'grp_solution': pd[0].idPrescription + none2zero(pd[0].solutionGroup),
                     'stage': 'ACM' if pd[0].solutionACM == 'S' else strNone(pd[0].solutionPhase) + ' x '+ strNone(pd[0].solutionTime) + ' (' + strNone(pd[0].solutionTotalTime) + ')',
                     'infusion': strNone(pd[0].solutionDose) + ' ' + strNone(pd[0].solutionUnit),
                     'score': str(pd[5]) if not pdWhiteList else '0',
                     'source': pd[0].source,
-                    'checked': bool(pd[0].checked),
+                    'checked': bool(pd[0].checked or (self.agg and pd[9] == 's')),
                     'suspended': bool(pd[0].suspendedDate),
                     'status': pd[0].status,
                     'near': pd[0].near,
@@ -185,21 +187,24 @@ class DrugList():
         result = {}
         for pd in self.drugList:
             if pd[0].solutionGroup:
-                if not pd[0].solutionGroup in result:
-                    result[pd[0].solutionGroup] = {'totalVol' : 0, 'amount': 0, 'vol': 0, 'speed': 0, 'unit': 'ml'}
+                
+                pdGroup = pd[0].idPrescription + none2zero(pd[0].solutionGroup)
+
+                if not pdGroup in result:
+                    result[pdGroup] = {'totalVol' : 0, 'amount': 0, 'vol': 0, 'speed': 0, 'unit': 'ml'}
 
                 pdDose = pd[0].dose
 
                 if pd[6] and pd[6].amount:
-                    result[pd[0].solutionGroup]['vol'] = pdDose
-                    result[pd[0].solutionGroup]['amount'] = pd[6].amount
-                    result[pd[0].solutionGroup]['unit'] = pd[6].amountUnit
+                    result[pdGroup]['vol'] = pdDose
+                    result[pdGroup]['amount'] = pd[6].amount
+                    result[pdGroup]['unit'] = pd[6].amountUnit
 
                     if pd[2].id.lower() != 'ml' and pd[2].id.lower() == pd[6].amountUnit.lower():
-                        result[pd[0].solutionGroup]['vol'] = pdDose = round(pd[0].dose / pd[6].amount,2)
+                        result[pdGroup]['vol'] = pdDose = round(pd[0].dose / pd[6].amount,2)
                 
-                result[pd[0].solutionGroup]['speed'] = pd[0].solutionDose
-                result[pd[0].solutionGroup]['totalVol'] += pdDose
+                result[pdGroup]['speed'] = pd[0].solutionDose
+                result[pdGroup]['totalVol'] += pdDose
 
         return result
 
@@ -209,10 +214,23 @@ class DrugList():
 def getPrescriptionAuth(idPrescription):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
-    return getPrescription(idPrescription)
 
-def getPrescription(idPrescription):
-    prescription = Prescription.getPrescription(idPrescription)
+    p = Prescription.getPrescription(idPrescription)
+
+    if (p is None):
+        return { 'status': 'error', 'message': 'Prescrição Inexistente!' }, status.HTTP_400_BAD_REQUEST
+
+    if p[0].agg:
+        return getPrescription(idPrescription=idPrescription, admissionNumber=p[0].admissionNumber, aggDate=p[0].date)
+    else:
+        return getPrescription(idPrescription=idPrescription)
+
+def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
+    
+    if idPrescription:
+        prescription = Prescription.getPrescription(idPrescription)
+    else:
+        prescription = Prescription.getPrescriptionAgg(admissionNumber, aggDate)
 
     if (prescription is None):
         return { 'status': 'error', 'message': 'Prescrição Inexistente!' }, status.HTTP_400_BAD_REQUEST
@@ -223,10 +241,10 @@ def getPrescription(idPrescription):
         patient.idPatient = prescription[0].idPatient
         patient.admissionNumber = prescription[0].admissionNumber
 
-    lastDept = Prescription.lastDeptbyAdmission(idPrescription, patient.admissionNumber)
-    drugs = PrescriptionDrug.findByPrescription(idPrescription, patient.admissionNumber)
+    lastDept = Prescription.lastDeptbyAdmission(prescription[0].id, patient.admissionNumber)
+    drugs = PrescriptionDrug.findByPrescription(prescription[0].id, patient.admissionNumber, aggDate)
     interventions = Intervention.findAll(admissionNumber=patient.admissionNumber)
-    relations = Prescription.findRelation(idPrescription,patient.admissionNumber)
+    relations = Prescription.findRelation(prescription[0].id,patient.admissionNumber, aggDate)
 
     exams = Exams.findLatestByAdmission(patient, prescription[0].idSegment)
     age = data2age(patient.birthdate.isoformat() if patient.birthdate else date.today().isoformat())
@@ -242,7 +260,7 @@ def getPrescription(idPrescription):
         'weight': patient.weight,
     })
 
-    drugList = DrugList(drugs, interventions, relations, exams)
+    drugList = DrugList(drugs, interventions, relations, exams, aggDate is not None)
 
     pDrugs = drugList.getDrugType([], 'Medicamentos')
     pDrugs = drugList.getDrugType(pDrugs, 'Medicamentos', checked=True)
@@ -259,11 +277,12 @@ def getPrescription(idPrescription):
     return {
         'status': 'success',
         'data': {
-            'idPrescription': prescription[0].id,
+            'idPrescription': str(prescription[0].id),
             'idSegment': prescription[0].idSegment,
             'segmentName': prescription[5],
             'idPatient': prescription[0].idPatient,
             'name': prescription[0].admissionNumber,
+            'agg': prescription[0].agg,
             'admissionNumber': prescription[0].admissionNumber,
             'birthdate': patient.birthdate.isoformat() if patient.birthdate else '',
             'gender': patient.gender,
@@ -289,7 +308,7 @@ def getPrescription(idPrescription):
             'solution': pSolution,
             'procedures': pProcedures,
             'infusion': [{'key': i, 'value': pInfusion[i]} for i in pInfusion],
-            'interventions': [i for i in interventions if i['idPrescription'] < idPrescription],
+            'interventions': [i for i in interventions if i['idPrescription'] < prescription[0].id],
             'alertExams': alertExams,
             'exams': examsJson[:10],
             'status': prescription[0].status,
@@ -308,12 +327,23 @@ def setPrescriptionStatus(idPrescription):
     if (p is None):
         return { 'status': 'error', 'message': 'Prescrição Inexistente!' }, status.HTTP_400_BAD_REQUEST
 
-    if 'status' in data.keys(): p.status = data.get('status', None)
+    if 'status' in data.keys(): 
+        p.status = data.get('status', None)
+        if p.agg:
+            db.session.query(Prescription)\
+                      .filter(Prescription.admissionNumber == p.admissionNumber)\
+                      .filter(func.date(Prescription.date) == func.date(p.date))\
+                      .update({
+                        'status': p.status,
+                        'update': datetime.today(),
+                        'user': user.id
+                      }, synchronize_session='fetch')
+
     if 'notes' in data.keys(): p.notes = data.get('notes', None)
     p.update = datetime.today()
     p.user = user.id
 
-    return tryCommit(db, idPrescription, User.permission(user))
+    return tryCommit(db, str(idPrescription), User.permission(user))
 
 @app_pres.route("/prescriptions/drug/<int:idPrescriptionDrug>/period", methods=['GET'])
 @jwt_required
@@ -330,112 +360,17 @@ def getDrugPeriod(idPrescriptionDrug):
         else:
             results[0][1].append('Não há prescrição posterior para esse Paciente')
 
-    return {
-        'status': 'success',
-        'data': results[0][1]
-    }, status.HTTP_200_OK
-
-def historyExam(typeExam, examsList, segExam):
-    results = []
-    for e in examsList:
-        if e.typeExam == typeExam:
-            item = formatExam(e, e.typeExam.lower(), segExam)
-            del(item['ref'])
-            results.append(item)
-    return results
-
-@app_pres.route("/exams/<int:admissionNumber>", methods=['GET'])
-@jwt_required
-def getExamsbyAdmission(admissionNumber):
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
-
-    idSegment = request.args.get('idSegment', 1)
-    examsList = Exams.findByAdmission(admissionNumber)
-    segExam = SegmentExam.refDict(idSegment)
-
-    perc = {
-        'h_conleuc': {
-            'total' : 1,
-            'relation': ['h_conlinfoc', 'h_conmono', 'h_coneos', 'h_conbaso', 'h_consegm']
-        }
-    }
-
-    bufferList = {}
-    typeExams = []
-    for e in examsList:
-        if not e.typeExam in typeExams and e.typeExam.lower() in segExam:
-            key = e.typeExam.lower()
-            item = formatExam(e, e.typeExam.lower(), segExam)
-            item['name'] = segExam[e.typeExam.lower()].name
-            item['perc'] = None
-            item['history'] = historyExam(e.typeExam, examsList, segExam)
-            bufferList[key] = item
-            typeExams.append(e.typeExam)
-            if key in perc:
-                perc[key]['total'] = float(e.value)
-
-    for p in perc:
-        total = perc[p]['total']
-        for r in perc[p]['relation']:
-            if r in bufferList:
-                val = bufferList[r]['value']
-                bufferList[r]['perc'] = round((val*100)/total,1)
-
-    results = copy.deepcopy(segExam)
-    for e in segExam:
-        if e in bufferList:
-            results[e] = bufferList[e]
-        else:
-            del(results[e])
+    periodList = results[0][1]
+    for i, p in enumerate(periodList):
+        p = p.replace('33x','SNx')
+        p = p.replace('44x','ACMx')
+        p = p.replace('99x','N/Dx')
+        periodList[i] = p
 
     return {
         'status': 'success',
-        'data': results
+        'data': periodList
     }, status.HTTP_200_OK
-
-
-@app_pres.route('/patient/<int:admissionNumber>', methods=['POST'])
-@jwt_required
-def setPatientData(admissionNumber):
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
-    data = request.get_json()
-
-    p = Patient.findByAdmission(admissionNumber)
-    if (p is None):
-        return { 'status': 'error', 'message': 'Paciente Inexistente!' }, status.HTTP_400_BAD_REQUEST
-
-    updateWeight = False
-    weight = data.get('weight', None)
-    if weight and weight != p.weight: 
-        p.weightDate = datetime.today()
-        p.weight = weight
-        p.user = user.id
-        updateWeight = True
-
-    alertExpire = data.get('alertExpire', None)
-    if alertExpire and alertExpire != p.alertExpire: 
-        p.alert = data.get('alert', None)
-        p.alertExpire = alertExpire
-        p.alertDate = datetime.today()
-
-    if 'height' in data.keys(): p.height = data.get('height', None)
-    if 'observation' in data.keys(): p.observation = data.get('observation', None)
-
-    p.update = datetime.today()
-
-    if 'idPrescription' in data.keys() and updateWeight:
-        idPrescription = data.get('idPrescription')
-
-        query = "INSERT INTO " + user.schema + ".presmed \
-                    SELECT *\
-                    FROM " + user.schema + ".presmed\
-                    WHERE fkprescricao = " + str(int(idPrescription)) + ";"
-
-        db.engine.execute(query) 
-
-    return tryCommit(db, admissionNumber, User.permission(user))
 
 @app_pres.route('/prescriptions/drug/<int:idPrescriptionDrug>', methods=['PUT'])
 @jwt_required
@@ -487,7 +422,7 @@ def getPrescriptionUpdate(idPrescription):
 
         db.engine.execute(query)
 
-        tryCommit(db, idPrescription)
+        tryCommit(db, str(idPrescription))
 
     return {
         'status': 'success',

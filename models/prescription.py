@@ -16,13 +16,14 @@ class Prescription(db.Model):
     idDepartment = db.Column("fksetor", db.Integer, nullable=False)
     idSegment = db.Column("idsegmento", db.Integer, nullable=False)
     date = db.Column("dtprescricao", db.DateTime, nullable=False)
-    expire = db.Column("dtvigencia", db.DateTime, nullable=False)
+    expire = db.Column("dtvigencia", db.DateTime, nullable=True)
     status = db.Column('status', db.String(1), nullable=False)
     bed = db.Column('leito', db.String(16), nullable=True)
     record = db.Column('prontuario', db.Integer, nullable=True)
     features = db.Column('indicadores', postgresql.JSON, nullable=True)
     notes = deferred(db.Column('evolucao', db.String, nullable=True))
     prescriber = deferred(db.Column('prescritor', db.String, nullable=True))
+    agg = db.Column('agregada', db.Boolean, nullable=True)
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.Integer, nullable=True)
 
@@ -41,8 +42,8 @@ class Prescription(db.Model):
             .order_by(desc(Prescription.date))\
             .first()
 
-    def getPrescription(idPrescription):
-        return db.session\
+    def getPrescriptionBasic():
+            return db.session\
             .query(
                 Prescription, Patient, '0', '0',
                 Department.name.label('department'), Segment.description, 
@@ -51,8 +52,18 @@ class Prescription(db.Model):
             )\
             .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)\
             .outerjoin(Department, Department.id == Prescription.idDepartment)\
-            .outerjoin(Segment, Segment.id == Prescription.idSegment)\
+            .outerjoin(Segment, Segment.id == Prescription.idSegment)
+
+    def getPrescription(idPrescription):
+        return Prescription.getPrescriptionBasic()\
             .filter(Prescription.id == idPrescription)\
+            .first()
+
+    def getPrescriptionAgg(admissionNumber, aggDate):
+        return Prescription.getPrescriptionBasic()\
+            .filter(Prescription.admissionNumber == admissionNumber)\
+            .filter(func.date(Prescription.date) == aggDate)\
+            .order_by(desc(Prescription.date))\
             .first()
 
     def shouldUpdate(idPrescription):
@@ -60,11 +71,15 @@ class Prescription(db.Model):
             .query(DrugAttributes.update)\
             .select_from(PrescriptionDrug)\
             .join(DrugAttributes, and_(DrugAttributes.idDrug == PrescriptionDrug.idDrug, DrugAttributes.idSegment == PrescriptionDrug.idSegment))\
+            .join(Outlier, Outlier.id == PrescriptionDrug.idOutlier)\
             .filter(PrescriptionDrug.idPrescription == idPrescription)\
-            .filter(DrugAttributes.update > (datetime.today() - timedelta(minutes=1)) )\
+            .filter(or_(
+                        DrugAttributes.update > (datetime.today() - timedelta(minutes=3)),
+                        Outlier.update > (datetime.today() - timedelta(minutes=3))
+                    ))\
             .all()
 
-    def findRelation(idPrescription, admissionNumber):
+    def findRelation(idPrescription, admissionNumber, aggDate=None):
         pd1 = db.aliased(PrescriptionDrug)
         pd2 = db.aliased(PrescriptionDrug)
         m1 = db.aliased(Drug)
@@ -76,9 +91,15 @@ class Prescription(db.Model):
             .join(m1, m1.id == pd1.idDrug)\
             .join(m2, m2.id == pd2.idDrug)\
             .join(Relation, and_(Relation.sctida == m1.sctid, Relation.sctidb == m2.sctid))\
-            .filter(pd1.idPrescription == idPrescription)\
             .filter(Relation.active == True)
-            
+        
+        if aggDate is None:
+            relation = relation.filter(pd1.idPrescription == idPrescription)
+        else:
+            relation = relation.outerjoin(Prescription, Prescription.id == pd1.idPrescription)\
+                               .filter(Prescription.admissionNumber == admissionNumber)\
+                               .filter(func.date(Prescription.date) == aggDate)
+
         interaction = relation.filter(Relation.kind.in_(['it','dt','dm']))
 
         incompatible = relation.filter(Relation.kind.in_(['iy']))\
@@ -157,13 +178,14 @@ class Patient(db.Model):
     alert = deferred(db.Column('alertatexto', db.String, nullable=True))
     alertDate = db.Column("alertadata", db.DateTime, nullable=True)
     alertExpire = db.Column("alertavigencia", db.DateTime, nullable=True)
+    alertBy = db.Column("alerta_by", db.Integer, nullable=True)
 
     def findByAdmission(admissionNumber):
         return db.session.query(Patient)\
                          .filter(Patient.admissionNumber == admissionNumber)\
                          .first()
 
-    def getPatients(idSegment=None, idDept=[], idDrug=[], startDate=date.today(), endDate=None, pending=False):
+    def getPatients(idSegment=None, idDept=[], idDrug=[], startDate=date.today(), endDate=None, pending=False, agg=False):
         q = db.session\
             .query(Prescription, Patient, Department.name.label('department'))\
             .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)\
@@ -182,6 +204,11 @@ class Patient(db.Model):
 
         if bool(int(none2zero(pending))):
             q = q.filter(Prescription.status == '0')
+
+        if bool(int(none2zero(agg))):
+            q = q.filter(Prescription.agg == True)
+        else:
+            q = q.filter(Prescription.agg == None)
 
         if endDate is None: endDate = startDate
 
@@ -213,7 +240,7 @@ def getDrugFuture(idPrescription, admissionNumber):
     pd1 = db.aliased(PrescriptionDrug)
     pr1 = db.aliased(Prescription)
 
-    query = db.session.query(func.concat(func.to_char(pr1.date, "DD/MM"),' (',pd1.frequency,'x ',pd1.dose,' ',pd1.idMeasureUnit,') via ',pd1.route))\
+    query = db.session.query(func.concat(pr1.id,' = ',func.to_char(pr1.date, "DD/MM"),' (',pd1.frequency,'x ',pd1.dose,' ',pd1.idMeasureUnit,') via ',pd1.route,'; '))\
         .select_from(pd1)\
         .join(pr1, pr1.id == pd1.idPrescription)\
         .filter(pr1.admissionNumber == admissionNumber)\
@@ -275,22 +302,29 @@ class PrescriptionDrug(db.Model):
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.Integer, nullable=True)
 
-    def findByPrescription(idPrescription, admissionNumber):
+    def findByPrescription(idPrescription, admissionNumber, aggDate=None):
         prevNotes = getPrevNotes(admissionNumber)
 
-        return db.session\
+        q = db.session\
             .query(PrescriptionDrug, Drug, MeasureUnit, Frequency, '0',\
                     func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4).label('score'),
-                    DrugAttributes, Notes.notes, prevNotes.label('prevNotes'))\
+                    DrugAttributes, Notes.notes, prevNotes.label('prevNotes'), Prescription.status)\
             .outerjoin(Outlier, Outlier.id == PrescriptionDrug.idOutlier)\
             .outerjoin(Drug, Drug.id == PrescriptionDrug.idDrug)\
             .outerjoin(Notes, Notes.idPrescriptionDrug == PrescriptionDrug.id)\
             .outerjoin(MeasureUnit, MeasureUnit.id == PrescriptionDrug.idMeasureUnit)\
             .outerjoin(Frequency, Frequency.id == PrescriptionDrug.idFrequency)\
             .outerjoin(DrugAttributes, and_(DrugAttributes.idDrug == PrescriptionDrug.idDrug, DrugAttributes.idSegment == PrescriptionDrug.idSegment))\
-            .filter(PrescriptionDrug.idPrescription == idPrescription)\
-            .order_by(asc(PrescriptionDrug.solutionGroup), asc(Drug.name))\
-            .all()
+            .outerjoin(Prescription, Prescription.id == PrescriptionDrug.idPrescription)\
+        
+        if aggDate is None:
+            q = q.filter(PrescriptionDrug.idPrescription == idPrescription)
+        else:
+            q = q.filter(Prescription.admissionNumber == admissionNumber)\
+                 .filter(func.date(Prescription.date) == aggDate)\
+                 .filter(Prescription.agg == None)
+        
+        return q.order_by(asc(PrescriptionDrug.solutionGroup), asc(Drug.name)).all()
 
     def findByPrescriptionDrug(idPrescriptionDrug, future):
         pd = PrescriptionDrug.query.get(idPrescriptionDrug)

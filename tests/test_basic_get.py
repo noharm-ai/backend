@@ -9,9 +9,6 @@ def dep_getall():
 	dep.name = 'dep'
 	return [dep, dep]
 
-def setSchema(schema):
-	return schema
-
 @patch('models.main.User.find', side_effect=user_find)
 @patch('models.appendix.Department.getAll', side_effect=dep_getall)
 @patch('models.main.dbSession.setSchema', side_effect=setSchema)

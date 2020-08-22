@@ -97,7 +97,6 @@ class Exams(db.Model):
                 exams[e.typeExam.lower()] = formatExam(e, e.typeExam.lower(), segExam)
             
             if e.typeExam.lower() in segExam and segExam[e.typeExam.lower()].initials.lower() == 'creatinina':
-                del(exams[e.typeExam.lower()])
                 exams['cr'] = formatExam(e, e.typeExam.lower(), segExam)
 
         if 'cr' in exams:
