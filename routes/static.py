@@ -56,9 +56,9 @@ def computePrescription(schema, idPrescription):
     return tryCommit(db, idPrescription)
 
 def genAggID(p):
-    id = (p.date.year - 2000) * 100000000000000000
-    id += p.date.month *          1000000000000000
-    id += p.date.day *              10000000000000
+    id = (p.date.year - 2000) * 100000000000000
+    id += p.date.month *          1000000000000
+    id += p.date.day *              10000000000
     id += p.admissionNumber
     return id
 
