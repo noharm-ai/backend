@@ -56,9 +56,10 @@ def getNameUrl():
     dbSession.setSchema(user.schema)
 
     if user: 
+        default = {'value':'http://localhost/{idPatient}'}
         return {
             'status': 'success',
-            'url': Memory.getMem('getnameurl', 'http://localhost/{idPatient}'),
+            'url': Memory.getMem('getnameurl', default)['value'],
         }, status.HTTP_200_OK 
     else:
         return {
