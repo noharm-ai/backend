@@ -77,14 +77,14 @@ def setUser():
     if not user: 
         return { 'status': 'error', 'message': 'Usuário Inexistente!' }, status.HTTP_400_BAD_REQUEST
 
+    update = {}
+
     config = user.config or {}
     config['sign'] = data.get('sign', None)
-
-    update = {}
     update['config'] = config
 
     if 'password' in data.keys():
-        update['password'] = func.md5(data.get('password', None))
+        update['password'] = func.md5(data.get('password'))
 
     db.session.query(User)\
               .filter(User.id == user.id)\
