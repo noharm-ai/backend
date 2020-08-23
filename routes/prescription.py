@@ -161,7 +161,7 @@ class DrugList():
                     'period': str(pd[0].period) + 'D' if pd[0].period else '',
                     'periodDates': [],
                     'route': pd[0].route,
-                    'grp_solution': pd[0].idPrescription + none2zero(pd[0].solutionGroup),
+                    'grp_solution': pd[10],
                     'stage': 'ACM' if pd[0].solutionACM == 'S' else strNone(pd[0].solutionPhase) + ' x '+ strNone(pd[0].solutionTime) + ' (' + strNone(pd[0].solutionTotalTime) + ')',
                     'infusion': strNone(pd[0].solutionDose) + ' ' + strNone(pd[0].solutionUnit),
                     'score': str(pd[5]) if not pdWhiteList else '0',

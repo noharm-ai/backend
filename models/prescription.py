@@ -308,7 +308,8 @@ class PrescriptionDrug(db.Model):
         q = db.session\
             .query(PrescriptionDrug, Drug, MeasureUnit, Frequency, '0',\
                     func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4).label('score'),
-                    DrugAttributes, Notes.notes, prevNotes.label('prevNotes'), Prescription.status)\
+                    DrugAttributes, Notes.notes, prevNotes.label('prevNotes'), Prescription.status,
+                    func.concat(PrescriptionDrug.idPrescription,PrescriptionDrug.solutionGroup))\
             .outerjoin(Outlier, Outlier.id == PrescriptionDrug.idOutlier)\
             .outerjoin(Drug, Drug.id == PrescriptionDrug.idDrug)\
             .outerjoin(Notes, Notes.idPrescriptionDrug == PrescriptionDrug.id)\
@@ -324,7 +325,7 @@ class PrescriptionDrug(db.Model):
                  .filter(func.date(Prescription.date) == aggDate)\
                  .filter(Prescription.agg == None)
         
-        return q.order_by(asc(PrescriptionDrug.solutionGroup), asc(Drug.name)).all()
+        return q.order_by(asc(func.concat(PrescriptionDrug.idPrescription,PrescriptionDrug.solutionGroup)), asc(Drug.name)).all()
 
     def findByPrescriptionDrug(idPrescriptionDrug, future):
         pd = PrescriptionDrug.query.get(idPrescriptionDrug)
