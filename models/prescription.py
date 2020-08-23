@@ -125,9 +125,15 @@ class Prescription(db.Model):
                                 and_(Relation.sctida == m1.sctid, Relation.sctidb == m2.sctid),
                                 and_(Relation.sctida == m2.sctid, Relation.sctidb == m1.sctid),
                             ))\
-            .filter(pd1.idPrescription == idPrescription)\
             .filter(Relation.active == True)\
             .filter(Relation.kind.in_(['rx']))
+
+        if aggDate is None:
+            xreactivity = xreactivity.filter(pd1.idPrescription == idPrescription)
+        else:
+            xreactivity = xreactivity.outerjoin(Prescription, Prescription.id == pd1.idPrescription)\
+                               .filter(Prescription.admissionNumber == admissionNumber)\
+                               .filter(func.date(Prescription.date) == aggDate)
 
         relations = interaction.union(incompatible).union(xreactivity).all()
 
