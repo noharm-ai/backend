@@ -188,7 +188,7 @@ class DrugList():
         for pd in self.drugList:
             if pd[0].solutionGroup:
                 
-                pdGroup = pd[0].idPrescription + none2zero(pd[0].solutionGroup)
+                pdGroup = pd[10]
 
                 if not pdGroup in result:
                     result[pdGroup] = {'totalVol' : 0, 'amount': 0, 'vol': 0, 'speed': 0, 'unit': 'ml'}
