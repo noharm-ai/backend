@@ -405,26 +405,14 @@ def setPrescriptionDrugNote(idPrescriptionDrug):
 @app_pres.route('/prescriptions/<int:idPrescription>/update', methods=['GET'])
 @jwt_required
 def getPrescriptionUpdate(idPrescription):
-    data = request.get_json()
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
 
-    results = Prescription.shouldUpdate(idPrescription)
+    query = "INSERT INTO " + user.schema + ".presmed \
+                SELECT *\
+                FROM " + user.schema + ".presmed\
+                WHERE fkprescricao = " + str(int(idPrescription)) + ";"
 
-    refresh = False
-    if len(results) > 0:
-        refresh = True
+    db.engine.execute(query)
 
-        query = "INSERT INTO " + user.schema + ".presmed \
-                    SELECT *\
-                    FROM " + user.schema + ".presmed\
-                    WHERE fkprescricao = " + str(int(idPrescription)) + ";"
-
-        db.engine.execute(query)
-
-        tryCommit(db, str(idPrescription))
-
-    return {
-        'status': 'success',
-        'data': refresh
-    }, status.HTTP_200_OK
+    return tryCommit(db, str(idPrescription), User.permission(user))

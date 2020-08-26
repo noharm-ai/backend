@@ -17,12 +17,9 @@ from routes.substance import app_sub
 from routes.memory import app_mem
 from routes.patient import app_pat
 from routes.user import app_usr
-import logging
 import os
 
 os.environ['TZ'] = 'America/Sao_Paulo'
-logging.basicConfig()
-logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
 
 app = FlaskAPI(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = Config.POTGRESQL_CONNECTION_STRING
@@ -54,7 +51,7 @@ CORS(app)
 def getVersion():
     return {
         'status': 'success',
-        'data': 'v1.21-beta'
+        'data': 'v1.22-beta'
     }, status.HTTP_200_OK
 
 if __name__ == "__main__":
