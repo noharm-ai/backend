@@ -113,4 +113,4 @@ def setPatientData(admissionNumber):
 
         db.engine.execute(query) 
 
-    return tryCommit(db, admissionNumber, User.permission(user))
+    return tryCommit(db, admissionNumber, user.permission())

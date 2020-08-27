@@ -331,7 +331,7 @@ class PrescriptionDrug(db.Model):
                  .filter(func.date(Prescription.date) == aggDate)\
                  .filter(Prescription.agg == None)
         
-        return q.order_by(asc(func.concat(PrescriptionDrug.idPrescription,PrescriptionDrug.solutionGroup)), asc(Drug.name)).all()
+        return q.order_by(desc(func.concat(PrescriptionDrug.idPrescription,PrescriptionDrug.solutionGroup)), asc(Drug.name)).all()
 
     def findByPrescriptionDrug(idPrescriptionDrug, future):
         pd = PrescriptionDrug.query.get(idPrescriptionDrug)

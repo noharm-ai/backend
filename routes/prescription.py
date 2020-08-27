@@ -205,6 +205,7 @@ class DrugList():
                 
                 result[pdGroup]['speed'] = pd[0].solutionDose
                 result[pdGroup]['totalVol'] += pdDose
+                result[pdGroup]['totalVol'] = round(result[pdGroup]['totalVol'],2)
 
         return result
 
@@ -343,7 +344,7 @@ def setPrescriptionStatus(idPrescription):
     p.update = datetime.today()
     p.user = user.id
 
-    return tryCommit(db, str(idPrescription), User.permission(user))
+    return tryCommit(db, str(idPrescription), user.permission())
 
 @app_pres.route("/prescriptions/drug/<int:idPrescriptionDrug>/period", methods=['GET'])
 @jwt_required
@@ -400,7 +401,7 @@ def setPrescriptionDrugNote(idPrescriptionDrug):
 
         if newObs: db.session.add(note)
 
-    return tryCommit(db, idPrescriptionDrug, User.permission(user))
+    return tryCommit(db, idPrescriptionDrug, user.permission())
 
 @app_pres.route('/prescriptions/<int:idPrescription>/update', methods=['GET'])
 @jwt_required
@@ -415,4 +416,4 @@ def getPrescriptionUpdate(idPrescription):
 
     db.engine.execute(query)
 
-    return tryCommit(db, str(idPrescription), User.permission(user))
+    return tryCommit(db, str(idPrescription), user.permission())
