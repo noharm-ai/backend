@@ -125,9 +125,15 @@ class Prescription(db.Model):
                                 and_(Relation.sctida == m1.sctid, Relation.sctidb == m2.sctid),
                                 and_(Relation.sctida == m2.sctid, Relation.sctidb == m1.sctid),
                             ))\
-            .filter(pd1.idPrescription == idPrescription)\
             .filter(Relation.active == True)\
             .filter(Relation.kind.in_(['rx']))
+
+        if aggDate is None:
+            xreactivity = xreactivity.filter(pd1.idPrescription == idPrescription)
+        else:
+            xreactivity = xreactivity.outerjoin(Prescription, Prescription.id == pd1.idPrescription)\
+                               .filter(Prescription.admissionNumber == admissionNumber)\
+                               .filter(func.date(Prescription.date) == aggDate)
 
         relations = interaction.union(incompatible).union(xreactivity).all()
 
@@ -308,7 +314,8 @@ class PrescriptionDrug(db.Model):
         q = db.session\
             .query(PrescriptionDrug, Drug, MeasureUnit, Frequency, '0',\
                     func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4).label('score'),
-                    DrugAttributes, Notes.notes, prevNotes.label('prevNotes'), Prescription.status)\
+                    DrugAttributes, Notes.notes, prevNotes.label('prevNotes'), Prescription.status,
+                    func.concat(PrescriptionDrug.idPrescription,PrescriptionDrug.solutionGroup))\
             .outerjoin(Outlier, Outlier.id == PrescriptionDrug.idOutlier)\
             .outerjoin(Drug, Drug.id == PrescriptionDrug.idDrug)\
             .outerjoin(Notes, Notes.idPrescriptionDrug == PrescriptionDrug.id)\
@@ -324,7 +331,7 @@ class PrescriptionDrug(db.Model):
                  .filter(func.date(Prescription.date) == aggDate)\
                  .filter(Prescription.agg == None)
         
-        return q.order_by(asc(PrescriptionDrug.solutionGroup), asc(Drug.name)).all()
+        return q.order_by(desc(func.concat(PrescriptionDrug.idPrescription,PrescriptionDrug.solutionGroup)), asc(Drug.name)).all()
 
     def findByPrescriptionDrug(idPrescriptionDrug, future):
         pd = PrescriptionDrug.query.get(idPrescriptionDrug)

@@ -55,7 +55,7 @@ def createIntervention(idPrescriptionDrug=None):
 
     setDrugStatus(idPrescriptionDrug, i.status)
 
-    return tryCommit(db, idPrescriptionDrug, User.permission(user))
+    return tryCommit(db, idPrescriptionDrug, user.permission())
 
 def sortReasons(e):
   return e['description']

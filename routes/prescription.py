@@ -161,7 +161,7 @@ class DrugList():
                     'period': str(pd[0].period) + 'D' if pd[0].period else '',
                     'periodDates': [],
                     'route': pd[0].route,
-                    'grp_solution': pd[0].idPrescription + none2zero(pd[0].solutionGroup),
+                    'grp_solution': pd[10],
                     'stage': 'ACM' if pd[0].solutionACM == 'S' else strNone(pd[0].solutionPhase) + ' x '+ strNone(pd[0].solutionTime) + ' (' + strNone(pd[0].solutionTotalTime) + ')',
                     'infusion': strNone(pd[0].solutionDose) + ' ' + strNone(pd[0].solutionUnit),
                     'score': str(pd[5]) if not pdWhiteList else '0',
@@ -188,7 +188,7 @@ class DrugList():
         for pd in self.drugList:
             if pd[0].solutionGroup:
                 
-                pdGroup = pd[0].idPrescription + none2zero(pd[0].solutionGroup)
+                pdGroup = pd[10]
 
                 if not pdGroup in result:
                     result[pdGroup] = {'totalVol' : 0, 'amount': 0, 'vol': 0, 'speed': 0, 'unit': 'ml'}
@@ -205,6 +205,7 @@ class DrugList():
                 
                 result[pdGroup]['speed'] = pd[0].solutionDose
                 result[pdGroup]['totalVol'] += pdDose
+                result[pdGroup]['totalVol'] = round(result[pdGroup]['totalVol'],2)
 
         return result
 
@@ -343,7 +344,7 @@ def setPrescriptionStatus(idPrescription):
     p.update = datetime.today()
     p.user = user.id
 
-    return tryCommit(db, str(idPrescription), User.permission(user))
+    return tryCommit(db, str(idPrescription), user.permission())
 
 @app_pres.route("/prescriptions/drug/<int:idPrescriptionDrug>/period", methods=['GET'])
 @jwt_required
@@ -400,31 +401,19 @@ def setPrescriptionDrugNote(idPrescriptionDrug):
 
         if newObs: db.session.add(note)
 
-    return tryCommit(db, idPrescriptionDrug, User.permission(user))
+    return tryCommit(db, idPrescriptionDrug, user.permission())
 
 @app_pres.route('/prescriptions/<int:idPrescription>/update', methods=['GET'])
 @jwt_required
 def getPrescriptionUpdate(idPrescription):
-    data = request.get_json()
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
 
-    results = Prescription.shouldUpdate(idPrescription)
+    query = "INSERT INTO " + user.schema + ".presmed \
+                SELECT *\
+                FROM " + user.schema + ".presmed\
+                WHERE fkprescricao = " + str(int(idPrescription)) + ";"
 
-    refresh = False
-    if len(results) > 0:
-        refresh = True
+    db.engine.execute(query)
 
-        query = "INSERT INTO " + user.schema + ".presmed \
-                    SELECT *\
-                    FROM " + user.schema + ".presmed\
-                    WHERE fkprescricao = " + str(int(idPrescription)) + ";"
-
-        db.engine.execute(query)
-
-        tryCommit(db, str(idPrescription))
-
-    return {
-        'status': 'success',
-        'data': refresh
-    }, status.HTTP_200_OK
+    return tryCommit(db, str(idPrescription), user.permission())

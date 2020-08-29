@@ -29,8 +29,8 @@ class User(db.Model):
     def authenticate(email, password):
         return User.query.filter_by(email=email, password=func.md5(password)).first()
 
-    def permission(user):
-        roles = user.config['roles'] if user.config and 'roles' in user.config else []
+    def permission(self):
+        roles = self.config['roles'] if self.config and 'roles' in self.config else []
         return ('suporte' not in roles)
 
 class Substance(db.Model):
