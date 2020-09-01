@@ -131,7 +131,7 @@ class DrugList():
                         doseWeightStr += ' ou ' + str(pd[0].doseconv) + ' ' + str(pd[6].idMeasureUnit) + '/Kg (faixa arredondada)'
 
                 if pd[6].maxDose and pd[6].maxDose < pdDoseconv:
-                    alerts.append('Dose diária prescrita (' + str(int(pdDoseconv)) + ') maior que a dose de alerta (' + str(pd[6].maxDose) + ') usualmente recomendada (considerada a dose diária independente da indicação).')
+                    alerts.append('Dose diária prescrita (' + str(pdDoseconv) + ') maior que a dose de alerta (' + str(pd[6].maxDose) + ') usualmente recomendada (considerada a dose diária independente da indicação).')
 
             if pd[0].alergy == 'S':
                 alerts.append('Paciente alérgico a este medicamento.')
@@ -166,7 +166,7 @@ class DrugList():
                     'infusion': strNone(pd[0].solutionDose) + ' ' + strNone(pd[0].solutionUnit),
                     'score': str(pd[5]) if not pdWhiteList else '0',
                     'source': pd[0].source,
-                    'checked': bool(pd[0].checked or (self.agg and pd[9] == 's')),
+                    'checked': bool(pd[0].checked or pd[9] == 's'),
                     'suspended': bool(pd[0].suspendedDate),
                     'status': pd[0].status,
                     'near': pd[0].near,
@@ -246,6 +246,7 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
     drugs = PrescriptionDrug.findByPrescription(prescription[0].id, patient.admissionNumber, aggDate)
     interventions = Intervention.findAll(admissionNumber=patient.admissionNumber)
     relations = Prescription.findRelation(prescription[0].id,patient.admissionNumber, aggDate)
+    headers = Prescription.getHeaders(admissionNumber, aggDate) if prescription[0].agg else []
 
     exams = Exams.findLatestByAdmission(patient, prescription[0].idSegment)
     age = data2age(patient.birthdate.isoformat() if patient.birthdate else date.today().isoformat())
@@ -313,7 +314,8 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
             'alertExams': alertExams,
             'exams': examsJson[:10],
             'status': prescription[0].status,
-            'prescriber': prescription[9]
+            'prescriber': prescription[9],
+            'headers': headers
         }
     }, status.HTTP_200_OK
 

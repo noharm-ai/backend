@@ -79,6 +79,24 @@ class Prescription(db.Model):
                     ))\
             .all()
 
+    def getHeaders(admissionNumber, aggDate):
+        prescriptions = db.session.query(Prescription)\
+                    .filter(Prescription.admissionNumber == admissionNumber)\
+                    .filter(func.date(Prescription.date) == aggDate)\
+                    .filter(Prescription.agg == None)\
+                    .all()
+        headers = {}
+        for p in prescriptions:
+            headers[p.id] = {
+                'date': p.date,
+                'expire': p.expire,
+                'status': p.status,
+                'bed': p.bed,
+                'prescriber': p.prescriber
+            }
+
+        return headers
+
     def findRelation(idPrescription, admissionNumber, aggDate=None):
         pd1 = db.aliased(PrescriptionDrug)
         pd2 = db.aliased(PrescriptionDrug)
@@ -265,7 +283,7 @@ def getPrevNotes(admissionNumber):
             .select_from(prevNotes)\
             .filter(prevNotes.admissionNumber == admissionNumber)\
             .filter(prevNotes.idDrug == PrescriptionDrug.idDrug)\
-            .filter(prevNotes.idPrescriptionDrug != PrescriptionDrug.id)\
+            .filter(prevNotes.idPrescriptionDrug < PrescriptionDrug.id)\
             .order_by(desc(prevNotes.update))\
             .limit(1)\
             .as_scalar()

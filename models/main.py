@@ -116,7 +116,7 @@ class DrugAttributes(db.Model):
     mav = db.Column("mav", db.Boolean, nullable=True)
     controlled = db.Column("controlados", db.Boolean, nullable=True)
     notdefault = db.Column("naopadronizado", db.Boolean, nullable=True)
-    maxDose = db.Column("dosemaxima", db.Integer, nullable=True)
+    maxDose = db.Column("dosemaxima", db.Float, nullable=True)
     kidney = db.Column("renal", db.Integer, nullable=True)
     liver = db.Column("hepatico", db.Integer, nullable=True)
     elderly = db.Column("idoso", db.Boolean, nullable=True)
