@@ -332,6 +332,7 @@ def setPrescriptionStatus(idPrescription):
 
     if 'status' in data.keys(): 
         p.status = data.get('status', None)
+        p.update = datetime.today()
         if p.agg:
             db.session.query(Prescription)\
                       .filter(Prescription.admissionNumber == p.admissionNumber)\
@@ -342,8 +343,10 @@ def setPrescriptionStatus(idPrescription):
                         'user': user.id
                       }, synchronize_session='fetch')
 
-    if 'notes' in data.keys(): p.notes = data.get('notes', None)
-    p.update = datetime.today()
+    if 'notes' in data.keys(): 
+        p.notes = data.get('notes', None)
+        p.notes_at = datetime.today()
+
     p.user = user.id
 
     return tryCommit(db, str(idPrescription), user.permission())

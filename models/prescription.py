@@ -22,6 +22,7 @@ class Prescription(db.Model):
     record = db.Column('prontuario', db.Integer, nullable=True)
     features = db.Column('indicadores', postgresql.JSON, nullable=True)
     notes = deferred(db.Column('evolucao', db.String, nullable=True))
+    notes_at = db.Column('evolucao_at', db.DateTime, nullable=True)
     prescriber = deferred(db.Column('prescritor', db.String, nullable=True))
     agg = db.Column('agregada', db.Boolean, nullable=True)
     update = db.Column("update_at", db.DateTime, nullable=True)
@@ -349,7 +350,7 @@ class PrescriptionDrug(db.Model):
                  .filter(func.date(Prescription.date) == aggDate)\
                  .filter(Prescription.agg == None)
         
-        return q.order_by(desc(func.concat(PrescriptionDrug.idPrescription,PrescriptionDrug.solutionGroup)), asc(Drug.name)).all()
+        return q.order_by(asc(Prescription.expire), desc(func.concat(PrescriptionDrug.idPrescription,PrescriptionDrug.solutionGroup)), asc(Drug.name)).all()
 
     def findByPrescriptionDrug(idPrescriptionDrug, future):
         pd = PrescriptionDrug.query.get(idPrescriptionDrug)
