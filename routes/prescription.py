@@ -421,4 +421,4 @@ def getPrescriptionUpdate(idPrescription):
 
     db.engine.execute(query)
 
-    return tryCommit(db, str(idPrescription), user.permission())
+    return tryCommit(db, str(idPrescription))
