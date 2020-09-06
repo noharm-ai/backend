@@ -89,8 +89,8 @@ class Prescription(db.Model):
         headers = {}
         for p in prescriptions:
             headers[p.id] = {
-                'date': p.date,
-                'expire': p.expire,
+                'date': p.date.isoformat() if p.date else None,
+                'expire': p.expire.isoformat() if p.expire else None,
                 'status': p.status,
                 'bed': p.bed,
                 'prescriber': p.prescriber
