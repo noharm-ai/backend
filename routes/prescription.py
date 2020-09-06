@@ -130,8 +130,13 @@ class DrugList():
                     if pd[6].idMeasureUnit != None and pd[6].idMeasureUnit != pdUnit:
                         doseWeightStr += ' ou ' + str(pd[0].doseconv) + ' ' + str(pd[6].idMeasureUnit) + '/Kg (faixa arredondada)'
 
-                if pd[6].maxDose and pd[6].maxDose < pdDoseconv:
-                    alerts.append('Dose diária prescrita (' + str(pdDoseconv) + ') maior que a dose de alerta (' + str(pd[6].maxDose) + ') usualmente recomendada (considerada a dose diária independente da indicação).')
+                    if pd[6].maxDose and pd[6].maxDose < doseWeight:
+                        alerts.append('Dose diária prescrita (' + str(doseWeight) + ' ' + str(pd[6].idMeasureUnit) + '/Kg) maior que a dose de alerta (' + str(pd[6].maxDose) + ' ' + str(pd[6].idMeasureUnit) + '/Kg) usualmente recomendada (considerada a dose diária independente da indicação).')
+
+                else:
+
+                    if pd[6].maxDose and pd[6].maxDose < pdDoseconv:
+                        alerts.append('Dose diária prescrita (' + str(pdDoseconv) + ' ' + str(pd[6].idMeasureUnit) + ') maior que a dose de alerta (' + str(pd[6].maxDose) + ' ' + str(pd[6].idMeasureUnit) + ') usualmente recomendada (considerada a dose diária independente da indicação).')
 
             if pd[0].alergy == 'S':
                 alerts.append('Paciente alérgico a este medicamento.')
