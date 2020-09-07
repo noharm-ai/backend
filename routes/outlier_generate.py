@@ -221,7 +221,7 @@ def outlierWizard(idSegment, idDrug, clean):
         drugAttr.idSegment = idSegment
 
     drugAttr.idMeasureUnit = idMeasureUnit
-    drugAttr.division = division
+    drugAttr.division = division if division != 0 else None
     drugAttr.useWeight = useWeight
     drugAttr.update = datetime.today()
     drugAttr.user  = user.id

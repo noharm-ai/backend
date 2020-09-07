@@ -7,6 +7,7 @@ from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
 from .utils import freqValue, tryCommit, typeRelations, sortSubstance, strNone
 from datetime import datetime
+from math import ceil
 
 app_out = Blueprint('app_out',__name__)
 
@@ -38,6 +39,9 @@ def getOutliers(idSegment=1, idDrug=1):
 
     frequency = request.args.get('f', None)
     dose = request.args.get('d', None)
+
+    if drugAttr.division and dose:
+        dose = ceil(((float(dose))/drugAttr.division)) * drugAttr.division
 
     units = getUnits(idDrug, idSegment) # TODO: Refactor
     defaultUnit = 'unlikely big name for a measure unit'

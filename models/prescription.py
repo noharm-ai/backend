@@ -22,6 +22,7 @@ class Prescription(db.Model):
     record = db.Column('prontuario', db.Integer, nullable=True)
     features = db.Column('indicadores', postgresql.JSON, nullable=True)
     notes = deferred(db.Column('evolucao', db.String, nullable=True))
+    notes_at = db.Column('evolucao_at', db.DateTime, nullable=True)
     prescriber = deferred(db.Column('prescritor', db.String, nullable=True))
     agg = db.Column('agregada', db.Boolean, nullable=True)
     update = db.Column("update_at", db.DateTime, nullable=True)
@@ -78,6 +79,24 @@ class Prescription(db.Model):
                         Outlier.update > (datetime.today() - timedelta(minutes=3))
                     ))\
             .all()
+
+    def getHeaders(admissionNumber, aggDate):
+        prescriptions = db.session.query(Prescription)\
+                    .filter(Prescription.admissionNumber == admissionNumber)\
+                    .filter(func.date(Prescription.date) == aggDate)\
+                    .filter(Prescription.agg == None)\
+                    .all()
+        headers = {}
+        for p in prescriptions:
+            headers[p.id] = {
+                'date': p.date.isoformat() if p.date else None,
+                'expire': p.expire.isoformat() if p.expire else None,
+                'status': p.status,
+                'bed': p.bed,
+                'prescriber': p.prescriber
+            }
+
+        return headers
 
     def findRelation(idPrescription, admissionNumber, aggDate=None):
         pd1 = db.aliased(PrescriptionDrug)
@@ -265,7 +284,7 @@ def getPrevNotes(admissionNumber):
             .select_from(prevNotes)\
             .filter(prevNotes.admissionNumber == admissionNumber)\
             .filter(prevNotes.idDrug == PrescriptionDrug.idDrug)\
-            .filter(prevNotes.idPrescriptionDrug != PrescriptionDrug.id)\
+            .filter(prevNotes.idPrescriptionDrug < PrescriptionDrug.id)\
             .order_by(desc(prevNotes.update))\
             .limit(1)\
             .as_scalar()
@@ -331,7 +350,7 @@ class PrescriptionDrug(db.Model):
                  .filter(func.date(Prescription.date) == aggDate)\
                  .filter(Prescription.agg == None)
         
-        return q.order_by(desc(func.concat(PrescriptionDrug.idPrescription,PrescriptionDrug.solutionGroup)), asc(Drug.name)).all()
+        return q.order_by(asc(Prescription.expire), desc(func.concat(PrescriptionDrug.idPrescription,PrescriptionDrug.solutionGroup)), asc(Drug.name)).all()
 
     def findByPrescriptionDrug(idPrescriptionDrug, future):
         pd = PrescriptionDrug.query.get(idPrescriptionDrug)
