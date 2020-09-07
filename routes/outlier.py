@@ -40,7 +40,7 @@ def getOutliers(idSegment=1, idDrug=1):
     frequency = request.args.get('f', None)
     dose = request.args.get('d', None)
 
-    if drugAttr.division:
+    if drugAttr.division and dose:
         dose = ceil(((float(dose))/drugAttr.division)) * drugAttr.division
 
     units = getUnits(idDrug, idSegment) # TODO: Refactor
