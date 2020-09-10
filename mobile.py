@@ -24,7 +24,7 @@ os.environ['TZ'] = 'America/Sao_Paulo'
 app = FlaskAPI(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = Config.POTGRESQL_CONNECTION_STRING
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = { "pool_recycle" : 500, "pool_pre_ping": True }
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = { "pool_recycle" : 500, "pool_pre_ping": True, "pool_size": 20, "max_overflow": 30 }
 app.config['JWT_SECRET_KEY'] = Config.SECRET_KEY
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = Config.JWT_ACCESS_TOKEN_EXPIRES
 app.config['JWT_REFRESH_TOKEN_EXPIRES'] = Config.JWT_REFRESH_TOKEN_EXPIRES
@@ -51,7 +51,7 @@ CORS(app)
 def getVersion():
     return {
         'status': 'success',
-        'data': 'v1.23-beta'
+        'data': 'v1.24-beta'
     }, status.HTTP_200_OK
 
 if __name__ == "__main__":
