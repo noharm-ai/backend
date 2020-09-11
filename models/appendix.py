@@ -39,12 +39,14 @@ class InterventionReason(db.Model):
     id = db.Column("idmotivointervencao", db.Integer, primary_key=True)
     description = db.Column("nome", db.String, nullable=False)
     mamy = db.Column("idmotivomae", db.Integer, nullable=False)
+    active = db.Column("ativo", db.Boolean, nullable=False)
 
     def findAll():
         im = db.aliased(InterventionReason)
 
         return db.session.query(InterventionReason, im.description)\
                 .outerjoin(im, im.id == InterventionReason.mamy)\
+                .filter(InterventionReason.active == True)\
                 .order_by(InterventionReason.description)\
                 .all()
 

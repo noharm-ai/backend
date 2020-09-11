@@ -97,6 +97,11 @@ class Drug(db.Model):
         segDrubs = db.session.query(PrescriptionAgg.idDrug.label('idDrug'))\
                       .filter(PrescriptionAgg.idSegment == idSegment)\
                       .group_by(PrescriptionAgg.idDrug)\
+                      .subquery() # too costly
+
+        segDrubs = db.session.query(Outlier.idDrug.label('idDrug'))\
+                      .filter(Outlier.idSegment == idSegment)\
+                      .group_by(Outlier.idDrug)\
                       .subquery()
 
         drugs = Drug.query.filter(Drug.id.in_(segDrubs))
