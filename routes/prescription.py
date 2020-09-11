@@ -191,7 +191,7 @@ class DrugList():
     def getInfusionList(self):
         result = {}
         for pd in self.drugList:
-            if pd[0].solutionGroup:
+            if pd[0].solutionGroup and pd[0].source == 'Soluções':
                 
                 pdGroup = pd[10]
 
