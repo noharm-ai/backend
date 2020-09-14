@@ -1,3 +1,4 @@
+import os
 import random
 from flask_api import status
 from models.main import *
@@ -191,7 +192,7 @@ class DrugList():
     def getInfusionList(self):
         result = {}
         for pd in self.drugList:
-            if pd[0].solutionGroup:
+            if pd[0].solutionGroup and pd[0].source == 'Soluções':
                 
                 pdGroup = pd[10]
 
@@ -330,6 +331,7 @@ def setPrescriptionStatus(idPrescription):
     data = request.get_json()
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
+    os.environ['TZ'] = 'America/Sao_Paulo'
 
     p = Prescription.query.get(idPrescription)
     if (p is None):
@@ -389,6 +391,7 @@ def setPrescriptionDrugNote(idPrescriptionDrug):
     data = request.get_json()
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
+    os.environ['TZ'] = 'America/Sao_Paulo'
 
     if 'notes' in data:
         notes = data.get('notes', None)

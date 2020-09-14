@@ -1,6 +1,7 @@
 from flask import Blueprint, request, url_for, jsonify
 from flask_api import status
 from models.main import *
+from models.appendix import *
 from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
 
@@ -29,6 +30,7 @@ def auth():
             'userName': user.name,
             'schema': user.schema,
             'roles': user.config['roles'] if user.config and 'roles' in user.config else [],
+            'nameUrl': Memory.getNameUrl(user.schema)['value'],
             'access_token': access_token,
             'refresh_token': refresh_token
         }, status.HTTP_200_OK

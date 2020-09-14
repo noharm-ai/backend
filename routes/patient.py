@@ -1,3 +1,4 @@
+import os
 import copy
 from flask_api import status
 from models.main import *
@@ -78,6 +79,7 @@ def setPatientData(admissionNumber):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
     data = request.get_json()
+    os.environ['TZ'] = 'America/Sao_Paulo'
 
     p = Patient.findByAdmission(admissionNumber)
     if (p is None):

@@ -97,6 +97,11 @@ class Drug(db.Model):
         segDrubs = db.session.query(PrescriptionAgg.idDrug.label('idDrug'))\
                       .filter(PrescriptionAgg.idSegment == idSegment)\
                       .group_by(PrescriptionAgg.idDrug)\
+                      .subquery() # too costly
+
+        segDrubs = db.session.query(Outlier.idDrug.label('idDrug'))\
+                      .filter(Outlier.idSegment == idSegment)\
+                      .group_by(Outlier.idDrug)\
                       .subquery()
 
         drugs = Drug.query.filter(Drug.id.in_(segDrubs))
@@ -126,6 +131,7 @@ class DrugAttributes(db.Model):
     amount = db.Column("concentracao", db.Float, nullable=True)
     amountUnit = db.Column("concentracaounidade", db.String(3), nullable=True)
     whiteList = db.Column("linhabranca", db.Boolean, nullable=True)
+    price = db.Column("custo", db.Float, nullable=True)
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.Integer, nullable=True)
 
