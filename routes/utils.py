@@ -193,7 +193,7 @@ def schwartz2_calc(cr, height):
     if not is_float(cr): return swrtz2Empty
     if not is_float(height): return swrtz2Empty
 
-    eGFR = (0.413 * height) / cr
+    eGFR = (0.413 * height) / cr if cr > 0 else 0
 
     return { 'value': round(eGFR,1), 'ref': 'maior que 90 mL/min por 1.73 m²', 'unit': 'mL/min/1.73m²',
              'alert': (eGFR < 90), 'name': 'Schwartz 2' , 'initials': 'Schwartz 2'}
