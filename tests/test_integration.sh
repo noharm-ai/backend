@@ -12,7 +12,7 @@ PRESCRIPTION=20
 PRESCRIPTIONDRUG=20
 ADMISSION=5
 
-for LINK in reports patient-name/123 user/name-url outliers/${SEGMENT}/${DRUG} \
+for LINK in reports outliers/${SEGMENT}/${DRUG} \
 			intervention/reasons intervention drugs/${SEGMENT} substance \
 			"prescriptions?idSegment=${SEGMENT}&date=2020-12-31" prescriptions/${PRESCRIPTION} \
 			prescriptions/drug/${PRESCRIPTIONDRUG}/period \
