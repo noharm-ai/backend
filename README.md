@@ -18,9 +18,9 @@ $ pip3 install -r requirements.txt
 ### 2. Test your Env
 
 ```
-$ python3 mobile.py
+$ python3 mobile.py &
 $ curl -X POST -d '{"email":"teste", "password":"1234"}' -H "Content-Type: application/json"  http://127.0.0.1:5000/authenticate
-$ curl -X GET http://127.0.0.1:5000/getName/1234
+$ curl -X GET http://127.0.0.1:5000/prescriptions
 ```
 
 ### Troubleshooting Tips

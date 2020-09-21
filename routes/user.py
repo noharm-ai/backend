@@ -8,24 +8,6 @@ from sqlalchemy import func
 
 app_usr = Blueprint('app_usr',__name__)
 
-@app_usr.route("/user/name-url", methods=['GET'])
-@jwt_required
-def getNameUrl():
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
-
-    if user: 
-        default = {'value':'http://localhost/{idPatient}'}
-        return {
-            'status': 'success',
-            'url': Memory.getMem('getnameurl', default)['value'],
-        }, status.HTTP_200_OK 
-    else:
-        return {
-            'status': 'error',
-            'message': 'HTTP_401_UNAUTHORIZED'
-        }, status.HTTP_401_UNAUTHORIZED
-
 @app_usr.route("/reports", methods=['GET'])
 @jwt_required
 def getReports():
@@ -42,15 +24,6 @@ def getReports():
             'status': 'error',
             'message': 'HTTP_401_UNAUTHORIZED'
         }, status.HTTP_401_UNAUTHORIZED
-
-@app_usr.route("/patient-name/<int:idPatient>", methods=['GET'])
-def getName(idPatient):
-    return {
-        'status': 'success',
-        'idPatient': idPatient,
-        'name': 'Paciente ' + str(idPatient)
-    }, status.HTTP_200_OK
-
 
 @app_usr.route("/user", methods=['GET'])
 @jwt_required
