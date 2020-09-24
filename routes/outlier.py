@@ -195,6 +195,7 @@ def setDrugClass(idDrug):
     if 'elderly' in data.keys(): drugAttr.elderly = data.get('elderly', 0)
     if 'division' in data.keys(): drugAttr.division = data.get('division', None)
     if 'price' in data.keys(): drugAttr.price = data.get('price', None)
+    if 'maxTime' in data.keys(): drugAttr.maxTime = data.get('maxTime', None)
     if 'useWeight' in data.keys(): drugAttr.useWeight = data.get('useWeight', 0)
     if 'amount' in data.keys(): drugAttr.amount = data.get('amount', 0)
     if 'amountUnit' in data.keys(): drugAttr.amountUnit = data.get('amountUnit', None)
