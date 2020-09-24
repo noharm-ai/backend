@@ -1,5 +1,4 @@
-import os
-import copy
+import os, copy
 from flask_api import status
 from models.main import *
 from models.appendix import *
@@ -36,7 +35,7 @@ def historyCalc(typeExam, examsList, patient):
             item = schwartz2_calc(e['value'], patient.height)
 
         item['date'] = e['date']
-        results.append(copy.deepcopy(item))
+        results.append(item)
     return results
 
 @app_pat.route("/exams/<int:admissionNumber>", methods=['GET'])

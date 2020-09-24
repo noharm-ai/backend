@@ -1,6 +1,6 @@
 from flask_api import status
 from datetime import date, datetime, timedelta
-import unicodedata
+import unicodedata, copy
 
 def data2age(birthdate):
     if birthdate is None: return ''
@@ -132,11 +132,11 @@ def period(tuples):
 # based on https://www.kidney.org/content/mdrd-study-equation
 # eGFR = 175 x (SCr)-1.154 x (age)-0.203 x 0.742 [if female] x 1.212 [if Black]
 def mdrd_calc(cr, birthdate, gender, skinColor):
-    if not is_float(cr): return mdrdEmpty
-    if birthdate is None: return mdrdEmpty
+    if not is_float(cr): return copy.deepcopy(mdrdEmpty)
+    if birthdate is None: return copy.deepcopy(mdrdEmpty)
     
     age = data2age(birthdate.isoformat())
-    if age == 0: return mdrdEmpty
+    if age == 0: return copy.deepcopy(mdrdEmpty)
 
     eGFR = 175 * (float(cr))**(-1.154) * (age)**(-0.203)
 
@@ -152,12 +152,12 @@ def mdrd_calc(cr, birthdate, gender, skinColor):
 # based on https://www.kidney.org/professionals/KDOQI/gfr_calculatorCoc
 # CCr = {((140–age) x weight)/(72xSCr)} x 0.85 (if female)
 def cg_calc(cr, birthdate, gender, weight):
-    if not is_float(cr): return cgEmpty
-    if not is_float(weight): return cgEmpty
-    if birthdate is None: return cgEmpty
+    if not is_float(cr): return copy.deepcopy(cgEmpty)
+    if not is_float(weight): return copy.deepcopy(cgEmpty)
+    if birthdate is None: return copy.deepcopy(cgEmpty)
 
     age = data2age(birthdate.isoformat())
-    if age == 0: return cgEmpty
+    if age == 0: return copy.deepcopy(cgEmpty)
 
     ccr = ((140 - age) * float(weight)) / (72 * float(cr))
     if gender == 'F': ccr *= 0.85
@@ -169,11 +169,11 @@ def cg_calc(cr, birthdate, gender, weight):
 # Chronic Kidney Disease Epidemiology Collaboration
 # based on https://www.kidney.org/professionals/kdoqi/gfr_calculator
 def ckd_calc(cr, birthdate, gender, skinColor):
-    if not is_float(cr): return ckdEmpty
-    if birthdate is None: return ckdEmpty
+    if not is_float(cr): return copy.deepcopy(ckdEmpty)
+    if birthdate is None: return copy.deepcopy(ckdEmpty)
 
     age = data2age(birthdate.isoformat())
-    if age == 0: return ckdEmpty
+    if age == 0: return copy.deepcopy(ckdEmpty)
 
     if gender == 'F':
         g = 0.7
@@ -193,8 +193,8 @@ def ckd_calc(cr, birthdate, gender, skinColor):
 # Schwartz (2) Formula
 # based on https://link.springer.com/article/10.1007%2Fs00467-014-3002-5
 def schwartz2_calc(cr, height):
-    if not is_float(cr): return swrtz2Empty
-    if not is_float(height): return swrtz2Empty
+    if not is_float(cr): return copy.deepcopy(swrtz2Empty)
+    if not is_float(height): return copy.deepcopy(swrtz2Empty)
 
     eGFR = (0.413 * height) / cr if cr > 0 else 0
 
