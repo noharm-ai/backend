@@ -145,7 +145,8 @@ def mdrd_calc(cr, birthdate, gender, skinColor):
 
 
     return { 'value': round(eGFR,1), 'ref': 'maior que 50 ml/min/1.73', 'unit': 'ml/min/1.73',
-             'alert': (eGFR < 50), 'name': 'Modification of Diet in Renal Disease', 'initials': 'MDRD' }
+             'alert': (eGFR < 50), 'name': 'Modification of Diet in Renal Disease', 
+             'initials': 'MDRD', 'min': 50, 'max': 120 }
 
 # Cockcroft-Gault
 # based on https://www.kidney.org/professionals/KDOQI/gfr_calculatorCoc
@@ -162,7 +163,8 @@ def cg_calc(cr, birthdate, gender, weight):
     if gender == 'F': ccr *= 0.85
 
     return { 'value': round(ccr,1), 'ref': 'maior que 50 mL/min', 'unit': 'mL/min',
-             'alert': (ccr < 50), 'name': 'Cockcroft-Gault', 'initials': 'CG'}
+             'alert': (ccr < 50), 'name': 'Cockcroft-Gault', 'initials': 'CG',
+             'min': 50, 'max': 120 }
 
 # Chronic Kidney Disease Epidemiology Collaboration
 # based on https://www.kidney.org/professionals/kdoqi/gfr_calculator
@@ -185,7 +187,8 @@ def ckd_calc(cr, birthdate, gender, skinColor):
     eGFR = s * (float(cr)/g)**(e) * (0.993)**(age)
 
     return { 'value': round(eGFR,1), 'ref': 'maior que 50 ml/min/1.73', 'unit': 'ml/min/1.73',
-             'alert': (eGFR < 50), 'name': 'Chronic Kidney Disease Epidemiology' , 'initials': 'CKD'}
+             'alert': (eGFR < 50), 'name': 'Chronic Kidney Disease Epidemiology' , 
+             'initials': 'CKD', 'min': 50, 'max': 120 }
 
 # Schwartz (2) Formula
 # based on https://link.springer.com/article/10.1007%2Fs00467-014-3002-5
@@ -196,7 +199,8 @@ def schwartz2_calc(cr, height):
     eGFR = (0.413 * height) / cr if cr > 0 else 0
 
     return { 'value': round(eGFR,1), 'ref': 'maior que 90 mL/min por 1.73 m²', 'unit': 'mL/min/1.73m²',
-             'alert': (eGFR < 90), 'name': 'Schwartz 2' , 'initials': 'Schwartz 2'}
+             'alert': (eGFR < 90), 'name': 'Schwartz 2' , 'initials': 'Schwartz 2',
+             'min': 90, 'max': 120 }
 
 def tryCommit(db, recId, allow=True):
     if not allow:
