@@ -63,7 +63,10 @@ class Prescription(db.Model):
     def getPrescriptionAgg(admissionNumber, aggDate):
         return Prescription.getPrescriptionBasic()\
             .filter(Prescription.admissionNumber == admissionNumber)\
-            .filter(func.date(Prescription.date) == aggDate)\
+            .filter(or_(
+                func.date(Prescription.date) == aggDate,
+                func.date(Prescription.expire) == aggDate
+            ))\
             .order_by(desc(Prescription.date))\
             .first()
 
@@ -83,7 +86,10 @@ class Prescription(db.Model):
     def getHeaders(admissionNumber, aggDate):
         prescriptions = db.session.query(Prescription)\
                     .filter(Prescription.admissionNumber == admissionNumber)\
-                    .filter(func.date(Prescription.date) == aggDate)\
+                    .filter(or_(
+                                func.date(Prescription.date) == aggDate,
+                                func.date(Prescription.expire) == aggDate
+                            ))\
                     .filter(Prescription.agg == None)\
                     .all()
         headers = {}
@@ -117,7 +123,10 @@ class Prescription(db.Model):
         else:
             relation = relation.outerjoin(Prescription, Prescription.id == pd1.idPrescription)\
                                .filter(Prescription.admissionNumber == admissionNumber)\
-                               .filter(func.date(Prescription.date) == aggDate)
+                               .filter(or_(
+                                    func.date(Prescription.date) == aggDate,
+                                    func.date(Prescription.expire) == aggDate
+                                ))
 
         interaction = relation.filter(Relation.kind.in_(['it','dt','dm']))
 
@@ -152,7 +161,10 @@ class Prescription(db.Model):
         else:
             xreactivity = xreactivity.outerjoin(Prescription, Prescription.id == pd1.idPrescription)\
                                .filter(Prescription.admissionNumber == admissionNumber)\
-                               .filter(func.date(Prescription.date) == aggDate)
+                               .filter(or_(
+                                    func.date(Prescription.date) == aggDate,
+                                    func.date(Prescription.expire) == aggDate
+                                ))
 
         relations = interaction.union(incompatible).union(xreactivity).all()
 
@@ -347,7 +359,10 @@ class PrescriptionDrug(db.Model):
             q = q.filter(PrescriptionDrug.idPrescription == idPrescription)
         else:
             q = q.filter(Prescription.admissionNumber == admissionNumber)\
-                 .filter(func.date(Prescription.date) == aggDate)\
+                 .filter(or_(
+                            func.date(Prescription.date) == aggDate,
+                            func.date(Prescription.expire) == aggDate
+                         ))\
                  .filter(Prescription.agg == None)
         
         return q.order_by(asc(Prescription.expire), desc(func.concat(PrescriptionDrug.idPrescription,PrescriptionDrug.solutionGroup)), asc(Drug.name)).all()
