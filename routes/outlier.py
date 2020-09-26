@@ -117,6 +117,7 @@ def getOutliers(idSegment=1, idDrug=1):
             'amount': drugAttr.amount,
             'amountUnit': drugAttr.amountUnit,
             'price': drugAttr.price,
+            'maxTime': drugAttr.maxTime,
             'whiteList': drugAttr.whiteList,
             'sctidA': d[0].sctid if d else '',
             'sctNameA': strNone(d[1]).upper() if d else '',
