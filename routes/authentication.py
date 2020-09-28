@@ -28,9 +28,10 @@ def auth():
         return {
             'status': 'success',
             'userName': user.name,
+            'email': user.email,
             'schema': user.schema,
             'roles': user.config['roles'] if user.config and 'roles' in user.config else [],
-            'nameUrl': Memory.getNameUrl(user.schema)['value'],
+            'nameUrl': Memory.getNameUrl(user.schema)['value'] if user.permission() else 'http://localhost/{idPatient}',
             'access_token': access_token,
             'refresh_token': refresh_token
         }, status.HTTP_200_OK

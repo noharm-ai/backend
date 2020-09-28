@@ -1,5 +1,4 @@
-import os
-import copy
+import os, copy
 from flask_api import status
 from models.main import *
 from models.appendix import *
@@ -22,6 +21,23 @@ def historyExam(typeExam, examsList, segExam):
             results.append(item)
     return results
 
+def historyCalc(typeExam, examsList, patient):
+    results = []
+    for e in examsList:
+        item = {}
+        if typeExam == 'mdrd':
+            item = mdrd_calc(e['value'], patient.birthdate, patient.gender, patient.skinColor)
+        elif typeExam == 'cg':
+            item = cg_calc(e['value'], patient.birthdate, patient.gender, patient.weight)
+        elif typeExam == 'ckd':
+            item = ckd_calc(e['value'], patient.birthdate, patient.gender, patient.skinColor)
+        elif typeExam == 'swrtz2':
+            item = schwartz2_calc(e['value'], patient.height)
+
+        item['date'] = e['date']
+        results.append(item)
+    return results
+
 @app_pat.route("/exams/<int:admissionNumber>", methods=['GET'])
 @jwt_required
 def getExamsbyAdmission(admissionNumber):
@@ -31,6 +47,7 @@ def getExamsbyAdmission(admissionNumber):
     idSegment = request.args.get('idSegment', 1)
     examsList = Exams.findByAdmission(admissionNumber)
     segExam = SegmentExam.refDict(idSegment)
+    patient = Patient.findByAdmission(admissionNumber)
 
     perc = {
         'h_conleuc': {
@@ -42,16 +59,35 @@ def getExamsbyAdmission(admissionNumber):
     bufferList = {}
     typeExams = []
     for e in examsList:
-        if not e.typeExam in typeExams and e.typeExam.lower() in segExam:
+        if not e.typeExam.lower() in typeExams and e.typeExam.lower() in segExam:
             key = e.typeExam.lower()
-            item = formatExam(e, e.typeExam.lower(), segExam)
-            item['name'] = segExam[e.typeExam.lower()].name
+            item = formatExam(e, key, segExam)
+            item['name'] = segExam[key].name
             item['perc'] = None
             item['history'] = historyExam(e.typeExam, examsList, segExam)
             bufferList[key] = item
-            typeExams.append(e.typeExam)
+            typeExams.append(key)
             if key in perc:
                 perc[key]['total'] = float(e.value)
+
+            if segExam[key].initials.lower() == 'creatinina':
+                for keyCalc in ['mdrd','ckd','cg','swrtz2']:
+                    if keyCalc in segExam:
+                        if keyCalc == 'mdrd':
+                            itemCalc = mdrd_calc(e.value, patient.birthdate, patient.gender, patient.skinColor)
+                        elif keyCalc == 'cg':
+                            itemCalc = cg_calc(e.value, patient.birthdate, patient.gender, patient.weight)
+                        elif keyCalc == 'ckd':
+                            itemCalc = ckd_calc(e.value, patient.birthdate, patient.gender, patient.skinColor)
+                        elif keyCalc == 'swrtz2':
+                            itemCalc = schwartz2_calc(e.value, patient.height)
+
+                        if itemCalc['value']:
+                            itemCalc['name'] = segExam[keyCalc].name
+                            itemCalc['perc'] = None
+                            itemCalc['date'] = item['date']
+                            itemCalc['history'] = historyCalc(keyCalc, item['history'], patient)
+                            bufferList[keyCalc] = itemCalc
 
     for p in perc:
         total = perc[p]['total']

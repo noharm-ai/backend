@@ -145,6 +145,9 @@ class DrugList():
             if pd[0].alergy == 'S':
                 alerts.append('Paciente alérgico a este medicamento.')
 
+            if pd[6] and pd[6].maxTime and pd[0].period and pd[0].period > pd[6].maxTime:
+                alerts.append('Tempo de tratamento atual (' + str(pd[0].period) + ' dias) maior que o tempo máximo de tratamento (' + str(pd[6].maxTime) + ' dias) usualmente recomendado.')
+
             if pd[0].id in self.relations:
                 for a in self.relations[pd[0].id]:
                     alerts.append(a)            
