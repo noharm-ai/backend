@@ -349,7 +349,10 @@ def setPrescriptionStatus(idPrescription):
         if p.agg:
             db.session.query(Prescription)\
                       .filter(Prescription.admissionNumber == p.admissionNumber)\
-                      .filter(func.date(Prescription.date) == func.date(p.date))\
+                      .filter(or_(
+                         func.date(Prescription.date) == func.date(p.date),
+                         func.date(Prescription.expire) == func.date(p.date)
+                      ))\
                       .update({
                         'status': p.status,
                         'update': datetime.today(),
