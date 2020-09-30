@@ -83,7 +83,7 @@ class DrugList():
     def getPrevIntervention(self, idDrug, idPrescription):
         result = {}
         for i in self.interventions:
-            if i['idDrug'] == idDrug and i['idPrescription'] < idPrescription:
+            if i['idDrug'] == idDrug and i['status'] == 's' and i['idPrescription'] < idPrescription:
                 if 'id' in result.keys() and result['id'] > i['id']: continue
                 result = i;
         return result
