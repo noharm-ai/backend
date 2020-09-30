@@ -216,6 +216,8 @@ class Patient(db.Model):
     alertDate = db.Column("alertadata", db.DateTime, nullable=True)
     alertExpire = db.Column("alertavigencia", db.DateTime, nullable=True)
     alertBy = db.Column("alerta_by", db.Integer, nullable=True)
+    dischargeReason = db.Column('motivoalta', db.String, nullable=True)
+    dischargeDate = db.Column("dtalta", db.DateTime, nullable=True)
 
     def findByAdmission(admissionNumber):
         return db.session.query(Patient)\

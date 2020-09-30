@@ -309,6 +309,8 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
             'age': age,
             'weightUser': bool(patient.user),
             'weightDate': patient.weightDate,
+            'dischargeDate': patient.dischargeDate,
+            'dischargeReason': patient.dischargeReason,
             'bed': prescription[0].bed,
             'record': prescription[0].record,
             'class': random.choice(['green','yellow','red']),
