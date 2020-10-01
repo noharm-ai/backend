@@ -60,6 +60,7 @@ def getPrescriptions():
             'weight': patient.weight,
             'skinColor': patient.skinColor,
             'lengthStay': lenghStay(patient.admissionDate),
+            'dischargeDate': patient.dischargeDate,
             'date': p[0].date.isoformat(),
             'department': str(p[2]),
             'class': 'yellow',
