@@ -55,11 +55,12 @@ def getPrescriptions():
             'idPatient': p[0].idPatient,
             'name': patient.admissionNumber,
             'admissionNumber': patient.admissionNumber,
-            'birthdate': patient.birthdate.isoformat() if patient.birthdate else '',
+            'birthdate': patient.birthdate.isoformat() if patient.birthdate else None,
             'gender': patient.gender,
             'weight': patient.weight,
             'skinColor': patient.skinColor,
             'lengthStay': lenghStay(patient.admissionDate),
+            'dischargeDate': patient.dischargeDate.isoformat() if patient.dischargeDate else None,
             'date': p[0].date.isoformat(),
             'department': str(p[2]),
             'class': 'yellow',
@@ -83,7 +84,7 @@ class DrugList():
     def getPrevIntervention(self, idDrug, idPrescription):
         result = {}
         for i in self.interventions:
-            if i['idDrug'] == idDrug and i['idPrescription'] < idPrescription:
+            if i['idDrug'] == idDrug and i['status'] == 's' and i['idPrescription'] < idPrescription:
                 if 'id' in result.keys() and result['id'] > i['id']: continue
                 result = i;
         return result
@@ -298,17 +299,19 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
             'name': prescription[0].admissionNumber,
             'agg': prescription[0].agg,
             'admissionNumber': prescription[0].admissionNumber,
-            'birthdate': patient.birthdate.isoformat() if patient.birthdate else '',
+            'birthdate': patient.birthdate.isoformat() if patient.birthdate else None,
             'gender': patient.gender,
             'height': patient.height,
             'weight': patient.weight,
             'observation': prescription[6],
             'notes': prescription[7],
             'alert': prescription[8],
-            'alertExpire': patient.alertExpire.isoformat() if patient.alertExpire else '',
+            'alertExpire': patient.alertExpire.isoformat() if patient.alertExpire else None,
             'age': age,
             'weightUser': bool(patient.user),
-            'weightDate': patient.weightDate,
+            'weightDate': patient.weightDate.isoformat() if patient.weightDate else None,
+            'dischargeDate': patient.dischargeDate.isoformat() if patient.dischargeDate else None,
+            'dischargeReason': patient.dischargeReason,
             'bed': prescription[0].bed,
             'record': prescription[0].record,
             'class': random.choice(['green','yellow','red']),
