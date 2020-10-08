@@ -61,11 +61,12 @@ if __name__ == "__main__":
 def add_security_headers(response):
     headers = {
         'strict-transport-security': [
-            'max-age=31536000',
+            'max-age=63072000',
             'includeSubDomains'
         ],
         'content-security-policy': [
-            'default-src \'self\''
+            'default-src \'none\'',
+            'frame-ancestors \'none\''
         ],
         'x-frame-options': ['SAMEORIGIN'],
         'x-xss-protection': [
