@@ -8,3 +8,6 @@ zappa
 flask-cors
 psycopg2-binary
 pandas
+networkx
+numpy
+sklearn
