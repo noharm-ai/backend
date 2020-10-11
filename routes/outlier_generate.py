@@ -54,7 +54,7 @@ def callOutliers(idSegment):
 
     processesUrl = []
     for fold in range(1,folds+1):
-        processUrl = Config.SELF_API_URL + "/segments/" + str(int(idSegment)) + "/outliers/generate/fold/" + str(fold)
+        processUrl = "/segments/" + str(int(idSegment)) + "/outliers/generate/fold/" + str(fold)
         processesUrl.append(processUrl)
 
     return {
