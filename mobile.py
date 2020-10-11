@@ -51,8 +51,28 @@ CORS(app)
 def getVersion():
     return {
         'status': 'success',
-        'data': 'v1.27-beta'
+        'data': 'v1.27.sec-beta'
     }, status.HTTP_200_OK
 
 if __name__ == "__main__":
     app.run(debug=True)
+
+@app.after_request
+def add_security_headers(response):
+    headers = {
+        'strict-transport-security': [
+            'max-age=63072000',
+            'includeSubDomains'
+        ],
+        'content-security-policy': [
+            'default-src \'none\'',
+            'frame-ancestors \'none\''
+        ],
+        'x-frame-options': ['SAMEORIGIN'],
+        'x-xss-protection': [ '1', 'mode=block' ],
+        'x-content-type-options': ['nosniff'],
+        'referrer-policy': ['same-origin'],
+    }
+    for (key, content) in headers.items():
+        response.headers[key] = ';'.join(content)
+    return response

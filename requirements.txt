@@ -12,3 +12,6 @@ pytest-flask
 mock
 pandas
 pylint
+networkx
+numpy
+sklearn
