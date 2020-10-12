@@ -35,7 +35,7 @@ def auth():
             'nameUrl': Memory.getNameUrl(user.schema)['value'] if user.permission() else 'http://localhost/{idPatient}',
             'access_token': access_token,
             'refresh_token': refresh_token,
-            'api_key': Config.API_KEY if hasattr(Config, 'API_KEY') else ''
+            'apiKey': Config.API_KEY if hasattr(Config, 'API_KEY') else ''
         }, status.HTTP_200_OK
 
 
