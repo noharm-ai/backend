@@ -208,7 +208,7 @@ class DrugList():
 
                 pdDose = pd[0].dose
 
-                if pd[6] and pd[6].amount:
+                if pd[6] and pd[6].amount and pd[6].amountUnit:
                     result[pdGroup]['vol'] = pdDose
                     result[pdGroup]['amount'] = pd[6].amount
                     result[pdGroup]['unit'] = pd[6].amountUnit
