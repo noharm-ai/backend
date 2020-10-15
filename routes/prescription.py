@@ -89,6 +89,13 @@ class DrugList():
                 result = i;
         return result
 
+    def getExistIntervention(self, idDrug, idPrescription):
+        result = False
+        for i in self.interventions:
+            if i['idDrug'] == idDrug and i['idPrescription'] < idPrescription:
+                result = True;
+        return result
+
     def getIntervention(self, idPrescriptionDrug):
         result = {}
         for i in self.interventions:
@@ -184,6 +191,7 @@ class DrugList():
                     'status': pd[0].status,
                     'near': pd[0].near,
                     'prevIntervention': self.getPrevIntervention(pd[0].idDrug, pd[0].idPrescription),
+                    'existIntervention': self.getExistIntervention(pd[0].idDrug, pd[0].idPrescription),
                     'intervention': self.getIntervention(pd[0].id),
                     'alerts': alerts,
                     'notes': pd[7],
