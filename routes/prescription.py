@@ -160,7 +160,7 @@ class DrugList():
                         alerts.append('Dose diária prescrita (' + str(doseWeight) + ' ' + str(pd[6].idMeasureUnit) + '/Kg) maior que a dose de alerta (' + str(pd[6].maxDose) + ' ' + str(pd[6].idMeasureUnit) + '/Kg) usualmente recomendada (considerada a dose diária independente da indicação).')
 
                     if pd[6].maxDose and pd[6].maxDose < self.maxDoseAgg[keyDrugKg]:
-                        alerts.append('Dose diária prescrita SOMADA (' + str(self.maxDoseAgg[str(pd[0].idDrug)+'kg']) + ' ' + str(pd[6].idMeasureUnit) + '/Kg) maior que a dose de alerta (' + str(pd[6].maxDose) + ' ' + str(pd[6].idMeasureUnit) + '/Kg) usualmente recomendada (considerada a dose diária independente da indicação).')
+                        alerts.append('Dose diária prescrita SOMADA (' + str(self.maxDoseAgg[keyDrugKg]) + ' ' + str(pd[6].idMeasureUnit) + '/Kg) maior que a dose de alerta (' + str(pd[6].maxDose) + ' ' + str(pd[6].idMeasureUnit) + '/Kg) usualmente recomendada (considerada a dose diária independente da indicação).')
 
                 else:
 
