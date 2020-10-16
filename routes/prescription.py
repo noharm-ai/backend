@@ -181,6 +181,7 @@ class DrugList():
                     alerts.append(a)       
 
             pDrugs.append({
+                'idPrescription': pd[0].idPrescription,
                 'idPrescriptionDrug': pd[0].id,
                 'idDrug': pd[0].idDrug,
                 'drug': pd[1].name if pd[1] is not None else 'Medicamento ' + str(pd[0].idDrug),
