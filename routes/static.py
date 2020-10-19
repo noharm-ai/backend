@@ -80,7 +80,7 @@ def getFeatures(result):
         score3 += int(int(d['score']) > 2)
         am += int(d['am']) if not d['am'] is None else 0
         av += int(d['av']) if not d['av'] is None else 0
-        np += int(d['np']) if not d['np'] is None else 0
+        np += int(d['np']) if not d['np'] is None and not d['existIntervention'] else 0
         control += int(d['c']) if not d['c'] is None else 0
         diff += int(not d['checked'])
         tubes = ['sonda', 'sg', 'se']

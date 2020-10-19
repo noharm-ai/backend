@@ -80,6 +80,7 @@ class DrugList():
         self.relations = relations
         self.exams = exams
         self.agg = agg
+        self.maxDoseAgg = {}
 
     def getPrevIntervention(self, idDrug, idPrescription):
         result = {}
@@ -87,6 +88,13 @@ class DrugList():
             if i['idDrug'] == idDrug and i['status'] == 's' and i['idPrescription'] < idPrescription:
                 if 'id' in result.keys() and result['id'] > i['id']: continue
                 result = i;
+        return result
+
+    def getExistIntervention(self, idDrug, idPrescription):
+        result = False
+        for i in self.interventions:
+            if i['idDrug'] == idDrug and i['idPrescription'] < idPrescription:
+                result = True;
         return result
 
     def getIntervention(self, idPrescriptionDrug):
@@ -107,11 +115,18 @@ class DrugList():
             if suspended and (bool(pd[0].suspendedDate) == True): belong = True
             if (not checked and not suspended) and (bool(pd[0].checked) == False and bool(pd[0].suspendedDate) == False): belong = True
 
+            if not belong: continue
+
             pdFrequency = 1 if pd[0].frequency in [33,44,99] else pd[0].frequency
             pdDoseconv = none2zero(pd[0].doseconv) * none2zero(pdFrequency)
             pdUnit = strNone(pd[2].id) if pd[2] else ''
             pdWhiteList = bool(pd[6].whiteList) if pd[6] is not None else False
             doseWeightStr = None
+
+            if pd[0].idDrug in self.maxDoseAgg:
+                self.maxDoseAgg[pd[0].idDrug] += pdDoseconv
+            else:
+                self.maxDoseAgg[pd[0].idDrug] = pdDoseconv
 
             alerts = []
             if self.exams and pd[6]:
@@ -120,7 +135,7 @@ class DrugList():
 
                 if pd[6].liver:
                     if ('tgp' in self.exams and self.exams['tgp']['value'] and float(self.exams['tgp']['value']) > pd[6].liver) or ('tgo' in self.exams and self.exams['tgo']['value'] and float(self.exams['tgo']['value']) > pd[6].liver):
-                        alerts.append('Medicamento deve sofre ajuste de posologia ou contraindicado, já que a função hepática do paciente está reduzida (acima de ' + str(pd[6].liver) + ' U/L).')
+                        alerts.append('Medicamento deve sofrer ajuste de posologia ou contraindicado, já que a função hepática do paciente está reduzida (acima de ' + str(pd[6].liver) + ' U/L).')
 
                 if pd[6].elderly and self.exams['age'] > 60:
                     alerts.append('Medicamento potencialmente inapropriado para idosos, independente das comorbidades do paciente.')
@@ -132,16 +147,28 @@ class DrugList():
                     doseWeight = round(pd[0].dose / float(weight),2)
                     doseWeightStr = str(doseWeight) + ' ' + pdUnit + '/Kg'
 
+                    keyDrugKg = str(pd[0].idDrug)+'kg'
+                    if keyDrugKg in self.maxDoseAgg:
+                        self.maxDoseAgg[keyDrugKg] += doseWeight
+                    else:
+                        self.maxDoseAgg[keyDrugKg] = doseWeight
+
                     if pd[6].idMeasureUnit != None and pd[6].idMeasureUnit != pdUnit:
                         doseWeightStr += ' ou ' + str(pd[0].doseconv) + ' ' + str(pd[6].idMeasureUnit) + '/Kg (faixa arredondada)'
 
                     if pd[6].maxDose and pd[6].maxDose < doseWeight:
                         alerts.append('Dose diária prescrita (' + str(doseWeight) + ' ' + str(pd[6].idMeasureUnit) + '/Kg) maior que a dose de alerta (' + str(pd[6].maxDose) + ' ' + str(pd[6].idMeasureUnit) + '/Kg) usualmente recomendada (considerada a dose diária independente da indicação).')
 
+                    if pd[6].maxDose and pd[6].maxDose < self.maxDoseAgg[keyDrugKg]:
+                        alerts.append('Dose diária prescrita SOMADA (' + str(self.maxDoseAgg[keyDrugKg]) + ' ' + str(pd[6].idMeasureUnit) + '/Kg) maior que a dose de alerta (' + str(pd[6].maxDose) + ' ' + str(pd[6].idMeasureUnit) + '/Kg) usualmente recomendada (considerada a dose diária independente da indicação).')
+
                 else:
 
                     if pd[6].maxDose and pd[6].maxDose < pdDoseconv:
                         alerts.append('Dose diária prescrita (' + str(pdDoseconv) + ' ' + str(pd[6].idMeasureUnit) + ') maior que a dose de alerta (' + str(pd[6].maxDose) + ' ' + str(pd[6].idMeasureUnit) + ') usualmente recomendada (considerada a dose diária independente da indicação).')
+
+                    if pd[6].maxDose and pd[6].maxDose < self.maxDoseAgg[pd[0].idDrug]:
+                        alerts.append('Dose diária prescrita SOMADA (' + str(self.maxDoseAgg[pd[0].idDrug]) + ' ' + str(pd[6].idMeasureUnit) + ') maior que a dose de alerta (' + str(pd[6].maxDose) + ' ' + str(pd[6].idMeasureUnit) + ') usualmente recomendada (considerada a dose diária independente da indicação).')
 
             if pd[0].alergy == 'S':
                 alerts.append('Paciente alérgico a este medicamento.')
@@ -151,44 +178,45 @@ class DrugList():
 
             if pd[0].id in self.relations:
                 for a in self.relations[pd[0].id]:
-                    alerts.append(a)            
+                    alerts.append(a)       
 
-            if belong:
-                pDrugs.append({
-                    'idPrescriptionDrug': pd[0].id,
-                    'idDrug': pd[0].idDrug,
-                    'drug': pd[1].name if pd[1] is not None else 'Medicamento ' + str(pd[0].idDrug),
-                    'np': pd[6].notdefault if pd[6] is not None else False,
-                    'am': pd[6].antimicro if pd[6] is not None else False,
-                    'av': pd[6].mav if pd[6] is not None else False,
-                    'c': pd[6].controlled if pd[6] is not None else False,
-                    'whiteList': pdWhiteList,
-                    'doseWeight': doseWeightStr,
-                    'dose': pd[0].dose,
-                    'measureUnit': { 'value': pd[2].id, 'label': pd[2].description } if pd[2] else '',
-                    'frequency': { 'value': pd[3].id, 'label': pd[3].description } if pd[3] else '',
-                    'dayFrequency': pd[0].frequency,
-                    'doseconv': pd[0].doseconv,
-                    'time': timeValue(pd[0].interval),
-                    'recommendation': pd[0].notes if pd[0].notes and len(pd[0].notes.strip()) > 0 else None,
-                    'period': str(pd[0].period) + 'D' if pd[0].period else '',
-                    'periodDates': [],
-                    'route': pd[0].route,
-                    'grp_solution': pd[10],
-                    'stage': 'ACM' if pd[0].solutionACM == 'S' else strNone(pd[0].solutionPhase) + ' x '+ strNone(pd[0].solutionTime) + ' (' + strNone(pd[0].solutionTotalTime) + ')',
-                    'infusion': strNone(pd[0].solutionDose) + ' ' + strNone(pd[0].solutionUnit),
-                    'score': str(pd[5]) if not pdWhiteList else '0',
-                    'source': pd[0].source,
-                    'checked': bool(pd[0].checked or pd[9] == 's'),
-                    'suspended': bool(pd[0].suspendedDate),
-                    'status': pd[0].status,
-                    'near': pd[0].near,
-                    'prevIntervention': self.getPrevIntervention(pd[0].idDrug, pd[0].idPrescription),
-                    'intervention': self.getIntervention(pd[0].id),
-                    'alerts': alerts,
-                    'notes': pd[7],
-                    'prevNotes': pd[8]
-                })
+            pDrugs.append({
+                'idPrescription': pd[0].idPrescription,
+                'idPrescriptionDrug': pd[0].id,
+                'idDrug': pd[0].idDrug,
+                'drug': pd[1].name if pd[1] is not None else 'Medicamento ' + str(pd[0].idDrug),
+                'np': pd[6].notdefault if pd[6] is not None else False,
+                'am': pd[6].antimicro if pd[6] is not None else False,
+                'av': pd[6].mav if pd[6] is not None else False,
+                'c': pd[6].controlled if pd[6] is not None else False,
+                'whiteList': pdWhiteList,
+                'doseWeight': doseWeightStr,
+                'dose': pd[0].dose,
+                'measureUnit': { 'value': pd[2].id, 'label': pd[2].description } if pd[2] else '',
+                'frequency': { 'value': pd[3].id, 'label': pd[3].description } if pd[3] else '',
+                'dayFrequency': pd[0].frequency,
+                'doseconv': pd[0].doseconv,
+                'time': timeValue(pd[0].interval),
+                'recommendation': pd[0].notes if pd[0].notes and len(pd[0].notes.strip()) > 0 else None,
+                'period': str(pd[0].period) + 'D' if pd[0].period else '',
+                'periodDates': [],
+                'route': pd[0].route,
+                'grp_solution': pd[10],
+                'stage': 'ACM' if pd[0].solutionACM == 'S' else strNone(pd[0].solutionPhase) + ' x '+ strNone(pd[0].solutionTime) + ' (' + strNone(pd[0].solutionTotalTime) + ')',
+                'infusion': strNone(pd[0].solutionDose) + ' ' + strNone(pd[0].solutionUnit),
+                'score': str(pd[5]) if not pdWhiteList else '0',
+                'source': pd[0].source,
+                'checked': bool(pd[0].checked or pd[9] == 's'),
+                'suspended': bool(pd[0].suspendedDate),
+                'status': pd[0].status,
+                'near': pd[0].near,
+                'prevIntervention': self.getPrevIntervention(pd[0].idDrug, pd[0].idPrescription),
+                'existIntervention': self.getExistIntervention(pd[0].idDrug, pd[0].idPrescription),
+                'intervention': self.getIntervention(pd[0].id),
+                'alerts': alerts,
+                'notes': pd[7],
+                'prevNotes': pd[8]
+            })
         return pDrugs
 
     def sortWhiteList(self, pDrugs):
@@ -208,7 +236,7 @@ class DrugList():
 
                 pdDose = pd[0].dose
 
-                if pd[6] and pd[6].amount:
+                if pd[6] and pd[6].amount and pd[6].amountUnit:
                     result[pdGroup]['vol'] = pdDose
                     result[pdGroup]['amount'] = pd[6].amount
                     result[pdGroup]['unit'] = pd[6].amountUnit

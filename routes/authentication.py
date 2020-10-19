@@ -4,6 +4,7 @@ from models.main import *
 from models.appendix import *
 from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
+from config import Config
 
 app_auth = Blueprint('app_auth',__name__)
 
@@ -33,7 +34,8 @@ def auth():
             'roles': user.config['roles'] if user.config and 'roles' in user.config else [],
             'nameUrl': Memory.getNameUrl(user.schema)['value'] if user.permission() else 'http://localhost/{idPatient}',
             'access_token': access_token,
-            'refresh_token': refresh_token
+            'refresh_token': refresh_token,
+            'apiKey': Config.API_KEY if hasattr(Config, 'API_KEY') else ''
         }, status.HTTP_200_OK
 
 
