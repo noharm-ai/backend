@@ -268,7 +268,7 @@ def getPrescriptionAuth(idPrescription):
         return getPrescription(idPrescription=idPrescription)
 
 def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
-    
+
     if idPrescription:
         prescription = Prescription.getPrescription(idPrescription)
     else:
