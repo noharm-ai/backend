@@ -4,7 +4,7 @@ from .segment import *
 from routes.utils import *
 from datetime import datetime
 from sqlalchemy.orm import deferred
-from sqlalchemy import case
+from sqlalchemy import case, BigInteger, cast
 
 class Prescription(db.Model):
     __tablename__ = 'prescricao'
@@ -66,8 +66,7 @@ class Prescription(db.Model):
         return Prescription.getPrescriptionBasic()\
             .filter(Prescription.admissionNumber == admissionNumber)\
             .filter(func.date(Prescription.date) == aggDate)\
-            .filter(Prescription.agg == True)\
-            .order_by(desc(Prescription.date))\
+            .order_by(asc(Prescription.date))\
             .first()
 
     def shouldUpdate(idPrescription):
@@ -237,12 +236,12 @@ class Patient(db.Model):
             q = q.filter(Prescription.idSegment == idSegment)
 
         if (len(idDept)>0):
-            q = q.filter(Prescription.idDepartment.in_(idDept))
+            idDept = list(map(int, idDept))
+            q = q.filter(postgresql.array(idDept).overlap(Prescription.aggDeps))
 
         if (len(idDrug)>0):
-            drugList = getDrugList()
             idDrug = list(map(int, idDrug))
-            q = q.filter(postgresql.array(idDrug).overlap(drugList))
+            q = q.filter(cast(idDrug, postgresql.ARRAY(BigInteger)).overlap(Prescription.aggDrugs))
 
         if bool(int(none2zero(pending))):
             q = q.filter(Prescription.status == '0')

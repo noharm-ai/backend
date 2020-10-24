@@ -287,7 +287,7 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
     drugs = PrescriptionDrug.findByPrescription(prescription[0].id, patient.admissionNumber, aggDate)
     interventions = Intervention.findAll(admissionNumber=patient.admissionNumber)
     relations = Prescription.findRelation(prescription[0].id,patient.admissionNumber, aggDate)
-    headers = Prescription.getHeaders(admissionNumber, aggDate) if prescription[0].agg else []
+    headers = Prescription.getHeaders(admissionNumber, aggDate) if aggDate else []
 
     exams = Exams.findLatestByAdmission(patient, prescription[0].idSegment)
     age = data2age(patient.birthdate.isoformat() if patient.birthdate else date.today().isoformat())
