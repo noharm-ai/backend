@@ -25,6 +25,13 @@ def computePrescription(schema, idPrescription):
     if (p is None):
         return { 'status': 'error', 'message': 'Prescrição Inexistente!' }, status.HTTP_400_BAD_REQUEST
 
+    if (p.idSegment is None):
+        return { 
+            'status': 'success', 
+            'data': idPrescription,
+            'message': 'Prescrição sem Segmento!' 
+        }, status.HTTP_200_OK
+
     resultPresc, stat = getPrescription(idPrescription=idPrescription)
     p.features = getFeatures(resultPresc)
     p.aggDrugs = p.features['drugIDs']

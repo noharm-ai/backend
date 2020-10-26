@@ -91,6 +91,7 @@ class Prescription(db.Model):
                                 func.date(Prescription.expire) == aggDate
                             ))\
                     .filter(Prescription.agg == None)\
+                    .filter(Prescription.idSegment != None)\
                     .all()
         headers = {}
         for p in prescriptions:
@@ -128,7 +129,8 @@ class Prescription(db.Model):
                                .filter(or_(
                                     func.date(Prescription.date) == aggDate,
                                     func.date(Prescription.expire) == aggDate
-                                ))
+                                ))\
+                               .filter(Prescription.idSegment != None)
 
         interaction = relation.filter(Relation.kind.in_(['it','dt','dm']))
 
@@ -166,7 +168,8 @@ class Prescription(db.Model):
                                .filter(or_(
                                     func.date(Prescription.date) == aggDate,
                                     func.date(Prescription.expire) == aggDate
-                                ))
+                                ))\
+                               .filter(Prescription.idSegment != None)
 
         relations = interaction.union(incompatible).union(xreactivity).all()
 
@@ -367,7 +370,8 @@ class PrescriptionDrug(db.Model):
                             func.date(Prescription.date) == aggDate,
                             func.date(Prescription.expire) == aggDate
                          ))\
-                 .filter(Prescription.agg == None)
+                 .filter(Prescription.agg == None)\
+                 .filter(Prescription.idSegment != None)
         
         return q.order_by(asc(Prescription.expire), desc(func.concat(PrescriptionDrug.idPrescription,PrescriptionDrug.solutionGroup)), asc(Drug.name)).all()
 
