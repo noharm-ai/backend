@@ -4,7 +4,7 @@ from .segment import *
 from routes.utils import *
 from datetime import datetime
 from sqlalchemy.orm import deferred
-from sqlalchemy import case
+from sqlalchemy import case, BigInteger, cast
 
 class Prescription(db.Model):
     __tablename__ = 'prescricao'
@@ -25,6 +25,8 @@ class Prescription(db.Model):
     notes_at = db.Column('evolucao_at', db.DateTime, nullable=True)
     prescriber = deferred(db.Column('prescritor', db.String, nullable=True))
     agg = db.Column('agregada', db.Boolean, nullable=True)
+    aggDeps = deferred(db.Column('aggsetor', postgresql.ARRAY(db.Integer), nullable=True))
+    aggDrugs = deferred(db.Column('aggmedicamento', postgresql.ARRAY(db.Integer), nullable=True))
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.Integer, nullable=True)
 
@@ -63,11 +65,8 @@ class Prescription(db.Model):
     def getPrescriptionAgg(admissionNumber, aggDate):
         return Prescription.getPrescriptionBasic()\
             .filter(Prescription.admissionNumber == admissionNumber)\
-            .filter(or_(
-                func.date(Prescription.date) == aggDate,
-                func.date(Prescription.expire) == aggDate
-            ))\
-            .order_by(desc(Prescription.date))\
+            .filter(func.date(Prescription.date) == aggDate)\
+            .order_by(asc(Prescription.date))\
             .first()
 
     def shouldUpdate(idPrescription):
@@ -84,22 +83,26 @@ class Prescription(db.Model):
             .all()
 
     def getHeaders(admissionNumber, aggDate):
-        prescriptions = db.session.query(Prescription)\
+        prescriptions = db.session.query(Prescription, Department.name)\
+                    .outerjoin(Department, Department.id == Prescription.idDepartment)\
                     .filter(Prescription.admissionNumber == admissionNumber)\
                     .filter(or_(
                                 func.date(Prescription.date) == aggDate,
                                 func.date(Prescription.expire) == aggDate
                             ))\
                     .filter(Prescription.agg == None)\
+                    .filter(Prescription.idSegment != None)\
                     .all()
         headers = {}
         for p in prescriptions:
-            headers[p.id] = {
-                'date': p.date.isoformat() if p.date else None,
-                'expire': p.expire.isoformat() if p.expire else None,
-                'status': p.status,
-                'bed': p.bed,
-                'prescriber': p.prescriber
+            headers[p[0].id] = {
+                'date': p[0].date.isoformat() if p[0].date else None,
+                'expire': p[0].expire.isoformat() if p[0].expire else None,
+                'status': p[0].status,
+                'bed': p[0].bed,
+                'prescriber': p[0].prescriber,
+                'idDepartment': p[0].idDepartment,
+                'department': p[1]
             }
 
         return headers
@@ -126,7 +129,8 @@ class Prescription(db.Model):
                                .filter(or_(
                                     func.date(Prescription.date) == aggDate,
                                     func.date(Prescription.expire) == aggDate
-                                ))
+                                ))\
+                               .filter(Prescription.idSegment != None)
 
         interaction = relation.filter(Relation.kind.in_(['it','dt','dm']))
 
@@ -164,7 +168,8 @@ class Prescription(db.Model):
                                .filter(or_(
                                     func.date(Prescription.date) == aggDate,
                                     func.date(Prescription.expire) == aggDate
-                                ))
+                                ))\
+                               .filter(Prescription.idSegment != None)
 
         relations = interaction.union(incompatible).union(xreactivity).all()
 
@@ -234,12 +239,12 @@ class Patient(db.Model):
             q = q.filter(Prescription.idSegment == idSegment)
 
         if (len(idDept)>0):
-            q = q.filter(Prescription.idDepartment.in_(idDept))
+            idDept = list(map(int, idDept))
+            q = q.filter(postgresql.array(idDept).contains(Prescription.aggDeps))
 
         if (len(idDrug)>0):
-            drugList = getDrugList()
             idDrug = list(map(int, idDrug))
-            q = q.filter(postgresql.array(idDrug).overlap(drugList))
+            q = q.filter(cast(idDrug, postgresql.ARRAY(BigInteger)).overlap(Prescription.aggDrugs))
 
         if bool(int(none2zero(pending))):
             q = q.filter(Prescription.status == '0')
@@ -365,7 +370,8 @@ class PrescriptionDrug(db.Model):
                             func.date(Prescription.date) == aggDate,
                             func.date(Prescription.expire) == aggDate
                          ))\
-                 .filter(Prescription.agg == None)
+                 .filter(Prescription.agg == None)\
+                 .filter(Prescription.idSegment != None)
         
         return q.order_by(asc(Prescription.expire), desc(func.concat(PrescriptionDrug.idPrescription,PrescriptionDrug.solutionGroup)), asc(Drug.name)).all()
 

@@ -25,8 +25,17 @@ def computePrescription(schema, idPrescription):
     if (p is None):
         return { 'status': 'error', 'message': 'Prescrição Inexistente!' }, status.HTTP_400_BAD_REQUEST
 
+    if (p.idSegment is None):
+        return { 
+            'status': 'success', 
+            'data': idPrescription,
+            'message': 'Prescrição sem Segmento!' 
+        }, status.HTTP_200_OK
+
     resultPresc, stat = getPrescription(idPrescription=idPrescription)
     p.features = getFeatures(resultPresc)
+    p.aggDrugs = p.features['drugIDs']
+    p.aggDeps = [p.idDepartment]
     
     newPrescAgg = False
     PrescAggID = genAggID(p)
@@ -50,6 +59,8 @@ def computePrescription(schema, idPrescription):
     pAgg.agg = True
     pAgg.status = 0
     pAgg.features = getFeatures(resultAgg)
+    pAgg.aggDrugs = pAgg.features['drugIDs']
+    pAgg.aggDeps = list(set([resultAgg['data']['headers'][h]['idDepartment'] for h in resultAgg['data']['headers']]))
 
     if newPrescAgg: db.session.add(pAgg)
 
@@ -70,7 +81,9 @@ def getFeatures(result):
 
     alerts = pScore = score1 = score2 = score3 = 0
     am = av = control = np = tube = diff = 0
+    drugIDs = []
     for d in drugList: 
+        drugIDs.append(d['idDrug'])
         if d['whiteList'] or d['suspended']: continue
 
         alerts += len(d['alerts'])
@@ -106,4 +119,5 @@ def getFeatures(result):
         'diff': diff,
         'alertExams': exams,
         'interventions': interventions,
+        'drugIDs': list(set(drugIDs))
     }

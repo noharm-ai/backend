@@ -268,7 +268,7 @@ def getPrescriptionAuth(idPrescription):
         return getPrescription(idPrescription=idPrescription)
 
 def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
-    
+
     if idPrescription:
         prescription = Prescription.getPrescription(idPrescription)
     else:
@@ -287,7 +287,7 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
     drugs = PrescriptionDrug.findByPrescription(prescription[0].id, patient.admissionNumber, aggDate)
     interventions = Intervention.findAll(admissionNumber=patient.admissionNumber)
     relations = Prescription.findRelation(prescription[0].id,patient.admissionNumber, aggDate)
-    headers = Prescription.getHeaders(admissionNumber, aggDate) if prescription[0].agg else []
+    headers = Prescription.getHeaders(admissionNumber, aggDate) if aggDate else []
 
     exams = Exams.findLatestByAdmission(patient, prescription[0].idSegment)
     age = data2age(patient.birthdate.isoformat() if patient.birthdate else date.today().isoformat())
@@ -381,6 +381,7 @@ def setPrescriptionStatus(idPrescription):
             db.session.query(Prescription)\
                       .filter(Prescription.admissionNumber == p.admissionNumber)\
                       .filter(Prescription.status == '0')\
+                      .filter(Prescription.idSegment != None)\
                       .filter(or_(
                          func.date(Prescription.date) == func.date(p.date),
                          func.date(Prescription.expire) == func.date(p.date)
