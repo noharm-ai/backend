@@ -380,7 +380,7 @@ def setPrescriptionStatus(idPrescription):
         if p.agg:
             db.session.query(Prescription)\
                       .filter(Prescription.admissionNumber == p.admissionNumber)\
-                      .filter(Prescription.status == '0')\
+                      .filter(Prescription.status != p.status)\
                       .filter(Prescription.idSegment != None)\
                       .filter(or_(
                          func.date(Prescription.date) == func.date(p.date),
