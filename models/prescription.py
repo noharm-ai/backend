@@ -353,7 +353,7 @@ class PrescriptionDrug(db.Model):
             .query(PrescriptionDrug, Drug, MeasureUnit, Frequency, '0',\
                     func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4).label('score'),
                     DrugAttributes, Notes.notes, prevNotes.label('prevNotes'), Prescription.status,
-                    func.concat(PrescriptionDrug.idPrescription,PrescriptionDrug.solutionGroup))\
+                    PrescriptionDrug.solutionGroup)\
             .outerjoin(Outlier, Outlier.id == PrescriptionDrug.idOutlier)\
             .outerjoin(Drug, Drug.id == PrescriptionDrug.idDrug)\
             .outerjoin(Notes, Notes.idPrescriptionDrug == PrescriptionDrug.id)\

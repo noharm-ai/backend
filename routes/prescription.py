@@ -380,7 +380,7 @@ def setPrescriptionStatus(idPrescription):
         if p.agg:
             db.session.query(Prescription)\
                       .filter(Prescription.admissionNumber == p.admissionNumber)\
-                      .filter(Prescription.status == '0')\
+                      .filter(Prescription.status != p.status)\
                       .filter(Prescription.idSegment != None)\
                       .filter(or_(
                          func.date(Prescription.date) == func.date(p.date),
@@ -464,10 +464,29 @@ def getPrescriptionUpdate(idPrescription):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
 
-    query = "INSERT INTO " + user.schema + ".presmed \
-                SELECT *\
-                FROM " + user.schema + ".presmed\
-                WHERE fkprescricao = " + str(int(idPrescription)) + ";"
+    p = Prescription.query.get(idPrescription)
+    if (p is None):
+        return { 'status': 'error', 'message': 'Prescrição Inexistente!' }, status.HTTP_400_BAD_REQUEST
+
+    if p.agg:
+        query = "INSERT INTO " + user.schema + ".presmed \
+                    SELECT pm.*\
+                    FROM " + user.schema + ".presmed pm\
+                    WHERE fkprescricao IN (\
+                        SELECT fkprescricao\
+                        FROM " + user.schema + ".prescricao p\
+                        WHERE p.nratendimento = " + str(p.admissionNumber) + "\
+                        AND p.idsegmento IS NOT NULL \
+                        AND (\
+                            p.dtprescricao::date = '" + str(p.date) + "'::date OR\
+                            p.dtvigencia::date = '" + str(p.date) + "'::date\
+                        )\
+                    );"  
+    else:
+        query = "INSERT INTO " + user.schema + ".presmed \
+                    SELECT *\
+                    FROM " + user.schema + ".presmed\
+                    WHERE fkprescricao = " + str(int(idPrescription)) + ";"
 
     db.engine.execute(query)
 
