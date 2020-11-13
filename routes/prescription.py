@@ -422,6 +422,8 @@ def getDrugPeriod(idPrescriptionDrug):
     for i, p in enumerate(periodList):
         p = p.replace('33x','SNx')
         p = p.replace('44x','ACMx')
+        p = p.replace('55x','CONTx')
+        p = p.replace('66x','AGORAx')
         p = p.replace('99x','N/Dx')
         periodList[i] = p
 

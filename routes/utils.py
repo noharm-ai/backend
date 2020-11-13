@@ -54,6 +54,8 @@ def timeValue(time):
 def freqValue(freq):
     if freq == 33: return 'SN'
     elif freq == 44: return 'ACM'
+    elif freq == 55: return 'CONT'
+    elif freq == 66: return 'AGORA'
     elif freq == 99: return 'N/D'
     else: return freq
 
