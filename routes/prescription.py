@@ -201,7 +201,7 @@ class DrugList():
                 'period': str(pd[0].period) + 'D' if pd[0].period else '',
                 'periodDates': [],
                 'route': pd[0].route,
-                'grp_solution': pd[10],
+                'grp_solution': pd[0].solutionGroup,
                 'stage': 'ACM' if pd[0].solutionACM == 'S' else strNone(pd[0].solutionPhase) + ' x '+ strNone(pd[0].solutionTime) + ' (' + strNone(pd[0].solutionTotalTime) + ')',
                 'infusion': strNone(pd[0].solutionDose) + ' ' + strNone(pd[0].solutionUnit),
                 'score': str(pd[5]) if not pdWhiteList else '0',
@@ -229,24 +229,27 @@ class DrugList():
         for pd in self.drugList:
             if pd[0].solutionGroup and pd[0].source == 'Soluções':
                 
-                pdGroup = pd[10]
+                pdID = pd[0].idPrescription
+                pdGroup = pd[0].solutionGroup
 
-                if not pdGroup in result:
-                    result[pdGroup] = {'totalVol' : 0, 'amount': 0, 'vol': 0, 'speed': 0, 'unit': 'ml'}
+                if not pdID in result:
+                    result[pdID] = {}
+                if not pdGroup in result[pdID].keys():
+                    result[pdID][pdGroup] = {'totalVol' : 0, 'amount': 0, 'vol': 0, 'speed': 0, 'unit': 'ml'}
 
                 pdDose = pd[0].dose
 
                 if pd[6] and pd[6].amount and pd[6].amountUnit:
-                    result[pdGroup]['vol'] = pdDose
-                    result[pdGroup]['amount'] = pd[6].amount
-                    result[pdGroup]['unit'] = pd[6].amountUnit
+                    result[pdID][pdGroup]['vol'] = pdDose
+                    result[pdID][pdGroup]['amount'] = pd[6].amount
+                    result[pdID][pdGroup]['unit'] = pd[6].amountUnit
 
                     if pd[2].id.lower() != 'ml' and pd[2].id.lower() == pd[6].amountUnit.lower():
-                        result[pdGroup]['vol'] = pdDose = round(pd[0].dose / pd[6].amount,2)
-                
-                result[pdGroup]['speed'] = pd[0].solutionDose
-                result[pdGroup]['totalVol'] += pdDose
-                result[pdGroup]['totalVol'] = round(result[pdGroup]['totalVol'],2)
+                        result[pdID][pdGroup]['vol'] = pdDose = round(pd[0].dose / pd[6].amount,2)
+
+                result[pdID][pdGroup]['speed'] = pd[0].solutionDose
+                result[pdID][pdGroup]['totalVol'] += pdDose
+                result[pdID][pdGroup]['totalVol'] = round(result[pdID][pdGroup]['totalVol'],2)
 
         return result
 
@@ -352,7 +355,7 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
             'prescription': pDrugs,
             'solution': pSolution,
             'procedures': pProcedures,
-            'infusion': [{'key': i, 'value': pInfusion[i]} for i in pInfusion],
+            'infusion': pInfusion,
             'interventions': [i for i in interventions if i['idPrescription'] < prescription[0].id],
             'alertExams': alertExams,
             'exams': examsJson[:10],
@@ -419,6 +422,8 @@ def getDrugPeriod(idPrescriptionDrug):
     for i, p in enumerate(periodList):
         p = p.replace('33x','SNx')
         p = p.replace('44x','ACMx')
+        p = p.replace('55x','CONTx')
+        p = p.replace('66x','AGORAx')
         p = p.replace('99x','N/Dx')
         periodList[i] = p
 

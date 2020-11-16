@@ -23,7 +23,7 @@ class Prescription(db.Model):
     features = db.Column('indicadores', postgresql.JSON, nullable=True)
     notes = deferred(db.Column('evolucao', db.String, nullable=True))
     notes_at = db.Column('evolucao_at', db.DateTime, nullable=True)
-    prescriber = deferred(db.Column('prescritor', db.String, nullable=True))
+    prescriber = db.Column('prescritor', db.String, nullable=True)
     agg = db.Column('agregada', db.Boolean, nullable=True)
     aggDeps = deferred(db.Column('aggsetor', postgresql.ARRAY(db.Integer), nullable=True))
     aggDrugs = deferred(db.Column('aggmedicamento', postgresql.ARRAY(db.Integer), nullable=True))
@@ -352,8 +352,7 @@ class PrescriptionDrug(db.Model):
         q = db.session\
             .query(PrescriptionDrug, Drug, MeasureUnit, Frequency, '0',\
                     func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4).label('score'),
-                    DrugAttributes, Notes.notes, prevNotes.label('prevNotes'), Prescription.status,
-                    PrescriptionDrug.solutionGroup)\
+                    DrugAttributes, Notes.notes, prevNotes.label('prevNotes'), Prescription.status)\
             .outerjoin(Outlier, Outlier.id == PrescriptionDrug.idOutlier)\
             .outerjoin(Drug, Drug.id == PrescriptionDrug.idDrug)\
             .outerjoin(Notes, Notes.idPrescriptionDrug == PrescriptionDrug.id)\

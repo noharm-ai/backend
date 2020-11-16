@@ -173,6 +173,9 @@ def outlierWizard(idSegment, idDrug, clean):
     measureUnitList = data.get('measureUnitList')
 
     if measureUnitList:
+        if idMeasureUnit is None or len(idMeasureUnit) == 0:
+            idMeasureUnit = measureUnitList[0]['idMeasureUnit']
+
         for m in measureUnitList:
             setDrugUnit(idDrug, m['idMeasureUnit'], idSegment, m['fator'])
 

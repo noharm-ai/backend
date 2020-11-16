@@ -50,17 +50,15 @@ def setUser():
     if not user: 
         return { 'status': 'error', 'message': 'Usuário Inexistente!' }, status.HTTP_400_BAD_REQUEST
 
-    update = {}
+    password = data.get('password', None)
+    user = User.authenticate(user.email, password)
 
-    config = user.config or {}
-    config['sign'] = data.get('sign', None)
-    update['config'] = config
+    if not user: 
+        return { 'status': 'error', 'message': 'Usuário Inexistente!' }, status.HTTP_400_BAD_REQUEST
 
-    if 'password' in data.keys():
-        update['password'] = func.md5(data.get('password'))
-
+    update = {'password': func.crypt(data.get('newpassword'), func.gen_salt('bf',8)) }
     db.session.query(User)\
-              .filter(User.id == user.id)\
-              .update(update, synchronize_session='fetch')
+            .filter(User.id == user.id)\
+            .update(update, synchronize_session='fetch')
     
     return tryCommit(db, user.id)
