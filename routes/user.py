@@ -62,3 +62,16 @@ def setUser():
             .update(update, synchronize_session='fetch')
     
     return tryCommit(db, user.id)
+
+@app_usr.route("/user/resetpw", methods=['GET'])
+def resetPassword():
+
+    email = request.args.get('email', None)    
+    user = User.query.filter_by(email=email).first()
+    if not user: 
+        return { 'status': 'error', 'message': 'Usuário Inexistente!' }, status.HTTP_400_BAD_REQUEST
+
+    return {
+        'status': 'success',
+        'message': 'Email enviado com sucesso para: ' + email
+    }, status.HTTP_200_OK
