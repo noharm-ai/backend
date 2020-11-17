@@ -1,9 +1,10 @@
 from models.main import *
 from models.appendix import *
-from flask import Blueprint, request
+from flask import Blueprint, request, render_template
 from flask_jwt_extended import (jwt_required, get_jwt_identity)
+from flask_jwt_extended import create_access_token, decode_token
 from .utils import tryCommit
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlalchemy import func
 
 app_usr = Blueprint('app_usr',__name__)
@@ -63,15 +64,36 @@ def setUser():
     
     return tryCommit(db, user.id)
 
-@app_usr.route("/user/resetpw", methods=['GET'])
-def resetPassword():
-
-    email = request.args.get('email', None)    
+@app_usr.route("/user/forget", methods=['GET'])
+def forgetPassword():
+    email = request.args.get('email', None)
     user = User.query.filter_by(email=email).first()
     if not user: 
         return { 'status': 'error', 'message': 'Usuário Inexistente!' }, status.HTTP_400_BAD_REQUEST
+
+    expires = timedelta(hours=24)
+    reset_token = create_access_token(str(user.id), expires_delta=expires)
 
     return {
         'status': 'success',
         'message': 'Email enviado com sucesso para: ' + email
     }, status.HTTP_200_OK
+
+@app_usr.route("/user/reset", methods=['GET'])
+def resetPassword():
+    reset_token = request.args.get('reset_token', None)
+    newpassword = request.args.get('newpassword', None)
+    if not reset_token:
+        return { 'status': 'error', 'message': 'Usuário Inexistente!' }, status.HTTP_400_BAD_REQUEST
+
+    user_id = decode_token(reset_token)['identity']
+    user = User.find(user_id)
+    if not user: 
+        return { 'status': 'error', 'message': 'Usuário Inexistente!' }, status.HTTP_400_BAD_REQUEST
+
+    update = {'password': func.crypt(newpassword, func.gen_salt('bf',8)) }
+    db.session.query(User)\
+            .filter(User.id == user.id)\
+            .update(update, synchronize_session='fetch')
+    
+    return tryCommit(db, user.id)
