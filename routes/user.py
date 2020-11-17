@@ -6,6 +6,9 @@ from flask_jwt_extended import create_access_token, decode_token
 from .utils import tryCommit
 from datetime import datetime, timedelta
 from sqlalchemy import func
+from flask import render_template
+from flask_mail import Message
+from config import Config
 
 app_usr = Blueprint('app_usr',__name__)
 
@@ -74,6 +77,13 @@ def forgetPassword():
     expires = timedelta(hours=24)
     reset_token = create_access_token(str(user.id), expires_delta=expires)
 
+    msg = Message()
+    msg.subject = "NoHarm: Esqueci a senha"
+    msg.sender = Config.MAIL_USERNAME
+    msg.recipients = [user.email]
+    msg.html = render_template('reset_email.html', user=user.name, token=reset_token)
+    mail.send(msg)
+
     return {
         'status': 'success',
         'message': 'Email enviado com sucesso para: ' + email
@@ -83,8 +93,9 @@ def forgetPassword():
 def resetPassword():
     reset_token = request.args.get('reset_token', None)
     newpassword = request.args.get('newpassword', None)
-    if not reset_token:
-        return { 'status': 'error', 'message': 'Usuário Inexistente!' }, status.HTTP_400_BAD_REQUEST
+
+    if not reset_token or not newpassword:
+        return { 'status': 'error', 'message': 'Token Inexistente!' }, status.HTTP_400_BAD_REQUEST
 
     user_id = decode_token(reset_token)['identity']
     user = User.find(user_id)

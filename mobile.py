@@ -3,7 +3,7 @@ from flask_api import FlaskAPI, status, exceptions
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager
 from flask_jwt_extended import (jwt_required, get_jwt_identity)
-from models.main import db
+from models.main import db, mail
 from config import Config
 from flask_cors import CORS
 from routes.authentication import app_auth
@@ -28,10 +28,15 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = { "pool_recycle" : 500, "pool_pre_ping
 app.config['JWT_SECRET_KEY'] = Config.SECRET_KEY
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = Config.JWT_ACCESS_TOKEN_EXPIRES
 app.config['JWT_REFRESH_TOKEN_EXPIRES'] = Config.JWT_REFRESH_TOKEN_EXPIRES
-
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 465
+app.config['MAIL_USE_SSL'] = True
+app.config['MAIL_USERNAME'] = Config.MAIL_USERNAME
+app.config['MAIL_PASSWORD'] = Config.MAIL_PASSWORD
 
 jwt = JWTManager(app)
 db.init_app(app)
+mail.init_app(app)
 
 app.register_blueprint(app_auth)
 app.register_blueprint(app_out)

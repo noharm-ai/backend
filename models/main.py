@@ -4,8 +4,10 @@ from datetime import date, timedelta
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import deferred
 from routes.utils import *
+from flask_mail import Mail
 
 db = SQLAlchemy()
+mail = Mail()
 
 class dbSession():
     def setSchema(schema):

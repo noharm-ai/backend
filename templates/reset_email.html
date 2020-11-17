@@ -1,0 +1,12 @@
+<p>
+    Olá, {{user}}</br>
+    Você pediu para redefinir sua senha?</br>
+    </br>
+    Para redefinir sua senha
+    <a href="{{ url_for('app_usr.resetPassword', token=token, _external=True) }}">
+        clique aqui
+    </a>.</br>
+    Qualquer dúvida, entre em contato.</br>
+    </br>
+    Abraços,
+</p>
