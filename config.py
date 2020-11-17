@@ -6,5 +6,5 @@ class Config:
     POTGRESQL_CONNECTION_STRING = "postgresql://postgres@localhost/noharm"
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(minutes=int(getenv("JWT_ACCESS_TOKEN_EXPIRES", 20)))
     JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=int(getenv("JWT_REFRESH_TOKEN_EXPIRES", 30)))
-    DDC_API_URL = None
-    SELF_API_URL = "http://localhost:5000/"
+    MAIL_USERNAME = "user@gmail.com"
+    MAIL_PASSWORD = "password"
