@@ -122,12 +122,14 @@ class DrugList():
             pdUnit = strNone(pd[2].id) if pd[2] else ''
             pdWhiteList = bool(pd[6].whiteList) if pd[6] is not None else False
             doseWeightStr = None
+            expireDay = pd[10].day if pd[10] else 0
 
-            if pd[0].idDrug not in self.maxDoseAgg:
-                self.maxDoseAgg[pd[0].idDrug] = {'value': 0, 'count': 0}
+            idDrugAgg = pd[0].idDrug * 10 + expireDay
+            if idDrugAgg not in self.maxDoseAgg:
+                self.maxDoseAgg[idDrugAgg] = {'value': 0, 'count': 0}
 
-            self.maxDoseAgg[pd[0].idDrug]['value'] += pdDoseconv
-            self.maxDoseAgg[pd[0].idDrug]['count'] += 1
+            self.maxDoseAgg[idDrugAgg]['value'] += pdDoseconv
+            self.maxDoseAgg[idDrugAgg]['count'] += 1
 
             alerts = []
             if not bool(pd[0].suspendedDate):
@@ -149,7 +151,7 @@ class DrugList():
                         doseWeight = round(pd[0].dose / float(weight),2)
                         doseWeightStr = str(doseWeight) + ' ' + pdUnit + '/Kg'
 
-                        keyDrugKg = str(pd[0].idDrug)+'kg'
+                        keyDrugKg = str(idDrugAgg)+'kg'
                         if keyDrugKg not in self.maxDoseAgg:
                             self.maxDoseAgg[keyDrugKg] = {'value': 0, 'count': 0}
 
@@ -170,8 +172,8 @@ class DrugList():
                         if pd[6].maxDose and pd[6].maxDose < pdDoseconv:
                             alerts.append('Dose diária prescrita (' + str(pdDoseconv) + ' ' + str(pd[6].idMeasureUnit) + ') maior que a dose de alerta (' + str(pd[6].maxDose) + ' ' + str(pd[6].idMeasureUnit) + ') usualmente recomendada (considerada a dose diária independente da indicação).')
 
-                        if pd[6].maxDose and self.maxDoseAgg[pd[0].idDrug]['count'] > 1 and pd[6].maxDose < self.maxDoseAgg[pd[0].idDrug]['value']:
-                            alerts.append('Dose diária prescrita SOMADA (' + str(self.maxDoseAgg[pd[0].idDrug]['value']) + ' ' + str(pd[6].idMeasureUnit) + ') maior que a dose de alerta (' + str(pd[6].maxDose) + ' ' + str(pd[6].idMeasureUnit) + ') usualmente recomendada (considerada a dose diária independente da indicação).')
+                        if pd[6].maxDose and self.maxDoseAgg[idDrugAgg]['count'] > 1 and pd[6].maxDose < self.maxDoseAgg[idDrugAgg]['value']:
+                            alerts.append('Dose diária prescrita SOMADA (' + str(self.maxDoseAgg[idDrugAgg]['value']) + ' ' + str(pd[6].idMeasureUnit) + ') maior que a dose de alerta (' + str(pd[6].maxDose) + ' ' + str(pd[6].idMeasureUnit) + ') usualmente recomendada (considerada a dose diária independente da indicação).')
 
                 if pd[0].alergy == 'S':
                     alerts.append('Paciente alérgico a este medicamento.')
