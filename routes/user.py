@@ -89,10 +89,12 @@ def forgetPassword():
         'message': 'Email enviado com sucesso para: ' + email
     }, status.HTTP_200_OK
 
-@app_usr.route("/user/reset", methods=['GET'])
+@app_usr.route("/user/reset", methods=['POST'])
 def resetPassword():
-    reset_token = request.args.get('reset_token', None)
-    newpassword = request.args.get('newpassword', None)
+    data = request.get_json()
+
+    reset_token = data.get('reset_token', None)
+    newpassword = data.get('newpassword', None)
 
     if not reset_token or not newpassword:
         return { 'status': 'error', 'message': 'Token Inexistente!' }, status.HTTP_400_BAD_REQUEST
