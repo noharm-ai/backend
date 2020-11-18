@@ -55,12 +55,13 @@ def setUser():
         return { 'status': 'error', 'message': 'Usuário Inexistente!' }, status.HTTP_400_BAD_REQUEST
 
     password = data.get('password', None)
+    newpassword = data.get('newpassword', None)
     user = User.authenticate(user.email, password)
 
-    if not user: 
+    if not user or not newpassword: 
         return { 'status': 'error', 'message': 'Usuário Inexistente!' }, status.HTTP_400_BAD_REQUEST
 
-    update = {'password': func.crypt(data.get('newpassword'), func.gen_salt('bf',8)) }
+    update = {'password': func.crypt(newpassword, func.gen_salt('bf',8)) }
     db.session.query(User)\
             .filter(User.id == user.id)\
             .update(update, synchronize_session='fetch')
