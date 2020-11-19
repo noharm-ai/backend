@@ -80,7 +80,7 @@ def forgetPassword():
 
     msg = Message()
     msg.subject = "NoHarm: Esqueci a senha"
-    msg.sender = Config.MAIL_USERNAME
+    msg.sender = Config.MAIL_SENDER
     msg.recipients = [user.email]
     msg.html = render_template('reset_email.html', user=user.name, token=reset_token, host=Config.MAIL_HOST)
     mail.send(msg)
