@@ -29,6 +29,7 @@ def auth():
         return {
             'status': 'success',
             'userName': user.name,
+            'userId': user.id,
             'email': user.email,
             'schema': user.schema,
             'roles': user.config['roles'] if user.config and 'roles' in user.config else [],
