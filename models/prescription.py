@@ -112,25 +112,33 @@ class Prescription(db.Model):
         pd2 = db.aliased(PrescriptionDrug)
         m1 = db.aliased(Drug)
         m2 = db.aliased(Drug)
+        p1 = db.aliased(Prescription)
+        p2 = db.aliased(Prescription)
 
-        relation = db.session\
-            .query(pd1.id, Relation, m1.name, m2.name)\
-            .join(pd2, and_(pd2.idPrescription == pd1.idPrescription, pd2.id != pd1.id))\
-            .join(m1, m1.id == pd1.idDrug)\
-            .join(m2, m2.id == pd2.idDrug)\
-            .join(Relation, and_(Relation.sctida == m1.sctid, Relation.sctidb == m2.sctid))\
-            .filter(Relation.active == True)
-        
         if aggDate is None:
-            relation = relation.filter(pd1.idPrescription == idPrescription)
+            relation = db.session.query(pd1.id, Relation, m1.name, m2.name, pd1.update)
+            relation = relation\
+                .join(pd2, and_(pd2.idPrescription == pd1.idPrescription, pd2.id != pd1.id))\
+                .join(m1, m1.id == pd1.idDrug)\
+                .join(m2, m2.id == pd2.idDrug)\
+                .join(Relation, and_(Relation.sctida == m1.sctid, Relation.sctidb == m2.sctid))\
+                .filter(pd1.idPrescription == idPrescription)
         else:
-            relation = relation.outerjoin(Prescription, Prescription.id == pd1.idPrescription)\
-                               .filter(Prescription.admissionNumber == admissionNumber)\
-                               .filter(or_(
-                                    func.date(Prescription.date) == aggDate,
-                                    func.date(Prescription.expire) == aggDate
-                                ))\
-                               .filter(Prescription.idSegment != None)
+            relation = db.session.query(pd1.id, Relation, m1.name, m2.name, p1.expire)\
+                    .select_from(p1)\
+                    .join(p2, p2.admissionNumber == admissionNumber)\
+                    .join(pd1, pd1.idPrescription == p1.id)\
+                    .join(pd2, and_(pd2.idPrescription == p2.id, pd2.id != pd1.id))\
+                    .join(m1, m1.id == pd1.idDrug)\
+                    .join(m2, m2.id == pd2.idDrug)\
+                    .join(Relation, and_(Relation.sctida == m1.sctid, Relation.sctidb == m2.sctid))\
+                    .filter(p1.admissionNumber == admissionNumber)\
+                    .filter(or_(func.date(p1.date) == aggDate,func.date(p1.expire) == aggDate))\
+                    .filter(or_(func.date(p2.date) == aggDate,func.date(p2.expire) == aggDate))\
+                    .filter(func.date(p2.expire) == func.date(p1.expire))\
+                    .filter(p1.idSegment != None)
+
+        relation = relation.filter(Relation.active == True)
 
         interaction = relation.filter(Relation.kind.in_(['it','dt','dm']))
 
@@ -149,7 +157,7 @@ class Prescription(db.Model):
         al = db.aliased(admissionAlergy)
 
         xreactivity = db.session\
-            .query(pd1.id, Relation, m1.name, m2.name)\
+            .query(pd1.id, Relation, m1.name, m2.name, pd1.update)\
             .join(al, al.c.id != pd1.id)\
             .join(m1, m1.id == pd1.idDrug)\
             .join(m2, m2.id == al.c.idDrug)\
@@ -163,7 +171,7 @@ class Prescription(db.Model):
         if aggDate is None:
             xreactivity = xreactivity.filter(pd1.idPrescription == idPrescription)
         else:
-            xreactivity = xreactivity.outerjoin(Prescription, Prescription.id == pd1.idPrescription)\
+            xreactivity = xreactivity.join(Prescription, Prescription.id == pd1.idPrescription)\
                                .filter(Prescription.admissionNumber == admissionNumber)\
                                .filter(or_(
                                     func.date(Prescription.date) == aggDate,
@@ -176,7 +184,11 @@ class Prescription(db.Model):
         results = {}
         pairs = []
         for r in relations:
-            key = str(r[1].sctida) + '-' + str(r[1].sctidb)
+            if aggDate is None:
+                key = str(r[1].sctida) + '-' + str(r[1].sctidb)
+            else:
+                key = str(r[1].sctida) + '-' + str(r[1].sctidb) + str(r[4].day if r[4] else 0)
+
             if key in pairs: 
                 continue;
 
@@ -188,8 +200,7 @@ class Prescription(db.Model):
             else:
                 results[r[0]] = [alert]
 
-            if (r[1].sctida == r[1].sctidb): 
-                pairs.append(key)
+            pairs.append(key)
 
         return results
 
@@ -352,7 +363,7 @@ class PrescriptionDrug(db.Model):
         q = db.session\
             .query(PrescriptionDrug, Drug, MeasureUnit, Frequency, '0',\
                     func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4).label('score'),
-                    DrugAttributes, Notes.notes, prevNotes.label('prevNotes'), Prescription.status)\
+                    DrugAttributes, Notes.notes, prevNotes.label('prevNotes'), Prescription.status, Prescription.expire)\
             .outerjoin(Outlier, Outlier.id == PrescriptionDrug.idOutlier)\
             .outerjoin(Drug, Drug.id == PrescriptionDrug.idDrug)\
             .outerjoin(Notes, Notes.idPrescriptionDrug == PrescriptionDrug.id)\
