@@ -251,7 +251,7 @@ class Patient(db.Model):
 
         if (len(idDept)>0):
             idDept = list(map(int, idDept))
-            q = q.filter(postgresql.array(idDept).contains(Prescription.aggDeps))
+            q = q.filter(postgresql.array(idDept).overlap(Prescription.aggDeps))
 
         if (len(idDrug)>0):
             idDrug = list(map(int, idDrug))
