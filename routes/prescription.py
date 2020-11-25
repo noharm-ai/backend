@@ -275,6 +275,9 @@ def getPrescriptionAuth(idPrescription):
     else:
         return getPrescription(idPrescription=idPrescription)
 
+def sortDrugs(d):
+  return d['drug']
+
 def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
 
     if idPrescription:
@@ -316,6 +319,7 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
     pDrugs = drugList.getDrugType([], 'Medicamentos')
     pDrugs = drugList.getDrugType(pDrugs, 'Medicamentos', checked=True)
     pDrugs = drugList.getDrugType(pDrugs, 'Medicamentos', suspended=True)
+    pDrugs.sort(key=sortDrugs)
     pDrugs = drugList.sortWhiteList(pDrugs)
 
     pSolution = drugList.getDrugType([], 'Soluções')
