@@ -95,7 +95,7 @@ class Prescription(db.Model):
                     .all()
         headers = {}
         for p in prescriptions:
-            headers[p[0].id] = dict(p[0].features, **{
+            headers[p[0].id] = dict(p[0].features or {}, **{
                 'date': p[0].date.isoformat() if p[0].date else None,
                 'expire': p[0].expire.isoformat() if p[0].expire else None,
                 'status': p[0].status,
