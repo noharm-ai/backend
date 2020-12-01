@@ -365,7 +365,7 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
             'solution': pSolution,
             'procedures': pProcedures,
             'infusion': pInfusion,
-            'interventions': [i for i in interventions if i['idPrescription'] < prescription[0].id],
+            'interventions': interventions,
             'alertExams': alertExams,
             'exams': examsJson[:10],
             'status': prescription[0].status,
