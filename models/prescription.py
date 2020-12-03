@@ -95,15 +95,18 @@ class Prescription(db.Model):
                     .all()
         headers = {}
         for p in prescriptions:
-            headers[p[0].id] = dict(p[0].features or {}, **{
+            headers[p[0].id] = {
                 'date': p[0].date.isoformat() if p[0].date else None,
                 'expire': p[0].expire.isoformat() if p[0].expire else None,
                 'status': p[0].status,
                 'bed': p[0].bed,
                 'prescriber': p[0].prescriber,
                 'idDepartment': p[0].idDepartment,
-                'department': p[1]
-            })
+                'department': p[1],
+                'drugs': {},
+                'procedures': {},
+                'solutions': {}
+            }
 
         return headers
 

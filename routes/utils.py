@@ -238,3 +238,52 @@ def tryCommit(db, recId, allow=True):
             'status': 'error',
             'message': str(e)
         }, status.HTTP_500_INTERNAL_SERVER_ERROR
+
+def getFeatures(result):
+
+    drugList = result['data']['prescription']
+    drugList.extend(result['data']['solution'])
+    drugList.extend(result['data']['procedures'])
+
+    alerts = pScore = score1 = score2 = score3 = 0
+    am = av = control = np = tube = diff = 0
+    drugIDs = []
+    for d in drugList: 
+        drugIDs.append(d['idDrug'])
+        if d['whiteList'] or d['suspended']: continue
+
+        alerts += len(d['alerts'])
+        pScore += int(d['score'])
+        score1 += int(d['score'] == '1')
+        score2 += int(d['score'] == '2')
+        score3 += int(int(d['score']) > 2)
+        am += int(d['am']) if not d['am'] is None else 0
+        av += int(d['av']) if not d['av'] is None else 0
+        np += int(d['np']) if not d['np'] is None and not d['existIntervention'] else 0
+        control += int(d['c']) if not d['c'] is None else 0
+        diff += int(not d['checked'])
+        tubes = ['sonda', 'sg', 'se']
+        tube += int(any(t in strNone(d['route']).lower() for t in tubes))
+
+    interventions = 0
+    for i in result['data']['interventions']:
+        interventions += int(i['status'] == 's')
+
+    exams = result['data']['alertExams']
+
+    return {
+        'alerts': alerts,
+        'prescriptionScore': pScore,
+        'scoreOne': score1,
+        'scoreTwo': score2,
+        'scoreThree': score3,
+        'am': am,
+        'av': av,
+        'controlled': control,
+        'np': np,
+        'tube': tube,
+        'diff': diff,
+        'alertExams': exams,
+        'interventions': interventions,
+        'drugIDs': list(set(drugIDs))
+    }

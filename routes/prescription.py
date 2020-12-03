@@ -278,6 +278,17 @@ def getPrescriptionAuth(idPrescription):
 def sortDrugs(d):
   return d['drug']
 
+def buildHeaders(headers, pDrugs, pSolution, pProcedures):
+    for pid in headers.keys():
+        drugs = [d for d in pDrugs if d['idPrescription'] == pid]
+        solutions = [s for s in pSolution if s['idPrescription'] == pid]
+        procedures = [p for p in pProcedures if p['idPrescription'] == pid]
+        headers[pid]['drugs'] = getFeatures({'data':{'prescription':drugs, 'solution': [], 'procedures': [], 'interventions':[], 'alertExams':[]}})
+        headers[pid]['solutions'] = getFeatures({'data':{'prescription':[], 'solution': solutions, 'procedures': [], 'interventions':[], 'alertExams':[]}})
+        headers[pid]['procedures'] = getFeatures({'data':{'prescription':[], 'solution': [], 'procedures': procedures, 'interventions':[], 'alertExams':[]}})
+
+    return headers
+
 def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
 
     if idPrescription:
@@ -328,6 +339,9 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
     pProcedures = drugList.getDrugType([], 'Proced/Exames')
     pProcedures = drugList.getDrugType(pProcedures, 'Proced/Exames', checked=True)
     pProcedures = drugList.getDrugType(pProcedures, 'Proced/Exames', suspended=True)
+
+    if aggDate:
+        headers = buildHeaders(headers, pDrugs,pSolution,pProcedures)
 
     return {
         'status': 'success',
