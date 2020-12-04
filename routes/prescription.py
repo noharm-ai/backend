@@ -141,6 +141,9 @@ class DrugList():
                         if ('tgp' in self.exams and self.exams['tgp']['value'] and float(self.exams['tgp']['value']) > pd[6].liver) or ('tgo' in self.exams and self.exams['tgo']['value'] and float(self.exams['tgo']['value']) > pd[6].liver):
                             alerts.append('Medicamento deve sofrer ajuste de posologia ou contraindicado, já que a função hepática do paciente está reduzida (acima de ' + str(pd[6].liver) + ' U/L).')
 
+                    if pd[6].platelets and 'plqt' in self.exams and self.exams['plqt']['value'] and pd[6].platelets > self.exams['plqt']['value']:
+                        alerts.append('Medicamento contraindicado para paciente com plaquetas (' + str(self.exams['plqt']['value']) + ' plaquetas/µL) abaixo de ' + str(pd[6].platelets) + ' plaquetas/µL.')
+
                     if pd[6].elderly and self.exams['age'] > 60:
                         alerts.append('Medicamento potencialmente inapropriado para idosos, independente das comorbidades do paciente.')
 
@@ -174,6 +177,12 @@ class DrugList():
 
                         if pd[6].maxDose and self.maxDoseAgg[idDrugAgg]['count'] > 1 and pd[6].maxDose < self.maxDoseAgg[idDrugAgg]['value']:
                             alerts.append('Dose diária prescrita SOMADA (' + str(self.maxDoseAgg[idDrugAgg]['value']) + ' ' + str(pd[6].idMeasureUnit) + ') maior que a dose de alerta (' + str(pd[6].maxDose) + ' ' + str(pd[6].idMeasureUnit) + ') usualmente recomendada (considerada a dose diária independente da indicação).')
+
+                tubeAlert = False
+                tubes = ['sonda nasoenteral', 'sonda nasogástrica', 'enteral','jejunostomia','gastrostomia', 'sg', 'se', 'gtt', 've', 'jtt', 'og', 'oj', 'ng', 'ne']
+                if pd[6] and pd[6].tube and any(t == strNone(pd[0].route).lower() for t in tubes):
+                    alerts.append('Medicamento contraindicado via sonda (' + strNone(pd[0].route) + ')')
+                    tubeAlert = True
 
                 if pd[0].alergy == 'S':
                     alerts.append('Paciente alérgico a este medicamento.')
@@ -219,6 +228,7 @@ class DrugList():
                 'existIntervention': self.getExistIntervention(pd[0].idDrug, pd[0].idPrescription),
                 'intervention': self.getIntervention(pd[0].id),
                 'alerts': alerts,
+                'tubeAlert': tubeAlert,
                 'notes': pd[7],
                 'prevNotes': pd[8]
             })

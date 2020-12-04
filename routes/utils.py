@@ -262,8 +262,7 @@ def getFeatures(result):
         np += int(d['np']) if not d['np'] is None and not d['existIntervention'] else 0
         control += int(d['c']) if not d['c'] is None else 0
         diff += int(not d['checked'])
-        tubes = ['sonda', 'sg', 'se']
-        tube += int(any(t in strNone(d['route']).lower() for t in tubes))
+        tube += int(d['tubeAlert'])
 
     interventions = 0
     for i in result['data']['interventions']:
