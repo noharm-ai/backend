@@ -291,11 +291,17 @@ def sortDrugs(d):
 def buildHeaders(headers, pDrugs, pSolution, pProcedures):
     for pid in headers.keys():
         drugs = [d for d in pDrugs if d['idPrescription'] == pid]
+        drugsInterv = [d['prevIntervention'] for d in drugs if d['prevIntervention'] != {}]
+
         solutions = [s for s in pSolution if s['idPrescription'] == pid]
+        solutionsInterv = [s['prevIntervention'] for s in solutions if s['prevIntervention'] != {}]
+        
         procedures = [p for p in pProcedures if p['idPrescription'] == pid]
-        headers[pid]['drugs'] = getFeatures({'data':{'prescription':drugs, 'solution': [], 'procedures': [], 'interventions':[], 'alertExams':[]}})
-        headers[pid]['solutions'] = getFeatures({'data':{'prescription':[], 'solution': solutions, 'procedures': [], 'interventions':[], 'alertExams':[]}})
-        headers[pid]['procedures'] = getFeatures({'data':{'prescription':[], 'solution': [], 'procedures': procedures, 'interventions':[], 'alertExams':[]}})
+        proceduresInterv = [s['prevIntervention'] for s in solutions if s['prevIntervention'] != {}]
+        
+        headers[pid]['drugs'] = getFeatures({'data':{'prescription':drugs, 'solution': [], 'procedures': [], 'interventions':drugsInterv, 'alertExams':[]}})
+        headers[pid]['solutions'] = getFeatures({'data':{'prescription':[], 'solution': solutions, 'procedures': [], 'interventions':solutionsInterv, 'alertExams':[]}})
+        headers[pid]['procedures'] = getFeatures({'data':{'prescription':[], 'solution': [], 'procedures': procedures, 'interventions':proceduresInterv, 'alertExams':[]}})
 
     return headers
 
