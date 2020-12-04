@@ -131,6 +131,7 @@ class DrugList():
             self.maxDoseAgg[idDrugAgg]['value'] += pdDoseconv
             self.maxDoseAgg[idDrugAgg]['count'] += 1
 
+            tubeAlert = False
             alerts = []
             if not bool(pd[0].suspendedDate):
                 if self.exams and pd[6]:
@@ -178,7 +179,6 @@ class DrugList():
                         if pd[6].maxDose and self.maxDoseAgg[idDrugAgg]['count'] > 1 and pd[6].maxDose < self.maxDoseAgg[idDrugAgg]['value']:
                             alerts.append('Dose diária prescrita SOMADA (' + str(self.maxDoseAgg[idDrugAgg]['value']) + ' ' + str(pd[6].idMeasureUnit) + ') maior que a dose de alerta (' + str(pd[6].maxDose) + ' ' + str(pd[6].idMeasureUnit) + ') usualmente recomendada (considerada a dose diária independente da indicação).')
 
-                tubeAlert = False
                 tubes = ['sonda nasoenteral', 'sonda nasogástrica', 'enteral','jejunostomia','gastrostomia', 'sg', 'se', 'gtt', 've', 'jtt', 'og', 'oj', 'ng', 'ne']
                 if pd[6] and pd[6].tube and any(t == strNone(pd[0].route).lower() for t in tubes):
                     alerts.append('Medicamento contraindicado via sonda (' + strNone(pd[0].route) + ')')
