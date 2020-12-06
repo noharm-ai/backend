@@ -46,9 +46,16 @@ def getPrescriptions():
         if p[0].features:
             for f in featuresNames:
                 features[f] = p[0].features[f] if f in p[0].features else 0
+            
+            features['globalScore'] = features['prescriptionScore'] + features['av'] + features['alertExams'] + features['alerts']
+            if features['globalScore'] > 90 : features['class'] = 'red'
+            elif features['globalScore'] > 60 : features['class'] = 'orange'
+            elif features['globalScore'] > 10 : features['class'] = 'yellow'
+            else: features['class'] = 'green'
         else:
             features['processed'] = False
-
+            features['globalScore'] = 0
+            features['class'] = 'blue'
 
         results.append(dict(features, **{
             'idPrescription': str(p[0].id),
@@ -63,8 +70,8 @@ def getPrescriptions():
             'dischargeDate': patient.dischargeDate.isoformat() if patient.dischargeDate else None,
             'date': p[0].date.isoformat(),
             'department': str(p[2]),
-            'class': 'yellow',
             'status': p[0].status,
+            'source': 'prescription'
         }))
 
     return {
@@ -400,7 +407,8 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
             'exams': examsJson[:10],
             'status': prescription[0].status,
             'prescriber': prescription[9],
-            'headers': headers
+            'headers': headers,
+            'source': 'prescription'
         }
     }, status.HTTP_200_OK
 
