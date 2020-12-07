@@ -340,7 +340,6 @@ class PrescriptionDrug(db.Model):
     notes = db.Column('complemento', db.String, nullable=True)
     interval = db.Column('horario', db.String, nullable=True)
     source = db.Column('origem', db.String, nullable=True)
-    default = db.Column('padronizado', db.String(1), nullable=True)
     alergy = db.Column('alergia', db.String(1), nullable=True)
 
     solutionGroup = db.Column('slagrupamento', db.String(1), nullable=True)
