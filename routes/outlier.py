@@ -110,7 +110,9 @@ def getOutliers(idSegment=1, idDrug=1):
             'maxDose': drugAttr.maxDose,
             'kidney': drugAttr.kidney,
             'liver': drugAttr.liver,
+            'platelets': drugAttr.platelets,
             'elderly': drugAttr.elderly,
+            'tube': drugAttr.tube,
             'division': drugAttr.division,
             'useWeight': drugAttr.useWeight,
             'idMeasureUnit': drugAttr.idMeasureUnit or defaultUnit,
@@ -193,7 +195,9 @@ def setDrugClass(idDrug):
     if 'maxDose' in data.keys(): drugAttr.maxDose = data.get('maxDose', None)
     if 'kidney' in data.keys(): drugAttr.kidney = data.get('kidney', None)
     if 'liver' in data.keys(): drugAttr.liver = data.get('liver', None)
+    if 'platelets' in data.keys(): drugAttr.platelets = data.get('platelets', None)
     if 'elderly' in data.keys(): drugAttr.elderly = data.get('elderly', 0)
+    if 'tube' in data.keys(): drugAttr.tube = data.get('tube', 0)
     if 'division' in data.keys(): drugAttr.division = data.get('division', None)
     if 'price' in data.keys(): drugAttr.price = data.get('price', None)
     if 'maxTime' in data.keys(): drugAttr.maxTime = data.get('maxTime', None)

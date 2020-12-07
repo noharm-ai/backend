@@ -222,3 +222,27 @@ def setExams(idSegment, typeExam):
     if newSegExam: db.session.add(segExam)
 
     return tryCommit(db, typeExam)
+
+@app_seg.route('/segments/<int:idSegment>/exams-order', methods=['PUT'])
+@jwt_required
+def setExamsOrder(idSegment):
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+    data = request.get_json()
+
+    examsOrder = data.get('exams', None)
+    if not examsOrder:
+        return { 'status': 'error', 'message': 'Sem exames para ordenar!' }, status.HTTP_400_BAD_REQUEST
+
+    segExams = SegmentExam.query\
+                .filter(SegmentExam.idSegment == idSegment)\
+                .order_by(asc(SegmentExam.order))\
+                .all()
+
+    result = {}
+    for s in segExams:
+        if s.typeExam in examsOrder:
+            s.order = examsOrder.index(s.typeExam)
+        result[s.typeExam] = s.order
+    
+    return tryCommit(db, result)

@@ -46,9 +46,16 @@ def getPrescriptions():
         if p[0].features:
             for f in featuresNames:
                 features[f] = p[0].features[f] if f in p[0].features else 0
+            
+            features['globalScore'] = features['prescriptionScore'] + features['av'] + features['alertExams'] + features['alerts']
+            if features['globalScore'] > 90 : features['class'] = 'red'
+            elif features['globalScore'] > 60 : features['class'] = 'orange'
+            elif features['globalScore'] > 10 : features['class'] = 'yellow'
+            else: features['class'] = 'green'
         else:
             features['processed'] = False
-
+            features['globalScore'] = 0
+            features['class'] = 'blue'
 
         results.append(dict(features, **{
             'idPrescription': str(p[0].id),
@@ -63,8 +70,7 @@ def getPrescriptions():
             'dischargeDate': patient.dischargeDate.isoformat() if patient.dischargeDate else None,
             'date': p[0].date.isoformat(),
             'department': str(p[2]),
-            'class': 'yellow',
-            'status': p[0].status,
+            'status': p[0].status
         }))
 
     return {
@@ -131,6 +137,7 @@ class DrugList():
             self.maxDoseAgg[idDrugAgg]['value'] += pdDoseconv
             self.maxDoseAgg[idDrugAgg]['count'] += 1
 
+            tubeAlert = False
             alerts = []
             if not bool(pd[0].suspendedDate):
                 if self.exams and pd[6]:
@@ -140,6 +147,9 @@ class DrugList():
                     if pd[6].liver:
                         if ('tgp' in self.exams and self.exams['tgp']['value'] and float(self.exams['tgp']['value']) > pd[6].liver) or ('tgo' in self.exams and self.exams['tgo']['value'] and float(self.exams['tgo']['value']) > pd[6].liver):
                             alerts.append('Medicamento deve sofrer ajuste de posologia ou contraindicado, já que a função hepática do paciente está reduzida (acima de ' + str(pd[6].liver) + ' U/L).')
+
+                    if pd[6].platelets and 'plqt' in self.exams and self.exams['plqt']['value'] and pd[6].platelets > self.exams['plqt']['value']:
+                        alerts.append('Medicamento contraindicado para paciente com plaquetas (' + str(self.exams['plqt']['value']) + ' plaquetas/µL) abaixo de ' + str(pd[6].platelets) + ' plaquetas/µL.')
 
                     if pd[6].elderly and self.exams['age'] > 60:
                         alerts.append('Medicamento potencialmente inapropriado para idosos, independente das comorbidades do paciente.')
@@ -174,6 +184,11 @@ class DrugList():
 
                         if pd[6].maxDose and self.maxDoseAgg[idDrugAgg]['count'] > 1 and pd[6].maxDose < self.maxDoseAgg[idDrugAgg]['value']:
                             alerts.append('Dose diária prescrita SOMADA (' + str(self.maxDoseAgg[idDrugAgg]['value']) + ' ' + str(pd[6].idMeasureUnit) + ') maior que a dose de alerta (' + str(pd[6].maxDose) + ' ' + str(pd[6].idMeasureUnit) + ') usualmente recomendada (considerada a dose diária independente da indicação).')
+
+                tubes = ['sonda nasoenteral', 'sonda nasogástrica', 'enteral','jejunostomia','gastrostomia', 'sg', 'se', 'gtt', 've', 'jtt', 'og', 'oj', 'ng', 'ne']
+                if pd[6] and pd[6].tube and any(t == strNone(pd[0].route).lower() for t in tubes):
+                    alerts.append('Medicamento contraindicado via sonda (' + strNone(pd[0].route) + ')')
+                    tubeAlert = True
 
                 if pd[0].alergy == 'S':
                     alerts.append('Paciente alérgico a este medicamento.')
@@ -219,6 +234,7 @@ class DrugList():
                 'existIntervention': self.getExistIntervention(pd[0].idDrug, pd[0].idPrescription),
                 'intervention': self.getIntervention(pd[0].id),
                 'alerts': alerts,
+                'tubeAlert': tubeAlert,
                 'notes': pd[7],
                 'prevNotes': pd[8]
             })
@@ -278,6 +294,23 @@ def getPrescriptionAuth(idPrescription):
 def sortDrugs(d):
   return d['drug']
 
+def buildHeaders(headers, pDrugs, pSolution, pProcedures):
+    for pid in headers.keys():
+        drugs = [d for d in pDrugs if d['idPrescription'] == pid]
+        drugsInterv = [d['prevIntervention'] for d in drugs if d['prevIntervention'] != {}]
+
+        solutions = [s for s in pSolution if s['idPrescription'] == pid]
+        solutionsInterv = [s['prevIntervention'] for s in solutions if s['prevIntervention'] != {}]
+        
+        procedures = [p for p in pProcedures if p['idPrescription'] == pid]
+        proceduresInterv = [s['prevIntervention'] for s in solutions if s['prevIntervention'] != {}]
+        
+        headers[pid]['drugs'] = getFeatures({'data':{'prescription':drugs, 'solution': [], 'procedures': [], 'interventions':drugsInterv, 'alertExams':[]}})
+        headers[pid]['solutions'] = getFeatures({'data':{'prescription':[], 'solution': solutions, 'procedures': [], 'interventions':solutionsInterv, 'alertExams':[]}})
+        headers[pid]['procedures'] = getFeatures({'data':{'prescription':[], 'solution': [], 'procedures': procedures, 'interventions':proceduresInterv, 'alertExams':[]}})
+
+    return headers
+
 def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
 
     if idPrescription:
@@ -329,6 +362,9 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
     pProcedures = drugList.getDrugType(pProcedures, 'Proced/Exames', checked=True)
     pProcedures = drugList.getDrugType(pProcedures, 'Proced/Exames', suspended=True)
 
+    if aggDate:
+        headers = buildHeaders(headers, pDrugs,pSolution,pProcedures)
+
     return {
         'status': 'success',
         'data': {
@@ -365,7 +401,7 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
             'solution': pSolution,
             'procedures': pProcedures,
             'infusion': pInfusion,
-            'interventions': [i for i in interventions if i['idPrescription'] < prescription[0].id],
+            'interventions': interventions,
             'alertExams': alertExams,
             'exams': examsJson[:10],
             'status': prescription[0].status,

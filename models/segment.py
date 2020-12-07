@@ -40,7 +40,7 @@ class SegmentExam(db.Model):
         results = {}
         for e in exams:
             results[e.typeExam.lower()] = e
-            if e.initials.lower() == 'creatinina':
+            if e.initials.lower() == 'creatinina': 
                 results['cr'] = e
 
         return results
@@ -86,18 +86,26 @@ class Exams(db.Model):
             examEmpty['max'] = segExam[e].max
             examEmpty['name'] = segExam[e].name
             examEmpty['initials'] = segExam[e].initials
-            if segExam[e].initials.lower() == 'creatinina':
+            if segExam[e].initials.lower() == 'creatinina': 
                 exams['cr'] = examEmpty
-            else:
+            else: 
                 exams[e.lower()] = examEmpty
 
+        examsExtra = {}
         for e in results:
             
             if e.typeExam.lower() not in ['mdrd','ckd','cg','swrtz2']:
                 exams[e.typeExam.lower()] = formatExam(e, e.typeExam.lower(), segExam)
             
-            if e.typeExam.lower() in segExam and segExam[e.typeExam.lower()].initials.lower() == 'creatinina':
-                exams['cr'] = formatExam(e, e.typeExam.lower(), segExam)
+            if e.typeExam.lower() in segExam:
+                if segExam[e.typeExam.lower()].initials.lower() == 'creatinina':
+                    exams['cr'] = formatExam(e, e.typeExam.lower(), segExam)
+                if segExam[e.typeExam.lower()].initials.lower() == 'tgo':
+                    examsExtra['tgo'] = formatExam(e, e.typeExam.lower(), segExam)
+                if segExam[e.typeExam.lower()].initials.lower() == 'tgp':
+                    examsExtra['tgp'] = formatExam(e, e.typeExam.lower(), segExam)
+                if segExam[e.typeExam.lower()].initials.lower() == 'plaquetas':
+                    examsExtra['plqt'] = formatExam(e, e.typeExam.lower(), segExam)
 
         if 'cr' in exams:
             if age > 17:
@@ -111,4 +119,4 @@ class Exams(db.Model):
                 if 'swrtz2' in exams:
                     exams['swrtz2'] = schwartz2_calc(exams['cr']['value'], patient.height)
 
-        return exams
+        return dict(exams, **examsExtra)
