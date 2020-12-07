@@ -70,8 +70,7 @@ def getPrescriptions():
             'dischargeDate': patient.dischargeDate.isoformat() if patient.dischargeDate else None,
             'date': p[0].date.isoformat(),
             'department': str(p[2]),
-            'status': p[0].status,
-            'source': 'prescription'
+            'status': p[0].status
         }))
 
     return {
@@ -407,8 +406,7 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
             'exams': examsJson[:10],
             'status': prescription[0].status,
             'prescriber': prescription[9],
-            'headers': headers,
-            'source': 'prescription'
+            'headers': headers
         }
     }, status.HTTP_200_OK
 
