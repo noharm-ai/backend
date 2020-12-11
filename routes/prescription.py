@@ -365,6 +365,8 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
     if aggDate:
         headers = buildHeaders(headers, pDrugs,pSolution,pProcedures)
 
+    pIntervention = [i for i in interventions if i['id'] == 0 and i['idPrescription'] == prescription[0].id]
+
     return {
         'status': 'success',
         'data': {
@@ -406,7 +408,8 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
             'exams': examsJson[:10],
             'status': prescription[0].status,
             'prescriber': prescription[9],
-            'headers': headers
+            'headers': headers,
+            'intervention': pIntervention[0] if len(pIntervention) else None
         }
     }, status.HTTP_200_OK
 

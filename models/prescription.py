@@ -42,7 +42,7 @@ class Prescription(db.Model):
             .outerjoin(Department, Department.id == Prescription.idDepartment)\
             .filter(Prescription.admissionNumber == admissionNumber)\
             .filter(Prescription.id < idPrescription)\
-            .order_by(desc(Prescription.date))\
+            .order_by(desc(Prescription.id))\
             .first()
 
     def getPrescriptionBasic():
@@ -407,6 +407,7 @@ class Intervention(db.Model):
     __tablename__ = 'intervencao'
 
     id = db.Column("fkpresmed", db.Integer, primary_key=True)
+    idPrescription = db.Column("fkprescricao", db.Integer, primary_key=True)
     admissionNumber = db.Column('nratendimento', db.Integer, nullable=False)
     idInterventionReason = db.Column("idmotivointervencao", db.Integer, nullable=False)
     error = db.Column('erro', db.Boolean, nullable=True)
@@ -443,8 +444,9 @@ class Intervention(db.Model):
             .query(Intervention, PrescriptionDrug, 
                     func.array(reason).label('reason'), Drug.name, 
                     func.array(interactions).label('interactions'),
-                    MeasureUnit, Frequency)\
-            .join(PrescriptionDrug, Intervention.id == PrescriptionDrug.id)\
+                    MeasureUnit, Frequency, Prescription)\
+            .outerjoin(PrescriptionDrug, Intervention.id == PrescriptionDrug.id)\
+            .outerjoin(Prescription, Intervention.idPrescription == Prescription.id)\
             .outerjoin(Drug, Drug.id == PrescriptionDrug.idDrug)\
             .outerjoin(MeasureUnit, MeasureUnit.id == PrescriptionDrug.idMeasureUnit)\
             .outerjoin(Frequency, Frequency.id == PrescriptionDrug.idFrequency)
@@ -461,17 +463,17 @@ class Intervention(db.Model):
         for i in interventions:
             intervBuffer.append({
                 'id': i[0].id,
-                'idSegment': i[1].idSegment,
+                'idSegment': i[1].idSegment if i[1] else i[7].idSegment if i[7] else None,
                 'idInterventionReason': i[0].idInterventionReason,
                 'reasonDescription': (', ').join(i[2]),
-                'idPrescription': i[1].idPrescription,
-                'idDrug': i[1].idDrug,
-                'drugName': i[3] if i[3] is not None else 'Medicamento ' + str(i[1].idDrug),
-                'dose': i[1].dose,
+                'idPrescription': i[1].idPrescription  if i[1] else i[0].idPrescription,
+                'idDrug': i[1].idDrug if i[1] else None,
+                'drugName': i[3] if i[3] is not None else 'Medicamento ' + str(i[1].idDrug) if i[1] else 'Intervenção no Paciente',
+                'dose': i[1].dose if i[1] else None,
                 'measureUnit': { 'value': i[5].id, 'label': i[5].description } if i[5] else '',
                 'frequency': { 'value': i[6].id, 'label': i[6].description } if i[6] else '',
-                'time': timeValue(i[1].interval),
-                'route': i[1].route,
+                'time': timeValue(i[1].interval) if i[1] else None,
+                'route': i[1].route if i[1] else 'None',
                 'admissionNumber': i[0].admissionNumber,
                 'observation': i[0].notes,
                 'error': i[0].error,
