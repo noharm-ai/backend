@@ -27,16 +27,22 @@ def setDrugStatus(idPrescriptionDrug, drugStatus):
 
 @app_itrv.route('/intervention/<int:idPrescriptionDrug>', methods=['PUT'])
 @jwt_required
-def createIntervention(idPrescriptionDrug=None):
+def createIntervention(idPrescriptionDrug):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
     data = request.get_json()
 
+    if idPrescriptionDrug == 0: 
+        idPrescription = data.get('idPrescription', 0)
+    else:
+        idPrescription = 0
+
     newIntervention = False
-    i = Intervention.query.get(idPrescriptionDrug)
+    i = Intervention.query.get((idPrescriptionDrug, idPrescription))
     if i is None:
         i = Intervention()
         i.id = idPrescriptionDrug
+        i.idPrescription = idPrescription
         i.date = datetime.today()
         i.update = datetime.today()
         i.user = user.id
