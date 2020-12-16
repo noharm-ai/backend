@@ -482,6 +482,7 @@ class Intervention(db.Model):
                 'interactionsList': interactionsList(i[4], splitStr),
                 'interactions': i[0].interactions,
                 'date': i[0].date.isoformat(),
+                'dateTime': i[0].date,
                 'status': i[0].status
             })
 

@@ -311,6 +311,20 @@ def buildHeaders(headers, pDrugs, pSolution, pProcedures):
 
     return headers
 
+def getPrevIntervention(interventions, dtPrescription):
+    result = False
+    for i in interventions:
+        if i['id'] == 0 and i['status'] == 's' and i['dateTime'] < dtPrescription:
+            result = True;
+    return result
+
+def getExistIntervention(interventions, dtPrescription):
+    result = False
+    for i in interventions:
+        if i['id'] == 0 and i['dateTime'] < dtPrescription:
+            result = True;
+    return result
+
 def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
 
     if idPrescription:
@@ -409,7 +423,9 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
             'status': prescription[0].status,
             'prescriber': prescription[9],
             'headers': headers,
-            'intervention': pIntervention[0] if len(pIntervention) else None
+            'intervention': pIntervention[0] if len(pIntervention) else None,
+            'prevIntervention': getPrevIntervention(interventions, prescription[0].date),
+            'existIntervention': getExistIntervention(interventions, prescription[0].date)
         }
     }, status.HTTP_200_OK
 
