@@ -293,7 +293,7 @@ def getPrescriptionAuth(idPrescription):
         return getPrescription(idPrescription=idPrescription)
 
 def sortDrugs(d):
-  return d['drug']
+  return d['drug'].lower()
 
 def buildHeaders(headers, pDrugs, pSolution, pProcedures):
     for pid in headers.keys():
