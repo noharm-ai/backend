@@ -124,7 +124,7 @@ class DrugList():
 
             if not belong: continue
 
-            pdFrequency = 1 if pd[0].frequency in [33,44,99] else pd[0].frequency
+            pdFrequency = 1 if pd[0].frequency in [33,44,55,66,99] else pd[0].frequency
             pdDoseconv = none2zero(pd[0].doseconv) * none2zero(pdFrequency)
             pdUnit = strNone(pd[2].id) if pd[2] else ''
             pdWhiteList = bool(pd[6].whiteList) if pd[6] is not None else False

@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/setup-python@v1
+      - uses: actions/setup-python@v2
         with:
           python-version: 3.8
       - name: Run Python Tests
@@ -21,14 +21,9 @@ jobs:
     runs-on: [ubuntu-latest]
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/setup-python@v1
+      - uses: actions/setup-python@v2
         with:
           python-version: 3.8
-      - name: Config Python
-        run: |
-          python -m pip install --upgrade pip
-          pip install pipenv
-          pipenv install -r requirements-prod.txt --skip-lock
       - name: Config Zappa
         run: |
           echo '${{ secrets.ZAPPA_DEV_SETTINGS }}' > zappa_settings.json 
@@ -38,5 +33,10 @@ jobs:
           aws_access_key_id = ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_access_key = ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           region = sa-east-1" > ~/.aws/credentials 
-      - name: Deploy Dev to AWS
-        run: pipenv run zappa update dev -q
+      - name: Deploy Zappa
+        run: |
+          python -m venv venv
+          source venv/bin/activate
+          python -m pip install --upgrade pip
+          pip install -r requirements-prod.txt
+          zappa update dev -q
