@@ -24,12 +24,6 @@ jobs:
       - uses: actions/setup-python@v2
         with:
           python-version: 3.8
-      - name: Config Python
-        run: |
-          python -m venv venv
-          source venv/bin/activate
-          python -m pip install --upgrade pip
-          pip install -r requirements-prod.txt
       - name: Config Zappa
         run: |
           echo '${{ secrets.ZAPPA_TEST_SETTINGS }}' > zappa_settings.json 
@@ -39,5 +33,13 @@ jobs:
           aws_access_key_id = ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_access_key = ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           region = sa-east-1" > ~/.aws/credentials 
+      - name: Config Python
+        run: |
+          python -m venv venv
+          source venv/bin/activate
+      - name: Install Dependencies
+          python -m pip install --upgrade pip
+          pip install -r requirements-prod.txt
       - name: Deploy Test to AWS
-        run: zappa update test -q
+        run: |
+          zappa update test -q
