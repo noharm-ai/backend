@@ -35,7 +35,7 @@ jobs:
           region = sa-east-1" > ~/.aws/credentials 
       - name: Deploy Zappa
         run: |
-          python -m venv venv
+          python3.8 -m venv venv
           source venv/bin/activate
           python -m pip install --upgrade pip
           pip install -r requirements-prod.txt
