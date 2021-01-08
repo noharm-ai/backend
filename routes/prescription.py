@@ -186,8 +186,7 @@ class DrugList():
                         if pd[6].maxDose and self.maxDoseAgg[idDrugAgg]['count'] > 1 and pd[6].maxDose < self.maxDoseAgg[idDrugAgg]['value']:
                             alerts.append('Dose diária prescrita SOMADA (' + str(self.maxDoseAgg[idDrugAgg]['value']) + ' ' + str(pd[6].idMeasureUnit) + ') maior que a dose de alerta (' + str(pd[6].maxDose) + ' ' + str(pd[6].idMeasureUnit) + ') usualmente recomendada (considerada a dose diária independente da indicação).')
 
-                tubes = ['sonda nasoenteral', 'sonda nasogástrica', 'enteral','jejunostomia','gastrostomia', 'sg', 'se', 'gtt', 've', 'jtt', 'og', 'oj', 'ng', 'ne']
-                if pd[6] and pd[6].tube and any(t == strNone(pd[0].route).lower() for t in tubes):
+                if pd[6] and pd[6].tube and pd[0].tube:
                     alerts.append('Medicamento contraindicado via sonda (' + strNone(pd[0].route) + ')')
                     tubeAlert = True
 
