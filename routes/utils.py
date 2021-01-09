@@ -65,6 +65,9 @@ def none2zero(s):
 def strNone(s):
     return '' if s is None else str(s)
 
+def skinChar(s):
+    return ' ' if s is None else str(s).upper()[0]
+
 def remove_accents(input_str):
     nfkd_form = unicodedata.normalize('NFKD', input_str)
     only_ascii = nfkd_form.encode('ASCII', 'ignore')
@@ -143,7 +146,7 @@ def mdrd_calc(cr, birthdate, gender, skinColor):
     eGFR = 175 * (float(cr))**(-1.154) * (age)**(-0.203)
 
     if gender == 'F': eGFR *= 0.742
-    if skinColor[1] in ['N','P']: eGFR *= 1.212
+    if skinChar(skinColor) in ['N','P']: eGFR *= 1.212
 
 
     return { 'value': round(eGFR,1), 'ref': 'maior que 50 ml/min/1.73', 'unit': 'ml/min/1.73',
@@ -179,11 +182,11 @@ def ckd_calc(cr, birthdate, gender, skinColor):
 
     if gender == 'F':
         g = 0.7
-        s = 166 if skinColor[1] in ['N','P'] else 144
+        s = 166 if skinChar(skinColor) in ['N','P'] else 144
         e = -1.209 if float(cr) > g else -0.329
     else:
         g = 0.9
-        s = 163 if skinColor[1] in ['N','P'] else 141
+        s = 163 if skinChar(skinColor) in ['N','P'] else 141
         e = -1.209 if float(cr) > g else -0.411
 
     eGFR = s * (float(cr)/g)**(e) * (0.993)**(age)
