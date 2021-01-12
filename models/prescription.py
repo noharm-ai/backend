@@ -340,6 +340,7 @@ class PrescriptionDrug(db.Model):
     frequency = db.Column("frequenciadia", db.Float, nullable=True)
     doseconv = db.Column("doseconv", db.Float, nullable=True)
     route = db.Column('via', db.String, nullable=True)
+    tube = db.Column('sonda', db.Boolean, nullable=True)
     notes = db.Column('complemento', db.String, nullable=True)
     interval = db.Column('horario', db.String, nullable=True)
     source = db.Column('origem', db.String, nullable=True)
