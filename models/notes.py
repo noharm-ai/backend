@@ -23,6 +23,6 @@ class ClinicalNotes(db.Model):
 
     def getIfExists(admissionNumber):
         if ClinicalNotes.exists():
-            return ClinicalNotes.query.filter(ClinicalNotes.admissionNumber==admissionNumber).all()
+            return ClinicalNotes.query.filter(ClinicalNotes.admissionNumber==admissionNumber).count()
         else:
-            return []
+            return None
