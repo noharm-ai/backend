@@ -17,6 +17,7 @@ from routes.substance import app_sub
 from routes.memory import app_mem
 from routes.patient import app_pat
 from routes.user import app_usr
+from routes.notes import app_note
 import os
 
 os.environ['TZ'] = 'America/Sao_Paulo'
@@ -49,6 +50,7 @@ app.register_blueprint(app_sub)
 app.register_blueprint(app_mem)
 app.register_blueprint(app_pat)
 app.register_blueprint(app_usr)
+app.register_blueprint(app_note)
 
 CORS(app)
 

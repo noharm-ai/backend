@@ -5,6 +5,7 @@ from models.main import *
 from models.appendix import *
 from models.segment import *
 from models.prescription import *
+from models.notes import ClinicalNotes
 from flask import Blueprint, request
 from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
@@ -347,6 +348,8 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
     relations = Prescription.findRelation(prescription[0].id,patient.admissionNumber, aggDate)
     headers = Prescription.getHeaders(admissionNumber, aggDate) if aggDate else []
 
+    clinicalNotes = ClinicalNotes.getIfExists(prescription[0].admissionNumber)
+
     exams = Exams.findLatestByAdmission(patient, prescription[0].idSegment)
     age = data2age(patient.birthdate.isoformat() if patient.birthdate else date.today().isoformat())
 
@@ -425,7 +428,8 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
             'headers': headers,
             'intervention': pIntervention[0] if len(pIntervention) else None,
             'prevIntervention': getPrevIntervention(interventions, prescription[0].date),
-            'existIntervention': getExistIntervention(interventions, prescription[0].date)
+            'existIntervention': getExistIntervention(interventions, prescription[0].date),
+            'clinicalNotes': clinicalNotes
         }
     }, status.HTTP_200_OK
 
