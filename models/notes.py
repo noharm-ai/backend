@@ -8,7 +8,7 @@ class ClinicalNotes(db.Model):
 
     id = db.Column("fkevolucao", db.Integer, primary_key=True)
     admissionNumber = db.Column('nratendimento', db.Integer, nullable=False)
-    text = deferred(db.Column("texto", db.String, nullable=False))
+    text = db.Column("texto", db.String, nullable=False)
     date = db.Column('dtevolucao', db.DateTime, nullable=False)
     prescriber = db.Column('prescritor', db.String, nullable=True)
     position = db.Column('cargo', db.String, nullable=True)

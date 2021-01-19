@@ -15,7 +15,21 @@ def getNotes(admissionNumber):
 
     if ClinicalNotes.exists():
     
-        results = ClinicalNotes.query.filter(ClinicalNotes.admissionNumber==admissionNumber).all()
+        notes = ClinicalNotes.query.filter(ClinicalNotes.admissionNumber==admissionNumber).all()
+
+        results = []
+        for n in notes:
+            results.append({
+                'admissionNumber': n.admissionNumber,
+                'text': n.text,
+                'date': n.date.isoformat(),
+                'prescriber': n.prescriber,
+                'position': n.position,
+                'features': n.features,
+                'update': n.update.isoformat(),
+                'user': n.user
+            })
+
 
         return {
             'status': 'success',
