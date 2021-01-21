@@ -4,6 +4,7 @@ from flask import Blueprint, request
 from flask_api import status
 from flask_jwt_extended import (jwt_required, get_jwt_identity)
 from .utils import tryCommit
+from sqlalchemy import desc
 
 app_note = Blueprint('app_note',__name__)
 
@@ -15,11 +16,15 @@ def getNotes(admissionNumber):
 
     if ClinicalNotes.exists():
     
-        notes = ClinicalNotes.query.filter(ClinicalNotes.admissionNumber==admissionNumber).all()
+        notes = ClinicalNotes.query\
+                .filter(ClinicalNotes.admissionNumber==admissionNumber)\
+                .order_by(desc(ClinicalNotes.date))\
+                .all()
 
         results = []
         for n in notes:
             results.append({
+                'id': n.id,
                 'admissionNumber': n.admissionNumber,
                 'text': n.text,
                 'date': n.date.isoformat(),
@@ -29,7 +34,6 @@ def getNotes(admissionNumber):
                 'update': n.update.isoformat(),
                 'user': n.user
             })
-
 
         return {
             'status': 'success',
