@@ -5,6 +5,7 @@ from flask_api import status
 from flask_jwt_extended import (jwt_required, get_jwt_identity)
 from .utils import tryCommit
 from sqlalchemy import desc
+from datetime import datetime, timedelta
 
 app_note = Blueprint('app_note',__name__)
 
@@ -18,6 +19,7 @@ def getNotes(admissionNumber):
     
         notes = ClinicalNotes.query\
                 .filter(ClinicalNotes.admissionNumber==admissionNumber)\
+                .filter(ClinicalNotes.date > (datetime.today() - timedelta(days=2)))\
                 .order_by(desc(ClinicalNotes.date))\
                 .all()
 
@@ -29,10 +31,7 @@ def getNotes(admissionNumber):
                 'text': n.text,
                 'date': n.date.isoformat(),
                 'prescriber': n.prescriber,
-                'position': n.position,
-                'features': n.features,
-                'update': n.update.isoformat(),
-                'user': n.user
+                'position': n.position
             })
 
         return {

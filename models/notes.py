@@ -2,6 +2,7 @@ from .main import db
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import deferred
 from sqlalchemy import inspect
+from datetime import datetime, timedelta
 
 class ClinicalNotes(db.Model):
     __tablename__ = 'evolucao'
@@ -22,6 +23,9 @@ class ClinicalNotes(db.Model):
 
     def getIfExists(admissionNumber):
         if ClinicalNotes.exists():
-            return ClinicalNotes.query.filter(ClinicalNotes.admissionNumber==admissionNumber).count()
+            return ClinicalNotes.query\
+                    .filter(ClinicalNotes.admissionNumber==admissionNumber)\
+                    .filter(ClinicalNotes.date > (datetime.today() - timedelta(days=2)))\
+                    .count()
         else:
             return None
