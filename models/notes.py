@@ -12,7 +12,6 @@ class ClinicalNotes(db.Model):
     date = db.Column('dtevolucao', db.DateTime, nullable=False)
     prescriber = db.Column('prescritor', db.String, nullable=True)
     position = db.Column('cargo', db.String, nullable=True)
-    features = db.Column("indicadores", postgresql.JSON, nullable=False)
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.Integer, nullable=True)
 
