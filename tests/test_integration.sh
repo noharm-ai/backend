@@ -18,7 +18,7 @@ for LINK in reports outliers/${SEGMENT}/${DRUG} \
 			prescriptions/drug/${PRESCRIPTIONDRUG}/period \
 			static/demo/prescription/${PRESCRIPTION} \
 			exams/${ADMISSION} segments segments/${SEGMENT} departments departments/free \
-			segments/exams/types \
+			segments/exams/types notes/${ADMISSION} \
 			segments/${SEGMENT}/outliers/generate/drug/${DRUG} 
 do
   COMMAND=("-H 'Accept: application/json' -H 'Authorization: Bearer ${TOKEN}' '${HOST}/${LINK}'")
