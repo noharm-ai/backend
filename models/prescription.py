@@ -460,7 +460,7 @@ class Intervention(db.Model):
         if userId:
             interventions = interventions.filter(Intervention.user == userId)
 
-        interventions = interventions.filter(Intervention.status.in_(['s','a','n','x']))\
+        interventions = interventions.filter(Intervention.status.in_(['s','a','n','x','j']))\
                                      .order_by(desc(Intervention.date)).all()
 
         intervBuffer = []
