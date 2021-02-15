@@ -5,7 +5,7 @@ from multiprocessing import Process, Manager
 from models.main import *
 from models.appendix import *
 from models.prescription import *
-from flask_jwt_extended import (jwt_required, get_jwt_identity, get_raw_jwt, create_access_token)
+from flask_jwt_extended import (jwt_required, get_jwt_identity, create_access_token)
 from config import Config
 import pandas as pd
 from sqlalchemy import distinct, func
