@@ -9,7 +9,7 @@ from .utils import freqValue, tryCommit, typeRelations, sortSubstance, strNone
 from datetime import datetime
 from math import ceil
 
-app_out = Blueprint('app_out',__name__, url_prefix='/auth')
+app_out = Blueprint('app_out',__name__)
 
 @app_out.route('/outliers/<int:idSegment>/<int:idDrug>', methods=['GET'])
 @jwt_required()
