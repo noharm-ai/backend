@@ -39,7 +39,7 @@ def historyCalc(typeExam, examsList, patient):
     return results
 
 @app_pat.route("/exams/<int:admissionNumber>", methods=['GET'])
-@jwt_required
+@jwt_required()
 def getExamsbyAdmission(admissionNumber):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
@@ -110,7 +110,7 @@ def getExamsbyAdmission(admissionNumber):
 
 
 @app_pat.route('/patient/<int:admissionNumber>', methods=['POST'])
-@jwt_required
+@jwt_required()
 def setPatientData(admissionNumber):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)

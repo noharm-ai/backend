@@ -16,7 +16,7 @@ from datetime import date, datetime
 app_pres = Blueprint('app_pres',__name__)
 
 @app_pres.route("/prescriptions", methods=['GET'])
-@jwt_required
+@jwt_required()
 def getPrescriptions():
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
@@ -277,7 +277,7 @@ class DrugList():
 
 
 @app_pres.route('/prescriptions/<int:idPrescription>', methods=['GET'])
-@jwt_required
+@jwt_required()
 def getPrescriptionAuth(idPrescription):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
@@ -434,7 +434,7 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
     }, status.HTTP_200_OK
 
 @app_pres.route('/prescriptions/<int:idPrescription>', methods=['PUT'])
-@jwt_required
+@jwt_required()
 def setPrescriptionStatus(idPrescription):
     data = request.get_json()
     user = User.find(get_jwt_identity())
@@ -472,7 +472,7 @@ def setPrescriptionStatus(idPrescription):
     return tryCommit(db, str(idPrescription), user.permission())
 
 @app_pres.route("/prescriptions/drug/<int:idPrescriptionDrug>/period", methods=['GET'])
-@jwt_required
+@jwt_required()
 def getDrugPeriod(idPrescriptionDrug):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
@@ -501,7 +501,7 @@ def getDrugPeriod(idPrescriptionDrug):
     }, status.HTTP_200_OK
 
 @app_pres.route('/prescriptions/drug/<int:idPrescriptionDrug>', methods=['PUT'])
-@jwt_required
+@jwt_required()
 def setPrescriptionDrugNote(idPrescriptionDrug):
     data = request.get_json()
     user = User.find(get_jwt_identity())
@@ -532,7 +532,7 @@ def setPrescriptionDrugNote(idPrescriptionDrug):
     return tryCommit(db, idPrescriptionDrug, user.permission())
 
 @app_pres.route('/prescriptions/<int:idPrescription>/update', methods=['GET'])
-@jwt_required
+@jwt_required()
 def getPrescriptionUpdate(idPrescription):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)

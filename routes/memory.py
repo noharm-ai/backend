@@ -8,7 +8,7 @@ from datetime import datetime
 app_mem = Blueprint('app_mem',__name__)
 
 @app_mem.route('/memory/<string:kind>', methods=['GET'])
-@jwt_required
+@jwt_required()
 def getMemory(kind):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
@@ -29,7 +29,7 @@ def getMemory(kind):
 
 @app_mem.route('/memory/', methods=['PUT'])
 @app_mem.route('/memory/<int:idMemory>', methods=['PUT'])
-@jwt_required
+@jwt_required()
 def setSubstance(idMemory=None):
     data = request.get_json()
     user = User.find(get_jwt_identity())

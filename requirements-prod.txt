@@ -1,7 +1,7 @@
 wheel
 Flask
 Flask-API
-Flask-JWT-Extended==3.25.0
+Flask-JWT-Extended
 Flask-SQLAlchemy
 Werkzeug==0.16.1
 zappa

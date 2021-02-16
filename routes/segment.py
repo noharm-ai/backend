@@ -12,7 +12,7 @@ from datetime import date, datetime, timedelta
 app_seg = Blueprint('app_seg',__name__)
 
 @app_seg.route("/segments", methods=['GET'])
-@jwt_required
+@jwt_required()
 def getSegments():
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
@@ -32,7 +32,7 @@ def getSegments():
     }, status.HTTP_200_OK
 
 @app_seg.route("/segments/<int:idSegment>", methods=['GET'])
-@jwt_required
+@jwt_required()
 def getSegmentsId(idSegment):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
@@ -81,7 +81,7 @@ def getSegmentsId(idSegment):
     }, status.HTTP_200_OK
 
 @app_seg.route('/segments/<int:idSegment>', methods=['PUT'])
-@jwt_required
+@jwt_required()
 def setSegment(idSegment=None):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
@@ -127,7 +127,7 @@ def setSegment(idSegment=None):
     return tryCommit(db, idSegment)
 
 @app_seg.route('/departments', methods=['GET'])
-@jwt_required
+@jwt_required()
 def getDepartments():
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
@@ -148,7 +148,7 @@ def getDepartments():
     }, status.HTTP_200_OK
 
 @app_seg.route('/departments/free', methods=['GET'])
-@jwt_required
+@jwt_required()
 def getFreeDepartments():
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
@@ -172,7 +172,7 @@ def getFreeDepartments():
     }, status.HTTP_200_OK
 
 @app_seg.route('/segments/exams/types', methods=['GET'])
-@jwt_required
+@jwt_required()
 def getCodes():
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
@@ -193,7 +193,7 @@ def getCodes():
 
 
 @app_seg.route('/segments/<int:idSegment>/exams/<string:typeExam>', methods=['PUT'])
-@jwt_required
+@jwt_required()
 def setExams(idSegment, typeExam):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
@@ -224,7 +224,7 @@ def setExams(idSegment, typeExam):
     return tryCommit(db, typeExam)
 
 @app_seg.route('/segments/<int:idSegment>/exams-order', methods=['PUT'])
-@jwt_required
+@jwt_required()
 def setExamsOrder(idSegment):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)

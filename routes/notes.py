@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 app_note = Blueprint('app_note',__name__)
 
 @app_note.route('/notes/<int:admissionNumber>', methods=['GET'])
-@jwt_required
+@jwt_required()
 def getNotes(admissionNumber):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)

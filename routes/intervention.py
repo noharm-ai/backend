@@ -12,7 +12,7 @@ from .utils import tryCommit
 app_itrv = Blueprint('app_itrv',__name__)
 
 @app_itrv.route('/prescriptions/drug/<int:idPrescriptionDrug>/<int:drugStatus>', methods=['PUT'])
-@jwt_required
+@jwt_required()
 def setDrugStatus(idPrescriptionDrug, drugStatus):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
@@ -26,7 +26,7 @@ def setDrugStatus(idPrescriptionDrug, drugStatus):
     return tryCommit(db, idPrescriptionDrug)
 
 @app_itrv.route('/intervention/<int:idPrescriptionDrug>', methods=['PUT'])
-@jwt_required
+@jwt_required()
 def createIntervention(idPrescriptionDrug):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
@@ -67,7 +67,7 @@ def sortReasons(e):
   return e['description']
 
 @app_itrv.route("/intervention/reasons", methods=['GET'])
-@jwt_required
+@jwt_required()
 def getInterventionReasons():
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
@@ -89,7 +89,7 @@ def getInterventionReasons():
     }, status.HTTP_200_OK
 
 @app_itrv.route("/intervention", methods=['GET'])
-@jwt_required
+@jwt_required()
 def getInterventions():
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)

@@ -7,7 +7,7 @@ from .utils import tryCommit
 app_sub = Blueprint('app_sub',__name__)
 
 @app_sub.route('/substance', methods=['GET'])
-@jwt_required
+@jwt_required()
 def getSubstance():
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
@@ -29,7 +29,7 @@ def getSubstance():
     }, status.HTTP_200_OK
 
 @app_sub.route('/substance/<int:idSubstance>', methods=['PUT'])
-@jwt_required
+@jwt_required()
 def setSubstance(idSubstance):
     data = request.get_json()
     user = User.find(get_jwt_identity())
@@ -50,7 +50,7 @@ def setSubstance(idSubstance):
     return tryCommit(db, idSubstance)
 
 @app_sub.route('/substance/<int:idSubstance>/relation', methods=['GET'])
-@jwt_required
+@jwt_required()
 def getRelations(idSubstance):
     data = request.get_json()
     user = User.find(get_jwt_identity())
@@ -64,7 +64,7 @@ def getRelations(idSubstance):
     }, status.HTTP_200_OK
 
 @app_sub.route('/relation/<int:sctidA>/<int:sctidB>/<string:kind>', methods=['PUT'])
-@jwt_required
+@jwt_required()
 def setRelation(sctidA,sctidB,kind):
     data = request.get_json()
     user = User.find(get_jwt_identity())

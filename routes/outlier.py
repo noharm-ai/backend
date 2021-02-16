@@ -9,10 +9,10 @@ from .utils import freqValue, tryCommit, typeRelations, sortSubstance, strNone
 from datetime import datetime
 from math import ceil
 
-app_out = Blueprint('app_out',__name__)
+app_out = Blueprint('app_out',__name__, url_prefix='/auth')
 
 @app_out.route('/outliers/<int:idSegment>/<int:idDrug>', methods=['GET'])
-@jwt_required
+@jwt_required()
 def getOutliers(idSegment=1, idDrug=1):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
@@ -133,7 +133,7 @@ def getOutliers(idSegment=1, idDrug=1):
 
 
 @app_out.route('/outliers/<int:idOutlier>', methods=['PUT'])
-@jwt_required
+@jwt_required()
 def setManualOutlier(idOutlier):
     data = request.get_json()
     user = User.find(get_jwt_identity())
@@ -171,7 +171,7 @@ def setManualOutlier(idOutlier):
 
 
 @app_out.route('/drugs/<int:idDrug>', methods=['PUT'])
-@jwt_required
+@jwt_required()
 def setDrugClass(idDrug):
     data = request.get_json()
     user = User.find(get_jwt_identity())
@@ -225,7 +225,7 @@ def setDrugClass(idDrug):
 
 @app_out.route('/drugs', methods=['GET'])
 @app_out.route('/drugs/<int:idSegment>', methods=['GET'])
-@jwt_required
+@jwt_required()
 def getDrugs(idSegment=1):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
@@ -248,7 +248,7 @@ def getDrugs(idSegment=1):
     }, status.HTTP_200_OK
 
 @app_out.route('/drugs/<int:idDrug>/units', methods=['GET'])
-@jwt_required
+@jwt_required()
 def getUnits(idDrug, idSegment=1):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
@@ -287,7 +287,7 @@ def getUnits(idDrug, idSegment=1):
     }, status.HTTP_200_OK
 
 @app_out.route('/drugs/<int:idDrug>/convertunit/<string:idMeasureUnit>', methods=['POST'])
-@jwt_required
+@jwt_required()
 def setDrugUnit(idDrug, idMeasureUnit):
     data = request.get_json()
     user = User.find(get_jwt_identity())

@@ -3,7 +3,7 @@ from flask_api import status
 from models.main import *
 from models.appendix import *
 from flask_jwt_extended import (create_access_token, create_refresh_token,
-                                jwt_required, get_jwt_identity, jwt_refresh_token_required)
+                                jwt_required, get_jwt_identity)
 from config import Config
 
 app_auth = Blueprint('app_auth',__name__)
@@ -41,7 +41,7 @@ def auth():
 
 
 @app_auth.route("/refresh-token", methods=['POST'])
-@jwt_refresh_token_required
+@jwt_required(refresh=True)
 def refreshToken():
     current_user = get_jwt_identity()
     access_token = create_access_token(identity=current_user)
