@@ -5,7 +5,7 @@ from multiprocessing import Process, Manager
 from models.main import *
 from models.appendix import *
 from models.prescription import *
-from flask_jwt_extended import (jwt_required, get_jwt_identity, get_raw_jwt, create_access_token)
+from flask_jwt_extended import (jwt_required, get_jwt_identity, create_access_token)
 from config import Config
 import pandas as pd
 from sqlalchemy import distinct, func
@@ -22,7 +22,7 @@ def compute_outlier(idDrug, drugsItem, poolDict, fold):
 
 
 @app_gen.route("/segments/<int:idSegment>/outliers/generate", methods=['GET'])
-@jwt_required
+@jwt_required()
 def callOutliers(idSegment):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
@@ -64,7 +64,7 @@ def callOutliers(idSegment):
 
 @app_gen.route("/segments/<int:idSegment>/outliers/generate/fold/<int:fold>", methods=['GET'])
 @app_gen.route("/segments/<int:idSegment>/outliers/generate/drug/<int:idDrug>", methods=['GET'])
-@jwt_required
+@jwt_required()
 def generateOutliers(idSegment,fold=None,idDrug=None,clean=None):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
@@ -161,7 +161,7 @@ def generateOutliers(idSegment,fold=None,idDrug=None,clean=None):
     }, status.HTTP_200_OK
 
 @app_gen.route("/segments/<int:idSegment>/outliers/generate/drug/<int:idDrug>/clean/<int:clean>", methods=['POST'])
-@jwt_required
+@jwt_required()
 def outlierWizard(idSegment, idDrug, clean):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)

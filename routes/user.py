@@ -13,7 +13,7 @@ from config import Config
 app_usr = Blueprint('app_usr',__name__)
 
 @app_usr.route("/reports", methods=['GET'])
-@jwt_required
+@jwt_required()
 def getReports():
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
@@ -30,7 +30,7 @@ def getReports():
         }, status.HTTP_401_UNAUTHORIZED
 
 @app_usr.route("/user", methods=['GET'])
-@jwt_required
+@jwt_required()
 def getUser():
     user = User.find(get_jwt_identity())
 
@@ -46,7 +46,7 @@ def getUser():
     }, status.HTTP_200_OK
 
 @app_usr.route("/user", methods=['PUT'])
-@jwt_required
+@jwt_required()
 def setUser():
     data = request.get_json()
     user = User.find(get_jwt_identity())

@@ -4,7 +4,7 @@ from models.prescription import *
 from sqlalchemy import desc, asc, and_, func
 from flask import Blueprint, request
 from flask_jwt_extended import (create_access_token, create_refresh_token,
-                                jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
+                                jwt_required, get_jwt_identity)
 from .utils import freqValue, tryCommit, typeRelations, sortSubstance, strNone
 from datetime import datetime
 from math import ceil
@@ -12,7 +12,7 @@ from math import ceil
 app_out = Blueprint('app_out',__name__)
 
 @app_out.route('/outliers/<int:idSegment>/<int:idDrug>', methods=['GET'])
-@jwt_required
+@jwt_required()
 def getOutliers(idSegment=1, idDrug=1):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
@@ -133,7 +133,7 @@ def getOutliers(idSegment=1, idDrug=1):
 
 
 @app_out.route('/outliers/<int:idOutlier>', methods=['PUT'])
-@jwt_required
+@jwt_required()
 def setManualOutlier(idOutlier):
     data = request.get_json()
     user = User.find(get_jwt_identity())
@@ -171,7 +171,7 @@ def setManualOutlier(idOutlier):
 
 
 @app_out.route('/drugs/<int:idDrug>', methods=['PUT'])
-@jwt_required
+@jwt_required()
 def setDrugClass(idDrug):
     data = request.get_json()
     user = User.find(get_jwt_identity())
@@ -199,7 +199,9 @@ def setDrugClass(idDrug):
     if 'elderly' in data.keys(): drugAttr.elderly = data.get('elderly', 0)
     if 'tube' in data.keys(): drugAttr.tube = data.get('tube', 0)
     if 'division' in data.keys(): drugAttr.division = data.get('division', None)
-    if 'price' in data.keys(): drugAttr.price = data.get('price', None)
+    if 'price' in data.keys(): 
+        drugAttr.price = data.get('price', None)
+        if len(drugAttr.price) == 0: drugAttr.price = None
     if 'maxTime' in data.keys(): drugAttr.maxTime = data.get('maxTime', None)
     if 'useWeight' in data.keys(): drugAttr.useWeight = data.get('useWeight', 0)
     if 'amount' in data.keys(): drugAttr.amount = data.get('amount', 0)
@@ -223,7 +225,7 @@ def setDrugClass(idDrug):
 
 @app_out.route('/drugs', methods=['GET'])
 @app_out.route('/drugs/<int:idSegment>', methods=['GET'])
-@jwt_required
+@jwt_required()
 def getDrugs(idSegment=1):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
@@ -246,7 +248,7 @@ def getDrugs(idSegment=1):
     }, status.HTTP_200_OK
 
 @app_out.route('/drugs/<int:idDrug>/units', methods=['GET'])
-@jwt_required
+@jwt_required()
 def getUnits(idDrug, idSegment=1):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
@@ -285,7 +287,7 @@ def getUnits(idDrug, idSegment=1):
     }, status.HTTP_200_OK
 
 @app_out.route('/drugs/<int:idDrug>/convertunit/<string:idMeasureUnit>', methods=['POST'])
-@jwt_required
+@jwt_required()
 def setDrugUnit(idDrug, idMeasureUnit):
     data = request.get_json()
     user = User.find(get_jwt_identity())

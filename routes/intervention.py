@@ -5,14 +5,14 @@ from models.appendix import *
 from models.prescription import *
 from flask import Blueprint, request
 from flask_jwt_extended import (create_access_token, create_refresh_token,
-                                jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
+                                jwt_required, get_jwt_identity)
 from datetime import date, datetime
 from .utils import tryCommit
 
 app_itrv = Blueprint('app_itrv',__name__)
 
 @app_itrv.route('/prescriptions/drug/<int:idPrescriptionDrug>/<int:drugStatus>', methods=['PUT'])
-@jwt_required
+@jwt_required()
 def setDrugStatus(idPrescriptionDrug, drugStatus):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
@@ -26,7 +26,7 @@ def setDrugStatus(idPrescriptionDrug, drugStatus):
     return tryCommit(db, idPrescriptionDrug)
 
 @app_itrv.route('/intervention/<int:idPrescriptionDrug>', methods=['PUT'])
-@jwt_required
+@jwt_required()
 def createIntervention(idPrescriptionDrug):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
@@ -67,7 +67,7 @@ def sortReasons(e):
   return e['description']
 
 @app_itrv.route("/intervention/reasons", methods=['GET'])
-@jwt_required
+@jwt_required()
 def getInterventionReasons():
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
@@ -89,7 +89,7 @@ def getInterventionReasons():
     }, status.HTTP_200_OK
 
 @app_itrv.route("/intervention", methods=['GET'])
-@jwt_required
+@jwt_required()
 def getInterventions():
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
