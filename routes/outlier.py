@@ -201,7 +201,7 @@ def setDrugClass(idDrug):
     if 'division' in data.keys(): drugAttr.division = data.get('division', None)
     if 'price' in data.keys(): 
         drugAttr.price = data.get('price', None)
-        if len(drugAttr.price) == 0: drugAttr.price = None
+        if drugAttr.price == '': drugAttr.price = None
     if 'maxTime' in data.keys(): drugAttr.maxTime = data.get('maxTime', None)
     if 'useWeight' in data.keys(): drugAttr.useWeight = data.get('useWeight', 0)
     if 'amount' in data.keys(): drugAttr.amount = data.get('amount', 0)
