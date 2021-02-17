@@ -448,20 +448,21 @@ class Intervention(db.Model):
             .query(Intervention, PrescriptionDrug, 
                     func.array(reason).label('reason'), Drug.name, 
                     func.array(interactions).label('interactions'),
-                    MeasureUnit, Frequency, Prescription)\
+                    MeasureUnit, Frequency, Prescription, User)\
             .outerjoin(PrescriptionDrug, Intervention.id == PrescriptionDrug.id)\
             .outerjoin(Prescription, Intervention.idPrescription == Prescription.id)\
             .outerjoin(Drug, Drug.id == PrescriptionDrug.idDrug)\
             .outerjoin(MeasureUnit, MeasureUnit.id == PrescriptionDrug.idMeasureUnit)\
-            .outerjoin(Frequency, Frequency.id == PrescriptionDrug.idFrequency)
+            .outerjoin(Frequency, Frequency.id == PrescriptionDrug.idFrequency)\
+            .outerjoin(User, User.id == Intervention.user)
 
         if admissionNumber:
             interventions = interventions.filter(Intervention.admissionNumber == admissionNumber)
-        if userId:
-            interventions = interventions.filter(Intervention.user == userId)
 
         interventions = interventions.filter(Intervention.status.in_(['s','a','n','x','j']))\
-                                     .order_by(desc(Intervention.date)).all()
+                                     .order_by(desc(Intervention.date))
+
+        interventions = interventions.limit(500).all()
 
         intervBuffer = []
         for i in interventions:
@@ -487,6 +488,7 @@ class Intervention(db.Model):
                 'interactions': i[0].interactions,
                 'date': i[0].date.isoformat(),
                 'dateTime': i[0].date,
+                'user': i[8].name,
                 'status': i[0].status
             })
 
