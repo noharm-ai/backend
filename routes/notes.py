@@ -81,4 +81,4 @@ def changeNote(idNote):
     n.signs = n.text.count('annotation-sinais')
     n.names = n.text.count('annotation-nomes')
 
-    return tryCommit(db, idNote, user.permission())
+    return tryCommit(db, idNote)
