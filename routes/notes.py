@@ -31,7 +31,15 @@ def getNotes(admissionNumber):
                 'text': n.text,
                 'date': n.date.isoformat(),
                 'prescriber': n.prescriber,
-                'position': n.position
+                'position': n.position,
+                'medications': n.medications,
+                'complication': n.complication,
+                'symptoms': n.symptoms,
+                'diseases': n.diseases,
+                'info': n.info,
+                'conduct': n.conduct,
+                'signs': n.signs,
+                'names': n.names
             })
 
         return {
