@@ -16,6 +16,15 @@ class ClinicalNotes(db.Model):
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.Integer, nullable=True)
 
+    medications = db.Column("medicamentos", db.Integer, nullable=True)
+    complication = db.Column("complicacoes", db.Integer, nullable=True)
+    symptoms = db.Column("sintomas", db.Integer, nullable=True)
+    diseases = db.Column("doencas", db.Integer, nullable=True)
+    info = db.Column("dados", db.Integer, nullable=True)
+    conduct = db.Column("conduta", db.Integer, nullable=True)
+    signs = db.Column("sinais", db.Integer, nullable=True)
+    names = db.Column("nomes", db.Integer, nullable=True)
+
     def exists():
         tMap = db.session.connection()._execution_options.get("schema_translate_map", { None: None })
         schemaName = tMap[None]

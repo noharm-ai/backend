@@ -1,4 +1,4 @@
-from models.main import dbSession, User
+from models.main import db, dbSession, User
 from models.notes import ClinicalNotes
 from flask import Blueprint, request
 from flask_api import status
@@ -31,7 +31,15 @@ def getNotes(admissionNumber):
                 'text': n.text,
                 'date': n.date.isoformat(),
                 'prescriber': n.prescriber,
-                'position': n.position
+                'position': n.position,
+                'medications': n.medications,
+                'complication': n.complication,
+                'symptoms': n.symptoms,
+                'diseases': n.diseases,
+                'info': n.info,
+                'conduct': n.conduct,
+                'signs': n.signs,
+                'names': n.names
             })
 
         return {
@@ -45,3 +53,32 @@ def getNotes(admissionNumber):
             'status': 'error',
             'message': 'Schema não tem evolução!'
         }, status.HTTP_400_BAD_REQUEST
+
+@app_note.route('/notes/<int:idNote>', methods=['POST'])
+@jwt_required()
+def changeNote(idNote):
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+    data = request.get_json()
+
+    if not ClinicalNotes.exists():
+        return { 'status': 'error', 'message': 'Schema não tem evolução!' }, status.HTTP_400_BAD_REQUEST
+
+    n = ClinicalNotes.query.get(idNote)
+
+    if (n is None):
+        return { 'status': 'error', 'message': 'Evolução Inexistente!' }, status.HTTP_400_BAD_REQUEST
+
+    n.update = datetime.today()
+    n.user = user.id
+    n.text = data.get('text', None)
+    n.medications = n.text.count('annotation-medicamentos')
+    n.complication = n.text.count('annotation-complicacoes')
+    n.symptoms = n.text.count('annotation-sintomas')
+    n.diseases = n.text.count('annotation-doencas')
+    n.info = n.text.count('annotation-dados')
+    n.conduct = n.text.count('annotation-conduta')
+    n.signs = n.text.count('annotation-sinais')
+    n.names = n.text.count('annotation-nomes')
+
+    return tryCommit(db, idNote)
