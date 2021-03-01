@@ -19,7 +19,7 @@ def getNotes(admissionNumber):
     
         notes = ClinicalNotes.query\
                 .filter(ClinicalNotes.admissionNumber==admissionNumber)\
-                .filter(ClinicalNotes.date > (datetime.today() - timedelta(days=2)))\
+                .filter(ClinicalNotes.date > (datetime.today() - timedelta(days=6)))\
                 .order_by(desc(ClinicalNotes.date))\
                 .all()
 
