@@ -189,7 +189,7 @@ def ckd_calc(cr, birthdate, gender, skinColor):
         s = 163 if skinChar(skinColor) in ['N','P'] else 141
         e = -1.209 if float(cr) > g else -0.411
 
-    eGFR = s * (float(cr)/g)**(e) * (0.993)**(age)
+    eGFR = s * (float(cr)/g)**(e) * (0.993)**(age) if cr > 0 else 0
 
     return { 'value': round(eGFR,1), 'ref': 'maior que 50 ml/min/1.73', 'unit': 'ml/min/1.73',
              'alert': (eGFR < 50), 'name': 'Chronic Kidney Disease Epidemiology' , 
