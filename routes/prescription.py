@@ -352,9 +352,8 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
     notesSigns = None
     notesInfo = None
     if clinicalNotes:
-        notesSigns = ''
-        notesInfo = ''
-
+        notesSigns = ClinicalNotes.getSigns(prescription[0].admissionNumber)
+        notesInfo = ClinicalNotes.getInfo(prescription[0].admissionNumber)
 
     exams = Exams.findLatestByAdmission(patient, prescription[0].idSegment)
     age = data2age(patient.birthdate.isoformat() if patient.birthdate else date.today().isoformat())
@@ -436,8 +435,8 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
             'prevIntervention': getPrevIntervention(interventions, prescription[0].date),
             'existIntervention': getExistIntervention(interventions, prescription[0].date),
             'clinicalNotes': clinicalNotes,
-            'notesSigns': notesSigns,
-            'notesInfo': notesInfo
+            'notesSigns': strNone(notesSigns),
+            'notesInfo': strNone(notesInfo)
         }
     }, status.HTTP_200_OK
 
