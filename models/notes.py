@@ -43,19 +43,17 @@ class ClinicalNotes(db.Model):
             return None
 
     def getSigns(admissionNumber):
-        return db.session.query(ClinicalNotes.signsText)\
+        return db.session.query(ClinicalNotes.signsText, ClinicalNotes.date)\
                 .select_from(ClinicalNotes)\
                 .filter(ClinicalNotes.admissionNumber == admissionNumber)\
                 .filter(func.length(ClinicalNotes.signsText) > 0)\
                 .order_by(desc(ClinicalNotes.date))\
-                .limit(1)\
-                .scalar()
+                .first()
 
     def getInfo(admissionNumber):
-        return db.session.query(ClinicalNotes.infoText)\
+        return db.session.query(ClinicalNotes.infoText, ClinicalNotes.date)\
                 .select_from(ClinicalNotes)\
                 .filter(ClinicalNotes.admissionNumber == admissionNumber)\
                 .filter(func.length(ClinicalNotes.infoText) > 0)\
                 .order_by(desc(ClinicalNotes.date))\
-                .limit(1)\
-                .scalar()
+                .first()

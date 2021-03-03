@@ -435,8 +435,10 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
             'prevIntervention': getPrevIntervention(interventions, prescription[0].date),
             'existIntervention': getExistIntervention(interventions, prescription[0].date),
             'clinicalNotes': clinicalNotes,
-            'notesSigns': strNone(notesSigns),
-            'notesInfo': strNone(notesInfo)
+            'notesSigns': strNone(notesSigns[0]) if notesSigns else '',
+            'notesSignsDate': notesSigns[1].isoformat() if notesSigns else None,
+            'notesInfo': strNone(notesInfo[0]) if notesInfo else '',
+            'notesInfoDate': notesInfo[1].isoformat() if notesInfo else None,
         }
     }, status.HTTP_200_OK
 
