@@ -1,7 +1,7 @@
 from .main import db
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import deferred
-from sqlalchemy import inspect
+from sqlalchemy import inspect, func, desc
 from datetime import datetime, timedelta
 
 class ClinicalNotes(db.Model):
@@ -25,6 +25,9 @@ class ClinicalNotes(db.Model):
     signs = db.Column("sinais", db.Integer, nullable=True)
     names = db.Column("nomes", db.Integer, nullable=True)
 
+    signsText = db.Column('sinaistexto', db.String, nullable=True)
+    infoText = db.Column('dadostexto', db.String, nullable=True)
+
     def exists():
         tMap = db.session.connection()._execution_options.get("schema_translate_map", { None: None })
         schemaName = tMap[None]
@@ -34,7 +37,23 @@ class ClinicalNotes(db.Model):
         if ClinicalNotes.exists():
             return ClinicalNotes.query\
                     .filter(ClinicalNotes.admissionNumber==admissionNumber)\
-                    .filter(ClinicalNotes.date > (datetime.today() - timedelta(days=2)))\
+                    .filter(ClinicalNotes.date > (datetime.today() - timedelta(days=6)))\
                     .count()
         else:
             return None
+
+    def getSigns(admissionNumber):
+        return db.session.query(ClinicalNotes.signsText, ClinicalNotes.date)\
+                .select_from(ClinicalNotes)\
+                .filter(ClinicalNotes.admissionNumber == admissionNumber)\
+                .filter(func.length(ClinicalNotes.signsText) > 0)\
+                .order_by(desc(ClinicalNotes.date))\
+                .first()
+
+    def getInfo(admissionNumber):
+        return db.session.query(ClinicalNotes.infoText, ClinicalNotes.date)\
+                .select_from(ClinicalNotes)\
+                .filter(ClinicalNotes.admissionNumber == admissionNumber)\
+                .filter(func.length(ClinicalNotes.infoText) > 0)\
+                .order_by(desc(ClinicalNotes.date))\
+                .first()

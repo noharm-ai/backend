@@ -1,10 +1,11 @@
 from models.main import db, dbSession, User
 from models.notes import ClinicalNotes
+from models.prescription import Patient
 from flask import Blueprint, request
 from flask_api import status
 from flask_jwt_extended import (jwt_required, get_jwt_identity)
 from .utils import tryCommit
-from sqlalchemy import desc
+from sqlalchemy import desc, or_
 from datetime import datetime, timedelta
 
 app_note = Blueprint('app_note',__name__)
@@ -17,9 +18,13 @@ def getNotes(admissionNumber):
 
     if ClinicalNotes.exists():
     
+        pat = Patient.query.get(admissionNumber)
         notes = ClinicalNotes.query\
                 .filter(ClinicalNotes.admissionNumber==admissionNumber)\
-                .filter(ClinicalNotes.date > (datetime.today() - timedelta(days=6)))\
+                .filter(or_(
+                        ClinicalNotes.date > (datetime.today() - timedelta(days=6)),
+                        ClinicalNotes.date == pat.admissionDate
+                ))\
                 .order_by(desc(ClinicalNotes.date))\
                 .all()
 
