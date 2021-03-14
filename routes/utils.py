@@ -1,6 +1,7 @@
 from flask_api import status
 from datetime import date, datetime, timedelta
 import unicodedata, copy
+import logging
 
 def data2age(birthdate):
     if birthdate is None: return ''
@@ -228,6 +229,10 @@ def tryCommit(db, recId, allow=True):
         db.session.close()
         db.session.remove()
 
+        logging.basicConfig()
+        logger = logging.getLogger('noharm.backend')
+        logger.error(str(e))
+
         return {
             'status': 'error',
             'message': str(e)
@@ -236,6 +241,10 @@ def tryCommit(db, recId, allow=True):
         db.session.rollback()
         db.session.close()
         db.session.remove()
+
+        logging.basicConfig()
+        logger = logging.getLogger('noharm.backend')
+        logger.error(str(e))
 
         return {
             'status': 'error',
