@@ -1,7 +1,7 @@
 name: Deploy Development
 on:
   push:
-    branches: [ develop ] 
+    branches: [ feature/white-label ] 
 
 jobs:
   build:
