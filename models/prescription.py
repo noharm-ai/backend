@@ -39,7 +39,7 @@ class Prescription(db.Model):
     def lastDeptbyAdmission(idPrescription, admissionNumber):
         return db.session.query(Department.name)\
             .select_from(Prescription)\
-            .outerjoin(Department, and_(Department.idDepartment == Prescription.id, Department.idHospital == Prescription.idHospital))\
+            .outerjoin(Department, and_(Department.id == Prescription.idDepartment, Department.idHospital == Prescription.idHospital))\
             .filter(Prescription.admissionNumber == admissionNumber)\
             .filter(Prescription.id < idPrescription)\
             .order_by(desc(Prescription.id))\
@@ -54,7 +54,7 @@ class Prescription(db.Model):
                 Prescription.prescriber
             )\
             .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)\
-            .outerjoin(Department, and_(Department.idDepartment == Prescription.id, Department.idHospital == Prescription.idHospital))\
+            .outerjoin(Department, and_(Department.id == Prescription.idDepartment, Department.idHospital == Prescription.idHospital))\
             .outerjoin(Segment, Segment.id == Prescription.idSegment)
 
     def getPrescription(idPrescription):
@@ -84,7 +84,7 @@ class Prescription(db.Model):
 
     def getHeaders(admissionNumber, aggDate):
         prescriptions = db.session.query(Prescription, Department.name)\
-                    .outerjoin(Department, and_(Department.idDepartment == Prescription.id, Department.idHospital == Prescription.idHospital))\
+                    .outerjoin(Department, and_(Department.id == Prescription.idDepartment, Department.idHospital == Prescription.idHospital))\
                     .filter(Prescription.admissionNumber == admissionNumber)\
                     .filter(or_(
                                 func.date(Prescription.date) == aggDate,
@@ -247,7 +247,7 @@ class Patient(db.Model):
         q = db.session\
             .query(Prescription, Patient, Department.name.label('department'))\
             .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)\
-            .outerjoin(Department, and_(Department.idDepartment == Prescription.id, Department.idHospital == Prescription.idHospital))
+            .outerjoin(Department, and_(Department.id == Prescription.idDepartment, Department.idHospital == Prescription.idHospital))
 
         if (not(idSegment is None)):
             q = q.filter(Prescription.idSegment == idSegment)
