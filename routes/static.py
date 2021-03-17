@@ -1,4 +1,4 @@
-from flask import Blueprint
+from flask import Blueprint, request
 from flask_api import status
 from models.main import *
 from models.prescription import *
