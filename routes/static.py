@@ -94,10 +94,27 @@ def addPrescriptionNoAuth(idPrescription):
     if (p is None):
         p = Prescription()
         p.id = idPrescription
-        p.idDepartment = data.get('idDept')
+        p.idDepartment = 0
         p.idPatient = data.get('idPatient')
+        p.admissionNumber = data.get('idPatient')
+        p.idSegment = 1
         p.date = datetime.today()
 
         db.session.add(p)
+
+    drug_fields = ['id','idDrug','idFrequency','dose']
+    drugs = data.get('drugs')
+    if drugs:
+        for d in drugs:
+            intersect = list(set(d.keys()) & set(drug_fields)) 
+            if len(intersect) == 4:
+                pd = PrescriptionDrug()
+                pd.idPrescription = p.id 
+                pd.id = d['id']
+                pd.idDrug = d['idDrug']
+                pd.idFrequency = d['idFrequency']
+                pd.dose = d['dose']
+
+                db.session.add(pd)
 
     return tryCommit(db, p.id)
