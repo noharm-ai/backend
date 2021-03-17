@@ -39,7 +39,7 @@ def getSegmentsId(idSegment):
     
     s = Segment.query.get(idSegment)
     departments = Department.query\
-                .outerjoin(SegmentDepartment, SegmentDepartment.idDepartment == Department.id)\
+                .outerjoin(SegmentDepartment, and_(SegmentDepartment.idDepartment == Department.id, SegmentDepartment.idHospital == Department.idHospital))\
                 .filter(SegmentDepartment.id == idSegment)\
                 .order_by(asc(Department.name))\
                 .all()
@@ -109,7 +109,7 @@ def setSegment(idSegment=None):
         for d in deps_new:
             sd = SegmentDepartment()
             sd.id = idSegment
-            sd.idHospital = 1
+            sd.idHospital = 1 #TODO
             sd.idDepartment = d
             
             if not sd.idDepartment in deps_idx:
@@ -154,7 +154,7 @@ def getFreeDepartments():
     dbSession.setSchema(user.schema)
     
     departs = Department.query\
-                .outerjoin(SegmentDepartment, SegmentDepartment.idDepartment == Department.id)\
+                .outerjoin(SegmentDepartment, and_(SegmentDepartment.idDepartment == Department.id, SegmentDepartment.idHospital == Department.idHospital))\
                 .filter(SegmentDepartment.id == None)\
                 .all()
 

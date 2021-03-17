@@ -48,6 +48,11 @@ def computePrescription(schema, idPrescription):
         pAgg.date = date(p.date.year, p.date.month, p.date.day)
         newPrescAgg = True
 
+    outpatient = request.args.get('outpatient', None)
+    if outpatient:
+        pAgg.id = p.admissionNumber
+        pAgg.date = p.date
+
     resultAgg, stat = getPrescription(admissionNumber=p.admissionNumber, aggDate=pAgg.date)
 
     pAgg.idHospital = p.idHospital
