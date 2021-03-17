@@ -109,7 +109,7 @@ def addPrescriptionNoAuth(idPrescription):
             intersect = list(set(d.keys()) & set(drug_fields)) 
             if len(intersect) == 4:
                 pd = PrescriptionDrug()
-                pd.idPrescription = p.id 
+                pd.idPrescription = idPrescription
                 pd.id = d['id']
                 pd.idDrug = d['idDrug']
                 pd.idFrequency = d['idFrequency']
@@ -117,4 +117,4 @@ def addPrescriptionNoAuth(idPrescription):
 
                 db.session.add(pd)
 
-    return tryCommit(db, p.id)
+    return tryCommit(db, idPrescription)
