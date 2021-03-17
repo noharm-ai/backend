@@ -1,4 +1,4 @@
-from flask import Blueprint
+from flask import Blueprint, request
 from flask_api import status
 from models.main import *
 from models.prescription import *
@@ -72,3 +72,32 @@ def genAggID(p):
     id += p.date.day *              10000000000
     id += p.admissionNumber
     return id
+
+@app_stc.route('/prescriptions/static/<int:idPrescription>', methods=['GET'])
+def getPrescriptionNoAuth(idPrescription):
+    dbSession.setSchema('demo')
+
+    p = Prescription.getPrescription(idPrescription)
+
+    if (p is None):
+        return { 'status': 'error', 'message': 'Prescrição Inexistente!' }, status.HTTP_400_BAD_REQUEST
+    else:
+        return getPrescription(idPrescription=idPrescription)
+
+@app_stc.route('/prescriptions/static/<int:idPrescription>', methods=['POST'])
+def addPrescriptionNoAuth(idPrescription):
+    data = request.get_json()
+    dbSession.setSchema('demo')
+
+    p = Prescription.query.get(idPrescription)
+
+    if (p is None):
+        p = Prescription()
+        p.id = idPrescription
+        p.idDepartment = data.get('idDept')
+        p.idPatient = data.get('idPatient')
+        p.date = datetime.today()
+
+        db.session.add(p)
+
+    return tryCommit(db, p.id)

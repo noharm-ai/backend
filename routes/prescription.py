@@ -326,17 +326,6 @@ def getExistIntervention(interventions, dtPrescription):
             result = True;
     return result
 
-@app_pres.route('/prescriptions/static/<int:idPrescription>', methods=['GET'])
-def getPrescriptionNoAuth(idPrescription):
-    dbSession.setSchema('demo')
-
-    p = Prescription.getPrescription(idPrescription)
-
-    if (p is None):
-        return { 'status': 'error', 'message': 'Prescrição Inexistente!' }, status.HTTP_400_BAD_REQUEST
-    else:
-        return getPrescription(idPrescription=idPrescription)
-
 def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
 
     if idPrescription:
