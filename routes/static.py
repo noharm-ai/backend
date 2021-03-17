@@ -94,7 +94,7 @@ def addPrescriptionNoAuth(idPrescription):
     if (p is None):
         p = Prescription()
         p.id = idPrescription
-        p.idDepartment = 0
+        p.idDepartment = 1
         p.idPatient = data.get('idPatient')
         p.admissionNumber = data.get('idPatient')
         p.idSegment = 1
