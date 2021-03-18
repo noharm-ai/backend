@@ -487,7 +487,12 @@ def getDrugPeriod(idPrescriptionDrug):
     dbSession.setSchema(user.schema)
 
     future = request.args.get('future', None)
-    results, admissionHistory = PrescriptionDrug.findByPrescriptionDrug(idPrescriptionDrug, future)
+    results = [{1: []}]
+
+    if idPrescriptionDrug != 0:
+        results, admissionHistory = PrescriptionDrug.findByPrescriptionDrug(idPrescriptionDrug, future)
+    else:
+        results[0][1].append('Intervenção no paciente não tem medicamento associado.')
 
     if future and len(results[0][1]) == 0:
         if admissionHistory:

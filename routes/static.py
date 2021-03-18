@@ -1,4 +1,4 @@
-from flask import Blueprint
+from flask import Blueprint, request
 from flask_api import status
 from models.main import *
 from models.prescription import *
@@ -47,6 +47,11 @@ def computePrescription(schema, idPrescription):
         pAgg.admissionNumber = p.admissionNumber
         pAgg.date = date(p.date.year, p.date.month, p.date.day)
         newPrescAgg = True
+
+    outpatient = request.args.get('outpatient', None)
+    if outpatient:
+        pAgg.id = p.admissionNumber
+        pAgg.date = date(p.date.year, p.date.month, p.date.day)
 
     resultAgg, stat = getPrescription(admissionNumber=p.admissionNumber, aggDate=pAgg.date)
 
