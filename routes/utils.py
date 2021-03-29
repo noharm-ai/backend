@@ -144,7 +144,7 @@ def mdrd_calc(cr, birthdate, gender, skinColor):
     age = data2age(birthdate.isoformat())
     if age == 0: return copy.deepcopy(mdrdEmpty)
 
-    eGFR = 175 * (float(cr))**(-1.154) * (age)**(-0.203)
+    eGFR = 175 * (float(cr))**(-1.154) * (age)**(-0.203) if cr > 0 else 0
 
     if gender == 'F': eGFR *= 0.742
     if skinChar(skinColor) in ['N','P']: eGFR *= 1.212
@@ -165,7 +165,7 @@ def cg_calc(cr, birthdate, gender, weight):
     age = data2age(birthdate.isoformat())
     if age == 0: return copy.deepcopy(cgEmpty)
 
-    ccr = ((140 - age) * float(weight)) / (72 * float(cr))
+    ccr = ((140 - age) * float(weight)) / (72 * float(cr))  if cr > 0 else 0
     if gender == 'F': ccr *= 0.85
 
     return { 'value': round(ccr,1), 'ref': 'maior que 50 mL/min', 'unit': 'mL/min',
