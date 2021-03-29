@@ -1,5 +1,6 @@
 from flask import Blueprint, request
 from flask_api import status
+from flask_jwt_extended import (jwt_required)
 from models.main import *
 from models.prescription import *
 from .prescription import getPrescription
@@ -73,21 +74,12 @@ def genAggID(p):
     id += p.admissionNumber
     return id
 
-@app_stc.route('/prescriptions/static/<int:idPrescription>', methods=['GET'])
-def getPrescriptionNoAuth(idPrescription):
-    dbSession.setSchema('demo')
-
-    p = Prescription.getPrescription(idPrescription)
-
-    if (p is None):
-        return { 'status': 'error', 'message': 'Prescrição Inexistente!' }, status.HTTP_400_BAD_REQUEST
-    else:
-        return getPrescription(idPrescription=idPrescription)
-
 @app_stc.route('/prescriptions/static/<int:idPrescription>', methods=['POST'])
-def addPrescriptionNoAuth(idPrescription):
+@jwt_required()
+def addPrescription(idPrescription):
     data = request.get_json()
-    dbSession.setSchema('demo')
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
 
     p = Prescription.query.get(idPrescription)
 
