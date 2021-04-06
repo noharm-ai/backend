@@ -61,7 +61,7 @@ def freqValue(freq):
     else: return freq
 
 def none2zero(s):
-    return s if is_float(s) else 0
+    return float(s) if is_float(s) else 0
 
 def strNone(s):
     return '' if s is None else str(s)
@@ -115,7 +115,7 @@ def formatExam(exam, typeExam, segExam):
             ref.initials = typeExam
             alert = False
 
-        return { 'value': float(exam.value), 'unit': strNone(exam.unit), 'alert': alert,\
+        return { 'value': none2zero(exam.value), 'unit': strNone(exam.unit), 'alert': alert,\
                  'date' : exam.date.isoformat(), 'ref': ref.ref, 'initials': ref.initials,
                  'min': ref.min, 'max': ref.max, 'name': ref.name }
     else:
