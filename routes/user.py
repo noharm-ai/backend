@@ -76,7 +76,7 @@ def forgetPassword():
         return { 'status': 'error', 'message': 'Usuário Inexistente!' }, status.HTTP_400_BAD_REQUEST
 
     expires = timedelta(hours=24)
-    reset_token = create_access_token(str(user.id), expires_delta=expires)
+    reset_token = create_access_token(identity=user.id, expires_delta=expires)
 
     msg = Message()
     msg.subject = "NoHarm: Esqueci a senha"
@@ -100,7 +100,11 @@ def resetPassword():
     if not reset_token or not newpassword:
         return { 'status': 'error', 'message': 'Token Inexistente!' }, status.HTTP_400_BAD_REQUEST
 
-    user_id = decode_token(reset_token)['identity']
+    user_token = decode_token(reset_token)
+    if not 'sub' in user_token:
+        return { 'status': 'error', 'message': 'Token Expirou!' }, status.HTTP_400_BAD_REQUEST
+
+    user_id = user_token['sub']
     user = User.find(user_id)
     if not user: 
         return { 'status': 'error', 'message': 'Usuário Inexistente!' }, status.HTTP_400_BAD_REQUEST
