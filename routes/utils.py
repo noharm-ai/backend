@@ -1,6 +1,6 @@
 from flask_api import status
 from datetime import date, datetime, timedelta
-import unicodedata, copy
+import unicodedata, copy, re
 import logging
 
 def data2age(birthdate):
@@ -69,10 +69,14 @@ def strNone(s):
 def skinChar(s):
     return ' ' if s is None else str(s).upper()[0]
 
-def remove_accents(input_str):
-    nfkd_form = unicodedata.normalize('NFKD', input_str)
+def remove_accents(text):
+    nfkd_form = unicodedata.normalize('NFKD', text)
     only_ascii = nfkd_form.encode('ASCII', 'ignore')
     return only_ascii
+
+def slugify(text):
+    text = remove_accents(text).lower()
+    return re.sub(r'[\W_]+', '-', str(text))
 
 def sortRelations(r):
   return remove_accents(r['nameB'])

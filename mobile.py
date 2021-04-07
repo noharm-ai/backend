@@ -58,11 +58,11 @@ CORS(app)
 def getVersion():
     return {
         'status': 'success',
-        'data': 'v1.45-beta'
+        'data': 'v1.46-beta'
     }, status.HTTP_200_OK
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0')
 
 @app.after_request
 def add_security_headers(response):

@@ -4,6 +4,7 @@ from models.main import *
 from models.appendix import *
 from models.segment import *
 from models.prescription import *
+from models.notes import ClinicalNotes
 from flask import Blueprint, request
 from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, get_jwt_identity)
@@ -65,6 +66,7 @@ def getExamsbyAdmission(admissionNumber):
             item['name'] = segExam[key].name
             item['perc'] = None
             item['history'] = historyExam(e.typeExam, examsList, segExam)
+            item['text'] = False
             bufferList[key] = item
             typeExams.append(key)
             if key in perc:
@@ -72,7 +74,7 @@ def getExamsbyAdmission(admissionNumber):
 
             if segExam[key].initials.lower() == 'creatinina':
                 for keyCalc in ['mdrd','ckd','cg','swrtz2']:
-                    if keyCalc in segExam:
+                    if keyCalc in segExam and patient:
                         if keyCalc == 'mdrd':
                             itemCalc = mdrd_calc(e.value, patient.birthdate, patient.gender, patient.skinColor)
                         elif keyCalc == 'cg':
@@ -103,9 +105,28 @@ def getExamsbyAdmission(admissionNumber):
         else:
             del(results[e])
 
+    examsText = ClinicalNotes.getExamsIfExists(admissionNumber)
+    resultsText = {}
+    for e in examsText:
+        slugExam = slugify(e.prescriber)
+        if not slugExam in resultsText.keys():
+            resultsText[slugExam] = {
+                'name': e.prescriber,
+                'text': True,
+                'date': e.date.isoformat(),
+                'ref': e.text[:20],
+                'history': []
+            }
+
+        item = {}
+        item['date'] = e.date.isoformat()
+        item['value'] = e.text
+        resultsText[slugExam]['history'].append(item)
+        resultsText[slugExam]['date'] = e.date.isoformat()
+
     return {
         'status': 'success',
-        'data': results
+        'data': dict(results, **resultsText)
     }, status.HTTP_200_OK
 
 
