@@ -27,6 +27,7 @@ class Prescription(db.Model):
     agg = db.Column('agregada', db.Boolean, nullable=True)
     aggDeps = deferred(db.Column('aggsetor', postgresql.ARRAY(db.Integer), nullable=True))
     aggDrugs = deferred(db.Column('aggmedicamento', postgresql.ARRAY(db.Integer), nullable=True))
+    concilia = db.Column('concilia', db.String(1), nullable=True)
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.Integer, nullable=True)
 
@@ -91,6 +92,7 @@ class Prescription(db.Model):
                                 func.date(Prescription.expire) == aggDate
                             ))\
                     .filter(Prescription.agg == None)\
+                    .filter(Prescription.concilia == None)\
                     .filter(Prescription.idSegment != None)\
                     .all()
         headers = {}
@@ -243,7 +245,7 @@ class Patient(db.Model):
                          .filter(Patient.admissionNumber == admissionNumber)\
                          .first()
 
-    def getPatients(idSegment=None, idDept=[], idDrug=[], startDate=date.today(), endDate=None, pending=False, agg=False, currentDepartment=False):
+    def getPatients(idSegment=None, idDept=[], idDrug=[], startDate=date.today(), endDate=None, pending=False, agg=False, currentDepartment=False, concilia=False):
         q = db.session\
             .query(Prescription, Patient, Department.name.label('department'))\
             .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)\
@@ -270,6 +272,11 @@ class Patient(db.Model):
             q = q.filter(Prescription.agg == True)
         else:
             q = q.filter(Prescription.agg == None)
+
+        if bool(int(none2zero(concilia))):
+            q = q.filter(Prescription.concilia != None)
+        else:
+            q = q.filter(Prescription.concilia == None)
 
         if endDate is None: endDate = startDate
 
@@ -387,6 +394,7 @@ class PrescriptionDrug(db.Model):
                             func.date(Prescription.expire) == aggDate
                          ))\
                  .filter(Prescription.agg == None)\
+                 .filter(Prescription.concilia == None)\
                  .filter(Prescription.idSegment != None)
         
         return q.order_by(asc(Prescription.expire), desc(func.concat(PrescriptionDrug.idPrescription,PrescriptionDrug.solutionGroup)), asc(Drug.name)).all()

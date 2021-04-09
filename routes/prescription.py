@@ -29,8 +29,9 @@ def getPrescriptions():
     pending = request.args.get('pending', 0)
     currentDepartment = request.args.get('currentDepartment', 0)
     agg = request.args.get('agg', 0)
+    concilia = request.args.get('concilia', 0)
 
-    patients = Patient.getPatients(idSegment=idSegment, idDept=idDept, idDrug=idDrug, startDate=startDate, endDate=endDate, pending=pending, agg=agg, currentDepartment=currentDepartment)
+    patients = Patient.getPatients(idSegment=idSegment, idDept=idDept, idDrug=idDrug, startDate=startDate, endDate=endDate, pending=pending, agg=agg, currentDepartment=currentDepartment, concilia=concilia)
 
     results = []
     for p in patients:
@@ -398,6 +399,8 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
             'idPatient': prescription[0].idPatient,
             'name': prescription[0].admissionNumber,
             'agg': prescription[0].agg,
+            'concilia': prescription[0].concilia,
+            'conciliaList': [],
             'admissionNumber': prescription[0].admissionNumber,
             'birthdate': patient.birthdate.isoformat() if patient.birthdate else None,
             'gender': patient.gender,
