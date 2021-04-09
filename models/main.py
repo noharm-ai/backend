@@ -135,6 +135,7 @@ class DrugAttributes(db.Model):
     amount = db.Column("concentracao", db.Float, nullable=True)
     amountUnit = db.Column("concentracaounidade", db.String(3), nullable=True)
     whiteList = db.Column("linhabranca", db.Boolean, nullable=True)
+    chemo = db.Column("quimio", db.Boolean, nullable=True)
     price = db.Column("custo", db.Float, nullable=True)
     maxTime = db.Column("tempotratamento", db.Integer, nullable=True)
     update = db.Column("update_at", db.DateTime, nullable=True)

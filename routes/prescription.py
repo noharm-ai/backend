@@ -211,6 +211,7 @@ class DrugList():
                 'am': pd[6].antimicro if pd[6] is not None else False,
                 'av': pd[6].mav if pd[6] is not None else False,
                 'c': pd[6].controlled if pd[6] is not None else False,
+                'q': pd[6].chemo if pd[6] is not None else False,
                 'whiteList': pdWhiteList,
                 'doseWeight': doseWeightStr,
                 'dose': pd[0].dose,
