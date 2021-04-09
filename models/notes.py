@@ -49,6 +49,7 @@ class ClinicalNotes(db.Model):
             return ClinicalNotes.query\
                     .filter(ClinicalNotes.admissionNumber==admissionNumber)\
                     .filter(ClinicalNotes.isExam == True)\
+                    .order_by(desc(ClinicalNotes.date))\
                     .all()
         else:
             return []
