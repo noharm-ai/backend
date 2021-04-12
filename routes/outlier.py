@@ -121,6 +121,7 @@ def getOutliers(idSegment=1, idDrug=1):
             'price': drugAttr.price,
             'maxTime': drugAttr.maxTime,
             'whiteList': drugAttr.whiteList,
+            'chemo': drugAttr.chemo,
             'sctidA': d[0].sctid if d else '',
             'sctNameA': strNone(d[1]).upper() if d else '',
             'relations': relations,
@@ -197,6 +198,7 @@ def setDrugClass(idDrug):
     if 'liver' in data.keys(): drugAttr.liver = data.get('liver', None)
     if 'platelets' in data.keys(): drugAttr.platelets = data.get('platelets', None)
     if 'elderly' in data.keys(): drugAttr.elderly = data.get('elderly', 0)
+    if 'chemo' in data.keys(): drugAttr.chemo = data.get('chemo', 0)
     if 'tube' in data.keys(): drugAttr.tube = data.get('tube', 0)
     if 'division' in data.keys(): drugAttr.division = data.get('division', None)
     if 'price' in data.keys(): 

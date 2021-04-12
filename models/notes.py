@@ -28,6 +28,8 @@ class ClinicalNotes(db.Model):
     signsText = db.Column('sinaistexto', db.String, nullable=True)
     infoText = db.Column('dadostexto', db.String, nullable=True)
 
+    isExam = db.Column("exame", db.Boolean, nullable=False)
+
     def exists():
         tMap = db.session.connection()._execution_options.get("schema_translate_map", { None: None })
         schemaName = tMap[None]
@@ -41,6 +43,16 @@ class ClinicalNotes(db.Model):
                     .count()
         else:
             return None
+
+    def getExamsIfExists(admissionNumber):
+        if ClinicalNotes.exists():
+            return ClinicalNotes.query\
+                    .filter(ClinicalNotes.admissionNumber==admissionNumber)\
+                    .filter(ClinicalNotes.isExam == True)\
+                    .order_by(desc(ClinicalNotes.date))\
+                    .all()
+        else:
+            return []
 
     def getSigns(admissionNumber):
         return db.session.query(ClinicalNotes.signsText, ClinicalNotes.date)\
