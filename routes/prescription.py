@@ -277,6 +277,30 @@ class DrugList():
 
         return result
 
+    def concilia(self, pDrugs):
+        result = []
+        for p in pDrugs:
+            if p['idDrug'] == 0:
+                p['drug'] = p['time']
+            result.append(p)
+        
+        return result
+
+    def conciliaList(self, pDrugs):
+        result = []
+        for pd in pDrugs:
+            result.append({
+                'idPrescription': pd[0].idPrescription,
+                'idPrescriptionDrug': pd[0].id,
+                'idDrug': pd[0].idDrug,
+                'drug': pd[1].name if pd[1] is not None else 'Medicamento ' + str(pd[0].idDrug),
+                'dose': pd[0].dose,
+                'measureUnit': { 'value': pd[2].id, 'label': pd[2].description } if pd[2] else '',
+                'frequency': { 'value': pd[3].id, 'label': pd[3].description } if pd[3] else '',
+                'time': timeValue(pd[0].interval),
+            })
+        
+        return result
 
 @app_pres.route('/prescriptions/<int:idPrescription>', methods=['GET'])
 @jwt_required()
@@ -378,6 +402,12 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
     pDrugs = drugList.getDrugType(pDrugs, 'Medicamentos', suspended=True)
     pDrugs.sort(key=sortDrugs)
     pDrugs = drugList.sortWhiteList(pDrugs)
+    
+    conciliaList = []
+    if prescription[0].concilia:
+        pDrugs = drugList.concilia(pDrugs)
+        conciliaDrugs = PrescriptionDrug.findByPrescription(prescription[0].id, patient.admissionNumber, (date.today() - timedelta(days=1)))
+        conciliaList = drugList.conciliaList(conciliaDrugs)
 
     pSolution = drugList.getDrugType([], 'Soluções')
     pInfusion = drugList.getInfusionList()
@@ -401,7 +431,7 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
             'name': prescription[0].admissionNumber,
             'agg': prescription[0].agg,
             'concilia': prescription[0].concilia,
-            'conciliaList': [],
+            'conciliaList': conciliaList,
             'admissionNumber': prescription[0].admissionNumber,
             'birthdate': patient.birthdate.isoformat() if patient.birthdate else None,
             'gender': patient.gender,
@@ -466,6 +496,7 @@ def setPrescriptionStatus(idPrescription):
                       .filter(Prescription.admissionNumber == p.admissionNumber)\
                       .filter(Prescription.status != p.status)\
                       .filter(Prescription.idSegment != None)\
+                      .filter(Prescription.concilia == None)\
                       .filter(or_(
                          func.date(Prescription.date) == func.date(p.date),
                          func.date(Prescription.expire) == func.date(p.date)
