@@ -148,8 +148,8 @@ class Prescription(db.Model):
         interaction = relation.filter(Relation.kind.in_(['it','dt','dm']))
 
         incompatible = relation.filter(Relation.kind.in_(['iy']))\
-                        .filter(pd1.route.in_(['Intravenosa infusao','Infusão Contínua','IV']))\
-                        .filter(pd2.route.in_(['Intravenosa infusao','Infusão Contínua','IV']))
+                        .filter(pd1.tube == True)\
+                        .filter(pd2.tube == True)
 
         admissionAlergy = db.session.query(PrescriptionDrug.idDrug.label('idDrug'), func.min(PrescriptionDrug.id).label('id') )\
                       .select_from(PrescriptionDrug)\
