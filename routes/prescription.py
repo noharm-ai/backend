@@ -513,7 +513,8 @@ def setPrescriptionStatus(idPrescription):
         p.notes_at = datetime.today()
 
     if 'concilia' in data.keys(): 
-        p.concilia = data.get('concilia', None)
+        concilia = data.get('concilia', 's')
+        p.concilia = str(concilia)[:1]
 
     p.user = user.id
 
