@@ -261,13 +261,14 @@ def getFeatures(result):
     drugList.extend(result['data']['solution'])
     drugList.extend(result['data']['procedures'])
 
-    alerts = pScore = score1 = score2 = score3 = 0
+    alergy = alerts = pScore = score1 = score2 = score3 = 0
     am = av = control = np = tube = diff = 0
     drugIDs = []
     for d in drugList: 
         drugIDs.append(d['idDrug'])
         if d['whiteList'] or d['suspended']: continue
 
+        alergy += int(d['alergy'])
         alerts += len(d['alerts'])
         pScore += int(d['score'])
         score1 += int(d['score'] == '1')
@@ -287,6 +288,7 @@ def getFeatures(result):
     exams = result['data']['alertExams']
 
     return {
+        'alergy': alergy,
         'alerts': alerts,
         'prescriptionScore': pScore,
         'scoreOne': score1,
