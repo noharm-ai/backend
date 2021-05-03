@@ -401,6 +401,8 @@ class PrescriptionDrug(db.Model):
 
     def findByPrescriptionDrug(idPrescriptionDrug, future):
         pd = PrescriptionDrug.query.get(idPrescriptionDrug)
+        if pd is None: return [{1: []}], None
+        
         p = Prescription.query.get(pd.idPrescription)
 
         admissionHistory = None

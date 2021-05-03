@@ -212,6 +212,7 @@ class DrugList():
                 'av': pd[6].mav if pd[6] is not None else False,
                 'c': pd[6].controlled if pd[6] is not None else False,
                 'q': pd[6].chemo if pd[6] is not None else False,
+                'alergy': bool(pd[0].alergy == 'S'),
                 'whiteList': pdWhiteList,
                 'doseWeight': doseWeightStr,
                 'dose': pd[0].dose,
@@ -510,6 +511,10 @@ def setPrescriptionStatus(idPrescription):
     if 'notes' in data.keys(): 
         p.notes = data.get('notes', None)
         p.notes_at = datetime.today()
+
+    if 'concilia' in data.keys(): 
+        concilia = data.get('concilia', 's')
+        p.concilia = str(concilia)[:1]
 
     p.user = user.id
 
