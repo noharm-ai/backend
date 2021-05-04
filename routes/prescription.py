@@ -43,14 +43,14 @@ def getPrescriptions():
             patient.admissionNumber = p[0].admissionNumber
 
         featuresNames = ['alerts','prescriptionScore','scoreOne','scoreTwo','scoreThree',\
-                        'am','av','controlled','np','tube','diff','alertExams','interventions']
+                        'am','av','controlled','np','tube','diff','alertExams','interventions','complication']
                         
         features = {'processed':True}
         if p[0].features:
             for f in featuresNames:
                 features[f] = p[0].features[f] if f in p[0].features else 0
             
-            features['globalScore'] = features['prescriptionScore'] + features['av'] + features['alertExams'] + features['alerts']
+            features['globalScore'] = features['prescriptionScore'] + features['av'] + features['alertExams'] + features['alerts'] + features['diff']
             if features['globalScore'] > 90 : features['class'] = 'red'
             elif features['globalScore'] > 60 : features['class'] = 'orange'
             elif features['globalScore'] > 10 : features['class'] = 'yellow'
@@ -333,9 +333,9 @@ def buildHeaders(headers, pDrugs, pSolution, pProcedures):
         procedures = [p for p in pProcedures if p['idPrescription'] == pid]
         proceduresInterv = [s['prevIntervention'] for s in solutions if s['prevIntervention'] != {}]
         
-        headers[pid]['drugs'] = getFeatures({'data':{'prescription':drugs, 'solution': [], 'procedures': [], 'interventions':drugsInterv, 'alertExams':[]}})
-        headers[pid]['solutions'] = getFeatures({'data':{'prescription':[], 'solution': solutions, 'procedures': [], 'interventions':solutionsInterv, 'alertExams':[]}})
-        headers[pid]['procedures'] = getFeatures({'data':{'prescription':[], 'solution': [], 'procedures': procedures, 'interventions':proceduresInterv, 'alertExams':[]}})
+        headers[pid]['drugs'] = getFeatures({'data':{'prescription':drugs, 'solution': [], 'procedures': [], 'interventions':drugsInterv, 'alertExams':[], 'complication': 0}})
+        headers[pid]['solutions'] = getFeatures({'data':{'prescription':[], 'solution': solutions, 'procedures': [], 'interventions':solutionsInterv, 'alertExams':[], 'complication': 0}})
+        headers[pid]['procedures'] = getFeatures({'data':{'prescription':[], 'solution': [], 'procedures': procedures, 'interventions':proceduresInterv, 'alertExams':[], 'complication': 0}})
 
     return headers
 
@@ -375,10 +375,11 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
     relations = Prescription.findRelation(prescription[0].id,patient.admissionNumber, aggDate)
     headers = Prescription.getHeaders(admissionNumber, aggDate) if aggDate else []
 
-    clinicalNotes = ClinicalNotes.getIfExists(prescription[0].admissionNumber)
+    clinicalNotesCount = ClinicalNotes.getCountIfExists(prescription[0].admissionNumber)
+    complicationCount = ClinicalNotes.getComplicationCountIfExists(prescription[0].admissionNumber)
     notesSigns = None
     notesInfo = None
-    if clinicalNotes:
+    if clinicalNotesCount:
         notesSigns = ClinicalNotes.getSigns(prescription[0].admissionNumber)
         notesInfo = ClinicalNotes.getInfo(prescription[0].admissionNumber)
 
@@ -469,7 +470,8 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
             'intervention': pIntervention[0] if len(pIntervention) else None,
             'prevIntervention': getPrevIntervention(interventions, prescription[0].date),
             'existIntervention': getExistIntervention(interventions, prescription[0].date),
-            'clinicalNotes': clinicalNotes,
+            'clinicalNotes': clinicalNotesCount,
+            'complication': complicationCount,
             'notesSigns': strNone(notesSigns[0]) if notesSigns else '',
             'notesSignsDate': notesSigns[1].isoformat() if notesSigns else None,
             'notesInfo': strNone(notesInfo[0]) if notesInfo else '',

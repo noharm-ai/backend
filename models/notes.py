@@ -35,11 +35,23 @@ class ClinicalNotes(db.Model):
         schemaName = tMap[None]
         return db.engine.has_table('evolucao', schema=schemaName)
 
-    def getIfExists(admissionNumber):
+    def getCountIfExists(admissionNumber):
         if ClinicalNotes.exists():
             return ClinicalNotes.query\
                     .filter(ClinicalNotes.admissionNumber==admissionNumber)\
+                    .filter(ClinicalNotes.isExam == None)\
                     .filter(ClinicalNotes.date > (datetime.today() - timedelta(days=6)))\
+                    .count()
+        else:
+            return None
+
+    def getComplicationCountIfExists(admissionNumber):
+        if ClinicalNotes.exists():
+            return ClinicalNotes.query\
+                    .filter(ClinicalNotes.admissionNumber==admissionNumber)\
+                    .filter(ClinicalNotes.isExam == None)\
+                    .filter(ClinicalNotes.date > (datetime.today() - timedelta(days=6)))\
+                    .filter(ClinicalNotes.complication > 0)\
                     .count()
         else:
             return None

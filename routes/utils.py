@@ -286,6 +286,7 @@ def getFeatures(result):
         interventions += int(i['status'] == 's')
 
     exams = result['data']['alertExams']
+    complicationCount = result['data']['complication']
 
     return {
         'alergy': alergy,
@@ -302,5 +303,6 @@ def getFeatures(result):
         'diff': diff,
         'alertExams': exams,
         'interventions': interventions,
+        'complication': complicationCount,
         'drugIDs': list(set(drugIDs))
     }
