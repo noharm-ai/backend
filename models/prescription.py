@@ -209,6 +209,28 @@ class Prescription(db.Model):
 
         return results
 
+    def checkPrescriptions(admissionNumber, aggDate, userId):
+        exists = db.session.query(Prescription)\
+                    .filter(Prescription.admissionNumber == admissionNumber)\
+                    .filter(Prescription.status != 's')\
+                    .filter(Prescription.idSegment != None)\
+                    .filter(Prescription.concilia == None)\
+                    .filter(Prescription.agg == None)\
+                    .filter(or_(
+                        func.date(Prescription.date) == func.date(aggDate),
+                        func.date(Prescription.expire) == func.date(aggDate)
+                    )).count()
+
+        db.session.query(Prescription)\
+                    .filter(Prescription.admissionNumber == admissionNumber)\
+                    .filter(Prescription.agg != None)\
+                    .filter(func.date(Prescription.date) == func.date(aggDate))\
+                    .update({
+                        'status': 's' if exists == 0 else '0',
+                        'update': datetime.today(),
+                        'user': userId
+                    }, synchronize_session='fetch')        
+
 def getDrugList():
     query = db.session.query(cast(PrescriptionDrug.idDrug,db.Integer))\
         .select_from(PrescriptionDrug)\

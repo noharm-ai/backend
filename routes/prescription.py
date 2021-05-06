@@ -509,6 +509,8 @@ def setPrescriptionStatus(idPrescription):
                         'update': datetime.today(),
                         'user': user.id
                       }, synchronize_session='fetch')
+        else:
+            Prescription.checkPrescriptions(p.admissionNumber, p.date, user.id)
 
     if 'notes' in data.keys(): 
         p.notes = data.get('notes', None)
