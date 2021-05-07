@@ -108,7 +108,7 @@ swrtz2Empty = dict(examEmpty, **{'initials': 'Schwartz 2', 'name': 'Schwartz 2'}
 class refEmpty():
     ref = initials = min = max = name = ''
 
-def formatExam(exam, typeExam, segExam):
+def formatExam(exam, typeExam, segExam, prevValue = None):
     if exam is not None:
         if typeExam in segExam:
             ref = segExam[typeExam]
@@ -119,9 +119,16 @@ def formatExam(exam, typeExam, segExam):
             ref.initials = typeExam
             alert = False
 
-        return { 'value': none2zero(exam.value), 'unit': strNone(exam.unit), 'alert': alert,\
+        value = none2zero(exam.value)
+        prevValue = none2zero(prevValue)
+        delta = None
+        if prevValue > 0 and value > 0:
+            delta = round( abs(prevValue - value) / prevValue, 2) * 100
+            delta = delta*(-1) if prevValue > value else delta
+
+        return { 'value': value, 'unit': strNone(exam.unit), 'alert': alert,\
                  'date' : exam.date.isoformat(), 'ref': ref.ref, 'initials': ref.initials,
-                 'min': ref.min, 'max': ref.max, 'name': ref.name }
+                 'min': ref.min, 'max': ref.max, 'name': ref.name, 'prev': prevValue, 'delta': delta }
     else:
         examEmpty['date'] = None
         return examEmpty
@@ -286,6 +293,7 @@ def getFeatures(result):
         interventions += int(i['status'] == 's')
 
     exams = result['data']['alertExams']
+    complicationCount = result['data']['complication']
 
     return {
         'alergy': alergy,
@@ -302,5 +310,6 @@ def getFeatures(result):
         'diff': diff,
         'alertExams': exams,
         'interventions': interventions,
+        'complication': complicationCount,
         'drugIDs': list(set(drugIDs))
     }
