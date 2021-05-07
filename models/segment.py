@@ -71,8 +71,21 @@ class Exams(db.Model):
 
         el = db.aliased(examLatest)
 
+        examPrevQ = db.session.query(Exams.typeExam.label('typeExam'), func.max(Exams.date).label('date'))\
+                      .select_from(Exams)\
+                      .join(el, and_(Exams.typeExam == el.c.typeExam, Exams.date < el.c.date))\
+                      .filter(Exams.admissionNumber == patient.admissionNumber)\
+                      .group_by(Exams.typeExam)\
+                      .subquery()
+
+        elPrev = db.aliased(examPrevQ)
+
         results = Exams.query\
                 .join(el, and_(Exams.typeExam == el.c.typeExam, Exams.date == el.c.date))\
+                .filter(Exams.admissionNumber == patient.admissionNumber)
+
+        resultsPrev = Exams.query\
+                .join(elPrev, and_(Exams.typeExam == elPrev.c.typeExam, Exams.date == elPrev.c.date))\
                 .filter(Exams.admissionNumber == patient.admissionNumber)
 
         segExam = SegmentExam.refDict(idSegment)
@@ -80,7 +93,7 @@ class Exams(db.Model):
         
         exams = {}
         for e in segExam:
-            examEmpty = { 'value': None, 'alert': False, 'ref': None, 'name': None, 'unit': None }
+            examEmpty = { 'value': None, 'alert': False, 'ref': None, 'name': None, 'unit': None, 'delta': None }
             examEmpty['date'] = None
             examEmpty['min'] = segExam[e].min
             examEmpty['max'] = segExam[e].max
@@ -91,21 +104,27 @@ class Exams(db.Model):
             else: 
                 exams[e.lower()] = examEmpty
 
+        examPrev = {}
+        for e in resultsPrev:
+            examPrev[e.typeExam] = e.value
+
         examsExtra = {}
         for e in results:
             
+            prevValue = examPrev[e.typeExam] if e.typeExam in examPrev.keys() else None
+
             if e.typeExam.lower() not in ['mdrd','ckd','cg','swrtz2']:
-                exams[e.typeExam.lower()] = formatExam(e, e.typeExam.lower(), segExam)
+                exams[e.typeExam.lower()] = formatExam(e, e.typeExam.lower(), segExam, prevValue)
             
             if e.typeExam.lower() in segExam:
                 if segExam[e.typeExam.lower()].initials.lower() == 'creatinina':
-                    exams['cr'] = formatExam(e, e.typeExam.lower(), segExam)
+                    exams['cr'] = formatExam(e, e.typeExam.lower(), segExam, prevValue)
                 if segExam[e.typeExam.lower()].initials.lower() == 'tgo':
-                    examsExtra['tgo'] = formatExam(e, e.typeExam.lower(), segExam)
+                    examsExtra['tgo'] = formatExam(e, e.typeExam.lower(), segExam, prevValue)
                 if segExam[e.typeExam.lower()].initials.lower() == 'tgp':
-                    examsExtra['tgp'] = formatExam(e, e.typeExam.lower(), segExam)
+                    examsExtra['tgp'] = formatExam(e, e.typeExam.lower(), segExam, prevValue)
                 if segExam[e.typeExam.lower()].initials.lower() == 'plaquetas':
-                    examsExtra['plqt'] = formatExam(e, e.typeExam.lower(), segExam)
+                    examsExtra['plqt'] = formatExam(e, e.typeExam.lower(), segExam, prevValue)
 
         if 'cr' in exams:
             if age > 17:

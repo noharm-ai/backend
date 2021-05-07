@@ -108,7 +108,7 @@ swrtz2Empty = dict(examEmpty, **{'initials': 'Schwartz 2', 'name': 'Schwartz 2'}
 class refEmpty():
     ref = initials = min = max = name = ''
 
-def formatExam(exam, typeExam, segExam):
+def formatExam(exam, typeExam, segExam, prevValue = None):
     if exam is not None:
         if typeExam in segExam:
             ref = segExam[typeExam]
@@ -119,9 +119,16 @@ def formatExam(exam, typeExam, segExam):
             ref.initials = typeExam
             alert = False
 
-        return { 'value': none2zero(exam.value), 'unit': strNone(exam.unit), 'alert': alert,\
+        value = none2zero(exam.value)
+        prevValue = none2zero(prevValue)
+        delta = None
+        if prevValue > 0 and value > 0:
+            delta = round(min([prevValue, value]) / max([prevValue, value]),2)
+            delta = delta*(-1) if prevValue > value else delta
+
+        return { 'value': value, 'unit': strNone(exam.unit), 'alert': alert,\
                  'date' : exam.date.isoformat(), 'ref': ref.ref, 'initials': ref.initials,
-                 'min': ref.min, 'max': ref.max, 'name': ref.name }
+                 'min': ref.min, 'max': ref.max, 'name': ref.name, 'delta': delta }
     else:
         examEmpty['date'] = None
         return examEmpty
