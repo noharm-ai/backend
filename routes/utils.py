@@ -123,12 +123,12 @@ def formatExam(exam, typeExam, segExam, prevValue = None):
         prevValue = none2zero(prevValue)
         delta = None
         if prevValue > 0 and value > 0:
-            delta = round(min([prevValue, value]) / max([prevValue, value]),2)*100
+            delta = round( abs(prevValue - value) / prevValue, 2) * 100
             delta = delta*(-1) if prevValue > value else delta
 
         return { 'value': value, 'unit': strNone(exam.unit), 'alert': alert,\
                  'date' : exam.date.isoformat(), 'ref': ref.ref, 'initials': ref.initials,
-                 'min': ref.min, 'max': ref.max, 'name': ref.name, 'delta': delta }
+                 'min': ref.min, 'max': ref.max, 'name': ref.name, 'prev': prevValue, 'delta': delta }
     else:
         examEmpty['date'] = None
         return examEmpty
