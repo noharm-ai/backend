@@ -123,7 +123,7 @@ def formatExam(exam, typeExam, segExam, prevValue = None):
         prevValue = none2zero(prevValue)
         delta = None
         if prevValue > 0 and value > 0:
-            delta = round(min([prevValue, value]) / max([prevValue, value]),2)
+            delta = round(min([prevValue, value]) / max([prevValue, value]),2)*100
             delta = delta*(-1) if prevValue > value else delta
 
         return { 'value': value, 'unit': strNone(exam.unit), 'alert': alert,\
