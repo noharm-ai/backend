@@ -23,6 +23,7 @@ class ClinicalNotes(db.Model):
     info = db.Column("dados", db.Integer, nullable=True)
     conduct = db.Column("conduta", db.Integer, nullable=True)
     signs = db.Column("sinais", db.Integer, nullable=True)
+    alergy = db.Column("alergia", db.Integer, nullable=True)
     names = db.Column("nomes", db.Integer, nullable=True)
 
     signsText = db.Column('sinaistexto', db.String, nullable=True)
