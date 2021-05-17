@@ -221,6 +221,9 @@ def schwartz2_calc(cr, height):
 
 def tryCommit(db, recId, allow=True):
     if not allow:
+        db.session.rollback()
+        db.session.close()
+        db.session.remove()
         return {
             'status': 'error',
             'message': 'Usuário não autorizado',
