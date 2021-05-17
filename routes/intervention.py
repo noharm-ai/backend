@@ -23,7 +23,7 @@ def setDrugStatus(idPrescriptionDrug, drugStatus):
         pd.update = datetime.today()
         pd.user = user.id
 
-    return tryCommit(db, idPrescriptionDrug)
+    return tryCommit(db, idPrescriptionDrug, user.permission())
 
 @app_itrv.route('/intervention/<int:idPrescriptionDrug>', methods=['PUT'])
 @jwt_required()
