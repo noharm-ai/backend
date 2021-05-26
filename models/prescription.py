@@ -302,8 +302,8 @@ class Patient(db.Model):
 
         if endDate is None: endDate = startDate
 
-        q = q.filter(func.date(Prescription.date) >= validate(startDate))
-        q = q.filter(func.date(Prescription.date) <= validate(endDate))
+        q = q.filter(Prescription.date >= validate(startDate))
+        q = q.filter(Prescription.date <= (validate(endDate) + timedelta(hours=23,minutes=59)))
 
         q = q.order_by(desc(Prescription.date))
 

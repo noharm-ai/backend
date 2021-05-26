@@ -23,7 +23,7 @@ def data2month(birthdate):
 
 def validate(date_text):
     try:
-        return datetime.strptime(date_text, '%Y-%m-%d').date()
+        return datetime.strptime(date_text, '%Y-%m-%d')
     except ValueError:
         return date.today()
 
