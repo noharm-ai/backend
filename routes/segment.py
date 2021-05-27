@@ -178,7 +178,7 @@ def getCodes():
     dbSession.setSchema(user.schema)
 
     typesExam = db.session.query(Exams.typeExam)\
-                .filter(Exams.date > (date.today() - timedelta(days=360)))\
+                .filter(Exams.date > (date.today() - timedelta(days=90)))\
                 .group_by(Exams.typeExam)\
                 .order_by(asc(Exams.typeExam)).all()
 
