@@ -54,6 +54,7 @@ class Frequency(db.Model):
     __tablename__ = 'frequencia'
 
     id = db.Column("fkfrequencia", db.String, primary_key=True)
+    idHospital = db.Column("fkhospital", db.Integer, nullable=False)
     description = db.Column("nome", db.String, nullable=False)
 
 class Notes(db.Model):

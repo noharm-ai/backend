@@ -193,7 +193,9 @@ def setDrugClass(idDrug):
     if 'controlled' in data.keys(): drugAttr.controlled = bool(data.get('controlled', 0))
     if 'idMeasureUnit' in data.keys(): drugAttr.idMeasureUnit = data.get('idMeasureUnit', None)
     if 'notdefault' in data.keys(): drugAttr.notdefault = data.get('notdefault', 0)
-    if 'maxDose' in data.keys(): drugAttr.maxDose = data.get('maxDose', None)
+    if 'maxDose' in data.keys(): 
+        drugAttr.maxDose = data.get('maxDose', None)
+        if drugAttr.maxDose == '': drugAttr.maxDose = None
     if 'kidney' in data.keys(): drugAttr.kidney = data.get('kidney', None)
     if 'liver' in data.keys(): drugAttr.liver = data.get('liver', None)
     if 'platelets' in data.keys(): drugAttr.platelets = data.get('platelets', None)
