@@ -243,7 +243,7 @@ class Patient(db.Model):
     __tablename__ = 'pessoa'
 
     idPatient = db.Column("fkpessoa", db.Integer, nullable=False)
-    fkHospital = db.Column("fkhospital", db.Integer, nullable=False)
+    idHospital = db.Column("fkhospital", db.Integer, nullable=False)
     admissionNumber = db.Column('nratendimento', db.Integer, primary_key=True)
     admissionDate = db.Column('dtinternacao', db.DateTime, nullable=True)
     birthdate = db.Column('dtnascimento', db.DateTime, nullable=True)
@@ -402,9 +402,9 @@ class PrescriptionDrug(db.Model):
             .outerjoin(Outlier, Outlier.id == PrescriptionDrug.idOutlier)\
             .outerjoin(Drug, Drug.id == PrescriptionDrug.idDrug)\
             .outerjoin(Notes, Notes.idPrescriptionDrug == PrescriptionDrug.id)\
-            .outerjoin(MeasureUnit, MeasureUnit.id == PrescriptionDrug.idMeasureUnit)\
-            .outerjoin(Frequency, Frequency.id == PrescriptionDrug.idFrequency)\
-            .outerjoin(DrugAttributes, and_(DrugAttributes.idDrug == PrescriptionDrug.idDrug, DrugAttributes.idSegment == PrescriptionDrug.idSegment))\
+            .outerjoin(MeasureUnit, and_(MeasureUnit.id == PrescriptionDrug.idMeasureUnit, MeasureUnit.idHospital == Prescription.idHospital))\
+            .outerjoin(Frequency, and_(Frequency.id == PrescriptionDrug.idFrequency, Frequency.idHospital == Prescription.idHospital))\
+            .outerjoin(DrugAttributes, DrugAttributes.idDrug == PrescriptionDrug.idDrug)\
             .outerjoin(Prescription, Prescription.id == PrescriptionDrug.idPrescription)\
         
         if aggDate is None:
@@ -484,8 +484,8 @@ class Intervention(db.Model):
             .outerjoin(PrescriptionDrug, Intervention.id == PrescriptionDrug.id)\
             .outerjoin(Prescription, Intervention.idPrescription == Prescription.id)\
             .outerjoin(Drug, Drug.id == PrescriptionDrug.idDrug)\
-            .outerjoin(MeasureUnit, MeasureUnit.id == PrescriptionDrug.idMeasureUnit)\
-            .outerjoin(Frequency, Frequency.id == PrescriptionDrug.idFrequency)\
+            .outerjoin(MeasureUnit, and_(MeasureUnit.id == PrescriptionDrug.idMeasureUnit, MeasureUnit.idHospital == Prescription.idHospital))\
+            .outerjoin(Frequency, and_(Frequency.id == PrescriptionDrug.idFrequency, Frequency.idHospital == Prescription.idHospital))\
             .outerjoin(User, User.id == Intervention.user)
 
         if admissionNumber:
