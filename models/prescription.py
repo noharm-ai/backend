@@ -404,7 +404,7 @@ class PrescriptionDrug(db.Model):
             .outerjoin(Notes, Notes.idPrescriptionDrug == PrescriptionDrug.id)\
             .outerjoin(MeasureUnit, and_(MeasureUnit.id == PrescriptionDrug.idMeasureUnit, MeasureUnit.idHospital == Prescription.idHospital))\
             .outerjoin(Frequency, and_(Frequency.id == PrescriptionDrug.idFrequency, Frequency.idHospital == Prescription.idHospital))\
-            .outerjoin(DrugAttributes, DrugAttributes.idDrug == PrescriptionDrug.idDrug)\
+            .outerjoin(DrugAttributes, and_(DrugAttributes.idDrug == PrescriptionDrug.idDrug, DrugAttributes.idSegment == PrescriptionDrug.idSegment))\
             .outerjoin(Prescription, Prescription.id == PrescriptionDrug.idPrescription)\
         
         if aggDate is None:
