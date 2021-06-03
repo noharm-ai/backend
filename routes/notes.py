@@ -19,11 +19,12 @@ def getNotes(admissionNumber):
     if ClinicalNotes.exists():
     
         pat = Patient.query.get(admissionNumber)
+        admDate = pat.admissionDate if pat else datetime.today()
         notes = ClinicalNotes.query\
                 .filter(ClinicalNotes.admissionNumber==admissionNumber)\
                 .filter(or_(
                         ClinicalNotes.date > (datetime.today() - timedelta(days=6)),
-                        ClinicalNotes.date == pat.admissionDate
+                        ClinicalNotes.date == admDate
                 ))\
                 .order_by(desc(ClinicalNotes.date))\
                 .all()
