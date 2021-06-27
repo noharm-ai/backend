@@ -476,17 +476,21 @@ class Intervention(db.Model):
                 .filter(dr1.id == func.any(Intervention.interactions))\
                 .as_scalar()
 
+        PrescriptionB = db.aliased(Prescription)
         interventions = db.session\
             .query(Intervention, PrescriptionDrug, 
                     func.array(reason).label('reason'), Drug.name, 
                     func.array(interactions).label('interactions'),
-                    MeasureUnit, Frequency, Prescription, User)\
+                    MeasureUnit, Frequency, Prescription, User.name, 
+                    Department.name, PrescriptionB.prescriber)\
             .outerjoin(PrescriptionDrug, Intervention.id == PrescriptionDrug.id)\
             .outerjoin(Prescription, Intervention.idPrescription == Prescription.id)\
+            .outerjoin(PrescriptionB, PrescriptionDrug.idPrescription == PrescriptionB.id)\
             .outerjoin(Drug, Drug.id == PrescriptionDrug.idDrug)\
             .outerjoin(MeasureUnit, and_(MeasureUnit.id == PrescriptionDrug.idMeasureUnit, MeasureUnit.idHospital == Prescription.idHospital))\
             .outerjoin(Frequency, and_(Frequency.id == PrescriptionDrug.idFrequency, Frequency.idHospital == Prescription.idHospital))\
-            .outerjoin(User, User.id == Intervention.user)
+            .outerjoin(User, User.id == Intervention.user)\
+            .outerjoin(Department, and_(Department.id == PrescriptionB.idDepartment, Department.idHospital == PrescriptionB.idHospital))
 
         if admissionNumber:
             interventions = interventions.filter(Intervention.admissionNumber == admissionNumber)
@@ -520,7 +524,9 @@ class Intervention(db.Model):
                 'interactions': i[0].interactions,
                 'date': i[0].date.isoformat(),
                 'dateTime': i[0].date,
-                'user': i[8].name,
+                'user': i[8],
+                'department': i[9] if i[9] else None,
+                'prescriber': i[10] if i[10] else None,
                 'status': i[0].status
             })
 
