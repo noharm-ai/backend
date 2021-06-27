@@ -28,6 +28,7 @@ jobs:
       - name: Setup PostgreSQL
         run: |
           git clone https://github.com/noharm-ai/database
+          psql -h localhost -U postgres -d noharm -a -f database/noharm-public.sql -v ON_ERROR_STOP=1
           psql -h localhost -U postgres -d noharm -a -f database/noharm-create.sql -v ON_ERROR_STOP=1
           psql -h localhost -U postgres -d noharm -a -f database/noharm-newuser.sql -v ON_ERROR_STOP=1
           psql -h localhost -U postgres -d noharm -a -f database/noharm-care.sql -v ON_ERROR_STOP=1
