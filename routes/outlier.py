@@ -56,7 +56,7 @@ def getOutliers(idSegment=1, idDrug=1):
     newOutlier = True
     results = []
     for o in outliers:
-        if dose is not None and frequency is not None:
+        if dose is not None and frequency is not None and is_float(dose) and is_float(frequency):
             if float(dose) == o[0].dose and float(frequency) == o[0].frequency: 
                 newOutlier = False
 
@@ -72,7 +72,7 @@ def getOutliers(idSegment=1, idDrug=1):
             'obs': o[1].notes if o[1] != None else ''
         })
 
-    if dose is not None and frequency is not None and newOutlier:
+    if dose is not None and frequency is not None and newOutlier and is_float(dose) and is_float(frequency):
         o = Outlier()
         o.idDrug = idDrug
         o.idSegment = idSegment
