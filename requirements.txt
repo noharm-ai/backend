@@ -11,7 +11,7 @@ psycopg2-binary
 pytest==5.4.1
 pytest-flask
 mock
-pandas
+pandas==1.2.5
 pylint
 networkx
 numpy
