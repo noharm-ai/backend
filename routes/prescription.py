@@ -332,7 +332,7 @@ def buildHeaders(headers, pDrugs, pSolution, pProcedures):
         solutionsInterv = [s['prevIntervention'] for s in solutions if s['prevIntervention'] != {}]
         
         procedures = [p for p in pProcedures if p['idPrescription'] == pid]
-        proceduresInterv = [s['prevIntervention'] for s in procedures if s['prevIntervention'] != {}]
+        proceduresInterv = [p['prevIntervention'] for p in procedures if p['prevIntervention'] != {}]
         
         headers[pid]['drugs'] = getFeatures({'data':{'prescription':drugs, 'solution': [], 'procedures': [], 'interventions':drugsInterv, 'alertExams':[], 'complication': 0}})
         headers[pid]['solutions'] = getFeatures({'data':{'prescription':[], 'solution': solutions, 'procedures': [], 'interventions':solutionsInterv, 'alertExams':[], 'complication': 0}})
