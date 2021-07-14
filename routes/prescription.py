@@ -421,6 +421,10 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
     pProcedures = drugList.getDrugType(pProcedures, 'Proced/Exames', checked=True)
     pProcedures = drugList.getDrugType(pProcedures, 'Proced/Exames', suspended=True)
 
+    pDiet = drugList.getDrugType([], 'Dietas')
+    pDiet = drugList.getDrugType(pDiet, 'Dietas', checked=True)
+    pDiet = drugList.getDrugType(pDiet, 'Dietas', suspended=True)
+
     if aggDate:
         headers = buildHeaders(headers, pDrugs,pSolution,pProcedures)
 
@@ -464,6 +468,7 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
             'solution': pSolution,
             'procedures': pProcedures,
             'infusion': pInfusion,
+            'diet': pDiet,
             'interventions': interventions,
             'alertExams': alertExams,
             'exams': examsJson[:10],
