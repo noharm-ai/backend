@@ -10,7 +10,7 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2
         with:
-          python-version: 3.8.10
+          python-version: 3.8
       - name: Run Python Tests
         run: |
           python -m pip install --upgrade pip
@@ -23,7 +23,7 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2
         with:
-          python-version: 3.8.10
+          python-version: 3.8
       - name: Config Zappa
         run: |
           echo '${{ secrets.ZAPPA_TEST_SETTINGS }}' > zappa_settings.json 
@@ -39,4 +39,4 @@ jobs:
           source venv/bin/activate
           python -m pip install --upgrade pip
           pip install -r requirements-prod.txt
-          zappa update test
+          zappa update test -q
