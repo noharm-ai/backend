@@ -1,3 +1,4 @@
+from flask.json import jsonify
 from conftest import *
 from models.appendix import Department
 from models.segment import Segment
@@ -10,17 +11,27 @@ from models.segment import Segment
 #   pres.name = 'pres'
 #   return [pres, pres]
 
+@app.route('/authenticate')
+def test_get_prescriptions(client):
+    mimetype = 'application/json'
+    headers = {
+        'Content-Type': mimetype,
+        'Accept': mimetype
+    }
+    data = {
+        "email": "demo",
+        "password": "demo"
+    }
+    url = '/authenticate'
 
-@patch('models.main.User.find', side_effect=user_find)
-# @patch('models.prescriptions.Prescriptions.findAll', side_effect=pres_getall)
-@patch('models.main.dbSession.setSchema', side_effect=setSchema)
-def test_get_prescriptions(user, main, client):
-    result = client.post(
-        '/authenticate', {"email": "demo", "password": "demo"})
-    response = client.get('/prescriptions', headers=make_headers(access_token))
-    data = json.loads(response.data)
-    print(result)
+    response = client.post(url, data=json.dumps(data), headers=headers)
+    my_json = response.data.decode('utf8').replace("'", '"')
+    data_response = json.loads(my_json)
+    print(data_response['access_token'])
+
+    response = client.get('/prescriptions', headers=make_headers(data_response['access_token']))
+    #data = json.loads(response.data)
     assert response.status_code == 200
     # assert data['status'] == 'success'
     # assert data['data'][0]['description'] == 'descript'
-    # assert len(data['data']) == 3
+    #assert len(data['data']) == 3

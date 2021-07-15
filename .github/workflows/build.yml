@@ -2,6 +2,8 @@ name: Build
 on:
   pull_request:
     branches: [ master, develop ]
+  push:
+    branches: [ feature/* ]
 
 jobs:
   build:
@@ -23,8 +25,6 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -q -r requirements.txt
-      - name: Run Python Tests
-        run: python -m pytest -v
       - name: Setup PostgreSQL
         run: |
           git clone https://github.com/noharm-ai/database
@@ -40,3 +40,5 @@ jobs:
           sleep 10
       - name: Run Integration Test
         run: ./tests/test_integration.sh
+      - name: Run Python Tests
+        run: python -m pytest -v
