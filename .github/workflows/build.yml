@@ -3,7 +3,7 @@ on:
   pull_request:
     branches: [ master, develop ]
   push:
-    branches: [ feature/* ]
+    branches: [ feature/#1-acceptence_test_prescriptions ]
 
 jobs:
   build:
