@@ -332,7 +332,7 @@ def buildHeaders(headers, pDrugs, pSolution, pProcedures):
         solutionsInterv = [s['prevIntervention'] for s in solutions if s['prevIntervention'] != {}]
         
         procedures = [p for p in pProcedures if p['idPrescription'] == pid]
-        proceduresInterv = [s['prevIntervention'] for s in solutions if s['prevIntervention'] != {}]
+        proceduresInterv = [p['prevIntervention'] for p in procedures if p['prevIntervention'] != {}]
         
         headers[pid]['drugs'] = getFeatures({'data':{'prescription':drugs, 'solution': [], 'procedures': [], 'interventions':drugsInterv, 'alertExams':[], 'complication': 0}})
         headers[pid]['solutions'] = getFeatures({'data':{'prescription':[], 'solution': solutions, 'procedures': [], 'interventions':solutionsInterv, 'alertExams':[], 'complication': 0}})
@@ -421,6 +421,10 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
     pProcedures = drugList.getDrugType(pProcedures, 'Proced/Exames', checked=True)
     pProcedures = drugList.getDrugType(pProcedures, 'Proced/Exames', suspended=True)
 
+    pDiet = drugList.getDrugType([], 'Dietas')
+    pDiet = drugList.getDrugType(pDiet, 'Dietas', checked=True)
+    pDiet = drugList.getDrugType(pDiet, 'Dietas', suspended=True)
+
     if aggDate:
         headers = buildHeaders(headers, pDrugs,pSolution,pProcedures)
 
@@ -464,6 +468,7 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
             'solution': pSolution,
             'procedures': pProcedures,
             'infusion': pInfusion,
+            'diet': pDiet,
             'interventions': interventions,
             'alertExams': alertExams,
             'exams': examsJson[:10],

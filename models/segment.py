@@ -56,16 +56,17 @@ class Exams(db.Model):
     value = db.Column("resultado", db.Float, nullable=False)
     unit = db.Column("unidade", db.String, nullable=True)
 
-    def findByAdmission(admissionNumber):
+    def findByPatient(idPatient):
         return db.session.query(Exams)\
-                         .filter(Exams.admissionNumber == admissionNumber)\
+                         .filter(Exams.idPatient == idPatient)\
+                         .filter(Exams.date > (date.today() - timedelta(days=180)))\
                          .order_by(asc(Exams.typeExam),desc(Exams.date))\
                          .all()
 
     def findLatestByAdmission(patient, idSegment):
         examLatest = db.session.query(Exams.typeExam.label('typeExam'), func.max(Exams.date).label('date'))\
                       .select_from(Exams)\
-                      .filter(Exams.admissionNumber == patient.admissionNumber)\
+                      .filter(Exams.idPatient == patient.idPatient)\
                       .group_by(Exams.typeExam)\
                       .subquery()
 
@@ -74,7 +75,7 @@ class Exams(db.Model):
         examPrevQ = db.session.query(Exams.typeExam.label('typeExam'), func.max(Exams.date).label('date'))\
                       .select_from(Exams)\
                       .join(el, and_(Exams.typeExam == el.c.typeExam, Exams.date < el.c.date))\
-                      .filter(Exams.admissionNumber == patient.admissionNumber)\
+                      .filter(Exams.idPatient == patient.idPatient)\
                       .group_by(Exams.typeExam)\
                       .subquery()
 
@@ -82,11 +83,11 @@ class Exams(db.Model):
 
         results = Exams.query\
                 .join(el, and_(Exams.typeExam == el.c.typeExam, Exams.date == el.c.date))\
-                .filter(Exams.admissionNumber == patient.admissionNumber)
+                .filter(Exams.idPatient == patient.idPatient)
 
         resultsPrev = Exams.query\
                 .join(elPrev, and_(Exams.typeExam == elPrev.c.typeExam, Exams.date == elPrev.c.date))\
-                .filter(Exams.admissionNumber == patient.admissionNumber)
+                .filter(Exams.idPatient == patient.idPatient)
 
         segExam = SegmentExam.refDict(idSegment)
         age = data2age(patient.birthdate.isoformat() if patient.birthdate else date.today().isoformat())
