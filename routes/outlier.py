@@ -214,7 +214,9 @@ def setDrugClass(idDrug):
         if drugAttr.price == '': drugAttr.price = None
     if 'maxTime' in data.keys(): drugAttr.maxTime = data.get('maxTime', None)
     if 'useWeight' in data.keys(): drugAttr.useWeight = data.get('useWeight', 0)
-    if 'amount' in data.keys(): drugAttr.amount = data.get('amount', 0)
+    if 'amount' in data.keys(): 
+        drugAttr.amount = data.get('amount', None)
+        if drugAttr.amount == '': drugAttr.amount = None
     if 'amountUnit' in data.keys(): drugAttr.amountUnit = data.get('amountUnit', None)
     if 'whiteList' in data.keys(): 
         drugAttr.whiteList = data.get('whiteList', None)

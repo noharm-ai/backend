@@ -508,10 +508,7 @@ def setPrescriptionStatus(idPrescription):
                       .filter(Prescription.status != p.status)\
                       .filter(Prescription.idSegment != None)\
                       .filter(Prescription.concilia == None)\
-                      .filter(or_(
-                         func.date(Prescription.date) == func.date(p.date),
-                         func.date(Prescription.expire) == func.date(p.date)
-                      ))\
+                      .filter(between(func.date(p.date), func.date(Prescription.date), func.date(Prescription.expire)))\
                       .update({
                         'status': p.status,
                         'update': datetime.today(),
