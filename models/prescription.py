@@ -4,7 +4,7 @@ from .segment import *
 from routes.utils import *
 from datetime import datetime
 from sqlalchemy.orm import deferred
-from sqlalchemy import case, BigInteger, cast
+from sqlalchemy import case, BigInteger, cast, between
 
 class Prescription(db.Model):
     __tablename__ = 'prescricao'
@@ -87,10 +87,7 @@ class Prescription(db.Model):
         prescriptions = db.session.query(Prescription, Department.name)\
                     .outerjoin(Department, and_(Department.id == Prescription.idDepartment, Department.idHospital == Prescription.idHospital))\
                     .filter(Prescription.admissionNumber == admissionNumber)\
-                    .filter(or_(
-                                func.date(Prescription.date) == aggDate,
-                                func.date(Prescription.expire) == aggDate
-                            ))\
+                    .filter(between(aggDate, func.date(Prescription.date), func.date(Prescription.expire)))\
                     .filter(Prescription.agg == None)\
                     .filter(Prescription.concilia == None)\
                     .filter(Prescription.idSegment != None)\
@@ -138,8 +135,8 @@ class Prescription(db.Model):
                     .join(m2, m2.id == pd2.idDrug)\
                     .join(Relation, and_(Relation.sctida == m1.sctid, Relation.sctidb == m2.sctid))\
                     .filter(p1.admissionNumber == admissionNumber)\
-                    .filter(or_(func.date(p1.date) == aggDate,func.date(p1.expire) == aggDate))\
-                    .filter(or_(func.date(p2.date) == aggDate,func.date(p2.expire) == aggDate))\
+                    .filter(between(aggDate, func.date(p1.date), func.date(p1.expire)))\
+                    .filter(between(aggDate, func.date(p2.date), func.date(p2.expire)))\
                     .filter(func.date(p2.expire) == func.date(p1.expire))\
                     .filter(p1.idSegment != None)
 
@@ -178,10 +175,7 @@ class Prescription(db.Model):
         else:
             xreactivity = xreactivity.join(Prescription, Prescription.id == pd1.idPrescription)\
                                .filter(Prescription.admissionNumber == admissionNumber)\
-                               .filter(or_(
-                                    func.date(Prescription.date) == aggDate,
-                                    func.date(Prescription.expire) == aggDate
-                                ))\
+                               .filter(between(aggDate, func.date(Prescription.date), func.date(Prescription.expire)))\
                                .filter(Prescription.idSegment != None)
 
         relations = interaction.union(incompatible).union(xreactivity).all()
@@ -216,10 +210,8 @@ class Prescription(db.Model):
                     .filter(Prescription.idSegment != None)\
                     .filter(Prescription.concilia == None)\
                     .filter(Prescription.agg == None)\
-                    .filter(or_(
-                        func.date(Prescription.date) == func.date(aggDate),
-                        func.date(Prescription.expire) == func.date(aggDate)
-                    )).count()
+                    .filter(between(aggDate, func.date(Prescription.date), func.date(Prescription.expire)))\
+                    .count()
 
         db.session.query(Prescription)\
                     .filter(Prescription.admissionNumber == admissionNumber)\
@@ -411,10 +403,7 @@ class PrescriptionDrug(db.Model):
             q = q.filter(PrescriptionDrug.idPrescription == idPrescription)
         else:
             q = q.filter(Prescription.admissionNumber == admissionNumber)\
-                 .filter(or_(
-                            func.date(Prescription.date) == aggDate,
-                            func.date(Prescription.expire) == aggDate
-                         ))\
+                 .filter(between(aggDate, func.date(Prescription.date), func.date(Prescription.expire)))\
                  .filter(Prescription.agg == None)\
                  .filter(Prescription.concilia == None)\
                  .filter(Prescription.idSegment != None)
