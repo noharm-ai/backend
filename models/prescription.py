@@ -210,7 +210,7 @@ class Prescription(db.Model):
                     .filter(Prescription.idSegment != None)\
                     .filter(Prescription.concilia == None)\
                     .filter(Prescription.agg == None)\
-                    .filter(between(aggDate, func.date(Prescription.date), func.date(Prescription.expire)))\
+                    .filter(between(func.date(aggDate), func.date(Prescription.date), func.date(Prescription.expire)))\
                     .count()
 
         db.session.query(Prescription)\
