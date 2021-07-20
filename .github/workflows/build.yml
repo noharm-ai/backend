@@ -24,7 +24,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install -q -r requirements.txt
       - name: Run Python Tests
-        run: python -m pytest -v
+        run: python -m pytest -v --cov=./ 
+      - name: Run Coverage Report
+        run: |
+          coverage report
+          coverage xml
+          coverage json
+      - uses: paambaati/codeclimate-action@v2.7.5
+        env:
+          CC_TEST_REPORTER_ID: 6dae01ae8838cf7fb0dc2e552051bd5befa71d9a038ef6ad86cbd0adabc8f858
       - name: Setup PostgreSQL
         run: |
           git clone https://github.com/noharm-ai/database
