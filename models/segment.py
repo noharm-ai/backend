@@ -59,7 +59,6 @@ class Exams(db.Model):
     def findByPatient(idPatient):
         return db.session.query(Exams)\
                          .filter(Exams.idPatient == idPatient)\
-                         .filter(Exams.date > (date.today() - timedelta(days=180)))\
                          .order_by(asc(Exams.typeExam),desc(Exams.date))\
                          .all()
 
