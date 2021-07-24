@@ -47,6 +47,9 @@ def getExamsbyAdmission(admissionNumber):
 
     idSegment = request.args.get('idSegment', 1)
     patient = Patient.findByAdmission(admissionNumber)
+    if (patient is None):
+        return { 'status': 'error', 'message': 'Paciente Inexistente!' }, status.HTTP_400_BAD_REQUEST
+        
     examsList = Exams.findByPatient(patient.idPatient)
     segExam = SegmentExam.refDict(idSegment)
 
