@@ -23,7 +23,7 @@ def getNotes(admissionNumber):
         notes = ClinicalNotes.query\
                 .filter(ClinicalNotes.admissionNumber==admissionNumber)\
                 .filter(or_(
-                        ClinicalNotes.date > (datetime.today() - timedelta(days=6)),
+                        ClinicalNotes.date > (datetime.today() - timedelta(days=30)),
                         ClinicalNotes.date == admDate
                 ))\
                 .order_by(desc(ClinicalNotes.date))\
@@ -36,7 +36,7 @@ def getNotes(admissionNumber):
                 'admissionNumber': n.admissionNumber,
                 'text': n.text,
                 'date': n.date.isoformat(),
-                'prescriber': n.prescriber,
+                'prescriber': '',
                 'position': n.position,
                 'medications': n.medications,
                 'complication': n.complication,

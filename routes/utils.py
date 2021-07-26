@@ -249,7 +249,7 @@ def tryCommit(db, recId, allow=True):
 
         return {
             'status': 'error',
-            'message': str(e)
+            'message': ''
         }, status.HTTP_400_BAD_REQUEST
     except Exception as e:
         db.session.rollback()
@@ -262,7 +262,7 @@ def tryCommit(db, recId, allow=True):
 
         return {
             'status': 'error',
-            'message': str(e)
+            'message': ''
         }, status.HTTP_500_INTERNAL_SERVER_ERROR
 
 def getFeatures(result):

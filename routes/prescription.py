@@ -473,7 +473,7 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
             'alertExams': alertExams,
             'exams': examsJson[:10],
             'status': prescription[0].status,
-            'prescriber': prescription[9],
+            'prescriber': '',
             'headers': headers,
             'intervention': pIntervention[0] if len(pIntervention) else None,
             'prevIntervention': getPrevIntervention(interventions, prescription[0].date),

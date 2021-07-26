@@ -8,8 +8,4 @@ troposphere==2.7.1
 zappa
 flask-cors
 psycopg2-binary
-pandas
-networkx
-numpy
-sklearn
 flask-mail
