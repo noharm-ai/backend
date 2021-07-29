@@ -484,6 +484,33 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
             'notesSignsDate': notesSigns[1].isoformat() if notesSigns else None,
             'notesInfo': strNone(notesInfo[0]) if notesInfo else '',
             'notesInfoDate': notesInfo[1].isoformat() if notesInfo else None,
+            'clinicalNotesStats': {
+                'medications': 0,
+                'complication': 0,
+                'symptoms': 0,
+                'diseases': 0,
+                'info': 0,
+                'conduct': 0,
+                'signs': 0,
+                'alergy': 0,
+            },
+            'alertStats': {
+                'dm': 0,
+                'dt': 0,
+                'it': 0,
+                'iy': 0,
+                'rx': 0,
+                'period': 0,
+                'max': 0,
+                'kidney': 0,
+                'liver': 0,
+                'alergy': 0, # alergy + rx
+                'elderly': 0,
+                'platelets': 0,
+                'exams': 0, # kidney + liver + platelets
+                'duplicate': 0, # dm + dt
+                'tube':0,
+            }
         }
     }, status.HTTP_200_OK
 
