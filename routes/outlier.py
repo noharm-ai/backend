@@ -41,7 +41,7 @@ def getOutliers(idSegment=1, idDrug=1):
     dose = request.args.get('d', None)
 
     if drugAttr.division and dose:
-        dose = ceil(((float(dose))/drugAttr.division)) * drugAttr.division
+        dose = round(ceil(((float(dose))/drugAttr.division)) * drugAttr.division,2)
 
     units = getUnits(idDrug, idSegment) # TODO: Refactor
     defaultUnit = 'unlikely big name for a measure unit'
