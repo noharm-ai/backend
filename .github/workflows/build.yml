@@ -43,13 +43,8 @@ jobs:
   coverage:
     runs-on: ubuntu-latest
     needs: build
-      - name: Run Python Tests
-        run: python -m pytest --cov=./ 
       - name: Run Coverage Report
-        run: |
-          coverage report
-          coverage xml
-          coverage json
+        run: python -m pytest --cov-report xml --cov=.
       - uses: paambaati/codeclimate-action@v2.7.5
         env:
           CC_TEST_REPORTER_ID: ${{secrets.CC_TEST_REPORTER_ID}}
