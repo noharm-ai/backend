@@ -23,16 +23,6 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -q -r requirements.txt
-      - name: Run Python Tests
-        run: python -m pytest -v --cov=./ 
-      - name: Run Coverage Report
-        run: |
-          coverage report
-          coverage xml
-          coverage json
-      - uses: paambaati/codeclimate-action@v2.7.5
-        env:
-          CC_TEST_REPORTER_ID: ${{secrets.CC_TEST_REPORTER_ID}}
       - name: Setup PostgreSQL
         run: |
           git clone https://github.com/noharm-ai/database
@@ -48,3 +38,13 @@ jobs:
           sleep 10
       - name: Run Integration Test
         run: ./tests/test_integration.sh
+      - name: Run Python Tests
+        run: python -m pytest -v --cov=./ 
+      - name: Run Coverage Report
+        run: |
+          coverage report
+          coverage xml
+          coverage json
+      - uses: paambaati/codeclimate-action@v2.7.5
+        env:
+          CC_TEST_REPORTER_ID: ${{secrets.CC_TEST_REPORTER_ID}}
