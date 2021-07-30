@@ -155,7 +155,7 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
     #complicationCount = ClinicalNotes.getComplicationCountIfExists(prescription[0].admissionNumber)
     notesSigns = None
     notesInfo = None
-    if clinicalNotesCount:
+    if clinicalNotesCount[0]:
         notesSigns = ClinicalNotes.getSigns(prescription[0].admissionNumber)
         notesInfo = ClinicalNotes.getInfo(prescription[0].admissionNumber)
 

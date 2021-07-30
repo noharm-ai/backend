@@ -56,7 +56,7 @@ class ClinicalNotes(db.Model):
                     .first()
 
         else:
-            return None
+            return [None,None,None,None,None,None,None,None,None,None]
 
     def getComplicationCountIfExists(admissionNumber):
         if ClinicalNotes.exists():
