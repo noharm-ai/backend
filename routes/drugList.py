@@ -165,6 +165,7 @@ class DrugList():
                 'av': pd[6].mav if pd[6] is not None else False,
                 'c': pd[6].controlled if pd[6] is not None else False,
                 'q': pd[6].chemo if pd[6] is not None else False,
+                'alergy': bool(pd[0].allergy == 'S'),
                 'allergy': bool(pd[0].allergy == 'S'),
                 'whiteList': pdWhiteList,
                 'doseWeight': doseWeightStr,

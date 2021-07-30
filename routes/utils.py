@@ -299,6 +299,7 @@ def getFeatures(result):
     complicationCount = result['data']['complication']
 
     return {
+        'alergy': allergy,
         'allergy': allergy,
         'alerts': alerts,
         'prescriptionScore': pScore,
