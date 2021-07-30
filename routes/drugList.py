@@ -22,12 +22,12 @@ class DrugList():
                 'platelets': 0,
                 'tube':0,
                 'exams': 0, # kidney + liver + platelets
-                'alergy': 0, # alergy + rea
+                'allergy': 0, # allergy + rea
             }
 
     def sumAlerts(self):
         self.alertStats['exams'] = self.alertStats['kidney'] + self.alertStats['liver'] + self.alertStats['platelets']
-        self.alertStats['alergy'] += self.alertStats['rea']
+        self.alertStats['allergy'] += self.alertStats['rea']
 
     def sortDrugs(self, d):
         return d['drug'].lower()
@@ -142,9 +142,9 @@ class DrugList():
                     self.alertStats['tube'] += 1
                     tubeAlert = True
 
-                if pd[0].alergy == 'S':
+                if pd[0].allergy == 'S':
                     alerts.append('Paciente alérgico a este medicamento.')
-                    self.alertStats['alergy'] += 1
+                    self.alertStats['allergy'] += 1
 
                 if pd[6] and pd[6].maxTime and pd[0].period and pd[0].period > pd[6].maxTime:
                     alerts.append('Tempo de tratamento atual (' + str(pd[0].period) + ' dias) maior que o tempo máximo de tratamento (' + str(pd[6].maxTime) + ' dias) usualmente recomendado.')
@@ -165,7 +165,7 @@ class DrugList():
                 'av': pd[6].mav if pd[6] is not None else False,
                 'c': pd[6].controlled if pd[6] is not None else False,
                 'q': pd[6].chemo if pd[6] is not None else False,
-                'alergy': bool(pd[0].alergy == 'S'),
+                'allergy': bool(pd[0].allergy == 'S'),
                 'whiteList': pdWhiteList,
                 'doseWeight': doseWeightStr,
                 'dose': pd[0].dose,

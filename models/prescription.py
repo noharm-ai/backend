@@ -148,15 +148,15 @@ class Prescription(db.Model):
                         .filter(pd1.tube == True)\
                         .filter(pd2.tube == True)
 
-        admissionAlergy = db.session.query(PrescriptionDrug.idDrug.label('idDrug'), func.min(PrescriptionDrug.id).label('id') )\
+        admissionAllergy = db.session.query(PrescriptionDrug.idDrug.label('idDrug'), func.min(PrescriptionDrug.id).label('id') )\
                       .select_from(PrescriptionDrug)\
                       .join(Prescription, Prescription.id == PrescriptionDrug.idPrescription)\
                       .filter(Prescription.admissionNumber == admissionNumber)\
-                      .filter(PrescriptionDrug.alergy == 'S')\
+                      .filter(PrescriptionDrug.allergy == 'S')\
                       .group_by(PrescriptionDrug.idDrug)\
                       .subquery()
 
-        al = db.aliased(admissionAlergy)
+        al = db.aliased(admissionAllergy)
 
         xreactivity = db.session\
             .query(pd1.id, Relation, m1.name, m2.name, pd1.update)\
@@ -365,7 +365,7 @@ class PrescriptionDrug(db.Model):
     notes = db.Column('complemento', db.String, nullable=True)
     interval = db.Column('horario', db.String, nullable=True)
     source = db.Column('origem', db.String, nullable=True)
-    alergy = db.Column('alergia', db.String(1), nullable=True)
+    allergy = db.Column('alergia', db.String(1), nullable=True)
 
     solutionGroup = db.Column('slagrupamento', db.String(1), nullable=True)
     solutionACM = db.Column('slacm', db.String(1), nullable=True)
