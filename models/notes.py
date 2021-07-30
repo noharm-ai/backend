@@ -38,11 +38,23 @@ class ClinicalNotes(db.Model):
 
     def getCountIfExists(admissionNumber):
         if ClinicalNotes.exists():
-            return ClinicalNotes.query\
+            return db.session.query(ClinicalNotes.admissionNumber, 
+                        func.sum(ClinicalNotes.medications),
+                        func.sum(ClinicalNotes.complication),
+                        func.sum(ClinicalNotes.symptoms),
+                        func.sum(ClinicalNotes.diseases),
+                        func.sum(ClinicalNotes.info),
+                        func.sum(ClinicalNotes.conduct),
+                        func.sum(ClinicalNotes.signs),
+                        func.sum(ClinicalNotes.alergy),
+                        func.count().label('total')
+                    ).select_from(ClinicalNotes)\
                     .filter(ClinicalNotes.admissionNumber==admissionNumber)\
                     .filter(ClinicalNotes.isExam == None)\
                     .filter(ClinicalNotes.date > (datetime.today() - timedelta(days=6)))\
-                    .count()
+                    .group_by(ClinicalNotes.admissionNumber)\
+                    .first()
+
         else:
             return None
 
