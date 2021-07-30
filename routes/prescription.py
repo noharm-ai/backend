@@ -270,6 +270,7 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
                 'conduct': clinicalNotesCount[6],
                 'signs': clinicalNotesCount[7],
                 'allergy': clinicalNotesCount[8],
+                'total': clinicalNotesCount[9],
             },
             'alertStats': drugList.alertStats
         }
