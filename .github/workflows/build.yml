@@ -40,10 +40,6 @@ jobs:
           sleep 10
       - name: Run Integration Test
         run: ./tests/test_integration.sh
-  coverage:
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
       - name: Run Coverage Report
         run: python -m pytest --cov-report xml --cov=.
       - uses: paambaati/codeclimate-action@v2.7.5
