@@ -37,8 +37,10 @@ class ClinicalNotes(db.Model):
         return db.engine.has_table('evolucao', schema=schemaName)
 
     def getCountIfExists(admissionNumber):
+        empty_return = [None,None,None,None,None,None,None,None,None,None]
+
         if ClinicalNotes.exists():
-            return db.session.query(ClinicalNotes.admissionNumber, 
+            stats_return = db.session.query(ClinicalNotes.admissionNumber, 
                         func.sum(ClinicalNotes.medications),
                         func.sum(ClinicalNotes.complication),
                         func.sum(ClinicalNotes.symptoms),
@@ -54,9 +56,10 @@ class ClinicalNotes(db.Model):
                     .filter(ClinicalNotes.date > (datetime.today() - timedelta(days=6)))\
                     .group_by(ClinicalNotes.admissionNumber)\
                     .first()
+            return stats_return if stats_return else empty_return
 
         else:
-            return [None,None,None,None,None,None,None,None,None,None]
+            return empty_return
 
     def getComplicationCountIfExists(admissionNumber):
         if ClinicalNotes.exists():
