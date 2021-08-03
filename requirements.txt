@@ -10,6 +10,7 @@ flask-cors
 psycopg2-binary
 pytest==5.4.1
 pytest-flask
+pytest-cov
 mock
 pandas
 pylint

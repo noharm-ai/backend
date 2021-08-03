@@ -40,5 +40,8 @@ jobs:
           sleep 10
       - name: Run Integration Test
         run: ./tests/test_integration.sh
-      - name: Run Python Tests
-        run: python -m pytest -v
+      - name: Run Coverage Report
+        run: python -m pytest --cov-report xml --cov=.
+      - uses: paambaati/codeclimate-action@v2.7.5
+        env:
+          CC_TEST_REPORTER_ID: ${{secrets.CC_TEST_REPORTER_ID}}

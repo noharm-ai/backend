@@ -4,7 +4,7 @@ from .segment import *
 from routes.utils import *
 from datetime import datetime
 from sqlalchemy.orm import deferred
-from sqlalchemy import case, BigInteger, cast
+from sqlalchemy import case, BigInteger, cast, between
 
 class Prescription(db.Model):
     __tablename__ = 'prescricao'
@@ -87,10 +87,7 @@ class Prescription(db.Model):
         prescriptions = db.session.query(Prescription, Department.name)\
                     .outerjoin(Department, and_(Department.id == Prescription.idDepartment, Department.idHospital == Prescription.idHospital))\
                     .filter(Prescription.admissionNumber == admissionNumber)\
-                    .filter(or_(
-                                func.date(Prescription.date) == aggDate,
-                                func.date(Prescription.expire) == aggDate
-                            ))\
+                    .filter(between(aggDate, func.date(Prescription.date), func.date(Prescription.expire)))\
                     .filter(Prescription.agg == None)\
                     .filter(Prescription.concilia == None)\
                     .filter(Prescription.idSegment != None)\
@@ -138,8 +135,8 @@ class Prescription(db.Model):
                     .join(m2, m2.id == pd2.idDrug)\
                     .join(Relation, and_(Relation.sctida == m1.sctid, Relation.sctidb == m2.sctid))\
                     .filter(p1.admissionNumber == admissionNumber)\
-                    .filter(or_(func.date(p1.date) == aggDate,func.date(p1.expire) == aggDate))\
-                    .filter(or_(func.date(p2.date) == aggDate,func.date(p2.expire) == aggDate))\
+                    .filter(between(aggDate, func.date(p1.date), func.date(p1.expire)))\
+                    .filter(between(aggDate, func.date(p2.date), func.date(p2.expire)))\
                     .filter(func.date(p2.expire) == func.date(p1.expire))\
                     .filter(p1.idSegment != None)
 
@@ -151,15 +148,15 @@ class Prescription(db.Model):
                         .filter(pd1.tube == True)\
                         .filter(pd2.tube == True)
 
-        admissionAlergy = db.session.query(PrescriptionDrug.idDrug.label('idDrug'), func.min(PrescriptionDrug.id).label('id') )\
+        admissionAllergy = db.session.query(PrescriptionDrug.idDrug.label('idDrug'), func.min(PrescriptionDrug.id).label('id') )\
                       .select_from(PrescriptionDrug)\
                       .join(Prescription, Prescription.id == PrescriptionDrug.idPrescription)\
                       .filter(Prescription.admissionNumber == admissionNumber)\
-                      .filter(PrescriptionDrug.alergy == 'S')\
+                      .filter(PrescriptionDrug.allergy == 'S')\
                       .group_by(PrescriptionDrug.idDrug)\
                       .subquery()
 
-        al = db.aliased(admissionAlergy)
+        al = db.aliased(admissionAllergy)
 
         xreactivity = db.session\
             .query(pd1.id, Relation, m1.name, m2.name, pd1.update)\
@@ -178,10 +175,7 @@ class Prescription(db.Model):
         else:
             xreactivity = xreactivity.join(Prescription, Prescription.id == pd1.idPrescription)\
                                .filter(Prescription.admissionNumber == admissionNumber)\
-                               .filter(or_(
-                                    func.date(Prescription.date) == aggDate,
-                                    func.date(Prescription.expire) == aggDate
-                                ))\
+                               .filter(between(aggDate, func.date(Prescription.date), func.date(Prescription.expire)))\
                                .filter(Prescription.idSegment != None)
 
         relations = interaction.union(incompatible).union(xreactivity).all()
@@ -216,10 +210,8 @@ class Prescription(db.Model):
                     .filter(Prescription.idSegment != None)\
                     .filter(Prescription.concilia == None)\
                     .filter(Prescription.agg == None)\
-                    .filter(or_(
-                        func.date(Prescription.date) == func.date(aggDate),
-                        func.date(Prescription.expire) == func.date(aggDate)
-                    )).count()
+                    .filter(between(func.date(aggDate), func.date(Prescription.date), func.date(Prescription.expire)))\
+                    .count()
 
         db.session.query(Prescription)\
                     .filter(Prescription.admissionNumber == admissionNumber)\
@@ -373,7 +365,7 @@ class PrescriptionDrug(db.Model):
     notes = db.Column('complemento', db.String, nullable=True)
     interval = db.Column('horario', db.String, nullable=True)
     source = db.Column('origem', db.String, nullable=True)
-    alergy = db.Column('alergia', db.String(1), nullable=True)
+    allergy = db.Column('alergia', db.String(1), nullable=True)
 
     solutionGroup = db.Column('slagrupamento', db.String(1), nullable=True)
     solutionACM = db.Column('slacm', db.String(1), nullable=True)
@@ -411,10 +403,7 @@ class PrescriptionDrug(db.Model):
             q = q.filter(PrescriptionDrug.idPrescription == idPrescription)
         else:
             q = q.filter(Prescription.admissionNumber == admissionNumber)\
-                 .filter(or_(
-                            func.date(Prescription.date) == aggDate,
-                            func.date(Prescription.expire) == aggDate
-                         ))\
+                 .filter(between(aggDate, func.date(Prescription.date), func.date(Prescription.expire)))\
                  .filter(Prescription.agg == None)\
                  .filter(Prescription.concilia == None)\
                  .filter(Prescription.idSegment != None)
@@ -498,7 +487,7 @@ class Intervention(db.Model):
         interventions = interventions.filter(Intervention.status.in_(['s','a','n','x','j']))\
                                      .order_by(desc(Intervention.date))
 
-        interventions = interventions.limit(500).all()
+        interventions = interventions.limit(1500).all()
 
         intervBuffer = []
         for i in interventions:
