@@ -4,8 +4,7 @@ from models.appendix import Department
 from models.segment import Segment
 # from models.prescription import Prescription
 
-from pytest_postgresql import factories
-import psycopg2
+from models.prescription import Prescription
 
 # def pres_getall():
 #   pres = Prescription()
@@ -29,23 +28,16 @@ def test_get_prescriptions_by_id(client):
 
     access_token = get_access(client)
 
-    response = client.get('/prescriptions/20', headers=make_headers(access_token))
-    data = json.loads(response.data)
+    idPrescription = '20'
 
-    conn = get_db_conn()
-    cursor = conn.cursor()
-    # buscar fkprescricao, prescription, solution, interventions, exams, alertExams, status
-    cursor.execute("select * from demo.prescricao where fkprescricao = 20")
-    result = cursor.fetchall()
-    result_columns = cursor.description
-    cursor.close()
-    conn.close()
+    response = client.get('/prescriptions/' + idPrescription, headers=make_headers(access_token))
+    data = json.loads(response.data)
+    prescription = session.query(Prescription).get(idPrescription)
+
+    # breakpoint()
 
     assert response.status_code == 200
     # assert data['data']['idPrescription'] == '20'
-    # assert data['data']['prescription']
-    # assert data['data']['solution']
-    # assert data['data']['interventions']
-    # assert data['data']['exams']
-    # assert data['data']['alertExams']
+    # assert data['data']['concilia']
+    # assert data['data']['bed']
     # assert data['data']['status']

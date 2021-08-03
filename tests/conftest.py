@@ -4,6 +4,18 @@ from models.main import User
 from unittest.mock import patch
 from flask_jwt_extended import (create_access_token)
 
+import sys
+sys.path.append('..')
+
+from config import Config
+import sqlalchemy
+from sqlalchemy.orm import sessionmaker
+
+engine = sqlalchemy.create_engine(Config.POTGRESQL_CONNECTION_STRING)
+DBSession = sessionmaker(bind=engine)
+session = DBSession()
+session.connection(execution_options={'schema_translate_map': {None: 'demo'}})
+
 import psycopg2
 
 with app.test_request_context():
