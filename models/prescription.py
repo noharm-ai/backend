@@ -466,12 +466,13 @@ class Intervention(db.Model):
                 .as_scalar()
 
         PrescriptionB = db.aliased(Prescription)
+        DepartmentB = db.aliased(Department)
         interventions = db.session\
             .query(Intervention, PrescriptionDrug, 
                     func.array(reason).label('reason'), Drug.name, 
                     func.array(interactions).label('interactions'),
                     MeasureUnit, Frequency, Prescription, User.name, 
-                    Department.name, PrescriptionB.prescriber)\
+                    Department.name, PrescriptionB.prescriber, DepartmentB.name)\
             .outerjoin(PrescriptionDrug, Intervention.id == PrescriptionDrug.id)\
             .outerjoin(Prescription, Intervention.idPrescription == Prescription.id)\
             .outerjoin(PrescriptionB, PrescriptionDrug.idPrescription == PrescriptionB.id)\
@@ -479,7 +480,8 @@ class Intervention(db.Model):
             .outerjoin(MeasureUnit, and_(MeasureUnit.id == PrescriptionDrug.idMeasureUnit, MeasureUnit.idHospital == Prescription.idHospital))\
             .outerjoin(Frequency, and_(Frequency.id == PrescriptionDrug.idFrequency, Frequency.idHospital == Prescription.idHospital))\
             .outerjoin(User, User.id == Intervention.user)\
-            .outerjoin(Department, and_(Department.id == PrescriptionB.idDepartment, Department.idHospital == PrescriptionB.idHospital))
+            .outerjoin(Department, and_(Department.id == PrescriptionB.idDepartment, Department.idHospital == PrescriptionB.idHospital))\
+            .outerjoin(DepartmentB, and_(DepartmentB.id == Prescription.idDepartment, DepartmentB.idHospital == Prescription.idHospital))
 
         if admissionNumber:
             interventions = interventions.filter(Intervention.admissionNumber == admissionNumber)
@@ -514,8 +516,8 @@ class Intervention(db.Model):
                 'date': i[0].date.isoformat(),
                 'dateTime': i[0].date,
                 'user': i[8],
-                'department': i[9] if i[9] else None,
-                'prescriber': i[10] if i[10] else None,
+                'department': i[9] if i[9] else i[11],
+                'prescriber': i[10] if i[10] else i[7].prescriber if i[7] else None,
                 'status': i[0].status
             })
 
