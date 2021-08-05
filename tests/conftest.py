@@ -16,8 +16,6 @@ DBSession = sessionmaker(bind=engine)
 session = DBSession()
 session.connection(execution_options={'schema_translate_map': {None: 'demo'}})
 
-import psycopg2
-
 with app.test_request_context():
 	access_token = create_access_token('1')
 
@@ -37,22 +35,6 @@ def client():
     client = app.test_client()
     yield client
 
-
-def get_db_conn():
-    # configurações
-    host = 'localhost'
-    dbname = 'noharm'
-    user = 'postgres'
-    password = 'postgres'    
-    sslmode = 'require'
-    port = '5432'
-
-    # string conexão
-    conn_string = 'host={0} user={1} dbname={2} password={3} port={4}'.format(host, user, dbname, password, port)
-
-    conn = psycopg2.connect(conn_string)
-    return conn
-
 def get_access(client):
     mimetype = 'application/json'
     headers = {
@@ -70,3 +52,13 @@ def get_access(client):
     data_response = json.loads(my_json)
     access_token = data_response['access_token']
     return access_token
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    outcome = yield
+    report = outcome.get_result()
+
+    test_fn = item.obj
+    docstring = getattr(test_fn, '__doc__')
+    if docstring:
+        report.nodeid = docstring

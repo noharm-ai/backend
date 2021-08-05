@@ -1,5 +1,6 @@
 from conftest import *
 
+@pytest.mark.skip(reason="WIP")
 def test_get_drugs(client):
 
     access_token = get_access(client)
@@ -9,6 +10,7 @@ def test_get_drugs(client):
 
     assert response.status_code == 200
 
+@pytest.mark.skip(reason="WIP")
 def test_get_drugs_by_id(client):
 
     access_token = get_access(client)

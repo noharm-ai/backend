@@ -13,8 +13,8 @@ from models.prescription import Prescription
 #   pres.name = 'pres'
 #   return [pres, pres]
 
-def test_get_prescriptions(client):
-
+def test_get_prescriptions_status_code(client):
+    """Teste get prescriptions - Valida status_code 200"""
     access_token = get_access(client)
 
     response = client.get('/prescriptions', headers=make_headers(access_token))
@@ -25,19 +25,43 @@ def test_get_prescriptions(client):
     #assert len(data['data']) == 3
 
 def test_get_prescriptions_by_id(client):
-
+    """Teste get prescriptions/id - compara response data com dados do banco e valida status_code 200"""
     access_token = get_access(client)
 
     idPrescription = '20'
 
     response = client.get('/prescriptions/' + idPrescription, headers=make_headers(access_token))
-    data = json.loads(response.data)
+    data = json.loads(response.data)['data']
     prescription = session.query(Prescription).get(idPrescription)
 
-    # breakpoint()
-
     assert response.status_code == 200
-    # assert data['data']['idPrescription'] == '20'
-    # assert data['data']['concilia']
-    # assert data['data']['bed']
-    # assert data['data']['status']
+    assert data['idPrescription'] == str(prescription.id)
+    assert data['concilia'] == prescription.concilia
+    assert data['bed'] == prescription.bed
+    assert data['status'] == prescription.status
+
+@pytest.mark.skip(reason="Erro [401 UNAUTHORIZED] - SyntaxError: unexpected EOF while parsing na função setPrescriptionStatus")
+def test_put_prescriptions_by_id(client):
+    """Teste put prescriptions/id - Compara dados enviados com dados salvos no banco e valida status_code 200"""
+    # - status = 's'
+    # - notes = 'note test'
+    # - conciliar = 's'
+    access_token = get_access(client)
+
+    idPrescription = '20'
+
+    mimetype = 'application/json'
+    authorization = 'Bearer {}'.format(access_token)
+    headers = {
+        'Content-Type': mimetype,
+        'Accept': mimetype,
+        'Authorization': authorization
+    }
+    data = {
+        "notes": "note test"
+    }
+    url = 'prescriptions/' + idPrescription
+
+    breakpoint()
+    response = client.put(url, data=json.dumps(data), headers=headers)
+    assert response.status_code == 200

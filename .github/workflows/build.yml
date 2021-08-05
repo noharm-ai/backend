@@ -25,8 +25,6 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -q -r requirements.txt
-      - name: Run Python Tests
-        run: python -m pytest -v
       - name: Setup PostgreSQL
         run: |
           git clone https://github.com/noharm-ai/database
@@ -36,6 +34,8 @@ jobs:
           psql -h localhost -U postgres -d noharm -a -f database/noharm-care.sql -v ON_ERROR_STOP=1
           psql -h localhost -U postgres -d noharm -a -f database/noharm-triggers.sql -v ON_ERROR_STOP=1
           psql -h localhost -U postgres -d noharm -a -f database/noharm-insert.sql -v ON_ERROR_STOP=1
+      - name: Run Python Tests
+        run: python -m pytest -v
       - name: Setup Application
         run: |
           python mobile.py &
@@ -44,6 +44,8 @@ jobs:
         run: ./tests/test_integration.sh
       - name: Run Coverage Report
         run: python -m pytest --cov-report xml --cov=.
-      - uses: paambaati/codeclimate-action@v2.7.5
+      - name: Submit Coverage Report
+        if: ${{ env.CC_TEST_REPORTER_ID != '' }}
+        uses: paambaati/codeclimate-action@v2.7.5
         env:
           CC_TEST_REPORTER_ID: ${{secrets.CC_TEST_REPORTER_ID}}
