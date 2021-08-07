@@ -35,15 +35,15 @@ def client():
     client = app.test_client()
     yield client
 
-def get_access(client):
+def get_access(client, email='demo', password='demo'):
     mimetype = 'application/json'
     headers = {
         'Content-Type': mimetype,
         'Accept': mimetype
     }
     data = {
-        "email": "demo",
-        "password": "demo"
+        "email": email,
+        "password": password
     }
     url = '/authenticate'
 
