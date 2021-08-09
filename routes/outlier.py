@@ -41,7 +41,7 @@ def getOutliers(idSegment=1, idDrug=1):
     dose = request.args.get('d', None)
 
     if drugAttr.division and dose:
-        dose = ceil(((float(dose))/drugAttr.division)) * drugAttr.division
+        dose = round(ceil(((float(dose))/drugAttr.division)) * drugAttr.division,2)
 
     units = getUnits(idDrug, idSegment) # TODO: Refactor
     defaultUnit = 'unlikely big name for a measure unit'
@@ -56,7 +56,7 @@ def getOutliers(idSegment=1, idDrug=1):
     newOutlier = True
     results = []
     for o in outliers:
-        if dose is not None and frequency is not None:
+        if dose is not None and frequency is not None and is_float(dose) and is_float(frequency):
             if float(dose) == o[0].dose and float(frequency) == o[0].frequency: 
                 newOutlier = False
 
@@ -72,7 +72,7 @@ def getOutliers(idSegment=1, idDrug=1):
             'obs': o[1].notes if o[1] != None else ''
         })
 
-    if dose is not None and frequency is not None and newOutlier:
+    if dose is not None and frequency is not None and newOutlier and is_float(dose) and is_float(frequency):
         o = Outlier()
         o.idDrug = idDrug
         o.idSegment = idSegment
@@ -214,7 +214,9 @@ def setDrugClass(idDrug):
         if drugAttr.price == '': drugAttr.price = None
     if 'maxTime' in data.keys(): drugAttr.maxTime = data.get('maxTime', None)
     if 'useWeight' in data.keys(): drugAttr.useWeight = data.get('useWeight', 0)
-    if 'amount' in data.keys(): drugAttr.amount = data.get('amount', 0)
+    if 'amount' in data.keys(): 
+        drugAttr.amount = data.get('amount', None)
+        if drugAttr.amount == '': drugAttr.amount = None
     if 'amountUnit' in data.keys(): drugAttr.amountUnit = data.get('amountUnit', None)
     if 'whiteList' in data.keys(): 
         drugAttr.whiteList = data.get('whiteList', None)

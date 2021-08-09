@@ -58,7 +58,7 @@ CORS(app)
 def getVersion():
     return {
         'status': 'success',
-        'data': 'v1.51-beta'
+        'data': 'v1.53-beta'
     }, status.HTTP_200_OK
 
 if __name__ == "__main__":

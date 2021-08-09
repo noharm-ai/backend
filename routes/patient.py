@@ -46,9 +46,12 @@ def getExamsbyAdmission(admissionNumber):
     dbSession.setSchema(user.schema)
 
     idSegment = request.args.get('idSegment', 1)
-    examsList = Exams.findByAdmission(admissionNumber)
-    segExam = SegmentExam.refDict(idSegment)
     patient = Patient.findByAdmission(admissionNumber)
+    if (patient is None):
+        return { 'status': 'error', 'message': 'Paciente Inexistente!' }, status.HTTP_400_BAD_REQUEST
+        
+    examsList = Exams.findByPatient(patient.idPatient)
+    segExam = SegmentExam.refDict(idSegment)
 
     perc = {
         'h_conleuc': {

@@ -45,7 +45,7 @@ def getNotes(admissionNumber):
                 'info': n.info,
                 'conduct': n.conduct,
                 'signs': n.signs,
-                'alergy': n.alergy,
+                'allergy': n.allergy,
                 'names': n.names
             })
 
@@ -86,7 +86,7 @@ def changeNote(idNote):
     n.info = n.text.count('annotation-dados')
     n.conduct = n.text.count('annotation-conduta')
     n.signs = n.text.count('annotation-sinais')
-    n.alergy = n.text.count('annotation-alergia')
+    n.allergy = n.text.count('annotation-alergia')
     n.names = n.text.count('annotation-nomes')
 
     return tryCommit(db, idNote)
