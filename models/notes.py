@@ -23,7 +23,7 @@ class ClinicalNotes(db.Model):
     info = db.Column("dados", db.Integer, nullable=True)
     conduct = db.Column("conduta", db.Integer, nullable=True)
     signs = db.Column("sinais", db.Integer, nullable=True)
-    alergy = db.Column("alergia", db.Integer, nullable=True)
+    allergy = db.Column("alergia", db.Integer, nullable=True)
     names = db.Column("nomes", db.Integer, nullable=True)
 
     signsText = db.Column('sinaistexto', db.String, nullable=True)
@@ -37,14 +37,29 @@ class ClinicalNotes(db.Model):
         return db.engine.has_table('evolucao', schema=schemaName)
 
     def getCountIfExists(admissionNumber):
+        empty_return = [None,None,None,None,None,None,None,None,None,None]
+
         if ClinicalNotes.exists():
-            return ClinicalNotes.query\
+            stats_return = db.session.query(ClinicalNotes.admissionNumber, 
+                        func.sum(ClinicalNotes.medications),
+                        func.sum(ClinicalNotes.complication),
+                        func.sum(ClinicalNotes.symptoms),
+                        func.sum(ClinicalNotes.diseases),
+                        func.sum(ClinicalNotes.info),
+                        func.sum(ClinicalNotes.conduct),
+                        func.sum(ClinicalNotes.signs),
+                        func.sum(ClinicalNotes.allergy),
+                        func.count().label('total')
+                    ).select_from(ClinicalNotes)\
                     .filter(ClinicalNotes.admissionNumber==admissionNumber)\
                     .filter(ClinicalNotes.isExam == None)\
                     .filter(ClinicalNotes.date > (datetime.today() - timedelta(days=6)))\
-                    .count()
+                    .group_by(ClinicalNotes.admissionNumber)\
+                    .first()
+            return stats_return if stats_return else empty_return
+
         else:
-            return None
+            return empty_return
 
     def getComplicationCountIfExists(admissionNumber):
         if ClinicalNotes.exists():

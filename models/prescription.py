@@ -148,15 +148,15 @@ class Prescription(db.Model):
                         .filter(pd1.tube == True)\
                         .filter(pd2.tube == True)
 
-        admissionAlergy = db.session.query(PrescriptionDrug.idDrug.label('idDrug'), func.min(PrescriptionDrug.id).label('id') )\
+        admissionAllergy = db.session.query(PrescriptionDrug.idDrug.label('idDrug'), func.min(PrescriptionDrug.id).label('id') )\
                       .select_from(PrescriptionDrug)\
                       .join(Prescription, Prescription.id == PrescriptionDrug.idPrescription)\
                       .filter(Prescription.admissionNumber == admissionNumber)\
-                      .filter(PrescriptionDrug.alergy == 'S')\
+                      .filter(PrescriptionDrug.allergy == 'S')\
                       .group_by(PrescriptionDrug.idDrug)\
                       .subquery()
 
-        al = db.aliased(admissionAlergy)
+        al = db.aliased(admissionAllergy)
 
         xreactivity = db.session\
             .query(pd1.id, Relation, m1.name, m2.name, pd1.update)\
@@ -365,7 +365,7 @@ class PrescriptionDrug(db.Model):
     notes = db.Column('complemento', db.String, nullable=True)
     interval = db.Column('horario', db.String, nullable=True)
     source = db.Column('origem', db.String, nullable=True)
-    alergy = db.Column('alergia', db.String(1), nullable=True)
+    allergy = db.Column('alergia', db.String(1), nullable=True)
 
     solutionGroup = db.Column('slagrupamento', db.String(1), nullable=True)
     solutionACM = db.Column('slacm', db.String(1), nullable=True)
@@ -466,12 +466,13 @@ class Intervention(db.Model):
                 .as_scalar()
 
         PrescriptionB = db.aliased(Prescription)
+        DepartmentB = db.aliased(Department)
         interventions = db.session\
             .query(Intervention, PrescriptionDrug, 
                     func.array(reason).label('reason'), Drug.name, 
                     func.array(interactions).label('interactions'),
                     MeasureUnit, Frequency, Prescription, User.name, 
-                    Department.name, PrescriptionB.prescriber)\
+                    Department.name, PrescriptionB.prescriber, DepartmentB.name)\
             .outerjoin(PrescriptionDrug, Intervention.id == PrescriptionDrug.id)\
             .outerjoin(Prescription, Intervention.idPrescription == Prescription.id)\
             .outerjoin(PrescriptionB, PrescriptionDrug.idPrescription == PrescriptionB.id)\
@@ -479,7 +480,8 @@ class Intervention(db.Model):
             .outerjoin(MeasureUnit, and_(MeasureUnit.id == PrescriptionDrug.idMeasureUnit, MeasureUnit.idHospital == Prescription.idHospital))\
             .outerjoin(Frequency, and_(Frequency.id == PrescriptionDrug.idFrequency, Frequency.idHospital == Prescription.idHospital))\
             .outerjoin(User, User.id == Intervention.user)\
-            .outerjoin(Department, and_(Department.id == PrescriptionB.idDepartment, Department.idHospital == PrescriptionB.idHospital))
+            .outerjoin(Department, and_(Department.id == PrescriptionB.idDepartment, Department.idHospital == PrescriptionB.idHospital))\
+            .outerjoin(DepartmentB, and_(DepartmentB.id == Prescription.idDepartment, DepartmentB.idHospital == Prescription.idHospital))
 
         if admissionNumber:
             interventions = interventions.filter(Intervention.admissionNumber == admissionNumber)
@@ -514,8 +516,8 @@ class Intervention(db.Model):
                 'date': i[0].date.isoformat(),
                 'dateTime': i[0].date,
                 'user': i[8],
-                'department': i[9] if i[9] else None,
-                'prescriber': i[10] if i[10] else None,
+                'department': i[9] if i[9] else i[11],
+                'prescriber': i[10] if i[10] else i[7].prescriber if i[7] else None,
                 'status': i[0].status
             })
 
