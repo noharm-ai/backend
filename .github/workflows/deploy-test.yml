@@ -6,16 +6,34 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:11.6
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_DB: noharm
+        ports:
+          - 5432:5432
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2
         with:
           python-version: 3.8
-      - name: Run Python Tests
+      - name: Setup Python
         run: |
           python -m pip install --upgrade pip
           pip install -q -r requirements.txt
-          python -m pytest -v
+      - name: Setup PostgreSQL
+        run: |
+          git clone https://github.com/noharm-ai/database
+          psql -h localhost -U postgres -d noharm -a -f database/noharm-public.sql -v ON_ERROR_STOP=1
+          psql -h localhost -U postgres -d noharm -a -f database/noharm-create.sql -v ON_ERROR_STOP=1
+          psql -h localhost -U postgres -d noharm -a -f database/noharm-newuser.sql -v ON_ERROR_STOP=1
+          psql -h localhost -U postgres -d noharm -a -f database/noharm-care.sql -v ON_ERROR_STOP=1
+          psql -h localhost -U postgres -d noharm -a -f database/noharm-triggers.sql -v ON_ERROR_STOP=1
+          psql -h localhost -U postgres -d noharm -a -f database/noharm-insert.sql -v ON_ERROR_STOP=1
+      - name: Run Python Tests
+        run: python -m pytest -v
   deploy:
     needs: [build]
     runs-on: [ubuntu-latest]
