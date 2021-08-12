@@ -47,14 +47,6 @@ def test_put_prescriptions_by_id(client):
     access_token = get_access(client, 'noadmin', 'noadmin')
 
     idPrescription = '20'
-
-    mimetype = 'application/json'
-    authorization = 'Bearer {}'.format(access_token)
-    headers = {
-        'Content-Type': mimetype,
-        'Accept': mimetype,
-        'Authorization': authorization
-    }
     data = {
         "status": "s",
         "notes": "note test",
@@ -62,7 +54,7 @@ def test_put_prescriptions_by_id(client):
     }
     url = 'prescriptions/' + idPrescription
 
-    response = client.put(url, data=json.dumps(data), headers=headers)
+    response = client.put(url, data=json.dumps(data), headers=make_headers(access_token))
     responseData = json.loads(response.data)['data']
     prescription = session.query(Prescription).get(idPrescription)
 
@@ -78,14 +70,6 @@ def test_put_prescriptions_by_id_permission(client):
     access_token = get_access(client)
 
     idPrescription = '20'
-
-    mimetype = 'application/json'
-    authorization = 'Bearer {}'.format(access_token)
-    headers = {
-        'Content-Type': mimetype,
-        'Accept': mimetype,
-        'Authorization': authorization
-    }
     data = {
         "status": "s",
         "notes": "note test",
@@ -93,6 +77,6 @@ def test_put_prescriptions_by_id_permission(client):
     }
     url = 'prescriptions/' + idPrescription
 
-    response = client.put(url, data=json.dumps(data), headers=headers)
+    response = client.put(url, data=json.dumps(data), headers=make_headers(access_token))
 
     assert response.status_code == 401
