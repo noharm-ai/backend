@@ -80,3 +80,15 @@ def test_put_prescriptions_by_id_permission(client):
     response = client.put(url, data=json.dumps(data), headers=make_headers(access_token))
 
     assert response.status_code == 401
+
+def test_get_static(client):
+    """Teste get /static/demo/prescription/idPrescription - Valida status_code 200"""
+    access_token = get_access(client)
+    
+    idPrescription = '20'
+    
+    response = client.get('static/demo/prescription/' + idPrescription, headers=make_headers(access_token))
+    data = json.loads(response.data)
+    # TODO: Add consulta ao banco de dados e comparar retorno (retornando status 200 porém data = 20)
+
+    assert response.status_code == 200
