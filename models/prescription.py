@@ -150,8 +150,8 @@ class Prescription(db.Model):
         interaction = relation.filter(Relation.kind.in_(['it','dt','dm']))
 
         incompatible = relation.filter(Relation.kind.in_(['iy']))\
-                        .filter(pd1.tube == True)\
-                        .filter(pd2.tube == True)
+                        .filter(pd1.intravenous == True)\
+                        .filter(pd2.intravenous == True)
 
         admissionAllergy = db.session.query(PrescriptionDrug.idDrug.label('idDrug'), func.min(PrescriptionDrug.id).label('id') )\
                       .select_from(PrescriptionDrug)\
@@ -368,6 +368,7 @@ class PrescriptionDrug(db.Model):
     doseconv = db.Column("doseconv", db.Float, nullable=True)
     route = db.Column('via', db.String, nullable=True)
     tube = db.Column('sonda', db.Boolean, nullable=True)
+    intravenous = db.Column('intravenosa', db.Boolean, nullable=True)
     notes = db.Column('complemento', db.String, nullable=True)
     interval = db.Column('horario', db.String, nullable=True)
     source = db.Column('origem', db.String, nullable=True)
