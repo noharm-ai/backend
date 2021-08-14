@@ -94,7 +94,7 @@ def getPrescriptionAuth(idPrescription):
         return { 'status': 'error', 'message': 'Prescrição Inexistente!' }, status.HTTP_400_BAD_REQUEST
 
     if p[0].agg:
-        return getPrescription(idPrescription=idPrescription, admissionNumber=p[0].admissionNumber, aggDate=p[0].date)
+        return getPrescription(idPrescription=idPrescription, admissionNumber=p[0].admissionNumber, aggDate=p[0].date, idSegment=p[0].idSegment)
     else:
         return getPrescription(idPrescription=idPrescription)
 
@@ -129,12 +129,12 @@ def getExistIntervention(interventions, dtPrescription):
             result = True;
     return result
 
-def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
+def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None, idSegment=None):
 
     if idPrescription:
         prescription = Prescription.getPrescription(idPrescription)
     else:
-        prescription = Prescription.getPrescriptionAgg(admissionNumber, aggDate)
+        prescription = Prescription.getPrescriptionAgg(admissionNumber, aggDate, idSegment)
 
     if (prescription is None):
         return { 'status': 'error', 'message': 'Prescrição Inexistente!' }, status.HTTP_400_BAD_REQUEST
@@ -146,10 +146,10 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
         patient.admissionNumber = prescription[0].admissionNumber
 
     lastDept = Prescription.lastDeptbyAdmission(prescription[0].id, patient.admissionNumber)
-    drugs = PrescriptionDrug.findByPrescription(prescription[0].id, patient.admissionNumber, aggDate)
+    drugs = PrescriptionDrug.findByPrescription(prescription[0].id, patient.admissionNumber, aggDate, idSegment)
     interventions = Intervention.findAll(admissionNumber=patient.admissionNumber)
     relations = Prescription.findRelation(prescription[0].id,patient.admissionNumber, aggDate)
-    headers = Prescription.getHeaders(admissionNumber, aggDate) if aggDate else []
+    headers = Prescription.getHeaders(admissionNumber, aggDate, idSegment) if aggDate else []
 
     clinicalNotesCount = ClinicalNotes.getCountIfExists(prescription[0].admissionNumber)
     #complicationCount = ClinicalNotes.getComplicationCountIfExists(prescription[0].admissionNumber)
@@ -274,6 +274,7 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
             },
             'alertStats': drugList.alertStats,
             'features': prescription[0].features,
+            'user': prescription[10],
         }
     }, status.HTTP_200_OK
 
@@ -296,7 +297,7 @@ def setPrescriptionStatus(idPrescription):
             db.session.query(Prescription)\
                       .filter(Prescription.admissionNumber == p.admissionNumber)\
                       .filter(Prescription.status != p.status)\
-                      .filter(Prescription.idSegment != None)\
+                      .filter(Prescription.idSegment == p.idSegment)\
                       .filter(Prescription.concilia == None)\
                       .filter(between(func.date(p.date), func.date(Prescription.date), func.date(Prescription.expire)))\
                       .update({
@@ -305,7 +306,7 @@ def setPrescriptionStatus(idPrescription):
                         'user': user.id
                       }, synchronize_session='fetch')
         else:
-            Prescription.checkPrescriptions(p.admissionNumber, p.date, user.id)
+            Prescription.checkPrescriptions(p.admissionNumber, p.date, p.idSegment, user.id)
 
     if 'notes' in data.keys(): 
         p.notes = data.get('notes', None)

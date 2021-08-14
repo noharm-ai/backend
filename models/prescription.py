@@ -52,21 +52,23 @@ class Prescription(db.Model):
                 Prescription, Patient, '0', '0',
                 Department.name.label('department'), Segment.description, 
                 Patient.observation, Prescription.notes, Patient.alert,
-                Prescription.prescriber
+                Prescription.prescriber, User.name
             )\
             .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)\
             .outerjoin(Department, and_(Department.id == Prescription.idDepartment, Department.idHospital == Prescription.idHospital))\
-            .outerjoin(Segment, Segment.id == Prescription.idSegment)
+            .outerjoin(Segment, Segment.id == Prescription.idSegment)\
+            .outerjoin(User, Prescription.user == User.id)
 
     def getPrescription(idPrescription):
         return Prescription.getPrescriptionBasic()\
             .filter(Prescription.id == idPrescription)\
             .first()
 
-    def getPrescriptionAgg(admissionNumber, aggDate):
+    def getPrescriptionAgg(admissionNumber, aggDate, idSegment):
         return Prescription.getPrescriptionBasic()\
             .filter(Prescription.admissionNumber == admissionNumber)\
             .filter(func.date(Prescription.date) == aggDate)\
+            .filter(Prescription.idSegment == idSegment)\
             .order_by(asc(Prescription.date))\
             .first()
 
@@ -83,11 +85,13 @@ class Prescription(db.Model):
                     ))\
             .all()
 
-    def getHeaders(admissionNumber, aggDate):
-        prescriptions = db.session.query(Prescription, Department.name)\
+    def getHeaders(admissionNumber, aggDate, idSegment):
+        prescriptions = db.session.query(Prescription, Department.name, User.name)\
                     .outerjoin(Department, and_(Department.id == Prescription.idDepartment, Department.idHospital == Prescription.idHospital))\
+                    .outerjoin(User, Prescription.user == User.id)\
                     .filter(Prescription.admissionNumber == admissionNumber)\
                     .filter(between(aggDate, func.date(Prescription.date), func.date(Prescription.expire)))\
+                    .filter(Prescription.idSegment == idSegment)\
                     .filter(Prescription.agg == None)\
                     .filter(Prescription.concilia == None)\
                     .filter(Prescription.idSegment != None)\
@@ -104,7 +108,8 @@ class Prescription(db.Model):
                 'department': p[1],
                 'drugs': {},
                 'procedures': {},
-                'solutions': {}
+                'solutions': {},
+                'user': p[2],
             }
 
         return headers
@@ -203,11 +208,11 @@ class Prescription(db.Model):
 
         return results
 
-    def checkPrescriptions(admissionNumber, aggDate, userId):
+    def checkPrescriptions(admissionNumber, aggDate, idSegment, userId):
         exists = db.session.query(Prescription)\
                     .filter(Prescription.admissionNumber == admissionNumber)\
                     .filter(Prescription.status != 's')\
-                    .filter(Prescription.idSegment != None)\
+                    .filter(Prescription.idSegment == idSegment)\
                     .filter(Prescription.concilia == None)\
                     .filter(Prescription.agg == None)\
                     .filter(between(func.date(aggDate), func.date(Prescription.date), func.date(Prescription.expire)))\
@@ -215,6 +220,7 @@ class Prescription(db.Model):
 
         db.session.query(Prescription)\
                     .filter(Prescription.admissionNumber == admissionNumber)\
+                    .filter(Prescription.idSegment == idSegment)\
                     .filter(Prescription.agg != None)\
                     .filter(func.date(Prescription.date) == func.date(aggDate))\
                     .update({
@@ -384,7 +390,7 @@ class PrescriptionDrug(db.Model):
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.Integer, nullable=True)
 
-    def findByPrescription(idPrescription, admissionNumber, aggDate=None):
+    def findByPrescription(idPrescription, admissionNumber, aggDate=None, idSegment=None):
         prevNotes = getPrevNotes(admissionNumber)
 
         q = db.session\
@@ -406,7 +412,7 @@ class PrescriptionDrug(db.Model):
                  .filter(between(aggDate, func.date(Prescription.date), func.date(Prescription.expire)))\
                  .filter(Prescription.agg == None)\
                  .filter(Prescription.concilia == None)\
-                 .filter(Prescription.idSegment != None)
+                 .filter(Prescription.idSegment == idSegment)
         
         return q.order_by(asc(Prescription.expire), desc(func.concat(PrescriptionDrug.idPrescription,PrescriptionDrug.solutionGroup)), asc(Drug.name)).all()
 

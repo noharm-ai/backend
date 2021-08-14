@@ -53,7 +53,7 @@ def computePrescription(schema, idPrescription):
         pAgg.id = p.admissionNumber
         pAgg.date = date(p.date.year, p.date.month, p.date.day)
 
-    resultAgg, stat = getPrescription(admissionNumber=p.admissionNumber, aggDate=pAgg.date)
+    resultAgg, stat = getPrescription(admissionNumber=p.admissionNumber, aggDate=pAgg.date, idSegment=p.idSegment)
 
     pAgg.idHospital = p.idHospital
     pAgg.idDepartment = p.idDepartment
