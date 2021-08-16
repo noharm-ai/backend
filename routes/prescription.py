@@ -184,8 +184,8 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None, idS
     conciliaList = []
     if prescription[0].concilia:
         pDrugs = drugList.concilia(pDrugs)
-        conciliaDrugsT = PrescriptionDrug.findByPrescription(prescription[0].id, patient.admissionNumber, date.today())
-        conciliaDrugsY = PrescriptionDrug.findByPrescription(prescription[0].id, patient.admissionNumber, (date.today() - timedelta(days=1)))
+        conciliaDrugsT = PrescriptionDrug.findByPrescription(prescription[0].id, patient.admissionNumber, date.today(), prescription[0].idSegment)
+        conciliaDrugsY = PrescriptionDrug.findByPrescription(prescription[0].id, patient.admissionNumber, (date.today() - timedelta(days=1)), prescription[0].idSegment)
         conciliaList = drugList.conciliaList(conciliaDrugsT)
         conciliaList = drugList.conciliaList(conciliaDrugsY,conciliaList)
 
