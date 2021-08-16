@@ -383,7 +383,7 @@ def setPrescriptionDrugNote(idPrescriptionDrug):
 
         if newObs: db.session.add(note)
 
-    return tryCommit(db, idPrescriptionDrug, user.permission())
+    return tryCommit(db, str(idPrescriptionDrug), user.permission())
 
 @app_pres.route('/prescriptions/<int:idPrescription>/update', methods=['GET'])
 @jwt_required()
