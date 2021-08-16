@@ -501,11 +501,11 @@ class Intervention(db.Model):
         intervBuffer = []
         for i in interventions:
             intervBuffer.append({
-                'id': i[0].id,
+                'id': str(i[0].id),
                 'idSegment': i[1].idSegment if i[1] else i[7].idSegment if i[7] else None,
                 'idInterventionReason': i[0].idInterventionReason,
                 'reasonDescription': (', ').join(i[2]),
-                'idPrescription': i[1].idPrescription  if i[1] else i[0].idPrescription,
+                'idPrescription': str(i[1].idPrescription if i[1] else i[0].idPrescription),
                 'idDrug': i[1].idDrug if i[1] else None,
                 'drugName': i[3] if i[3] is not None else 'Medicamento ' + str(i[1].idDrug) if i[1] else 'Intervenção no Paciente',
                 'dose': i[1].dose if i[1] else None,

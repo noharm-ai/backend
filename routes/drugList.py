@@ -35,22 +35,22 @@ class DrugList():
     def getPrevIntervention(self, idDrug, idPrescription):
         result = {}
         for i in self.interventions:
-            if i['idDrug'] == idDrug and i['status'] == 's' and i['idPrescription'] < idPrescription:
-                if 'id' in result.keys() and result['id'] > i['id']: continue
+            if i['idDrug'] == idDrug and i['status'] == 's' and int(i['idPrescription']) < idPrescription:
+                if 'id' in result.keys() and int(result['id']) > int(i['id']): continue
                 result = i;
         return result
 
     def getExistIntervention(self, idDrug, idPrescription):
         result = False
         for i in self.interventions:
-            if i['idDrug'] == idDrug and i['idPrescription'] < idPrescription:
+            if i['idDrug'] == idDrug and int(i['idPrescription']) < idPrescription:
                 result = True;
         return result
 
     def getIntervention(self, idPrescriptionDrug):
         result = {}
         for i in self.interventions:
-            if i['id'] == idPrescriptionDrug:
+            if int(i['id']) == idPrescriptionDrug:
                 result = i;
         return result
 
@@ -156,8 +156,8 @@ class DrugList():
                         alerts.append(a)       
 
             pDrugs.append({
-                'idPrescription': pd[0].idPrescription,
-                'idPrescriptionDrug': pd[0].id,
+                'idPrescription': str(pd[0].idPrescription),
+                'idPrescriptionDrug': str(pd[0].id),
                 'idDrug': pd[0].idDrug,
                 'drug': pd[1].name if pd[1] is not None else 'Medicamento ' + str(pd[0].idDrug),
                 'np': pd[6].notdefault if pd[6] is not None else False,
@@ -246,8 +246,8 @@ class DrugList():
             existsDrug = next((d for d in result if d['idDrug'] == pd[0].idDrug), False)
             if not existsDrug:
                 result.append({
-                    'idPrescription': pd[0].idPrescription,
-                    'idPrescriptionDrug': pd[0].id,
+                    'idPrescription': str(pd[0].idPrescription),
+                    'idPrescriptionDrug': str(pd[0].id),
                     'idDrug': pd[0].idDrug,
                     'drug': pd[1].name if pd[1] is not None else 'Medicamento ' + str(pd[0].idDrug),
                     'dose': pd[0].dose,

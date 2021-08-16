@@ -100,13 +100,13 @@ def getPrescriptionAuth(idPrescription):
 
 def buildHeaders(headers, pDrugs, pSolution, pProcedures):
     for pid in headers.keys():
-        drugs = [d for d in pDrugs if d['idPrescription'] == pid]
+        drugs = [d for d in pDrugs if int(d['idPrescription']) == pid]
         drugsInterv = [d['prevIntervention'] for d in drugs if d['prevIntervention'] != {}]
 
-        solutions = [s for s in pSolution if s['idPrescription'] == pid]
+        solutions = [s for s in pSolution if int(s['idPrescription']) == pid]
         solutionsInterv = [s['prevIntervention'] for s in solutions if s['prevIntervention'] != {}]
         
-        procedures = [p for p in pProcedures if p['idPrescription'] == pid]
+        procedures = [p for p in pProcedures if int(p['idPrescription']) == pid]
         proceduresInterv = [p['prevIntervention'] for p in procedures if p['prevIntervention'] != {}]
         
         headers[pid]['drugs'] = getFeatures({'data':{'prescription':drugs, 'solution': [], 'procedures': [], 'interventions':drugsInterv, 'alertExams':[], 'complication': 0}})
@@ -205,7 +205,7 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None, idS
     if aggDate:
         headers = buildHeaders(headers, pDrugs,pSolution,pProcedures)
 
-    pIntervention = [i for i in interventions if i['id'] == 0 and i['idPrescription'] == prescription[0].id]
+    pIntervention = [i for i in interventions if i['id'] == 0 and int(i['idPrescription']) == prescription[0].id]
 
     return {
         'status': 'success',
