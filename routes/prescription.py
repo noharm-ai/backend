@@ -118,14 +118,14 @@ def buildHeaders(headers, pDrugs, pSolution, pProcedures):
 def getPrevIntervention(interventions, dtPrescription):
     result = False
     for i in interventions:
-        if i['id'] == 0 and i['status'] == 's' and i['dateTime'] < dtPrescription:
+        if int(i['id']) == 0 and i['status'] == 's' and i['dateTime'] < dtPrescription:
             result = True;
     return result
 
 def getExistIntervention(interventions, dtPrescription):
     result = False
     for i in interventions:
-        if i['id'] == 0 and i['dateTime'] < dtPrescription:
+        if int(i['id']) == 0 and i['dateTime'] < dtPrescription:
             result = True;
     return result
 
