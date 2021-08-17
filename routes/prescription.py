@@ -205,7 +205,7 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None, idS
     if aggDate:
         headers = buildHeaders(headers, pDrugs,pSolution,pProcedures)
 
-    pIntervention = [i for i in interventions if i['id'] == 0 and int(i['idPrescription']) == prescription[0].id]
+    pIntervention = [i for i in interventions if int(i['id']) == 0 and int(i['idPrescription']) == prescription[0].id]
 
     return {
         'status': 'success',
