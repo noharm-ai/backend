@@ -40,7 +40,7 @@ class SegmentExam(db.Model):
         results = {}
         for e in exams:
             results[e.typeExam.lower()] = e
-            if e.initials.lower() == 'creatinina': 
+            if e.initials.lower().strip() == 'creatinina': 
                 results['cr'] = e
 
         return results
@@ -99,7 +99,7 @@ class Exams(db.Model):
             examEmpty['max'] = segExam[e].max
             examEmpty['name'] = segExam[e].name
             examEmpty['initials'] = segExam[e].initials
-            if segExam[e].initials.lower() == 'creatinina': 
+            if segExam[e].initials.lower().strip() == 'creatinina': 
                 exams['cr'] = examEmpty
             else: 
                 exams[e.lower()] = examEmpty
@@ -117,13 +117,13 @@ class Exams(db.Model):
                 exams[e.typeExam.lower()] = formatExam(e, e.typeExam.lower(), segExam, prevValue)
             
             if e.typeExam.lower() in segExam:
-                if segExam[e.typeExam.lower()].initials.lower() == 'creatinina':
+                if segExam[e.typeExam.lower()].initials.lower().strip() == 'creatinina':
                     exams['cr'] = formatExam(e, e.typeExam.lower(), segExam, prevValue)
-                if segExam[e.typeExam.lower()].initials.lower() == 'tgo':
+                if segExam[e.typeExam.lower()].initials.lower().strip() == 'tgo':
                     examsExtra['tgo'] = formatExam(e, e.typeExam.lower(), segExam, prevValue)
-                if segExam[e.typeExam.lower()].initials.lower() == 'tgp':
+                if segExam[e.typeExam.lower()].initials.lower().strip() == 'tgp':
                     examsExtra['tgp'] = formatExam(e, e.typeExam.lower(), segExam, prevValue)
-                if segExam[e.typeExam.lower()].initials.lower() == 'plaquetas':
+                if segExam[e.typeExam.lower()].initials.lower().strip() == 'plaquetas':
                     examsExtra['plqt'] = formatExam(e, e.typeExam.lower(), segExam, prevValue)
 
         if 'cr' in exams:
