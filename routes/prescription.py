@@ -94,19 +94,19 @@ def getPrescriptionAuth(idPrescription):
         return { 'status': 'error', 'message': 'Prescrição Inexistente!' }, status.HTTP_400_BAD_REQUEST
 
     if p[0].agg:
-        return getPrescription(idPrescription=idPrescription, admissionNumber=p[0].admissionNumber, aggDate=p[0].date)
+        return getPrescription(idPrescription=idPrescription, admissionNumber=p[0].admissionNumber, aggDate=p[0].date, idSegment=p[0].idSegment)
     else:
         return getPrescription(idPrescription=idPrescription)
 
 def buildHeaders(headers, pDrugs, pSolution, pProcedures):
     for pid in headers.keys():
-        drugs = [d for d in pDrugs if d['idPrescription'] == pid]
+        drugs = [d for d in pDrugs if int(d['idPrescription']) == pid]
         drugsInterv = [d['prevIntervention'] for d in drugs if d['prevIntervention'] != {}]
 
-        solutions = [s for s in pSolution if s['idPrescription'] == pid]
+        solutions = [s for s in pSolution if int(s['idPrescription']) == pid]
         solutionsInterv = [s['prevIntervention'] for s in solutions if s['prevIntervention'] != {}]
         
-        procedures = [p for p in pProcedures if p['idPrescription'] == pid]
+        procedures = [p for p in pProcedures if int(p['idPrescription']) == pid]
         proceduresInterv = [p['prevIntervention'] for p in procedures if p['prevIntervention'] != {}]
         
         headers[pid]['drugs'] = getFeatures({'data':{'prescription':drugs, 'solution': [], 'procedures': [], 'interventions':drugsInterv, 'alertExams':[], 'complication': 0}})
@@ -118,23 +118,23 @@ def buildHeaders(headers, pDrugs, pSolution, pProcedures):
 def getPrevIntervention(interventions, dtPrescription):
     result = False
     for i in interventions:
-        if i['id'] == 0 and i['status'] == 's' and i['dateTime'] < dtPrescription:
+        if int(i['id']) == 0 and i['status'] == 's' and i['dateTime'] < dtPrescription:
             result = True;
     return result
 
 def getExistIntervention(interventions, dtPrescription):
     result = False
     for i in interventions:
-        if i['id'] == 0 and i['dateTime'] < dtPrescription:
+        if int(i['id']) == 0 and i['dateTime'] < dtPrescription:
             result = True;
     return result
 
-def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
+def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None, idSegment=None):
 
     if idPrescription:
         prescription = Prescription.getPrescription(idPrescription)
     else:
-        prescription = Prescription.getPrescriptionAgg(admissionNumber, aggDate)
+        prescription = Prescription.getPrescriptionAgg(admissionNumber, aggDate, idSegment)
 
     if (prescription is None):
         return { 'status': 'error', 'message': 'Prescrição Inexistente!' }, status.HTTP_400_BAD_REQUEST
@@ -146,10 +146,10 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
         patient.admissionNumber = prescription[0].admissionNumber
 
     lastDept = Prescription.lastDeptbyAdmission(prescription[0].id, patient.admissionNumber)
-    drugs = PrescriptionDrug.findByPrescription(prescription[0].id, patient.admissionNumber, aggDate)
+    drugs = PrescriptionDrug.findByPrescription(prescription[0].id, patient.admissionNumber, aggDate, idSegment)
     interventions = Intervention.findAll(admissionNumber=patient.admissionNumber)
     relations = Prescription.findRelation(prescription[0].id,patient.admissionNumber, aggDate)
-    headers = Prescription.getHeaders(admissionNumber, aggDate) if aggDate else []
+    headers = Prescription.getHeaders(admissionNumber, aggDate, idSegment) if aggDate else []
 
     clinicalNotesCount = ClinicalNotes.getCountIfExists(prescription[0].admissionNumber)
     #complicationCount = ClinicalNotes.getComplicationCountIfExists(prescription[0].admissionNumber)
@@ -184,8 +184,8 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
     conciliaList = []
     if prescription[0].concilia:
         pDrugs = drugList.concilia(pDrugs)
-        conciliaDrugsT = PrescriptionDrug.findByPrescription(prescription[0].id, patient.admissionNumber, date.today())
-        conciliaDrugsY = PrescriptionDrug.findByPrescription(prescription[0].id, patient.admissionNumber, (date.today() - timedelta(days=1)))
+        conciliaDrugsT = PrescriptionDrug.findByPrescription(prescription[0].id, patient.admissionNumber, date.today(), prescription[0].idSegment)
+        conciliaDrugsY = PrescriptionDrug.findByPrescription(prescription[0].id, patient.admissionNumber, (date.today() - timedelta(days=1)), prescription[0].idSegment)
         conciliaList = drugList.conciliaList(conciliaDrugsT)
         conciliaList = drugList.conciliaList(conciliaDrugsY,conciliaList)
 
@@ -205,7 +205,7 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
     if aggDate:
         headers = buildHeaders(headers, pDrugs,pSolution,pProcedures)
 
-    pIntervention = [i for i in interventions if i['id'] == 0 and i['idPrescription'] == prescription[0].id]
+    pIntervention = [i for i in interventions if int(i['id']) == 0 and int(i['idPrescription']) == prescription[0].id]
 
     return {
         'status': 'success',
@@ -274,6 +274,7 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None):
             },
             'alertStats': drugList.alertStats,
             'features': prescription[0].features,
+            'user': prescription[10],
         }
     }, status.HTTP_200_OK
 
@@ -296,7 +297,7 @@ def setPrescriptionStatus(idPrescription):
             db.session.query(Prescription)\
                       .filter(Prescription.admissionNumber == p.admissionNumber)\
                       .filter(Prescription.status != p.status)\
-                      .filter(Prescription.idSegment != None)\
+                      .filter(Prescription.idSegment == p.idSegment)\
                       .filter(Prescription.concilia == None)\
                       .filter(between(func.date(p.date), func.date(Prescription.date), func.date(Prescription.expire)))\
                       .update({
@@ -305,7 +306,7 @@ def setPrescriptionStatus(idPrescription):
                         'user': user.id
                       }, synchronize_session='fetch')
         else:
-            Prescription.checkPrescriptions(p.admissionNumber, p.date, user.id)
+            Prescription.checkPrescriptions(p.admissionNumber, p.date, p.idSegment, user.id)
 
     if 'notes' in data.keys(): 
         p.notes = data.get('notes', None)
@@ -382,7 +383,7 @@ def setPrescriptionDrugNote(idPrescriptionDrug):
 
         if newObs: db.session.add(note)
 
-    return tryCommit(db, idPrescriptionDrug, user.permission())
+    return tryCommit(db, str(idPrescriptionDrug), user.permission())
 
 @app_pres.route('/prescriptions/<int:idPrescription>/update', methods=['GET'])
 @jwt_required()

@@ -87,6 +87,7 @@ celerybeat-schedule
 env/
 venv/
 ENV/
+prod/
 env.bak/
 venv.bak/
 .vscode

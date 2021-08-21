@@ -28,7 +28,7 @@ def computePrescription(schema, idPrescription):
     if (p.idSegment is None):
         return { 
             'status': 'success', 
-            'data': idPrescription,
+            'data': str(idPrescription),
             'message': 'Prescrição sem Segmento!' 
         }, status.HTTP_200_OK
 
@@ -53,7 +53,7 @@ def computePrescription(schema, idPrescription):
         pAgg.id = p.admissionNumber
         pAgg.date = date(p.date.year, p.date.month, p.date.day)
 
-    resultAgg, stat = getPrescription(admissionNumber=p.admissionNumber, aggDate=pAgg.date)
+    resultAgg, stat = getPrescription(admissionNumber=p.admissionNumber, aggDate=pAgg.date, idSegment=p.idSegment)
 
     pAgg.idHospital = p.idHospital
     pAgg.idDepartment = p.idDepartment
@@ -69,7 +69,7 @@ def computePrescription(schema, idPrescription):
 
     if newPrescAgg: db.session.add(pAgg)
 
-    return tryCommit(db, idPrescription)
+    return tryCommit(db, str(idPrescription))
 
 def genAggID(p):
     id = (p.date.year - 2000) * 100000000000000

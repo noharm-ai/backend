@@ -110,16 +110,17 @@ class refEmpty():
 
 def formatExam(exam, typeExam, segExam, prevValue = None):
     if exam is not None:
+        value = none2zero(exam.value)
+
         if typeExam in segExam:
             ref = segExam[typeExam]
-            alert = not (exam.value >= ref.min and exam.value <= ref.max )
+            alert = not (value >= ref.min and value <= ref.max )
         else:
             ref = refEmpty()
             ref.name = typeExam
             ref.initials = typeExam
             alert = False
 
-        value = none2zero(exam.value)
         prevValue = none2zero(prevValue)
         delta = None
         if prevValue > 0 and value > 0:
