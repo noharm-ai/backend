@@ -23,6 +23,8 @@ class User(db.Model):
     password = db.Column('senha', db.String(128), nullable=False)
     schema = db.Column("schema", db.String, nullable=False)
     config = db.Column("config", postgresql.JSON, nullable=False)
+    external = db.Column("fkusuario", db.String, nullable=False)
+    active = db.Column("ativo", db.Boolean, nullable=True)
 
     def find(id):
         db_session = db.create_scoped_session()
