@@ -24,8 +24,8 @@ def test_get_prescriptions_status_code(client):
     # assert data['data'][0]['description'] == 'descript'
     #assert len(data['data']) == 3
 
-def test_get_prescriptions_by_id(client):
-    """Teste get /prescriptions/id - Compara response data com dados do banco e valida status_code 200"""
+def test_get_prescriptions_by_idPrescription(client):
+    """Teste get /prescriptions/idPrescription - Compara response data com dados do banco e valida status_code 200"""
 
     access_token = get_access(client)
 
@@ -40,6 +40,22 @@ def test_get_prescriptions_by_id(client):
     assert data['concilia'] == prescription.concilia
     assert data['bed'] == prescription.bed
     assert data['status'] == prescription.status
+
+def test_get_prescriptions_drug_by_idPrescription_and_period(client):
+    """Teste get /prescriptions/drug/idPrescription/period - Compara response data com dados do banco e valida status_code 200"""
+
+    access_token = get_access(client)
+
+    idPrescription = '20'
+
+    url = '/prescriptions/drug/{0}/period'.format(idPrescription)
+
+    response = client.get(url, headers=make_headers(access_token))
+    data = json.loads(response.data)['data']
+    # TODO: Add consulta ao banco de dados e comparar retorno (retornando status 200 porém data = [])
+
+
+    assert response.status_code == 200
 
 def test_put_prescriptions_by_id(client):
     """Teste put /prescriptions/id - Compara dados enviados com dados salvos no banco e valida status_code 200"""
@@ -81,14 +97,14 @@ def test_put_prescriptions_by_id_permission(client):
 
     assert response.status_code == 401
 
-def test_get_static(client):
+def test_get_static_demo_prescription_by_idPrescription(client):
     """Teste get /static/demo/prescription/idPrescription - Valida status_code 200"""
     access_token = get_access(client)
     
     idPrescription = '20'
     
     response = client.get('static/demo/prescription/' + idPrescription, headers=make_headers(access_token))
-    data = json.loads(response.data)
+    data = json.loads(response.data)    
     # TODO: Add consulta ao banco de dados e comparar retorno (retornando status 200 porém data = 20)
 
     assert response.status_code == 200

@@ -12,7 +12,6 @@ def test_get_interventions(client):
     response = client.get('/intervention', headers=make_headers(access_token)) 
     data = json.loads(response.data)['data']
     # TODO: Add consulta ao banco de dados e comparar count de intervenções
-    # breakpoint()
 
     assert response.status_code == 200
 

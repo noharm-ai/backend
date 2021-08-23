@@ -33,3 +33,32 @@ def test_post_patient(client):
     assert response.status_code == 200
     assert data['height'] == str(patient.height)
     assert admission == str(responseData)
+
+def test_get_notes_by_idAdmission(client):
+    """Teste get /notes/idAdmission - Valida status_code 200"""
+
+    access_token = get_access(client, 'noadmin', 'noadmin')
+
+    idAdmission = '5'
+
+    response = client.get('/notes/' + idAdmission, headers=make_headers(access_token))
+    data = json.loads(response.data)
+    # TODO: Add consulta ao banco de dados e comparar retorno (retornando data: [])
+
+    assert response.status_code == 200
+
+def test_get_exams_by_idAdmission(client):
+    """Teste get /exams/idAdmission - Valida status_code 200"""
+
+    access_token = get_access(client)
+
+    idAdmission = '5'
+
+    response = client.get('/exams/' + idAdmission, headers=make_headers(access_token))
+    data = json.loads(response.data)    
+
+    # TODO: Add consulta ao banco de dados e comparar retorno (retornando data : {}")
+
+    assert response.status_code == 200
+    
+    
