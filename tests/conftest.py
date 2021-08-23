@@ -20,7 +20,11 @@ with app.test_request_context():
 	access_token = create_access_token('1')
 
 def make_headers(jwt):
-    return {'Authorization': 'Bearer {}'.format(jwt)}
+    return {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': 'Bearer {}'.format(jwt)
+            }
 
 def user_find(id):
 	user = User()
