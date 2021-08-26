@@ -1,9 +1,7 @@
 name: Build
 on:
   pull_request:
-    branches: [ master, develop ]
-  push:
-    branches: [ feature/#1-acceptence_test_prescriptions ]
+    branches: [ master, develop, feature/acceptance_tests_lanceiros ]
 
 jobs:
   build:
