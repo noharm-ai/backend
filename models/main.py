@@ -31,7 +31,7 @@ class User(db.Model):
         return db_session.query(User).filter(User.id == id).first()
 
     def authenticate(email, password):
-        return User.query.filter_by(email=email, password=func.crypt(password, User.password)).first()
+        return User.query.filter_by(email=email, password=func.crypt(password, User.password), active=True).first()
 
     def permission(self):
         roles = self.config['roles'] if self.config and 'roles' in self.config else []
