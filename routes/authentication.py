@@ -27,8 +27,8 @@ def auth():
             'schema': user.schema,
             'config': user.config
         }
-        access_token = create_access_token(identity=user.id)
-        refresh_token = create_refresh_token(identity=user.id)
+        access_token = create_access_token(identity=user.id,additional_claims=claims)
+        refresh_token = create_refresh_token(identity=user.id,additional_claims=claims)
 
         return {
             'status': 'success',
@@ -49,7 +49,7 @@ def auth():
 def refreshToken():
     current_user = get_jwt_identity()
     current_claims = get_jwt()
-
+    
     if 'schema' in current_claims:
         claims = {
             "schema": current_claims['schema'],
