@@ -32,8 +32,8 @@ class User(db.Model):
         user.id = id
         claims = get_jwt()
         if 'schema' in claims:
-            user.schema = get_jwt()["schema"]
-            user.config = get_jwt()["config"]
+            user.schema = claims["schema"]
+            user.config = claims["config"]
         else:
             db_session = db.create_scoped_session()
             user = db_session.query(User).filter(User.id == id).first()

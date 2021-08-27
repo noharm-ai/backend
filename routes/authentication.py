@@ -27,8 +27,8 @@ def auth():
             'schema': user.schema,
             'config': user.config
         }
-        access_token = create_access_token(identity=user.id,additional_claims=claims)
-        refresh_token = create_refresh_token(identity=user.id,additional_claims=claims)
+        access_token = create_access_token(identity=user.id)
+        refresh_token = create_refresh_token(identity=user.id)
 
         return {
             'status': 'success',
@@ -49,5 +49,19 @@ def auth():
 def refreshToken():
     current_user = get_jwt_identity()
     current_claims = get_jwt()
-    access_token = create_access_token(identity=current_user,additional_claims=current_claims)
+
+    if 'schema' in current_claims:
+        claims = {
+            "schema": current_claims['schema'],
+            "config": current_claims['config']
+        }        
+    else:
+        db_session = db.create_scoped_session()
+        user = db_session.query(User).filter(User.id == current_user).first()
+        claims = {
+            "schema": user.schema,
+            "config": user.config
+        }
+
+    access_token = create_access_token(identity=current_user,additional_claims=claims)
     return {'access_token': access_token}
