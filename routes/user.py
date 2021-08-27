@@ -32,7 +32,7 @@ def getReports():
 @app_usr.route("/user", methods=['GET'])
 @jwt_required()
 def getUser():
-    user = User.find(get_jwt_identity())
+    user = User.query.get(get_jwt_identity())
 
     if not user: 
         return { 'status': 'error', 'message': 'Usuário Inexistente!' }, status.HTTP_400_BAD_REQUEST
@@ -49,7 +49,7 @@ def getUser():
 @jwt_required()
 def setUser():
     data = request.get_json()
-    user = User.find(get_jwt_identity())
+    user = User.query.get(get_jwt_identity())
 
     if not user: 
         return { 'status': 'error', 'message': 'Usuário Inexistente!' }, status.HTTP_400_BAD_REQUEST
@@ -105,7 +105,7 @@ def resetPassword():
         return { 'status': 'error', 'message': 'Token Expirou!' }, status.HTTP_400_BAD_REQUEST
 
     user_id = user_token['sub']
-    user = User.find(user_id)
+    user = User.query.get(user_id)
     if not user: 
         return { 'status': 'error', 'message': 'Usuário Inexistente!' }, status.HTTP_400_BAD_REQUEST
 

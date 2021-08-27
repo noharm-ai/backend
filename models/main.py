@@ -5,6 +5,7 @@ from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import deferred
 from routes.utils import *
 from flask_mail import Mail
+from flask_jwt_extended import (get_jwt)
 
 db = SQLAlchemy()
 mail = Mail()
@@ -27,8 +28,16 @@ class User(db.Model):
     active = db.Column("ativo", db.Boolean, nullable=True)
 
     def find(id):
-        db_session = db.create_scoped_session()
-        return db_session.query(User).filter(User.id == id).first()
+        user = User()
+        user.id = id
+        claims = get_jwt()
+        if 'schema' in claims:
+            user.schema = get_jwt()["schema"]
+            user.config = get_jwt()["config"]
+        else:
+            db_session = db.create_scoped_session()
+            user = db_session.query(User).filter(User.id == id).first()
+        return user
 
     def authenticate(email, password):
         return User.query.filter_by(email=email, password=func.crypt(password, User.password), active=True).first()
