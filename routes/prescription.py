@@ -152,7 +152,6 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None, idS
     headers = Prescription.getHeaders(admissionNumber, aggDate, idSegment) if aggDate else []
 
     clinicalNotesCount = ClinicalNotes.getCountIfExists(prescription[0].admissionNumber)
-    #complicationCount = ClinicalNotes.getComplicationCountIfExists(prescription[0].admissionNumber)
     notesSigns = None
     notesInfo = None
     if clinicalNotesCount[0]:

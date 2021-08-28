@@ -3,7 +3,7 @@ from flask_api import status
 from models.main import *
 from models.appendix import *
 from flask_jwt_extended import (create_access_token, create_refresh_token,
-                                jwt_required, get_jwt_identity)
+                                jwt_required, get_jwt_identity, get_jwt)
 from config import Config
 
 app_auth = Blueprint('app_auth',__name__)
@@ -23,8 +23,12 @@ def auth():
             'message': 'Usuário inválido',
         }, status.HTTP_401_UNAUTHORIZED
     else:
-        access_token = create_access_token(identity=user.id)
-        refresh_token = create_refresh_token(identity=user.id)
+        claims = {
+            'schema': user.schema,
+            'config': user.config
+        }
+        access_token = create_access_token(identity=user.id,additional_claims=claims)
+        refresh_token = create_refresh_token(identity=user.id,additional_claims=claims)
 
         return {
             'status': 'success',
@@ -44,5 +48,20 @@ def auth():
 @jwt_required(refresh=True)
 def refreshToken():
     current_user = get_jwt_identity()
-    access_token = create_access_token(identity=current_user)
+    current_claims = get_jwt()
+    
+    if 'schema' in current_claims:
+        claims = {
+            "schema": current_claims['schema'],
+            "config": current_claims['config']
+        }        
+    else:
+        db_session = db.create_scoped_session()
+        user = db_session.query(User).filter(User.id == current_user).first()
+        claims = {
+            "schema": user.schema,
+            "config": user.config
+        }
+
+    access_token = create_access_token(identity=current_user,additional_claims=claims)
     return {'access_token': access_token}

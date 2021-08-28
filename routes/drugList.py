@@ -182,7 +182,7 @@ class DrugList():
                 'grp_solution': pd[0].solutionGroup,
                 'stage': 'ACM' if pd[0].solutionACM == 'S' else strNone(pd[0].solutionPhase) + ' x '+ strNone(pd[0].solutionTime) + ' (' + strNone(pd[0].solutionTotalTime) + ')',
                 'infusion': strNone(pd[0].solutionDose) + ' ' + strNone(pd[0].solutionUnit),
-                'score': str(pd[5]) if not pdWhiteList else '0',
+                'score': str(pd[5]) if not pdWhiteList and source != 'Dietas' else '0',
                 'source': pd[0].source,
                 'checked': bool(pd[0].checked or pd[9] == 's'),
                 'suspended': bool(pd[0].suspendedDate),
