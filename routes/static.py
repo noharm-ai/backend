@@ -63,7 +63,7 @@ def computePrescription(schema, idPrescription):
     pAgg.prescriber = 'Prescrição Agregada'
     pAgg.agg = True
     pAgg.status = 0
-    if resultAgg['data']:
+    if 'data' in resultAgg:
         pAgg.features = getFeatures(resultAgg)
         pAgg.aggDrugs = pAgg.features['drugIDs']
         pAgg.aggDeps = list(set([resultAgg['data']['headers'][h]['idDepartment'] for h in resultAgg['data']['headers']]))

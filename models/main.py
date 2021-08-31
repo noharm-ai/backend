@@ -31,12 +31,8 @@ class User(db.Model):
         user = User()
         user.id = id
         claims = get_jwt()
-        if 'schema' in claims:
-            user.schema = claims["schema"]
-            user.config = claims["config"]
-        else:
-            db_session = db.create_scoped_session()
-            user = db_session.query(User).filter(User.id == id).first()
+        user.schema = claims["schema"]
+        user.config = claims["config"]
         return user
 
     def authenticate(email, password):
