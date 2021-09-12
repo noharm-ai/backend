@@ -99,6 +99,8 @@ def getOutliers(idSegment=1, idDrug=1):
             'obs': ''
         })
 
+    defaultNote = Notes.getDefaultNote(d[0].sctid) if not user.permission() else None
+
     returnJson = {
         'status': 'success',
         'data': {
@@ -125,7 +127,8 @@ def getOutliers(idSegment=1, idDrug=1):
             'sctidA': d[0].sctid if d else '',
             'sctNameA': strNone(d[1]).upper() if d else '',
             'relations': relations,
-            'relationTypes' : [{'key': t, 'value': typeRelations[t]} for t in typeRelations]
+            'relationTypes' : [{'key': t, 'value': typeRelations[t]} for t in typeRelations],
+            'defaultNote': defaultNote
         }
     }
 
