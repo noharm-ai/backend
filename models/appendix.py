@@ -71,6 +71,22 @@ class Notes(db.Model):
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.Integer, nullable=True)
 
+    def getDefaultNote(sctid):
+        result = db.engine.execute('SELECT schema_name FROM information_schema.schemata')
+        defaultSchema = 'hsc_test'
+
+        schemaExists = False
+        for r in result:
+            if r[0] == defaultSchema: schemaExists = True
+
+        if schemaExists:
+            db_session = db.create_scoped_session()
+            db_session.connection(execution_options={'schema_translate_map': {None: defaultSchema}})
+            note = db_session.query(Notes).filter_by(idDrug=sctid, idSegment=5).first()
+            return note.notes if note else None
+        else:
+            return None
+
 class Memory(db.Model):
     __tablename__ = 'memoria'
 

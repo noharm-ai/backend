@@ -227,7 +227,7 @@ class DrugList():
                         result[pdID][pdGroup]['vol'] = pdDose = round(pd[0].dose / pd[6].amount,2)
 
                 result[pdID][pdGroup]['speed'] = pd[0].solutionDose
-                result[pdID][pdGroup]['totalVol'] += pdDose
+                result[pdID][pdGroup]['totalVol'] += pdDose if pdDose else 0
                 result[pdID][pdGroup]['totalVol'] = round(result[pdID][pdGroup]['totalVol'],2)
 
         return result

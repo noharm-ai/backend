@@ -32,8 +32,10 @@ def getOutliers(idSegment=1, idDrug=1):
     drugAttr = DrugAttributes.query.get((idDrug,idSegment))
     
     relations = []
+    defaultNote = None
     if d and d[0].sctid:
         relations = Relation.findBySctid(d[0].sctid, user)
+        defaultNote = Notes.getDefaultNote(d[0].sctid) if not user.permission() else None
 
     if drugAttr is None: drugAttr = DrugAttributes()
 
@@ -125,7 +127,8 @@ def getOutliers(idSegment=1, idDrug=1):
             'sctidA': d[0].sctid if d else '',
             'sctNameA': strNone(d[1]).upper() if d else '',
             'relations': relations,
-            'relationTypes' : [{'key': t, 'value': typeRelations[t]} for t in typeRelations]
+            'relationTypes' : [{'key': t, 'value': typeRelations[t]} for t in typeRelations],
+            'defaultNote': defaultNote
         }
     }
 
