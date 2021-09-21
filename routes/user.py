@@ -115,3 +115,34 @@ def resetPassword():
             .update(update, synchronize_session='fetch')
     
     return tryCommit(db, user.id)
+
+@app_usr.route('/users', methods=['GET'])
+@jwt_required()
+def getUsers():
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+
+    roles = user.config['roles'] if user.config and 'roles' in user.config else []
+    
+    if ('userAdmin' not in roles): 
+        return {
+            'status': 'error',
+            'message': 'Usuário não autorizado',
+        }, status.HTTP_401_UNAUTHORIZED
+
+    users = User.query.filter_by(schema=user.schema).all()
+
+    results = []
+    for u in users:
+        results.append({
+            'id': u.id,
+            'external': u.external,
+            'name': u.name,
+            'email': u.email,
+            'active': u.active
+        })
+
+    return {
+        'status': 'success',
+        'data': results
+    }, status.HTTP_200_OK
