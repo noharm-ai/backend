@@ -25,14 +25,16 @@ def getPrescriptions():
     idSegment = request.args.get('idSegment', None)
     idDept = request.args.getlist('idDept[]')
     idDrug = request.args.getlist('idDrug[]')
+    allDrugs = request.args.get('allDrugs', 0)
     startDate = request.args.get('startDate', str(date.today()))
     endDate = request.args.get('endDate', None)
     pending = request.args.get('pending', 0)
     currentDepartment = request.args.get('currentDepartment', 0)
     agg = request.args.get('agg', 0)
     concilia = request.args.get('concilia', 0)
+    discharged = request.args.get('discharged', 0)
 
-    patients = Patient.getPatients(idSegment=idSegment, idDept=idDept, idDrug=idDrug, startDate=startDate, endDate=endDate, pending=pending, agg=agg, currentDepartment=currentDepartment, concilia=concilia)
+    patients = Patient.getPatients(idSegment=idSegment, idDept=idDept, idDrug=idDrug, startDate=startDate, endDate=endDate, pending=pending, agg=agg, currentDepartment=currentDepartment, concilia=concilia, allDrugs=allDrugs, discharged=discharged)
 
     results = []
     for p in patients:
