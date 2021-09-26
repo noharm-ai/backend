@@ -38,6 +38,7 @@ def auth():
             'schema': user.schema,
             'roles': user.config['roles'] if user.config and 'roles' in user.config else [],
             'nameUrl': Memory.getNameUrl(user.schema)['value'] if user.permission() else 'http://localhost/{idPatient}',
+            'notify': Notify.getNotification(),
             'access_token': access_token,
             'refresh_token': refresh_token,
             'apiKey': Config.API_KEY if hasattr(Config, 'API_KEY') else ''
