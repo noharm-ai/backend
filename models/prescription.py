@@ -265,7 +265,7 @@ class Patient(db.Model):
                          .filter(Patient.admissionNumber == admissionNumber)\
                          .first()
 
-    def getPatients(idSegment=None, idDept=[], idDrug=[], startDate=date.today(), endDate=None, pending=False, agg=False, currentDepartment=False, concilia=False):
+    def getPatients(idSegment=None, idDept=[], idDrug=[], startDate=date.today(), endDate=None, pending=False, agg=False, currentDepartment=False, concilia=False, allDrugs=False, discharged=False):
         q = db.session\
             .query(Prescription, Patient, Department.name.label('department'))\
             .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)\
@@ -283,10 +283,16 @@ class Patient(db.Model):
 
         if (len(idDrug)>0):
             idDrug = list(map(int, idDrug))
-            q = q.filter(cast(idDrug, postgresql.ARRAY(BigInteger)).overlap(Prescription.aggDrugs))
+            if bool(int(none2zero(allDrugs))):
+                q = q.filter(cast(idDrug, postgresql.ARRAY(BigInteger)).contained_by(Prescription.aggDrugs))
+            else:
+                q = q.filter(cast(idDrug, postgresql.ARRAY(BigInteger)).overlap(Prescription.aggDrugs))
 
         if bool(int(none2zero(pending))):
             q = q.filter(Prescription.status == '0')
+
+        if bool(int(none2zero(discharged))):
+            q = q.filter(Patient.dischargeDate != None)
 
         if bool(int(none2zero(agg))):
             q = q.filter(Prescription.agg == True)
