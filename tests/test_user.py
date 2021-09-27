@@ -30,3 +30,21 @@ def test_get_users_permission(client):
     response = client.get('/users', headers=make_headers(access_token))
 
     assert response.status_code == 401
+
+@pytest.mark.skip(reason="Pendente ajustes! (validar adição e remover usuário adicionado)")
+def test_put_user(client):
+    """Teste put /user - """
+
+    access_token = get_access(client)
+
+    data = {
+        "id": "",
+        "email": "teste3",
+        "name": "teste3",
+        "external": "teste",
+        "active": "true"
+    }
+    
+    response = client.put('/user', data=json.dumps(data), headers=make_headers(access_token))
+    # breakpoint()
+    assert response.status_code == 200

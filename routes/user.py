@@ -53,19 +53,42 @@ def setUser():
 
     if not user: 
         return { 'status': 'error', 'message': 'Usuário Inexistente!' }, status.HTTP_400_BAD_REQUEST
-
-    password = data.get('password', None)
-    newpassword = data.get('newpassword', None)
-    user = User.authenticate(user.email, password)
-
-    if not user or not newpassword: 
-        return { 'status': 'error', 'message': 'Usuário Inexistente!' }, status.HTTP_400_BAD_REQUEST
-
-    update = {'password': func.crypt(newpassword, func.gen_salt('bf',8)) }
-    db.session.query(User)\
-            .filter(User.id == user.id)\
-            .update(update, synchronize_session='fetch')
     
+    dbSession.setSchema(user.schema)
+
+    if 'id' in data.keys(): id = data.get('id', None)
+
+    if not id: #Criar usuário (pendente ajustes)
+        roles = user.config['roles'] if user.config and 'roles' in user.config else []
+        
+        if ('userAdmin' not in roles): 
+            return {
+                'status': 'error',
+                'message': 'Usuário não autorizado',
+            }, status.HTTP_401_UNAUTHORIZED
+
+        newUser = User()
+        newUser.id = '9'
+        newUser.email = data.get('email', None)
+        newUser.name = data.get('name', None)
+        newUser.external = data.get('external', None)
+        newUser.active =  bool(data.get('active', False))
+        newUser.schema = user.schema
+        newUser.password = '$2a$08$7axJvahakvPzfYoEcRwRuec8RRCoKKluNirtgTwktX0xF006L6ls2'
+        newUser.config = '{ }'
+        db.session.add(newUser)
+        return tryCommit(db, newUser.id)
+    else: #Editar usuário (pendente ajustes)
+        if 'password' in data.keys(): password = data.get('password', None)
+        if 'newpassword' in data.keys(): newpassword = data.get('newpassword', None)
+        user = User.authenticate(user.email, password)
+        if not user or not newpassword: 
+            return { 'status': 'error', 'message': 'Usuário Inexistente!' }, status.HTTP_400_BAD_REQUEST
+        update = {'password': func.crypt(newpassword, func.gen_salt('bf',8)) }
+        db.session.query(User)\
+                .filter(User.id == user.id)\
+                .update(update, synchronize_session='fetch')
+
     return tryCommit(db, user.id)
 
 @app_usr.route("/user/forget", methods=['GET'])
