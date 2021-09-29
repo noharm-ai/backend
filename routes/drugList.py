@@ -31,7 +31,7 @@ class DrugList():
 
     @staticmethod
     def sortDrugs(d):
-        return d['drug'].lower()
+        return remove_accents(d['drug']).lower()
 
     def getPrevIntervention(self, idDrug, idPrescription):
         result = {}
