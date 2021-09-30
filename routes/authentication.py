@@ -30,6 +30,20 @@ def auth():
         access_token = create_access_token(identity=user.id,additional_claims=claims)
         refresh_token = create_refresh_token(identity=user.id,additional_claims=claims)
 
+        notification = Notify.getNotification()
+
+        if notification is not None:
+            db_session = db.create_scoped_session()
+            db_session.connection(execution_options={'schema_translate_map': {None: user.schema}})
+
+            notificationMemory = db_session.query(Memory)\
+              .filter(Memory.kind == 'info-alert-' + str(notification['id']) + '-' + str(user.id))\
+              .first()
+              
+            if notificationMemory is not None:
+                notification = None
+        
+
         return {
             'status': 'success',
             'userName': user.name,
@@ -38,7 +52,7 @@ def auth():
             'schema': user.schema,
             'roles': user.config['roles'] if user.config and 'roles' in user.config else [],
             'nameUrl': Memory.getNameUrl(user.schema)['value'] if user.permission() else 'http://localhost/{idPatient}',
-            'notify': Notify.getNotification(),
+            'notify': notification,
             'access_token': access_token,
             'refresh_token': refresh_token,
             'apiKey': Config.API_KEY if hasattr(Config, 'API_KEY') else ''
