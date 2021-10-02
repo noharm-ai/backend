@@ -29,8 +29,9 @@ class DrugList():
         self.alertStats['exams'] = self.alertStats['kidney'] + self.alertStats['liver'] + self.alertStats['platelets']
         self.alertStats['allergy'] += self.alertStats['rea']
 
-    def sortDrugs(self, d):
-        return d['drug'].lower()
+    @staticmethod
+    def sortDrugs(d):
+        return remove_accents(d['drug']).lower()
 
     def getPrevIntervention(self, idDrug, idPrescription):
         result = {}
@@ -257,3 +258,13 @@ class DrugList():
                 })
         
         return result
+
+    @staticmethod
+    def cpoeDrugs(drugs, idPrescription):
+        for d in drugs:
+            drugs[drugs.index(d)]['cpoe'] = d['idPrescription']
+            drugs[drugs.index(d)]['idPrescription'] = idPrescription
+
+        drugs.sort(key=DrugList.sortDrugs)
+
+        return drugs

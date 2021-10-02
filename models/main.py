@@ -42,6 +42,10 @@ class User(db.Model):
         roles = self.config['roles'] if self.config and 'roles' in self.config else []
         return ('suporte' not in roles)
 
+    def cpoe(self):
+        roles = self.config['roles'] if self.config and 'roles' in self.config else []
+        return ('cpoe' in roles)
+
 class Substance(db.Model):
     __tablename__ = 'substancia'
     __table_args__ = {'schema':'public'}
@@ -93,6 +97,31 @@ class Relation(db.Model):
         results.sort(key=sortRelations)
 
         return results
+
+class Notify(db.Model):
+    __tablename__ = 'notifica'
+    __table_args__ = {'schema':'public'}
+
+    id = db.Column("idnotifica", db.Integer, primary_key=True, autoincrement=True)
+    title = db.Column("titulo", db.String(100), nullable=False)
+    tooltip = db.Column("tooltip", db.String(255), nullable=False)
+    link = db.Column("link", db.String(100), nullable=False)
+    icon = db.Column("icon", db.String(25), nullable=False)
+    classname = db.Column("classname", db.String(50), nullable=False)
+    startDate = db.Column("inicio", db.Date, nullable=False)
+    endDate = db.Column("validade", db.Date, nullable=False)
+
+    def getNotification():
+        n = Notify.query.filter(Notify.startDate <= date.today())\
+                        .filter(Notify.endDate >= date.today()).first()
+        return {
+            'id' : n.id,
+            'title' : n.title,
+            'tooltip' : n.tooltip,
+            'link' : n.link,
+            'icon' : n.icon,
+            'classname' : n.classname,
+        } if n else None
 
 class Drug(db.Model):
     __tablename__ = 'medicamento'

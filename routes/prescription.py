@@ -8,7 +8,7 @@ from models.prescription import *
 from models.notes import ClinicalNotes
 from flask import Blueprint, request
 from flask_jwt_extended import (create_access_token, create_refresh_token,
-                                jwt_required, get_jwt_identity)
+                                jwt_required, get_jwt_identity, verify_jwt_in_request)
 from .utils import *
 from sqlalchemy import func, between
 from datetime import date, datetime
@@ -176,9 +176,9 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None, idS
 
     drugList = DrugList(drugs, interventions, relations, exams, aggDate is not None)
 
-    pDrugs = drugList.getDrugType([], 'Medicamentos')
-    pDrugs = drugList.getDrugType(pDrugs, 'Medicamentos', checked=True)
-    pDrugs = drugList.getDrugType(pDrugs, 'Medicamentos', suspended=True)
+    pDrugs = drugList.getDrugType([], 'Medicamentos') #refactor sort
+    pDrugs = drugList.getDrugType(pDrugs, 'Medicamentos', checked=True) #refactor sort
+    pDrugs = drugList.getDrugType(pDrugs, 'Medicamentos', suspended=True) #refactor sort
     pDrugs.sort(key=drugList.sortDrugs)
     pDrugs = drugList.sortWhiteList(pDrugs)
     
@@ -205,6 +205,15 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None, idS
 
     if aggDate:
         headers = buildHeaders(headers, pDrugs,pSolution,pProcedures)
+
+        if verify_jwt_in_request(optional=True):
+            user = User.find(get_jwt_identity())
+            if user.cpoe():
+                pDrugs = drugList.cpoeDrugs(pDrugs, idPrescription)
+                pDrugs = drugList.sortWhiteList(pDrugs)
+                pSolution = drugList.cpoeDrugs(pSolution, idPrescription)
+                pProcedures = drugList.cpoeDrugs(pProcedures, idPrescription)
+                pDiet = drugList.cpoeDrugs(pDiet, idPrescription)
 
     pIntervention = [i for i in interventions if int(i['id']) == 0 and int(i['idPrescription']) == prescription[0].id]
 
