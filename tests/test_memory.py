@@ -28,15 +28,13 @@ def add_memory(mem_kind, mem_value):
     mem.user = 0
     
     session.add(mem)
-    session.commit()
-    session.connection(execution_options={'schema_translate_map': {None: 'demo'}})
+    session_commit()
     return mem.key
 
 def delete_memory(key):
-    session.connection(execution_options={'schema_translate_map': {None: 'demo'}})
     memory = session.query(Memory).get(key)
     session.delete(memory)
-    session.commit()
+    session_commit()
 
 def test_get_existing_memory(client):
     """Test get /memory/string:kind - check status_code 200 and data array"""
