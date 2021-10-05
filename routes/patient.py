@@ -146,8 +146,11 @@ def setPatientData(admissionNumber):
         return { 'status': 'error', 'message': 'Paciente Inexistente!' }, status.HTTP_400_BAD_REQUEST
 
     updateWeight = False
-    weight = data.get('weight', None)
-    if weight and weight != p.weight: 
+
+    if 'weight' in data.keys():
+      weight = data.get('weight', None)
+      
+      if weight != p.weight: 
         p.weightDate = datetime.today()
         p.weight = weight
         p.user = user.id
