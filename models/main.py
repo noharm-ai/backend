@@ -110,10 +110,14 @@ class Notify(db.Model):
     classname = db.Column("classname", db.String(50), nullable=False)
     startDate = db.Column("inicio", db.Date, nullable=False)
     endDate = db.Column("validade", db.Date, nullable=False)
+    schema = db.Column("schema", db.String, nullable=False)
 
-    def getNotification():
+    def getNotification(schema):
         n = Notify.query.filter(Notify.startDate <= date.today())\
-                        .filter(Notify.endDate >= date.today()).first()
+                        .filter(Notify.endDate >= date.today())\
+                        .filter(or_(Notify.schema == schema, Notify.schema == None))\
+                        .order_by(asc(Notify.id))\
+                        .first()
         return {
             'id' : n.id,
             'title' : n.title,

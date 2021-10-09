@@ -30,7 +30,7 @@ def auth():
         access_token = create_access_token(identity=user.id,additional_claims=claims)
         refresh_token = create_refresh_token(identity=user.id,additional_claims=claims)
 
-        notification = Notify.getNotification()
+        notification = Notify.getNotification(schema=user.schema)
 
         if notification is not None:
             db_session = db.create_scoped_session()
