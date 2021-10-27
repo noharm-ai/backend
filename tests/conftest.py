@@ -34,6 +34,10 @@ def user_find(id):
 def setSchema(schema):
 	return schema
 
+def session_commit():
+    session.commit()
+    session.connection(execution_options={'schema_translate_map': {None: 'demo'}})
+
 @pytest.fixture
 def client():
     client = app.test_client()

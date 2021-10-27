@@ -22,6 +22,7 @@ def getNotes(admissionNumber):
         admDate = pat.admissionDate if pat else datetime.today()
         notes = ClinicalNotes.query\
                 .filter(ClinicalNotes.admissionNumber==admissionNumber)\
+                .filter(or_(ClinicalNotes.isExam == None, ClinicalNotes.isExam == False))\
                 .filter(or_(
                         ClinicalNotes.date > (datetime.today() - timedelta(days=6)),
                         ClinicalNotes.date == admDate
