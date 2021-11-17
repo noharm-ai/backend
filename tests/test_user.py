@@ -10,7 +10,7 @@ def test_get_reports(client):
     # TODO: Add consulta ao banco de dados e comparar retorno (retornando status 200 porém data = [])
 
     assert response.status_code == 200
-    
+
 def test_get_users(client):
     """Teste get /users/ - Compara quantidade de usuários enviados com dados do banco e valida status_code 200"""
     access_token = get_access(client)
@@ -31,9 +31,9 @@ def test_get_users_permission(client):
 
     assert response.status_code == 401
 
-@pytest.mark.skip(reason="Pendente ajustes! (validar adição e remover usuário adicionado)")
+#@pytest.mark.skip(reason="Pendente ajustes! (validar adição e remover usuário adicionado)")
 def test_put_user(client):
-    """Teste put /user - """
+    """Teste put /editUser - """
 
     access_token = get_access(client)
 
@@ -45,6 +45,6 @@ def test_put_user(client):
         "active": "true"
     }
     
-    response = client.put('/user', data=json.dumps(data), headers=make_headers(access_token))
-    # breakpoint()
+    response = client.put('/editUser', data=json.dumps(data), headers=make_headers(access_token))
+    breakpoint()
     assert response.status_code == 200
