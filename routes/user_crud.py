@@ -22,19 +22,40 @@ def createUser(idUser = None):
     user = User.query.get(get_jwt_identity())
 
     if not user: 
-        return { 'status': 'error', 'message': 'Usuário Inexistente!', 'code': 'errors.invalidRequestUser' }, status.HTTP_400_BAD_REQUEST
+        return { 'status': 'error', 'message': 'Usuário Inexistente!', 'code': 'errors.invalidUser' }, status.HTTP_400_BAD_REQUEST
     
     dbSession.setSchema(user.schema)
 
+    roles = user.config['roles'] if user.config and 'roles' in user.config else []
+    if ('userAdmin' not in roles):
+        return {
+            'status': 'error',
+            'message': 'Usuário não autorizado',
+            'code': 'errors.unauthorizedUser'
+        }, status.HTTP_401_UNAUTHORIZED
+
     if not idUser: 
-        roles = user.config['roles'] if user.config and 'roles' in user.config else []
+    
+        userEmail = data.get('email', None)
+        usuarioEncontrado = User.findByEmail(userEmail)
         
-        if ('userAdmin' not in roles):
+        if usuarioEncontrado != None: 
             return {
                 'status': 'error',
-                'message': 'Usuário não autorizado',
-                'code': 'errors.unauthorizedUser'
-            }, status.HTTP_401_UNAUTHORIZED
+                'message': 'Já existe um usuário com este email!',
+                'code': 'errors.emailExists'
+            }, status.HTTP_400_BAD_REQUEST
+
+       
+        nameFound = User.findByName(data.get('name', None))
+
+        if nameFound != None:
+            return {
+                'status': 'error',
+                'message': 'Ja existe um usuário com este nome!',
+                'code': 'errors.nameExists'
+            }, status.HTTP_400_BAD_REQUEST
+
 
         newUser = User()
         newUser.email = data.get('email', None)
@@ -52,10 +73,40 @@ def createUser(idUser = None):
         return tryCommit(db, newUser.id)
     else:
         updatedUser = User.query.get(idUser)
+
         if (updatedUser is None):
-            return { 'status': 'error', 'message': '!Usuário Inexistente!', 'code': 'errors.invalidUser' }, status.HTTP_400_BAD_REQUEST
+            return { 
+                'status': 'error', 'message': '!Usuário Inexistente!', 'code': 'errors.invalidUser'
+            }, status.HTTP_400_BAD_REQUEST
     
-        changeEmail = updatedUser.email == data.get('email', None)
+        changeEmail = updatedUser.email != data.get('email', None)
+
+        if changeEmail:
+            userEmail = data.get('email', None)
+            usuarioEncontrado = User.findByEmail(userEmail)
+    
+            if usuarioEncontrado != None: 
+                return {
+                    'status': 'error',
+                    'message': 'Já existe um usuário com este email!',
+                    'code': 'errors.emailExists'
+                }, status.HTTP_400_BAD_REQUEST
+
+
+        changeName = updatedUser.name != data.get('name', None)
+
+        if changeName:
+            usuarioEncontrado = User.findByName(data.get('name', None))
+    
+            if usuarioEncontrado != None: 
+                return {
+                    'status': 'error',
+                    'message': 'Já existe um usuário com este nome!',
+                    'code': 'errors.nameExists'
+                }, status.HTTP_400_BAD_REQUEST
+
+
+
         updatedUser.email = data.get('email', None)
         updatedUser.name = data.get('name', None)
         updatedUser.external = data.get('external', None)
