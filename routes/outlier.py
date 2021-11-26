@@ -324,3 +324,75 @@ def setDrugUnit(idDrug, idMeasureUnit):
     if new: db.session.add(u)
 
     return tryCommit(db, idMeasureUnit)
+
+@app_out.route('/drugs/summary/<int:idSegment>/<int:idDrug>', methods=['GET'])
+@jwt_required()
+def getDrugSummary(idDrug, idSegment):
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+
+    u = db.aliased(MeasureUnit)
+    agg = db.aliased(PrescriptionAgg)
+    p = db.aliased(Prescription)
+    pd = db.aliased(PrescriptionDrug)
+    f = db.aliased(Frequency)
+
+    units = db.session\
+      .query(u.id, u.description, func.sum(func.coalesce(agg.countNum, 0)).label('count'))\
+      .select_from(u)\
+      .outerjoin(agg, and_(agg.idMeasureUnit == u.id, agg.idDrug == idDrug, agg.idSegment == idSegment))\
+      .filter(agg.idSegment == idSegment)\
+      .group_by(u.id, u.description, agg.idMeasureUnit)\
+      .order_by(asc(u.description))\
+      .all()
+
+    unitResults = []
+    for u in units:
+      unitResults.append({
+        'id': u.id,
+        'description': u.description,
+        'amount': u.count
+      })
+
+    frequencies = db.session\
+      .query(f.id, f.description, func.sum(func.coalesce(agg.countNum, 0)).label('count'))\
+      .select_from(f)\
+      .outerjoin(agg, and_(agg.idFrequency == f.id, agg.idDrug == idDrug, agg.idSegment == idSegment))\
+      .filter(agg.idSegment == idSegment)\
+      .group_by(f.id, f.description, agg.idMeasureUnit)\
+      .order_by(asc(f.description))\
+      .all()
+
+    frequencyResults = []
+    for f in frequencies:
+      frequencyResults.append({
+        'id': f.id,
+        'description': f.description,
+        'amount': f.count
+      })
+
+    routes = db.session\
+      .query(pd.route)\
+      .select_from(pd)\
+      .join(p, p.id == pd.idPrescription)\
+      .filter(and_(pd.idDrug == idDrug, pd.idSegment == idSegment, p.date > func.current_date() - 1000))\
+      .group_by(pd.route)\
+      .all()
+
+    routeResults = []
+    for r in routes:
+      routeResults.append({
+        'id': r.route,
+        'description': r.route
+      })
+
+    results = {
+      'units': unitResults,
+      'frequencies': frequencyResults,
+      'routes': routeResults
+    }
+
+    return {
+        'status': 'success',
+        'data': results
+    }, status.HTTP_200_OK
