@@ -331,11 +331,14 @@ def getDrugSummary(idDrug, idSegment):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
 
+    d = db.aliased(Drug)
     u = db.aliased(MeasureUnit)
     agg = db.aliased(PrescriptionAgg)
     p = db.aliased(Prescription)
     pd = db.aliased(PrescriptionDrug)
     f = db.aliased(Frequency)
+
+    drug = Drug.query.get(idDrug)
 
     units = db.session\
       .query(u.id, u.description, func.sum(func.coalesce(agg.countNum, 0)).label('count'))\
@@ -387,6 +390,10 @@ def getDrugSummary(idDrug, idSegment):
       })
 
     results = {
+      'drug': {
+        'id': drug.id,
+        'name': drug.name
+      },
       'units': unitResults,
       'frequencies': frequencyResults,
       'routes': routeResults
