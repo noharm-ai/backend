@@ -192,12 +192,13 @@ def getCodes():
     }, status.HTTP_200_OK
 
 
-@app_seg.route('/segments/<int:idSegment>/exams/<string:typeExam>', methods=['PUT'])
+@app_seg.route('/segments/<int:idSegment>/exams', methods=['PUT'])
 @jwt_required()
-def setExams(idSegment, typeExam):
+def setExams(idSegment):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
     data = request.get_json()
+    typeExam = data.get('type', None)
 
     segExam = SegmentExam.query.get((idSegment,typeExam))
 
