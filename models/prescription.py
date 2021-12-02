@@ -491,8 +491,8 @@ class Intervention(db.Model):
             .outerjoin(Prescription, Intervention.idPrescription == Prescription.id)\
             .outerjoin(PrescriptionB, PrescriptionDrug.idPrescription == PrescriptionB.id)\
             .outerjoin(Drug, Drug.id == PrescriptionDrug.idDrug)\
-            .outerjoin(MeasureUnit, and_(MeasureUnit.id == PrescriptionDrug.idMeasureUnit, MeasureUnit.idHospital == Prescription.idHospital))\
-            .outerjoin(Frequency, and_(Frequency.id == PrescriptionDrug.idFrequency, Frequency.idHospital == Prescription.idHospital))\
+            .outerjoin(MeasureUnit, and_(MeasureUnit.id == PrescriptionDrug.idMeasureUnit, MeasureUnit.idHospital == PrescriptionB.idHospital))\
+            .outerjoin(Frequency, and_(Frequency.id == PrescriptionDrug.idFrequency, Frequency.idHospital == PrescriptionB.idHospital))\
             .outerjoin(User, User.id == Intervention.user)\
             .outerjoin(Department, and_(Department.id == PrescriptionB.idDepartment, Department.idHospital == PrescriptionB.idHospital))\
             .outerjoin(DepartmentB, and_(DepartmentB.id == Prescription.idDepartment, DepartmentB.idHospital == Prescription.idHospital))
@@ -504,7 +504,7 @@ class Intervention(db.Model):
                                      .order_by(desc(Intervention.date))
 
         interventions = interventions.limit(1500).all()
-
+        
         intervBuffer = []
         for i in interventions:
             intervBuffer.append({

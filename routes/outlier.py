@@ -362,7 +362,7 @@ def getDrugSummary(idDrug, idSegment):
       .select_from(f)\
       .outerjoin(agg, and_(agg.idFrequency == f.id, agg.idDrug == idDrug, agg.idSegment == idSegment))\
       .filter(agg.idSegment == idSegment)\
-      .group_by(f.id, f.description, agg.idMeasureUnit)\
+      .group_by(f.id, f.description, agg.idFrequency)\
       .order_by(asc(f.description))\
       .all()
 
