@@ -57,4 +57,5 @@ jobs:
           source venv/bin/activate
           python -m pip install --upgrade pip
           pip install -r requirements-prod.txt
-          zappa update homolog -q
+      - name: Deploy Zappa
+        run: zappa update homolog -q

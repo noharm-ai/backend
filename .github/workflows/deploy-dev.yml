@@ -51,10 +51,11 @@ jobs:
           aws_access_key_id = ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_access_key = ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           region = sa-east-1" > ~/.aws/credentials 
-      - name: Deploy Zappa
+      - name: Config Zappa
         run: |
           python -m venv venv
           source venv/bin/activate
           python -m pip install --upgrade pip
           pip install -r requirements-prod.txt
-          zappa update dev
+      - name: Deploy Zappa
+        run: zappa update dev -q
