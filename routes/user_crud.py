@@ -5,12 +5,13 @@ from models.appendix import *
 from flask import Blueprint, request, render_template
 from flask_jwt_extended import (jwt_required, get_jwt_identity)
 from flask_jwt_extended import create_access_token, decode_token
-from .utils import tryCommit
+from .utils import tryCommit, sendEmail
 from datetime import datetime, timedelta
 from sqlalchemy import func
 from flask import render_template
-from flask_mail import Message
 from config import Config
+from flask_mail import Message, Mail
+
 
 app_user_crud = Blueprint('app_user_crud',__name__)
 
@@ -37,19 +38,19 @@ def createUser(idUser = None):
     if not idUser: 
     
         userEmail = data.get('email', None)
-        usuarioEncontrado = User.findByEmail(userEmail)
+        userNotFound = User.findByEmail(userEmail)
         
-        if usuarioEncontrado != None: 
+        if userNotFound != None: 
             return {
                 'status': 'error',
                 'message': 'Já existe um usuário com este email!',
                 'code': 'errors.emailExists'
             }, status.HTTP_400_BAD_REQUEST
 
-       
-        nameFound = User.findByName(data.get('name', None))
+        userName = data.get('name', None)
+        userByName = User.findByName(userName)
 
-        if nameFound != None:
+        if userByName != None:
             return {
                 'status': 'error',
                 'message': 'Ja existe um usuário com este nome!',
@@ -58,19 +59,32 @@ def createUser(idUser = None):
 
 
         newUser = User()
-        newUser.email = data.get('email', None)
-        newUser.name = data.get('name', None)
+        newUser.email = userEmail
+        newUser.name = userName
         newUser.external = data.get('external', None)
         newUser.active =  bool(data.get('active', True))
         newUser.schema = user.schema
         pwo = PasswordGenerator()
         pwo.minlen = 6
-        pwo.maxlen = 16 
-        newUser.password = func.crypt(pwo.generate(), func.gen_salt('bf',8))
+        pwo.maxlen = 16
+        password = pwo.generate()
+        newUser.password = func.crypt(password, func.gen_salt('bf', 8))
         newUser.config = '{ }'
         db.session.add(newUser)
         db.session.flush()
-        return tryCommit(db, newUser.id)
+
+        response, rstatus = tryCommit(db, newUser.id)
+        print("!!!!RESPOSTA!!!!",rstatus)
+
+        if rstatus == status.HTTP_200_OK:
+            sendEmail(
+                "Boas-vindas noHarm: Credenciais",
+                Config.MAIL_SENDER,
+                [userEmail],
+                render_template('new_user.html', user= userName, email= userEmail, password=password , host=Config.MAIL_HOST)
+            )
+
+        return response
     else:
         updatedUser = User.query.get(idUser)
 
@@ -79,26 +93,11 @@ def createUser(idUser = None):
                 'status': 'error', 'message': '!Usuário Inexistente!', 'code': 'errors.invalidUser'
             }, status.HTTP_400_BAD_REQUEST
     
-        changeEmail = updatedUser.email != data.get('email', None)
 
-        if changeEmail:
-            userEmail = data.get('email', None)
-            usuarioEncontrado = User.findByEmail(userEmail)
+        if updatedUser.name != data.get('name', None):
+            userFound = User.findByName(data.get('name', None))
     
-            if usuarioEncontrado != None: 
-                return {
-                    'status': 'error',
-                    'message': 'Já existe um usuário com este email!',
-                    'code': 'errors.emailExists'
-                }, status.HTTP_400_BAD_REQUEST
-
-
-        changeName = updatedUser.name != data.get('name', None)
-
-        if changeName:
-            usuarioEncontrado = User.findByName(data.get('name', None))
-    
-            if usuarioEncontrado != None: 
+            if userFound != None: 
                 return {
                     'status': 'error',
                     'message': 'Já existe um usuário com este nome!',
@@ -106,42 +105,14 @@ def createUser(idUser = None):
                 }, status.HTTP_400_BAD_REQUEST
 
 
-
-        updatedUser.email = data.get('email', None)
         updatedUser.name = data.get('name', None)
         updatedUser.external = data.get('external', None)
         updatedUser.active =  bool(data.get('active', True))
         
         db.session.add(updatedUser)
         db.session.flush()
-
-        # if changeEmail: 
-
-        #     expires = timedelta(hours=24)
-        #     reset_token = create_access_token(identity=updatedUser.id, expires_delta=expires)
-            
-        #     msg = Message()
-        #     msg.subject = "NoHarm: Alteração de email"
-        #     msg.sender = Config.MAIL_SENDER
-        #     msg.recipients = [updatedUser.email]
-        #     msg.html = render_template('reset_email.html', user=updatedUser.name, token=reset_token, host=Config.MAIL_HOST)
-        #     mail.send(msg)
         
-        # db.session.query(User)\
-        #     .filter(User.id == idUser)\
-        #     .update(update, synchronize_session='fetch')
-
-        # if 'password' in data.keys(): password = data.get('password', None)
-        # if 'newpassword' in data.keys(): newpassword = data.get('newpassword', None)
-        # user = User.authenticate(user.email, password)
-        # if not user or not newpassword: 
-        #     return { 'status': 'error', 'message': 'Usuário Inexistente!' }, status.HTTP_400_BAD_REQUEST
-        # update = {'password': func.crypt(newpassword, func.gen_salt('bf',8)) }
-        # db.session.query(User)\
-        #         .filter(User.id == user.id)\
-        #         .update(update, synchronize_session='fetch')
-
-    return tryCommit(db, updatedUser.id)
+        return tryCommit(db, updatedUser.id)
 
 @app_user_crud.route('/users', methods=['GET'])
 @jwt_required()

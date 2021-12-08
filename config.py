@@ -12,4 +12,5 @@ class Config:
     JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=int(getenv("JWT_REFRESH_TOKEN_EXPIRES", 30)))
     MAIL_USERNAME = "user@gmail.com"
     MAIL_PASSWORD = "password"
-    MAIL_SENDER = "user@gmail.com"
+    MAIL_SENDER = "gabriel@lanceiros.com"
+    MAIL_HOST = "http://localhost:3000"
