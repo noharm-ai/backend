@@ -18,7 +18,6 @@ from routes.memory import app_mem
 from routes.patient import app_pat
 from routes.user import app_usr
 from routes.notes import app_note
-from routes.user_crud import app_user_crud
 import os
 
 os.environ['TZ'] = 'America/Sao_Paulo'
@@ -30,11 +29,11 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = { "pool_recycle" : 500, "pool_pre_ping
 app.config['JWT_SECRET_KEY'] = Config.SECRET_KEY
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = Config.JWT_ACCESS_TOKEN_EXPIRES
 app.config['JWT_REFRESH_TOKEN_EXPIRES'] = Config.JWT_REFRESH_TOKEN_EXPIRES
-app.config['MAIL_SERVER'] = 'mail.smtpbucket.com'
-app.config['MAIL_PORT'] = 8025
-app.config['MAIL_USE_SSL'] = False
-#app.config['MAIL_USERNAME'] = Config.MAIL_USERNAME
-#app.config['MAIL_PASSWORD'] = Config.MAIL_PASSWORD
+app.config['MAIL_SERVER'] = 'email-smtp.sa-east-1.amazonaws.com'
+app.config['MAIL_PORT'] = 465
+app.config['MAIL_USE_SSL'] = True
+app.config['MAIL_USERNAME'] = Config.MAIL_USERNAME
+app.config['MAIL_PASSWORD'] = Config.MAIL_PASSWORD
 
 jwt = JWTManager(app)
 db.init_app(app)
@@ -52,7 +51,6 @@ app.register_blueprint(app_mem)
 app.register_blueprint(app_pat)
 app.register_blueprint(app_usr)
 app.register_blueprint(app_note)
-app.register_blueprint(app_user_crud)
 
 CORS(app)
 

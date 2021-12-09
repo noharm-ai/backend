@@ -1,16 +1,12 @@
-from sqlalchemy.sql.expression import update
 from password_generator import PasswordGenerator
 from models.main import *
 from models.appendix import *
 from flask import Blueprint, request, render_template
 from flask_jwt_extended import (jwt_required, get_jwt_identity)
-from flask_jwt_extended import create_access_token, decode_token
 from .utils import tryCommit, sendEmail
-from datetime import datetime, timedelta
 from sqlalchemy import func
 from flask import render_template
 from config import Config
-from flask_mail import Message, Mail
 
 
 app_user_crud = Blueprint('app_user_crud',__name__)
@@ -38,9 +34,9 @@ def createUser(idUser = None):
     if not idUser: 
     
         userEmail = data.get('email', None)
-        userNotFound = User.findByEmail(userEmail)
+        emailExists = User.findByEmail(userEmail) != None
         
-        if userNotFound != None: 
+        if emailExists : 
             return {
                 'status': 'error',
                 'message': 'Já existe um usuário com este email!',
@@ -48,9 +44,9 @@ def createUser(idUser = None):
             }, status.HTTP_400_BAD_REQUEST
 
         userName = data.get('name', None)
-        userByName = User.findByName(userName)
+        nameExists = User.findByName(userName) != None
 
-        if userByName != None:
+        if nameExists :
             return {
                 'status': 'error',
                 'message': 'Ja existe um usuário com este nome!',
@@ -74,11 +70,10 @@ def createUser(idUser = None):
         db.session.flush()
 
         response, rstatus = tryCommit(db, newUser.id)
-        print("!!!!RESPOSTA!!!!",rstatus)
 
         if rstatus == status.HTTP_200_OK:
             sendEmail(
-                "Boas-vindas noHarm: Credenciais",
+                "Boas-vindas NoHarm: Credenciais",
                 Config.MAIL_SENDER,
                 [userEmail],
                 render_template('new_user.html', user= userName, email= userEmail, password=password , host=Config.MAIL_HOST)
@@ -95,9 +90,9 @@ def createUser(idUser = None):
     
 
         if updatedUser.name != data.get('name', None):
-            userFound = User.findByName(data.get('name', None))
+            userFound = User.findByName(data.get('name', None)) != None
     
-            if userFound != None: 
+            if userFound : 
                 return {
                     'status': 'error',
                     'message': 'Já existe um usuário com este nome!',
