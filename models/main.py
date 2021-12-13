@@ -45,9 +45,6 @@ class User(db.Model):
     def findByEmail (email):
         return User.query.filter_by(email=email).first()
 
-    def findByName (name):
-        return User.query.filter_by(name=name).first()
-
 class Substance(db.Model):
     __tablename__ = 'substancia'
     __table_args__ = {'schema':'public'}

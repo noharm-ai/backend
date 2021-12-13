@@ -34,6 +34,8 @@ def createUser(idUser = None):
     if not idUser: 
     
         userEmail = data.get('email', None)
+        userName = data.get('name', None)
+
         emailExists = User.findByEmail(userEmail) != None
         
         if emailExists : 
@@ -42,17 +44,6 @@ def createUser(idUser = None):
                 'message': 'Já existe um usuário com este email!',
                 'code': 'errors.emailExists'
             }, status.HTTP_400_BAD_REQUEST
-
-        userName = data.get('name', None)
-        nameExists = User.findByName(userName) != None
-
-        if nameExists :
-            return {
-                'status': 'error',
-                'message': 'Ja existe um usuário com este nome!',
-                'code': 'errors.nameExists'
-            }, status.HTTP_400_BAD_REQUEST
-
 
         newUser = User()
         newUser.email = userEmail
@@ -68,7 +59,6 @@ def createUser(idUser = None):
         newUser.config = '{ }'
         db.session.add(newUser)
         db.session.flush()
-
         response, rstatus = tryCommit(db, newUser.id)
 
         if rstatus == status.HTTP_200_OK:
@@ -87,18 +77,13 @@ def createUser(idUser = None):
             return { 
                 'status': 'error', 'message': '!Usuário Inexistente!', 'code': 'errors.invalidUser'
             }, status.HTTP_400_BAD_REQUEST
-    
-
-        if updatedUser.name != data.get('name', None):
-            userFound = User.findByName(data.get('name', None)) != None
-    
-            if userFound : 
-                return {
-                    'status': 'error',
-                    'message': 'Já existe um usuário com este nome!',
-                    'code': 'errors.nameExists'
-                }, status.HTTP_400_BAD_REQUEST
-
+        
+        if (updatedUser.schema != user.schema):
+            return {
+                'status': 'error',
+                'message': 'Usuário não autorizado',
+                'code': 'errors.unauthorizedUser'
+            }, status.HTTP_401_UNAUTHORIZED
 
         updatedUser.name = data.get('name', None)
         updatedUser.external = data.get('external', None)
