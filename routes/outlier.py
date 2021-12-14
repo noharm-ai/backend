@@ -389,6 +389,25 @@ def getDrugSummary(idDrug, idSegment):
         'description': r.route
       })
 
+    intervals = db.session\
+      .query(pd.interval)\
+      .select_from(pd)\
+      .join(p, p.id == pd.idPrescription)\
+      .filter(and_(\
+        pd.idDrug == idDrug, pd.idSegment == idSegment,\
+        p.date > func.current_date() - 1000,\
+        pd.interval != None\
+      ))\
+      .group_by(pd.interval)\
+      .all()
+
+    intervalResults = []
+    for i in intervals:
+      intervalResults.append({
+        'id': i.interval,
+        'description': timeValue(i.interval)
+      })
+
     results = {
       'drug': {
         'id': drug.id,
@@ -396,7 +415,8 @@ def getDrugSummary(idDrug, idSegment):
       },
       'units': unitResults,
       'frequencies': frequencyResults,
-      'routes': routeResults
+      'routes': routeResults,
+      'intervals': intervalResults
     }
 
     return {
