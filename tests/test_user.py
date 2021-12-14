@@ -17,7 +17,7 @@ def test_get_users(client):
 
     response = client.get('/users', headers=make_headers(access_token))
     data = json.loads(response.data)
-    user = session.query(User).filter_by(email = 'noadmin')
+    user = session.query(User).filter_by(email = 'noadmin') # Filtrar pelo usuario que fez login 'get_access'
     qtdUsers = session.query(User).filter(User.schema == user[0].schema).count()
 
     assert response.status_code == 200
@@ -34,7 +34,6 @@ def test_get_users_permission(client):
 #@pytest.mark.skip(reason="Pendente ajustes! (validar adição e remover usuário adicionado)")
 def test_put_user(client):
     """Teste put /editUser - """
-
     access_token = get_access(client)
 
     data = {
@@ -46,5 +45,5 @@ def test_put_user(client):
     }
     
     response = client.put('/editUser', data=json.dumps(data), headers=make_headers(access_token))
-    breakpoint()
+    #breakpoint()
     assert response.status_code == 200
