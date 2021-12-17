@@ -66,7 +66,7 @@ def get_access(client, email='demo', password='demo', roles = ["suporte"]):
 
 def update_roles(email, roles):
 
-    user = session.query(User).filter_by(email = email)
+    user = session.query(User).filter_by(email = email).first()
     if user != None:
         user.config = {"roles":roles}
         session_commit()
