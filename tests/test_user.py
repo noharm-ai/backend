@@ -6,6 +6,12 @@ import time
 
 from routes.utils import tryCommit
 
+def delete_user(key):
+    user = session.query(User).get(key)
+    if user:
+        session.delete(user)
+        session_commit()
+
 def test_get_reports(client):
     """Teste get /reports/ - Valida status_code 200"""
     access_token = get_access(client)
@@ -81,3 +87,5 @@ def test_put_editUser(client):
     assert data["name"] == userEdited.name
     assert data["external"] == userEdited.external
     assert data["active"] ==  userEdited.active
+
+    delete_memory("test@noharm.ai")
