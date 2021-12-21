@@ -88,4 +88,4 @@ def test_put_editUser(client):
     assert data["external"] == userEdited.external
     assert data["active"] ==  userEdited.active
 
-    delete_memory("test@noharm.ai")
+    delete_user("test@noharm.ai")
