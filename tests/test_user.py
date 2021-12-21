@@ -6,8 +6,8 @@ import time
 
 from routes.utils import tryCommit
 
-def delete_user(key):
-    user = session.query(User).get(key)
+def delete_user(email):
+    user = session.query(User).filter(User.email == email).first()
     if user:
         session.delete(user)
         session_commit()
