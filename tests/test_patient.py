@@ -18,7 +18,7 @@ def test_post_patient_permission(client):
 def test_post_patient(client):
     """Teste post /patient/admission - Compara dados enviados com dados salvos no banco e valida status_code 200"""
     
-    access_token = get_access(client, 'noadmin', 'noadmin')
+    access_token = get_access(client, roles = [])
 
     admission = '5'
     data = {
@@ -29,7 +29,6 @@ def test_post_patient(client):
     response = client.post(url, data=json.dumps(data), headers=make_headers(access_token))
     responseData = json.loads(response.data)['data']
     patient = session.query(Patient).get(admission)
-
     assert response.status_code == 200
     assert data['height'] == str(patient.height)
     assert admission == str(responseData)
@@ -37,7 +36,7 @@ def test_post_patient(client):
 def test_get_notes_by_idAdmission(client):
     """Teste get /notes/idAdmission - Valida status_code 200"""
 
-    access_token = get_access(client, 'noadmin', 'noadmin')
+    access_token = get_access(client)
 
     idAdmission = '5'
 

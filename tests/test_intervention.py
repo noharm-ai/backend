@@ -30,7 +30,7 @@ def test_get_interventions_by_reason(client):
 def test_put_interventions(client):
     """Teste put /intervention - Compara dados enviados com dados salvos no banco e valida status_code 200"""
 
-    access_token = get_access(client, 'noadmin', 'noadmin')
+    access_token = get_access(client, roles = [] )
 
     idPrescriptionDrug = '99'
     data = {
@@ -60,7 +60,7 @@ def test_put_interventions(client):
 def test_put_interventions_permission(client):
     """Teste put /intervention - Deve retornar erro [401 UNAUTHORIZED] devido ao usuário utilizado"""
 
-    access_token = get_access(client)
+    access_token = get_access(client, roles = ["suporte"])
 
     idPrescriptionDrug = '20'
     data = {
@@ -70,8 +70,9 @@ def test_put_interventions_permission(client):
     url = 'intervention/' + idPrescriptionDrug
     
     response = client.put(url, data=json.dumps(data), headers=make_headers(access_token))
+    print("ESTOU AQUI", response.data)
     assert response.status_code == 401
-
+    
 
 
 

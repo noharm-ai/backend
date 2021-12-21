@@ -3,6 +3,7 @@ from mobile import app
 from models.main import User
 from unittest.mock import patch
 from flask_jwt_extended import (create_access_token)
+from models.appendix import Memory
 
 import sys
 sys.path.append('..')
@@ -43,7 +44,7 @@ def client():
     client = app.test_client()
     yield client
 
-def get_access(client, email='demo', password='demo'):
+def get_access(client, email='demo', password='demo', roles = ["suporte"]):
     mimetype = 'application/json'
     headers = {
         'Content-Type': mimetype,
@@ -54,12 +55,33 @@ def get_access(client, email='demo', password='demo'):
         "password": password
     }
     url = '/authenticate'
+    
+    update_roles(email, roles)
 
     response = client.post(url, data=json.dumps(data), headers=headers)
     my_json = response.data.decode('utf8').replace("'", '"')
     data_response = json.loads(my_json)
     access_token = data_response['access_token']
     return access_token
+
+def update_roles(email, roles):
+
+    user = session.query(User).filter_by(email = email).first()
+    if user != None:
+        user.config = {"roles":roles}
+        session_commit()
+
+    # mem.kind = mem_kind
+    # mem.value = mem_value
+    # mem.update = datetime.today()
+    # mem.user = 0
+    # def delete_memory(key):
+    # memory = session.query(Memory).get(key)
+    # if memory:
+    #     session.delete(memory)
+    #     session_commit()ion_commit()
+    # return mem.key
+
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_makereport(item, call):
