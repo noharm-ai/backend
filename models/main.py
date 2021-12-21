@@ -42,10 +42,6 @@ class User(db.Model):
         roles = self.config['roles'] if self.config and 'roles' in self.config else []
         return ('suporte' not in roles)
 
-    def cpoe(self):
-        roles = self.config['roles'] if self.config and 'roles' in self.config else []
-        return ('cpoe' in roles)
-
 class Substance(db.Model):
     __tablename__ = 'substancia'
     __table_args__ = {'schema':'public'}
