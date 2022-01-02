@@ -2,7 +2,7 @@ from conftest import *
 from models.segment import Segment
 
 def test_get_segments(client):
-    """Teste get /segments/ - Valida status_code 200"""
+    """Teste get /segments/ - Compara quantidade de segmentos enviados com dados do banco e valida status_code 200"""
     access_token = get_access(client)
 
     qtdSegment = session.query(Segment).count()

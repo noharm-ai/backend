@@ -32,14 +32,14 @@ jobs:
           psql -h localhost -U postgres -d noharm -a -f database/noharm-care.sql -v ON_ERROR_STOP=1
           psql -h localhost -U postgres -d noharm -a -f database/noharm-triggers.sql -v ON_ERROR_STOP=1
           psql -h localhost -U postgres -d noharm -a -f database/noharm-insert.sql -v ON_ERROR_STOP=1
-      - name: Run Python Tests
-        run: python -m pytest -v
       - name: Setup Application
         run: |
           python mobile.py &
           sleep 10
       - name: Run Integration Test
         run: ./tests/test_integration.sh
+      - name: Run Python Tests
+        run: python -m pytest -v
       - name: Run Coverage Report
         run: python -m pytest --cov-report xml --cov=.
       - name: Submit Coverage Report

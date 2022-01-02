@@ -60,7 +60,7 @@ def test_get_prescriptions_drug_by_idPrescription_and_period(client):
 def test_put_prescriptions_by_id(client):
     """Teste put /prescriptions/id - Compara dados enviados com dados salvos no banco e valida status_code 200"""
     
-    access_token = get_access(client, 'noadmin', 'noadmin')
+    access_token = get_access(client, roles=[])
 
     idPrescription = '20'
     data = {

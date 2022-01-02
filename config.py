@@ -13,3 +13,4 @@ class Config:
     MAIL_USERNAME = "user@gmail.com"
     MAIL_PASSWORD = "password"
     MAIL_SENDER = "user@gmail.com"
+    MAIL_HOST = "localhost"

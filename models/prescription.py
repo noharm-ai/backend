@@ -456,6 +456,7 @@ class Intervention(db.Model):
     status = db.Column('status', db.String(1), nullable=True)
     update = db.Column("update_at", db.DateTime, nullable=False)
     user = db.Column("update_by", db.Integer, nullable=False)
+    transcription = db.Column("transcricao", postgresql.JSON, nullable=True)
 
     def findAll(admissionNumber=None,userId=None):
         mReasion = db.aliased(InterventionReason)
@@ -490,8 +491,8 @@ class Intervention(db.Model):
             .outerjoin(Prescription, Intervention.idPrescription == Prescription.id)\
             .outerjoin(PrescriptionB, PrescriptionDrug.idPrescription == PrescriptionB.id)\
             .outerjoin(Drug, Drug.id == PrescriptionDrug.idDrug)\
-            .outerjoin(MeasureUnit, and_(MeasureUnit.id == PrescriptionDrug.idMeasureUnit, MeasureUnit.idHospital == Prescription.idHospital))\
-            .outerjoin(Frequency, and_(Frequency.id == PrescriptionDrug.idFrequency, Frequency.idHospital == Prescription.idHospital))\
+            .outerjoin(MeasureUnit, and_(MeasureUnit.id == PrescriptionDrug.idMeasureUnit, MeasureUnit.idHospital == PrescriptionB.idHospital))\
+            .outerjoin(Frequency, and_(Frequency.id == PrescriptionDrug.idFrequency, Frequency.idHospital == PrescriptionB.idHospital))\
             .outerjoin(User, User.id == Intervention.user)\
             .outerjoin(Department, and_(Department.id == PrescriptionB.idDepartment, Department.idHospital == PrescriptionB.idHospital))\
             .outerjoin(DepartmentB, and_(DepartmentB.id == Prescription.idDepartment, DepartmentB.idHospital == Prescription.idHospital))
@@ -503,7 +504,7 @@ class Intervention(db.Model):
                                      .order_by(desc(Intervention.date))
 
         interventions = interventions.limit(1500).all()
-
+        
         intervBuffer = []
         for i in interventions:
             intervBuffer.append({
@@ -531,7 +532,8 @@ class Intervention(db.Model):
                 'user': i[8],
                 'department': i[9] if i[9] else i[11],
                 'prescriber': i[10] if i[10] else i[7].prescriber if i[7] else None,
-                'status': i[0].status
+                'status': i[0].status,
+                'transcription':i[0].transcription
             })
 
         result = [i for i in intervBuffer if i['status'] == 's']

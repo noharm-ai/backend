@@ -13,3 +13,4 @@ networkx
 numpy
 sklearn
 flask-mail
+random-password-generator

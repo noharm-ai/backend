@@ -2,6 +2,7 @@ from flask_api import status
 from datetime import date, datetime, timedelta
 import unicodedata, copy, re
 import logging
+from flask_mail import Message, Mail
 
 def data2age(birthdate):
     if birthdate is None: return ''
@@ -318,3 +319,14 @@ def getFeatures(result):
         'complication': complicationCount,
         'drugIDs': list(set(drugIDs))
     }
+
+def sendEmail(subject, sender, emails, html) : 
+    try : 
+        msg = Message()
+        mail = Mail()
+        msg.subject = subject
+        msg.sender = sender
+        msg.recipients = emails
+        msg.html = html
+        mail.send(msg)
+    except : print('Erro ao enviar email') 

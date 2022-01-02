@@ -324,3 +324,103 @@ def setDrugUnit(idDrug, idMeasureUnit):
     if new: db.session.add(u)
 
     return tryCommit(db, idMeasureUnit)
+
+@app_out.route('/drugs/summary/<int:idSegment>/<int:idDrug>', methods=['GET'])
+@jwt_required()
+def getDrugSummary(idDrug, idSegment):
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+    maxDays = 60
+
+    d = db.aliased(Drug)
+    u = db.aliased(MeasureUnit)
+    agg = db.aliased(PrescriptionAgg)
+    p = db.aliased(Prescription)
+    pd = db.aliased(PrescriptionDrug)
+    f = db.aliased(Frequency)
+
+    drug = Drug.query.get(idDrug)
+
+    units = db.session\
+      .query(u.id, u.description, func.sum(func.coalesce(agg.countNum, 0)).label('count'))\
+      .select_from(u)\
+      .outerjoin(agg, and_(agg.idMeasureUnit == u.id, agg.idDrug == idDrug, agg.idSegment == idSegment))\
+      .filter(agg.idSegment == idSegment)\
+      .group_by(u.id, u.description, agg.idMeasureUnit)\
+      .order_by(asc(u.description))\
+      .all()
+
+    unitResults = []
+    for u in units:
+      unitResults.append({
+        'id': u.id,
+        'description': u.description,
+        'amount': u.count
+      })
+
+    frequencies = db.session\
+      .query(f.id, f.description, func.sum(func.coalesce(agg.countNum, 0)).label('count'))\
+      .select_from(f)\
+      .outerjoin(agg, and_(agg.idFrequency == f.id, agg.idDrug == idDrug, agg.idSegment == idSegment))\
+      .filter(agg.idSegment == idSegment)\
+      .group_by(f.id, f.description, agg.idFrequency)\
+      .order_by(asc(f.description))\
+      .all()
+
+    frequencyResults = []
+    for f in frequencies:
+      frequencyResults.append({
+        'id': f.id,
+        'description': f.description,
+        'amount': f.count
+      })
+
+    routes = db.session\
+      .query(pd.route)\
+      .select_from(pd)\
+      .join(p, p.id == pd.idPrescription)\
+      .filter(and_(pd.idDrug == idDrug, pd.idSegment == idSegment, p.date > func.current_date() - maxDays))\
+      .group_by(pd.route)\
+      .all()
+
+    routeResults = []
+    for r in routes:
+      routeResults.append({
+        'id': r.route,
+        'description': r.route
+      })
+
+    intervals = db.session\
+      .query(pd.interval)\
+      .select_from(pd)\
+      .join(p, p.id == pd.idPrescription)\
+      .filter(and_(\
+        pd.idDrug == idDrug, pd.idSegment == idSegment,\
+        p.date > func.current_date() - maxDays,\
+        pd.interval != None\
+      ))\
+      .group_by(pd.interval)\
+      .all()
+
+    intervalResults = []
+    for i in intervals:
+      intervalResults.append({
+        'id': i.interval,
+        'description': timeValue(i.interval)
+      })
+
+    results = {
+      'drug': {
+        'id': drug.id,
+        'name': drug.name
+      },
+      'units': unitResults,
+      'frequencies': frequencyResults,
+      'routes': routeResults,
+      'intervals': intervalResults
+    }
+
+    return {
+        'status': 'success',
+        'data': results
+    }, status.HTTP_200_OK

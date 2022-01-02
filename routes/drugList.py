@@ -176,6 +176,7 @@ class DrugList():
                 'dayFrequency': pd[0].frequency,
                 'doseconv': pd[0].doseconv,
                 'time': timeValue(pd[0].interval),
+                'interval': pd[0].interval,
                 'recommendation': pd[0].notes if pd[0].notes and len(pd[0].notes.strip()) > 0 else None,
                 'period': str(pd[0].period) + 'D' if pd[0].period else '',
                 'periodDates': [],

@@ -46,6 +46,9 @@ class User(db.Model):
         roles = self.config['roles'] if self.config and 'roles' in self.config else []
         return ('cpoe' in roles)
 
+    def findByEmail (email):
+        return User.query.filter_by(email=email).first()
+
 class Substance(db.Model):
     __tablename__ = 'substancia'
     __table_args__ = {'schema':'public'}
