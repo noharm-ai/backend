@@ -234,7 +234,9 @@ class DrugList():
 
         return result
 
-    def concilia(self, pDrugs):
+    # troca nome do medicamento do paciente
+    @staticmethod
+    def changeDrugName(pDrugs):
         result = []
         for p in pDrugs:
             if p['idDrug'] == 0:
@@ -243,7 +245,8 @@ class DrugList():
         
         return result
 
-    def conciliaList(self, pDrugs, result = []):
+    @staticmethod
+    def conciliaList(pDrugs, result = []):
         for pd in pDrugs:
             existsDrug = next((d for d in result if d['idDrug'] == pd[0].idDrug), False)
             if not existsDrug:
