@@ -229,6 +229,7 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None, idS
             'concilia': prescription[0].concilia,
             'conciliaList': conciliaList,
             'admissionNumber': prescription[0].admissionNumber,
+            'admissionDate': patient.admissionDate.isoformat() if patient.admissionDate else None,
             'birthdate': patient.birthdate.isoformat() if patient.birthdate else None,
             'gender': patient.gender,
             'height': patient.height,
