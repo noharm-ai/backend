@@ -56,7 +56,25 @@ def createUser(idUser = None):
         pwo.maxlen = 16
         password = pwo.generate()
         newUser.password = func.crypt(password, func.gen_salt('bf', 8))
-        newUser.config = '{ }'
+
+        if ('admin' in roles):
+          newUser.config = {
+              'roles': data.get('roles', [])
+          }
+        else:
+          newUserRoles = roles.copy()
+          #remove administration roles
+          try:
+            newUserRoles.remove('userAdmin')
+            newUserRoles.remove('admin')
+            newUserRoles.remove("suporte")
+          except ValueError:
+            pass
+
+          newUser.config = {
+              'roles': newUserRoles
+          }
+
         db.session.add(newUser)
         db.session.flush()
         response, rstatus = tryCommit(db, newUser.id)
@@ -88,6 +106,16 @@ def createUser(idUser = None):
         updatedUser.name = data.get('name', None)
         updatedUser.external = data.get('external', None)
         updatedUser.active =  bool(data.get('active', True))
+
+        if ('admin' in roles):
+          if updatedUser.config is None:
+            updatedUser.config = {
+              'roles': data.get('roles', [])
+            }
+          else:
+            newConfig = updatedUser.config.copy()
+            newConfig['roles'] = data.get('roles', [])
+            updatedUser.config = newConfig
         
         db.session.add(updatedUser)
         db.session.flush()
@@ -118,7 +146,8 @@ def getUsers():
             'external': u.external,
             'name': u.name,
             'email': u.email,
-            'active': u.active
+            'active': u.active,
+            'roles': u.config['roles'] if u.config and 'roles' in u.config else []
         })
 
     return {

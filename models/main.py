@@ -26,6 +26,7 @@ class User(db.Model):
     config = db.Column("config", postgresql.JSON, nullable=False)
     external = db.Column("fkusuario", db.String, nullable=False)
     active = db.Column("ativo", db.Boolean, nullable=True)
+    config = db.Column("config", postgresql.JSON, nullable=True)
 
     def find(id):
         user = User()
