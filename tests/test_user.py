@@ -28,7 +28,7 @@ def test_get_users(client):
 
     response = client.get('/users', headers=make_headers(access_token))
     data = json.loads(response.data)
-    qtdUsers = session.query(User).filter(User.schema == "demo").count()
+    qtdUsers = session.query(User).filter(User.schema == "demo").filter(~User.config['roles'].astext.contains('suporte')).count()
 
     assert response.status_code == 200
     assert len(data["data"]) == qtdUsers
