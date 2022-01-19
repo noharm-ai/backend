@@ -330,7 +330,7 @@ def setDrugUnit(idDrug, idMeasureUnit):
 def getDrugSummary(idDrug, idSegment):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
-    maxDays = 60
+    maxDays = 90
 
     d = db.aliased(Drug)
     u = db.aliased(MeasureUnit)
@@ -391,7 +391,7 @@ def getDrugSummary(idDrug, idSegment):
       })
 
     intervals = db.session\
-      .query(pd.interval)\
+      .query(pd.interval, pd.idFrequency)\
       .select_from(pd)\
       .join(p, p.id == pd.idPrescription)\
       .filter(and_(\
@@ -399,13 +399,14 @@ def getDrugSummary(idDrug, idSegment):
         p.date > func.current_date() - maxDays,\
         pd.interval != None\
       ))\
-      .group_by(pd.interval)\
+      .group_by(pd.interval, pd.idFrequency)\
       .all()
 
     intervalResults = []
     for i in intervals:
       intervalResults.append({
         'id': i.interval,
+        'idFrequency': i.idFrequency,
         'description': timeValue(i.interval)
       })
 
