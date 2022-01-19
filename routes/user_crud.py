@@ -137,7 +137,11 @@ def getUsers():
             'code': 'errors.unauthorizedUser',
         }, status.HTTP_401_UNAUTHORIZED
 
-    users = User.query.filter_by(schema=user.schema).all()
+    users = User.query\
+            .filter(User.schema == user.schema)\
+            .filter(~User.config['roles'].astext.contains('suporte'))\
+            .order_by(desc(User.active),asc(User.name))\
+            .all()
 
     results = []
     for u in users:
