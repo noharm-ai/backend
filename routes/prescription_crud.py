@@ -145,3 +145,42 @@ def createPrescriptionDrug():
     }
 
     return tryCommit(db, result, user.permission())
+
+@app_pres_crud.route('/editPrescription/drug/<int:idPrescriptionDrug>/suspend/<int:suspend>', methods=['PUT'])
+@jwt_required()
+def suspend(idPrescriptionDrug, suspend):
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+    os.environ['TZ'] = 'America/Sao_Paulo'
+
+    roles = user.config['roles'] if user.config and 'roles' in user.config else []
+    if ('prescriptionEdit' not in roles):
+        return {
+            'status': 'error',
+            'message': 'Usuário não autorizado',
+            'code': 'errors.unauthorizedUser'
+        }, status.HTTP_401_UNAUTHORIZED
+
+    pdUpdate = PrescriptionDrug.query.get(idPrescriptionDrug)
+    if (pdUpdate is None):
+        return { 'status': 'error', 'message': 'Registro Inexistente!', 'code': 'errors.invalidRegister' }, status.HTTP_400_BAD_REQUEST
+
+    if (suspend == 1):
+      pdUpdate.suspendedDate = datetime.today()
+    else:
+      pdUpdate.suspendedDate = None
+
+    pdUpdate.update = datetime.today()
+    pdUpdate.user = user.id
+      
+    db.session.add(pdUpdate)
+    db.session.flush()
+
+    result = {
+      'idPrescription': str(pdUpdate.idPrescription),
+      'idPrescriptionDrug': str(pdUpdate.id),
+      'idDrug': pdUpdate.idDrug,
+      'suspended': True if suspend == 1 else False
+    }
+
+    return tryCommit(db, result, user.permission())
