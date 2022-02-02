@@ -62,25 +62,8 @@ def updatePrescriptionDrug(idPrescriptionDrug):
     db.session.execute(query, {'id': idPrescriptionDrug})
 
     pd = PrescriptionDrug.findByPrescriptionDrugComplete(idPrescriptionDrug)
-    pdWhiteList = bool(pd[6].whiteList) if pd[6] is not None else False
 
-    result = {
-      'idPrescription': str(pd[0].idPrescription),
-      'idPrescriptionDrug': str(pd[0].id),
-      'idDrug': pd[0].idDrug,
-      'drug': pd[1].name if pd[1] is not None else 'Medicamento ' + str(pd[0].idDrug),
-      'dose': pd[0].dose,
-      'measureUnit': { 'value': pd[2].id, 'label': pd[2].description } if pd[2] else '',
-      'frequency': { 'value': pd[3].id, 'label': pd[3].description } if pd[3] else '',
-      'dayFrequency': pd[0].frequency,
-      'doseconv': pd[0].doseconv,
-      'time': timeValue(data.get('interval', None)),
-      'interval': pd[0].interval,
-      'route': pd[0].route,
-      'score': str(pd[5]) if not pdWhiteList and pd[0].source != 'Dietas' else '0',
-    }
-
-    return tryCommit(db, result, user.permission())
+    return tryCommit(db, prescriptionDrugToDTO(pd), user.permission())
 
 @app_pres_crud.route('/editPrescription/drug', methods=['POST'])
 @jwt_required()
@@ -118,33 +101,8 @@ def createPrescriptionDrug():
     db.session.flush()
 
     pd = PrescriptionDrug.findByPrescriptionDrugComplete(pdCreate.id)
-    pdWhiteList = bool(pd[6].whiteList) if pd[6] is not None else False
 
-    result = {
-      'idPrescription': str(pd[0].idPrescription),
-      'idPrescriptionDrug': str(pd[0].id),
-      'idDrug': pd[0].idDrug,
-      'drug': pd[1].name if pd[1] is not None else 'Medicamento ' + str(pd[0].idDrug),
-      'dose': pd[0].dose,
-      'measureUnit': { 'value': pd[2].id, 'label': pd[2].description } if pd[2] else '',
-      'frequency': { 'value': pd[3].id, 'label': pd[3].description } if pd[3] else '',
-      'dayFrequency': pd[0].frequency,
-      'doseconv': pd[0].doseconv,
-      'time': timeValue(data.get('interval', None)),
-      'interval': pd[0].interval,
-      'route': pd[0].route,
-      'score': str(pd[5]) if not pdWhiteList and pd[0].source != 'Dietas' else '0',
-      'np': pd[6].notdefault if pd[6] is not None else False,
-      'am': pd[6].antimicro if pd[6] is not None else False,
-      'av': pd[6].mav if pd[6] is not None else False,
-      'c': pd[6].controlled if pd[6] is not None else False,
-      'q': pd[6].chemo if pd[6] is not None else False,
-      'alergy': bool(pd[0].allergy == 'S'),
-      'allergy': bool(pd[0].allergy == 'S'),
-      'whiteList': pdWhiteList,
-    }
-
-    return tryCommit(db, result, user.permission())
+    return tryCommit(db, prescriptionDrugToDTO(pd), user.permission())
 
 @app_pres_crud.route('/editPrescription/drug/<int:idPrescriptionDrug>/suspend/<int:suspend>', methods=['PUT'])
 @jwt_required()
@@ -184,3 +142,30 @@ def suspend(idPrescriptionDrug, suspend):
     }
 
     return tryCommit(db, result, user.permission())
+
+def prescriptionDrugToDTO(pd):
+  pdWhiteList = bool(pd[6].whiteList) if pd[6] is not None else False
+
+  return {
+    'idPrescription': str(pd[0].idPrescription),
+    'idPrescriptionDrug': str(pd[0].id),
+    'idDrug': pd[0].idDrug,
+    'drug': pd[1].name if pd[1] is not None else 'Medicamento ' + str(pd[0].idDrug),
+    'dose': pd[0].dose,
+    'measureUnit': { 'value': pd[2].id, 'label': pd[2].description } if pd[2] else '',
+    'frequency': { 'value': pd[3].id, 'label': pd[3].description } if pd[3] else '',
+    'dayFrequency': pd[0].frequency,
+    'doseconv': pd[0].doseconv,
+    'time': timeValue(pd[0].interval),
+    'interval': pd[0].interval,
+    'route': pd[0].route,
+    'score': str(pd[5]) if not pdWhiteList and pd[0].source != 'Dietas' else '0',
+    'np': pd[6].notdefault if pd[6] is not None else False,
+    'am': pd[6].antimicro if pd[6] is not None else False,
+    'av': pd[6].mav if pd[6] is not None else False,
+    'c': pd[6].controlled if pd[6] is not None else False,
+    'q': pd[6].chemo if pd[6] is not None else False,
+    'alergy': bool(pd[0].allergy == 'S'),
+    'allergy': bool(pd[0].allergy == 'S'),
+    'whiteList': pdWhiteList,
+  }

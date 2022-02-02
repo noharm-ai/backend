@@ -468,9 +468,6 @@ class PrescriptionDrug(db.Model):
         {'id': idPrescription}
       )
 
-      print('akiiii')
-      print(result)
-
       return ([row[0] for row in result])[0]
 
 class Intervention(db.Model):
