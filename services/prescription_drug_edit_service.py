@@ -6,6 +6,20 @@ from models.prescription import *
 
 from exception.validation_error import ValidationError
 
+def getNextId(idPrescription, schema):
+    result = db.session.execute(\
+      "SELECT\
+        CONCAT(p.fkprescricao, LPAD(COUNT(*)::VARCHAR, 3, '0'))\
+      FROM " + schema + ".presmed p\
+      WHERE\
+        p.fkprescricao = :id\
+      GROUP BY\
+        p.fkprescricao",
+      {'id': idPrescription}
+    )
+
+    return ([row[0] for row in result])[0]
+
 def createPrescriptionDrug(data, user):
     roles = user.config['roles'] if user.config and 'roles' in user.config else []
     if ('prescriptionEdit' not in roles):
@@ -13,7 +27,7 @@ def createPrescriptionDrug(data, user):
 
     pdCreate = PrescriptionDrug()
 
-    pdCreate.id = PrescriptionDrug.getNextId(data.get('idPrescription', None), user.schema)
+    pdCreate.id = getNextId(data.get('idPrescription', None), user.schema)
     pdCreate.idPrescription = data.get('idPrescription', None)
     pdCreate.source = data.get('source', None)
 

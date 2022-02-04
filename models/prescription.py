@@ -441,35 +441,6 @@ class PrescriptionDrug(db.Model):
             .filter(PrescriptionDrug.id == idPrescriptionDrug)\
             .all() , admissionHistory
 
-    def findByPrescriptionDrugComplete(idPrescriptionDrug):
-        return db.session\
-            .query(PrescriptionDrug, Drug, MeasureUnit, Frequency, '0',\
-                    func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4).label('score'),
-                    DrugAttributes, Notes.notes, Prescription.status, Prescription.expire)\
-            .outerjoin(Outlier, Outlier.id == PrescriptionDrug.idOutlier)\
-            .outerjoin(Drug, Drug.id == PrescriptionDrug.idDrug)\
-            .outerjoin(Notes, Notes.idPrescriptionDrug == PrescriptionDrug.id)\
-            .outerjoin(Prescription, Prescription.id == PrescriptionDrug.idPrescription)\
-            .outerjoin(MeasureUnit, and_(MeasureUnit.id == PrescriptionDrug.idMeasureUnit, MeasureUnit.idHospital == Prescription.idHospital))\
-            .outerjoin(Frequency, and_(Frequency.id == PrescriptionDrug.idFrequency, Frequency.idHospital == Prescription.idHospital))\
-            .outerjoin(DrugAttributes, and_(DrugAttributes.idDrug == PrescriptionDrug.idDrug, DrugAttributes.idSegment == PrescriptionDrug.idSegment))\
-            .filter(PrescriptionDrug.id == idPrescriptionDrug)\
-            .first()
-
-    def getNextId(idPrescription, schema):
-      result = db.session.execute(\
-        "SELECT\
-          CONCAT(p.fkprescricao, LPAD(COUNT(*)::VARCHAR, 3, '0'))\
-        FROM " + schema + ".presmed p\
-        WHERE\
-          p.fkprescricao = :id\
-        GROUP BY\
-          p.fkprescricao",
-        {'id': idPrescription}
-      )
-
-      return ([row[0] for row in result])[0]
-
 class Intervention(db.Model):
     __tablename__ = 'intervencao'
 
