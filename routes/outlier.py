@@ -9,6 +9,8 @@ from .utils import freqValue, tryCommit, typeRelations, sortSubstance, strNone
 from datetime import datetime
 from math import ceil
 
+from services.drug_service import getPreviouslyPrescribedUnits, getPreviouslyPrescribedFrequencies
+
 app_out = Blueprint('app_out',__name__)
 
 @app_out.route('/outliers/<int:idSegment>/<int:idDrug>', methods=['GET'])
@@ -332,23 +334,14 @@ def getDrugSummary(idDrug, idSegment):
     dbSession.setSchema(user.schema)
     maxDays = 90
 
-    d = db.aliased(Drug)
     u = db.aliased(MeasureUnit)
-    agg = db.aliased(PrescriptionAgg)
     p = db.aliased(Prescription)
     pd = db.aliased(PrescriptionDrug)
     f = db.aliased(Frequency)
 
     drug = Drug.query.get(idDrug)
 
-    units = db.session\
-      .query(u.id, u.description, func.sum(func.coalesce(agg.countNum, 0)).label('count'))\
-      .select_from(u)\
-      .outerjoin(agg, and_(agg.idMeasureUnit == u.id, agg.idDrug == idDrug, agg.idSegment == idSegment))\
-      .filter(agg.idSegment == idSegment)\
-      .group_by(u.id, u.description, agg.idMeasureUnit)\
-      .order_by(asc(u.description))\
-      .all()
+    units = getPreviouslyPrescribedUnits(idDrug, idSegment)
 
     unitResults = []
     for u in units:
@@ -358,14 +351,7 @@ def getDrugSummary(idDrug, idSegment):
         'amount': u.count
       })
 
-    frequencies = db.session\
-      .query(f.id, f.description, func.sum(func.coalesce(agg.countNum, 0)).label('count'))\
-      .select_from(f)\
-      .outerjoin(agg, and_(agg.idFrequency == f.id, agg.idDrug == idDrug, agg.idSegment == idSegment))\
-      .filter(agg.idSegment == idSegment)\
-      .group_by(f.id, f.description, agg.idFrequency)\
-      .order_by(asc(f.description))\
-      .all()
+    frequencies = getPreviouslyPrescribedFrequencies(idDrug, idSegment)
 
     frequencyResults = []
     for f in frequencies:
