@@ -224,6 +224,7 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None, idS
             'idSegment': prescription[0].idSegment,
             'segmentName': prescription[5],
             'idPatient': prescription[0].idPatient,
+            'idHospital': prescription[0].idHospital,
             'name': prescription[0].admissionNumber,
             'agg': prescription[0].agg,
             'concilia': prescription[0].concilia,
