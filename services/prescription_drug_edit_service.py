@@ -1,12 +1,14 @@
 from flask_api import status
+from flask_jwt_extended import (get_jwt_identity)
 
 from models.main import db
 from models.appendix import *
 from models.prescription import *
+from services import prescription_drug_service
 
 from exception.validation_error import ValidationError
 
-def getNextId(idPrescription, schema):
+def get_next_id(idPrescription, schema):
     result = db.session.execute(\
       "SELECT\
         CONCAT(p.fkprescricao, LPAD(COUNT(*)::VARCHAR, 3, '0'))\
@@ -20,14 +22,15 @@ def getNextId(idPrescription, schema):
 
     return ([row[0] for row in result])[0]
 
-def createPrescriptionDrug(data, user):
+def create(data):
+    user = User.find(get_jwt_identity())
     roles = user.config['roles'] if user.config and 'roles' in user.config else []
     if ('prescriptionEdit' not in roles):
         raise ValidationError('Usuário não autorizado', 'errors.unauthorizedUser', status.HTTP_401_UNAUTHORIZED)
 
     pdCreate = PrescriptionDrug()
 
-    pdCreate.id = getNextId(data.get('idPrescription', None), user.schema)
+    pdCreate.id = get_next_id(data.get('idPrescription', None), user.schema)
     pdCreate.idPrescription = data.get('idPrescription', None)
     pdCreate.source = data.get('source', None)
 
@@ -44,9 +47,11 @@ def createPrescriptionDrug(data, user):
     db.session.add(pdCreate)
     db.session.flush()
 
-    return pdCreate.id
+    return prescription_drug_service.get(pdCreate.id)
 
-def updatePrescriptionDrug(idPrescriptionDrug, data, user):
+def update(idPrescriptionDrug, data):
+    user = User.find(get_jwt_identity())
+
     roles = user.config['roles'] if user.config and 'roles' in user.config else []
     if ('prescriptionEdit' not in roles):
         raise ValidationError('Usuário não autorizado', 'errors.unauthorizedUser', status.HTTP_401_UNAUTHORIZED)
@@ -85,7 +90,10 @@ def updatePrescriptionDrug(idPrescriptionDrug, data, user):
 
     db.session.execute(query, {'id': idPrescriptionDrug})
 
-def togglePrescriptionDrugSuspension(idPrescriptionDrug, user, suspend):
+    return prescription_drug_service.get(idPrescriptionDrug)
+
+def toggle_suspension(idPrescriptionDrug, suspend):
+    user = User.find(get_jwt_identity())
     roles = user.config['roles'] if user.config and 'roles' in user.config else []
     if ('prescriptionEdit' not in roles):
         raise ValidationError('Usuário não autorizado', 'errors.unauthorizedUser', status.HTTP_401_UNAUTHORIZED)
