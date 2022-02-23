@@ -4,7 +4,7 @@ from models.appendix import *
 from flask import Blueprint, request, render_template
 from flask_jwt_extended import (jwt_required, get_jwt_identity)
 from .utils import tryCommit, sendEmail
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from flask import render_template
 from config import Config
 
@@ -139,7 +139,7 @@ def getUsers():
 
     users = User.query\
             .filter(User.schema == user.schema)\
-            .filter(~User.config['roles'].astext.contains('suporte'))\
+            .filter(or_(~User.config['roles'].astext.contains('suporte'), User.config['roles'] == None))\
             .order_by(desc(User.active),asc(User.name))\
             .all()
 

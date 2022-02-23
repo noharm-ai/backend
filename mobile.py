@@ -19,6 +19,8 @@ from routes.patient import app_pat
 from routes.user import app_usr
 from routes.notes import app_note
 from routes.user_crud import app_user_crud
+from routes.prescription_crud import app_pres_crud
+from routes.drugs import app_drugs
 import os
 
 os.environ['TZ'] = 'America/Sao_Paulo'
@@ -52,7 +54,10 @@ app.register_blueprint(app_mem)
 app.register_blueprint(app_pat)
 app.register_blueprint(app_usr)
 app.register_blueprint(app_note)
+app.register_blueprint(app_drugs)
+
 app.register_blueprint(app_user_crud)
+app.register_blueprint(app_pres_crud)
 
 CORS(app)
 

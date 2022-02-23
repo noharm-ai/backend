@@ -1,8 +1,6 @@
-from flask.wrappers import Response
-from sqlalchemy.sql.functions import user
+from sqlalchemy import or_
 from conftest import *
 from models.main import User
-import time
 
 from routes.utils import tryCommit
 
@@ -28,7 +26,10 @@ def test_get_users(client):
 
     response = client.get('/users', headers=make_headers(access_token))
     data = json.loads(response.data)
-    qtdUsers = session.query(User).filter(User.schema == "demo").filter(~User.config['roles'].astext.contains('suporte')).count()
+    qtdUsers = session.query(User)\
+        .filter(User.schema == "demo")\
+        .filter(or_(~User.config['roles'].astext.contains('suporte'), User.config['roles'] == None))\
+        .count()
 
     assert response.status_code == 200
     assert len(data["data"]) == qtdUsers
