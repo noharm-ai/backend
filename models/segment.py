@@ -133,7 +133,7 @@ class Exams(db.Model):
                 if 'cg' in exams:
                     exams['cg'] = cg_calc(exams['cr']['value'], patient.birthdate, patient.gender, patient.weight)
                 if 'ckd' in exams:
-                    exams['ckd'] = ckd_calc(exams['cr']['value'], patient.birthdate, patient.gender, patient.skinColor)
+                    exams['ckd'] = ckd_calc(exams['cr']['value'], patient.birthdate, patient.gender, patient.skinColor, patient.height, patient.weight)
             else:
                 if 'swrtz2' in exams:
                     exams['swrtz2'] = schwartz2_calc(exams['cr']['value'], patient.height)
