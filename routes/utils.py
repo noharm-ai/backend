@@ -2,6 +2,7 @@ from flask_api import status
 from datetime import date, datetime, timedelta
 import unicodedata, copy, re
 import logging
+import math
 from flask_mail import Message, Mail
 
 def data2age(birthdate):
@@ -206,7 +207,7 @@ def ckd_calc(cr, birthdate, gender, skinColor, height, weight):
     eGFR = s * (float(cr)/g)**(e) * (0.993)**(age) if cr > 0 else 0
 
     if is_float(height) and is_float(weight):
-        eGFR *= (float(height) * float(weight)/ 3600) / (1.73)
+        eGFR *= math.sqrt((float(height) * float(weight)) / 3600) / (1.73)
 
     return { 'value': round(eGFR,1), 'ref': 'maior que 50 ml/min/1.73', 'unit': 'ml/min/1.73',
              'alert': (eGFR < 50), 'name': 'Chronic Kidney Disease Epidemiology' , 
