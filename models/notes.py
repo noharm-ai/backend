@@ -28,6 +28,7 @@ class ClinicalNotes(db.Model):
 
     signsText = db.Column('sinaistexto', db.String, nullable=True)
     infoText = db.Column('dadostexto', db.String, nullable=True)
+    allergyText = db.Column('alergiatexto', db.String, nullable=True)
 
     isExam = db.Column("exame", db.Boolean, nullable=False)
 
@@ -95,5 +96,13 @@ class ClinicalNotes(db.Model):
                 .select_from(ClinicalNotes)\
                 .filter(ClinicalNotes.admissionNumber == admissionNumber)\
                 .filter(func.length(ClinicalNotes.infoText) > 0)\
+                .order_by(desc(ClinicalNotes.date))\
+                .first()
+
+    def getAllergies(admissionNumber):
+        return db.session.query(ClinicalNotes.allergyText, ClinicalNotes.date)\
+                .select_from(ClinicalNotes)\
+                .filter(ClinicalNotes.admissionNumber == admissionNumber)\
+                .filter(func.length(ClinicalNotes.allergyText) > 0)\
                 .order_by(desc(ClinicalNotes.date))\
                 .first()

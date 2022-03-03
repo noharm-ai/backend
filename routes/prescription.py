@@ -156,9 +156,11 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None, idS
     clinicalNotesCount = ClinicalNotes.getCountIfExists(prescription[0].admissionNumber)
     notesSigns = None
     notesInfo = None
+    notesAllergies = None
     if clinicalNotesCount[0]:
         notesSigns = ClinicalNotes.getSigns(prescription[0].admissionNumber)
         notesInfo = ClinicalNotes.getInfo(prescription[0].admissionNumber)
+        notesAllergies = ClinicalNotes.getAllergies(prescription[0].admissionNumber)
 
     exams = Exams.findLatestByAdmission(patient, prescription[0].idSegment)
     age = data2age(patient.birthdate.isoformat() if patient.birthdate else date.today().isoformat())
@@ -273,6 +275,8 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None, idS
             'notesSignsDate': notesSigns[1].isoformat() if notesSigns else None,
             'notesInfo': strNone(notesInfo[0]) if notesInfo else '',
             'notesInfoDate': notesInfo[1].isoformat() if notesInfo else None,
+            'notesAllergies': strNone(notesAllergies[0]) if notesAllergies else '',
+            'notesAllergiesDate': notesAllergies[1].isoformat() if notesAllergies else None,
             'clinicalNotesStats': {
                 'medications': clinicalNotesCount[1],
                 'complication': clinicalNotesCount[2],
