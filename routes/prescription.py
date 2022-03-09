@@ -157,10 +157,28 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None, idS
     notesSigns = None
     notesInfo = None
     notesAllergies = None
+    notesDialysis = None
     if clinicalNotesCount[0]:
         notesSigns = ClinicalNotes.getSigns(prescription[0].admissionNumber)
         notesInfo = ClinicalNotes.getInfo(prescription[0].admissionNumber)
-        notesAllergies = ClinicalNotes.getAllergies(prescription[0].admissionNumber)
+
+        allergies = ClinicalNotes.getAllergies(prescription[0].admissionNumber)
+        dialysis = ClinicalNotes.getDialysis(prescription[0].admissionNumber)
+
+        notesAllergies = []
+        for a in allergies:
+            notesAllergies.append({
+                'date': a[1].isoformat(),
+                'text': a[0]
+            })
+
+        notesDialysis = []
+        for a in dialysis:
+            notesDialysis.append({
+                'date': a[1].isoformat(),
+                'text': a[0]
+            })
+
 
     exams = Exams.findLatestByAdmission(patient, prescription[0].idSegment)
     age = data2age(patient.birthdate.isoformat() if patient.birthdate else date.today().isoformat())
@@ -275,8 +293,10 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None, idS
             'notesSignsDate': notesSigns[1].isoformat() if notesSigns else None,
             'notesInfo': strNone(notesInfo[0]) if notesInfo else '',
             'notesInfoDate': notesInfo[1].isoformat() if notesInfo else None,
-            'notesAllergies': strNone(notesAllergies[0]) if notesAllergies else '',
-            'notesAllergiesDate': notesAllergies[1].isoformat() if notesAllergies else None,
+            'notesAllergies': notesAllergies,
+            'notesAllergiesDate': notesAllergies[0]['date'] if notesAllergies else None,
+            'notesDialysis': notesDialysis,
+            'notesDialysisDate': notesDialysis[0]['date'] if notesDialysis else None,
             'clinicalNotesStats': {
                 'medications': clinicalNotesCount[1],
                 'complication': clinicalNotesCount[2],
@@ -287,6 +307,7 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None, idS
                 'signs': clinicalNotesCount[7],
                 'allergy': clinicalNotesCount[8],
                 'total': clinicalNotesCount[9],
+                'dialysis': clinicalNotesCount[10],
             },
             'alertStats': drugList.alertStats,
             'features': prescription[0].features,
