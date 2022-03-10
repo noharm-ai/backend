@@ -40,7 +40,7 @@ class ClinicalNotes(db.Model):
         return db.engine.has_table('evolucao', schema=schemaName)
 
     def getCountIfExists(admissionNumber):
-        empty_return = [None,None,None,None,None,None,None,None,None,None]
+        empty_return = [None,None,None,None,None,None,None,None,None,None,None]
 
         if ClinicalNotes.exists():
             stats_return = db.session.query(ClinicalNotes.admissionNumber, 

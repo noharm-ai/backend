@@ -259,6 +259,7 @@ class Patient(db.Model):
     alertBy = db.Column("alerta_by", db.Integer, nullable=True)
     dischargeReason = db.Column('motivoalta', db.String, nullable=True)
     dischargeDate = db.Column("dtalta", db.DateTime, nullable=True)
+    dialysis = db.Column('dialise', db.String(1), nullable=True)
 
     def findByAdmission(admissionNumber):
         return db.session.query(Patient)\

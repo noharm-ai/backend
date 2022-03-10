@@ -255,6 +255,7 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None, idS
             'gender': patient.gender,
             'height': patient.height,
             'weight': patient.weight,
+            'dialysis': patient.dialysis,
             'observation': prescription[6],
             'notes': prescription[7],
             'alert': prescription[8],

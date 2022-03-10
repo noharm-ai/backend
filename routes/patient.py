@@ -164,6 +164,7 @@ def setPatientData(admissionNumber):
         p.alertBy = user.id
 
     if 'height' in data.keys(): p.height = data.get('height', None)
+    if 'dialysis' in data.keys(): p.dialysis = data.get('dialysis', None)
     if 'observation' in data.keys(): p.observation = data.get('observation', None)
 
     p.update = datetime.today()
