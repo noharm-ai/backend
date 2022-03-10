@@ -113,10 +113,14 @@ class ClinicalNotes(db.Model):
                 .all()
 
     def getDialysis(admissionNumber):
-        return db.session.query(ClinicalNotes.dialysisText, ClinicalNotes.date)\
-                .select_from(ClinicalNotes)\
+        return db.session.query(\
+                    func.first_value(ClinicalNotes.dialysisText)\
+                        .over(partition_by=func.date(ClinicalNotes.date), order_by=desc(ClinicalNotes.date))\
+                    , func.date(ClinicalNotes.date).label('date')\
+                )\
+                .distinct(func.date(ClinicalNotes.date))\
                 .filter(ClinicalNotes.admissionNumber == admissionNumber)\
                 .filter(func.length(ClinicalNotes.dialysisText) > 0)\
-                .filter(ClinicalNotes.date > func.current_date() - 2)\
-                .order_by(desc(ClinicalNotes.date))\
+                .filter(ClinicalNotes.date > func.current_date() - 3)\
+                .order_by(desc('date'))\
                 .all()
