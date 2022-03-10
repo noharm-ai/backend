@@ -196,7 +196,8 @@ class DrugList():
                 'alerts': alerts,
                 'tubeAlert': tubeAlert,
                 'notes': pd[7],
-                'prevNotes': pd[8]
+                'prevNotes': pd[8],
+                'micromedex': pd[11],
             })
         return pDrugs
 

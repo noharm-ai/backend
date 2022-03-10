@@ -55,6 +55,7 @@ class Substance(db.Model):
 
     id = db.Column("sctid", db.Integer, primary_key=True)
     name = db.Column('nome', db.String(255), nullable=False)
+    link = db.Column('link', db.String(255), nullable=False)
 
 class Relation(db.Model):
     __tablename__ = 'relacao'

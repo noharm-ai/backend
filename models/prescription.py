@@ -4,7 +4,7 @@ from .segment import *
 from routes.utils import *
 from datetime import datetime
 from sqlalchemy.orm import deferred
-from sqlalchemy import case, BigInteger, cast, between
+from sqlalchemy import case, BigInteger, cast, between, outerjoin
 
 class Prescription(db.Model):
     __tablename__ = 'prescricao'
@@ -403,14 +403,15 @@ class PrescriptionDrug(db.Model):
         q = db.session\
             .query(PrescriptionDrug, Drug, MeasureUnit, Frequency, '0',\
                     func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4).label('score'),
-                    DrugAttributes, Notes.notes, prevNotes.label('prevNotes'), Prescription.status, Prescription.expire)\
+                    DrugAttributes, Notes.notes, prevNotes.label('prevNotes'), Prescription.status, Prescription.expire, Substance.link)\
             .outerjoin(Outlier, Outlier.id == PrescriptionDrug.idOutlier)\
             .outerjoin(Drug, Drug.id == PrescriptionDrug.idDrug)\
             .outerjoin(Notes, Notes.idPrescriptionDrug == PrescriptionDrug.id)\
             .outerjoin(Prescription, Prescription.id == PrescriptionDrug.idPrescription)\
             .outerjoin(MeasureUnit, and_(MeasureUnit.id == PrescriptionDrug.idMeasureUnit, MeasureUnit.idHospital == Prescription.idHospital))\
             .outerjoin(Frequency, and_(Frequency.id == PrescriptionDrug.idFrequency, Frequency.idHospital == Prescription.idHospital))\
-            .outerjoin(DrugAttributes, and_(DrugAttributes.idDrug == PrescriptionDrug.idDrug, DrugAttributes.idSegment == PrescriptionDrug.idSegment))
+            .outerjoin(DrugAttributes, and_(DrugAttributes.idDrug == PrescriptionDrug.idDrug, DrugAttributes.idSegment == PrescriptionDrug.idSegment))\
+            .outerjoin(Substance, Drug.sctid == Substance.id)
         
         if aggDate is None:
             q = q.filter(PrescriptionDrug.idPrescription == idPrescription)
