@@ -194,7 +194,7 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None, idS
         'weight': patient.weight,
     })
 
-    drugList = DrugList(drugs, interventions, relations, exams, aggDate is not None)
+    drugList = DrugList(drugs, interventions, relations, exams, aggDate is not None, patient.dialysis)
 
     pDrugs = drugList.getDrugType([], 'Medicamentos') #refactor sort
     pDrugs = drugList.getDrugType(pDrugs, 'Medicamentos', checked=True) #refactor sort
