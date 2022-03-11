@@ -2,12 +2,13 @@ from .utils import *
 
 class DrugList():
 
-    def __init__(self, drugList, interventions, relations, exams, agg):
+    def __init__(self, drugList, interventions, relations, exams, agg, dialysis):
         self.drugList = drugList
         self.interventions = interventions
         self.relations = relations
         self.exams = exams
         self.agg = agg
+        self.dialysis = dialysis
         self.maxDoseAgg = {}
         self.alertStats = {
                 'dup': 0,
@@ -86,9 +87,19 @@ class DrugList():
             alerts = []
             if not bool(pd[0].suspendedDate):
                 if self.exams and pd[6]:
-                    if pd[6].kidney and 'ckd' in self.exams and self.exams['ckd']['value'] and pd[6].kidney > self.exams['ckd']['value']:
-                        alerts.append('Medicamento deve sofrer ajuste de posologia ou contraindicado, já que a função renal do paciente (' + str(self.exams['ckd']['value']) + ' mL/min) está abaixo de ' + str(pd[6].kidney) + ' mL/min.')
-                        self.alertStats['kidney'] += 1
+                    if pd[6].kidney:
+                        if self.dialysis == 'c':
+                            alerts.append('Medicamento é contraindicado ou deve sofrer ajuste de posologia, já que o paciente está diálise contínua.')
+                            self.alertStats['kidney'] += 1
+                        elif self.dialysis == 'x':
+                            alerts.append('Medicamento é contraindicado ou deve sofrer ajuste de posologia, já que o paciente está diálise estendida, também conhecida como SLED.')
+                            self.alertStats['kidney'] += 1
+                        elif self.dialysis == 'v':
+                            alerts.append('Medicamento é contraindicado ou deve sofrer ajuste de posologia, já que o paciente está em diálise intermitente.')
+                            self.alertStats['kidney'] += 1
+                        elif 'ckd' in self.exams and self.exams['ckd']['value'] and pd[6].kidney > self.exams['ckd']['value']:
+                            alerts.append('Medicamento deve sofrer ajuste de posologia ou contraindicado, já que a função renal do paciente (' + str(self.exams['ckd']['value']) + ' mL/min) está abaixo de ' + str(pd[6].kidney) + ' mL/min.')
+                            self.alertStats['kidney'] += 1
 
                     if pd[6].liver:
                         if ('tgp' in self.exams and self.exams['tgp']['value'] and float(self.exams['tgp']['value']) > pd[6].liver) or ('tgo' in self.exams and self.exams['tgo']['value'] and float(self.exams['tgo']['value']) > pd[6].liver):
@@ -196,7 +207,8 @@ class DrugList():
                 'alerts': alerts,
                 'tubeAlert': tubeAlert,
                 'notes': pd[7],
-                'prevNotes': pd[8]
+                'prevNotes': pd[8],
+                'drugInfoLink': pd[11],
             })
         return pDrugs
 

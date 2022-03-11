@@ -1,7 +1,7 @@
 from .main import db
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import deferred
-from sqlalchemy import inspect, func, desc
+from sqlalchemy import inspect, func, desc, distinct
 from datetime import datetime, timedelta
 
 class ClinicalNotes(db.Model):
@@ -24,11 +24,13 @@ class ClinicalNotes(db.Model):
     conduct = db.Column("conduta", db.Integer, nullable=True)
     signs = db.Column("sinais", db.Integer, nullable=True)
     allergy = db.Column("alergia", db.Integer, nullable=True)
+    dialysis = db.Column("dialise", db.Integer, nullable=True)
     names = db.Column("nomes", db.Integer, nullable=True)
 
     signsText = db.Column('sinaistexto', db.String, nullable=True)
     infoText = db.Column('dadostexto', db.String, nullable=True)
     allergyText = db.Column('alergiatexto', db.String, nullable=True)
+    dialysisText = db.Column('dialisetexto', db.String, nullable=True)
 
     isExam = db.Column("exame", db.Boolean, nullable=False)
 
@@ -38,7 +40,7 @@ class ClinicalNotes(db.Model):
         return db.engine.has_table('evolucao', schema=schemaName)
 
     def getCountIfExists(admissionNumber):
-        empty_return = [None,None,None,None,None,None,None,None,None,None]
+        empty_return = [None,None,None,None,None,None,None,None,None,None,None]
 
         if ClinicalNotes.exists():
             stats_return = db.session.query(ClinicalNotes.admissionNumber, 
@@ -50,7 +52,8 @@ class ClinicalNotes(db.Model):
                         func.sum(ClinicalNotes.conduct),
                         func.sum(ClinicalNotes.signs),
                         func.sum(ClinicalNotes.allergy),
-                        func.count().label('total')
+                        func.count().label('total'),
+                        func.sum(ClinicalNotes.dialysis),
                     ).select_from(ClinicalNotes)\
                     .filter(ClinicalNotes.admissionNumber==admissionNumber)\
                     .filter(ClinicalNotes.isExam == None)\
@@ -100,9 +103,24 @@ class ClinicalNotes(db.Model):
                 .first()
 
     def getAllergies(admissionNumber):
-        return db.session.query(ClinicalNotes.allergyText, ClinicalNotes.date)\
+        return db.session.query(ClinicalNotes.allergyText, func.max(ClinicalNotes.date).label('maxdate'))\
                 .select_from(ClinicalNotes)\
                 .filter(ClinicalNotes.admissionNumber == admissionNumber)\
                 .filter(func.length(ClinicalNotes.allergyText) > 0)\
-                .order_by(desc(ClinicalNotes.date))\
-                .first()
+                .group_by(ClinicalNotes.allergyText)\
+                .order_by(desc('maxdate'))\
+                .limit(10)\
+                .all()
+
+    def getDialysis(admissionNumber):
+        return db.session.query(\
+                    func.first_value(ClinicalNotes.dialysisText)\
+                        .over(partition_by=func.date(ClinicalNotes.date), order_by=desc(ClinicalNotes.date))\
+                    , func.date(ClinicalNotes.date).label('date')\
+                )\
+                .distinct(func.date(ClinicalNotes.date))\
+                .filter(ClinicalNotes.admissionNumber == admissionNumber)\
+                .filter(func.length(ClinicalNotes.dialysisText) > 0)\
+                .filter(ClinicalNotes.date > func.current_date() - 3)\
+                .order_by(desc('date'))\
+                .all()
