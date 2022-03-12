@@ -207,14 +207,16 @@ def ckd_calc(cr, birthdate, gender, skinColor, height, weight):
     eGFR = s * (float(cr)/g)**(e) * (0.993)**(age) if cr > 0 else 0
 
     unit = 'ml/min/1.73'
+    adjust = False
 
     if is_float(height) and is_float(weight):
         eGFR *= math.sqrt((float(height) * float(weight)) / 3600) / (1.73)
         unit = 'ml/min'
+        adjust = True
 
     return { 'value': round(eGFR,1), 'ref': 'maior que 50 '+ unit, 'unit': unit,
-             'alert': (eGFR < 50), 'name': 'Chronic Kidney Disease Epidemiology' , 
-             'initials': 'CKD', 'min': 50, 'max': 120 }
+             'alert': (eGFR < 50), 'name': 'Chronic Kidney Disease Epidemiology' + (' (Adjusted)' if adjust else ''), 
+             'initials': 'CKD' + ('-A' if adjust else '') , 'min': 50, 'max': 120, 'adjust': adjust }
 
 # Schwartz (2) Formula
 # based on https://link.springer.com/article/10.1007%2Fs00467-014-3002-5
