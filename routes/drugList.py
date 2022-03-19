@@ -97,6 +97,9 @@ class DrugList():
                         elif self.dialysis == 'v':
                             alerts.append('Medicamento é contraindicado ou deve sofrer ajuste de posologia, já que o paciente está em diálise intermitente.')
                             self.alertStats['kidney'] += 1
+                        elif self.dialysis == 'p':
+                            alerts.append('Medicamento é contraindicado ou deve sofrer ajuste de posologia, já que o paciente está em diálise peritoneal.')
+                            self.alertStats['kidney'] += 1
                         elif 'ckd' in self.exams and self.exams['ckd']['value'] and pd[6].kidney > self.exams['ckd']['value']:
                             alerts.append('Medicamento deve sofrer ajuste de posologia ou contraindicado, já que a função renal do paciente (' + str(self.exams['ckd']['value']) + ' mL/min) está abaixo de ' + str(pd[6].kidney) + ' mL/min.')
                             self.alertStats['kidney'] += 1
