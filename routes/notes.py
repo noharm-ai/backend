@@ -47,7 +47,8 @@ def getNotes(admissionNumber):
                 'conduct': n.conduct,
                 'signs': n.signs,
                 'allergy': n.allergy,
-                'names': n.names
+                'names': n.names,
+                'dialysis': n.dialysis,
             })
 
         return {

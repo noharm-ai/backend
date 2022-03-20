@@ -31,7 +31,7 @@ def historyCalc(typeExam, examsList, patient):
         elif typeExam == 'cg':
             item = cg_calc(e['value'], patient.birthdate, patient.gender, patient.weight)
         elif typeExam == 'ckd':
-            item = ckd_calc(e['value'], patient.birthdate, patient.gender, patient.skinColor)
+            item = ckd_calc(e['value'], patient.birthdate, patient.gender, patient.skinColor, patient.height, patient.weight)
         elif typeExam == 'swrtz2':
             item = schwartz2_calc(e['value'], patient.height)
 
@@ -83,7 +83,7 @@ def getExamsbyAdmission(admissionNumber):
                         elif keyCalc == 'cg':
                             itemCalc = cg_calc(e.value, patient.birthdate, patient.gender, patient.weight)
                         elif keyCalc == 'ckd':
-                            itemCalc = ckd_calc(e.value, patient.birthdate, patient.gender, patient.skinColor)
+                            itemCalc = ckd_calc(e.value, patient.birthdate, patient.gender, patient.skinColor, patient.height, patient.weight)
                         elif keyCalc == 'swrtz2':
                             itemCalc = schwartz2_calc(e.value, patient.height)
 
@@ -164,6 +164,7 @@ def setPatientData(admissionNumber):
         p.alertBy = user.id
 
     if 'height' in data.keys(): p.height = data.get('height', None)
+    if 'dialysis' in data.keys(): p.dialysis = data.get('dialysis', None)
     if 'observation' in data.keys(): p.observation = data.get('observation', None)
 
     p.update = datetime.today()

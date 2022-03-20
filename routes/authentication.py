@@ -32,10 +32,10 @@ def auth():
 
         notification = Notify.getNotification(schema=user.schema)
 
-        if notification is not None:
-            db_session = db.create_scoped_session()
-            db_session.connection(execution_options={'schema_translate_map': {None: user.schema}})
+        db_session = db.create_scoped_session()
+        db_session.connection(execution_options={'schema_translate_map': {None: user.schema}})
 
+        if notification is not None:
             notificationMemory = db_session.query(Memory)\
               .filter(Memory.kind == 'info-alert-' + str(notification['id']) + '-' + str(user.id))\
               .first()
@@ -43,6 +43,9 @@ def auth():
             if notificationMemory is not None:
                 notification = None
         
+        features = db_session.query(Memory)\
+            .filter(Memory.kind == 'features')\
+            .first()
 
         return {
             'status': 'success',
@@ -51,6 +54,7 @@ def auth():
             'email': user.email,
             'schema': user.schema,
             'roles': user.config['roles'] if user.config and 'roles' in user.config else [],
+            'features': features.value if features is not None else [],
             'nameUrl': Memory.getNameUrl(user.schema)['value'] if user.permission() else 'http://localhost/{idPatient}',
             'notify': notification,
             'access_token': access_token,
