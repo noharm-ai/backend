@@ -57,7 +57,7 @@ def createUser(idUser = None):
         password = pwo.generate()
         newUser.password = func.crypt(password, func.gen_salt('bf', 8))
 
-        if ('admin' in roles):
+        if ('admin' in roles or 'suporte' in roles):
           newUser.config = {
               'roles': data.get('roles', [])
           }
@@ -107,7 +107,7 @@ def createUser(idUser = None):
         updatedUser.external = data.get('external', None)
         updatedUser.active =  bool(data.get('active', True))
 
-        if ('admin' in roles):
+        if ('admin' in roles or 'suporte' in roles):
           if updatedUser.config is None:
             updatedUser.config = {
               'roles': data.get('roles', [])
