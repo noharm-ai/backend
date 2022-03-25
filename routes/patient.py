@@ -190,7 +190,16 @@ def list_patients():
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
 
-    patients = patient_service.get_patients()
+    id_segment = request.args.get('idSegment', None)
+    id_department_list = request.args.getlist('idDepartment[]', None)
+    next_appointment_start_date = request.args.get('nextAppointmentStartDate', None)
+    next_appointment_end_date = request.args.get('nextAppointmentEndDate', None)
+
+    patients = patient_service.get_patients(\
+        id_segment=id_segment, id_department_list=id_department_list\
+        , next_appointment_start_date=next_appointment_start_date\
+        , next_appointment_end_date=next_appointment_end_date\
+    )
 
     return {
         'status': 'success',
