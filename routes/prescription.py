@@ -147,8 +147,13 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None, idS
         patient.idPatient = prescription[0].idPatient
         patient.admissionNumber = prescription[0].admissionNumber
 
+    is_cpoe = False
+    if verify_jwt_in_request(optional=True):
+        is_cpoe = (User.find(get_jwt_identity())).cpoe()
+
     lastDept = Prescription.lastDeptbyAdmission(prescription[0].id, patient.admissionNumber)
-    drugs = PrescriptionDrug.findByPrescription(prescription[0].id, patient.admissionNumber, aggDate, idSegment)
+    drugs = PrescriptionDrug.findByPrescription(\
+        prescription[0].id, patient.admissionNumber, aggDate, idSegment, is_cpoe)
     interventions = Intervention.findAll(admissionNumber=patient.admissionNumber)
     relations = Prescription.findRelation(prescription[0].id,patient.admissionNumber, aggDate)
     headers = Prescription.getHeaders(admissionNumber, aggDate, idSegment) if aggDate else []
@@ -226,14 +231,12 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None, idS
     if aggDate:
         headers = buildHeaders(headers, pDrugs,pSolution,pProcedures)
 
-        if verify_jwt_in_request(optional=True):
-            user = User.find(get_jwt_identity())
-            if user.cpoe():
-                pDrugs = drugList.cpoeDrugs(pDrugs, idPrescription)
-                pDrugs = drugList.sortWhiteList(pDrugs)
-                pSolution = drugList.cpoeDrugs(pSolution, idPrescription)
-                pProcedures = drugList.cpoeDrugs(pProcedures, idPrescription)
-                pDiet = drugList.cpoeDrugs(pDiet, idPrescription)
+        if is_cpoe:
+            pDrugs = drugList.cpoeDrugs(pDrugs, idPrescription)
+            pDrugs = drugList.sortWhiteList(pDrugs)
+            pSolution = drugList.cpoeDrugs(pSolution, idPrescription)
+            pProcedures = drugList.cpoeDrugs(pProcedures, idPrescription)
+            pDiet = drugList.cpoeDrugs(pDiet, idPrescription)
 
     pIntervention = [i for i in interventions if int(i['id']) == 0 and int(i['idPrescription']) == prescription[0].id]
 

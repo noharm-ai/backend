@@ -398,7 +398,7 @@ class PrescriptionDrug(db.Model):
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.Integer, nullable=True)
 
-    def findByPrescription(idPrescription, admissionNumber, aggDate=None, idSegment=None):
+    def findByPrescription(idPrescription, admissionNumber, aggDate=None, idSegment=None, is_cpoe=False):
         prevNotes = getPrevNotes(admissionNumber)
 
         q = db.session\
@@ -422,6 +422,31 @@ class PrescriptionDrug(db.Model):
                  .filter(Prescription.agg == None)\
                  .filter(Prescription.concilia == None)\
                  .filter(Prescription.idSegment == idSegment)
+
+            if is_cpoe:
+                p_aux = db.aliased(Prescription)
+
+                query_prescription = db.session.query(p_aux.id)\
+                    .select_from(p_aux)\
+                    .filter(p_aux.admissionNumber == admissionNumber)\
+                    .filter(between(aggDate, func.date(p_aux.date), func.date(p_aux.expire)))
+
+                pd_max = db.aliased(PrescriptionDrug)
+
+                query_pd_max = db.session.query(func.max(pd_max.id))\
+                    .select_from(pd_max)\
+                    .filter(pd_max.idPrescription.in_(query_prescription))\
+                    .filter(pd_max.idDrug == PrescriptionDrug.idDrug)\
+                    .filter(pd_max.idSegment == PrescriptionDrug.idSegment)\
+                    .filter(func.coalesce(pd_max.idMeasureUnit, '0') == func.coalesce(PrescriptionDrug.idMeasureUnit, '0'))\
+                    .filter(func.coalesce(pd_max.idFrequency, '0') == func.coalesce(PrescriptionDrug.idFrequency, '0'))\
+                    .filter(func.coalesce(pd_max.dose, 0) == func.coalesce(PrescriptionDrug.dose, 0))\
+                    .filter(pd_max.source == PrescriptionDrug.source)\
+                    .filter(func.coalesce(pd_max.route, '0') == func.coalesce(PrescriptionDrug.route, '0'))\
+                    .filter(func.coalesce(pd_max.suspendedDate, func.current_date()) == func.coalesce(PrescriptionDrug.suspendedDate, func.current_date()))\
+                    
+
+                q = q.filter(PrescriptionDrug.id == query_pd_max)
         
         return q.order_by(asc(Prescription.expire), desc(func.concat(PrescriptionDrug.idPrescription,PrescriptionDrug.solutionGroup)), asc(Drug.name)).all()
 
