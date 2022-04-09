@@ -443,8 +443,7 @@ class PrescriptionDrug(db.Model):
                     .filter(func.coalesce(pd_max.dose, 0) == func.coalesce(PrescriptionDrug.dose, 0))\
                     .filter(pd_max.source == PrescriptionDrug.source)\
                     .filter(func.coalesce(pd_max.route, '0') == func.coalesce(PrescriptionDrug.route, '0'))\
-                    .filter(func.coalesce(pd_max.suspendedDate, func.current_date()) == func.coalesce(PrescriptionDrug.suspendedDate, func.current_date()))\
-                    
+                    .filter(func.coalesce(pd_max.suspendedDate, func.current_date()) == func.coalesce(PrescriptionDrug.suspendedDate, func.current_date()))
 
                 q = q.filter(PrescriptionDrug.id == query_pd_max)
         

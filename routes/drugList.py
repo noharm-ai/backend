@@ -220,13 +220,16 @@ class DrugList():
         result.extend([p for p in pDrugs if p['whiteList']])
         return result
 
-    def getInfusionList(self):
+    def getInfusionList(self, is_cpoe):
         result = {}
         for pd in self.drugList:
             if pd[0].solutionGroup and pd[0].source == 'Soluções':
                 
                 pdID = pd[0].idPrescription
-                pdGroup = pd[0].solutionGroup
+                if is_cpoe:
+                    pdGroup = str(pd[0].idPrescription) + str(pd[0].solutionGroup)
+                else:
+                    pdGroup = pd[0].solutionGroup
 
                 if not pdID in result:
                     result[pdID] = {}
@@ -283,7 +286,7 @@ class DrugList():
         for d in drugs:
             drugs[drugs.index(d)]['cpoe'] = d['idPrescription']
             drugs[drugs.index(d)]['idPrescription'] = idPrescription
-
-        drugs.sort(key=DrugList.sortDrugs)
+            if drugs[drugs.index(d)]['grp_solution'] is not None:
+                drugs[drugs.index(d)]['grp_solution'] = str(d['cpoe']) + str(d['grp_solution'])
 
         return drugs

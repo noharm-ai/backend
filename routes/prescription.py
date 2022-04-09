@@ -216,7 +216,7 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None, idS
         conciliaList = drugList.conciliaList(conciliaDrugsY,conciliaList)
 
     pSolution = drugList.getDrugType([], 'Soluções')
-    pInfusion = drugList.getInfusionList()
+    pInfusion = drugList.getInfusionList(is_cpoe)
 
     pProcedures = drugList.getDrugType([], 'Proced/Exames')
     pProcedures = drugList.getDrugType(pProcedures, 'Proced/Exames', checked=True)
