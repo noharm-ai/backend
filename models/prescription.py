@@ -398,6 +398,9 @@ class PrescriptionDrug(db.Model):
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.Integer, nullable=True)
 
+    cpoe_group = db.Column("cpoe_grupo", db.Integer, nullable=True)
+    cpoe_duplicity = db.Column('cpoe_duplicada', db.String(1), nullable=True)
+
     def findByPrescription(idPrescription, admissionNumber, aggDate=None, idSegment=None, is_cpoe=False):
         prevNotes = getPrevNotes(admissionNumber)
 
@@ -437,13 +440,15 @@ class PrescriptionDrug(db.Model):
                     .select_from(pd_max)\
                     .filter(pd_max.idPrescription.in_(query_prescription))\
                     .filter(pd_max.idDrug == PrescriptionDrug.idDrug)\
-                    .filter(pd_max.idSegment == PrescriptionDrug.idSegment)\
-                    .filter(func.coalesce(pd_max.idMeasureUnit, '0') == func.coalesce(PrescriptionDrug.idMeasureUnit, '0'))\
-                    .filter(func.coalesce(pd_max.idFrequency, '0') == func.coalesce(PrescriptionDrug.idFrequency, '0'))\
-                    .filter(func.coalesce(pd_max.dose, 0) == func.coalesce(PrescriptionDrug.dose, 0))\
-                    .filter(pd_max.source == PrescriptionDrug.source)\
-                    .filter(func.coalesce(pd_max.route, '0') == func.coalesce(PrescriptionDrug.route, '0'))\
-                    .filter(func.coalesce(pd_max.suspendedDate, func.current_date()) == func.coalesce(PrescriptionDrug.suspendedDate, func.current_date()))
+                    .filter(\
+                        or_(\
+                            pd_max.cpoe_group == PrescriptionDrug.cpoe_group,\
+                            and_(\
+                                pd_max.cpoe_group != PrescriptionDrug.cpoe_group,\
+                                pd_max.cpoe_duplicity == 'S'\
+                            )
+                        )\
+                    )
 
                 q = q.filter(PrescriptionDrug.id == query_pd_max)
         
