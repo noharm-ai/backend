@@ -10,6 +10,8 @@ from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, get_jwt_identity)
 from .utils import *
 from datetime import  datetime
+from services import patient_service
+from converter import patient_converter
 
 app_pat = Blueprint('app_pat',__name__)
 
@@ -180,3 +182,26 @@ def setPatientData(admissionNumber):
         db.engine.execute(query) 
 
     return tryCommit(db, admissionNumber, user.permission())
+
+
+@app_pat.route('/patient', methods=['GET'])
+@jwt_required()
+def list_patients():
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+
+    id_segment = request.args.get('idSegment', None)
+    id_department_list = request.args.getlist('idDepartment[]', None)
+    next_appointment_start_date = request.args.get('nextAppointmentStartDate', None)
+    next_appointment_end_date = request.args.get('nextAppointmentEndDate', None)
+
+    patients = patient_service.get_patients(\
+        id_segment=id_segment, id_department_list=id_department_list\
+        , next_appointment_start_date=next_appointment_start_date\
+        , next_appointment_end_date=next_appointment_end_date\
+    )
+
+    return {
+        'status': 'success',
+        'data': patient_converter.list_to_dto(patients)
+    }, status.HTTP_200_OK

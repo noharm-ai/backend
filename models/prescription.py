@@ -398,7 +398,10 @@ class PrescriptionDrug(db.Model):
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.Integer, nullable=True)
 
-    def findByPrescription(idPrescription, admissionNumber, aggDate=None, idSegment=None):
+    cpoe_group = db.Column("cpoe_grupo", db.Integer, nullable=True)
+    cpoe_duplicity = db.Column('cpoe_duplicada', db.String(1), nullable=True)
+
+    def findByPrescription(idPrescription, admissionNumber, aggDate=None, idSegment=None, is_cpoe=False):
         prevNotes = getPrevNotes(admissionNumber)
 
         q = db.session\
@@ -422,6 +425,32 @@ class PrescriptionDrug(db.Model):
                  .filter(Prescription.agg == None)\
                  .filter(Prescription.concilia == None)\
                  .filter(Prescription.idSegment == idSegment)
+
+            if is_cpoe:
+                p_aux = db.aliased(Prescription)
+
+                query_prescription = db.session.query(p_aux.id)\
+                    .select_from(p_aux)\
+                    .filter(p_aux.admissionNumber == admissionNumber)\
+                    .filter(between(aggDate, func.date(p_aux.date), func.date(p_aux.expire)))
+
+                pd_max = db.aliased(PrescriptionDrug)
+
+                query_pd_max = db.session.query(func.max(pd_max.id))\
+                    .select_from(pd_max)\
+                    .filter(pd_max.idPrescription.in_(query_prescription))\
+                    .filter(pd_max.idDrug == PrescriptionDrug.idDrug)\
+                    .filter(\
+                        or_(\
+                            pd_max.cpoe_group == PrescriptionDrug.cpoe_group,\
+                            and_(\
+                                pd_max.cpoe_group != PrescriptionDrug.cpoe_group,\
+                                pd_max.cpoe_duplicity == 'S'\
+                            )
+                        )\
+                    )
+
+                q = q.filter(PrescriptionDrug.id == query_pd_max)
         
         return q.order_by(asc(Prescription.expire), desc(func.concat(PrescriptionDrug.idPrescription,PrescriptionDrug.solutionGroup)), asc(Drug.name)).all()
 
