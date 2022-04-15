@@ -90,7 +90,9 @@ def generateOutliers(idSegment,fold=None,idDrug=None,clean=None):
         if clean != None:
             queryUpdate = "UPDATE " + user.schema + ".presmed SET idoutlier = NULL WHERE fkmedicamento = " + str(int(idDrug)) \
                                     + " AND idsegmento = " + str(int(idSegment)) \
-                                    + " AND fkprescricao in (SELECT fkprescricao FROM " + user.schema + ".prescricao WHERE dtprescricao > current_date - 7);"
+                                    + " AND fkprescricao in (SELECT fkprescricao FROM " + user.schema + ".prescricao" \
+                                                            + " WHERE dtprescricao > current_date - 7" \
+                                                            + " AND idsegmento = " + str(int(idSegment)) + ");"
             result = db.engine.execute(queryUpdate)
             print('RowCount Update Drug', result.rowcount)
 
