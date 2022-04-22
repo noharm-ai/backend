@@ -399,7 +399,6 @@ class PrescriptionDrug(db.Model):
     user = db.Column("update_by", db.Integer, nullable=True)
 
     cpoe_group = db.Column("cpoe_grupo", db.Integer, nullable=True)
-    cpoe_duplicity = db.Column('cpoe_duplicada', db.String(1), nullable=True)
 
     def findByPrescription(idPrescription, admissionNumber, aggDate=None, idSegment=None, is_cpoe=False):
         prevNotes = getPrevNotes(admissionNumber)
@@ -432,7 +431,10 @@ class PrescriptionDrug(db.Model):
                 query_prescription = db.session.query(p_aux.id)\
                     .select_from(p_aux)\
                     .filter(p_aux.admissionNumber == admissionNumber)\
-                    .filter(between(aggDate, func.date(p_aux.date), func.date(p_aux.expire)))
+                    .filter(between(aggDate, func.date(p_aux.date), func.date(p_aux.expire)))\
+                    .filter(p_aux.agg == None)\
+                    .filter(p_aux.concilia == None)\
+                    .filter(p_aux.idSegment == idSegment)
 
                 pd_max = db.aliased(PrescriptionDrug)
 
@@ -440,15 +442,7 @@ class PrescriptionDrug(db.Model):
                     .select_from(pd_max)\
                     .filter(pd_max.idPrescription.in_(query_prescription))\
                     .filter(pd_max.idDrug == PrescriptionDrug.idDrug)\
-                    .filter(\
-                        or_(\
-                            pd_max.cpoe_group == PrescriptionDrug.cpoe_group,\
-                            and_(\
-                                pd_max.cpoe_group != PrescriptionDrug.cpoe_group,\
-                                pd_max.cpoe_duplicity == 'S'\
-                            )
-                        )\
-                    )
+                    .filter(pd_max.cpoe_group == PrescriptionDrug.cpoe_group)
 
                 q = q.filter(PrescriptionDrug.id == query_pd_max)
         
