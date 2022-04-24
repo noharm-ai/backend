@@ -52,8 +52,8 @@ def getDrugSummary(idDrug, idSegment, idHospital):
 
   results = {
     'drug': {
-      'id': drug.id,
-      'name': drug.name
+      'id': idDrug,
+      'name': drug.name if drug else ''
     },
     'units': unitResults,
     'frequencies': frequencyResults

@@ -88,10 +88,6 @@ def generateOutliers(idSegment,fold=None,idDrug=None,clean=None):
         query += " AND fkmedicamento = " + str(int(idDrug))
 
         if clean != None:
-            queryUpdate = "UPDATE " + user.schema + ".presmed SET idoutlier = NULL WHERE fkmedicamento = " + str(int(idDrug)) + " AND idsegmento = " + str(int(idSegment)) + ";"
-            result = db.engine.execute(queryUpdate)
-            print('RowCount Update Drug', result.rowcount)
-
             queryDelete = "DELETE FROM " + user.schema + ".outlier WHERE fkmedicamento = " + str(int(idDrug)) + " AND idsegmento = " + str(int(idSegment)) + ";"
             result = db.engine.execute(queryDelete)
             print('RowCount Delete Drug', result.rowcount)
