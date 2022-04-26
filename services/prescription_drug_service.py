@@ -18,6 +18,14 @@ def getPrescriptionDrug(idPrescriptionDrug):
         .filter(PrescriptionDrug.id == idPrescriptionDrug)\
         .first()
 
+def has_unchecked_drugs(idPrescription):
+    count = db.session.query(PrescriptionDrug)\
+        .filter(PrescriptionDrug.idPrescription == idPrescription)\
+        .filter(or_(PrescriptionDrug.checked == False, PrescriptionDrug.checked == None))\
+        .count()
+
+    return count > 0
+
 def prescriptionDrugToDTO(pd):
     pdWhiteList = bool(pd[6].whiteList) if pd[6] is not None else False
 

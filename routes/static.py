@@ -7,6 +7,8 @@ from .utils import tryCommit, strNone, getFeatures
 from datetime import date
 from random import random 
 
+from services import prescription_drug_service
+
 app_stc = Blueprint('app_stc',__name__)
 
 @app_stc.route('/static/<string:schema>/prescription/<int:idPrescription>', methods=['GET'])
@@ -46,6 +48,7 @@ def computePrescription(schema, idPrescription):
         pAgg.idPatient = p.idPatient
         pAgg.admissionNumber = p.admissionNumber
         pAgg.date = date(p.date.year, p.date.month, p.date.day)
+        pAgg.status = 0
         newPrescAgg = True
 
     outpatient = request.args.get('outpatient', None)
@@ -62,7 +65,10 @@ def computePrescription(schema, idPrescription):
     pAgg.record = p.record
     pAgg.prescriber = 'Prescrição Agregada'
     pAgg.agg = True
-    pAgg.status = 0
+
+    if prescription_drug_service.has_unchecked_drugs(idPrescription):
+        pAgg.status = 0
+
     if 'data' in resultAgg:
         pAgg.features = getFeatures(resultAgg)
         pAgg.aggDrugs = pAgg.features['drugIDs']
