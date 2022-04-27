@@ -21,7 +21,7 @@ def getPrescriptionDrug(idPrescriptionDrug):
 def has_unchecked_drugs(idPrescription):
     count = db.session.query(PrescriptionDrug)\
         .filter(PrescriptionDrug.idPrescription == idPrescription)\
-        .filter(or_(PrescriptionDrug.checked == False, PrescriptionDrug.checked == None))\
+        .filter(or_(PrescriptionDrug.checked == False, PrescriptionDrug.checked == None, PrescriptionDrug.cpoe_group == None))\
         .count()
 
     return count > 0
