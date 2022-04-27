@@ -65,6 +65,7 @@ def computePrescription(schema, idPrescription):
     pAgg.record = p.record
     pAgg.prescriber = 'Prescrição Agregada'
     pAgg.agg = True
+    pAgg.status = 0
 
     if prescription_drug_service.has_unchecked_drugs(idPrescription):
         pAgg.status = 0
