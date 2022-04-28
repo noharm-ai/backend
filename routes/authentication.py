@@ -47,6 +47,8 @@ def auth():
             .filter(Memory.kind == 'features')\
             .first()
 
+        nameUrl = Memory.getNameUrl(user.schema)
+
         return {
             'status': 'success',
             'userName': user.name,
@@ -55,7 +57,8 @@ def auth():
             'schema': user.schema,
             'roles': user.config['roles'] if user.config and 'roles' in user.config else [],
             'features': features.value if features is not None else [],
-            'nameUrl': Memory.getNameUrl(user.schema)['value'] if user.permission() else 'http://localhost/{idPatient}',
+            'nameUrl': nameUrl['value'] if user.permission() else 'http://localhost/{idPatient}',
+            'nameHeaders': nameUrl['headers'] if 'headers' in nameUrl else {},
             'notify': notification,
             'access_token': access_token,
             'refresh_token': refresh_token,
