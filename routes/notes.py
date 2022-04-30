@@ -1,3 +1,4 @@
+import os
 from models.main import db, dbSession, User
 from models.notes import ClinicalNotes
 from models.prescription import Patient
@@ -7,6 +8,9 @@ from flask_jwt_extended import (jwt_required, get_jwt_identity)
 from .utils import tryCommit
 from sqlalchemy import desc, or_
 from datetime import datetime, timedelta
+from services import clinical_notes_service
+
+from exception.validation_error import ValidationError
 
 app_note = Blueprint('app_note',__name__)
 
@@ -92,3 +96,23 @@ def changeNote(idNote):
     n.names = n.text.count('annotation-nomes')
 
     return tryCommit(db, idNote)
+
+
+@app_note.route('/notes', methods=['POST'])
+@jwt_required()
+def create():
+    data = request.get_json()
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+    os.environ['TZ'] = 'America/Sao_Paulo'
+
+    try:
+        id = clinical_notes_service.create_clinical_notes(data, user)
+    except ValidationError as e:
+        return {
+            'status': 'error',
+            'message': e.message,
+            'code': e.code
+        }, e.httpStatus
+
+    return tryCommit(db, id, user.permission())
