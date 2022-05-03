@@ -5,6 +5,8 @@ from routes.utils import *
 from datetime import datetime
 from sqlalchemy.orm import deferred
 from sqlalchemy import case, BigInteger, cast, between, outerjoin
+from functools import partial
+from sqlalchemy.dialects.postgresql import TSRANGE
 
 class Prescription(db.Model):
     __tablename__ = 'prescricao'
@@ -114,7 +116,7 @@ class Prescription(db.Model):
 
         return headers
 
-    def findRelation(idPrescription, admissionNumber, aggDate=None):
+    def findRelation(idPrescription, admissionNumber, aggDate=None, is_cpoe = False):
         pd1 = db.aliased(PrescriptionDrug)
         pd2 = db.aliased(PrescriptionDrug)
         m1 = db.aliased(Drug)
@@ -131,19 +133,40 @@ class Prescription(db.Model):
                 .join(Relation, and_(Relation.sctida == m1.sctid, Relation.sctidb == m2.sctid))\
                 .filter(pd1.idPrescription == idPrescription)
         else:
-            relation = db.session.query(pd1.id, Relation, m1.name, m2.name, p1.expire)\
-                    .select_from(p1)\
-                    .join(p2, p2.admissionNumber == admissionNumber)\
-                    .join(pd1, pd1.idPrescription == p1.id)\
-                    .join(pd2, and_(pd2.idPrescription == p2.id, pd2.id != pd1.id))\
-                    .join(m1, m1.id == pd1.idDrug)\
-                    .join(m2, m2.id == pd2.idDrug)\
-                    .join(Relation, and_(Relation.sctida == m1.sctid, Relation.sctidb == m2.sctid))\
-                    .filter(p1.admissionNumber == admissionNumber)\
-                    .filter(between(aggDate, func.date(p1.date), func.date(p1.expire)))\
-                    .filter(between(aggDate, func.date(p2.date), func.date(p2.expire)))\
-                    .filter(func.date(p2.expire) == func.date(p1.expire))\
-                    .filter(p1.idSegment != None)
+            if is_cpoe:
+                daterange = partial(func.tsrange, type_=TSRANGE)
+                relation = db.session.query(pd1.id, Relation, m1.name, m2.name, p1.expire)\
+                        .select_from(p1)\
+                        .join(p2, p2.admissionNumber == admissionNumber)\
+                        .join(pd1, pd1.idPrescription == p1.id)\
+                        .join(pd2, and_(\
+                            pd2.idPrescription == p2.id, pd2.id != pd1.id, pd2.cpoe_group != pd1.cpoe_group\
+                        ))\
+                        .join(m1, m1.id == pd1.idDrug)\
+                        .join(m2, m2.id == pd2.idDrug)\
+                        .join(Relation, and_(Relation.sctida == m1.sctid, Relation.sctidb == m2.sctid))\
+                        .filter(p1.admissionNumber == admissionNumber)\
+                        .filter(between(aggDate, func.date(p1.date), func.date(p1.expire)))\
+                        .filter(between(aggDate, func.date(p2.date), func.date(p2.expire)))\
+                        .filter(p1.idSegment != None)\
+                        .filter(\
+                            daterange(p1.date, p1.expire, '[]')\
+                                .overlaps(daterange(p2.date, p2.expire, '[]'))\
+                        )
+            else:
+                relation = db.session.query(pd1.id, Relation, m1.name, m2.name, p1.expire)\
+                        .select_from(p1)\
+                        .join(p2, p2.admissionNumber == admissionNumber)\
+                        .join(pd1, pd1.idPrescription == p1.id)\
+                        .join(pd2, and_(pd2.idPrescription == p2.id, pd2.id != pd1.id))\
+                        .join(m1, m1.id == pd1.idDrug)\
+                        .join(m2, m2.id == pd2.idDrug)\
+                        .join(Relation, and_(Relation.sctida == m1.sctid, Relation.sctidb == m2.sctid))\
+                        .filter(p1.admissionNumber == admissionNumber)\
+                        .filter(between(aggDate, func.date(p1.date), func.date(p1.expire)))\
+                        .filter(between(aggDate, func.date(p2.date), func.date(p2.expire)))\
+                        .filter(func.date(p2.expire) == func.date(p1.expire))\
+                        .filter(p1.idSegment != None)
 
         relation = relation.filter(Relation.active == True)
 
