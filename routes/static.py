@@ -38,9 +38,14 @@ def computePrescription(schema, idPrescription):
     p.features = getFeatures(resultPresc)
     p.aggDrugs = p.features['drugIDs']
     p.aggDeps = [p.idDepartment]
-    
+
+    outpatient = request.args.get('outpatient', None)
+    if outpatient:
+        PrescAggID = p.admissionNumber
+    else:
+        PrescAggID = genAggID(p)
+
     newPrescAgg = False
-    PrescAggID = genAggID(p)
     pAgg = Prescription.query.get(PrescAggID)
     if (pAgg is None):
         pAgg = Prescription()
@@ -51,9 +56,7 @@ def computePrescription(schema, idPrescription):
         pAgg.status = 0
         newPrescAgg = True
 
-    outpatient = request.args.get('outpatient', None)
     if outpatient:
-        pAgg.id = p.admissionNumber
         pAgg.date = date(p.date.year, p.date.month, p.date.day)
 
     resultAgg, stat = getPrescription(admissionNumber=p.admissionNumber, aggDate=pAgg.date, idSegment=p.idSegment)
