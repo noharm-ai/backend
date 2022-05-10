@@ -8,6 +8,7 @@ def list_to_dto(patients):
             'admissionDate': p[0].admissionDate.isoformat() if p[0].admissionDate else None,
             'birthdate': p[0].birthdate.isoformat() if p[0].birthdate else None,
             'idPrescription': p[1].id,
+            'observation': p[0].observation,
             'lastAppointment': p[2].isoformat() if p[2] else None,
             'nextAppointment': p[3].isoformat() if p[3] else None,
         })

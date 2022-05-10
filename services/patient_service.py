@@ -1,5 +1,6 @@
 from models.main import db
 from sqlalchemy import desc, func
+from sqlalchemy.orm import undefer
 
 from models.appendix import *
 from models.notes import ClinicalNotes
@@ -34,6 +35,7 @@ def get_patients(id_segment, id_department_list, next_appointment_start_date, ne
                 .filter(Pmax.agg == True)\
             )\
         .order_by(desc("next_appointment"))\
+        .options(undefer('observation'))
 
     if (id_segment):
         query = query.filter(Prescription.idSegment == id_segment)
