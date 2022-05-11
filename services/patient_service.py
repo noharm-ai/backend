@@ -16,7 +16,7 @@ def get_patients(id_segment, id_department_list, next_appointment_start_date, ne
         .filter(func.date(ClinicalNotes.date) <= func.date(func.current_date()))\
         .label('last_appointment')
 
-    sq_next_appointment = db.session.query(func.max(ClinicalNotes.date))\
+    sq_next_appointment = db.session.query(func.max(func.date(ClinicalNotes.date)))\
         .select_from(ClinicalNotes)\
         .filter(ClinicalNotes.admissionNumber == Prescription.admissionNumber)\
         .filter(ClinicalNotes.date > func.current_date())\
