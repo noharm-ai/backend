@@ -25,6 +25,8 @@ def create_clinical_notes(data, user):
     cn.update = datetime.today()
     cn.user = user.id
     cn.position = 'Agendamento' if data.get('action', None) == 'schedule' else 'Farmacêutica'
+    cn.form = data.get('formValues', None)
+    cn.template = data.get('template', None)
 
     db.session.add(cn)
     db.session.flush()

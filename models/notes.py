@@ -34,6 +34,9 @@ class ClinicalNotes(db.Model):
 
     isExam = db.Column("exame", db.Boolean, nullable=False)
 
+    form = db.Column("formulario", postgresql.JSON, nullable=True)
+    template = db.Column("template", postgresql.JSON, nullable=True)
+
     def exists():
         tMap = db.session.connection()._execution_options.get("schema_translate_map", { None: None })
         schemaName = tMap[None]
