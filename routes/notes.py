@@ -40,6 +40,8 @@ def getNotes(admissionNumber):
                 'id': n.id,
                 'admissionNumber': n.admissionNumber,
                 'text': n.text,
+                'form': n.form,
+                'template': n.template,
                 'date': n.date.isoformat(),
                 'prescriber': n.prescriber,
                 'position': n.position,
