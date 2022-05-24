@@ -7,8 +7,9 @@ from flask_api import status
 from flask_jwt_extended import (jwt_required, get_jwt_identity)
 from .utils import tryCommit
 from sqlalchemy import desc, or_
+from sqlalchemy.orm import undefer
 from datetime import datetime, timedelta
-from services import clinical_notes_service
+from services import clinical_notes_service, memory_service
 
 from exception.validation_error import ValidationError
 
@@ -21,10 +22,10 @@ def getNotes(admissionNumber):
     dbSession.setSchema(user.schema)
 
     if ClinicalNotes.exists():
-    
+        has_primary_care = memory_service.has_feature('PRIMARYCARE')
         pat = Patient.query.get(admissionNumber)
         admDate = pat.admissionDate if pat else datetime.today()
-        notes = ClinicalNotes.query\
+        query = ClinicalNotes.query\
                 .filter(ClinicalNotes.admissionNumber==admissionNumber)\
                 .filter(or_(ClinicalNotes.isExam == None, ClinicalNotes.isExam == False))\
                 .filter(or_(
@@ -32,7 +33,11 @@ def getNotes(admissionNumber):
                         ClinicalNotes.date == admDate
                 ))\
                 .order_by(desc(ClinicalNotes.date))\
-                .all()
+
+        if has_primary_care:
+            query.options(undefer("form"), undefer("template"))
+
+        notes = query.all()
 
         results = []
         for n in notes:
@@ -40,8 +45,8 @@ def getNotes(admissionNumber):
                 'id': n.id,
                 'admissionNumber': n.admissionNumber,
                 'text': n.text,
-                'form': n.form,
-                'template': n.template,
+                'form': n.form if has_primary_care else None,
+                'template': n.template if has_primary_care else None,
                 'date': n.date.isoformat(),
                 'prescriber': n.prescriber,
                 'position': n.position,
