@@ -33,6 +33,9 @@ class ClinicalNotes(db.Model):
     dialysisText = db.Column('dialisetexto', db.String, nullable=True)
 
     isExam = db.Column("exame", db.Boolean, nullable=False)
+    # primary care columns
+    form = deferred(db.Column("formulario", postgresql.JSON, nullable=True))
+    template = deferred(db.Column("template", postgresql.JSON, nullable=True))
 
     def exists():
         tMap = db.session.connection()._execution_options.get("schema_translate_map", { None: None })
