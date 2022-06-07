@@ -13,9 +13,8 @@ def proxy_name(idPatient):
     schema = claims["schema"].upper()
     to_url = getenv(schema + '_PROXY_URL')
     header_env = getenv(schema + '_PROXY_HEADERS')
-    current_app.logger.info(to_url)
-    current_app.logger.info('proxyurl', to_url)
-    current_app.logger.info('proxyheaders', header_env)
+    current_app.logger.info('proxyurl %s', to_url)
+    current_app.logger.info('proxyheaders %s', header_env)
     headers = {}
 
     #split headers
@@ -27,6 +26,6 @@ def proxy_name(idPatient):
         url=to_url.replace("{idPatient}", str(idPatient)),\
         headers=headers)
 
-    current_app.logger.info('proxyresponse', response.content)
+    current_app.logger.info('proxyresponse %s', response.content)
     
     return response.json()
