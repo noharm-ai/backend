@@ -1,3 +1,4 @@
+from flask import current_app
 from os import getenv
 import requests
 from flask import Blueprint
@@ -12,6 +13,8 @@ def proxy_name(idPatient):
     schema = claims["schema"].upper()
     to_url = getenv(schema + '_PROXY_URL')
     header_env = getenv(schema + '_PROXY_HEADERS')
+    current_app.logger.info('proxyurl', to_url)
+    current_app.logger.info('proxyheaders', header_env)
     headers = {}
 
     #split headers
@@ -22,5 +25,7 @@ def proxy_name(idPatient):
     response = requests.get(\
         url=to_url.replace("{idPatient}", str(idPatient)),\
         headers=headers)
+
+    current_app.logger.info('proxyresponse', response.content)
     
     return response.json()
