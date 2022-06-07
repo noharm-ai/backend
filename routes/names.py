@@ -1,7 +1,7 @@
 from os import getenv
 import requests
 from flask import Blueprint
-from flask_jwt_extended import (jwt_required, get_jwt_identity, get_jwt)
+from flask_jwt_extended import (jwt_required, get_jwt)
 
 app_names = Blueprint('app_names',__name__)
 
@@ -14,6 +14,7 @@ def proxy_name(idPatient):
     header_env = getenv(schema + '_PROXY_HEADERS')
     headers = {}
 
+    #split headers
     for h in header_env.split("@@"):
         item = h.split(":")
         headers[item[0]] = item[1]
