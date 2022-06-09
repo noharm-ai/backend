@@ -59,6 +59,7 @@ def auth():
             'features': features.value if features is not None else [],
             'nameUrl': nameUrl['value'] if user.permission() else 'http://localhost/{idPatient}',
             'nameHeaders': nameUrl['headers'] if 'headers' in nameUrl else {},
+            'proxy': True if 'to' in nameUrl else False,
             'notify': notification,
             'access_token': access_token,
             'refresh_token': refresh_token,
