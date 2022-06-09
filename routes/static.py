@@ -69,7 +69,7 @@ def computePrescription(schema, idPrescription):
     pAgg.prescriber = 'Prescrição Agregada'
     pAgg.agg = True
 
-    if prescription_drug_service.has_unchecked_drugs(idPrescription):
+    if p.concilia is None and prescription_drug_service.has_unchecked_drugs(idPrescription):
         pAgg.status = 0
 
     if 'data' in resultAgg:
