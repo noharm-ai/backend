@@ -68,6 +68,9 @@ def none2zero(s):
 def strNone(s):
     return '' if s is None else str(s)
 
+def strFormatBR(s):
+    return f'{s:_.2f}'.replace('.',',').replace('_','.')
+
 def skinChar(s):
     return ' ' if s is None else str(s).upper()[0]
 
