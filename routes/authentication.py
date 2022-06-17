@@ -56,6 +56,7 @@ def auth():
             'email': user.email,
             'schema': user.schema,
             'roles': user.config['roles'] if user.config and 'roles' in user.config else [],
+            'userFeatures': user.config['features'] if user.config and 'features' in user.config else [],
             'features': features.value if features is not None else [],
             'nameUrl': nameUrl['value'] if user.permission() else 'http://localhost/{idPatient}',
             'nameHeaders': nameUrl['headers'] if 'headers' in nameUrl else {},
