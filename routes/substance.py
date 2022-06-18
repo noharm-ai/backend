@@ -28,6 +28,36 @@ def getSubstance():
         'data': results
     }, status.HTTP_200_OK
 
+@app_sub.route('/substance/find', methods=['GET'])
+@jwt_required()
+def find_substance():
+    term = request.args.get('term', '')
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+
+    if term == '':
+        return {
+            'status': 'success',
+            'data': []
+        }, status.HTTP_200_OK
+
+    drugs = Substance.query\
+        .filter(Substance.name.ilike("%"+ term +"%"))\
+        .order_by(asc(Substance.name))\
+        .all()
+
+    results = []
+    for d in drugs:
+        results.append({
+            'sctid': d.id,
+            'name': d.name.upper(),
+        })
+
+    return {
+        'status': 'success',
+        'data': results
+    }, status.HTTP_200_OK
+
 @app_sub.route('/substance/<int:idSubstance>', methods=['PUT'])
 @jwt_required()
 def setSubstance(idSubstance):

@@ -49,4 +49,4 @@ def get_patients(id_segment, id_department_list, next_appointment_start_date, ne
     if (next_appointment_end_date):
         query = query.filter(sq_next_appointment <= next_appointment_end_date)
 
-    return query.limit(500).all()
+    return query.limit(1500).all()
