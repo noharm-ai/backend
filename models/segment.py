@@ -50,6 +50,7 @@ class Exams(db.Model):
 
     idExame = db.Column("fkexame", db.Integer, primary_key=True)
     idPatient = db.Column("fkpessoa", db.Integer, nullable=False)
+    idPrescription = db.Column("fkprescricao", db.Integer, nullable=False)
     admissionNumber = db.Column('nratendimento', db.Integer, nullable=False)
     date = db.Column("dtexame", db.DateTime, nullable=False)
     typeExam = db.Column("tpexame", db.String, primary_key=True)
