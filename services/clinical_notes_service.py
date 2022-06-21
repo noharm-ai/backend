@@ -3,7 +3,7 @@ from models.main import db
 from models.appendix import *
 from models.notes import ClinicalNotes
 from models.prescription import *
-from services import memory_service
+from services import memory_service, exams_service
 
 from exception.validation_error import ValidationError
 
@@ -30,6 +30,24 @@ def create_clinical_notes(data, user):
 
     db.session.add(cn)
     db.session.flush()
+
+    # route data
+    if cn.template != None:
+        prescription = Prescription.query.get(data.get('idPrescription'))
+
+        for group in cn.template:
+            for q in group['questions']:
+                if 'integration' in q:
+                    if q['integration']['to'] == 'exams' and q["id"] in cn.form and cn.form[q["id"]] != None:
+                        exams_service.create_exam(\
+                            admission_number = data.get('admissionNumber', None),\
+                            id_prescription = prescription.id,\
+                            id_patient = prescription.idPatient,\
+                            type_exam = q["id"],\
+                            value = cn.form[q["id"]],\
+                            unit = q['integration']['unit'],\
+                            user = user\
+                        )
 
     return cn.id
 
