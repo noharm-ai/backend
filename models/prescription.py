@@ -168,7 +168,9 @@ class Prescription(db.Model):
                         .filter(func.date(p2.expire) == func.date(p1.expire))\
                         .filter(p1.idSegment != None)
 
-        relation = relation.filter(Relation.active == True)
+        relation = relation.filter(Relation.active == True)\
+                            .filter(pd1.suspendedDate is None)\
+                            .filter(pd2.suspendedDate is None)
 
         interaction = relation.filter(Relation.kind.in_(['it','dt','dm']))
 
@@ -196,6 +198,7 @@ class Prescription(db.Model):
                                 and_(Relation.sctida == m2.sctid, Relation.sctidb == m1.sctid),
                             ))\
             .filter(Relation.active == True)\
+            .filter(pd1.suspendedDate is None)\
             .filter(Relation.kind.in_(['rx']))
 
         if aggDate is None:
