@@ -3,9 +3,8 @@ from flask_api import status
 from models.main import *
 from models.prescription import *
 from .prescription import getPrescription
-from .utils import tryCommit, strNone, getFeatures
-from datetime import date
-from random import random 
+from .utils import tryCommit, getFeatures
+from datetime import date, timedelta
 
 from services import prescription_drug_service
 
@@ -41,50 +40,61 @@ def computePrescription(schema, idPrescription):
 
     outpatient = request.args.get('outpatient', None)
     if outpatient:
-        PrescAggID = p.admissionNumber
+        prescription_dates = [p.date]
     else:
-        PrescAggID = genAggID(p)
+        prescription_dates = get_date_range(p)
 
-    newPrescAgg = False
-    pAgg = Prescription.query.get(PrescAggID)
-    if (pAgg is None):
-        pAgg = Prescription()
-        pAgg.id = PrescAggID
-        pAgg.idPatient = p.idPatient
-        pAgg.admissionNumber = p.admissionNumber
-        pAgg.date = date(p.date.year, p.date.month, p.date.day)
-        pAgg.status = 0
-        newPrescAgg = True
+    for pdate in prescription_dates:
+        if outpatient:
+            PrescAggID = p.admissionNumber
+        else:
+            PrescAggID = genAggID(p, pdate)
 
-    if outpatient:
-        pAgg.date = date(p.date.year, p.date.month, p.date.day)
+        newPrescAgg = False
+        pAgg = Prescription.query.get(PrescAggID)
+        if (pAgg is None):
+            pAgg = Prescription()
+            pAgg.id = PrescAggID
+            pAgg.idPatient = p.idPatient
+            pAgg.admissionNumber = p.admissionNumber
+            pAgg.date = pdate
+            pAgg.status = 0
+            newPrescAgg = True
 
-    resultAgg, stat = getPrescription(admissionNumber=p.admissionNumber, aggDate=pAgg.date, idSegment=p.idSegment)
+        if outpatient:
+            pAgg.date = date(p.date.year, p.date.month, p.date.day)
 
-    pAgg.idHospital = p.idHospital
-    pAgg.idDepartment = p.idDepartment
-    pAgg.idSegment = p.idSegment
-    pAgg.bed = p.bed
-    pAgg.record = p.record
-    pAgg.prescriber = 'Prescrição Agregada'
-    pAgg.agg = True
+        resultAgg, stat = getPrescription(admissionNumber=p.admissionNumber, aggDate=pAgg.date, idSegment=p.idSegment)
 
-    if p.concilia is None and prescription_drug_service.has_unchecked_drugs(idPrescription):
-        pAgg.status = 0
+        pAgg.idHospital = p.idHospital
+        pAgg.idDepartment = p.idDepartment
+        pAgg.idSegment = p.idSegment
+        pAgg.bed = p.bed
+        pAgg.record = p.record
+        pAgg.prescriber = 'Prescrição Agregada'
+        pAgg.agg = True
 
-    if 'data' in resultAgg:
-        pAgg.features = getFeatures(resultAgg)
-        pAgg.aggDrugs = pAgg.features['drugIDs']
-        pAgg.aggDeps = list(set([resultAgg['data']['headers'][h]['idDepartment'] for h in resultAgg['data']['headers']]))
+        if p.concilia is None and prescription_drug_service.has_unchecked_drugs(idPrescription):
+            pAgg.status = 0
 
-    if newPrescAgg: db.session.add(pAgg)
+        if 'data' in resultAgg:
+            pAgg.features = getFeatures(resultAgg)
+            pAgg.aggDrugs = pAgg.features['drugIDs']
+            pAgg.aggDeps = list(set([resultAgg['data']['headers'][h]['idDepartment'] for h in resultAgg['data']['headers']]))
+
+        if newPrescAgg: db.session.add(pAgg)
 
     return tryCommit(db, str(idPrescription))
 
-def genAggID(p):
-    id = (p.date.year - 2000) * 100000000000000
-    id += p.date.month *          1000000000000
-    id += p.date.day *              10000000000
+def genAggID(p, pdate):
+    id = (pdate.year - 2000) * 100000000000000
+    id += pdate.month *          1000000000000
+    id += pdate.day *              10000000000
     id += p.idSegment *              1000000000
     id += p.admissionNumber
     return id
+
+def get_date_range(p):
+    start_date = p.date.date()
+    end_date = (p.expire.date() if p.expire != None else p.date.date()) + timedelta(days=1) 
+    return [start_date + timedelta(days=x) for x in range((end_date-start_date).days)]
