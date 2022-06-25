@@ -246,6 +246,9 @@ class DrugList():
                     if pd[2] and pd[2].id.lower() != 'ml' and pd[2].id.lower() == pd[6].amountUnit.lower():
                         result[pdID][pdGroup]['vol'] = pdDose = round(pd[0].dose / pd[6].amount,2)
 
+                if pd[6] and pd[6].amount and pd[6].amountUnit is None:
+                    result[pdID][pdGroup]['vol'] = pdDose = pd[6].amount
+
                 result[pdID][pdGroup]['speed'] = pd[0].solutionDose
                 result[pdID][pdGroup]['totalVol'] += pdDose if pdDose else 0
                 result[pdID][pdGroup]['totalVol'] = round(result[pdID][pdGroup]['totalVol'],2)
