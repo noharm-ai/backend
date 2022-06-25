@@ -10,7 +10,7 @@ from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, get_jwt_identity)
 from .utils import *
 from datetime import  datetime
-from services import patient_service, memory_service
+from services import patient_service
 from converter import patient_converter
 
 app_pat = Blueprint('app_pat',__name__)
@@ -168,11 +168,9 @@ def setPatientData(admissionNumber):
     if 'height' in data.keys(): p.height = data.get('height', None)
     if 'dialysis' in data.keys(): p.dialysis = data.get('dialysis', None)
     if 'observation' in data.keys(): p.observation = data.get('observation', None)
-
-    if memory_service.has_feature('PRIMARYCARE'):
-        if 'skinColor' in data.keys(): p.skinColor = data.get('skinColor', None)
-        if 'gender' in data.keys(): p.gender = data.get('gender', None)
-        if 'birthdate' in data.keys(): p.birthdate = data.get('birthdate', None)
+    if 'skinColor' in data.keys(): p.skinColor = data.get('skinColor', None)
+    if 'gender' in data.keys(): p.gender = data.get('gender', None)
+    if 'birthdate' in data.keys(): p.birthdate = data.get('birthdate', None)
 
     p.update = datetime.today()
 
