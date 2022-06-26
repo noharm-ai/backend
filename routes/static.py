@@ -40,10 +40,11 @@ def computePrescription(schema, idPrescription):
 
     outpatient = request.args.get('outpatient', None)
     cpoe = request.args.get('cpoe', None)
-    if outpatient or cpoe is None:
-        prescription_dates = [p.date]
-    else:
+    
+    if cpoe:
         prescription_dates = get_date_range(p)
+    else:
+        prescription_dates = [p.date]
 
     for pdate in prescription_dates:
         if outpatient:
