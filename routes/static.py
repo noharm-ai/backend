@@ -83,8 +83,7 @@ def computePrescription(schema, idPrescription):
             pAgg.features = getFeatures(resultAgg)
             pAgg.aggDrugs = pAgg.features['drugIDs']
             pAgg.aggDeps = list(set([resultAgg['data']['headers'][h]['idDepartment'] for h in resultAgg['data']['headers']]))
-
-        if newPrescAgg: db.session.add(pAgg)
+            if newPrescAgg: db.session.add(pAgg)
 
     return tryCommit(db, str(idPrescription))
 
