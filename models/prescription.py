@@ -71,6 +71,8 @@ class Prescription(db.Model):
             .filter(Prescription.admissionNumber == admissionNumber)\
             .filter(between(aggDate, func.date(Prescription.date), func.date(Prescription.expire)))\
             .filter(Prescription.idSegment == idSegment)\
+            .filter(Prescription.agg == None)\
+            .filter(Prescription.concilia == None)\
             .order_by(asc(Prescription.date))\
             .first()
 
@@ -96,7 +98,6 @@ class Prescription(db.Model):
                     .filter(Prescription.idSegment == idSegment)\
                     .filter(Prescription.agg == None)\
                     .filter(Prescription.concilia == None)\
-                    .filter(Prescription.idSegment != None)\
                     .all()
         headers = {}
         for p in prescriptions:
