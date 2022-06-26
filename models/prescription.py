@@ -69,7 +69,7 @@ class Prescription(db.Model):
     def getPrescriptionAgg(admissionNumber, aggDate, idSegment):
         return Prescription.getPrescriptionBasic()\
             .filter(Prescription.admissionNumber == admissionNumber)\
-            .filter(func.date(Prescription.date) == aggDate)\
+            .filter(between(aggDate, func.date(Prescription.date), func.date(Prescription.expire)))\
             .filter(Prescription.idSegment == idSegment)\
             .order_by(asc(Prescription.date))\
             .first()
