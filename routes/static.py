@@ -39,7 +39,8 @@ def computePrescription(schema, idPrescription):
     p.aggDeps = [p.idDepartment]
 
     outpatient = request.args.get('outpatient', None)
-    if outpatient:
+    cpoe = request.args.get('cpoe', None)
+    if outpatient or cpoe is None:
         prescription_dates = [p.date]
     else:
         prescription_dates = get_date_range(p)
