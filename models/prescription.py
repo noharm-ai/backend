@@ -169,8 +169,8 @@ class Prescription(db.Model):
                         .filter(p1.idSegment != None)
 
         relation = relation.filter(Relation.active == True)\
-                            .filter(pd1.suspendedDate is None)\
-                            .filter(pd2.suspendedDate is None)
+                            .filter(pd1.suspendedDate == None)\
+                            .filter(pd2.suspendedDate == None)
 
         interaction = relation.filter(Relation.kind.in_(['it','dt','dm']))
 
@@ -198,7 +198,7 @@ class Prescription(db.Model):
                                 and_(Relation.sctida == m2.sctid, Relation.sctidb == m1.sctid),
                             ))\
             .filter(Relation.active == True)\
-            .filter(pd1.suspendedDate is None)\
+            .filter(pd1.suspendedDate == None)\
             .filter(Relation.kind.in_(['rx']))
 
         if aggDate is None:
