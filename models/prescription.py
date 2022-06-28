@@ -324,6 +324,8 @@ class Patient(db.Model):
 
         if bool(int(none2zero(agg))):
             q = q.filter(Prescription.agg == True)
+
+            q = q.filter(Prescription.date <= func.coalesce(Patient.dischargeDate, Prescription.date))
         else:
             q = q.filter(Prescription.agg == None)
 
