@@ -96,7 +96,13 @@ def getPrescriptionAuth(idPrescription):
         return { 'status': 'error', 'message': 'Prescrição Inexistente!' }, status.HTTP_400_BAD_REQUEST
 
     if p[0].agg:
-        return getPrescription(idPrescription=idPrescription, admissionNumber=p[0].admissionNumber, aggDate=p[0].date, idSegment=p[0].idSegment)
+        return getPrescription(\
+            idPrescription=idPrescription,\
+            admissionNumber=p[0].admissionNumber,\
+            aggDate=p[0].date,\
+            idSegment=p[0].idSegment,\
+            is_cpoe=user.cpoe()\
+        )
     else:
         return getPrescription(idPrescription=idPrescription)
 
@@ -131,7 +137,7 @@ def getExistIntervention(interventions, dtPrescription):
             result = True;
     return result
 
-def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None, idSegment=None):
+def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None, idSegment=None, is_cpoe=False):
 
     if idPrescription:
         prescription = Prescription.getPrescription(idPrescription)
@@ -146,10 +152,6 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None, idS
         patient = Patient()
         patient.idPatient = prescription[0].idPatient
         patient.admissionNumber = prescription[0].admissionNumber
-
-    is_cpoe = False
-    if verify_jwt_in_request(optional=True):
-        is_cpoe = (User.find(get_jwt_identity())).cpoe()
 
     lastDept = Prescription.lastDeptbyAdmission(prescription[0].id, patient.admissionNumber)
     drugs = PrescriptionDrug.findByPrescription(\
