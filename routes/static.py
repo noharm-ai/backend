@@ -46,9 +46,6 @@ def computePrescription(schema, idPrescription):
     else:
         prescription_dates = [p.date]
 
-    print(prescription_dates)
-    exit()
-
     for pdate in prescription_dates:
         if outpatient:
             PrescAggID = p.admissionNumber
