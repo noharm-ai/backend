@@ -46,6 +46,9 @@ def computePrescription(schema, idPrescription):
     else:
         prescription_dates = [p.date]
 
+    print(prescription_dates)
+    exit()
+
     for pdate in prescription_dates:
         if outpatient:
             PrescAggID = p.admissionNumber
@@ -97,6 +100,8 @@ def genAggID(p, pdate):
     return id
 
 def get_date_range(p):
-    start_date = p.date.date()
+    max_date = date.today() + timedelta(days=3)
+    start_date = p.date.date() if p.date.date() >= date.today() else date.today()
     end_date = (p.expire.date() if p.expire != None else p.date.date()) + timedelta(days=1) 
+    end_date = end_date if end_date < max_date else max_date
     return [start_date + timedelta(days=x) for x in range((end_date-start_date).days)]
