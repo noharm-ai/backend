@@ -27,12 +27,14 @@ def getNotes(admissionNumber):
         admDate = pat.admissionDate if pat else datetime.today()
         query = ClinicalNotes.query\
                 .filter(ClinicalNotes.admissionNumber==admissionNumber)\
-                .filter(or_(ClinicalNotes.isExam == None, ClinicalNotes.isExam == False))\
-                .filter(or_(
+                .filter(or_(ClinicalNotes.isExam == None, ClinicalNotes.isExam == False))
+
+        if not has_primary_care:
+            query = query.filter(or_(
                         ClinicalNotes.date > (datetime.today() - timedelta(days=6)),
-                        ClinicalNotes.date == admDate
-                ))\
-                .order_by(desc(ClinicalNotes.date))\
+                        ClinicalNotes.date == admDate))
+
+        query = query.order_by(desc(ClinicalNotes.date))
 
         if has_primary_care:
             query.options(undefer("form"), undefer("template"))
