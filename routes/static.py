@@ -39,7 +39,7 @@ def computePrescription(schema, idPrescription):
     p.aggDeps = [p.idDepartment]
 
     outpatient = request.args.get('outpatient', None)
-    cpoe = request.args.get('cpoe', None)
+    cpoe = request.args.get('cpoe', False)
     
     if cpoe:
         prescription_dates = get_date_range(p)
@@ -66,7 +66,8 @@ def computePrescription(schema, idPrescription):
         if outpatient:
             pAgg.date = date(pdate.year, pdate.month, pdate.day)
 
-        resultAgg, stat = getPrescription(admissionNumber=p.admissionNumber, aggDate=pAgg.date, idSegment=p.idSegment)
+        resultAgg, stat = getPrescription(admissionNumber=p.admissionNumber,\
+            aggDate=pAgg.date, idSegment=p.idSegment, is_cpoe=cpoe)
 
         pAgg.idHospital = p.idHospital
         pAgg.idDepartment = p.idDepartment
@@ -96,6 +97,8 @@ def genAggID(p, pdate):
     return id
 
 def get_date_range(p):
-    start_date = p.date.date()
+    max_date = date.today() + timedelta(days=3)
+    start_date = p.date.date() if p.date.date() >= date.today() else date.today()
     end_date = (p.expire.date() if p.expire != None else p.date.date()) + timedelta(days=1) 
+    end_date = end_date if end_date < max_date else max_date
     return [start_date + timedelta(days=x) for x in range((end_date-start_date).days)]
