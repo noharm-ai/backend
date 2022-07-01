@@ -51,4 +51,5 @@ def prescriptionDrugToDTO(pd):
         'alergy': bool(pd[0].allergy == 'S'),
         'allergy': bool(pd[0].allergy == 'S'),
         'whiteList': pdWhiteList,
+        'recommendation': pd[0].notes
     }

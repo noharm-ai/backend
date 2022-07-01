@@ -72,6 +72,9 @@ def updatePrescriptionDrug(idPrescriptionDrug, data, user):
 
     if 'route' in data.keys(): 
         pdUpdate.route = data.get('route', None)
+
+    if 'recommendation' in data.keys(): 
+        pdUpdate.notes = data.get('recommendation', None)
       
     db.session.add(pdUpdate)
     db.session.flush()
