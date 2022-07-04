@@ -5,6 +5,7 @@ from routes.utils import *
 from datetime import datetime
 from sqlalchemy.orm import deferred
 from sqlalchemy import case, BigInteger, cast, between, outerjoin
+from sqlalchemy.sql.expression import literal_column, case
 from functools import partial
 from sqlalchemy.dialects.postgresql import TSRANGE
 
@@ -430,10 +431,24 @@ class PrescriptionDrug(db.Model):
     def findByPrescription(idPrescription, admissionNumber, aggDate=None, idSegment=None, is_cpoe=False):
         prevNotes = getPrevNotes(admissionNumber)
 
+        if aggDate != None and is_cpoe:
+
+            agg_date_with_time = cast(func.concat(func.date(aggDate), ' ', '23:59:59'),\
+                                    postgresql.TIMESTAMP)
+
+            period_calc = func.ceil(func.extract('epoch', agg_date_with_time - Prescription.date) / 86400)
+            max_period = func.ceil(func.extract('epoch', Prescription.expire - Prescription.date) / 86400)
+            period_cpoe = case([(agg_date_with_time > Prescription.expire, max_period),
+                                ], else_ = period_calc)
+
+        else:
+            period_cpoe = literal_column("0")
+
         q = db.session\
             .query(PrescriptionDrug, Drug, MeasureUnit, Frequency, '0',\
                     func.coalesce(PrescriptionDrug.finalscore, func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4)).label('score'),
-                    DrugAttributes, Notes.notes, prevNotes.label('prevNotes'), Prescription.status, Prescription.expire, Substance.link)\
+                    DrugAttributes, Notes.notes, prevNotes.label('prevNotes'), Prescription.status, Prescription.expire, Substance.link,\
+                    period_cpoe.label('period_cpoe'))\
             .outerjoin(Outlier, Outlier.id == PrescriptionDrug.idOutlier)\
             .outerjoin(Drug, Drug.id == PrescriptionDrug.idDrug)\
             .outerjoin(Notes, Notes.idPrescriptionDrug == PrescriptionDrug.id)\
