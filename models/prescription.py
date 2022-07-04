@@ -293,7 +293,7 @@ class Patient(db.Model):
                          .filter(Patient.admissionNumber == admissionNumber)\
                          .first()
 
-    def getPatients(idSegment=None, idDept=[], idDrug=[], startDate=date.today(), endDate=None, pending=False, agg=False, currentDepartment=False, concilia=False, allDrugs=False, discharged=False):
+    def getPatients(idSegment=None, idDept=[], idDrug=[], startDate=date.today(), endDate=None, pending=False, agg=False, currentDepartment=False, concilia=False, allDrugs=False, discharged=False, is_cpoe=False):
         q = db.session\
             .query(Prescription, Patient, Department.name.label('department'))\
             .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)\
@@ -325,7 +325,8 @@ class Patient(db.Model):
         if bool(int(none2zero(agg))):
             q = q.filter(Prescription.agg == True)
 
-            q = q.filter(Prescription.date <= func.coalesce(Patient.dischargeDate, Prescription.date))
+            if is_cpoe:
+                q = q.filter(Prescription.date <= func.coalesce(Patient.dischargeDate, Prescription.date))
         else:
             q = q.filter(Prescription.agg == None)
 
