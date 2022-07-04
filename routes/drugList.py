@@ -218,6 +218,7 @@ class DrugList():
                 'notes': pd[7],
                 'prevNotes': pd[8],
                 'drugInfoLink': pd[11],
+                'cpoe_group': pd[0].cpoe_group
             })
         return pDrugs
 
@@ -296,6 +297,6 @@ class DrugList():
             drugs[drugs.index(d)]['cpoe'] = d['idPrescription']
             drugs[drugs.index(d)]['idPrescription'] = idPrescription
             if drugs[drugs.index(d)]['grp_solution'] is not None:
-                drugs[drugs.index(d)]['grp_solution'] = str(d['cpoe']) + str(d['grp_solution'])
+                drugs[drugs.index(d)]['grp_solution'] = str(d['cpoe_group']) + str(d['grp_solution'])
 
         return drugs
