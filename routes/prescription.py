@@ -34,7 +34,10 @@ def getPrescriptions():
     concilia = request.args.get('concilia', 0)
     discharged = request.args.get('discharged', 0)
 
-    patients = Patient.getPatients(idSegment=idSegment, idDept=idDept, idDrug=idDrug, startDate=startDate, endDate=endDate, pending=pending, agg=agg, currentDepartment=currentDepartment, concilia=concilia, allDrugs=allDrugs, discharged=discharged)
+    patients = Patient.getPatients(idSegment=idSegment, idDept=idDept, idDrug=idDrug,\
+                                    startDate=startDate, endDate=endDate, pending=pending,\
+                                    agg=agg, currentDepartment=currentDepartment, concilia=concilia,\
+                                    allDrugs=allDrugs, discharged=discharged, is_cpoe=user.cpoe())
 
     results = []
     for p in patients:
