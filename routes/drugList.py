@@ -2,13 +2,14 @@ from .utils import *
 
 class DrugList():
 
-    def __init__(self, drugList, interventions, relations, exams, agg, dialysis):
+    def __init__(self, drugList, interventions, relations, exams, agg, dialysis, is_cpoe=False):
         self.drugList = drugList
         self.interventions = interventions
         self.relations = relations
         self.exams = exams
         self.agg = agg
         self.dialysis = dialysis
+        self.is_cpoe = is_cpoe
         self.maxDoseAgg = {}
         self.alertStats = {
                 'dup': 0,
@@ -170,6 +171,11 @@ class DrugList():
                         self.alertStats[a[:3].lower()] += 1
                         alerts.append(a)       
 
+            if self.is_cpoe:
+                period = str(round(pd[12])) + 'D' if pd[12] else ''
+            else:
+                period = str(pd[0].period) + 'D' if pd[0].period else '',
+
             pDrugs.append({
                 'idPrescription': str(pd[0].idPrescription),
                 'idPrescriptionDrug': str(pd[0].id),
@@ -192,7 +198,7 @@ class DrugList():
                 'time': timeValue(pd[0].interval),
                 'interval': pd[0].interval,
                 'recommendation': pd[0].notes if pd[0].notes and len(pd[0].notes.strip()) > 0 else None,
-                'period': str(pd[0].period) + 'D' if pd[0].period else '',
+                'period': period,
                 'periodDates': [],
                 'route': pd[0].route,
                 'grp_solution': pd[0].solutionGroup,
@@ -212,6 +218,7 @@ class DrugList():
                 'notes': pd[7],
                 'prevNotes': pd[8],
                 'drugInfoLink': pd[11],
+                'cpoe_group': pd[0].cpoe_group
             })
         return pDrugs
 
@@ -290,6 +297,6 @@ class DrugList():
             drugs[drugs.index(d)]['cpoe'] = d['idPrescription']
             drugs[drugs.index(d)]['idPrescription'] = idPrescription
             if drugs[drugs.index(d)]['grp_solution'] is not None:
-                drugs[drugs.index(d)]['grp_solution'] = str(d['cpoe']) + str(d['grp_solution'])
+                drugs[drugs.index(d)]['grp_solution'] = str(d['cpoe_group']) + str(d['grp_solution'])
 
         return drugs

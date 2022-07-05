@@ -34,7 +34,10 @@ def getPrescriptions():
     concilia = request.args.get('concilia', 0)
     discharged = request.args.get('discharged', 0)
 
-    patients = Patient.getPatients(idSegment=idSegment, idDept=idDept, idDrug=idDrug, startDate=startDate, endDate=endDate, pending=pending, agg=agg, currentDepartment=currentDepartment, concilia=concilia, allDrugs=allDrugs, discharged=discharged)
+    patients = Patient.getPatients(idSegment=idSegment, idDept=idDept, idDrug=idDrug,\
+                                    startDate=startDate, endDate=endDate, pending=pending,\
+                                    agg=agg, currentDepartment=currentDepartment, concilia=concilia,\
+                                    allDrugs=allDrugs, discharged=discharged, is_cpoe=user.cpoe())
 
     results = []
     for p in patients:
@@ -201,7 +204,7 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None, idS
         'weight': patient.weight,
     })
 
-    drugList = DrugList(drugs, interventions, relations, exams, aggDate is not None, patient.dialysis)
+    drugList = DrugList(drugs, interventions, relations, exams, aggDate is not None, patient.dialysis, is_cpoe)
 
     pDrugs = drugList.getDrugType([], 'Medicamentos') #refactor sort
     pDrugs = drugList.getDrugType(pDrugs, 'Medicamentos', checked=True) #refactor sort
