@@ -151,10 +151,13 @@ class Prescription(db.Model):
                         .filter(between(func.date(aggDate), func.date(p1.date), func.date(p1.expire)))\
                         .filter(between(func.date(aggDate), func.date(p2.date), func.date(p2.expire)))\
                         .filter(p1.idSegment != None)\
+                        .filter(p1.concilia == None)\
+                        .filter(p2.concilia == None)\
                         .filter(\
-                            daterange(func.date(p1.date), func.date(p1.expire), '[]')\
-                                .overlaps(daterange(func.date(p2.date), func.date(p2.expire), '[]'))\
+                            daterange(p1.date, p1.expire, '[]')\
+                                .overlaps(daterange(p2.date, p2.expire, '[]'))\
                         )
+                        
             else:
                 relation = db.session.query(pd1.id, Relation, m1.name, m2.name, p1.expire)\
                         .select_from(p1)\
