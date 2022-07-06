@@ -115,3 +115,30 @@ def resetPassword():
             .update(update, synchronize_session='fetch')
     
     return tryCommit(db, user.id)
+
+@app_usr.route('/users/search', methods=['GET'])
+@jwt_required()
+def search_users():
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+
+    term = request.args.get('term', None)
+
+    users = User.query\
+            .filter(User.schema == user.schema)\
+            .filter(or_(~User.config['roles'].astext.contains('suporte'), User.config['roles'] == None))\
+            .filter(User.name.ilike("%" + str(term) + "%"))\
+            .order_by(desc(User.active),asc(User.name))\
+            .all()
+
+    results = []
+    for u in users:
+        results.append({
+            'id': u.id,
+            'name': u.name
+        })
+
+    return {
+        'status': 'success',
+        'data': results
+    }, status.HTTP_200_OK
