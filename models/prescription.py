@@ -492,7 +492,9 @@ class PrescriptionDrug(db.Model):
                     .filter(pd_max.idDrug == PrescriptionDrug.idDrug)\
                     .filter(pd_max.cpoe_group == PrescriptionDrug.cpoe_group)
 
-                q = q.filter(PrescriptionDrug.id == query_pd_max)
+                q = q.filter(PrescriptionDrug.id == query_pd_max)\
+                     .filter(or_(PrescriptionDrug.suspendedDate == None,\
+                        func.date(PrescriptionDrug.suspendedDate) >= func.date(aggDate)))
         
         return q.order_by(asc(Prescription.expire), desc(func.concat(PrescriptionDrug.idPrescription,PrescriptionDrug.solutionGroup)), asc(Drug.name)).all()
 
