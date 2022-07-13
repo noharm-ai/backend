@@ -81,6 +81,7 @@ def getNotes(admissionNumber):
 def changeNote(idNote):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
+    has_primary_care = memory_service.has_feature('PRIMARYCARE')
     data = request.get_json()
 
     if not ClinicalNotes.exists():
@@ -93,16 +94,25 @@ def changeNote(idNote):
 
     n.update = datetime.today()
     n.user = user.id
-    n.text = data.get('text', None)
-    n.medications = n.text.count('annotation-medicamentos')
-    n.complication = n.text.count('annotation-complicacoes')
-    n.symptoms = n.text.count('annotation-sintomas')
-    n.diseases = n.text.count('annotation-doencas')
-    n.info = n.text.count('annotation-dados')
-    n.conduct = n.text.count('annotation-conduta')
-    n.signs = n.text.count('annotation-sinais')
-    n.allergy = n.text.count('annotation-alergia')
-    n.names = n.text.count('annotation-nomes')
+
+    if 'text' in data.keys():
+        n.text = data.get('text', None)
+        n.medications = n.text.count('annotation-medicamentos')
+        n.complication = n.text.count('annotation-complicacoes')
+        n.symptoms = n.text.count('annotation-sintomas')
+        n.diseases = n.text.count('annotation-doencas')
+        n.info = n.text.count('annotation-dados')
+        n.conduct = n.text.count('annotation-conduta')
+        n.signs = n.text.count('annotation-sinais')
+        n.allergy = n.text.count('annotation-alergia')
+        n.names = n.text.count('annotation-nomes')
+
+    if has_primary_care:
+        if 'date' in data.keys() and data.get('date', None) != None:
+            n.date = data.get('date')
+
+        if 'form' in data.keys() and data.get('form', None) != None:
+            n.form = data.get('form')
 
     return tryCommit(db, idNote)
 

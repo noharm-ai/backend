@@ -24,7 +24,7 @@ def create_clinical_notes(data, user):
     cn.prescriber = user_complete.name
     cn.update = datetime.today()
     cn.user = user.id
-    cn.position = 'Agendamento' if data.get('action', None) == 'schedule' else 'Farmacêutica'
+    cn.position = 'Agendamento' if data.get('action', None) == 'schedule' else data.get('tplName', 'Farmacêutica')
     cn.form = data.get('formValues', None)
     cn.template = data.get('template', None)
 
