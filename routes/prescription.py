@@ -13,6 +13,7 @@ from .utils import *
 from sqlalchemy import func, between
 from datetime import date, datetime
 from .drugList import DrugList
+from services import memory_service
 
 app_pres = Blueprint('app_pres',__name__)
 
@@ -99,12 +100,13 @@ def getPrescriptionAuth(idPrescription):
         return { 'status': 'error', 'message': 'Prescrição Inexistente!' }, status.HTTP_400_BAD_REQUEST
 
     if p[0].agg:
-        return getPrescription(\
-            idPrescription=idPrescription,\
-            admissionNumber=p[0].admissionNumber,\
-            aggDate=p[0].date,\
-            idSegment=p[0].idSegment,\
-            is_cpoe=user.cpoe()\
+        return getPrescription(
+            idPrescription=idPrescription,
+            admissionNumber=p[0].admissionNumber,
+            aggDate=p[0].date,
+            idSegment=p[0].idSegment,
+            is_cpoe=user.cpoe(),
+            is_pmc=memory_service.has_feature('PRIMARYCARE')
         )
     else:
         return getPrescription(idPrescription=idPrescription)
@@ -140,7 +142,7 @@ def getExistIntervention(interventions, dtPrescription):
             result = True;
     return result
 
-def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None, idSegment=None, is_cpoe=False):
+def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None, idSegment=None, is_cpoe=False, is_pmc=False):
 
     if idPrescription:
         prescription = Prescription.getPrescription(idPrescription)
@@ -163,7 +165,7 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None, idS
     relations = Prescription.findRelation(prescription[0].id,patient.admissionNumber, aggDate, is_cpoe)
     headers = Prescription.getHeaders(admissionNumber, aggDate, idSegment) if aggDate else []
 
-    clinicalNotesCount = ClinicalNotes.getCountIfExists(prescription[0].admissionNumber)
+    clinicalNotesCount = ClinicalNotes.getCountIfExists(prescription[0].admissionNumber, is_pmc)
     notesSigns = None
     notesInfo = None
     notesAllergies = None
