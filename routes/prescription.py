@@ -78,6 +78,7 @@ def getPrescriptions():
             'skinColor': patient.skinColor,
             'lengthStay': lenghStay(patient.admissionDate),
             'dischargeDate': patient.dischargeDate.isoformat() if patient.dischargeDate else None,
+            'dischargeReason': patient.dischargeReason,
             'date': p[0].date.isoformat(),
             'department': str(p[2]),
             'status': p[0].status
