@@ -201,7 +201,7 @@ class DrugList():
                 'period': period,
                 'periodDates': [],
                 'route': pd[0].route,
-                'grp_solution': pd[0].solutionGroup,
+                'grp_solution': pd[0].cpoe_group if self.is_cpoe else pd[0].solutionGroup,
                 'stage': 'ACM' if pd[0].solutionACM == 'S' else strNone(pd[0].solutionPhase) + ' x '+ strNone(pd[0].solutionTime) + ' (' + strNone(pd[0].solutionTotalTime) + ')',
                 'infusion': strNone(pd[0].solutionDose) + ' ' + strNone(pd[0].solutionUnit),
                 'score': str(pd[5]) if not pdWhiteList and source != 'Dietas' else '0',
@@ -218,7 +218,8 @@ class DrugList():
                 'notes': pd[7],
                 'prevNotes': pd[8],
                 'drugInfoLink': pd[11],
-                'cpoe_group': pd[0].cpoe_group
+                'cpoe_group': pd[0].cpoe_group,
+                'infusionKey': self.getInfusionKey(pd)
             })
         return pDrugs
 
@@ -227,38 +228,37 @@ class DrugList():
         result.extend([p for p in pDrugs if p['whiteList']])
         return result
 
-    def getInfusionList(self, is_cpoe):
+    def getInfusionKey(self, pd):
+        if self.is_cpoe:
+            return pd[0].cpoe_group
+
+        return str(pd[0].idPrescription) + str(pd[0].solutionGroup)
+
+    def getInfusionList(self):
         result = {}
         for pd in self.drugList:
             if pd[0].solutionGroup and pd[0].source == 'Soluções':
-                
-                pdID = pd[0].idPrescription
-                if is_cpoe:
-                    pdGroup = str(pd[0].idPrescription) + str(pd[0].solutionGroup)
-                else:
-                    pdGroup = pd[0].solutionGroup
+                key = self.getInfusionKey(pd)
 
-                if not pdID in result:
-                    result[pdID] = {}
-                if not pdGroup in result[pdID].keys():
-                    result[pdID][pdGroup] = {'totalVol' : 0, 'amount': 0, 'vol': 0, 'speed': 0, 'unit': 'ml'}
+                if not key in result:
+                    result[key] = {'totalVol' : 0, 'amount': 0, 'vol': 0, 'speed': 0, 'unit': 'ml'}
 
                 pdDose = pd[0].dose
 
                 if pd[6] and pd[6].amount and pd[6].amountUnit:
-                    result[pdID][pdGroup]['vol'] = pdDose
-                    result[pdID][pdGroup]['amount'] = pd[6].amount
-                    result[pdID][pdGroup]['unit'] = pd[6].amountUnit
+                    result[key]['vol'] = pdDose
+                    result[key]['amount'] = pd[6].amount
+                    result[key]['unit'] = pd[6].amountUnit
 
                     if pd[2] and pd[2].id.lower() != 'ml' and pd[2].id.lower() == pd[6].amountUnit.lower():
-                        result[pdID][pdGroup]['vol'] = pdDose = round(pd[0].dose / pd[6].amount,2)
+                        result[key]['vol'] = pdDose = round(pd[0].dose / pd[6].amount,2)
 
                 if pd[6] and pd[6].amount and pd[6].amountUnit is None:
-                    result[pdID][pdGroup]['vol'] = pdDose = pd[6].amount
+                    result[key]['vol'] = pdDose = pd[6].amount
 
-                result[pdID][pdGroup]['speed'] = pd[0].solutionDose
-                result[pdID][pdGroup]['totalVol'] += pdDose if pdDose else 0
-                result[pdID][pdGroup]['totalVol'] = round(result[pdID][pdGroup]['totalVol'],2)
+                result[key]['speed'] = pd[0].solutionDose
+                result[key]['totalVol'] += pdDose if pdDose else 0
+                result[key]['totalVol'] = round(result[key]['totalVol'],2)
 
         return result
 
@@ -296,7 +296,5 @@ class DrugList():
         for d in drugs:
             drugs[drugs.index(d)]['cpoe'] = d['idPrescription']
             drugs[drugs.index(d)]['idPrescription'] = idPrescription
-            if drugs[drugs.index(d)]['grp_solution'] is not None:
-                drugs[drugs.index(d)]['grp_solution'] = str(d['cpoe_group']) + str(d['grp_solution'])
 
         return drugs

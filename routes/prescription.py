@@ -132,14 +132,14 @@ def buildHeaders(headers, pDrugs, pSolution, pProcedures):
 def getPrevIntervention(interventions, dtPrescription):
     result = False
     for i in interventions:
-        if int(i['id']) == 0 and i['status'] == 's' and i['dateTime'] < datetime(dtPrescription.year, dtPrescription.month, dtPrescription.day, 0, 0):
+        if int(i['id']) == 0 and i['status'] == 's' and datetime.fromisoformat(i['date']) < datetime(dtPrescription.year, dtPrescription.month, dtPrescription.day, 0, 0):
             result = True;
     return result
 
 def getExistIntervention(interventions, dtPrescription):
     result = False
     for i in interventions:
-        if int(i['id']) == 0 and i['dateTime'] < datetime(dtPrescription.year, dtPrescription.month, dtPrescription.day, 0, 0):
+        if int(i['id']) == 0 and datetime.fromisoformat(i['date']) < datetime(dtPrescription.year, dtPrescription.month, dtPrescription.day, 0, 0):
             result = True;
     return result
 
@@ -224,7 +224,7 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None, idS
         conciliaList = drugList.conciliaList(conciliaDrugsY,conciliaList)
 
     pSolution = drugList.getDrugType([], 'Soluções')
-    pInfusion = drugList.getInfusionList(is_cpoe)
+    pInfusion = drugList.getInfusionList()
 
     pProcedures = drugList.getDrugType([], 'Proced/Exames')
     pProcedures = drugList.getDrugType(pProcedures, 'Proced/Exames', checked=True)

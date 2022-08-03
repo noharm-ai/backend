@@ -603,7 +603,6 @@ class Intervention(db.Model):
                 'interactionsList': interactionsList(i[4], splitStr),
                 'interactions': i[0].interactions,
                 'date': i[0].date.isoformat(),
-                'dateTime': i[0].date,
                 'user': i[8],
                 'department': i[9] if i[9] else i[11],
                 'prescriber': i[10] if i[10] else i[7].prescriber if i[7] else None,
