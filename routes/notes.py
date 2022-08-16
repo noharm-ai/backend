@@ -6,9 +6,9 @@ from flask import Blueprint, request
 from flask_api import status
 from flask_jwt_extended import (jwt_required, get_jwt_identity)
 from .utils import tryCommit
-from sqlalchemy import desc, or_
+from sqlalchemy import desc, or_, func
 from sqlalchemy.orm import undefer
-from datetime import datetime, timedelta
+from datetime import datetime
 from services import clinical_notes_service, memory_service
 
 from exception.validation_error import ValidationError
@@ -23,46 +23,28 @@ def getNotes(admissionNumber):
 
     if ClinicalNotes.exists():
         has_primary_care = memory_service.has_feature('PRIMARYCARE')
+        limit = 100
         pat = Patient.query.get(admissionNumber)
         admDate = pat.admissionDate if pat else datetime.today()
         query = ClinicalNotes.query\
                 .filter(ClinicalNotes.admissionNumber==admissionNumber)\
                 .filter(or_(ClinicalNotes.isExam == None, ClinicalNotes.isExam == False))
 
-        if not has_primary_care:
-            query = query.filter(or_(
-                        ClinicalNotes.date > (datetime.today() - timedelta(days=6)),
-                        ClinicalNotes.date == admDate))
-
         query = query.order_by(desc(ClinicalNotes.date))
 
         if has_primary_care:
+            limit = 500
             query.options(undefer("form"), undefer("template"))
 
-        notes = query.all()
+        notes = query.filter(func.date(ClinicalNotes.date) > func.date(admDate)).limit(limit).all()
+        admissionNotes = query.filter(func.date(ClinicalNotes.date) == func.date(admDate)).limit(50).all()
 
         results = []
         for n in notes:
-            results.append({
-                'id': n.id,
-                'admissionNumber': n.admissionNumber,
-                'text': n.text,
-                'form': n.form if has_primary_care else None,
-                'template': n.template if has_primary_care else None,
-                'date': n.date.isoformat(),
-                'prescriber': n.prescriber,
-                'position': n.position,
-                'medications': n.medications,
-                'complication': n.complication,
-                'symptoms': n.symptoms,
-                'diseases': n.diseases,
-                'info': n.info,
-                'conduct': n.conduct,
-                'signs': n.signs,
-                'allergy': n.allergy,
-                'names': n.names,
-                'dialysis': n.dialysis,
-            })
+            results.append(convert_notes(n, has_primary_care))
+
+        for n in admissionNotes:
+            results.append(convert_notes(n, has_primary_care))
 
         return {
             'status': 'success',
@@ -75,6 +57,29 @@ def getNotes(admissionNumber):
             'status': 'error',
             'message': 'Schema não tem evolução!'
         }, status.HTTP_400_BAD_REQUEST
+
+
+def convert_notes(notes, has_primary_care):
+    return {
+        'id': notes.id,
+        'admissionNumber': notes.admissionNumber,
+        'text': notes.text,
+        'form': notes.form if has_primary_care else None,
+        'template': notes.template if has_primary_care else None,
+        'date': notes.date.isoformat(),
+        'prescriber': notes.prescriber,
+        'position': notes.position,
+        'medications': notes.medications,
+        'complication': notes.complication,
+        'symptoms': notes.symptoms,
+        'diseases': notes.diseases,
+        'info': notes.info,
+        'conduct': notes.conduct,
+        'signs': notes.signs,
+        'allergy': notes.allergy,
+        'names': notes.names,
+        'dialysis': notes.dialysis,
+    }
 
 @app_note.route('/notes/<int:idNote>', methods=['POST'])
 @jwt_required()
