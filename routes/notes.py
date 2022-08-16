@@ -37,13 +37,22 @@ def getNotes(admissionNumber):
             query.options(undefer("form"), undefer("template"))
 
         notes = query.filter(func.date(ClinicalNotes.date) > func.date(admDate)).limit(limit).all()
-        admissionNotes = query.filter(func.date(ClinicalNotes.date) == func.date(admDate)).limit(50).all()
+        admission_notes = query.filter(func.date(ClinicalNotes.date) == func.date(admDate)).limit(50).all()
+        old_notes = []
+
+        if len(notes) < limit:
+            old_notes = query.filter(func.date(ClinicalNotes.date) < func.date(admDate))\
+                .limit(limit - len(notes))\
+                .all()
 
         results = []
         for n in notes:
             results.append(convert_notes(n, has_primary_care))
 
-        for n in admissionNotes:
+        for n in admission_notes:
+            results.append(convert_notes(n, has_primary_care))
+
+        for n in old_notes:
             results.append(convert_notes(n, has_primary_care))
 
         return {
