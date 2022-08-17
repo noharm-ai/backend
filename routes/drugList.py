@@ -132,7 +132,7 @@ class DrugList():
                         self.maxDoseAgg[keyDrugKg]['value'] += doseWeight
                         self.maxDoseAgg[keyDrugKg]['count'] += 1 
 
-                        if pd[6].idMeasureUnit != None and pd[6].idMeasureUnit != pdUnit:
+                        if pd[6].idMeasureUnit != None and pd[6].idMeasureUnit != pdUnit and pd[0].doseconv != None:
                             doseWeightStr += ' ou ' + strFormatBR(pd[0].doseconv) + ' ' + str(pd[6].idMeasureUnit) + '/Kg (faixa arredondada)'
 
                         if pd[6].maxDose and pd[6].maxDose < doseWeight:

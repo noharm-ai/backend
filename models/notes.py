@@ -60,9 +60,6 @@ class ClinicalNotes(db.Model):
                     ).select_from(ClinicalNotes)\
                     .filter(ClinicalNotes.admissionNumber==admissionNumber)\
                     .filter(ClinicalNotes.isExam == None)
-            
-            if not pmc:
-                qNotes = qNotes.filter(ClinicalNotes.date > (datetime.today() - timedelta(days=6)))
 
             stats_return = qNotes.group_by(ClinicalNotes.admissionNumber).first()
 
@@ -115,7 +112,7 @@ class ClinicalNotes(db.Model):
                 .filter(func.length(ClinicalNotes.allergyText) > 0)\
                 .group_by(ClinicalNotes.allergyText)\
                 .order_by(desc('maxdate'))\
-                .limit(10)\
+                .limit(50)\
                 .all()
 
     def getDialysis(admissionNumber):
