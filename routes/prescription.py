@@ -167,6 +167,7 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None, idS
     headers = Prescription.getHeaders(admissionNumber, aggDate, idSegment) if aggDate else []
 
     clinicalNotesCount = ClinicalNotes.getCountIfExists(prescription[0].admissionNumber, is_pmc)
+    notesTotal = ClinicalNotes.getTotalIfExists(prescription[0].admissionNumber)
     notesSigns = None
     notesInfo = None
     notesAllergies = None
@@ -299,7 +300,7 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None, idS
             'intervention': pIntervention[0] if len(pIntervention) else None,
             'prevIntervention': getPrevIntervention(interventions, prescription[0].date),
             'existIntervention': getExistIntervention(interventions, prescription[0].date),
-            'clinicalNotes': clinicalNotesCount[9],
+            'clinicalNotes': notesTotal,
             'complication': clinicalNotesCount[2],
             'notesSigns': strNone(notesSigns[0]) if notesSigns else '',
             'notesSignsDate': notesSigns[1].isoformat() if notesSigns else None,
