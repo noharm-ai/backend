@@ -62,6 +62,8 @@ def getPrescriptions():
             elif features['globalScore'] > 60 : features['class'] = 'orange'
             elif features['globalScore'] > 10 : features['class'] = 'yellow'
             else: features['class'] = 'green'
+
+            features['alertStats'] = p[0].features['alertStats'] if 'alertStats' in p[0].features else None
         else:
             features['processed'] = False
             features['globalScore'] = 0

@@ -329,7 +329,8 @@ def getFeatures(result):
         'alertExams': exams,
         'interventions': interventions,
         'complication': complicationCount,
-        'drugIDs': list(set(drugIDs))
+        'drugIDs': list(set(drugIDs)),
+        'alertStats': result['data']['alertStats'] if 'alertStats' in result['data'] else None
     }
 
 def sendEmail(subject, sender, emails, html) : 
