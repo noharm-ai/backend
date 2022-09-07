@@ -155,7 +155,6 @@ def setPatientData(admissionNumber):
       if weight != p.weight: 
         p.weightDate = datetime.today()
         p.weight = weight
-        p.user = user.id
         updateWeight = True
 
     alertExpire = data.get('alertExpire', None)
@@ -173,6 +172,7 @@ def setPatientData(admissionNumber):
     if 'birthdate' in data.keys(): p.birthdate = data.get('birthdate', None)
 
     p.update = datetime.today()
+    p.user = user.id
 
     if 'idPrescription' in data.keys() and updateWeight:
         idPrescription = data.get('idPrescription')
