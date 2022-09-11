@@ -118,7 +118,7 @@ class DrugList():
                         alerts.append('Medicamento potencialmente inapropriado para idosos, independente das comorbidades do paciente.')
                         self.alertStats['elderly'] += 1
 
-                    if pd[6].useWeight:
+                    if pd[6].useWeight and pd[0].dose:
                         weight = none2zero(self.exams['weight'])
                         weight = weight if weight > 0 else 1
 

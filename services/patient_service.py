@@ -11,20 +11,13 @@ def get_patients(id_segment, id_department_list, next_appointment_start_date, ne
                 scheduled_by_list, attended_by_list):
     Pmax = db.aliased(Prescription)
 
-    sq_last_appointment = db.session.query(func.max(ClinicalNotes.date))\
+    sq_last_interaction = db.session.query(func.max(func.date(ClinicalNotes.date)))\
         .select_from(ClinicalNotes)\
         .filter(ClinicalNotes.admissionNumber == Prescription.admissionNumber)\
-        .filter(func.date(ClinicalNotes.date) <= func.date(func.current_date()))\
-        .label('last_appointment')
-
-    sq_next_appointment = db.session.query(func.max(func.date(ClinicalNotes.date)))\
-        .select_from(ClinicalNotes)\
-        .filter(ClinicalNotes.admissionNumber == Prescription.admissionNumber)\
-        .filter(ClinicalNotes.date > func.current_date())\
-        .label('next_appointment')
+        .label('last_interaction')
 
     query = db.session\
-        .query(Patient, Prescription, sq_last_appointment, sq_next_appointment)\
+        .query(Patient, Prescription, sq_last_interaction)\
         .select_from(Patient)\
         .join(\
             Prescription,\
@@ -35,7 +28,7 @@ def get_patients(id_segment, id_department_list, next_appointment_start_date, ne
                 .filter(Pmax.idHospital == Patient.idHospital)\
                 .filter(Pmax.agg == True)\
             )\
-        .order_by(desc("next_appointment"))\
+        .order_by(desc("last_interaction"))\
         .options(undefer('observation'))
 
     if (id_segment):
@@ -45,10 +38,10 @@ def get_patients(id_segment, id_department_list, next_appointment_start_date, ne
         query = query.filter(Prescription.idDepartment.in_(id_department_list))
 
     if (next_appointment_start_date):
-        query = query.filter(sq_next_appointment >= next_appointment_start_date)
+        query = query.filter(sq_last_interaction >= next_appointment_start_date)
 
     if (next_appointment_end_date):
-        query = query.filter(sq_next_appointment <= next_appointment_end_date)
+        query = query.filter(sq_last_interaction <= next_appointment_end_date)
 
     if (scheduled_by_list):
         scheduled_by_query = db.session.query(func.count())\

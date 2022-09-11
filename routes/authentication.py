@@ -2,6 +2,7 @@ from flask import Blueprint, request, url_for, jsonify
 from flask_api import status
 from models.main import *
 from models.appendix import *
+from models.prescription import *
 from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, get_jwt_identity, get_jwt)
 from config import Config
@@ -49,6 +50,18 @@ def auth():
 
         nameUrl = Memory.getNameUrl(user.schema)
 
+        segments = db_session\
+            .query(Segment)\
+            .order_by(asc(Segment.description))\
+            .all()
+        segmentList = []
+        for s in segments:
+            segmentList.append({
+                'id': s.id,
+                'description': s.description,
+                'status': s.status
+            })
+
         return {
             'status': 'success',
             'userName': user.name,
@@ -64,7 +77,8 @@ def auth():
             'notify': notification,
             'access_token': access_token,
             'refresh_token': refresh_token,
-            'apiKey': Config.API_KEY if hasattr(Config, 'API_KEY') else ''
+            'apiKey': Config.API_KEY if hasattr(Config, 'API_KEY') else '',
+            'segments': segmentList
         }, status.HTTP_200_OK
 
 
