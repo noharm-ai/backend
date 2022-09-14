@@ -208,6 +208,7 @@ class DrugList():
                 'source': pd[0].source,
                 'checked': bool(pd[0].checked or pd[9] == 's'),
                 'suspended': bool(pd[0].suspendedDate),
+                'suspensionDate': pd[0].suspendedDate,
                 'status': pd[0].status,
                 'near': pd[0].near,
                 'prevIntervention': self.getPrevIntervention(pd[0].idDrug, pd[0].idPrescription),
