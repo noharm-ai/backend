@@ -83,6 +83,7 @@ def getPrescriptions():
             'dischargeReason': patient.dischargeReason,
             'date': p[0].date.isoformat(),
             'department': str(p[2]),
+            'insurance': p[0].insurance,
             'status': p[0].status
         }))
 
