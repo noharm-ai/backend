@@ -31,6 +31,7 @@ class Prescription(db.Model):
     aggDeps = deferred(db.Column('aggsetor', postgresql.ARRAY(db.Integer), nullable=True))
     aggDrugs = deferred(db.Column('aggmedicamento', postgresql.ARRAY(db.Integer), nullable=True))
     concilia = db.Column('concilia', db.String(1), nullable=True)
+    insurance = db.Column('convenio', db.String, nullable=True)
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.Integer, nullable=True)
 
@@ -55,7 +56,7 @@ class Prescription(db.Model):
                 Prescription, Patient, '0', '0',
                 Department.name.label('department'), Segment.description, 
                 Patient.observation, Prescription.notes, Patient.alert,
-                Prescription.prescriber, User.name
+                Prescription.prescriber, User.name, Prescription.insurance
             )\
             .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)\
             .outerjoin(Department, and_(Department.id == Prescription.idDepartment, Department.idHospital == Prescription.idHospital))\

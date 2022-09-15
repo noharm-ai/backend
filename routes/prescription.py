@@ -83,6 +83,7 @@ def getPrescriptions():
             'dischargeReason': patient.dischargeReason,
             'date': p[0].date.isoformat(),
             'department': str(p[2]),
+            'insurance': p[0].insurance,
             'status': p[0].status
         }))
 
@@ -327,6 +328,7 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None, idS
             'alertStats': drugList.alertStats,
             'features': prescription[0].features,
             'user': prescription[10],
+            'insurance': prescription[11],
         }
     }, status.HTTP_200_OK
 

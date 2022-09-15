@@ -75,6 +75,7 @@ def computePrescription(schema, idPrescription):
         pAgg.bed = p.bed
         pAgg.record = p.record
         pAgg.prescriber = 'Prescrição Agregada'
+        pAgg.insurance = p.insurance
         pAgg.agg = True
 
         if p.concilia is None and prescription_drug_service.has_unchecked_drugs(idPrescription):
