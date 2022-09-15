@@ -327,6 +327,7 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None, idS
             'alertStats': drugList.alertStats,
             'features': prescription[0].features,
             'user': prescription[10],
+            'insurance': prescription[11],
         }
     }, status.HTTP_200_OK
 
