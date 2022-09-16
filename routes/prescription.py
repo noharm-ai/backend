@@ -379,12 +379,13 @@ def setPrescriptionStatus(idPrescription):
 def getDrugPeriod(idPrescriptionDrug):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
+    is_cpoe = user.cpoe()
 
     future = request.args.get('future', None)
     results = [{1: []}]
 
     if idPrescriptionDrug != 0:
-        results, admissionHistory = PrescriptionDrug.findByPrescriptionDrug(idPrescriptionDrug, future)
+        results, admissionHistory = PrescriptionDrug.findByPrescriptionDrug(idPrescriptionDrug, future, is_cpoe=is_cpoe)
     else:
         results[0][1].append('Intervenção no paciente não tem medicamento associado.')
 
@@ -394,14 +395,28 @@ def getDrugPeriod(idPrescriptionDrug):
         else:
             results[0][1].append('Não há prescrição posterior para esse Paciente')
 
-    periodList = results[0][1]
-    for i, p in enumerate(periodList):
-        p = p.replace('33x','SNx')
-        p = p.replace('44x','ACMx')
-        p = p.replace('55x','CONTx')
-        p = p.replace('66x','AGORAx')
-        p = p.replace('99x','N/Dx')
-        periodList[i] = p
+    if is_cpoe:
+        periodList = []
+
+        for i, p in enumerate(results):
+            period = p[0]
+            
+            period = period.replace('33x','SNx')
+            period = period.replace('44x','ACMx')
+            period = period.replace('55x','CONTx')
+            period = period.replace('66x','AGORAx')
+            period = period.replace('99x','N/Dx')
+            periodList.append(period)
+    else:
+        periodList = results[0][1]
+
+        for i, p in enumerate(periodList):
+            p = p.replace('33x','SNx')
+            p = p.replace('44x','ACMx')
+            p = p.replace('55x','CONTx')
+            p = p.replace('66x','AGORAx')
+            p = p.replace('99x','N/Dx')
+            periodList[i] = p
 
     return {
         'status': 'success',
