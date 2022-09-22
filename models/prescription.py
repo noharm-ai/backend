@@ -298,7 +298,7 @@ class Patient(db.Model):
                          .filter(Patient.admissionNumber == admissionNumber)\
                          .first()
 
-    def getPatients(idSegment=None, idDept=[], idDrug=[], startDate=date.today(), endDate=None, pending=False, agg=False, currentDepartment=False, concilia=False, allDrugs=False, discharged=False, is_cpoe=False):
+    def getPatients(idSegment=None, idDept=[], idDrug=[], startDate=date.today(), endDate=None, pending=False, agg=False, currentDepartment=False, concilia=False, allDrugs=False, discharged=False, is_cpoe=False, insurance=None):
         q = db.session\
             .query(Prescription, Patient, Department.name.label('department'))\
             .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)\
@@ -340,6 +340,9 @@ class Patient(db.Model):
         else:
             q = q.filter(Prescription.concilia == None)
 
+        if (insurance != None):
+            q = q.filter(Prescription.insurance.ilike("%" + str(insurance) + "%"))
+
         if endDate is None: endDate = startDate
 
         q = q.filter(Prescription.date >= validate(startDate))
@@ -349,22 +352,37 @@ class Patient(db.Model):
 
         return q.limit(500).all()
 
-def getDrugHistory(idPrescription, admissionNumber):
+def getDrugHistory(idPrescription, admissionNumber, id_drug, is_cpoe):
     pd1 = db.aliased(PrescriptionDrug)
     pr1 = db.aliased(Prescription)
 
-    query = db.session.query(func.concat(func.to_char(pr1.date, "DD/MM"),' (',pd1.frequency,'x ',func.trim(func.to_char(pd1.dose,'9G999G999D99')),' ',pd1.idMeasureUnit,')'))\
-        .select_from(pd1)\
-        .join(pr1, pr1.id == pd1.idPrescription)\
-        .filter(pr1.admissionNumber == admissionNumber)\
-        .filter(pr1.id < idPrescription)\
-        .filter(pd1.idDrug == PrescriptionDrug.idDrug)\
-        .filter(pd1.suspendedDate == None)\
-        .filter(pr1.date > (date.today() - timedelta(days=30)))\
-        .order_by(asc(pr1.date))\
-        .as_scalar()
+    if (is_cpoe == False):
+        query = db.session.query(func.concat(func.to_char(pr1.date, "DD/MM"),' (',pd1.frequency,'x ',func.trim(func.to_char(pd1.dose,'9G999G999D99')),' ',pd1.idMeasureUnit,')'))\
+            .select_from(pd1)\
+            .join(pr1, pr1.id == pd1.idPrescription)\
+            .filter(pr1.admissionNumber == admissionNumber)\
+            .filter(pr1.id < idPrescription)\
+            .filter(pd1.idDrug == PrescriptionDrug.idDrug)\
+            .filter(pd1.suspendedDate == None)\
+            .filter(pr1.date > (date.today() - timedelta(days=30)))\
+            .order_by(asc(pr1.date))\
+            .as_scalar()
 
-    return func.array(query)
+        return func.array(query)
+    else:
+        query = db.session.query(\
+                func.concat(\
+                    func.to_char(pr1.date, "DD/MM"), ' - ', func.to_char(func.coalesce(pd1.suspendedDate, pr1.expire), "DD/MM"),\
+                    ' (',pd1.frequency,'x ',func.trim(func.to_char(pd1.dose,'9G999G999D99')),' ',pd1.idMeasureUnit,')',\
+                    case([(pd1.suspendedDate != None, ' - suspenso')], else_ = '')
+                )
+            )\
+            .distinct(pr1.date, pd1.frequency, pd1.dose, pd1.idMeasureUnit)\
+            .join(pr1, pr1.id == pd1.idPrescription)\
+            .filter(pr1.admissionNumber == admissionNumber)\
+            .filter(pd1.idDrug == id_drug)\
+        
+        return query
 
 def getDrugFuture(idPrescription, admissionNumber):
     pd1 = db.aliased(PrescriptionDrug)
@@ -499,7 +517,7 @@ class PrescriptionDrug(db.Model):
         
         return q.order_by(asc(Prescription.expire), desc(func.concat(PrescriptionDrug.idPrescription,PrescriptionDrug.solutionGroup)), asc(Drug.name)).all()
 
-    def findByPrescriptionDrug(idPrescriptionDrug, future):
+    def findByPrescriptionDrug(idPrescriptionDrug, future, is_cpoe = False):
         pd = PrescriptionDrug.query.get(idPrescriptionDrug)
         if pd is None: return [{1: []}], None
         
@@ -510,12 +528,15 @@ class PrescriptionDrug(db.Model):
             drugHistory = getDrugFuture(p.id, p.admissionNumber)
             admissionHistory = Prescription.getFuturePrescription(p.id, p.admissionNumber)
         else:
-            drugHistory = getDrugHistory(p.id, p.admissionNumber)
+            drugHistory = getDrugHistory(p.id, p.admissionNumber, id_drug = pd.idDrug, is_cpoe = is_cpoe)
 
-        return db.session\
-            .query(PrescriptionDrug, drugHistory.label('drugHistory'))\
-            .filter(PrescriptionDrug.id == idPrescriptionDrug)\
-            .all() , admissionHistory
+        if is_cpoe:
+            return drugHistory.all(), admissionHistory
+        else:
+            return db.session\
+                .query(PrescriptionDrug, drugHistory.label('drugHistory'))\
+                .filter(PrescriptionDrug.id == idPrescriptionDrug)\
+                .all() , admissionHistory
 
 class Intervention(db.Model):
     __tablename__ = 'intervencao'
