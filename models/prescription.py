@@ -71,7 +71,13 @@ class Prescription(db.Model):
     def getPrescriptionAgg(admissionNumber, aggDate, idSegment):
         return Prescription.getPrescriptionBasic()\
             .filter(Prescription.admissionNumber == admissionNumber)\
-            .filter(between(func.date(aggDate), func.date(Prescription.date), func.date(Prescription.expire)))\
+            .filter(\
+                between(\
+                    func.date(aggDate),\
+                    func.date(Prescription.date),
+                    func.coalesce(func.date(Prescription.expire), func.date(aggDate))\
+                )\
+            )\
             .filter(Prescription.idSegment == idSegment)\
             .filter(Prescription.agg == None)\
             .filter(Prescription.concilia == None)\
@@ -96,7 +102,13 @@ class Prescription(db.Model):
                     .outerjoin(Department, and_(Department.id == Prescription.idDepartment, Department.idHospital == Prescription.idHospital))\
                     .outerjoin(User, Prescription.user == User.id)\
                     .filter(Prescription.admissionNumber == admissionNumber)\
-                    .filter(between(func.date(aggDate), func.date(Prescription.date), func.date(Prescription.expire)))\
+                    .filter(\
+                        between(\
+                            func.date(aggDate),\
+                            func.date(Prescription.date),\
+                            func.coalesce(func.date(Prescription.expire), func.date(aggDate))\
+                        )\
+                    )\
                     .filter(Prescription.idSegment == idSegment)\
                     .filter(Prescription.agg == None)\
                     .filter(Prescription.concilia == None)\
@@ -149,8 +161,20 @@ class Prescription(db.Model):
                         .join(m2, m2.id == pd2.idDrug)\
                         .join(Relation, and_(Relation.sctida == m1.sctid, Relation.sctidb == m2.sctid))\
                         .filter(p1.admissionNumber == admissionNumber)\
-                        .filter(between(func.date(aggDate), func.date(p1.date), func.date(p1.expire)))\
-                        .filter(between(func.date(aggDate), func.date(p2.date), func.date(p2.expire)))\
+                        .filter(\
+                            between(\
+                                func.date(aggDate),\
+                                func.date(p1.date),\
+                                func.coalesce(func.date(p1.expire), func.date(aggDate))\
+                            )\
+                        )\
+                        .filter(\
+                            between(\
+                                func.date(aggDate),\
+                                func.date(p2.date),\
+                                func.coalesce(func.date(p2.expire), func.date(aggDate))\
+                            )\
+                        )\
                         .filter(p1.idSegment != None)\
                         .filter(p1.concilia == None)\
                         .filter(p2.concilia == None)\
@@ -169,8 +193,20 @@ class Prescription(db.Model):
                         .join(m2, m2.id == pd2.idDrug)\
                         .join(Relation, and_(Relation.sctida == m1.sctid, Relation.sctidb == m2.sctid))\
                         .filter(p1.admissionNumber == admissionNumber)\
-                        .filter(between(func.date(aggDate), func.date(p1.date), func.date(p1.expire)))\
-                        .filter(between(func.date(aggDate), func.date(p2.date), func.date(p2.expire)))\
+                        .filter(\
+                            between(\
+                                func.date(aggDate),\
+                                func.date(p1.date),\
+                                func.coalesce(func.date(p1.expire), func.date(aggDate))\
+                            )\
+                        )\
+                        .filter(\
+                            between(\
+                                func.date(aggDate),\
+                                func.date(p2.date),\
+                                func.coalesce(func.date(p2.expire), func.date(aggDate))\
+                            )\
+                        )\
                         .filter(func.date(p2.expire) == func.date(p1.expire))\
                         .filter(p1.idSegment != None)
 
@@ -212,7 +248,13 @@ class Prescription(db.Model):
         else:
             xreactivity = xreactivity.join(Prescription, Prescription.id == pd1.idPrescription)\
                                .filter(Prescription.admissionNumber == admissionNumber)\
-                               .filter(between(func.date(aggDate), func.date(Prescription.date), func.date(Prescription.expire)))\
+                               .filter(\
+                                    between(\
+                                        func.date(aggDate),\
+                                        func.date(Prescription.date),\
+                                        func.coalesce(func.date(Prescription.expire), func.date(aggDate))\
+                                    )\
+                                )\
                                .filter(Prescription.idSegment != None)
 
         relations = interaction.union(incompatible).union(xreactivity).all()
@@ -247,7 +289,13 @@ class Prescription(db.Model):
                     .filter(Prescription.idSegment == idSegment)\
                     .filter(Prescription.concilia == None)\
                     .filter(Prescription.agg == None)\
-                    .filter(between(func.date(aggDate), func.date(Prescription.date), func.date(Prescription.expire)))\
+                    .filter(\
+                        between(\
+                            func.date(aggDate),\
+                            func.date(Prescription.date),\
+                            func.coalesce(func.date(Prescription.expire), func.date(aggDate))\
+                        )\
+                    )\
                     .count()
 
         db.session.query(Prescription)\
@@ -487,7 +535,13 @@ class PrescriptionDrug(db.Model):
             q = q.filter(PrescriptionDrug.idPrescription == idPrescription)
         else:
             q = q.filter(Prescription.admissionNumber == admissionNumber)\
-                 .filter(between(func.date(aggDate), func.date(Prescription.date), func.date(Prescription.expire)))\
+                 .filter(\
+                    between(\
+                        func.date(aggDate),\
+                        func.date(Prescription.date),\
+                        func.coalesce(func.date(Prescription.expire), func.date(aggDate))\
+                    )\
+                 )\
                  .filter(Prescription.agg == None)\
                  .filter(Prescription.concilia == None)\
                  .filter(Prescription.idSegment == idSegment)
@@ -498,7 +552,13 @@ class PrescriptionDrug(db.Model):
                 query_prescription = db.session.query(p_aux.id)\
                     .select_from(p_aux)\
                     .filter(p_aux.admissionNumber == admissionNumber)\
-                    .filter(between(func.date(aggDate), func.date(p_aux.date), func.date(p_aux.expire)))\
+                    .filter(\
+                        between(\
+                            func.date(aggDate),\
+                            func.date(p_aux.date),\
+                            func.coalesce(func.date(p_aux.expire), func.date(aggDate))\
+                        )\
+                    )\
                     .filter(p_aux.agg == None)\
                     .filter(p_aux.concilia == None)\
                     .filter(p_aux.idSegment == idSegment)
