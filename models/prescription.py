@@ -388,7 +388,7 @@ class Patient(db.Model):
         else:
             q = q.filter(Prescription.concilia == None)
 
-        if (insurance != None):
+        if (insurance != None and len(insurance.strip()) > 0):
             q = q.filter(Prescription.insurance.ilike("%" + str(insurance) + "%"))
 
         if endDate is None: endDate = startDate
