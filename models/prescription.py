@@ -128,7 +128,7 @@ class Prescription(db.Model):
         p2 = db.aliased(Prescription)
 
         if aggDate is None:
-            relation = db.session.query(pd1.id, Relation, m1.name, m2.name, pd1.update)
+            relation = db.session.query(pd1.id, Relation, m1.name, m2.name, pd1.update, pd1.intravenous, pd2.intravenous)
             relation = relation\
                 .join(pd2, and_(pd2.idPrescription == pd1.idPrescription, pd2.id != pd1.id))\
                 .join(m1, m1.id == pd1.idDrug)\
@@ -138,7 +138,7 @@ class Prescription(db.Model):
         else:
             if is_cpoe:
                 daterange = partial(func.tsrange, type_=TSRANGE)
-                relation = db.session.query(pd1.id, Relation, m1.name, m2.name, p1.expire)\
+                relation = db.session.query(pd1.id, Relation, m1.name, m2.name, p1.expire, pd1.intravenous, pd2.intravenous)\
                         .select_from(p1)\
                         .join(p2, p2.admissionNumber == admissionNumber)\
                         .join(pd1, pd1.idPrescription == p1.id)\
@@ -160,7 +160,7 @@ class Prescription(db.Model):
                         )
                         
             else:
-                relation = db.session.query(pd1.id, Relation, m1.name, m2.name, p1.expire)\
+                relation = db.session.query(pd1.id, Relation, m1.name, m2.name, p1.expire, pd1.intravenous, pd2.intravenous)\
                         .select_from(p1)\
                         .join(p2, p2.admissionNumber == admissionNumber)\
                         .join(pd1, pd1.idPrescription == p1.id)\
@@ -178,11 +178,11 @@ class Prescription(db.Model):
                             .filter(pd1.suspendedDate == None)\
                             .filter(pd2.suspendedDate == None)
 
-        interaction = relation.filter(Relation.kind.in_(['it','dt','dm']))
+        interaction = relation.filter(Relation.kind.in_(['it','dt','dm','iy']))
 
-        incompatible = relation.filter(Relation.kind.in_(['iy']))\
-                        .filter(pd1.intravenous == True)\
-                        .filter(pd2.intravenous == True)
+        #incompatible = relation.filter(Relation.kind.in_(['iy']))\
+        #                .filter(pd1.intravenous == True)\
+        #                .filter(pd2.intravenous == True)
 
         admissionAllergy = db.session.query(PrescriptionDrug.idDrug.label('idDrug'), func.min(PrescriptionDrug.id).label('id') )\
                       .select_from(PrescriptionDrug)\
@@ -195,7 +195,7 @@ class Prescription(db.Model):
         al = db.aliased(admissionAllergy)
 
         xreactivity = db.session\
-            .query(pd1.id, Relation, m1.name, m2.name, pd1.update)\
+            .query(pd1.id, Relation, m1.name, m2.name, pd1.update, pd1.intravenous, pd2.intravenous)\
             .join(al, al.c.id != pd1.id)\
             .join(m1, m1.id == pd1.idDrug)\
             .join(m2, m2.id == al.c.idDrug)\
@@ -215,7 +215,7 @@ class Prescription(db.Model):
                                .filter(between(func.date(aggDate), func.date(Prescription.date), func.date(Prescription.expire)))\
                                .filter(Prescription.idSegment != None)
 
-        relations = interaction.union(incompatible).union(xreactivity).all()
+        relations = interaction.union(xreactivity).all()
 
         results = {}
         pairs = []
@@ -226,6 +226,9 @@ class Prescription(db.Model):
                 key = str(r[1].sctida) + '-' + str(r[1].sctidb) + str(r[4].day if r[4] else 0)
 
             if key in pairs: 
+                continue;
+
+            if r[1].kind == 'iy' and (r[5] != True or r[6] != True):
                 continue;
 
             alert = typeRelations[r[1].kind] + ': '
