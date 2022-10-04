@@ -11,13 +11,14 @@ def get_patients(id_segment, id_department_list, next_appointment_start_date, ne
                 scheduled_by_list, attended_by_list):
     Pmax = db.aliased(Prescription)
 
-    sq_last_interaction = db.session.query(func.max(func.date(ClinicalNotes.date)))\
+    sq_appointment = db.session.query(func.max(func.date(ClinicalNotes.date)))\
         .select_from(ClinicalNotes)\
         .filter(ClinicalNotes.admissionNumber == Prescription.admissionNumber)\
-        .label('last_interaction')
+        .filter(ClinicalNotes.position == 'Agendamento')\
+        .label('appointment')
 
     query = db.session\
-        .query(Patient, Prescription, sq_last_interaction)\
+        .query(Patient, Prescription, sq_appointment)\
         .select_from(Patient)\
         .join(\
             Prescription,\
@@ -28,7 +29,7 @@ def get_patients(id_segment, id_department_list, next_appointment_start_date, ne
                 .filter(Pmax.idHospital == Patient.idHospital)\
                 .filter(Pmax.agg == True)\
             )\
-        .order_by(desc("last_interaction"))\
+        .order_by(desc("appointment"))\
         .options(undefer('observation'))
 
     if (id_segment):
@@ -38,10 +39,10 @@ def get_patients(id_segment, id_department_list, next_appointment_start_date, ne
         query = query.filter(Prescription.idDepartment.in_(id_department_list))
 
     if (next_appointment_start_date):
-        query = query.filter(sq_last_interaction >= next_appointment_start_date)
+        query = query.filter(sq_appointment >= next_appointment_start_date)
 
     if (next_appointment_end_date):
-        query = query.filter(sq_last_interaction <= next_appointment_end_date)
+        query = query.filter(sq_appointment <= next_appointment_end_date)
 
     if (scheduled_by_list):
         scheduled_by_query = db.session.query(func.count())\
