@@ -231,7 +231,7 @@ class Prescription(db.Model):
         al = db.aliased(admissionAllergy)
 
         xreactivity = db.session\
-            .query(pd1.id, Relation, m1.name, m2.name, pd1.update, pd1.intravenous, pd2.intravenous)\
+            .query(pd1.id, Relation, m1.name, m2.name, pd1.update, pd1.intravenous, pd1.intravenous.label('intravenous2'))\
             .join(al, al.c.id != pd1.id)\
             .join(m1, m1.id == pd1.idDrug)\
             .join(m2, m2.id == al.c.idDrug)\
