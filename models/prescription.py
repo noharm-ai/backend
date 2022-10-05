@@ -421,17 +421,35 @@ def getDrugHistory(idPrescription, admissionNumber, id_drug, is_cpoe):
 
         return func.array(query)
     else:
+        sub_qry = db.session\
+            .query(\
+                Prescription.date.label('date'),\
+                func.max(Prescription.expire).label('expire'),\
+                func.max(PrescriptionDrug.suspendedDate).label('suspension'),\
+                PrescriptionDrug.frequency.label('frequency'),\
+                PrescriptionDrug.dose.label('dose'),\
+                PrescriptionDrug.idMeasureUnit.label('idMeasureUnit')\
+            )\
+            .select_from(PrescriptionDrug)\
+            .join(Prescription, Prescription.id == PrescriptionDrug.idPrescription)\
+            .filter(Prescription.admissionNumber == admissionNumber)\
+            .filter(PrescriptionDrug.idDrug == id_drug)\
+            .group_by(\
+                Prescription.date, PrescriptionDrug.frequency, PrescriptionDrug.dose, PrescriptionDrug.idMeasureUnit\
+            )\
+            .order_by(asc(Prescription.date))\
+            .subquery()
+
+        cpoeperiods = db.aliased(sub_qry)
+
         query = db.session.query(\
                 func.concat(\
-                    func.to_char(pr1.date, "DD/MM"), ' - ', func.to_char(func.coalesce(pd1.suspendedDate, pr1.expire), "DD/MM"),\
-                    ' (',pd1.frequency,'x ',func.trim(func.to_char(pd1.dose,'9G999G999D99')),' ',pd1.idMeasureUnit,')',\
-                    case([(pd1.suspendedDate != None, ' - suspenso')], else_ = '')
+                    func.to_char(cpoeperiods.c.date, "DD/MM"), ' - ', func.to_char(func.coalesce(cpoeperiods.c.suspension, cpoeperiods.c.expire), "DD/MM"),\
+                    ' (',cpoeperiods.c.frequency,'x ',func.trim(func.to_char(cpoeperiods.c.dose,'9G999G999D99')),' ', cpoeperiods.c.idMeasureUnit,')',\
+                    case([(cpoeperiods.c.suspension != None, ' - suspenso')], else_ = '')
                 )
             )\
-            .distinct(pr1.date, pd1.frequency, pd1.dose, pd1.idMeasureUnit)\
-            .join(pr1, pr1.id == pd1.idPrescription)\
-            .filter(pr1.admissionNumber == admissionNumber)\
-            .filter(pd1.idDrug == id_drug)\
+            .select_from(cpoeperiods)
         
         return query
 
