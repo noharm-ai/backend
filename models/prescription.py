@@ -679,6 +679,7 @@ class Intervention(db.Model):
             interventions = interventions.filter(Intervention.admissionNumber == admissionNumber)
 
         interventions = interventions.filter(Intervention.status.in_(['s','a','n','x','j']))\
+                                     .filter(Intervention.date > (date.today() - timedelta(days=60)))\
                                      .order_by(desc(Intervention.date))
 
         interventions = interventions.limit(1500).all()
