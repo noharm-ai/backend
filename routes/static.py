@@ -1,105 +1,44 @@
 from flask import Blueprint, request
-from flask_api import status
+from datetime import datetime
+
 from models.main import *
 from models.prescription import *
-from .prescription import getPrescription
-from .utils import tryCommit, getFeatures
-from datetime import date, timedelta
+from .utils import tryCommit
+from services import prescription_agg_service
 
-from services import prescription_drug_service
+from exception.validation_error import ValidationError
 
 app_stc = Blueprint('app_stc',__name__)
 
-@app_stc.route('/static/<string:schema>/prescription/<int:idPrescription>', methods=['GET'])
-def computePrescription(schema, idPrescription):
-    result = db.engine.execute('SELECT schema_name FROM information_schema.schemata')
+@app_stc.route('/static/<string:schema>/prescription/<int:id_prescription>', methods=['GET'])
+def computePrescription(schema, id_prescription):
+    is_cpoe = request.args.get('cpoe', False)
+    out_patient = request.args.get('outpatient', None)
 
-    schemaExists = False
-    for r in result:
-        if r[0] == schema: schemaExists = True
+    try:    
+        prescription_agg_service.create_agg_prescription_by_prescription(schema, id_prescription, is_cpoe, out_patient)
+    except ValidationError as e:
+        return {
+            'status': 'error',
+            'message': e.message,
+            'code': e.code
+        }, e.httpStatus
 
-    if not schemaExists:
-        return { 'status': 'error', 'message': 'Schema Inexistente!' }, status.HTTP_400_BAD_REQUEST
+    return tryCommit(db, str(id_prescription))
 
-    dbSession.setSchema(schema)
-    p = Prescription.query.get(idPrescription)
-    if (p is None):
-        return { 'status': 'error', 'message': 'Prescrição Inexistente!' }, status.HTTP_400_BAD_REQUEST
+@app_stc.route('/static/<string:schema>/aggregate/<int:admission_number>', methods=['GET'])
+def create_aggregated_prescription_by_date(schema, admission_number):
+    is_cpoe = request.args.get('cpoe', False)
+    str_date = request.args.get('p_date', None)
+    p_date = datetime.strptime(str_date, '%Y-%m-%d').date()
 
-    if (p.idSegment is None):
-        return { 
-            'status': 'success', 
-            'data': str(idPrescription),
-            'message': 'Prescrição sem Segmento!' 
-        }, status.HTTP_200_OK
+    try:    
+        prescription_agg_service.create_agg_prescription_by_date(schema, admission_number, p_date, is_cpoe)
+    except ValidationError as e:
+        return {
+            'status': 'error',
+            'message': e.message,
+            'code': e.code
+        }, e.httpStatus
 
-    resultPresc, stat = getPrescription(idPrescription=idPrescription)
-    p.features = getFeatures(resultPresc)
-    p.aggDrugs = p.features['drugIDs']
-    p.aggDeps = [p.idDepartment]
-
-    outpatient = request.args.get('outpatient', None)
-    cpoe = request.args.get('cpoe', False)
-    
-    if cpoe:
-        prescription_dates = get_date_range(p)
-    else:
-        prescription_dates = [p.date]
-
-    for pdate in prescription_dates:
-        if outpatient:
-            PrescAggID = p.admissionNumber
-        else:
-            PrescAggID = genAggID(p, pdate)
-
-        newPrescAgg = False
-        pAgg = Prescription.query.get(PrescAggID)
-        if (pAgg is None):
-            pAgg = Prescription()
-            pAgg.id = PrescAggID
-            pAgg.idPatient = p.idPatient
-            pAgg.admissionNumber = p.admissionNumber
-            pAgg.date = pdate
-            pAgg.status = 0
-            newPrescAgg = True
-
-        if outpatient:
-            pAgg.date = date(pdate.year, pdate.month, pdate.day)
-
-        resultAgg, stat = getPrescription(admissionNumber=p.admissionNumber,\
-            aggDate=pAgg.date, idSegment=p.idSegment, is_cpoe=cpoe)
-
-        pAgg.idHospital = p.idHospital
-        pAgg.idDepartment = p.idDepartment
-        pAgg.idSegment = p.idSegment
-        pAgg.bed = p.bed
-        pAgg.record = p.record
-        pAgg.prescriber = 'Prescrição Agregada'
-        pAgg.insurance = p.insurance
-        pAgg.agg = True
-
-        if p.concilia is None and prescription_drug_service.has_unchecked_drugs(idPrescription):
-            pAgg.status = 0
-
-        if 'data' in resultAgg:
-            pAgg.features = getFeatures(resultAgg)
-            pAgg.aggDrugs = pAgg.features['drugIDs']
-            pAgg.aggDeps = list(set([resultAgg['data']['headers'][h]['idDepartment'] for h in resultAgg['data']['headers']]))
-            if newPrescAgg: db.session.add(pAgg)
-
-    return tryCommit(db, str(idPrescription))
-
-def genAggID(p, pdate):
-    id = (pdate.year - 2000) * 100000000000000
-    id += pdate.month *          1000000000000
-    id += pdate.day *              10000000000
-    id += p.idSegment *              1000000000
-    id += p.admissionNumber
-    return id
-
-def get_date_range(p):
-    max_date = date.today() + timedelta(days=3)
-    start_date = p.date.date() if p.date.date() >= date.today() else date.today()
-    end_date = (p.expire.date() if p.expire != None else p.date.date()) + timedelta(days=1) 
-    end_date = end_date if end_date < max_date else max_date
-    return [start_date + timedelta(days=x) for x in range((end_date-start_date).days)]
+    return tryCommit(db, str(admission_number))
