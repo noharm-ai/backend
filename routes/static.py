@@ -30,7 +30,7 @@ def computePrescription(schema, id_prescription):
 def create_aggregated_prescription_by_date(schema, admission_number):
     is_cpoe = request.args.get('cpoe', False)
     str_date = request.args.get('p_date', None)
-    p_date = datetime.strptime(str_date, '%Y-%m-%d').date()
+    p_date = datetime.strptime(str_date, '%Y-%m-%d').date() if str_date else datetime.today().date()
 
     try:    
         prescription_agg_service.create_agg_prescription_by_date(schema, admission_number, p_date, is_cpoe)

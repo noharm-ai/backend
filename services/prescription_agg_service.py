@@ -84,10 +84,6 @@ def create_agg_prescription_by_date(schema, admission_number, p_date, is_cpoe):
 
     agg_p = db.session.query(Prescription).get(p_id)
 
-    print("////////////////////")
-    print("ID", p_id)
-    print("PRESCRIPTIon", agg_p)
-
     if (agg_p != None):
         return
     
