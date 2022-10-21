@@ -382,7 +382,7 @@ def setPrescriptionStatus(idPrescription):
 
     p.user = user.id
 
-    return tryCommit(db, str(idPrescription), True)
+    return tryCommit(db, str(idPrescription), user.permission())
 
 @app_pres.route("/prescriptions/drug/<int:idPrescriptionDrug>/period", methods=['GET'])
 @jwt_required()
