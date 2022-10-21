@@ -357,7 +357,13 @@ def setPrescriptionStatus(idPrescription):
                       .filter(Prescription.status != p.status)\
                       .filter(Prescription.idSegment == p.idSegment)\
                       .filter(Prescription.concilia == None)\
-                      .filter(between(func.date(p.date), func.date(Prescription.date), func.date(Prescription.expire)))\
+                      .filter(\
+                            between(\
+                                func.date(p.date),\
+                                func.date(Prescription.date),\
+                                func.coalesce(func.date(Prescription.expire), func.date(p.date))\
+                            )\
+                      )\
                       .update({
                         'status': p.status,
                         'update': datetime.today(),
@@ -376,7 +382,7 @@ def setPrescriptionStatus(idPrescription):
 
     p.user = user.id
 
-    return tryCommit(db, str(idPrescription), user.permission())
+    return tryCommit(db, str(idPrescription), True)
 
 @app_pres.route("/prescriptions/drug/<int:idPrescriptionDrug>/period", methods=['GET'])
 @jwt_required()
