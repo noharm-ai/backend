@@ -11,6 +11,6 @@ psycopg2-binary
 pandas
 networkx
 numpy
-sklearn
+scikit-learn
 flask-mail
 random-password-generator
