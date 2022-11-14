@@ -16,6 +16,6 @@ pandas
 pylint
 networkx
 numpy
-sklearn
+scikit-learn
 flask-mail
 random-password-generator

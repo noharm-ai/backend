@@ -1,5 +1,5 @@
 from .utils import *
-
+from models.appendix import *
 class DrugList():
 
     def __init__(self, drugList, interventions, relations, exams, agg, dialysis, is_cpoe=False):
@@ -71,7 +71,18 @@ class DrugList():
             if not belong: continue
 
             pdFrequency = 1 if pd[0].frequency in [33,44,55,66,99] else pd[0].frequency
-            pdDoseconv = none2zero(pd[0].doseconv) * none2zero(pdFrequency)
+            
+            if (pd[2] != None and pd[6] != None and pd[6].division != None):
+                measureUnitFactor = 1
+                measureUnitConvert = MeasureUnitConvert.query.get((pd[2].id, pd[0].idDrug, pd[0].idSegment))
+                if (measureUnitConvert):
+                    measureUnitFactor = measureUnitConvert.factor
+
+                pdDoseconv = none2zero(pd[0].dose * measureUnitFactor) * none2zero(pdFrequency)
+            else:
+                pdDoseconv = none2zero(pd[0].doseconv) * none2zero(pdFrequency)    
+
+            
             pdUnit = strNone(pd[2].id) if pd[2] else ''
             pdWhiteList = bool(pd[6].whiteList) if pd[6] is not None else False
             doseWeightStr = None

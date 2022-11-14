@@ -1,7 +1,7 @@
 name: Build
 on:
   pull_request:
-    branches: [ master, develop, feature/acceptance_tests_lanceiros ]
+    branches: [master, develop, feature/acceptance_tests_lanceiros]
 
 jobs:
   build:
@@ -22,7 +22,7 @@ jobs:
       - name: Setup Python
         run: |
           python -m pip install --upgrade pip
-          pip install -q -r requirements.txt
+          pip install -r requirements.txt
       - name: Setup PostgreSQL
         run: |
           git clone https://github.com/noharm-ai/database
@@ -46,3 +46,36 @@ jobs:
         uses: paambaati/codeclimate-action@v2.7.5
         env:
           CC_TEST_REPORTER_ID: ${{secrets.CC_TEST_REPORTER_ID}}
+  build-prod:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:11.6
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_DB: noharm
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.8
+      - name: Setup Python
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-prod.txt
+      - name: Setup PostgreSQL
+        run: |
+          git clone https://github.com/noharm-ai/database
+          psql -h localhost -U postgres -d noharm -a -f database/noharm-public.sql -v ON_ERROR_STOP=1
+          psql -h localhost -U postgres -d noharm -a -f database/noharm-create.sql -v ON_ERROR_STOP=1
+          psql -h localhost -U postgres -d noharm -a -f database/noharm-newuser.sql -v ON_ERROR_STOP=1
+          psql -h localhost -U postgres -d noharm -a -f database/noharm-triggers.sql -v ON_ERROR_STOP=1
+          psql -h localhost -U postgres -d noharm -a -f database/noharm-insert.sql -v ON_ERROR_STOP=1
+      - name: Setup Application
+        run: |
+          python mobile.py &
+          sleep 10
+      - name: Run Integration Test
+        run: ./tests/test_integration.sh
