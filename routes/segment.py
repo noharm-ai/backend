@@ -191,6 +191,34 @@ def getCodes():
         'data': { 'types': results}
     }, status.HTTP_200_OK
 
+@app_seg.route('/segments/exams/refs', methods=['GET'])
+@jwt_required()
+def getRefs():
+    dbSession.setSchema("hsc_test")
+
+    refs = db.session.query(SegmentExam, Segment)\
+                .join(Segment, Segment.id == SegmentExam.idSegment)\
+                .filter(SegmentExam.idSegment.in_([1, 3]))\
+                .order_by(asc(Segment.id), asc(SegmentExam.name)).all()
+
+    results = []
+    for r in refs:
+        results.append({
+            'segment': r[1].description,
+            'type': r[0].typeExam,
+            'name': r[0].name,
+            'initials': r[0].initials,
+            'ref': r[0].ref,
+            'min': r[0].min,
+            'max': r[0].max,
+            'order': r[0].order
+        })
+
+    return {
+        'status': 'success',
+        'data': results
+    }, status.HTTP_200_OK
+
 
 @app_seg.route('/segments/<int:idSegment>/exams', methods=['PUT'])
 @jwt_required()
