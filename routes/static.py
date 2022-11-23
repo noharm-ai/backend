@@ -20,7 +20,7 @@ def computePrescription(schema, id_prescription):
     except ValidationError as e:
         return {
             'status': 'error',
-            'message': e.message,
+            'message': str(e),
             'code': e.code
         }, e.httpStatus
 
@@ -37,7 +37,7 @@ def create_aggregated_prescription_by_date(schema, admission_number):
     except ValidationError as e:
         return {
             'status': 'error',
-            'message': e.message,
+            'message': str(e),
             'code': e.code
         }, e.httpStatus
 
