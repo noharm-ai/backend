@@ -77,8 +77,8 @@ def create_agg_prescription_by_date(schema, admission_number, p_date, is_cpoe):
 
     last_prescription = get_last_prescription(admission_number);
 
-    if (last_prescription == None):
-        raise ValidationError('Não foi possível encontrar o segmento desta prescrição', 'errors.invalidSegment', status.HTTP_400_BAD_REQUEST)
+    if (last_prescription == None or last_prescription.idSegment == None):
+        raise ValidationError('Não foi possível encontrar o segmento deste atendimento', 'errors.invalidSegment', status.HTTP_400_BAD_REQUEST)
 
     p_id = gen_agg_id(admission_number, last_prescription.idSegment, p_date)
 
@@ -131,6 +131,7 @@ def get_last_prescription(admission_number):
         .filter(Prescription.admissionNumber == admission_number)\
         .filter(Prescription.agg == None)\
         .filter(Prescription.concilia == None)\
+        .filter(Prescription.idSegment != None)\
         .order_by(desc(Prescription.date))\
         .first()
 
