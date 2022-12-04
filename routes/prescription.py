@@ -14,6 +14,7 @@ from sqlalchemy import func, between
 from datetime import date, datetime
 from .drugList import DrugList
 from services import memory_service
+from pytz import timezone
 
 app_pres = Blueprint('app_pres',__name__)
 
@@ -366,7 +367,7 @@ def setPrescriptionStatus(idPrescription):
                       )\
                       .update({
                         'status': p.status,
-                        'update': datetime.today(),
+                        'update': datetime.now(timezone('America/Sao_Paulo')).today(),
                         'user': user.id
                       }, synchronize_session='fetch')
         else:
@@ -374,7 +375,7 @@ def setPrescriptionStatus(idPrescription):
 
     if 'notes' in data.keys(): 
         p.notes = data.get('notes', None)
-        p.notes_at = datetime.today()
+        p.notes_at = datetime.now(timezone('America/Sao_Paulo')).today()
 
     if 'concilia' in data.keys(): 
         concilia = data.get('concilia', 's')

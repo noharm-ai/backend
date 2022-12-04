@@ -8,6 +8,7 @@ from sqlalchemy import case, BigInteger, cast, between, outerjoin
 from sqlalchemy.sql.expression import literal_column, case
 from functools import partial
 from sqlalchemy.dialects.postgresql import TSRANGE
+from pytz import timezone
 
 class Prescription(db.Model):
     __tablename__ = 'prescricao'
@@ -308,7 +309,7 @@ class Prescription(db.Model):
                     .filter(func.date(Prescription.date) == func.date(aggDate))\
                     .update({
                         'status': 's' if exists == 0 else '0',
-                        'update': datetime.today(),
+                        'update': datetime.now(timezone('America/Sao_Paulo')).today(),
                         'user': userId
                     }, synchronize_session='fetch')        
 
