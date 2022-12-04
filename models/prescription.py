@@ -355,12 +355,14 @@ class Patient(db.Model):
             .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)\
             .outerjoin(Department, and_(Department.id == Prescription.idDepartment, Department.idHospital == Prescription.idHospital))
 
-        if (not(idSegment is None)):
+        currentDepartment = bool(int(none2zero(currentDepartment))) and (len(idDept)>0)
+
+        if (not(idSegment is None)) and (not currentDepartment):
             q = q.filter(Prescription.idSegment == idSegment)
 
         if (len(idDept)>0):
             idDept = list(map(int, idDept))
-            if bool(int(none2zero(currentDepartment))):
+            if currentDepartment:
                 q = q.filter(Prescription.idDepartment.in_(idDept))
             else:
                 q = q.filter(postgresql.array(idDept).overlap(Prescription.aggDeps))
