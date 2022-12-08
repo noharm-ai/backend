@@ -475,7 +475,20 @@ def getPrescriptionUpdate(idPrescription):
         return { 'status': 'error', 'message': 'Prescrição Inexistente!' }, status.HTTP_400_BAD_REQUEST
 
     if p.agg:
-        query = "INSERT INTO " + user.schema + ".presmed \
+        if user.cpoe():
+            query = "INSERT INTO " + user.schema + ".presmed \
+                        SELECT pm.*\
+                        FROM " + user.schema + ".presmed pm\
+                        WHERE fkprescricao IN (\
+                            SELECT fkprescricao\
+                            FROM " + user.schema + ".prescricao p\
+                            WHERE p.nratendimento = " + str(p.admissionNumber) + "\
+                            AND p.idsegmento IS NOT NULL \
+                            AND '" + str(p.date) + "'::date\
+                            BETWEEN p.dtprescricao::date AND COALESCE(p.dtvigencia::date, '" + str(p.date) + "'::date)\
+                        );"
+        else:
+            query = "INSERT INTO " + user.schema + ".presmed \
                     SELECT pm.*\
                     FROM " + user.schema + ".presmed pm\
                     WHERE fkprescricao IN (\
@@ -487,7 +500,7 @@ def getPrescriptionUpdate(idPrescription):
                             p.dtprescricao::date = '" + str(p.date) + "'::date OR\
                             p.dtvigencia::date = '" + str(p.date) + "'::date\
                         )\
-                    );"  
+                    );"
     else:
         query = "INSERT INTO " + user.schema + ".presmed \
                     SELECT *\
