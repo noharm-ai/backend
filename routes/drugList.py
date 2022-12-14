@@ -249,7 +249,7 @@ class DrugList():
     def getInfusionList(self):
         result = {}
         for pd in self.drugList:
-            if pd[0].solutionGroup and pd[0].source == 'Soluções':
+            if (pd[0].solutionGroup or pd[0].cpoe_group) and pd[0].source == 'Soluções':
                 key = self.getInfusionKey(pd)
 
                 if not key in result:
