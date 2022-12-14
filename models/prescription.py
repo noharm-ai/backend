@@ -598,7 +598,10 @@ class PrescriptionDrug(db.Model):
                      .filter(or_(PrescriptionDrug.suspendedDate == None,\
                         func.date(PrescriptionDrug.suspendedDate) >= func.date(aggDate)))
         
-        return q.order_by(asc(Prescription.expire), desc(func.concat(PrescriptionDrug.idPrescription,PrescriptionDrug.solutionGroup)), asc(Drug.name)).all()
+        if is_cpoe:
+            return q.order_by(asc(Prescription.expire), desc(PrescriptionDrug.cpoe_group), asc(Drug.name)).all()
+        else:
+            return q.order_by(asc(Prescription.expire), desc(func.concat(PrescriptionDrug.idPrescription,PrescriptionDrug.solutionGroup)), asc(Drug.name)).all()
 
     def findByPrescriptionDrug(idPrescriptionDrug, future, is_cpoe = False):
         pd = PrescriptionDrug.query.get(idPrescriptionDrug)
