@@ -78,7 +78,7 @@ class DrugList():
                 if (measureUnitConvert):
                     measureUnitFactor = measureUnitConvert.factor
 
-                pdDoseconv = none2zero(pd[0].dose * measureUnitFactor) * none2zero(pdFrequency)
+                pdDoseconv = none2zero(pd[0].dose) * measureUnitFactor * none2zero(pdFrequency)
             else:
                 pdDoseconv = none2zero(pd[0].doseconv) * none2zero(pdFrequency)    
 
@@ -249,7 +249,7 @@ class DrugList():
     def getInfusionList(self):
         result = {}
         for pd in self.drugList:
-            if (pd[0].solutionGroup or pd[0].cpoe_group) and pd[0].source == 'Soluções':
+            if pd[0].solutionGroup and pd[0].source == 'Soluções':
                 key = self.getInfusionKey(pd)
 
                 if not key in result:
