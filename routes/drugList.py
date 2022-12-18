@@ -78,7 +78,7 @@ class DrugList():
                 if (measureUnitConvert):
                     measureUnitFactor = measureUnitConvert.factor
 
-                pdDoseconv = none2zero(pd[0].dose * measureUnitFactor) * none2zero(pdFrequency)
+                pdDoseconv = none2zero(pd[0].dose) * measureUnitFactor * none2zero(pdFrequency)
             else:
                 pdDoseconv = none2zero(pd[0].doseconv) * none2zero(pdFrequency)    
 
