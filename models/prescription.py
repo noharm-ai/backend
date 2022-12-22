@@ -97,22 +97,26 @@ class Prescription(db.Model):
                     ))\
             .all()
 
-    def getHeaders(admissionNumber, aggDate, idSegment):
-        prescriptions = db.session.query(Prescription, Department.name, User.name)\
+    def getHeaders(admissionNumber, aggDate, idSegment, is_pmc=False):
+        q = db.session.query(Prescription, Department.name, User.name)\
                     .outerjoin(Department, and_(Department.id == Prescription.idDepartment, Department.idHospital == Prescription.idHospital))\
                     .outerjoin(User, Prescription.user == User.id)\
                     .filter(Prescription.admissionNumber == admissionNumber)\
-                    .filter(\
+                    .filter(Prescription.idSegment == idSegment)\
+                    .filter(Prescription.agg == None)\
+                    .filter(Prescription.concilia == None)
+
+        if not is_pmc:
+            q = q.filter(\
                         between(\
                             func.date(aggDate),\
                             func.date(Prescription.date),\
                             func.coalesce(func.date(Prescription.expire), func.date(aggDate))\
                         )\
-                    )\
-                    .filter(Prescription.idSegment == idSegment)\
-                    .filter(Prescription.agg == None)\
-                    .filter(Prescription.concilia == None)\
-                    .all()
+                    )
+
+        prescriptions = q.all()
+        
         headers = {}
         for p in prescriptions:
             headers[p[0].id] = {
@@ -131,7 +135,7 @@ class Prescription(db.Model):
 
         return headers
 
-    def findRelation(idPrescription, admissionNumber, aggDate=None, is_cpoe = False):
+    def findRelation(idPrescription, admissionNumber, aggDate=None, is_cpoe = False, is_pmc = False):
         pd1 = db.aliased(PrescriptionDrug)
         pd2 = db.aliased(PrescriptionDrug)
         m1 = db.aliased(Drug)
@@ -193,7 +197,11 @@ class Prescription(db.Model):
                         .join(m2, m2.id == pd2.idDrug)\
                         .join(Relation, and_(Relation.sctida == m1.sctid, Relation.sctidb == m2.sctid))\
                         .filter(p1.admissionNumber == admissionNumber)\
-                        .filter(\
+                        .filter(func.date(p2.expire) == func.date(p1.expire))\
+                        .filter(p1.idSegment != None)
+
+                if not is_pmc:
+                    relation = relation.filter(\
                             between(\
                                 func.date(aggDate),\
                                 func.date(p1.date),\
@@ -206,9 +214,7 @@ class Prescription(db.Model):
                                 func.date(p2.date),\
                                 func.coalesce(func.date(p2.expire), func.date(aggDate))\
                             )\
-                        )\
-                        .filter(func.date(p2.expire) == func.date(p1.expire))\
-                        .filter(p1.idSegment != None)
+                        )
 
         relation = relation.filter(Relation.active == True)\
                             .filter(pd1.suspendedDate == None)\
@@ -524,7 +530,7 @@ class PrescriptionDrug(db.Model):
 
     cpoe_group = db.Column("cpoe_grupo", db.Integer, nullable=True)
 
-    def findByPrescription(idPrescription, admissionNumber, aggDate=None, idSegment=None, is_cpoe=False):
+    def findByPrescription(idPrescription, admissionNumber, aggDate=None, idSegment=None, is_cpoe=False, is_pmc=False):
         prevNotes = getPrevNotes(admissionNumber)
 
         if aggDate != None and is_cpoe:
@@ -558,16 +564,19 @@ class PrescriptionDrug(db.Model):
             q = q.filter(PrescriptionDrug.idPrescription == idPrescription)
         else:
             q = q.filter(Prescription.admissionNumber == admissionNumber)\
-                 .filter(\
+                 .filter(Prescription.agg == None)\
+                 .filter(Prescription.concilia == None)\
+                 .filter(Prescription.idSegment == idSegment)
+
+            #pmc shows all prescriptions
+            if not is_pmc:
+                q = q.filter(\
                     between(\
                         func.date(aggDate),\
                         func.date(Prescription.date),\
                         func.coalesce(func.date(Prescription.expire), func.date(aggDate))\
                     )\
-                 )\
-                 .filter(Prescription.agg == None)\
-                 .filter(Prescription.concilia == None)\
-                 .filter(Prescription.idSegment == idSegment)
+                )\
 
             if is_cpoe:
                 p_aux = db.aliased(Prescription)
