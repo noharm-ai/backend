@@ -405,7 +405,7 @@ def getDrugPeriod(idPrescriptionDrug):
         else:
             results[0][1].append('Não há prescrição posterior para esse Paciente')
 
-    if is_cpoe:
+    if is_cpoe and not future:
         periodList = []
 
         for i, p in enumerate(results):

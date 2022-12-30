@@ -619,11 +619,17 @@ class PrescriptionDrug(db.Model):
         p = Prescription.query.get(pd.idPrescription)
 
         admissionHistory = None
+
         if future:
             drugHistory = getDrugFuture(p.id, p.admissionNumber)
             admissionHistory = Prescription.getFuturePrescription(p.id, p.admissionNumber)
-        else:
-            drugHistory = getDrugHistory(p.id, p.admissionNumber, id_drug = pd.idDrug, is_cpoe = is_cpoe)
+
+            return db.session\
+                .query(PrescriptionDrug, drugHistory.label('drugHistory'))\
+                .filter(PrescriptionDrug.id == idPrescriptionDrug)\
+                .all() , admissionHistory
+        
+        drugHistory = getDrugHistory(p.id, p.admissionNumber, id_drug = pd.idDrug, is_cpoe = is_cpoe)
 
         if is_cpoe:
             return drugHistory.all(), admissionHistory
