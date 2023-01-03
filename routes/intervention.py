@@ -43,9 +43,6 @@ def createIntervention(idPrescriptionDrug):
         i = Intervention()
         i.id = idPrescriptionDrug
         i.idPrescription = idPrescription
-        i.date = datetime.today()
-        i.update = datetime.today()
-        i.user = user.id
         newIntervention = True
 
     if 'admissionNumber' in data.keys(): i.admissionNumber = data.get('admissionNumber', None)
@@ -56,7 +53,10 @@ def createIntervention(idPrescriptionDrug):
     if 'interactions' in data.keys(): i.interactions = data.get('interactions', None)
     if 'transcription' in data.keys(): i.transcription = data.get('transcription', None)
     
+    i.date = datetime.today()
     i.status = data.get('status', 's')
+    i.update = datetime.today()
+    i.user = user.id
 
     if newIntervention: db.session.add(i)
 
