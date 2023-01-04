@@ -28,7 +28,7 @@ class DrugList():
             }
 
     def sumAlerts(self):
-        self.alertStats['exams'] = self.alertStats['kidney'] + self.alertStats['liver'] + self.alertStats['platelets']
+        self.alertStats['exams'] = self.alertStats['exams'] + self.alertStats['kidney'] + self.alertStats['liver'] + self.alertStats['platelets']
         self.alertStats['allergy'] += self.alertStats['rea']
 
     @staticmethod
@@ -192,7 +192,7 @@ class DrugList():
                         maxira = 0.6219
 
                         if ira > maxira and self.dialysis is None:
-                            self.alertStats['platelets'] += 1
+                            self.alertStats['exams'] += 1
                             alerts.append('Risco de desenvolvimento de Insuficiência Renal Aguda (IRA), já que o resultado do cálculo [dose diária de VANCOMICINA/TFG/peso] é superior a 0,6219. Caso o paciente esteja em diálise, desconsiderar. Ref. em: https://revista.ghc.com.br/index.php/cadernosdeensinoepesquisa/issue/view/3')
 
             if self.is_cpoe:
