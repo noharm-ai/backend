@@ -182,7 +182,7 @@ class DrugList():
                         self.alertStats[a[:3].lower()] += 1
                         alerts.append(a)   
 
-                if 'vanco' in pd[1].name.lower():
+                if pd[1] and 'vanco' in pd[1].name.lower():
                     maxdose = self.maxDoseAgg[idDrugAgg]['value']
                     ckd = self.exams['ckd']['value'] if 'ckd' in self.exams and self.exams['ckd']['value'] else None
                     weight = self.exams['weight']
