@@ -193,7 +193,7 @@ class DrugList():
 
                         if ira > maxira and self.dialysis is None:
                             self.alertStats['exams'] += 1
-                            alerts.append('Risco de desenvolvimento de Insuficiência Renal Aguda (IRA), já que o resultado do cálculo [dose diária de VANCOMICINA/TFG/peso] é superior a 0,6219. Caso o paciente esteja em diálise, desconsiderar. Ref. em: https://revista.ghc.com.br/index.php/cadernosdeensinoepesquisa/issue/view/3')
+                            alerts.append('Risco de desenvolvimento de Insuficiência Renal Aguda (IRA), já que o resultado do cálculo [dose diária de VANCOMICINA/TFG/peso] é superior a 0,6219. Caso o paciente esteja em diálise, desconsiderar. <a href="https://revista.ghc.com.br/index.php/cadernosdeensinoepesquisa/issue/view/3" target="_blank">Referência: CaEPS</a>')
 
             if self.is_cpoe:
                 period = str(round(pd[12])) + 'D' if pd[12] else ''
