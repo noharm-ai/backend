@@ -55,8 +55,17 @@ def createIntervention(idPrescriptionDrug):
     if 'observation' in data.keys(): i.notes = data.get('observation', None)
     if 'interactions' in data.keys(): i.interactions = data.get('interactions', None)
     if 'transcription' in data.keys(): i.transcription = data.get('transcription', None)
-    
-    i.status = data.get('status', 's')
+ 
+    new_status = data.get('status', 's')
+    if new_status != i.status:
+        if i.status == '0':
+            i.date = datetime.today()
+            i.user = user.id    
+            
+        i.status = new_status
+    else:
+        i.date = datetime.today()
+        i.user = user.id
 
     if newIntervention: db.session.add(i)
 
