@@ -187,7 +187,7 @@ class DrugList():
                     ckd = self.exams['ckd']['value'] if 'ckd' in self.exams and self.exams['ckd']['value'] else None
                     weight = self.exams['weight']
 
-                    if maxdose != None and ckd != None and weight != None:
+                    if maxdose != None and ckd != None and weight != None and ckd > 0 and weight > 0:
                         ira = maxdose / ckd / weight
                         maxira = 0.6219
 
