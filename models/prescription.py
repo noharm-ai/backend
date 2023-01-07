@@ -7,7 +7,7 @@ from sqlalchemy.orm import deferred
 from sqlalchemy import case, BigInteger, cast, between, outerjoin
 from sqlalchemy.sql.expression import literal_column, case
 from functools import partial
-from sqlalchemy.dialects.postgresql import TSRANGE
+from sqlalchemy.dialects.postgresql import TSRANGE, INTERVAL
 
 class Prescription(db.Model):
     __tablename__ = 'prescricao'
@@ -594,7 +594,7 @@ class PrescriptionDrug(db.Model):
                     .filter(\
                         between(\
                             func.date(aggDate),\
-                            func.date(p_aux.date),\
+                            func.date(p_aux.date - func.cast('2 DAY', INTERVAL)),\
                             func.coalesce(func.date(p_aux.expire), func.date(aggDate))\
                         )\
                     )\
