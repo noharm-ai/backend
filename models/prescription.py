@@ -69,7 +69,7 @@ class Prescription(db.Model):
                         Prescription.id == idPrescription,
                         and_(
                             Prescription.admissionNumber == idPrescription,
-                            Prescription.date == date.today(),
+                            func.date(Prescription.date) == date.today(),
                             Prescription.agg != None
                         )
                     ))\
