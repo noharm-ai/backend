@@ -65,14 +65,7 @@ class Prescription(db.Model):
 
     def getPrescription(idPrescription):
         return Prescription.getPrescriptionBasic()\
-            .filter(or_(
-                        Prescription.id == idPrescription,
-                        and_(
-                            Prescription.admissionNumber == idPrescription,
-                            func.date(Prescription.date) == date.today(),
-                            Prescription.agg != None
-                        )
-                    ))\
+            .filter(Prescription.id == idPrescription)\
             .first()
 
     def getPrescriptionAgg(admissionNumber, aggDate, idSegment):
