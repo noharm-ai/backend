@@ -14,7 +14,7 @@ pytest-cov
 mock
 pandas
 pylint
-networkx
+networkx==2.6.3
 numpy
 scikit-learn
 flask-mail

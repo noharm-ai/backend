@@ -9,7 +9,7 @@ zappa
 flask-cors
 psycopg2-binary
 pandas
-networkx
+networkx==2.6.3
 numpy
 scikit-learn
 flask-mail
