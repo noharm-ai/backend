@@ -220,14 +220,9 @@ class Prescription(db.Model):
         else:
             xreactivity = xreactivity.join(Prescription, Prescription.id == pd1.idPrescription)\
                                .filter(Prescription.admissionNumber == admissionNumber)\
-                               .filter(\
-                                    between(\
-                                        func.date(aggDate),\
-                                        func.date(Prescription.date),\
-                                        func.coalesce(func.date(Prescription.expire), func.date(aggDate))\
-                                    )\
-                                )\
                                .filter(Prescription.idSegment != None)
+
+            xreactivity = get_period_filter(xreactivity, Prescription, aggDate, is_pmc, is_cpoe)
 
         relations = interaction.union(xreactivity).all()
 
@@ -257,21 +252,15 @@ class Prescription(db.Model):
 
         return results
 
-    def checkPrescriptions(admissionNumber, aggDate, idSegment, userId):
+    def checkPrescriptions(admissionNumber, aggDate, idSegment, userId, is_cpoe, is_pmc):
         exists = db.session.query(Prescription)\
                     .filter(Prescription.admissionNumber == admissionNumber)\
                     .filter(Prescription.status != 's')\
                     .filter(Prescription.idSegment == idSegment)\
                     .filter(Prescription.concilia == None)\
-                    .filter(Prescription.agg == None)\
-                    .filter(\
-                        between(\
-                            func.date(aggDate),\
-                            func.date(Prescription.date),\
-                            func.coalesce(func.date(Prescription.expire), func.date(aggDate))\
-                        )\
-                    )\
-                    .count()
+                    .filter(Prescription.agg == None)
+
+        exists = get_period_filter(exists, Prescription, aggDate, is_pmc, is_cpoe)
 
         db.session.query(Prescription)\
                     .filter(Prescription.admissionNumber == admissionNumber)\
@@ -279,7 +268,7 @@ class Prescription(db.Model):
                     .filter(Prescription.agg != None)\
                     .filter(func.date(Prescription.date) == func.date(aggDate))\
                     .update({
-                        'status': 's' if exists == 0 else '0',
+                        'status': 's' if exists.count() == 0 else '0',
                         'update': datetime.today(),
                         'user': userId
                     }, synchronize_session='fetch')
