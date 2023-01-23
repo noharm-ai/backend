@@ -97,12 +97,11 @@ class Prescription(db.Model):
                     ))\
             .all()
 
-    def getHeaders(admissionNumber, aggDate, idSegment, is_pmc=False):
+    def getHeaders(admissionNumber, aggDate, idSegment, is_pmc=False, is_cpoe=False):
         q = db.session.query(Prescription, Department.name, User.name)\
                     .outerjoin(Department, and_(Department.id == Prescription.idDepartment, Department.idHospital == Prescription.idHospital))\
                     .outerjoin(User, Prescription.user == User.id)\
                     .filter(Prescription.admissionNumber == admissionNumber)\
-                    .filter(Prescription.idSegment == idSegment)\
                     .filter(Prescription.agg == None)\
                     .filter(Prescription.concilia == None)
 
@@ -114,6 +113,9 @@ class Prescription(db.Model):
                             func.coalesce(func.date(Prescription.expire), func.date(aggDate))\
                         )\
                     )
+
+        if not is_cpoe:
+            q = q.filter(Prescription.idSegment == idSegment)
 
         prescriptions = q.all()
         
@@ -565,8 +567,7 @@ class PrescriptionDrug(db.Model):
         else:
             q = q.filter(Prescription.admissionNumber == admissionNumber)\
                  .filter(Prescription.agg == None)\
-                 .filter(Prescription.concilia == None)\
-                 .filter(Prescription.idSegment == idSegment)
+                 .filter(Prescription.concilia == None)
 
             #pmc shows all prescriptions
             if not is_pmc:
@@ -592,8 +593,7 @@ class PrescriptionDrug(db.Model):
                         )\
                     )\
                     .filter(p_aux.agg == None)\
-                    .filter(p_aux.concilia == None)\
-                    .filter(p_aux.idSegment == idSegment)
+                    .filter(p_aux.concilia == None)
 
                 pd_max = db.aliased(PrescriptionDrug)
 
@@ -608,9 +608,18 @@ class PrescriptionDrug(db.Model):
                         func.date(PrescriptionDrug.suspendedDate) >= func.date(aggDate)))
         
         if is_cpoe:
-            return q.order_by(asc(Prescription.expire), desc(PrescriptionDrug.cpoe_group), asc(Drug.name)).all()
+            return q\
+                .order_by(asc(Prescription.expire), desc(PrescriptionDrug.cpoe_group), asc(Drug.name))\
+                .all()
         else:
-            return q.order_by(asc(Prescription.expire), desc(func.concat(PrescriptionDrug.idPrescription,PrescriptionDrug.solutionGroup)), asc(Drug.name)).all()
+            return q\
+                .filter(Prescription.idSegment == idSegment)\
+                .order_by(\
+                    asc(Prescription.expire),\
+                    desc(func.concat(PrescriptionDrug.idPrescription,PrescriptionDrug.solutionGroup)),\
+                    asc(Drug.name)\
+                )\
+                .all()
 
     def findByPrescriptionDrug(idPrescriptionDrug, future, is_cpoe = False):
         pd = PrescriptionDrug.query.get(idPrescriptionDrug)
