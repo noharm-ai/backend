@@ -606,6 +606,8 @@ class PrescriptionDrug(db.Model):
                 q = q.filter(PrescriptionDrug.id == query_pd_max)\
                      .filter(or_(PrescriptionDrug.suspendedDate == None,\
                         func.date(PrescriptionDrug.suspendedDate) >= func.date(aggDate)))
+            else:
+                q = q.filter(Prescription.idSegment == idSegment)
         
         if is_cpoe:
             return q\
@@ -613,7 +615,6 @@ class PrescriptionDrug(db.Model):
                 .all()
         else:
             return q\
-                .filter(Prescription.idSegment == idSegment)\
                 .order_by(\
                     asc(Prescription.expire),\
                     desc(func.concat(PrescriptionDrug.idPrescription,PrescriptionDrug.solutionGroup)),\
