@@ -13,7 +13,8 @@ from .utils import *
 from sqlalchemy import func, between
 from datetime import date, datetime
 from .drugList import DrugList
-from services import memory_service
+from services import memory_service, prescription_service
+from converter import prescription_converter
 
 app_pres = Blueprint('app_pres',__name__)
 
@@ -510,3 +511,21 @@ def getPrescriptionUpdate(idPrescription):
     db.engine.execute(query)
 
     return tryCommit(db, str(idPrescription))
+
+@app_pres.route('/prescriptions/search', methods=['GET'])
+@jwt_required()
+def search_prescriptions():
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+
+    search_key = request.args.get('term', None)
+
+    if (search_key == None):
+        return { 'status': 'error', 'message': 'Missing search param' }, status.HTTP_400_BAD_REQUEST
+
+    results = prescription_service.search(search_key)
+
+    return {
+        'status': 'success',
+        'data': prescription_converter.search_results(results)
+    }, status.HTTP_200_OK
