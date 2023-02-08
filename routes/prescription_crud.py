@@ -127,14 +127,8 @@ def copy_prescription_missing_drugs(idPrescription):
             'message': str(e),
             'code': e.code
         }, e.httpStatus
-    
-    list = []
 
-    for id in ids:
-        pd = getPrescriptionDrug(id)
-        list.append(prescriptionDrugToDTO(pd))
-
-    return tryCommit(db, list, user.permission())
+    return tryCommit(db, 1, user.permission())
 
 @app_pres_crud.route('/editPrescription/<int:idPrescription>/copy', methods=['POST'])
 @jwt_required()

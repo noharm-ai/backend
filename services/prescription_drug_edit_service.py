@@ -153,8 +153,7 @@ def copy_missing_drugs(idPrescription, user, idDrugs):
         pdCreate.update = datetime.today()
         pdCreate.user = user.id
         db.session.add(pdCreate)
-
-    db.session.flush()
+        db.session.flush()
 
     return ids_list
 
