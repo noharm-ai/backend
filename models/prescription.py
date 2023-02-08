@@ -127,6 +127,8 @@ class Prescription(db.Model):
                 'status': p[0].status,
                 'bed': p[0].bed,
                 'prescriber': p[0].prescriber,
+                'idSegment': p[0].idSegment,
+                'idHospital': p[0].idHospital,
                 'idDepartment': p[0].idDepartment,
                 'department': p[1],
                 'drugs': {},
