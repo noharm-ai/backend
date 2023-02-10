@@ -10,9 +10,9 @@ from models.prescription import *
 from services.admin import intervention_reason_service
 from exception.validation_error import ValidationError
 
-app_admin_freq = Blueprint('app_admin_freq',__name__)
+app_admin_interv = Blueprint('app_admin_interv',__name__)
 
-@app_admin_freq.route('/admin/intervention-reason', methods=['GET'])
+@app_admin_interv.route('/admin/intervention-reason', methods=['GET'])
 @jwt_required()
 def get_records():
     user = User.find(get_jwt_identity())
@@ -26,7 +26,7 @@ def get_records():
     }, status.HTTP_200_OK
     
 
-@app_admin_freq.route('/admin/intervention-reason', methods=['PUT'])
+@app_admin_interv.route('/admin/intervention-reason', methods=['PUT'])
 @jwt_required()
 def update_record():
     data = request.get_json()
@@ -49,7 +49,7 @@ def update_record():
 
     return tryCommit(db, intervention_reason_service.list_to_dto([reason]))
 
-@app_admin_freq.route('/admin/intervention-reason', methods=['POST'])
+@app_admin_interv.route('/admin/intervention-reason', methods=['POST'])
 @jwt_required()
 def create_record():
     data = request.get_json()
