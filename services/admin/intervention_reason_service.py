@@ -7,9 +7,12 @@ from models.appendix import *
 from exception.validation_error import ValidationError
 
 def get_reasons():
+    parent = db.aliased(InterventionReason)
+
     return db.session\
-        .query(InterventionReason)\
-        .order_by(asc(InterventionReason.description))\
+        .query(InterventionReason, parent.description.label('parent_name'))\
+        .outerjoin(parent, InterventionReason.mamy == parent.id)\
+        .order_by(asc(parent.description), asc(InterventionReason.description))\
         .all()
 
 def update_reason(id, reason: InterventionReason , user):
@@ -50,10 +53,11 @@ def list_to_dto(reasons):
     
     for r in reasons:
         list.append({
-            'id': r.id,
-            'name': r.description,
-            'parent': r.mamy,
-            'active': r.active
+            'id': r[0].id,
+            'name': r[0].description,
+            'parentId': r[0].mamy,
+            'parentName': r[1],
+            'active': r[0].active
         })
 
     return list
