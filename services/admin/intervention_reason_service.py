@@ -3,7 +3,6 @@ from sqlalchemy import asc, func
 
 from models.main import db
 from models.appendix import *
-from functools import partial
 
 from exception.validation_error import ValidationError
 
