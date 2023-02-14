@@ -37,6 +37,7 @@ class InterventionReason(db.Model):
     __tablename__ = 'motivointervencao'
 
     id = db.Column("idmotivointervencao", db.Integer, primary_key=True)
+    idHospital = db.Column("fkhospital", db.Integer, nullable=False)
     description = db.Column("nome", db.String, nullable=False)
     mamy = db.Column("idmotivomae", db.Integer, nullable=False)
     active = db.Column("ativo", db.Boolean, nullable=False)
