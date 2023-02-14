@@ -26,7 +26,7 @@ def get_records():
     }, status.HTTP_200_OK
     
 
-@app_admin_interv.route('/admin/intervention-reason', methods=['PUT'])
+@app_admin_interv.route('/admin/intervention-reason', methods=['POST'])
 @jwt_required()
 def update_record():
     data = request.get_json()
@@ -35,11 +35,17 @@ def update_record():
     os.environ['TZ'] = 'America/Sao_Paulo'
 
     try:
-        reason =  intervention_reason_service.update_reason(\
-            data.get('id', None),\
-            data_to_object(data),\
-            user\
-        )
+        if (data.get('id', None) != None):
+            reason =  intervention_reason_service.update_reason(\
+                data.get('id', None),\
+                data_to_object(data),\
+                user\
+            )
+        else:
+            reason =  intervention_reason_service.create_reason(\
+                data_to_object(data),\
+                user\
+            )
     except ValidationError as e:
         return {
             'status': 'error',
@@ -47,33 +53,12 @@ def update_record():
             'code': e.code
         }, e.httpStatus
 
-    return tryCommit(db, intervention_reason_service.list_to_dto([reason]))
-
-@app_admin_interv.route('/admin/intervention-reason', methods=['POST'])
-@jwt_required()
-def create_record():
-    data = request.get_json()
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
-    os.environ['TZ'] = 'America/Sao_Paulo'
-
-    try:
-        reason =  intervention_reason_service.create_reason(\
-            data_to_object(data),\
-            user\
-        )
-    except ValidationError as e:
-        return {
-            'status': 'error',
-            'message': str(e),
-            'code': e.code
-        }, e.httpStatus
-
-    return tryCommit(db, intervention_reason_service.list_to_dto([reason]))
+    return tryCommit(db, intervention_reason_service.list_to_dto(reason))
 
 def data_to_object(data) -> InterventionReason:
     return InterventionReason(\
-        description = data.get('description', None),\
-        mamy = data.get('parent', None),\
-        active = data.get('active', None),\
+        description = data.get('name', None),\
+        mamy = data.get('parentId', None),\
+        active = data.get('active', False),\
+        idHospital = data.get('idHospital', 1),\
     )

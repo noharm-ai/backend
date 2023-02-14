@@ -1,19 +1,28 @@
 from flask_api import status
-from sqlalchemy import asc
+from sqlalchemy import asc, func
 
 from models.main import db
 from models.appendix import *
+from functools import partial
 
 from exception.validation_error import ValidationError
 
-def get_reasons():
+def get_reasons(id = None):
     parent = db.aliased(InterventionReason)
 
-    return db.session\
-        .query(InterventionReason, parent.description.label('parent_name'))\
+    q = db.session\
+        .query(\
+            InterventionReason,\
+            parent.description.label('parent_name'),\
+            func.concat(func.coalesce(parent.description, ''), InterventionReason.description).label('concat_field')\
+        )\
         .outerjoin(parent, InterventionReason.mamy == parent.id)\
-        .order_by(asc(parent.description), asc(InterventionReason.description))\
-        .all()
+        .order_by(asc('concat_field'))
+    
+    if id != None:
+        q = q.filter(InterventionReason.id == id)
+
+    return q.all()
 
 def update_reason(id, reason: InterventionReason , user):
     roles = user.config['roles'] if user.config and 'roles' in user.config else []
@@ -31,7 +40,7 @@ def update_reason(id, reason: InterventionReason , user):
     db.session.add(record)
     db.session.flush()
 
-    return record
+    return get_reasons(record.id)
 
 def create_reason(reason: InterventionReason, user):
     roles = user.config['roles'] if user.config and 'roles' in user.config else []
@@ -46,7 +55,7 @@ def create_reason(reason: InterventionReason, user):
     db.session.add(record)
     db.session.flush()
 
-    return record
+    return get_reasons(record.id)
 
 def list_to_dto(reasons):
     list = []
