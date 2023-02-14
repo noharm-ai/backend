@@ -3,17 +3,23 @@ from sqlalchemy import asc, func
 
 from models.main import db
 from models.appendix import *
+from models.prescription import *
 
 from exception.validation_error import ValidationError
 
 def get_reasons(id = None):
     parent = db.aliased(InterventionReason)
+    query_editable = db.session.\
+        query(func.count(Intervention.id))\
+        .select_from(Intervention)\
+        .filter(Intervention.idInterventionReason.any(InterventionReason.id))
 
     q = db.session\
         .query(\
             InterventionReason,\
             parent.description.label('parent_name'),\
-            func.concat(func.coalesce(parent.description, ''), InterventionReason.description).label('concat_field')\
+            func.concat(func.coalesce(parent.description, ''), InterventionReason.description).label('concat_field'),\
+            query_editable.exists().label('protected')
         )\
         .outerjoin(parent, InterventionReason.mamy == parent.id)\
         .order_by(asc('concat_field'))
@@ -23,32 +29,27 @@ def get_reasons(id = None):
 
     return q.all()
 
-def update_reason(id, reason: InterventionReason , user):
+def upsert_reason(id, reason: InterventionReason , user):
     roles = user.config['roles'] if user.config and 'roles' in user.config else []
-    if ('suporte' not in roles):
+    if ('admin' not in roles):
         raise ValidationError('Usuário não autorizado', 'errors.unauthorizedUser', status.HTTP_401_UNAUTHORIZED)
+    
+    is_protected = False
+    
+    if id != None:
+        records = get_reasons(id)
+        if (len(records) == 0):
+            raise ValidationError('Registro inexistente', 'errors.invalidRecord', status.HTTP_400_BAD_REQUEST)
+        
+        record = records[0][0]
+        is_protected = records[0][3]
+    else:
+        record = InterventionReason()
 
-    record = InterventionReason.query.get(id)
-    if (record is None):
-        raise ValidationError('Registro inexistente', 'errors.invalidRecord', status.HTTP_401_UNAUTHORIZED)
+    if not is_protected:
+        record.description = reason.description
+        record.mamy = reason.mamy
 
-    record.description = reason.description
-    record.mamy = reason.mamy
-    record.active = reason.active
-
-    db.session.add(record)
-    db.session.flush()
-
-    return get_reasons(record.id)
-
-def create_reason(reason: InterventionReason, user):
-    roles = user.config['roles'] if user.config and 'roles' in user.config else []
-    if ('suporte' not in roles):
-        raise ValidationError('Usuário não autorizado', 'errors.unauthorizedUser', status.HTTP_401_UNAUTHORIZED)
-
-    record = InterventionReason()
-    record.description = reason.description
-    record.mamy = reason.mamy
     record.active = reason.active
 
     db.session.add(record)
@@ -65,7 +66,8 @@ def list_to_dto(reasons):
             'name': r[0].description,
             'parentId': r[0].mamy,
             'parentName': r[1],
-            'active': r[0].active
+            'active': r[0].active,
+            'protected': r[3]
         })
 
     return list

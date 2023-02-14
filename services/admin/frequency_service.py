@@ -14,7 +14,7 @@ def get_frequencies():
 
 def update_daily_frequency(id, daily_frequency, user):
     roles = user.config['roles'] if user.config and 'roles' in user.config else []
-    if ('suporte' not in roles):
+    if ('admin' not in roles):
         raise ValidationError('Usuário não autorizado', 'errors.unauthorizedUser', status.HTTP_401_UNAUTHORIZED)
 
     freq = Frequency.query.get(id)

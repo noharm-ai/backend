@@ -28,24 +28,18 @@ def get_records():
 
 @app_admin_interv.route('/admin/intervention-reason', methods=['POST'])
 @jwt_required()
-def update_record():
+def upsert_record():
     data = request.get_json()
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
     os.environ['TZ'] = 'America/Sao_Paulo'
 
     try:
-        if (data.get('id', None) != None):
-            reason =  intervention_reason_service.update_reason(\
-                data.get('id', None),\
-                data_to_object(data),\
-                user\
-            )
-        else:
-            reason =  intervention_reason_service.create_reason(\
-                data_to_object(data),\
-                user\
-            )
+        reason =  intervention_reason_service.upsert_reason(\
+            data.get('id', None),\
+            data_to_object(data),\
+            user\
+        )
     except ValidationError as e:
         return {
             'status': 'error',

@@ -657,7 +657,7 @@ class Intervention(db.Model):
     id = db.Column("fkpresmed", db.Integer, primary_key=True)
     idPrescription = db.Column("fkprescricao", db.Integer, primary_key=True)
     admissionNumber = db.Column('nratendimento', db.Integer, nullable=False)
-    idInterventionReason = db.Column("idmotivointervencao", db.Integer, nullable=False)
+    idInterventionReason = db.Column("idmotivointervencao", postgresql.ARRAY(db.Integer), nullable=False)
     error = db.Column('erro', db.Boolean, nullable=True)
     cost = db.Column("custo", db.Boolean, nullable=True)
     notes = db.Column("observacao", db.String, nullable=True)
