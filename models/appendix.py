@@ -42,6 +42,7 @@ class InterventionReason(db.Model):
     mamy = db.Column("idmotivomae", db.Integer, nullable=False)
     active = db.Column("ativo", db.Boolean, nullable=False)
     suspension = db.Column("suspensao", db.Boolean, nullable=False)
+    substitution = db.Column("substituicao", db.Boolean, nullable=False)
     relation_type = db.Column("tp_relacao", db.Integer, nullable=False)
 
     def findAll():

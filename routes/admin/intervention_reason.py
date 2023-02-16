@@ -55,6 +55,7 @@ def data_to_object(data) -> InterventionReason:
         mamy = data.get('parentId', None),\
         active = data.get('active', False),\
         suspension = data.get('suspension', False),\
+        substitution = data.get('substitution', False),\
         relation_type = data.get('relationType', 0),\
         idHospital = data.get('idHospital', 1),\
     )
