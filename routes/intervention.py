@@ -1,13 +1,12 @@
-import random
 from flask_api import status
 from models.main import *
 from models.appendix import *
 from models.prescription import *
 from flask import Blueprint, request
-from flask_jwt_extended import (create_access_token, create_refresh_token,
-                                jwt_required, get_jwt_identity)
-from datetime import date, datetime
+from flask_jwt_extended import (jwt_required, get_jwt_identity)
+from datetime import datetime
 from .utils import tryCommit
+from services import memory_service
 
 app_itrv = Blueprint('app_itrv',__name__)
 
@@ -64,8 +63,10 @@ def createIntervention(idPrescriptionDrug):
             
         i.status = new_status
     else:
-        i.date = datetime.today()
         i.user = user.id
+
+        if (memory_service.has_feature('PRIMARYCARE')):
+            i.date = datetime.today()
 
     if newIntervention: db.session.add(i)
 
