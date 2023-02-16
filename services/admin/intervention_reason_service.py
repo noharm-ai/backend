@@ -50,6 +50,7 @@ def upsert_reason(id, reason: InterventionReason , user):
         record.description = reason.description
         record.mamy = reason.mamy
 
+    record.idHospital = reason.idHospital
     record.active = reason.active
 
     db.session.add(record)
