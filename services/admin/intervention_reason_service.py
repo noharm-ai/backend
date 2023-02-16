@@ -50,7 +50,10 @@ def upsert_reason(id, reason: InterventionReason , user):
         record.description = reason.description
         record.mamy = reason.mamy
 
+    record.idHospital = reason.idHospital
     record.active = reason.active
+    record.suspension = reason.suspension
+    record.relation_type = reason.relation_type
 
     db.session.add(record)
     db.session.flush()
@@ -67,6 +70,8 @@ def list_to_dto(reasons):
             'parentId': r[0].mamy,
             'parentName': r[1],
             'active': r[0].active,
+            'suspension': r[0].suspension,
+            'relationType': r[0].relation_type,
             'protected': r[3]
         })
 
