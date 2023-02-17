@@ -7,6 +7,7 @@ from flask_jwt_extended import (jwt_required, get_jwt_identity)
 from datetime import datetime
 from .utils import tryCommit
 from services import memory_service
+from services.admin import intervention_reason_service
 
 app_itrv = Blueprint('app_itrv',__name__)
 
@@ -82,21 +83,12 @@ def sortReasons(e):
 def getInterventionReasons():
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
-    
-    results = InterventionReason.findAll()
 
-    iList = []
-    for i in results:
-        iList.append({
-            'id': i[0].id,
-            'description': i[1] + ' - ' +  i[0].description if i[1] else i[0].description
-        })
-
-    iList.sort(key=sortReasons)
+    list = intervention_reason_service.get_reasons()
 
     return {
         'status': 'success',
-        'data': iList
+        'data': intervention_reason_service.list_to_dto(list)
     }, status.HTTP_200_OK
 
 @app_itrv.route("/intervention", methods=['GET'])

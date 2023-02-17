@@ -45,15 +45,6 @@ class InterventionReason(db.Model):
     substitution = db.Column("substituicao", db.Boolean, nullable=False)
     relation_type = db.Column("tp_relacao", db.Integer, nullable=False)
 
-    def findAll():
-        im = db.aliased(InterventionReason)
-
-        return db.session.query(InterventionReason, im.description)\
-                .outerjoin(im, im.id == InterventionReason.mamy)\
-                .filter(InterventionReason.active == True)\
-                .order_by(InterventionReason.description)\
-                .all()
-
 class Frequency(db.Model):
     __tablename__ = 'frequencia'
 
