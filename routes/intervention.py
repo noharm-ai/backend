@@ -55,6 +55,7 @@ def createIntervention(idPrescriptionDrug):
     if 'observation' in data.keys(): i.notes = data.get('observation', None)
     if 'interactions' in data.keys(): i.interactions = data.get('interactions', None)
     if 'transcription' in data.keys(): i.transcription = data.get('transcription', None)
+    if 'economyDays' in data.keys(): i.economy_days = data.get('economyDays', None)
  
     new_status = data.get('status', 's')
     if new_status != i.status:

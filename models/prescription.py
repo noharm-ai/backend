@@ -667,6 +667,7 @@ class Intervention(db.Model):
     update = db.Column("update_at", db.DateTime, nullable=False)
     user = db.Column("update_by", db.Integer, nullable=False)
     transcription = db.Column("transcricao", postgresql.JSON, nullable=True)
+    economy_days = db.Column("dias_economia", db.Integer, nullable=True)
 
     def findAll(admissionNumber=None,userId=None):
         mReasion = db.aliased(InterventionReason)
@@ -744,7 +745,8 @@ class Intervention(db.Model):
                 'department': i[9] if i[9] else i[11],
                 'prescriber': i[10] if i[10] else i[7].prescriber if i[7] else None,
                 'status': i[0].status,
-                'transcription':i[0].transcription
+                'transcription':i[0].transcription,
+                'economyDays': i[0].economy_days
             })
 
         result = [i for i in intervBuffer if i['status'] == 's']
