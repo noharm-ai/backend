@@ -23,6 +23,7 @@ from routes.prescription_crud import app_pres_crud
 from routes.drugs import app_drugs
 from routes.names import app_names
 from routes.admin.frequency import app_admin_freq
+from routes.admin.intervention_reason import app_admin_interv
 import os
 
 os.environ['TZ'] = 'America/Sao_Paulo'
@@ -63,6 +64,7 @@ app.register_blueprint(app_user_crud)
 app.register_blueprint(app_pres_crud)
 
 app.register_blueprint(app_admin_freq)
+app.register_blueprint(app_admin_interv)
 
 CORS(app)
 
@@ -70,7 +72,7 @@ CORS(app)
 def getVersion():
     return {
         'status': 'success',
-        'data': 'v1.62-beta'
+        'data': 'v1.63-beta'
     }, status.HTTP_200_OK
 
 if __name__ == "__main__":
