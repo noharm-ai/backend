@@ -85,7 +85,7 @@ def getInterventionReasons():
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
 
-    list = intervention_reason_service.get_reasons()
+    list = intervention_reason_service.get_reasons(active_only = True)
 
     return {
         'status': 'success',
