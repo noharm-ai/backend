@@ -7,7 +7,7 @@ from models.prescription import *
 
 from exception.validation_error import ValidationError
 
-def get_reasons(id = None):
+def get_reasons(id = None, active_only = False):
     parent = db.aliased(InterventionReason)
     query_editable = db.session.\
         query(func.count(Intervention.id))\
@@ -26,6 +26,9 @@ def get_reasons(id = None):
     
     if id != None:
         q = q.filter(InterventionReason.id == id)
+
+    if (active_only):
+        q = q.filter(InterventionReason.active == True)
 
     return q.all()
 
