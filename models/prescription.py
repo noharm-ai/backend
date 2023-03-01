@@ -225,29 +225,12 @@ class Prescription(db.Model):
                             .filter(pd2.suspendedDate == None)
 
         interaction = relation.filter(Relation.kind.in_(['it','dt','dm','iy']))
-
-        #incompatible = relation.filter(Relation.kind.in_(['iy']))\
-        #                .filter(pd1.intravenous == True)\
-        #                .filter(pd2.intravenous == True)
-
-        # admissionAllergy = db.session.query(PrescriptionDrug.idDrug.label('idDrug'), func.min(PrescriptionDrug.id).label('id') )\
-        #               .select_from(PrescriptionDrug)\
-        #               .join(Prescription, Prescription.id == PrescriptionDrug.idPrescription)\
-        #               .filter(Prescription.admissionNumber == admissionNumber)\
-        #               .filter(PrescriptionDrug.allergy == 'S')\
-        #               .group_by(PrescriptionDrug.idDrug)\
-        #               .subquery()
         
         q_allergy = db.session.query(Allergy.idDrug.label('idDrug'))\
                       .select_from(Allergy)\
                       .filter(Allergy.idPatient == idPatient)\
                       .subquery()
-        
-        print("ALLERGY////////////////////")
-        print(q_allergy)
-        print("ALLERGY////////////////////")
 
-        #al = db.aliased(admissionAllergy)
         al = db.aliased(q_allergy)
 
         xreactivity = db.session\
@@ -276,10 +259,6 @@ class Prescription(db.Model):
                                     )\
                                 )\
                                .filter(Prescription.idSegment != None)
-            
-        print("XREACTIVY////////////////////")
-        print(xreactivity)
-        print("XREACTIVY////////////////////")
 
         relations = interaction.union(xreactivity).all()
 
