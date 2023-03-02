@@ -139,7 +139,7 @@ class Prescription(db.Model):
 
         return headers
 
-    def findRelation(idPrescription, admissionNumber, aggDate=None, is_cpoe = False, is_pmc = False):
+    def findRelation(idPrescription, admissionNumber, idPatient, aggDate=None, is_cpoe = False, is_pmc = False):
         pd1 = db.aliased(PrescriptionDrug)
         pd2 = db.aliased(PrescriptionDrug)
         m1 = db.aliased(Drug)
@@ -225,24 +225,17 @@ class Prescription(db.Model):
                             .filter(pd2.suspendedDate == None)
 
         interaction = relation.filter(Relation.kind.in_(['it','dt','dm','iy']))
-
-        #incompatible = relation.filter(Relation.kind.in_(['iy']))\
-        #                .filter(pd1.intravenous == True)\
-        #                .filter(pd2.intravenous == True)
-
-        admissionAllergy = db.session.query(PrescriptionDrug.idDrug.label('idDrug'), func.min(PrescriptionDrug.id).label('id') )\
-                      .select_from(PrescriptionDrug)\
-                      .join(Prescription, Prescription.id == PrescriptionDrug.idPrescription)\
-                      .filter(Prescription.admissionNumber == admissionNumber)\
-                      .filter(PrescriptionDrug.allergy == 'S')\
-                      .group_by(PrescriptionDrug.idDrug)\
+        
+        q_allergy = db.session.query(Allergy.idDrug.label('idDrug'))\
+                      .select_from(Allergy)\
+                      .filter(Allergy.idPatient == idPatient)\
                       .subquery()
 
-        al = db.aliased(admissionAllergy)
+        al = db.aliased(q_allergy)
 
         xreactivity = db.session\
             .query(pd1.id, Relation, m1.name, m2.name, pd1.update, pd1.intravenous, pd1.intravenous.label('intravenous2'))\
-            .join(al, al.c.id != pd1.id)\
+            .join(al, al.c.idDrug != pd1.idDrug)\
             .join(m1, m1.id == pd1.idDrug)\
             .join(m2, m2.id == al.c.idDrug)\
             .join(Relation, or_(

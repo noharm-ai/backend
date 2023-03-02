@@ -170,7 +170,7 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None, idS
     drugs = PrescriptionDrug.findByPrescription(\
         prescription[0].id, patient.admissionNumber, aggDate, idSegment, is_cpoe, is_pmc)
     interventions = Intervention.findAll(admissionNumber=patient.admissionNumber)
-    relations = Prescription.findRelation(prescription[0].id,patient.admissionNumber, aggDate, is_cpoe, is_pmc)
+    relations = Prescription.findRelation(prescription[0].id,patient.admissionNumber, patient.idPatient, aggDate, is_cpoe, is_pmc)
     headers = Prescription.getHeaders(admissionNumber, aggDate, idSegment, is_pmc, is_cpoe) if aggDate else []
 
     clinicalNotesCount = ClinicalNotes.getCountIfExists(prescription[0].admissionNumber, is_pmc)
