@@ -1,8 +1,7 @@
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import func, text, and_, or_, desc, asc, distinct, cast
-from datetime import date, timedelta
+from sqlalchemy import func, or_, asc
+from datetime import date
 from sqlalchemy.dialects import postgresql
-from sqlalchemy.orm import deferred
 from routes.utils import *
 from flask_mail import Mail
 from flask_jwt_extended import (get_jwt)
