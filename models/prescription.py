@@ -229,6 +229,7 @@ class Prescription(db.Model):
         q_allergy = db.session.query(Allergy.idDrug.label('idDrug'))\
                       .select_from(Allergy)\
                       .filter(Allergy.idPatient == idPatient)\
+                      .filter(Allergy.active == True)\
                       .subquery()
 
         al = db.aliased(q_allergy)
