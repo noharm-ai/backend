@@ -185,6 +185,13 @@ class DrugAttributes(db.Model):
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.Integer, nullable=True)
 
+class Allergy(db.Model):
+    __tablename__ = 'alergia'
+
+    idDrug = db.Column("fkmedicamento", db.Integer, primary_key=True)
+    idPatient = db.Column("fkpessoa", db.Integer, primary_key=True)
+    active = db.Column("ativo", db.Boolean, nullable=False)
+
 class Outlier(db.Model):
     __tablename__ = 'outlier'
 
