@@ -1,5 +1,6 @@
 from .main import db
 from sqlalchemy import func, text, and_, or_, desc, asc, distinct, cast
+from sqlalchemy.dialects.postgresql import INTERVAL
 from routes.utils import *
 
 class Segment(db.Model):
@@ -67,6 +68,7 @@ class Exams(db.Model):
         examLatest = db.session.query(Exams.typeExam.label('typeExam'), func.max(Exams.date).label('date'))\
                       .select_from(Exams)\
                       .filter(Exams.idPatient == patient.idPatient)\
+                      .filter(Exams.date >= (func.now() - func.cast('15 DAYS', INTERVAL)))\
                       .group_by(Exams.typeExam)\
                       .subquery()
 
