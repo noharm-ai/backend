@@ -120,6 +120,7 @@ def getOutliers(idSegment=1, idDrug=1):
             'division': drugAttr.division,
             'useWeight': drugAttr.useWeight,
             'idMeasureUnit': drugAttr.idMeasureUnit or defaultUnit,
+            'idMeasureUnitPrice': drugAttr.idMeasureUnitPrice,
             'amount': drugAttr.amount,
             'amountUnit': drugAttr.amountUnit,
             'price': drugAttr.price,
