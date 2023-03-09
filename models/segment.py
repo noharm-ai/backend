@@ -45,6 +45,12 @@ class SegmentExam(db.Model):
                 results['cr'] = e
 
         return results
+    
+class Hospital(db.Model):
+    __tablename__ = 'hospital'
+
+    id = db.Column("fkhospital", db.Integer, primary_key=True)
+    name = db.Column("nome", db.String, nullable=False)
 
 class Exams(db.Model):
     __tablename__ = 'exame'
