@@ -37,13 +37,18 @@ class InterventionReason(db.Model):
     __tablename__ = 'motivointervencao'
 
     id = db.Column("idmotivointervencao", db.Integer, primary_key=True)
-    idHospital = db.Column("fkhospital", db.Integer, nullable=False)
     description = db.Column("nome", db.String, nullable=False)
     mamy = db.Column("idmotivomae", db.Integer, nullable=False)
     active = db.Column("ativo", db.Boolean, nullable=False)
-    suspension = db.Column("suspensao", db.Boolean, nullable=False)
-    substitution = db.Column("substituicao", db.Boolean, nullable=False)
-    relation_type = db.Column("tp_relacao", db.Integer, nullable=False)
+
+    def findAll():
+        im = db.aliased(InterventionReason)
+
+        return db.session.query(InterventionReason, im.description)\
+                .outerjoin(im, im.id == InterventionReason.mamy)\
+                .filter(InterventionReason.active == True)\
+                .order_by(InterventionReason.description)\
+                .all()
 
 class Frequency(db.Model):
     __tablename__ = 'frequencia'

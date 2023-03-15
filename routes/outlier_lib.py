@@ -26,7 +26,7 @@ class ddc_outlier():
                 self.sim_matrix = cosine_similarity(X,X)
             else:
                 self.sim_matrix = pairwise_distances(X,X,self.metric)
-            medication_graph = nx.from_numpy_array(self.sim_matrix)
+            medication_graph = nx.from_numpy_matrix(self.sim_matrix)
             self.pr = nx.pagerank(medication_graph, alpha=0.9, max_iter=1000, personalization=dict(self.frequency['count']))
         except:
             self.pr = dict(enumerate(np.zeros((len(X),1)).flatten()))

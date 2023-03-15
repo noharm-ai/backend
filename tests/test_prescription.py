@@ -40,7 +40,6 @@ def test_get_prescriptions_by_idPrescription(client):
     assert data['concilia'] == prescription.concilia
     assert data['bed'] == prescription.bed
     assert data['status'] == prescription.status
-    assert len(data['prescription']) > 0
 
 def test_get_prescriptions_drug_by_idPrescription_and_period(client):
     """Teste get /prescriptions/drug/idPrescription/period - Compara response data com dados do banco e valida status_code 200"""

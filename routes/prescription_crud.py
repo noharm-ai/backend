@@ -8,7 +8,8 @@ from flask import Blueprint, request
 from flask_jwt_extended import (jwt_required, get_jwt_identity)
 from .utils import *
 
-from services.prescription_drug_edit_service import createPrescriptionDrug, updatePrescriptionDrug, togglePrescriptionDrugSuspension, get_missing_drugs, copy_missing_drugs
+from services.prescription_edit_service import copyPrescription
+from services.prescription_drug_edit_service import createPrescriptionDrug, updatePrescriptionDrug, togglePrescriptionDrugSuspension
 from services.prescription_drug_service import getPrescriptionDrug, prescriptionDrugToDTO
 from exception.validation_error import ValidationError
 
@@ -27,7 +28,7 @@ def actionUpdatePrescriptionDrug(idPrescriptionDrug):
     except ValidationError as e:
         return {
             'status': 'error',
-            'message': str(e),
+            'message': e.message,
             'code': e.code
         }, e.httpStatus
 
@@ -48,7 +49,7 @@ def actionCreatePrescriptionDrug():
     except ValidationError as e:
         return {
             'status': 'error',
-            'message': str(e),
+            'message': e.message,
             'code': e.code
         }, e.httpStatus
 
@@ -68,7 +69,7 @@ def actionSuspendPrescriptionDrug(idPrescriptionDrug, suspend):
     except ValidationError as e:
         return {
             'status': 'error',
-            'message': str(e),
+            'message': e.message,
             'code': e.code
         }, e.httpStatus
 
@@ -80,55 +81,6 @@ def actionSuspendPrescriptionDrug(idPrescriptionDrug, suspend):
     }
 
     return tryCommit(db, result, user.permission())
-
-@app_pres_crud.route('/editPrescription/<int:idPrescription>/missing-drugs', methods=['GET'])
-@jwt_required()
-def get_prescription_missing_drugs(idPrescription):
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
-    os.environ['TZ'] = 'America/Sao_Paulo'
-
-    try:
-        missing_drugs = get_missing_drugs(idPrescription, user)
-    except ValidationError as e:
-        return {
-            'status': 'error',
-            'message': str(e),
-            'code': e.code
-        }, e.httpStatus
-    
-    list = []
-
-    for d in missing_drugs:
-        list.append({
-            'idDrug': d[0],
-            'name': d[1]
-        })
-
-    return {
-        'status': 'success',
-        'data': list
-    }, status.HTTP_200_OK
-
-
-@app_pres_crud.route('/editPrescription/<int:idPrescription>/missing-drugs/copy', methods=['POST'])
-@jwt_required()
-def copy_prescription_missing_drugs(idPrescription):
-    data = request.get_json()
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
-    os.environ['TZ'] = 'America/Sao_Paulo'
-
-    try:
-        ids = copy_missing_drugs(idPrescription, user, data.get('idDrugs', None))
-    except ValidationError as e:
-        return {
-            'status': 'error',
-            'message': str(e),
-            'code': e.code
-        }, e.httpStatus
-
-    return tryCommit(db, 1, user.permission())
 
 @app_pres_crud.route('/editPrescription/<int:idPrescription>/copy', methods=['POST'])
 @jwt_required()

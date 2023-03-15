@@ -70,7 +70,7 @@ def test_put_interventions_permission(client):
     url = 'intervention/' + idPrescriptionDrug
     
     response = client.put(url, data=json.dumps(data), headers=make_headers(access_token))
-    
+    print("ESTOU AQUI", response.data)
     assert response.status_code == 401
     
 

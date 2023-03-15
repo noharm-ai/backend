@@ -176,7 +176,6 @@ class DrugAttributes(db.Model):
     division = db.Column("divisor", db.Float, nullable=True)
     useWeight = db.Column("usapeso", db.Boolean, nullable=True)
     idMeasureUnit = db.Column("fkunidademedida", db.String, nullable=True)
-    idMeasureUnitPrice = db.Column("fkunidademedidacusto", db.String, nullable=True)
     amount = db.Column("concentracao", db.Float, nullable=True)
     amountUnit = db.Column("concentracaounidade", db.String(3), nullable=True)
     whiteList = db.Column("linhabranca", db.Boolean, nullable=True)
@@ -185,13 +184,6 @@ class DrugAttributes(db.Model):
     maxTime = db.Column("tempotratamento", db.Integer, nullable=True)
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.Integer, nullable=True)
-
-class Allergy(db.Model):
-    __tablename__ = 'alergia'
-
-    idDrug = db.Column("fkmedicamento", db.Integer, primary_key=True)
-    idPatient = db.Column("fkpessoa", db.Integer, primary_key=True)
-    active = db.Column("ativo", db.Boolean, nullable=False)
 
 class Outlier(db.Model):
     __tablename__ = 'outlier'

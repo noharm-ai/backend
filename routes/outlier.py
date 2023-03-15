@@ -73,8 +73,7 @@ def getOutliers(idSegment=1, idDrug=1):
             'frequency': freqValue(o[0].frequency),
             'score': o[0].score,
             'manualScore': o[0].manualScore,
-            'obs': o[1].notes if o[1] != None else '',
-            'updatedAt': o[0].update.isoformat() if o[0].update else None
+            'obs': o[1].notes if o[1] != None else ''
         })
 
     if dose is not None and frequency is not None and newOutlier and is_float(dose) and is_float(frequency):
@@ -101,8 +100,7 @@ def getOutliers(idSegment=1, idDrug=1):
             'frequency': freqValue(float(frequency)),
             'score': 4,
             'manualScore': None,
-            'obs': '',
-            'updatedAt': o.update.isoformat() if o.update else None
+            'obs': ''
         })
 
     returnJson = {
@@ -122,7 +120,6 @@ def getOutliers(idSegment=1, idDrug=1):
             'division': drugAttr.division,
             'useWeight': drugAttr.useWeight,
             'idMeasureUnit': drugAttr.idMeasureUnit or defaultUnit,
-            'idMeasureUnitPrice': drugAttr.idMeasureUnitPrice,
             'amount': drugAttr.amount,
             'amountUnit': drugAttr.amountUnit,
             'price': drugAttr.price,
