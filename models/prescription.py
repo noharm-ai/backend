@@ -574,15 +574,6 @@ class PrescriptionDrug(db.Model):
                         func.coalesce(func.date(Prescription.expire), func.date(aggDate))\
                     )\
                 )\
-            #pmc shows all prescriptions
-            if not is_pmc:
-                q = q.filter(\
-                    between(\
-                        func.date(aggDate),\
-                        func.date(Prescription.date),\
-                        func.coalesce(func.date(Prescription.expire), func.date(aggDate))\
-                    )\
-                )\
 
             if is_cpoe:
                 p_aux = db.aliased(Prescription)
