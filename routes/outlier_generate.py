@@ -92,8 +92,8 @@ def generateOutliers(idSegment,fold=None,idDrug=None,clean=None):
             result = db.engine.execute(queryDelete)
             print('RowCount Delete Drug', result.rowcount)
 
-        queryInsert = "INSERT INTO " + user.schema + ".outlier (idsegmento, fkmedicamento, doseconv, frequenciadia, contagem, escore)\
-                SELECT idsegmento, fkmedicamento, ROUND(doseconv::numeric,2) as doseconv, frequenciadia, SUM(contagem), NULL\
+        queryInsert = "INSERT INTO " + user.schema + ".outlier (idsegmento, fkmedicamento, doseconv, frequenciadia, contagem, escore, update_at)\
+                SELECT idsegmento, fkmedicamento, ROUND(doseconv::numeric,2) as doseconv, frequenciadia, SUM(contagem), NULL, now()\
                 FROM " + user.schema + ".prescricaoagg\
                 WHERE idsegmento = " + str(int(idSegment)) + "\
                 AND fkmedicamento = " + str(int(idDrug)) + " and frequenciadia is not null and doseconv is not null\

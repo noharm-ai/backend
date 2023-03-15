@@ -7,7 +7,7 @@ from sqlalchemy.orm import deferred
 from sqlalchemy import case, BigInteger, cast, between, outerjoin
 from sqlalchemy.sql.expression import literal_column, case
 from functools import partial
-from sqlalchemy.dialects.postgresql import TSRANGE, INTERVAL
+from sqlalchemy.dialects.postgresql import TSRANGE
 
 class Prescription(db.Model):
     __tablename__ = 'prescricao'
@@ -102,7 +102,6 @@ class Prescription(db.Model):
                     .outerjoin(Department, and_(Department.id == Prescription.idDepartment, Department.idHospital == Prescription.idHospital))\
                     .outerjoin(User, Prescription.user == User.id)\
                     .filter(Prescription.admissionNumber == admissionNumber)\
-                    .filter(Prescription.idSegment == idSegment)\
                     .filter(Prescription.agg == None)\
                     .filter(Prescription.concilia == None)
 
@@ -115,6 +114,9 @@ class Prescription(db.Model):
                         )\
                     )
 
+        if not is_cpoe:
+            q = q.filter(Prescription.idSegment == idSegment)
+
         prescriptions = q.all()
         
         headers = {}
@@ -125,6 +127,8 @@ class Prescription(db.Model):
                 'status': p[0].status,
                 'bed': p[0].bed,
                 'prescriber': p[0].prescriber,
+                'idSegment': p[0].idSegment,
+                'idHospital': p[0].idHospital,
                 'idDepartment': p[0].idDepartment,
                 'department': p[1],
                 'drugs': {},
@@ -135,7 +139,7 @@ class Prescription(db.Model):
 
         return headers
 
-    def findRelation(idPrescription, admissionNumber, aggDate=None, is_cpoe = False, is_pmc = False):
+    def findRelation(idPrescription, admissionNumber, idPatient, aggDate=None, is_cpoe = False, is_pmc = False):
         pd1 = db.aliased(PrescriptionDrug)
         pd2 = db.aliased(PrescriptionDrug)
         m1 = db.aliased(Drug)
@@ -221,24 +225,18 @@ class Prescription(db.Model):
                             .filter(pd2.suspendedDate == None)
 
         interaction = relation.filter(Relation.kind.in_(['it','dt','dm','iy']))
-
-        #incompatible = relation.filter(Relation.kind.in_(['iy']))\
-        #                .filter(pd1.intravenous == True)\
-        #                .filter(pd2.intravenous == True)
-
-        admissionAllergy = db.session.query(PrescriptionDrug.idDrug.label('idDrug'), func.min(PrescriptionDrug.id).label('id') )\
-                      .select_from(PrescriptionDrug)\
-                      .join(Prescription, Prescription.id == PrescriptionDrug.idPrescription)\
-                      .filter(Prescription.admissionNumber == admissionNumber)\
-                      .filter(PrescriptionDrug.allergy == 'S')\
-                      .group_by(PrescriptionDrug.idDrug)\
+        
+        q_allergy = db.session.query(Allergy.idDrug.label('idDrug'))\
+                      .select_from(Allergy)\
+                      .filter(Allergy.idPatient == idPatient)\
+                      .filter(Allergy.active == True)\
                       .subquery()
 
-        al = db.aliased(admissionAllergy)
+        al = db.aliased(q_allergy)
 
         xreactivity = db.session\
             .query(pd1.id, Relation, m1.name, m2.name, pd1.update, pd1.intravenous, pd1.intravenous.label('intravenous2'))\
-            .join(al, al.c.id != pd1.id)\
+            .join(al, al.c.idDrug != pd1.idDrug)\
             .join(m1, m1.id == pd1.idDrug)\
             .join(m2, m2.id == al.c.idDrug)\
             .join(Relation, or_(
@@ -565,9 +563,17 @@ class PrescriptionDrug(db.Model):
         else:
             q = q.filter(Prescription.admissionNumber == admissionNumber)\
                  .filter(Prescription.agg == None)\
-                 .filter(Prescription.concilia == None)\
-                 .filter(Prescription.idSegment == idSegment)
+                 .filter(Prescription.concilia == None)
 
+            #pmc shows all prescriptions
+            if not is_pmc:
+                q = q.filter(\
+                    between(\
+                        func.date(aggDate),\
+                        func.date(Prescription.date),\
+                        func.coalesce(func.date(Prescription.expire), func.date(aggDate))\
+                    )\
+                )\
             #pmc shows all prescriptions
             if not is_pmc:
                 q = q.filter(\
@@ -605,11 +611,21 @@ class PrescriptionDrug(db.Model):
                 q = q.filter(PrescriptionDrug.id == query_pd_max)\
                      .filter(or_(PrescriptionDrug.suspendedDate == None,\
                         func.date(PrescriptionDrug.suspendedDate) >= func.date(aggDate)))
+            else:
+                q = q.filter(Prescription.idSegment == idSegment)
         
         if is_cpoe:
-            return q.order_by(asc(Prescription.expire), desc(PrescriptionDrug.cpoe_group), asc(Drug.name)).all()
+            return q\
+                .order_by(asc(Prescription.expire), desc(PrescriptionDrug.cpoe_group), asc(Drug.name))\
+                .all()
         else:
-            return q.order_by(asc(Prescription.expire), desc(func.concat(PrescriptionDrug.idPrescription,PrescriptionDrug.solutionGroup)), asc(Drug.name)).all()
+            return q\
+                .order_by(\
+                    asc(Prescription.expire),\
+                    desc(func.concat(PrescriptionDrug.idPrescription,PrescriptionDrug.solutionGroup)),\
+                    asc(Drug.name)\
+                )\
+                .all()
 
     def findByPrescriptionDrug(idPrescriptionDrug, future, is_cpoe = False):
         pd = PrescriptionDrug.query.get(idPrescriptionDrug)
@@ -644,7 +660,7 @@ class Intervention(db.Model):
     id = db.Column("fkpresmed", db.Integer, primary_key=True)
     idPrescription = db.Column("fkprescricao", db.Integer, primary_key=True)
     admissionNumber = db.Column('nratendimento', db.Integer, nullable=False)
-    idInterventionReason = db.Column("idmotivointervencao", db.Integer, nullable=False)
+    idInterventionReason = db.Column("idmotivointervencao", postgresql.ARRAY(db.Integer), nullable=False)
     error = db.Column('erro', db.Boolean, nullable=True)
     cost = db.Column("custo", db.Boolean, nullable=True)
     notes = db.Column("observacao", db.String, nullable=True)
@@ -654,6 +670,7 @@ class Intervention(db.Model):
     update = db.Column("update_at", db.DateTime, nullable=False)
     user = db.Column("update_by", db.Integer, nullable=False)
     transcription = db.Column("transcricao", postgresql.JSON, nullable=True)
+    economy_days = db.Column("dias_economia", db.Integer, nullable=True)
 
     def findAll(admissionNumber=None,userId=None):
         mReasion = db.aliased(InterventionReason)
@@ -731,7 +748,8 @@ class Intervention(db.Model):
                 'department': i[9] if i[9] else i[11],
                 'prescriber': i[10] if i[10] else i[7].prescriber if i[7] else None,
                 'status': i[0].status,
-                'transcription':i[0].transcription
+                'transcription':i[0].transcription,
+                'economyDays': i[0].economy_days
             })
 
         result = [i for i in intervBuffer if i['status'] == 's']

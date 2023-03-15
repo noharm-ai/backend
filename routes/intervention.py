@@ -1,13 +1,13 @@
-import random
 from flask_api import status
 from models.main import *
 from models.appendix import *
 from models.prescription import *
 from flask import Blueprint, request
-from flask_jwt_extended import (create_access_token, create_refresh_token,
-                                jwt_required, get_jwt_identity)
-from datetime import date, datetime
+from flask_jwt_extended import (jwt_required, get_jwt_identity)
+from datetime import datetime
 from .utils import tryCommit
+from services import memory_service
+from services.admin import intervention_reason_service
 
 app_itrv = Blueprint('app_itrv',__name__)
 
@@ -55,6 +55,7 @@ def createIntervention(idPrescriptionDrug):
     if 'observation' in data.keys(): i.notes = data.get('observation', None)
     if 'interactions' in data.keys(): i.interactions = data.get('interactions', None)
     if 'transcription' in data.keys(): i.transcription = data.get('transcription', None)
+    if 'economyDays' in data.keys(): i.economy_days = data.get('economyDays', None)
  
     new_status = data.get('status', 's')
     if new_status != i.status:
@@ -64,8 +65,10 @@ def createIntervention(idPrescriptionDrug):
             
         i.status = new_status
     else:
-        i.date = datetime.today()
         i.user = user.id
+
+        if (memory_service.has_feature('PRIMARYCARE')):
+            i.date = datetime.today()
 
     if newIntervention: db.session.add(i)
 
@@ -81,21 +84,12 @@ def sortReasons(e):
 def getInterventionReasons():
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
-    
-    results = InterventionReason.findAll()
 
-    iList = []
-    for i in results:
-        iList.append({
-            'id': i[0].id,
-            'description': i[1] + ' - ' +  i[0].description if i[1] else i[0].description
-        })
-
-    iList.sort(key=sortReasons)
+    list = intervention_reason_service.get_reasons(active_only = True)
 
     return {
         'status': 'success',
-        'data': iList
+        'data': intervention_reason_service.list_to_dto(list)
     }, status.HTTP_200_OK
 
 @app_itrv.route("/intervention", methods=['GET'])
