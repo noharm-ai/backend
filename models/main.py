@@ -176,6 +176,7 @@ class DrugAttributes(db.Model):
     division = db.Column("divisor", db.Float, nullable=True)
     useWeight = db.Column("usapeso", db.Boolean, nullable=True)
     idMeasureUnit = db.Column("fkunidademedida", db.String, nullable=True)
+    idMeasureUnitPrice = db.Column("fkunidademedidacusto", db.String, nullable=True)
     amount = db.Column("concentracao", db.Float, nullable=True)
     amountUnit = db.Column("concentracaounidade", db.String(3), nullable=True)
     whiteList = db.Column("linhabranca", db.Boolean, nullable=True)

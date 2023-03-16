@@ -50,6 +50,17 @@ def auth():
 
         nameUrl = Memory.getNameUrl(user.schema)
 
+        hospitals = db_session\
+            .query(Hospital)\
+            .order_by(asc(Hospital.name))\
+            .all()
+        hospitalList = []
+        for h in hospitals:
+            hospitalList.append({
+                'id': h.id,
+                'name': h.name
+            })
+
         segments = db_session\
             .query(Segment)\
             .order_by(asc(Segment.description))\
@@ -78,7 +89,8 @@ def auth():
             'access_token': access_token,
             'refresh_token': refresh_token,
             'apiKey': Config.API_KEY if hasattr(Config, 'API_KEY') else '',
-            'segments': segmentList
+            'segments': segmentList,
+            'hospitals': hospitalList
         }, status.HTTP_200_OK
 
 
