@@ -74,7 +74,6 @@ class Exams(db.Model):
         examLatest = db.session.query(Exams.typeExam.label('typeExam'), func.max(Exams.date).label('date'))\
                       .select_from(Exams)\
                       .filter(Exams.idPatient == patient.idPatient)\
-                      .filter(Exams.date >= (func.now() - func.cast('15 DAYS', INTERVAL)))\
                       .group_by(Exams.typeExam)\
                       .subquery()
 
