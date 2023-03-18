@@ -90,7 +90,8 @@ class Exams(db.Model):
 
         results = Exams.query\
                 .join(el, and_(Exams.typeExam == el.c.typeExam, Exams.date == el.c.date))\
-                .filter(Exams.idPatient == patient.idPatient)
+                .filter(Exams.idPatient == patient.idPatient)\
+                .filter(Exams.date >= (func.now() - func.cast('15 DAYS', INTERVAL)))
 
         resultsPrev = Exams.query\
                 .join(elPrev, and_(Exams.typeExam == elPrev.c.typeExam, Exams.date == elPrev.c.date))\
