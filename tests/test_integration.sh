@@ -17,7 +17,7 @@ for LINK in reports outliers/${SEGMENT}/${DRUG} \
 			"prescriptions?idSegment=${SEGMENT}&date=2020-12-31" prescriptions/${PRESCRIPTION} \
 			prescriptions/drug/${PRESCRIPTIONDRUG}/period \
 			static/demo/prescription/${PRESCRIPTION} \
-			exams/${ADMISSION} segments segments/${SEGMENT} departments departments/free \
+			exams/${ADMISSION} segments segments/${SEGMENT} departments \
 			segments/exams/types notes/${ADMISSION} \
 			segments/${SEGMENT}/outliers/generate/drug/${DRUG} 
 do
