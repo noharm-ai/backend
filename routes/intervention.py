@@ -70,6 +70,8 @@ def createIntervention(idPrescriptionDrug):
         if (memory_service.has_feature('PRIMARYCARE')):
             i.date = datetime.today()
 
+    i.update = datetime.today()
+
     if newIntervention: db.session.add(i)
 
     setDrugStatus(idPrescriptionDrug, i.status)
