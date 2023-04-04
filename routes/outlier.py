@@ -306,14 +306,18 @@ def getUnits(idDrug, idSegment=1):
         'data': results
     }, status.HTTP_200_OK
 
-@app_out.route('/drugs/<int:idDrug>/convertunit/<string:idMeasureUnit>', methods=['POST'])
+@app_out.route('/drugs/<int:idSegment>/<int:idDrug>/convertunit', methods=['POST'])
 @jwt_required()
-def setDrugUnit(idDrug, idMeasureUnit):
+def setDrugUnit(idSegment, idDrug):
     data = request.get_json()
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
 
-    idSegment = data.get('idSegment', 1)
+    roles = user.config['roles'] if user.config and 'roles' in user.config else []
+    if ('admin' not in roles):
+        return { 'status': 'error', 'message': 'Usuário não autorizado' }, status.HTTP_401_UNAUTHORIZED
+
+    idMeasureUnit = data.get('idMeasureUnit', 1)
     u = MeasureUnitConvert.query.get((idMeasureUnit, idDrug, idSegment))
     new = False
 
@@ -324,7 +328,7 @@ def setDrugUnit(idDrug, idMeasureUnit):
         u.idDrug = idDrug
         u.idSegment = idSegment
 
-    u.factor = data.get('fator', 1)
+    u.factor = data.get('factor', 1)
 
     if new: db.session.add(u)
 
