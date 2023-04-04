@@ -19,7 +19,7 @@ for LINK in reports outliers/${SEGMENT}/${DRUG} \
 			static/demo/prescription/${PRESCRIPTION} \
 			exams/${ADMISSION} segments segments/${SEGMENT} departments \
 			segments/exams/types notes/${ADMISSION} \
-			segments/${SEGMENT}/outliers/generate/drug/${DRUG} 
+			segments/${SEGMENT}/outliers/generate/drug/${DRUG}/clean/1
 do
   COMMAND=("-H 'Accept: application/json' -H 'Authorization: Bearer ${TOKEN}' '${HOST}/${LINK}'")
   printf "${LINK} "
