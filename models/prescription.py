@@ -313,7 +313,7 @@ class Patient(db.Model):
                          .filter(Patient.admissionNumber == admissionNumber)\
                          .first()
 
-    def getPatients(idSegment=None, idDept=[], idDrug=[], startDate=date.today(), endDate=None, pending=False, agg=False, currentDepartment=False, concilia=False, allDrugs=False, discharged=False, is_cpoe=False, insurance=None, indicators=[]):
+    def getPatients(idSegment=None, idDept=[], idDrug=[], startDate=date.today(), endDate=None, pending=False, agg=False, currentDepartment=False, concilia=False, allDrugs=False, discharged=False, is_cpoe=False, insurance=None, indicators=[], frequencies=[]):
         q = db.session\
             .query(Prescription, Patient, Department.name.label('department'))\
             .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)\
@@ -363,6 +363,9 @@ class Patient(db.Model):
         if (len(indicators) > 0):
             for i in indicators:
                 q = q.filter(Prescription.features['alertStats'][i].as_integer() > 0)
+
+        if (len(frequencies) > 0):
+            q = q.filter(cast(Prescription.features['frequencies'], db.String ).op('~*')("|".join(frequencies)))
 
         if endDate is None: endDate = startDate
 
