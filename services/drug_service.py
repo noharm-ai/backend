@@ -1,5 +1,5 @@
 from models.main import db
-from sqlalchemy import asc
+from sqlalchemy import asc, distinct
 
 from models.appendix import *
 from models.prescription import *
@@ -41,5 +41,12 @@ def getPreviouslyPrescribedFrequencies(idDrug, idSegment):
 def getFrequencies(idHospital):
     return db.session.query(Frequency)\
         .filter(Frequency.idHospital == idHospital)\
+        .order_by(asc(Frequency.description))\
+        .all()
+
+
+def get_all_frequencies():
+    return db.session.query(distinct(Frequency.id), Frequency.description)\
+        .select_from(Frequency)\
         .order_by(asc(Frequency.description))\
         .all()
