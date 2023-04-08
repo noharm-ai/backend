@@ -4,7 +4,7 @@ from flask import Blueprint
 from flask_jwt_extended import (jwt_required, get_jwt_identity)
 from .utils import *
 
-from services.drug_service import getPreviouslyPrescribedUnits, getUnits, getPreviouslyPrescribedFrequencies, getFrequencies
+from services.drug_service import getPreviouslyPrescribedUnits, getUnits, getPreviouslyPrescribedFrequencies, getFrequencies, get_all_frequencies
 
 app_drugs = Blueprint('app_drugs',__name__)
 
@@ -58,6 +58,27 @@ def getDrugSummary(idDrug, idSegment, idHospital):
     'units': unitResults,
     'frequencies': frequencyResults
   }
+
+  return {
+    'status': 'success',
+    'data': results
+  }, status.HTTP_200_OK
+
+
+@app_drugs.route('/drugs/frequencies', methods=['GET'])
+@jwt_required()
+def get_frequencies():
+  user = User.find(get_jwt_identity())
+  dbSession.setSchema(user.schema)
+
+  all_frequencies = get_all_frequencies()
+
+  results = []
+  for f in all_frequencies:
+    results.append({
+      'id': f[0],
+      'description': f[1],
+    })
 
   return {
     'status': 'success',
