@@ -37,12 +37,13 @@ def getPrescriptions():
     discharged = request.args.get('discharged', 0)
     insurance = request.args.get('insurance', None)
     indicators = request.args.getlist('indicators[]')
+    frequencies = request.args.getlist('frequencies[]')
 
     patients = Patient.getPatients(idSegment=idSegment, idDept=idDept, idDrug=idDrug,\
                                     startDate=startDate, endDate=endDate, pending=pending,\
                                     agg=agg, currentDepartment=currentDepartment, concilia=concilia,\
                                     allDrugs=allDrugs, discharged=discharged, is_cpoe=user.cpoe(),\
-                                    insurance=insurance, indicators=indicators)
+                                    insurance=insurance, indicators=indicators, frequencies=frequencies)
 
     results = []
     for p in patients:

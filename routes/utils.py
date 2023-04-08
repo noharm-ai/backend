@@ -290,6 +290,7 @@ def getFeatures(result):
     allergy = alerts = pScore = score1 = score2 = score3 = 0
     am = av = control = np = tube = diff = 0
     drugIDs = []
+    frequencies = []
     for d in drugList: 
         drugIDs.append(d['idDrug'])
         if d['whiteList'] or d['suspended']: continue
@@ -306,6 +307,9 @@ def getFeatures(result):
         control += int(d['c']) if not d['c'] is None else 0
         diff += int(not d['checked'])
         tube += int(d['tubeAlert'])
+
+        if d['frequency']['value'] != '':
+            frequencies.append(d['frequency']['value'])
 
     interventions = 0
     for i in result['data']['interventions']:
@@ -332,7 +336,8 @@ def getFeatures(result):
         'interventions': interventions,
         'complication': complicationCount,
         'drugIDs': list(set(drugIDs)),
-        'alertStats': result['data']['alertStats'] if 'alertStats' in result['data'] else None
+        'alertStats': result['data']['alertStats'] if 'alertStats' in result['data'] else None,
+        'frequencies': list(set(frequencies))
     }
 
 def sendEmail(subject, sender, emails, html) : 
