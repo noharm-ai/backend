@@ -302,7 +302,7 @@ class DrugList():
     def conciliaList(pDrugs, result = []):
         for pd in pDrugs:
             existsDrug = next((d for d in result if d['idDrug'] == pd[0].idDrug), False)
-            if not existsDrug:
+            if not existsDrug and not bool(pd[0].suspendedDate):
                 result.append({
                     'idPrescription': str(pd[0].idPrescription),
                     'idPrescriptionDrug': str(pd[0].id),
