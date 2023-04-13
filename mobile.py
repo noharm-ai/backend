@@ -24,6 +24,7 @@ from routes.drugs import app_drugs
 from routes.names import app_names
 from routes.admin.frequency import app_admin_freq
 from routes.admin.intervention_reason import app_admin_interv
+from routes.admin.memory import app_admin_memory
 import os
 
 os.environ['TZ'] = 'America/Sao_Paulo'
@@ -65,6 +66,7 @@ app.register_blueprint(app_pres_crud)
 
 app.register_blueprint(app_admin_freq)
 app.register_blueprint(app_admin_interv)
+app.register_blueprint(app_admin_memory)
 
 CORS(app)
 
