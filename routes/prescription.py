@@ -361,7 +361,8 @@ def setPrescriptionStatus(idPrescription):
                       .filter(Prescription.admissionNumber == p.admissionNumber)\
                       .filter(Prescription.status != p.status)\
                       .filter(Prescription.idSegment == p.idSegment)\
-                      .filter(Prescription.concilia == None)
+                      .filter(Prescription.concilia == None)\
+                      .filter(Prescription.agg == None)
             
             q = get_period_filter(q, Prescription, p.date, is_pmc, is_cpoe)
 
