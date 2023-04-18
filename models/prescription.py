@@ -365,7 +365,7 @@ class Patient(db.Model):
                 q = q.filter(Prescription.features['alertStats'][i].as_integer() > 0)
 
         if (len(frequencies) > 0):
-            q = q.filter(cast(Prescription.features['frequencies'], db.String ).op('~*')("|".join(frequencies)))
+            q = q.filter(cast(Prescription.features['frequencies'], db.String ).op('~*')("|".join(map(re.escape, frequencies))))
 
         if endDate is None: endDate = startDate
 
