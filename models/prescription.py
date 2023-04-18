@@ -329,9 +329,7 @@ class Patient(db.Model):
             if currentDepartment:
                 q = q.filter(Prescription.idDepartment.in_(idDept))
             else:
-                q = q.filter(cast(idDept, postgresql.ARRAY(BigInteger)).overlap(\
-                    cast(Prescription.aggDeps, postgresql.ARRAY(BigInteger))\
-                ))
+                q = q.filter(postgresql.array(idDept).overlap(Prescription.aggDeps))
 
         if (len(idDrug)>0):
             idDrug = list(map(int, idDrug))
