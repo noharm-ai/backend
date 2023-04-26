@@ -20,3 +20,6 @@ def has_feature(feature):
         return False
 
     return True
+
+def get_memory(key):
+    return db.session.query(Memory).filter(Memory.kind == key).first()

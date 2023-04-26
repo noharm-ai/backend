@@ -244,7 +244,8 @@ class DrugList():
                 'prevNotes': pd[8],
                 'drugInfoLink': pd[11],
                 'cpoe_group': pd[0].cpoe_group,
-                'infusionKey': self.getInfusionKey(pd)
+                'infusionKey': self.getInfusionKey(pd),
+                'formValues': pd[0].form
             })
         return pDrugs
 
