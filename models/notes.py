@@ -101,6 +101,7 @@ class ClinicalNotes(db.Model):
             return ClinicalNotes.query\
                     .filter(ClinicalNotes.admissionNumber==admissionNumber)\
                     .filter(ClinicalNotes.isExam == True)\
+                    .filter(ClinicalNotes.date > (datetime.today() - timedelta(days=90)))\
                     .order_by(desc(ClinicalNotes.date))\
                     .all()
         else:
