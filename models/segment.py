@@ -67,6 +67,7 @@ class Exams(db.Model):
     def findByPatient(idPatient):
         return db.session.query(Exams)\
                          .filter(Exams.idPatient == idPatient)\
+                         .filter(Exams.date >= (func.now() - func.cast('90 DAYS', INTERVAL)))\
                          .order_by(asc(Exams.typeExam),desc(Exams.date))\
                          .all()
 
