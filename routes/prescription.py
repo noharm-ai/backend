@@ -15,6 +15,7 @@ from datetime import date, datetime
 from .drugList import DrugList
 from services import memory_service, prescription_service
 from converter import prescription_converter
+from models.enums import MemoryEnum
 
 app_pres = Blueprint('app_pres',__name__)
 
@@ -174,6 +175,7 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None, idS
     interventions = Intervention.findAll(admissionNumber=patient.admissionNumber)
     relations = Prescription.findRelation(prescription[0].id,patient.admissionNumber, patient.idPatient, aggDate, is_cpoe, is_pmc)
     headers = Prescription.getHeaders(admissionNumber, aggDate, idSegment, is_pmc, is_cpoe) if aggDate else []
+    formTemplate = memory_service.get_memory(MemoryEnum.PRESMED_FORM.value)
 
     clinicalNotesCount = ClinicalNotes.getCountIfExists(prescription[0].admissionNumber, is_pmc)
     notesTotal = ClinicalNotes.getTotalIfExists(prescription[0].admissionNumber)
@@ -336,6 +338,7 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None, idS
             'features': prescription[0].features,
             'user': prescription[10],
             'insurance': prescription[11],
+            'formTemplate': formTemplate.value if formTemplate else None
         }
     }, status.HTTP_200_OK
 
@@ -463,6 +466,13 @@ def setPrescriptionDrugNote(idPrescriptionDrug):
         note.user  = user.id
 
         if newObs: db.session.add(note)
+
+    if 'form' in data:
+        drug = PrescriptionDrug.query.get(idPrescriptionDrug)
+        if (drug is None):
+            return { 'status': 'error', 'message': 'Prescrição  Inexistente!' }, status.HTTP_400_BAD_REQUEST
+        
+        drug.form = data.get('form', None)
 
     return tryCommit(db, str(idPrescriptionDrug), user.permission())
 
