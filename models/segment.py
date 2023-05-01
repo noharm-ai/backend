@@ -75,7 +75,6 @@ class Exams(db.Model):
         examLatest = db.session.query(Exams.typeExam.label('typeExam'), func.max(Exams.date).label('date'))\
                       .select_from(Exams)\
                       .filter(Exams.idPatient == patient.idPatient)\
-                      .filter(Exams.date >= (func.now() - func.cast('15 DAYS', INTERVAL)))\
                       .group_by(Exams.typeExam)\
                       .subquery()
 
@@ -85,7 +84,6 @@ class Exams(db.Model):
                       .select_from(Exams)\
                       .join(el, and_(Exams.typeExam == el.c.typeExam, Exams.date < el.c.date))\
                       .filter(Exams.idPatient == patient.idPatient)\
-                      .filter(Exams.date >= (func.now() - func.cast('20 DAYS', INTERVAL)))\
                       .group_by(Exams.typeExam)\
                       .subquery()
 
@@ -98,8 +96,7 @@ class Exams(db.Model):
 
         resultsPrev = Exams.query\
                 .join(elPrev, and_(Exams.typeExam == elPrev.c.typeExam, Exams.date == elPrev.c.date))\
-                .filter(Exams.idPatient == patient.idPatient)\
-                .filter(Exams.date >= (func.now() - func.cast('20 DAYS', INTERVAL)))
+                .filter(Exams.idPatient == patient.idPatient)
 
         segExam = SegmentExam.refDict(idSegment)
         age = data2age(patient.birthdate.isoformat() if patient.birthdate else date.today().isoformat())
