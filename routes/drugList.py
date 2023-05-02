@@ -133,8 +133,11 @@ class DrugList():
                         weight = none2zero(self.exams['weight'])
                         weight = weight if weight > 0 else 1
 
-                        doseWeight = round(pd[0].dose / float(weight),2)
-                        doseWeightStr = strFormatBR(doseWeight) + ' ' + pdUnit + '/Kg'
+                        doseWeight = round(pdDoseconv / float(weight), 2)
+                        doseWeightStr = strFormatBR(round(pd[0].dose / float(weight),2)) + ' ' + pdUnit + '/Kg'
+
+                        if pd[6].idMeasureUnit != None and pd[6].idMeasureUnit != pdUnit and pd[0].doseconv != None:
+                            doseWeightStr += ' ou ' + strFormatBR(pd[0].doseconv) + ' ' + str(pd[6].idMeasureUnit) + '/Kg (faixa arredondada)'
 
                         keyDrugKg = str(idDrugAgg)+'kg'
                         if keyDrugKg not in self.maxDoseAgg:
@@ -142,9 +145,6 @@ class DrugList():
 
                         self.maxDoseAgg[keyDrugKg]['value'] += doseWeight
                         self.maxDoseAgg[keyDrugKg]['count'] += 1 
-
-                        if pd[6].idMeasureUnit != None and pd[6].idMeasureUnit != pdUnit and pd[0].doseconv != None:
-                            doseWeightStr += ' ou ' + strFormatBR(pd[0].doseconv) + ' ' + str(pd[6].idMeasureUnit) + '/Kg (faixa arredondada)'
 
                         if pd[6].maxDose and pd[6].maxDose < doseWeight:
                             alerts.append('Dose diária prescrita (' + strFormatBR(doseWeight) + ' ' + str(pd[6].idMeasureUnit) + '/Kg) maior que a dose de alerta (' + strFormatBR(pd[6].maxDose) + ' ' + str(pd[6].idMeasureUnit) + '/Kg) usualmente recomendada (considerada a dose diária independente da indicação).')
