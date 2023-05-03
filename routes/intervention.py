@@ -8,6 +8,7 @@ from datetime import datetime
 from .utils import tryCommit
 from services import memory_service
 from services.admin import intervention_reason_service
+from services import intervention_service
 
 app_itrv = Blueprint('app_itrv',__name__)
 
@@ -102,6 +103,23 @@ def getInterventions():
     dbSession.setSchema(user.schema)
     
     results = Intervention.findAll(userId=user.id)
+
+    return {
+        'status': 'success',
+        'data': results
+    }, status.HTTP_200_OK
+
+@app_itrv.route("/intervention/search", methods=['POST'])
+@jwt_required()
+def search_interventions():
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+    data = request.get_json()
+    
+    results = intervention_service.get_interventions(\
+        admissionNumber=data.get("admissionNumber", None),\
+        startDate=data.get("startDate", None)\
+    )
 
     return {
         'status': 'success',
