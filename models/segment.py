@@ -89,10 +89,10 @@ class Exams(db.Model):
 
         elPrev = db.aliased(examPrevQ)
 
-        results = Exams.query\
-                .join(el, and_(Exams.typeExam == el.c.typeExam, Exams.date == el.c.date))\
+        results = Exams.query.distinct(Exams.typeExam)\
                 .filter(Exams.idPatient == patient.idPatient)\
-                .filter(Exams.date >= (func.now() - func.cast('15 DAYS', INTERVAL)))
+                .filter(Exams.date >= (func.now() - func.cast('15 DAYS', INTERVAL)))\
+                .order_by(Exams.typeExam, Exams.date.desc())
 
         resultsPrev = Exams.query\
                 .join(elPrev, and_(Exams.typeExam == elPrev.c.typeExam, Exams.date == elPrev.c.date))\
