@@ -494,6 +494,7 @@ class PrescriptionDrug(db.Model):
     user = db.Column("update_by", db.Integer, nullable=True)
 
     cpoe_group = db.Column("cpoe_grupo", db.Integer, nullable=True)
+    form = db.Column("form", postgresql.JSON, nullable=True)
 
     def findByPrescription(idPrescription, admissionNumber, aggDate=None, idSegment=None, is_cpoe=False, is_pmc=False):
         prevNotes = getPrevNotes(admissionNumber)
