@@ -83,6 +83,7 @@ def auth():
             'userFeatures': user.config['features'] if user.config and 'features' in user.config else [],
             'features': features.value if features is not None else [],
             'nameUrl': nameUrl['value'] if user.permission() else 'http://localhost/{idPatient}',
+            'multipleNameUrl': nameUrl['multiple'] if 'multiple' in nameUrl and user.permission() else None,
             'nameHeaders': nameUrl['headers'] if 'headers' in nameUrl else {},
             'proxy': True if 'to' in nameUrl else False,
             'notify': notification,
