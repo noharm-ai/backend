@@ -473,6 +473,8 @@ def setPrescriptionDrugNote(idPrescriptionDrug):
             return { 'status': 'error', 'message': 'Prescrição  Inexistente!' }, status.HTTP_400_BAD_REQUEST
         
         drug.form = data.get('form', None)
+        drug.update = datetime.today()
+        drug.user = user.id
 
     return tryCommit(db, str(idPrescriptionDrug), user.permission())
 
