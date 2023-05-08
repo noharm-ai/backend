@@ -71,32 +71,27 @@ class Exams(db.Model):
                          .order_by(asc(Exams.typeExam),desc(Exams.date))\
                          .all()
 
-    def findLatestByAdmission(patient, idSegment):
-        examLatest = db.session.query(Exams.typeExam.label('typeExam'), func.max(Exams.date).label('date'))\
+    def findLatestByAdmission(patient, idSegment, prevEx=False):
+        examLatest = db.session.query(Exams.typeExam.label('typeExam'), Exams.date.label('date'))\
                       .select_from(Exams)\
+                      .distinct(Exams.typeExam)\
                       .filter(Exams.idPatient == patient.idPatient)\
-                      .group_by(Exams.typeExam)\
+                      .filter(Exams.date >= (func.now() - func.cast('15 DAYS', INTERVAL)))\
+                      .order_by(Exams.typeExam, Exams.date.desc())\
                       .subquery()
 
         el = db.aliased(examLatest)
-
-        examPrevQ = db.session.query(Exams.typeExam.label('typeExam'), func.max(Exams.date).label('date'))\
-                      .select_from(Exams)\
-                      .join(el, and_(Exams.typeExam == el.c.typeExam, Exams.date < el.c.date))\
-                      .filter(Exams.idPatient == patient.idPatient)\
-                      .group_by(Exams.typeExam)\
-                      .subquery()
-
-        elPrev = db.aliased(examPrevQ)
 
         results = Exams.query.distinct(Exams.typeExam)\
                 .filter(Exams.idPatient == patient.idPatient)\
                 .filter(Exams.date >= (func.now() - func.cast('15 DAYS', INTERVAL)))\
                 .order_by(Exams.typeExam, Exams.date.desc())
 
-        resultsPrev = Exams.query\
-                .join(elPrev, and_(Exams.typeExam == elPrev.c.typeExam, Exams.date == elPrev.c.date))\
-                .filter(Exams.idPatient == patient.idPatient)
+        resultsPrev = Exams.query.distinct(Exams.typeExam)\
+                .join(el, and_(Exams.typeExam == el.c.typeExam, Exams.date < el.c.date))\
+                .filter(Exams.idPatient == patient.idPatient)\
+                .filter(Exams.date >= (func.now() - func.cast('20 DAYS', INTERVAL)))\
+                .order_by(Exams.typeExam, Exams.date.desc())
 
         segExam = SegmentExam.refDict(idSegment)
         age = data2age(patient.birthdate.isoformat() if patient.birthdate else date.today().isoformat())
@@ -115,13 +110,14 @@ class Exams(db.Model):
                 exams[e.lower()] = examEmpty
 
         examPrev = {}
-        for e in resultsPrev:
-            examPrev[e.typeExam] = e.value
+        if prevEx:
+            for e in resultsPrev:
+                examPrev[e.typeExam] = e.value
 
         examsExtra = {}
         for e in results:
             
-            prevValue = examPrev[e.typeExam] if e.typeExam in examPrev.keys() else None
+            prevValue = examPrev[e.typeExam] if prevEx and e.typeExam in examPrev.keys() else None
 
             if e.typeExam.lower() not in ['mdrd','ckd','cg','swrtz2']:
                 exams[e.typeExam.lower()] = formatExam(e, e.typeExam.lower(), segExam, prevValue)

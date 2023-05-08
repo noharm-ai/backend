@@ -117,10 +117,11 @@ def getPrescriptionAuth(idPrescription):
             aggDate=p[0].date,
             idSegment=p[0].idSegment,
             is_cpoe=user.cpoe(),
-            is_pmc=memory_service.has_feature('PRIMARYCARE')
+            is_pmc=memory_service.has_feature('PRIMARYCARE'),
+            is_complete=True
         )
     else:
-        return getPrescription(idPrescription=idPrescription)
+        return getPrescription(idPrescription=idPrescription, is_complete=True)
 
 def buildHeaders(headers, pDrugs, pSolution, pProcedures):
     for pid in headers.keys():
@@ -153,7 +154,7 @@ def getExistIntervention(interventions, dtPrescription):
             result = True;
     return result
 
-def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None, idSegment=None, is_cpoe=False, is_pmc=False):
+def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None, idSegment=None, is_cpoe=False, is_pmc=False, is_complete=False):
 
     if idPrescription:
         prescription = Prescription.getPrescription(idPrescription)
@@ -206,7 +207,7 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None, idS
             })
 
 
-    exams = Exams.findLatestByAdmission(patient, prescription[0].idSegment)
+    exams = Exams.findLatestByAdmission(patient, prescription[0].idSegment, prevEx=is_complete)
     age = data2age(patient.birthdate.isoformat() if patient.birthdate else date.today().isoformat())
 
     examsJson = []
