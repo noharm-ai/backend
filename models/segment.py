@@ -67,7 +67,7 @@ class Exams(db.Model):
     def findByPatient(idPatient):
         return db.session.query(Exams)\
                          .filter(Exams.idPatient == idPatient)\
-                         .filter(Exams.date >= (func.now() - func.cast('90 DAYS', INTERVAL)))\
+                         .filter(Exams.date >= (func.now() - func.cast('120 DAYS', INTERVAL)))\
                          .order_by(asc(Exams.typeExam),desc(Exams.date))\
                          .all()
 
@@ -76,7 +76,6 @@ class Exams(db.Model):
                       .select_from(Exams)\
                       .distinct(Exams.typeExam)\
                       .filter(Exams.idPatient == patient.idPatient)\
-                      .filter(Exams.date >= (func.now() - func.cast('15 DAYS', INTERVAL)))\
                       .order_by(Exams.typeExam, Exams.date.desc())\
                       .subquery()
 
@@ -84,13 +83,11 @@ class Exams(db.Model):
 
         results = Exams.query.distinct(Exams.typeExam)\
                 .filter(Exams.idPatient == patient.idPatient)\
-                .filter(Exams.date >= (func.now() - func.cast('15 DAYS', INTERVAL)))\
                 .order_by(Exams.typeExam, Exams.date.desc())
 
         resultsPrev = Exams.query.distinct(Exams.typeExam)\
                 .join(el, and_(Exams.typeExam == el.c.typeExam, Exams.date < el.c.date))\
                 .filter(Exams.idPatient == patient.idPatient)\
-                .filter(Exams.date >= (func.now() - func.cast('20 DAYS', INTERVAL)))\
                 .order_by(Exams.typeExam, Exams.date.desc())
 
         segExam = SegmentExam.refDict(idSegment)
