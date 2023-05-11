@@ -83,6 +83,7 @@ class Exams(db.Model):
 
         results = Exams.query.distinct(Exams.typeExam)\
                 .filter(Exams.idPatient == patient.idPatient)\
+                .filter(Exams.date >= (func.now() - func.cast('15 DAYS', INTERVAL)))\
                 .order_by(Exams.typeExam, Exams.date.desc())
 
         resultsPrev = Exams.query.distinct(Exams.typeExam)\
