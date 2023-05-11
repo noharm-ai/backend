@@ -313,7 +313,7 @@ class Patient(db.Model):
                          .filter(Patient.admissionNumber == admissionNumber)\
                          .first()
 
-    def getPatients(idSegment=None, idDept=[], idDrug=[], startDate=date.today(), endDate=None, pending=False, agg=False, currentDepartment=False, concilia=False, allDrugs=False, discharged=False, is_cpoe=False, insurance=None, indicators=[], frequencies=[]):
+    def getPatients(idSegment=None, idDept=[], idDrug=[], startDate=date.today(), endDate=None, pending=False, agg=False, currentDepartment=False, concilia=False, allDrugs=False, is_cpoe=False, insurance=None, indicators=[], frequencies=[], patientStatus=None):
         q = db.session\
             .query(Prescription, Patient, Department.name.label('department'))\
             .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)\
@@ -341,8 +341,11 @@ class Patient(db.Model):
         if bool(int(none2zero(pending))):
             q = q.filter(Prescription.status == '0')
 
-        if bool(int(none2zero(discharged))):
+        if patientStatus == 'DISCHARGED':
             q = q.filter(Patient.dischargeDate != None)
+
+        if patientStatus == 'ACTIVE':
+            q = q.filter(Patient.dischargeDate == None)
 
         if bool(int(none2zero(agg))):
             q = q.filter(Prescription.agg == True)

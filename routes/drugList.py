@@ -74,7 +74,7 @@ class DrugList():
             
             if (pd[2] != None and pd[6] != None and pd[6].division != None):
                 measureUnitFactor = 1
-                measureUnitConvert = MeasureUnitConvert.query.get((pd[2].id, pd[0].idDrug, pd[0].idSegment))
+                measureUnitConvert = MeasureUnitConvert.query.get((pd[2].id, pd[0].idDrug, pd[0].idSegment)) #TODO: multiple lazy loading
                 if (measureUnitConvert):
                     measureUnitFactor = measureUnitConvert.factor
 
