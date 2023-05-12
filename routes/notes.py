@@ -15,6 +15,7 @@ from exception.validation_error import ValidationError
 
 app_note = Blueprint('app_note',__name__)
 
+#deprecated - use /notes/<int:admissionNumber>/v2
 @app_note.route('/notes/<int:admissionNumber>', methods=['GET'])
 @jwt_required()
 def getNotes(admissionNumber):
@@ -66,7 +67,73 @@ def getNotes(admissionNumber):
             'status': 'error',
             'message': 'Schema não tem evolução!'
         }, status.HTTP_400_BAD_REQUEST
+    
+@app_note.route('/notes/<int:admissionNumber>/v2', methods=['GET'])
+@jwt_required()
+def get_notes_v2(admissionNumber):
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
 
+    has_primary_care = memory_service.has_feature('PRIMARYCARE')
+    filter_date = request.args.get('date', None)
+    dates = None
+
+
+    if filter_date is None:
+        dates = db.session\
+            .query(\
+                func.date(ClinicalNotes.date), func.count(), func.sum(ClinicalNotes.diseases),\
+                func.sum(ClinicalNotes.complication), func.sum(ClinicalNotes.symptoms),\
+                func.sum(ClinicalNotes.conduct)
+            )\
+            .select_from(ClinicalNotes)\
+            .filter(ClinicalNotes.admissionNumber==admissionNumber)\
+            .filter(or_(ClinicalNotes.isExam == None, ClinicalNotes.isExam == False))\
+            .group_by(func.date(ClinicalNotes.date))\
+            .order_by(desc(func.date(ClinicalNotes.date)))\
+            .all()
+        
+        if len(dates) > 0:
+            notes = get_notes_by_date(admissionNumber, dates[0][0], has_primary_care)
+        else:
+            notes = []
+    else:
+        notes = get_notes_by_date(admissionNumber, filter_date, has_primary_care)
+
+    noteResults = []
+    for n in notes:
+        noteResults.append(convert_notes(n, has_primary_care))
+
+    dateResults = []
+    if dates is not None:
+        for d in dates:
+            dateResults.append({
+                'date': d[0].isoformat(),
+                'count': d[1],
+                'diseases': d[2],
+                'complication': d[3],
+                'symptoms': d[4],
+                'conduct': d[5],
+            })
+
+    return {
+        'status': 'success',
+        'data': {
+            'dates': dateResults,
+            'notes': noteResults
+        }
+    }, status.HTTP_200_OK
+
+def get_notes_by_date(admissionNumber, date, has_primary_care):
+    query = ClinicalNotes.query\
+            .filter(ClinicalNotes.admissionNumber==admissionNumber)\
+            .filter(or_(ClinicalNotes.isExam == None, ClinicalNotes.isExam == False))\
+            .filter(func.date(ClinicalNotes.date) == date)
+    
+    if (has_primary_care):
+        query = query.options(undefer("form"), undefer("template"))
+    
+    return query.order_by(desc(ClinicalNotes.date)).all()
 
 def convert_notes(notes, has_primary_care):
     return {
@@ -89,6 +156,7 @@ def convert_notes(notes, has_primary_care):
         'names': notes.names,
         'dialysis': notes.dialysis,
     }
+        
 
 @app_note.route('/notes/<int:idNote>', methods=['POST'])
 @jwt_required()
