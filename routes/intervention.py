@@ -104,7 +104,7 @@ def getInterventions():
     dbSession.setSchema(user.schema)
     
     results = intervention_service.get_interventions(\
-        startDate=datetime.today() - timedelta(days=30),\
+        startDate=(datetime.today() - timedelta(days=30)).isoformat(),\
     )
 
     return {
