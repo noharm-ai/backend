@@ -258,7 +258,7 @@ def getDrugs(idSegment=1):
     results = []
     for d in drugs:
         results.append({
-            'idDrug': d.id,
+            'idDrug': str(d.id),
             'name': d.name,
         })
 
