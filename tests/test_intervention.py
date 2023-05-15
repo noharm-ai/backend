@@ -1,15 +1,20 @@
 from conftest import *
+from datetime import datetime
 
 from models.appendix import InterventionReason
 from models.prescription import Intervention
 
 def test_get_interventions(client):
-    """Teste get /intervention - Compara quantidade de intervenções enviadas com quantidade salva no banco e valida status_code 200"""
+    """Teste get /intervention/search - Compara quantidade de intervenções enviadas com quantidade salva no banco e valida status_code 200"""
     
     access_token = get_access(client)
     interventions = session.query(Intervention).count()
 
-    response = client.get('/intervention', headers=make_headers(access_token)) 
+    data = {
+        "startDate": datetime.today().isoformat()
+    }
+
+    response = client.post('/intervention/search', data=json.dumps(data), headers=make_headers(access_token)) 
     data = json.loads(response.data)['data']
     # TODO: Add consulta ao banco de dados e comparar count de intervenções
 
