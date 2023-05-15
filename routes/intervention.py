@@ -96,13 +96,16 @@ def getInterventionReasons():
         'data': intervention_reason_service.list_to_dto(list)
     }, status.HTTP_200_OK
 
+#deprecated - use /intervention/search instead
 @app_itrv.route("/intervention", methods=['GET'])
 @jwt_required()
 def getInterventions():
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
     
-    results = Intervention.findAll(userId=user.id)
+    results = intervention_service.get_interventions(\
+        startDate=datetime.today() - timedelta(days=30),\
+    )
 
     return {
         'status': 'success',
@@ -118,7 +121,8 @@ def search_interventions():
     
     results = intervention_service.get_interventions(\
         admissionNumber=data.get("admissionNumber", None),\
-        startDate=data.get("startDate", None)\
+        startDate=data.get("startDate", None),\
+        endDate=data.get("endDate", None)\
     )
 
     return {
