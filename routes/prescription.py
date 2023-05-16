@@ -13,7 +13,7 @@ from .utils import *
 from sqlalchemy import func, between
 from datetime import date, datetime
 from .drugList import DrugList
-from services import memory_service, prescription_service
+from services import memory_service, prescription_service, intervention_service
 from converter import prescription_converter
 from models.enums import MemoryEnum
 
@@ -174,7 +174,7 @@ def getPrescription(idPrescription=None, admissionNumber=None, aggDate=None, idS
     lastDept = Prescription.lastDeptbyAdmission(prescription[0].id, patient.admissionNumber)
     drugs = PrescriptionDrug.findByPrescription(\
         prescription[0].id, patient.admissionNumber, aggDate, idSegment, is_cpoe, is_pmc)
-    interventions = Intervention.findAll(admissionNumber=patient.admissionNumber)
+    interventions = intervention_service.get_interventions(admissionNumber=patient.admissionNumber)
     relations = Prescription.findRelation(prescription[0].id,patient.admissionNumber, patient.idPatient, aggDate, is_cpoe, is_pmc)
     headers = Prescription.getHeaders(admissionNumber, aggDate, idSegment, is_pmc, is_cpoe) if aggDate else []
     formTemplate = memory_service.get_memory(MemoryEnum.PRESMED_FORM.value)

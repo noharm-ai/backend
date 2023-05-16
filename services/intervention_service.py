@@ -52,14 +52,14 @@ def get_interventions(admissionNumber=None, startDate=None, endDate=None):
         if not startDate:
             raise ValidationError('Data inicial inválida', 'errors.invalidRequest', status.HTTP_400_BAD_REQUEST)
 
-    if startDate is not None:
-        interventions = interventions.filter(Intervention.date > validate(startDate))
+        if startDate is not None:
+            interventions = interventions.filter(Intervention.date >= validate(startDate))
+
+        if endDate is not None:
+            interventions = interventions.filter(Intervention.date <= (validate(endDate) + timedelta(hours=23,minutes=59)))
 
     interventions = interventions.filter(Intervention.status.in_(['s','a','n','x','j']))\
                                     .order_by(desc(Intervention.date))
-    
-    print("||||||", interventions)
-    print("|||||||")
 
     interventions = interventions.limit(1500).all()
     

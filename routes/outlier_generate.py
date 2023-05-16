@@ -8,7 +8,7 @@ from models.prescription import *
 from flask_jwt_extended import (jwt_required, get_jwt_identity, create_access_token)
 from config import Config
 import pandas as pd
-from sqlalchemy import distinct, func
+from sqlalchemy import distinct, func, text
 from math import ceil
 from .outlier_lib import add_score
 
@@ -92,15 +92,21 @@ def generateOutliers(idSegment,fold=None,idDrug=None,clean=None):
             result = db.engine.execute(queryDelete)
             print('RowCount Delete Drug', result.rowcount)
 
-        queryInsert = "INSERT INTO " + user.schema + ".outlier (idsegmento, fkmedicamento, doseconv, frequenciadia, contagem, escore, update_at)\
-                SELECT idsegmento, fkmedicamento, ROUND(doseconv::numeric,2) as doseconv, frequenciadia, SUM(contagem), NULL, now()\
-                FROM " + user.schema + ".prescricaoagg\
-                WHERE idsegmento = " + str(int(idSegment)) + "\
-                AND fkmedicamento = " + str(int(idDrug)) + " and frequenciadia is not null and doseconv is not null\
-                GROUP BY idsegmento, fkmedicamento, ROUND(doseconv::numeric,2), frequenciadia\
-                ON CONFLICT DO nothing;"
+        queryInsert = text("""
+            INSERT INTO {schema}.outlier (idsegmento, fkmedicamento, doseconv, frequenciadia, contagem, escore, update_at)
+                SELECT pagg.idsegmento, pagg.fkmedicamento, ROUND(pagg.doseconv::numeric,2) as doseconv, pagg.frequenciadia, SUM(pagg.contagem), NULL, now()
+                FROM {schema}.prescricaoagg pagg
+                INNER JOIN {schema}.frequencia f ON (pagg.fkfrequencia = f.fkfrequencia)
+                INNER JOIN {schema}.unidademedida u  ON (pagg.fkunidademedida  = u.fkunidademedida)
+                WHERE pagg.idsegmento = :idSegment
+                AND pagg.fkmedicamento = :idDrug and pagg.frequenciadia is not null and pagg.doseconv is not null
+                GROUP BY pagg.idsegmento, pagg.fkmedicamento, ROUND(pagg.doseconv::numeric,2), pagg.frequenciadia
+                ON CONFLICT DO nothing;
+        """.format(schema=user.schema))
 
-        result = db.engine.execute(queryInsert)
+        result = db.engine.execute(\
+            queryInsert, {'idSegment': idSegment, 'idDrug': idDrug}\
+        )
         print('RowCount Insert Drug', result.rowcount)
 
         if clean != None and clean == 0: return { 'status': 'success' }, status.HTTP_200_OK
