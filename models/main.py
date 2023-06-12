@@ -63,6 +63,16 @@ class Substance(db.Model):
     id = db.Column("sctid", db.Integer, primary_key=True)
     name = db.Column("nome", db.String(255), nullable=False)
     link = db.Column("link", db.String(255), nullable=False)
+    idclass = db.Column("idclasse", db.String(255), nullable=False)
+
+
+class SubstanceClass(db.Model):
+    __tablename__ = "classe"
+    __table_args__ = {"schema": "public"}
+
+    id = db.Column("idclasse", db.String(10), primary_key=True)
+    idParent = db.Column("idclassemae", db.String(10), nullable=False)
+    name = db.Column("nome", db.String(255), nullable=False)
 
 
 class Relation(db.Model):
