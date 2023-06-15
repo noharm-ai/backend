@@ -1,12 +1,14 @@
 from models.main import *
 from models.prescription import *
 from flask import Blueprint, request
-from flask_jwt_extended import (jwt_required, get_jwt_identity)
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from .utils import tryCommit
+from exception.validation_error import ValidationError
 
-app_sub = Blueprint('app_sub',__name__)
+app_sub = Blueprint("app_sub", __name__)
 
-@app_sub.route('/substance', methods=['GET'])
+
+@app_sub.route("/substance", methods=["GET"])
 @jwt_required()
 def getSubstance():
     user = User.find(get_jwt_identity())
@@ -16,54 +18,69 @@ def getSubstance():
 
     results = []
     for d in drugs:
-        results.append({
-            'sctid': d.id,
-            'name': d.name.upper(),
-        })
+        results.append({"sctid": d.id, "name": d.name.upper(), "idclass": d.idclass})
 
     results.sort(key=sortSubstance)
 
-    return {
-        'status': 'success',
-        'data': results
-    }, status.HTTP_200_OK
+    return {"status": "success", "data": results}, status.HTTP_200_OK
 
-@app_sub.route('/substance/find', methods=['GET'])
+
+@app_sub.route("/substance/single/<int:idSubstance>", methods=["GET"])
 @jwt_required()
-def find_substance():
-    term = request.args.get('term', '')
+def get_substance_single(idSubstance):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
 
-    if term == '':
-        return {
-            'status': 'success',
-            'data': []
-        }, status.HTTP_200_OK
+    subs = Substance.query.get(idSubstance)
 
-    drugs = Substance.query\
-        .filter(Substance.name.ilike("%"+ term +"%"))\
-        .order_by(asc(Substance.name))\
+    return {
+        "status": "success",
+        "data": {"sctid": subs.id, "name": subs.name.upper(), "idclass": subs.idclass},
+    }, status.HTTP_200_OK
+
+
+@app_sub.route("/substance/find", methods=["GET"])
+@jwt_required()
+def find_substance():
+    term = request.args.get("term", "")
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+
+    if term == "":
+        return {"status": "success", "data": []}, status.HTTP_200_OK
+
+    drugs = (
+        Substance.query.filter(Substance.name.ilike("%" + term + "%"))
+        .order_by(asc(Substance.name))
         .all()
+    )
 
     results = []
     for d in drugs:
-        results.append({
-            'sctid': d.id,
-            'name': d.name.upper(),
-        })
+        results.append(
+            {
+                "sctid": d.id,
+                "name": d.name.upper(),
+            }
+        )
 
-    return {
-        'status': 'success',
-        'data': results
-    }, status.HTTP_200_OK
+    return {"status": "success", "data": results}, status.HTTP_200_OK
 
-@app_sub.route('/substance/<int:idSubstance>', methods=['PUT'])
+
+@app_sub.route("/substance/<int:idSubstance>", methods=["PUT"])
 @jwt_required()
 def setSubstance(idSubstance):
     data = request.get_json()
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
+
+    roles = user.config["roles"] if user.config and "roles" in user.config else []
+    if "admin" not in roles:
+        raise ValidationError(
+            "Usuário não autorizado",
+            "errors.unauthorizedUser",
+            status.HTTP_401_UNAUTHORIZED,
+        )
 
     subs = Substance.query.get(idSubstance)
 
@@ -73,13 +90,16 @@ def setSubstance(idSubstance):
         subs = Substance()
         subs.id = idSubstance
 
-    subs.name = data.get('name', None)
+    subs.name = data.get("name", None)
+    subs.idclass = data.get("idclass", None)
 
-    if newSubs: db.session.add(subs)
+    if newSubs:
+        db.session.add(subs)
 
     return tryCommit(db, idSubstance)
 
-@app_sub.route('/substance/<int:idSubstance>/relation', methods=['GET'])
+
+@app_sub.route("/substance/<int:idSubstance>/relation", methods=["GET"])
 @jwt_required()
 def getRelations(idSubstance):
     data = request.get_json()
@@ -88,20 +108,38 @@ def getRelations(idSubstance):
 
     relations = Relation.findBySctid(idSubstance, user)
 
-    return {
-        'status': 'success',
-        'data': relations
-    }, status.HTTP_200_OK
+    return {"status": "success", "data": relations}, status.HTTP_200_OK
 
-@app_sub.route('/relation/<int:sctidA>/<int:sctidB>/<string:kind>', methods=['PUT'])
+
+@app_sub.route("/substance/class", methods=["GET"])
 @jwt_required()
-def setRelation(sctidA,sctidB,kind):
+def get_substance_class():
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+
+    classes = SubstanceClass.query.order_by(asc(SubstanceClass.name)).all()
+
+    results = []
+    for d in classes:
+        results.append(
+            {
+                "id": d.id,
+                "name": d.name.upper(),
+            }
+        )
+
+    return {"status": "success", "data": results}, status.HTTP_200_OK
+
+
+@app_sub.route("/relation/<int:sctidA>/<int:sctidB>/<string:kind>", methods=["PUT"])
+@jwt_required()
+def setRelation(sctidA, sctidB, kind):
     data = request.get_json()
     user = User.find(get_jwt_identity())
 
-    relation = Relation.query.get((sctidA,sctidB,kind))
+    relation = Relation.query.get((sctidA, sctidB, kind))
     if relation is None:
-        relation = Relation.query.get((sctidB,sctidA,kind))
+        relation = Relation.query.get((sctidB, sctidA, kind))
 
     newRelation = False
     if relation is None:
@@ -112,12 +150,15 @@ def setRelation(sctidA,sctidB,kind):
         relation.kind = kind
         relation.creator = user.id
 
-    if 'text' in data.keys(): relation.text = data.get('text', None)
-    if 'active' in data.keys(): relation.active = bool(data.get('active', False))
+    if "text" in data.keys():
+        relation.text = data.get("text", None)
+    if "active" in data.keys():
+        relation.active = bool(data.get("active", False))
 
     relation.update = datetime.today()
-    relation.user  = user.id
+    relation.user = user.id
 
-    if newRelation: db.session.add(relation)
+    if newRelation:
+        db.session.add(relation)
 
     return tryCommit(db, sctidA)

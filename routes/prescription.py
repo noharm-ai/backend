@@ -21,11 +21,13 @@ from .drugList import DrugList
 from services import (
     memory_service,
     prescription_service,
+    prescription_drug_service,
     intervention_service,
     patient_service,
 )
 from converter import prescription_converter
 from models.enums import MemoryEnum
+from exception.validation_error import ValidationError
 
 app_pres = Blueprint("app_pres", __name__)
 
@@ -673,6 +675,22 @@ def setPrescriptionDrugNote(idPrescriptionDrug):
         drug.user = user.id
 
     return tryCommit(db, str(idPrescriptionDrug), user.permission())
+
+
+@app_pres.route("/prescriptions/drug/form", methods=["PUT"])
+@jwt_required()
+def update_form():
+    data = request.get_json()
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+    os.environ["TZ"] = "America/Sao_Paulo"
+
+    try:
+        prescription_drug_service.update_pd_form(data, user)
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+
+    return tryCommit(db, True, user.permission())
 
 
 @app_pres.route("/prescriptions/<int:idPrescription>/update", methods=["GET"])
