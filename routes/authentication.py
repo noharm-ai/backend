@@ -31,21 +31,21 @@ def auth():
             "message": "Usuário inválido",
         }, status.HTTP_401_UNAUTHORIZED
     else:
-        if Config.ENV == NoHarmENV.STAGING:
-            roles = (
-                user.config["roles"] if user.config and "roles" in user.config else []
-            )
-            if (
-                "suporte" not in roles
-                and "admin" not in roles
-                and "staging" not in roles
-            ):
-                return {
-                    "status": "error",
-                    "message": "Este é o ambiente de homologação da NoHarm. Acesse {} para utilizar a NoHarm.".format(
-                        Config.APP_URL
-                    ),
-                }, status.HTTP_401_UNAUTHORIZED
+        # if Config.ENV == NoHarmENV.STAGING:
+        #     roles = (
+        #         user.config["roles"] if user.config and "roles" in user.config else []
+        #     )
+        #     if (
+        #         "suporte" not in roles
+        #         and "admin" not in roles
+        #         and "staging" not in roles
+        #     ):
+        #         return {
+        #             "status": "error",
+        #             "message": "Este é o ambiente de homologação da NoHarm. Acesse {} para utilizar a NoHarm.".format(
+        #                 Config.APP_URL
+        #             ),
+        #         }, status.HTTP_401_UNAUTHORIZED
 
         claims = {"schema": user.schema, "config": user.config}
         access_token = create_access_token(identity=user.id, additional_claims=claims)

@@ -44,6 +44,7 @@ jobs:
       - name: Config Zappa
         run: |
           echo '${{ secrets.ZAPPA_TEST_SETTINGS }}' > zappa_settings.json 
+          echo '${{ secrets.PYTHON_TEST_CONFIG }}' > config.py
           mkdir ~/.aws/ 
           echo "[default]
           aws_access_key_id = ${{ secrets.AWS_ACCESS_KEY_ID }}
