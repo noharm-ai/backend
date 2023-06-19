@@ -5,7 +5,7 @@ from models.enums import NoHarmENV
 
 
 class Config:
-    ENV = getenv("ENV") or NoHarmENV.PRODUCTION
+    ENV = getenv("ENV") or NoHarmENV.STAGING
     SECRET_KEY = getenv("SECRET_KEY") or ""
     API_KEY = getenv("API_KEY") or ""
     SELF_API_URL = getenv("SELF_API_URL") or ""
