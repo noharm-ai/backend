@@ -2,12 +2,14 @@ from os import getenv
 from datetime import timedelta
 import logging
 
+from models.enums import NoHarmENV
+
 logging.basicConfig()
 logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)
 
 
 class Config:
-    ENV = getenv("ENV") or "staging"
+    ENV = getenv("ENV") or NoHarmENV.STAGING
     SECRET_KEY = getenv("SECRET_KEY") or "insert_secret_key"
     POTGRESQL_CONNECTION_STRING = "postgresql://postgres@localhost/noharm"
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(

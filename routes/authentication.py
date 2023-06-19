@@ -11,6 +11,7 @@ from flask_jwt_extended import (
     get_jwt,
 )
 from config import Config
+from models.enums import NoHarmENV
 
 app_auth = Blueprint("app_auth", __name__)
 
@@ -30,7 +31,7 @@ def auth():
             "message": "Usuário inválido",
         }, status.HTTP_401_UNAUTHORIZED
     else:
-        if Config.ENV == "staging":
+        if Config.ENV == NoHarmENV.STAGING:
             roles = (
                 user.config["roles"] if user.config and "roles" in user.config else []
             )
