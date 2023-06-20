@@ -31,7 +31,7 @@ def auth():
             "message": "Usuário inválido",
         }, status.HTTP_401_UNAUTHORIZED
     else:
-        if Config.ENV == NoHarmENV.STAGING:
+        if Config.ENV == NoHarmENV.STAGING.value:
             roles = (
                 user.config["roles"] if user.config and "roles" in user.config else []
             )
