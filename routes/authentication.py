@@ -10,8 +10,13 @@ from flask_jwt_extended import (
     get_jwt_identity,
     get_jwt,
 )
+import jwt
+import logging
+import requests
+from http.client import HTTPConnection
 from config import Config
-from models.enums import NoHarmENV
+from models.enums import NoHarmENV, MemoryEnum
+from services import memory_service
 
 app_auth = Blueprint("app_auth", __name__)
 
@@ -115,6 +120,53 @@ def auth():
             "segments": segmentList,
             "hospitals": hospitalList,
         }, status.HTTP_200_OK
+
+
+@app_auth.route("/auth-provider", methods=["POST"])
+def auth_provider():
+    data = request.get_json()
+
+    if "schema" not in data or data["schema"] is None:
+        return {
+            "status": "error",
+            "message": "Schema inválido",
+        }, status.HTTP_401_UNAUTHORIZED
+
+    dbSession.setSchema(data["schema"])
+
+    if Config.ENV == NoHarmENV.STAGING.value:
+        HTTPConnection.debuglevel = 1
+        requests_log = logging.getLogger("requests.packages.urllib3")
+        requests_log.setLevel(logging.DEBUG)
+        requests_log.propagate = True
+
+    oauth_config = memory_service.get_memory(MemoryEnum.OAUTH_CONFIG.value)
+
+    if oauth_config is None:
+        return {
+            "status": "error",
+            "message": "OAUTH não configurado",
+        }, status.HTTP_401_UNAUTHORIZED
+
+    params = {"grant_type": "authorization_code", "code": data["code"]}
+
+    response = requests.post(url=oauth_config.value["login_url"], data=params)
+
+    if response.status_code != status.HTTP_200_OK:
+        return {
+            "status": "error",
+            "message": "OAUTH provider error",
+        }, status.HTTP_401_UNAUTHORIZED
+
+    auth_data = response.json()
+    user = jwt.decode(auth_data["id_token"], options={"verify_signature": False})
+
+    print(
+        "//////////USER///////",
+        user,
+    )
+
+    return {"status": "success", "user": user}, status.HTTP_200_OK
 
 
 @app_auth.route("/refresh-token", methods=["POST"])
