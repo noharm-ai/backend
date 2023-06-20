@@ -77,9 +77,9 @@ app.register_blueprint(app_admin_memory)
 
 CORS(app)
 
-# if Config.ENV == NoHarmENV.STAGING:
-#     logging.basicConfig()
-#     logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)
+if Config.ENV == NoHarmENV.STAGING:
+    logging.basicConfig()
+    logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)
 
 
 @app.route("/version", methods=["GET"])
