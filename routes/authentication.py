@@ -5,14 +5,13 @@ from models.appendix import *
 from models.prescription import *
 from flask_jwt_extended import (
     create_access_token,
-    create_refresh_token,
     jwt_required,
     get_jwt_identity,
     get_jwt,
 )
-from config import Config
-from models.enums import NoHarmENV
-from services import auth_service
+
+from models.enums import MemoryEnum
+from services import auth_service, memory_service
 from exception.validation_error import ValidationError
 
 app_auth = Blueprint("app_auth", __name__)
@@ -49,6 +48,24 @@ def auth_provider():
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
     return tryCommit(db, auth_data)
+
+
+@app_auth.route("/auth-provider/<schema>", methods=["GET"])
+def get_auth_provider(schema):
+    dbSession.setSchema(schema)
+
+    oauth_config = memory_service.get_memory(MemoryEnum.OAUTH_CONFIG.value)
+
+    if oauth_config is None:
+        return {"status": "error"}, status.HTTP_404_NOT_FOUND
+
+    return {
+        "status": "success",
+        "data": {
+            "url": oauth_config.value["auth_url"],
+            "company": oauth_config.value["company"],
+        },
+    }, status.HTTP_200_OK
 
 
 @app_auth.route("/refresh-token", methods=["POST"])

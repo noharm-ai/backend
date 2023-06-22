@@ -151,6 +151,19 @@ def auth_provider(code, schema):
             status.HTTP_401_UNAUTHORIZED,
         )
 
+    features = (
+        db.session.query(Memory)
+        .filter(Memory.kind == MemoryEnum.FEATURES.value)
+        .first()
+    )
+
+    if features is not None and FeatureEnum.OAUTH.value not in features.value:
+        raise ValidationError(
+            "OAUTH bloqueado",
+            "errors.unauthorizedUser",
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
     params = {"grant_type": "authorization_code", "code": code}
 
     response = requests.post(url=oauth_config.value["login_url"], data=params)
