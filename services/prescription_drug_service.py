@@ -69,6 +69,15 @@ def has_unchecked_drugs(idPrescription):
     return count > 0
 
 
+def count_drugs_by_prescription(idPrescription, drug_types):
+    return (
+        db.session.query(PrescriptionDrug)
+        .filter(PrescriptionDrug.idPrescription == idPrescription)
+        .filter(PrescriptionDrug.source.in_(drug_types))
+        .count()
+    )
+
+
 def update_pd_form(pd_list, user):
     roles = user.config["roles"] if user.config and "roles" in user.config else []
     if "presmed-form" not in roles:

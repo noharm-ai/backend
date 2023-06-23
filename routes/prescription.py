@@ -547,28 +547,31 @@ def setPrescriptionStatus(idPrescription):
         }, status.HTTP_400_BAD_REQUEST
 
     if "status" in data.keys():
-        p.status = data.get("status", None)
-        p.update = datetime.today()
-        if p.agg:
-            q = (
-                db.session.query(Prescription)
-                .filter(Prescription.admissionNumber == p.admissionNumber)
-                .filter(Prescription.status != p.status)
-                .filter(Prescription.idSegment == p.idSegment)
-                .filter(Prescription.concilia == None)
-                .filter(Prescription.agg == None)
-            )
+        prescription_service.check_prescription(
+            idPrescription=idPrescription, status=data.get("status", None), user=user
+        )
+        # p.status = data.get("status", None)
+        # p.update = datetime.today()
+        # if p.agg:
+        #     q = (
+        #         db.session.query(Prescription)
+        #         .filter(Prescription.admissionNumber == p.admissionNumber)
+        #         .filter(Prescription.status != p.status)
+        #         .filter(Prescription.idSegment == p.idSegment)
+        #         .filter(Prescription.concilia == None)
+        #         .filter(Prescription.agg == None)
+        #     )
 
-            q = get_period_filter(q, Prescription, p.date, is_pmc, is_cpoe)
+        #     q = get_period_filter(q, Prescription, p.date, is_pmc, is_cpoe)
 
-            q.update(
-                {"status": p.status, "update": datetime.today(), "user": user.id},
-                synchronize_session="fetch",
-            )
-        else:
-            Prescription.checkPrescriptions(
-                p.admissionNumber, p.date, p.idSegment, user.id, is_cpoe, is_pmc
-            )
+        #     q.update(
+        #         {"status": p.status, "update": datetime.today(), "user": user.id},
+        #         synchronize_session="fetch",
+        #     )
+        # else:
+        #     Prescription.checkPrescriptions(
+        #         p.admissionNumber, p.date, p.idSegment, user.id, is_cpoe, is_pmc
+        #     )
 
     if "notes" in data.keys():
         p.notes = data.get("notes", None)
