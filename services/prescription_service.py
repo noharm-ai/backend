@@ -4,9 +4,9 @@ from datetime import date
 from models.main import db
 from models.appendix import *
 from models.prescription import *
-from models.enums import RoleEnum, PrescriptionAuditTypeEnum, DrugTypeEnum
+from models.enums import RoleEnum, PrescriptionAuditTypeEnum, DrugTypeEnum, FeatureEnum
 from exception.validation_error import ValidationError
-from services import prescription_drug_service
+from services import prescription_drug_service, memory_service
 
 
 def search(search_key):
@@ -58,14 +58,61 @@ def check_prescription(idPrescription, status, user):
             status.HTTP_400_BAD_REQUEST,
         )
 
-    p.status = status
-    p.update = datetime.today()
-    p.user = user.id
+    if p.agg:
+        agg_total_itens = _check_agg_internal_prescriptions(
+            prescription=p, status=status, user=user
+        )
 
-    _audit_check(p, user.id)
+        _check_single_prescription(
+            prescription=p, status=status, user=user, agg_total_itens=agg_total_itens
+        )
+    else:
+        _check_single_prescription(prescription=p, status=status, user=user)
 
 
-def _audit_check(prescription: Prescription, userId: int):
+def _check_agg_internal_prescriptions(prescription, status, user):
+    total_itens = 0
+    is_cpoe = user.cpoe()
+    is_pmc = memory_service.has_feature(FeatureEnum.PRIMARY_CARE.value)
+
+    q = (
+        db.session.query(Prescription)
+        .filter(Prescription.admissionNumber == prescription.admissionNumber)
+        .filter(Prescription.status != status)
+        .filter(Prescription.idSegment == prescription.idSegment)
+        .filter(Prescription.concilia == None)
+        .filter(Prescription.agg == None)
+    )
+
+    q = get_period_filter(q, Prescription, prescription.date, is_pmc, is_cpoe)
+
+    prescriptions = q.all()
+
+    for p in prescriptions:
+        total_itens += _check_single_prescription(
+            prescription=p, status=status, user=user
+        )
+
+    return total_itens
+
+
+def _check_single_prescription(prescription, status, user, agg_total_itens=0):
+    total_itens = 0
+    prescription.status = status
+    prescription.update = datetime.today()
+    prescription.user = user.id
+
+    if memory_service.has_feature(FeatureEnum.AUDIT.value):
+        total_itens = _audit_check(
+            prescription=prescription, userId=user.id, agg_total_itens=agg_total_itens
+        )
+
+    db.session.flush()
+
+    return total_itens
+
+
+def _audit_check(prescription: Prescription, userId: int, agg_total_itens=0):
     a = PrescriptionAudit()
     a.auditType = (
         PrescriptionAuditTypeEnum.CHECK.value
@@ -77,17 +124,25 @@ def _audit_check(prescription: Prescription, userId: int):
     a.prescriptionDate = prescription.date
     a.idDepartment = prescription.idDepartment
     a.idSegment = prescription.idSegment
-    a.totalItens = prescription_drug_service.count_drugs_by_prescription(
-        prescription.id,
-        [
-            DrugTypeEnum.DRUG.value,
-            DrugTypeEnum.PROCEDURE.value,
-            DrugTypeEnum.SOLUTION.value,
-        ],
-    )
+
+    if prescription.agg:
+        a.totalItens = agg_total_itens
+    else:
+        a.totalItens = prescription_drug_service.count_drugs_by_prescription(
+            prescription.id,
+            [
+                DrugTypeEnum.DRUG.value,
+                DrugTypeEnum.PROCEDURE.value,
+                DrugTypeEnum.SOLUTION.value,
+            ],
+        )
+
     a.agg = prescription.agg
+    a.concilia = prescription.concilia
     a.bed = prescription.bed
     a.createdAt = datetime.today()
     a.createdBy = userId
 
     db.session.add(a)
+
+    return a.totalItens

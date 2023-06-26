@@ -429,6 +429,7 @@ class PrescriptionAudit(db.Model):
     idSegment = db.Column("idsegmento", db.Integer, nullable=True)
     totalItens = db.Column("total_itens", db.Integer, nullable=False)
     agg = db.Column("agregada", db.Boolean, nullable=True)
+    concilia = db.Column("concilia", db.String(1), nullable=True)
     bed = db.Column("leito", db.String, nullable=True)
     createdAt = db.Column("created_at", db.DateTime, nullable=False)
     createdBy = db.Column("created_by", db.Integer, nullable=False)

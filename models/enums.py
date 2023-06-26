@@ -14,6 +14,11 @@ class RoleEnum(Enum):
     SUPPORT = "suporte"
 
 
+class FeatureEnum(Enum):
+    AUDIT = "AUDIT"
+    PRIMARY_CARE = "PRIMARYCARE"
+
+
 class PrescriptionAuditTypeEnum(Enum):
     CHECK = 1
     UNCHECK = 2
