@@ -1,5 +1,6 @@
 from sqlalchemy import desc
 from datetime import date
+from flask_api import status
 
 from models.main import db
 from models.appendix import *
@@ -41,7 +42,7 @@ def search(search_key):
     )
 
 
-def check_prescription(idPrescription, status, user):
+def check_prescription(idPrescription, p_status, user):
     roles = user.config["roles"] if user.config and "roles" in user.config else []
     if RoleEnum.SUPPORT.value in roles:
         raise ValidationError(
@@ -59,60 +60,84 @@ def check_prescription(idPrescription, status, user):
         )
 
     if p.agg:
-        agg_total_itens = _check_agg_internal_prescriptions(
-            prescription=p, status=status, user=user
-        )
+        _check_agg_internal_prescriptions(prescription=p, p_status=p_status, user=user)
+        _check_single_prescription(prescription=p, p_status=p_status, user=user)
 
-        _check_single_prescription(
-            prescription=p, status=status, user=user, agg_total_itens=agg_total_itens
-        )
     else:
-        _check_single_prescription(prescription=p, status=status, user=user)
+        _check_single_prescription(prescription=p, p_status=p_status, user=user)
+        _update_agg_status(prescription=p, user=user)
 
 
-def _check_agg_internal_prescriptions(prescription, status, user):
-    total_itens = 0
+def _update_agg_status(prescription: Prescription, user: User):
+    unchecked_prescriptions = get_query_prescriptions_by_agg(
+        agg_prescription=prescription, user=user
+    )
+    unchecked_prescriptions = unchecked_prescriptions.filter(Prescription.status != "s")
+
+    agg_status = "0" if unchecked_prescriptions.count() > 0 else "s"
+
+    agg_prescription = (
+        db.session.query(Prescription)
+        .filter(Prescription.admissionNumber == prescription.admissionNumber)
+        .filter(Prescription.idSegment == prescription.idSegment)
+        .filter(Prescription.agg != None)
+        .filter(func.date(Prescription.date) == func.date(prescription.date))
+        .first()
+    )
+
+    if agg_prescription is not None and agg_prescription.status != agg_status:
+        _check_single_prescription(
+            prescription=agg_prescription, status=agg_status, user=user
+        )
+
+
+def get_query_prescriptions_by_agg(agg_prescription: Prescription, user, only_id=False):
     is_cpoe = user.cpoe()
     is_pmc = memory_service.has_feature(FeatureEnum.PRIMARY_CARE.value)
 
     q = (
-        db.session.query(Prescription)
-        .filter(Prescription.admissionNumber == prescription.admissionNumber)
-        .filter(Prescription.status != status)
-        .filter(Prescription.idSegment == prescription.idSegment)
+        db.session.query(Prescription.id if only_id else Prescription)
+        .filter(Prescription.admissionNumber == agg_prescription.admissionNumber)
         .filter(Prescription.concilia == None)
         .filter(Prescription.agg == None)
     )
 
-    q = get_period_filter(q, Prescription, prescription.date, is_pmc, is_cpoe)
+    q = get_period_filter(q, Prescription, agg_prescription.date, is_pmc, is_cpoe)
 
-    prescriptions = q.all()
+    if not is_cpoe:
+        q = q.filter(Prescription.idSegment == agg_prescription.idSegment)
+
+    return q
+
+
+def _check_agg_internal_prescriptions(prescription, p_status, user):
+    q_internal_prescription = get_query_prescriptions_by_agg(
+        agg_prescription=prescription, user=user
+    )
+    q_internal_prescription = q_internal_prescription.filter(
+        Prescription.status != p_status
+    )
+
+    prescriptions = q_internal_prescription.all()
 
     for p in prescriptions:
-        total_itens += _check_single_prescription(
-            prescription=p, status=status, user=user
-        )
-
-    return total_itens
+        _check_single_prescription(prescription=p, p_status=p_status, user=user)
 
 
-def _check_single_prescription(prescription, status, user, agg_total_itens=0):
-    total_itens = 0
-    prescription.status = status
+def _check_single_prescription(prescription, p_status, user):
+    prescription.status = p_status
     prescription.update = datetime.today()
     prescription.user = user.id
 
     if memory_service.has_feature(FeatureEnum.AUDIT.value):
-        total_itens = _audit_check(
-            prescription=prescription, userId=user.id, agg_total_itens=agg_total_itens
-        )
+        total_itens = _audit_check(prescription=prescription, user=user)
 
     db.session.flush()
 
     return total_itens
 
 
-def _audit_check(prescription: Prescription, userId: int, agg_total_itens=0):
+def _audit_check(prescription: Prescription, user: User):
     a = PrescriptionAudit()
     a.auditType = (
         PrescriptionAuditTypeEnum.CHECK.value
@@ -125,23 +150,21 @@ def _audit_check(prescription: Prescription, userId: int, agg_total_itens=0):
     a.idDepartment = prescription.idDepartment
     a.idSegment = prescription.idSegment
 
-    if prescription.agg:
-        a.totalItens = agg_total_itens
-    else:
-        a.totalItens = prescription_drug_service.count_drugs_by_prescription(
-            prescription.id,
-            [
-                DrugTypeEnum.DRUG.value,
-                DrugTypeEnum.PROCEDURE.value,
-                DrugTypeEnum.SOLUTION.value,
-            ],
-        )
+    a.totalItens = prescription_drug_service.count_drugs_by_prescription(
+        prescription=prescription,
+        drug_types=[
+            DrugTypeEnum.DRUG.value,
+            DrugTypeEnum.PROCEDURE.value,
+            DrugTypeEnum.SOLUTION.value,
+        ],
+        user=user,
+    )
 
     a.agg = prescription.agg
     a.concilia = prescription.concilia
     a.bed = prescription.bed
     a.createdAt = datetime.today()
-    a.createdBy = userId
+    a.createdBy = user.id
 
     db.session.add(a)
 

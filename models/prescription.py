@@ -387,35 +387,6 @@ class Prescription(db.Model):
 
         return results
 
-    def checkPrescriptions(
-        admissionNumber, aggDate, idSegment, userId, is_cpoe, is_pmc
-    ):
-        exists = (
-            db.session.query(Prescription)
-            .filter(Prescription.admissionNumber == admissionNumber)
-            .filter(Prescription.status != "s")
-            .filter(Prescription.idSegment == idSegment)
-            .filter(Prescription.concilia == None)
-            .filter(Prescription.agg == None)
-        )
-
-        exists = get_period_filter(exists, Prescription, aggDate, is_pmc, is_cpoe)
-
-        db.session.query(Prescription).filter(
-            Prescription.admissionNumber == admissionNumber
-        ).filter(Prescription.idSegment == idSegment).filter(
-            Prescription.agg != None
-        ).filter(
-            func.date(Prescription.date) == func.date(aggDate)
-        ).update(
-            {
-                "status": "s" if exists.count() == 0 else "0",
-                "update": datetime.today(),
-                "user": userId,
-            },
-            synchronize_session="fetch",
-        )
-
 
 class PrescriptionAudit(db.Model):
     __tablename__ = "prescricao_audit"

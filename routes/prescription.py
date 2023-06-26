@@ -536,8 +536,6 @@ def setPrescriptionStatus(idPrescription):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
     os.environ["TZ"] = "America/Sao_Paulo"
-    is_cpoe = user.cpoe()
-    is_pmc = memory_service.has_feature("PRIMARYCARE")
 
     p = Prescription.query.get(idPrescription)
     if p is None:
@@ -547,31 +545,14 @@ def setPrescriptionStatus(idPrescription):
         }, status.HTTP_400_BAD_REQUEST
 
     if "status" in data.keys():
-        prescription_service.check_prescription(
-            idPrescription=idPrescription, status=data.get("status", None), user=user
-        )
-        # p.status = data.get("status", None)
-        # p.update = datetime.today()
-        # if p.agg:
-        #     q = (
-        #         db.session.query(Prescription)
-        #         .filter(Prescription.admissionNumber == p.admissionNumber)
-        #         .filter(Prescription.status != p.status)
-        #         .filter(Prescription.idSegment == p.idSegment)
-        #         .filter(Prescription.concilia == None)
-        #         .filter(Prescription.agg == None)
-        #     )
-
-        #     q = get_period_filter(q, Prescription, p.date, is_pmc, is_cpoe)
-
-        #     q.update(
-        #         {"status": p.status, "update": datetime.today(), "user": user.id},
-        #         synchronize_session="fetch",
-        #     )
-        # else:
-        #     Prescription.checkPrescriptions(
-        #         p.admissionNumber, p.date, p.idSegment, user.id, is_cpoe, is_pmc
-        #     )
+        try:
+            prescription_service.check_prescription(
+                idPrescription=idPrescription,
+                p_status=data.get("status", None),
+                user=user,
+            )
+        except ValidationError as e:
+            return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
     if "notes" in data.keys():
         p.notes = data.get("notes", None)

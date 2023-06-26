@@ -2,7 +2,8 @@ from models.main import db
 
 from models.appendix import *
 from models.prescription import *
-
+from models.enums import FeatureEnum
+from services import memory_service, prescription_service
 from exception.validation_error import ValidationError
 
 
@@ -69,13 +70,25 @@ def has_unchecked_drugs(idPrescription):
     return count > 0
 
 
-def count_drugs_by_prescription(idPrescription, drug_types):
-    return (
-        db.session.query(PrescriptionDrug)
-        .filter(PrescriptionDrug.idPrescription == idPrescription)
-        .filter(PrescriptionDrug.source.in_(drug_types))
-        .count()
-    )
+def count_drugs_by_prescription(prescription: Prescription, drug_types, user: User):
+    if prescription.agg:
+        prescription_query = prescription_service.get_query_prescriptions_by_agg(
+            agg_prescription=prescription, user=user, only_id=True
+        )
+
+        return (
+            db.session.query(PrescriptionDrug)
+            .filter(PrescriptionDrug.idPrescription.in_(prescription_query))
+            .filter(PrescriptionDrug.source.in_(drug_types))
+            .count()
+        )
+    else:
+        return (
+            db.session.query(PrescriptionDrug)
+            .filter(PrescriptionDrug.idPrescription == prescription.id)
+            .filter(PrescriptionDrug.source.in_(drug_types))
+            .count()
+        )
 
 
 def update_pd_form(pd_list, user):
