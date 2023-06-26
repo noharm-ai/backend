@@ -164,9 +164,18 @@ def auth_provider(code, schema):
             status.HTTP_401_UNAUTHORIZED,
         )
 
-    params = {"grant_type": "authorization_code", "code": code}
+    params = {
+        "grant_type": "authorization_code",
+        "code": code,
+        "client_id": oauth_config.value["client_id"],
+        "client_secret": oauth_config.value["client_secret"],
+        "redirect_uri": oauth_config.value["redirect_uri"],
+        "scope": oauth_config.value["scope"],
+    }
 
     response = requests.post(url=oauth_config.value["login_url"], data=params)
+
+    # print("CONTENT////////////", response.content)
 
     if response.status_code != status.HTTP_200_OK:
         raise ValidationError(
