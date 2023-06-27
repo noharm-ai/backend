@@ -26,7 +26,7 @@ from services import (
     patient_service,
 )
 from converter import prescription_converter
-from models.enums import MemoryEnum
+from models.enums import MemoryEnum, FeatureEnum
 from exception.validation_error import ValidationError
 
 app_pres = Blueprint("app_pres", __name__)
@@ -545,14 +545,47 @@ def setPrescriptionStatus(idPrescription):
         }, status.HTTP_400_BAD_REQUEST
 
     if "status" in data.keys():
-        try:
-            prescription_service.check_prescription(
-                idPrescription=idPrescription,
-                p_status=data.get("status", None),
-                user=user,
-            )
-        except ValidationError as e:
-            return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+        if memory_service.has_feature(FeatureEnum.AUDIT.value):
+            try:
+                prescription_service.check_prescription(
+                    idPrescription=idPrescription,
+                    p_status=data.get("status", None),
+                    user=user,
+                )
+            except ValidationError as e:
+                return {
+                    "status": "error",
+                    "message": str(e),
+                    "code": e.code,
+                }, e.httpStatus
+        else:
+            # will be discontinued
+            p.status = data.get("status", None)
+            p.update = datetime.today()
+
+            is_cpoe = user.cpoe()
+            is_pmc = memory_service.has_feature(FeatureEnum.PRIMARY_CARE.value)
+
+            if p.agg:
+                q = (
+                    db.session.query(Prescription)
+                    .filter(Prescription.admissionNumber == p.admissionNumber)
+                    .filter(Prescription.status != p.status)
+                    .filter(Prescription.idSegment == p.idSegment)
+                    .filter(Prescription.concilia == None)
+                    .filter(Prescription.agg == None)
+                )
+
+                q = get_period_filter(q, Prescription, p.date, is_pmc, is_cpoe)
+
+                q.update(
+                    {"status": p.status, "update": datetime.today(), "user": user.id},
+                    synchronize_session="fetch",
+                )
+            else:
+                Prescription.checkPrescriptions(
+                    p.admissionNumber, p.date, p.idSegment, user.id, is_cpoe, is_pmc
+                )
 
     if "notes" in data.keys():
         p.notes = data.get("notes", None)

@@ -174,6 +174,4 @@ def _audit_check(prescription: Prescription, user: User, parent_agg_date=None):
 
     db.session.add(a)
 
-    # print("///////check prescription////////", a.idPrescription, a.totalItens)
-
     return a.totalItens
