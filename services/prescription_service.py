@@ -121,23 +121,28 @@ def _check_agg_internal_prescriptions(prescription, p_status, user):
     prescriptions = q_internal_prescription.all()
 
     for p in prescriptions:
-        _check_single_prescription(prescription=p, p_status=p_status, user=user)
+        _check_single_prescription(
+            prescription=p,
+            p_status=p_status,
+            user=user,
+            parent_agg_date=prescription.date,
+        )
 
 
-def _check_single_prescription(prescription, p_status, user):
+def _check_single_prescription(prescription, p_status, user, parent_agg_date=None):
     prescription.status = p_status
     prescription.update = datetime.today()
     prescription.user = user.id
 
     if memory_service.has_feature(FeatureEnum.AUDIT.value):
-        total_itens = _audit_check(prescription=prescription, user=user)
+        _audit_check(
+            prescription=prescription, user=user, parent_agg_date=parent_agg_date
+        )
 
     db.session.flush()
 
-    return total_itens
 
-
-def _audit_check(prescription: Prescription, user: User):
+def _audit_check(prescription: Prescription, user: User, parent_agg_date=None):
     a = PrescriptionAudit()
     a.auditType = (
         PrescriptionAuditTypeEnum.CHECK.value
@@ -158,6 +163,7 @@ def _audit_check(prescription: Prescription, user: User):
             DrugTypeEnum.SOLUTION.value,
         ],
         user=user,
+        parent_agg_date=parent_agg_date,
     )
 
     a.agg = prescription.agg
@@ -167,5 +173,7 @@ def _audit_check(prescription: Prescription, user: User):
     a.createdBy = user.id
 
     db.session.add(a)
+
+    # print("///////check prescription////////", a.idPrescription, a.totalItens)
 
     return a.totalItens

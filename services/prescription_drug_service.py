@@ -70,25 +70,47 @@ def has_unchecked_drugs(idPrescription):
     return count > 0
 
 
-def count_drugs_by_prescription(prescription: Prescription, drug_types, user: User):
+def count_drugs_by_prescription(
+    prescription: Prescription, drug_types, user: User, parent_agg_date=None
+):
     if prescription.agg:
         prescription_query = prescription_service.get_query_prescriptions_by_agg(
             agg_prescription=prescription, user=user, only_id=True
         )
 
-        return (
+        q = (
             db.session.query(PrescriptionDrug)
             .filter(PrescriptionDrug.idPrescription.in_(prescription_query))
             .filter(PrescriptionDrug.source.in_(drug_types))
-            .count()
         )
+
+        if user.cpoe():
+            q = q.filter(
+                or_(
+                    PrescriptionDrug.suspendedDate == None,
+                    func.date(PrescriptionDrug.suspendedDate)
+                    >= func.date(prescription.date),
+                )
+            )
+
+        return q.count()
     else:
-        return (
+        q = (
             db.session.query(PrescriptionDrug)
             .filter(PrescriptionDrug.idPrescription == prescription.id)
             .filter(PrescriptionDrug.source.in_(drug_types))
-            .count()
         )
+
+        if user.cpoe:
+            q = q.filter(
+                or_(
+                    PrescriptionDrug.suspendedDate == None,
+                    func.date(PrescriptionDrug.suspendedDate)
+                    >= func.date(parent_agg_date),
+                )
+            )
+
+        return q.count()
 
 
 def update_pd_form(pd_list, user):
