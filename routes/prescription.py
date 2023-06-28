@@ -104,6 +104,7 @@ def getPrescriptions():
             features["globalScore"] = (
                 features["prescriptionScore"]
                 + features["av"]
+                + features["am"]
                 + features["alertExams"]
                 + features["alerts"]
                 + features["diff"]
