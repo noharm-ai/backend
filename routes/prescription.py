@@ -345,7 +345,7 @@ def getPrescription(
 
     registeredAllergies = patient_service.get_patient_allergies(patient.idPatient)
     for a in registeredAllergies:
-        notesAllergies.append({"date": a[0].createdAt, "text": a[1], "source": "pep"})
+        notesAllergies.append({"date": a[0], "text": a[1], "source": "pep"})
 
     exams = Exams.findLatestByAdmission(
         patient, prescription[0].idSegment, prevEx=is_complete

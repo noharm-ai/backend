@@ -230,6 +230,7 @@ class Allergy(db.Model):
 
     idDrug = db.Column("fkmedicamento", db.Integer, primary_key=True)
     idPatient = db.Column("fkpessoa", db.Integer, primary_key=True)
+    drugName = db.Column("nome_medicamento", db.String, nullable=True)
     active = db.Column("ativo", db.Boolean, nullable=False)
     createdAt = db.Column("created_at", db.DateTime, nullable=True)
 
