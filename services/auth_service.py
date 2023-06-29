@@ -175,7 +175,7 @@ def auth_provider(code, schema):
 
     response = requests.post(url=oauth_config.value["login_url"], data=params)
 
-    # print("CONTENT////////////", response.content)
+    print("CONTENT////////////", response.content)
 
     if response.status_code != status.HTTP_200_OK:
         raise ValidationError(
