@@ -87,7 +87,7 @@ def _update_agg_status(prescription: Prescription, user: User):
 
     if agg_prescription is not None and agg_prescription.status != agg_status:
         _check_single_prescription(
-            prescription=agg_prescription, status=agg_status, user=user
+            prescription=agg_prescription, p_status=agg_status, user=user
         )
 
 
