@@ -20,3 +20,4 @@ numpy
 scikit-learn
 flask-mail
 random-password-generator
+pyjwt[crypto]

@@ -1,4 +1,5 @@
 import jwt
+import json
 import logging
 import requests
 from http.client import HTTPConnection
@@ -6,6 +7,7 @@ from flask_jwt_extended import (
     create_access_token,
     create_refresh_token,
 )
+from cryptography.hazmat.primitives import serialization
 
 from models.main import *
 from models.appendix import *
@@ -170,12 +172,9 @@ def auth_provider(code, schema):
         "client_id": oauth_config.value["client_id"],
         "client_secret": oauth_config.value["client_secret"],
         "redirect_uri": oauth_config.value["redirect_uri"],
-        "scope": oauth_config.value["scope"],
     }
 
     response = requests.post(url=oauth_config.value["login_url"], data=params)
-
-    print("CONTENT////////////", response.content)
 
     if response.status_code != status.HTTP_200_OK:
         raise ValidationError(
@@ -185,27 +184,77 @@ def auth_provider(code, schema):
         )
 
     auth_data = response.json()
-    jwt_user = jwt.decode(auth_data["id_token"], options={"verify_signature": False})
 
-    if "email" not in jwt_user or jwt_user["email"] is None:
+    if oauth_config.value["verify_signature"]:
+        keys_response = requests.get(oauth_config.value["keys_url"])
+        keys = keys_response.json()["keys"]
+
+        token_headers = jwt.get_unverified_header(auth_data["id_token"])
+        token_alg = token_headers["alg"]
+        token_kid = token_headers["kid"]
+        public_key = None
+        for key in keys:
+            if key["kid"] == token_kid:
+                public_key = key
+
+        rsa_pem_key = jwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(public_key))
+        rsa_pem_key_bytes = rsa_pem_key.public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+
+        try:
+            jwt_user = jwt.decode(
+                auth_data["id_token"],
+                key=rsa_pem_key_bytes,
+                algorithms=[token_alg],
+                audience=[oauth_config.value["client_id"]],
+            )
+        except Exception as error:
+            raise ValidationError(
+                "OAUTH provider error:" + str(error),
+                "errors.unauthorizedUser",
+                status.HTTP_401_UNAUTHORIZED,
+            )
+    else:
+        try:
+            jwt_user = jwt.decode(
+                auth_data["id_token"],
+                options={"verify_signature": False},
+            )
+        except Exception as error:
+            raise ValidationError(
+                "OAUTH provider error:" + str(error),
+                "errors.unauthorizedUser",
+                status.HTTP_401_UNAUTHORIZED,
+            )
+
+    email_attr = oauth_config.value["email_attr"]
+    name_attr = oauth_config.value["name_attr"]
+
+    if email_attr not in jwt_user or jwt_user[email_attr] is None:
         raise ValidationError(
             "OAUTH: email inválido",
             "errors.unauthorizedUser",
             status.HTTP_401_UNAUTHORIZED,
         )
 
-    nh_user = _get_oauth_user(jwt_user, schema)
+    nh_user = _get_oauth_user(
+        jwt_user[email_attr],
+        jwt_user[name_attr] if name_attr in jwt_user else "Usuário",
+        schema,
+    )
 
     return _auth_user(nh_user, db.session)
 
 
-def _get_oauth_user(user, schema):
-    db_user = User.query.filter_by(email=user["email"]).first()
+def _get_oauth_user(email, name, schema):
+    db_user = User.query.filter_by(email=email).first()
 
     if db_user is None:
         nh_user = User()
-        nh_user.name = user["name"] if "name" in user else "Usuário"
-        nh_user.email = user["email"]
+        nh_user.name = name
+        nh_user.email = email
         nh_user.password = "#"
         nh_user.schema = schema
         nh_user.config = {
