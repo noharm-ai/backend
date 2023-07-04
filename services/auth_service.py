@@ -255,23 +255,29 @@ def auth_provider(code, schema):
         jwt_user[email_attr],
         jwt_user[name_attr] if name_attr in jwt_user else "Usuário",
         schema,
+        oauth_config.value,
     )
 
     return _auth_user(nh_user, db.session)
 
 
-def _get_oauth_user(email, name, schema):
+def _get_oauth_user(email, name, schema, oauth_config):
     db_user = User.query.filter_by(email=email).first()
 
     if db_user is None:
+        if not oauth_config["create_user"]:
+            raise ValidationError(
+                "OAUTH: o usuário deve ser cadastrado previamente na NoHarm",
+                "errors.unauthorizedUser",
+                status.HTTP_401_UNAUTHORIZED,
+            )
+
         nh_user = User()
         nh_user.name = name
         nh_user.email = email
         nh_user.password = "#"
         nh_user.schema = schema
-        nh_user.config = {
-            "roles": ["staging"] if Config.ENV == NoHarmENV.STAGING.value else []
-        }
+        nh_user.config = {"roles": []}
         nh_user.active = True
 
         db.session.add(nh_user)
