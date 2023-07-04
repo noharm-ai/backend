@@ -65,6 +65,17 @@ def _auth_user(user, db_session):
             {"id": s.id, "description": s.description, "status": s.status}
         )
 
+    logout_url = None
+    if features is not None and FeatureEnum.OAUTH.value in features.value:
+        oauth_config = (
+            db_session.query(Memory)
+            .filter(Memory.kind == MemoryEnum.OAUTH_CONFIG.value)
+            .first()
+        )
+        logout_url = (
+            oauth_config.value["logout_url"] if oauth_config is not None else None
+        )
+
     return {
         "status": "success",
         "userName": user.name,
@@ -90,6 +101,7 @@ def _auth_user(user, db_session):
         "apiKey": Config.API_KEY if hasattr(Config, "API_KEY") else "",
         "segments": segmentList,
         "hospitals": hospitalList,
+        "logoutUrl": logout_url,
     }
 
 
