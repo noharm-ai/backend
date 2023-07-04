@@ -2,6 +2,7 @@ import jwt
 import json
 import logging
 import requests
+from password_generator import PasswordGenerator
 from http.client import HTTPConnection
 from flask_jwt_extended import (
     create_access_token,
@@ -275,10 +276,15 @@ def _get_oauth_user(email, name, schema, oauth_config):
         nh_user = User()
         nh_user.name = name
         nh_user.email = email
-        nh_user.password = "#"
         nh_user.schema = schema
         nh_user.config = {"roles": []}
         nh_user.active = True
+
+        pwo = PasswordGenerator()
+        pwo.minlen = 6
+        pwo.maxlen = 16
+        # do not crypt
+        nh_user.password = pwo.generate()
 
         db.session.add(nh_user)
 
