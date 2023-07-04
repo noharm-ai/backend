@@ -81,13 +81,15 @@ def get_patients(
 
 def get_patient_allergies(id_patient):
     return (
-        db.session.query(Allergy, Substance.name)
-        .distinct(Substance.name)
-        .join(Drug, Allergy.idDrug == Drug.id)
-        .join(Substance, Drug.sctid == Substance.id)
+        db.session.query(
+            Allergy.createdAt, func.coalesce(Substance.name, Allergy.drugName)
+        )
+        .distinct(func.coalesce(Substance.name, Allergy.drugName))
+        .outerjoin(Drug, Allergy.idDrug == Drug.id)
+        .outerjoin(Substance, Drug.sctid == Substance.id)
         .filter(Allergy.idPatient == id_patient)
         .filter(Allergy.active == True)
-        .order_by(Substance.name)
+        .order_by(func.coalesce(Substance.name, Allergy.drugName))
         .limit(100)
         .all()
     )
