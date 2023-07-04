@@ -14,3 +14,9 @@ class FeatureEnum(Enum):
 class NoHarmENV(Enum):
     STAGING = "staging"
     PRODUCTION = "production"
+
+
+class RoleEnum(Enum):
+    ADMIN = "admin"
+    SUPPORT = "suporte"
+    STAGING = "staging"

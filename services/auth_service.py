@@ -13,7 +13,7 @@ from cryptography.hazmat.primitives import serialization
 from models.main import *
 from models.appendix import *
 from models.prescription import *
-from models.enums import NoHarmENV, MemoryEnum, FeatureEnum
+from models.enums import NoHarmENV, MemoryEnum, FeatureEnum, RoleEnum
 from services import memory_service
 from config import Config
 from exception.validation_error import ValidationError
@@ -22,7 +22,11 @@ from exception.validation_error import ValidationError
 def _auth_user(user, db_session):
     if Config.ENV == NoHarmENV.STAGING.value:
         roles = user.config["roles"] if user.config and "roles" in user.config else []
-        if "suporte" not in roles and "admin" not in roles and "staging" not in roles:
+        if (
+            RoleEnum.SUPPORT.value not in roles
+            and RoleEnum.ADMIN.value not in roles
+            and RoleEnum.STAGING.value not in roles
+        ):
             raise ValidationError(
                 "Este é o ambiente de homologação da NoHarm. Acesse {} para utilizar a NoHarm.".format(
                     Config.APP_URL
@@ -107,9 +111,9 @@ def _auth_user(user, db_session):
 
 
 def auth_local(email, password):
-    user = User.authenticate(email, password)
+    preCheckUser = User.query.filter_by(email=email).first()
 
-    if user is None:
+    if preCheckUser is None:
         raise ValidationError(
             "Usuário inválido",
             "errors.unauthorizedUser",
@@ -119,7 +123,7 @@ def auth_local(email, password):
     # need to create a new session to set schema
     db_session = db.create_scoped_session()
     db_session.connection(
-        execution_options={"schema_translate_map": {None: user.schema}}
+        execution_options={"schema_translate_map": {None: preCheckUser.schema}}
     )
 
     features = (
@@ -129,12 +133,27 @@ def auth_local(email, password):
     )
 
     if features is not None and FeatureEnum.OAUTH.value in features.value:
+        roles = (
+            preCheckUser.config["roles"]
+            if preCheckUser.config and "roles" in preCheckUser.config
+            else []
+        )
+        if RoleEnum.SUPPORT.value not in roles:
+            raise ValidationError(
+                "Utilize o endereço {}/login/{} para fazer login na NoHarm".format(
+                    Config.APP_URL, preCheckUser.schema
+                ),
+                "{}/login/{}".format(Config.APP_URL, preCheckUser.schema),
+                status.HTTP_401_UNAUTHORIZED,
+            )
+
+    user = User.authenticate(email, password)
+
+    if user is None:
         raise ValidationError(
-            "Utilize o endereço {}/{} para fazer login na NoHarm".format(
-                Config.APP_URL, user.schema
-            ),
+            "Usuário inválido",
             "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
+            status.HTTP_400_BAD_REQUEST,
         )
 
     return _auth_user(user, db_session)
