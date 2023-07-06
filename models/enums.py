@@ -5,6 +5,7 @@ class MemoryEnum(Enum):
     PRESMED_FORM = "presmed-form"
     OAUTH_CONFIG = "oauth-config"
     FEATURES = "features"
+    ADMISSION_REPORTS = "admission-reports"
 
 
 class NoHarmENV(Enum):
@@ -28,7 +29,7 @@ class PrescriptionAuditTypeEnum(Enum):
     CHECK = 1
     UNCHECK = 2
 
-    
+
 class DrugTypeEnum(Enum):
     DRUG = "Medicamentos"
     SOLUTION = "Soluções"

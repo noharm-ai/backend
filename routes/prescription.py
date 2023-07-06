@@ -318,6 +318,7 @@ def getPrescription(
         else []
     )
     formTemplate = memory_service.get_memory(MemoryEnum.PRESMED_FORM.value)
+    admission_reports = memory_service.get_memory(MemoryEnum.ADMISSION_REPORTS.value)
 
     clinicalNotesCount = ClinicalNotes.getCountIfExists(
         prescription[0].admissionNumber, is_pmc
@@ -526,6 +527,7 @@ def getPrescription(
             "user": prescription[10],
             "insurance": prescription[11],
             "formTemplate": formTemplate.value if formTemplate else None,
+            "admissionReports": admission_reports.value if admission_reports else None,
         },
     }, status.HTTP_200_OK
 
