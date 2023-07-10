@@ -185,19 +185,6 @@ def auth_provider(code, schema):
             status.HTTP_401_UNAUTHORIZED,
         )
 
-    features = (
-        db.session.query(Memory)
-        .filter(Memory.kind == MemoryEnum.FEATURES.value)
-        .first()
-    )
-
-    if features is not None and FeatureEnum.OAUTH.value not in features.value:
-        raise ValidationError(
-            "OAUTH bloqueado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-
     params = {
         "grant_type": "authorization_code",
         "code": code,
@@ -277,6 +264,26 @@ def auth_provider(code, schema):
         schema,
         oauth_config.value,
     )
+
+    features = (
+        db.session.query(Memory)
+        .filter(Memory.kind == MemoryEnum.FEATURES.value)
+        .first()
+    )
+
+    if features is None or FeatureEnum.OAUTH.value not in features.value:
+        roles = (
+            nh_user.config["roles"]
+            if nh_user.config and "roles" in nh_user.config
+            else []
+        )
+
+        if "oauth-test" not in roles:
+            raise ValidationError(
+                "OAUTH bloqueado",
+                "errors.unauthorizedUser",
+                status.HTTP_401_UNAUTHORIZED,
+            )
 
     return _auth_user(nh_user, db.session)
 
