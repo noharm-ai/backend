@@ -2,7 +2,7 @@ from flask import request, url_for, jsonify
 from flask_api import FlaskAPI, status, exceptions
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager
-from flask_jwt_extended import (jwt_required, get_jwt_identity)
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from models.main import db, mail
 from config import Config
 from flask_cors import CORS
@@ -26,21 +26,28 @@ from routes.admin.frequency import app_admin_freq
 from routes.admin.intervention_reason import app_admin_interv
 from routes.admin.memory import app_admin_memory
 import os
+import logging
+from models.enums import NoHarmENV
 
-os.environ['TZ'] = 'America/Sao_Paulo'
+os.environ["TZ"] = "America/Sao_Paulo"
 
 app = FlaskAPI(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = Config.POTGRESQL_CONNECTION_STRING
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = { "pool_recycle" : 500, "pool_pre_ping": True, "pool_size": 20, "max_overflow": 30 }
-app.config['JWT_SECRET_KEY'] = Config.SECRET_KEY
-app.config['JWT_ACCESS_TOKEN_EXPIRES'] = Config.JWT_ACCESS_TOKEN_EXPIRES
-app.config['JWT_REFRESH_TOKEN_EXPIRES'] = Config.JWT_REFRESH_TOKEN_EXPIRES
-app.config['MAIL_SERVER'] = 'email-smtp.sa-east-1.amazonaws.com'
-app.config['MAIL_PORT'] = 465
-app.config['MAIL_USE_SSL'] = True
-app.config['MAIL_USERNAME'] = Config.MAIL_USERNAME
-app.config['MAIL_PASSWORD'] = Config.MAIL_PASSWORD
+app.config["SQLALCHEMY_DATABASE_URI"] = Config.POTGRESQL_CONNECTION_STRING
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+    "pool_recycle": 500,
+    "pool_pre_ping": True,
+    "pool_size": 20,
+    "max_overflow": 30,
+}
+app.config["JWT_SECRET_KEY"] = Config.SECRET_KEY
+app.config["JWT_ACCESS_TOKEN_EXPIRES"] = Config.JWT_ACCESS_TOKEN_EXPIRES
+app.config["JWT_REFRESH_TOKEN_EXPIRES"] = Config.JWT_REFRESH_TOKEN_EXPIRES
+app.config["MAIL_SERVER"] = "email-smtp.sa-east-1.amazonaws.com"
+app.config["MAIL_PORT"] = 465
+app.config["MAIL_USE_SSL"] = True
+app.config["MAIL_USERNAME"] = Config.MAIL_USERNAME
+app.config["MAIL_PASSWORD"] = Config.MAIL_PASSWORD
 
 jwt = JWTManager(app)
 db.init_app(app)
@@ -70,32 +77,30 @@ app.register_blueprint(app_admin_memory)
 
 CORS(app)
 
-@app.route("/version", methods=['GET'])
+if Config.ENV == NoHarmENV.STAGING.value:
+    logging.basicConfig()
+    logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)
+
+
+@app.route("/version", methods=["GET"])
 def getVersion():
-    return {
-        'status': 'success',
-        'data': 'v1.76-beta'
-    }, status.HTTP_200_OK
+    return {"status": "success", "data": "v1.82-beta"}, status.HTTP_200_OK
+
 
 if __name__ == "__main__":
-    app.run(debug=True, host='0.0.0.0')
+    app.run(debug=True, host="0.0.0.0")
+
 
 @app.after_request
 def add_security_headers(response):
     headers = {
-        'strict-transport-security': [
-            'max-age=63072000',
-            'includeSubDomains'
-        ],
-        'content-security-policy': [
-            'default-src \'none\'',
-            'frame-ancestors \'none\''
-        ],
-        'x-frame-options': ['SAMEORIGIN'],
-        'x-xss-protection': [ '1', 'mode=block' ],
-        'x-content-type-options': ['nosniff'],
-        'referrer-policy': ['same-origin'],
+        "strict-transport-security": ["max-age=63072000", "includeSubDomains"],
+        "content-security-policy": ["default-src 'none'", "frame-ancestors 'none'"],
+        "x-frame-options": ["SAMEORIGIN"],
+        "x-xss-protection": ["1", "mode=block"],
+        "x-content-type-options": ["nosniff"],
+        "referrer-policy": ["same-origin"],
     }
-    for (key, content) in headers.items():
-        response.headers[key] = ';'.join(content)
+    for key, content in headers.items():
+        response.headers[key] = ";".join(content)
     return response
