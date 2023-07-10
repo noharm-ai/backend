@@ -5,13 +5,14 @@ from models.appendix import *
 from models.prescription import *
 from flask_jwt_extended import (
     create_access_token,
-    create_refresh_token,
     jwt_required,
     get_jwt_identity,
     get_jwt,
 )
-from config import Config
-from models.enums import NoHarmENV
+
+from models.enums import MemoryEnum
+from services import auth_service, memory_service
+from exception.validation_error import ValidationError
 
 app_auth = Blueprint("app_auth", __name__)
 
@@ -23,98 +24,48 @@ def auth():
     email = data.get("email", None)
     password = data.get("password", None)
 
-    user = User.authenticate(email, password)
+    try:
+        auth_data = auth_service.auth_local(email, password)
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
-    if user is None:
+    return auth_data, status.HTTP_200_OK
+
+
+@app_auth.route("/auth-provider", methods=["POST"])
+def auth_provider():
+    data = request.get_json()
+
+    if "schema" not in data or "code" not in data:
         return {
             "status": "error",
-            "message": "Usuário inválido",
-        }, status.HTTP_401_UNAUTHORIZED
-    else:
-        if Config.ENV == NoHarmENV.STAGING.value:
-            roles = (
-                user.config["roles"] if user.config and "roles" in user.config else []
-            )
-            if (
-                "suporte" not in roles
-                and "admin" not in roles
-                and "staging" not in roles
-            ):
-                return {
-                    "status": "error",
-                    "message": "Este é o ambiente de homologação da NoHarm. Acesse {} para utilizar a NoHarm.".format(
-                        Config.APP_URL
-                    ),
-                }, status.HTTP_401_UNAUTHORIZED
+            "message": "Parâmetro inválido",
+        }, status.HTTP_400_BAD_REQUEST
 
-        claims = {"schema": user.schema, "config": user.config}
-        access_token = create_access_token(identity=user.id, additional_claims=claims)
-        refresh_token = create_refresh_token(identity=user.id, additional_claims=claims)
+    try:
+        auth_data = auth_service.auth_provider(code=data["code"], schema=data["schema"])
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
-        notification = Notify.getNotification(schema=user.schema)
+    return tryCommit(db, auth_data)
 
-        db_session = db.create_scoped_session()
-        db_session.connection(
-            execution_options={"schema_translate_map": {None: user.schema}}
-        )
 
-        if notification is not None:
-            notificationMemory = (
-                db_session.query(Memory)
-                .filter(
-                    Memory.kind
-                    == "info-alert-" + str(notification["id"]) + "-" + str(user.id)
-                )
-                .first()
-            )
+@app_auth.route("/auth-provider/<schema>", methods=["GET"])
+def get_auth_provider(schema):
+    dbSession.setSchema(schema)
 
-            if notificationMemory is not None:
-                notification = None
+    oauth_config = memory_service.get_memory(MemoryEnum.OAUTH_CONFIG.value)
 
-        features = db_session.query(Memory).filter(Memory.kind == "features").first()
+    if oauth_config is None:
+        return {"status": "error"}, status.HTTP_404_NOT_FOUND
 
-        nameUrl = Memory.getNameUrl(user.schema)
-
-        hospitals = db_session.query(Hospital).order_by(asc(Hospital.name)).all()
-        hospitalList = []
-        for h in hospitals:
-            hospitalList.append({"id": h.id, "name": h.name})
-
-        segments = db_session.query(Segment).order_by(asc(Segment.description)).all()
-        segmentList = []
-        for s in segments:
-            segmentList.append(
-                {"id": s.id, "description": s.description, "status": s.status}
-            )
-
-        return {
-            "status": "success",
-            "userName": user.name,
-            "userId": user.id,
-            "email": user.email,
-            "schema": user.schema,
-            "roles": user.config["roles"]
-            if user.config and "roles" in user.config
-            else [],
-            "userFeatures": user.config["features"]
-            if user.config and "features" in user.config
-            else [],
-            "features": features.value if features is not None else [],
-            "nameUrl": nameUrl["value"]
-            if user.permission()
-            else "http://localhost/{idPatient}",
-            "multipleNameUrl": nameUrl["multiple"]
-            if "multiple" in nameUrl and user.permission()
-            else None,
-            "nameHeaders": nameUrl["headers"] if "headers" in nameUrl else {},
-            "proxy": True if "to" in nameUrl else False,
-            "notify": notification,
-            "access_token": access_token,
-            "refresh_token": refresh_token,
-            "apiKey": Config.API_KEY if hasattr(Config, "API_KEY") else "",
-            "segments": segmentList,
-            "hospitals": hospitalList,
-        }, status.HTTP_200_OK
+    return {
+        "status": "success",
+        "data": {
+            "url": oauth_config.value["auth_url"],
+            "company": oauth_config.value["company"],
+        },
+    }, status.HTTP_200_OK
 
 
 @app_auth.route("/refresh-token", methods=["POST"])

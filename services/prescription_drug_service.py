@@ -101,7 +101,7 @@ def count_drugs_by_prescription(
             .filter(PrescriptionDrug.source.in_(drug_types))
         )
 
-        if user.cpoe:
+        if user.cpoe():
             q = q.filter(
                 or_(
                     PrescriptionDrug.suspendedDate == None,

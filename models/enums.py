@@ -3,6 +3,9 @@ from enum import Enum
 
 class MemoryEnum(Enum):
     PRESMED_FORM = "presmed-form"
+    OAUTH_CONFIG = "oauth-config"
+    FEATURES = "features"
+    ADMISSION_REPORTS = "admission-reports"
 
 
 class NoHarmENV(Enum):
@@ -11,12 +14,15 @@ class NoHarmENV(Enum):
 
 
 class RoleEnum(Enum):
+    ADMIN = "admin"
     SUPPORT = "suporte"
+    STAGING = "staging"
 
 
 class FeatureEnum(Enum):
     AUDIT = "AUDIT"
     PRIMARY_CARE = "PRIMARYCARE"
+    OAUTH = "OAUTH"
 
 
 class PrescriptionAuditTypeEnum(Enum):

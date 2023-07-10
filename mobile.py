@@ -77,14 +77,14 @@ app.register_blueprint(app_admin_memory)
 
 CORS(app)
 
-if Config.ENV == NoHarmENV.STAGING:
+if Config.ENV == NoHarmENV.STAGING.value:
     logging.basicConfig()
     logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)
 
 
 @app.route("/version", methods=["GET"])
 def getVersion():
-    return {"status": "success", "data": "v1.81-beta"}, status.HTTP_200_OK
+    return {"status": "success", "data": "v1.82-beta"}, status.HTTP_200_OK
 
 
 if __name__ == "__main__":
