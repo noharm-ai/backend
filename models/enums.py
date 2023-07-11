@@ -6,6 +6,8 @@ class MemoryEnum(Enum):
     OAUTH_CONFIG = "oauth-config"
     FEATURES = "features"
     ADMISSION_REPORTS = "admission-reports"
+    REPORTS = "reports"
+    GETNAME = "getnameurl"
 
 
 class NoHarmENV(Enum):
