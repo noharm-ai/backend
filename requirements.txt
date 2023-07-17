@@ -21,4 +21,4 @@ scikit-learn
 flask-mail
 random-password-generator
 pyjwt[crypto]
-cryptography==41.0.2 
+cryptography==3.4.8

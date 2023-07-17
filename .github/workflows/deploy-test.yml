@@ -23,7 +23,6 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install --platform manylinux2014_x86_64 --target=${{ secrets.AWS_TEST_FOLDER }} --implementation cp --python-version 3.8 --only-binary=:all: --upgrade cryptography==41.0.2
       - name: Setup PostgreSQL
         run: |
           git clone https://github.com/noharm-ai/database
@@ -56,5 +55,4 @@ jobs:
           source venv/bin/activate
           python -m pip install --upgrade pip
           pip install -r requirements-prod.txt
-          pip install --platform manylinux2014_x86_64 --target=${{ secrets.AWS_TEST_FOLDER }} --implementation cp --python-version 3.8 --only-binary=:all: --upgrade cryptography==41.0.2
           zappa update test -q
