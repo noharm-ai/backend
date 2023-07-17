@@ -22,7 +22,7 @@ jobs:
       - name: Setup Python
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install --platform manylinux2014_x86_64 --target=${{ secrets.AWS_TEST_FOLDER }} --implementation cp --python-version 3.8 --only-binary=:all: -r requirements.txt
       - name: Setup PostgreSQL
         run: |
           git clone https://github.com/noharm-ai/database
@@ -54,5 +54,5 @@ jobs:
           python -m venv venv
           source venv/bin/activate
           python -m pip install --upgrade pip
-          pip install -r requirements-prod.txt
+          pip install --platform manylinux2014_x86_64 --target=${{ secrets.AWS_TEST_FOLDER }} --implementation cp --python-version 3.8 --only-binary=:all: -r requirements-prod.txt
           zappa update test -q
