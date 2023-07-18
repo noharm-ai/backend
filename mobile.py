@@ -84,7 +84,7 @@ if Config.ENV == NoHarmENV.STAGING.value:
 
 @app.route("/version", methods=["GET"])
 def getVersion():
-    return {"status": "success", "data": "v1.83-beta"}, status.HTTP_200_OK
+    return {"status": "success", "data": "v1.84-beta"}, status.HTTP_200_OK
 
 
 if __name__ == "__main__":
