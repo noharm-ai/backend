@@ -1,7 +1,6 @@
 import jwt
 import json
 import logging
-import requests
 from password_generator import PasswordGenerator
 from http.client import HTTPConnection
 from flask_jwt_extended import (
@@ -185,30 +184,38 @@ def auth_provider(code, schema):
             status.HTTP_401_UNAUTHORIZED,
         )
 
-    params = {
-        "grant_type": "authorization_code",
-        "code": code,
-        "client_id": oauth_config.value["client_id"],
-        "client_secret": oauth_config.value["client_secret"],
-        "redirect_uri": oauth_config.value["redirect_uri"],
-    }
+    # authorization_code flow
+    # params = {
+    #     "grant_type": "authorization_code",
+    #     "code": code,
+    #     "client_id": oauth_config.value["client_id"],
+    #     "client_secret": oauth_config.value["client_secret"],
+    #     "redirect_uri": oauth_config.value["redirect_uri"],
+    # }
 
-    response = requests.post(url=oauth_config.value["login_url"], data=params)
+    # response = requests.post(url=oauth_config.value["login_url"], data=params)
 
-    if response.status_code != status.HTTP_200_OK:
-        raise ValidationError(
-            "OAUTH provider error",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
+    # if response.status_code != status.HTTP_200_OK:
+    #     raise ValidationError(
+    #         "OAUTH provider error",
+    #         "errors.unauthorizedUser",
+    #         status.HTTP_401_UNAUTHORIZED,
+    #     )
 
-    auth_data = response.json()
+    # auth_data = response.json()
 
     if oauth_config.value["verify_signature"]:
-        keys_response = requests.get(oauth_config.value["keys_url"])
-        keys = keys_response.json()["keys"]
+        oauth_keys = memory_service.get_memory(MemoryEnum.OAUTH_KEYS.value)
 
-        token_headers = jwt.get_unverified_header(auth_data["id_token"])
+        if oauth_keys is None:
+            raise ValidationError(
+                "OAUTH KEYS não configurado",
+                "errors.unauthorizedUser",
+                status.HTTP_401_UNAUTHORIZED,
+            )
+        keys = oauth_keys.value["keys"]
+
+        token_headers = jwt.get_unverified_header(code)
         token_alg = token_headers["alg"]
         token_kid = token_headers["kid"]
         public_key = None
@@ -224,7 +231,7 @@ def auth_provider(code, schema):
 
         try:
             jwt_user = jwt.decode(
-                auth_data["id_token"],
+                code,
                 key=rsa_pem_key_bytes,
                 algorithms=[token_alg],
                 audience=[oauth_config.value["client_id"]],
@@ -238,7 +245,7 @@ def auth_provider(code, schema):
     else:
         try:
             jwt_user = jwt.decode(
-                auth_data["id_token"],
+                code,
                 options={"verify_signature": False},
             )
         except Exception as error:
