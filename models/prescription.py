@@ -281,7 +281,14 @@ class Prescription(db.Model):
                     .join(m2, m2.id == pd2.idDrug)
                     .join(
                         Relation,
-                        and_(Relation.sctida == m1.sctid, Relation.sctidb == m2.sctid),
+                        or_(
+                            and_(
+                                Relation.sctida == m1.sctid, Relation.sctidb == m2.sctid
+                            ),
+                            and_(
+                                Relation.sctidb == m1.sctid, Relation.sctida == m2.sctid
+                            ),
+                        ),
                     )
                     .filter(p1.admissionNumber == admissionNumber)
                     .filter(func.date(p2.expire) == func.date(p1.expire))
