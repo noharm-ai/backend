@@ -400,6 +400,7 @@ class DrugList:
                     if pd[0].notes and len(pd[0].notes.strip()) > 0
                     else None,
                     "period": period,
+                    "periodFixed": pd[0].period,
                     "periodDates": [],
                     "route": pd[0].route,
                     "grp_solution": pd[0].cpoe_group
