@@ -20,7 +20,7 @@ app_user_crud = Blueprint("app_user_crud", __name__)
 @jwt_required()
 def createUser(idUser=None):
     data = request.get_json()
-    user = User.query.get(get_jwt_identity())
+    user = User.find(get_jwt_identity())
 
     if not user:
         return {
@@ -78,16 +78,17 @@ def createUser(idUser=None):
 
             newUser.config = {"roles": newUserRoles}
 
+        if memory_service.has_feature(FeatureEnum.OAUTH.value):
+            template = "new_user_oauth.html"
+        else:
+            template = "new_user.html"
+
         db.session.add(newUser)
         db.session.flush()
+
         response, rstatus = tryCommit(db, newUser.id)
 
         if rstatus == status.HTTP_200_OK:
-            if memory_service.has_feature(FeatureEnum.OAUTH.value):
-                template = "new_user_oauth.html"
-            else:
-                template = "new_user.html"
-
             sendEmail(
                 "Boas-vindas NoHarm: Credenciais",
                 Config.MAIL_SENDER,
