@@ -13,6 +13,7 @@ from .utils import freqValue, tryCommit, typeRelations, sortSubstance, strNone
 from datetime import datetime
 from math import ceil
 
+from models.enums import RoleEnum
 from services.drug_service import (
     getPreviouslyPrescribedUnits,
     getPreviouslyPrescribedFrequencies,
@@ -381,7 +382,7 @@ def setDrugUnit(idSegment, idDrug):
     dbSession.setSchema(user.schema)
 
     roles = user.config["roles"] if user.config and "roles" in user.config else []
-    if "admin" not in roles:
+    if RoleEnum.ADMIN.value not in roles and RoleEnum.TRAINING.value not in roles:
         return {
             "status": "error",
             "message": "Usuário não autorizado",
