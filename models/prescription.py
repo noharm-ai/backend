@@ -281,7 +281,14 @@ class Prescription(db.Model):
                     .join(m2, m2.id == pd2.idDrug)
                     .join(
                         Relation,
-                        and_(Relation.sctida == m1.sctid, Relation.sctidb == m2.sctid),
+                        or_(
+                            and_(
+                                Relation.sctida == m1.sctid, Relation.sctidb == m2.sctid
+                            ),
+                            and_(
+                                Relation.sctidb == m1.sctid, Relation.sctida == m2.sctid
+                            ),
+                        ),
                     )
                     .filter(p1.admissionNumber == admissionNumber)
                     .filter(func.date(p2.expire) == func.date(p1.expire))
@@ -352,7 +359,14 @@ class Prescription(db.Model):
                 .filter(Prescription.idSegment != None)
             )
 
-        relations = interaction.union(xreactivity).all()
+        if is_cpoe:
+            relations = interaction.union(xreactivity).all()
+        else:
+            relations = (
+                interaction.union(xreactivity)
+                .order_by(desc(Relation.kind), desc(pd1.id))
+                .all()
+            )
 
         results = {}
         pairs = []
@@ -365,6 +379,7 @@ class Prescription(db.Model):
                     + "-"
                     + str(r[1].sctidb)
                     + str(r[4].day if r[4] else 0)
+                    + str(r[1].kind)
                 )
 
             if key in pairs:
@@ -854,7 +869,7 @@ class PrescriptionDrug(db.Model):
         else:
             return q.order_by(
                 asc(Prescription.expire),
-                desc(
+                asc(
                     func.concat(
                         PrescriptionDrug.idPrescription, PrescriptionDrug.solutionGroup
                     )
