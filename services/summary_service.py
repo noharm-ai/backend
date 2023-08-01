@@ -1,3 +1,4 @@
+import json
 from flask_api import status
 
 from models.main import db
@@ -33,13 +34,35 @@ def get_structured_info(admission_number, user):
 
     exams = _get_exams(patient.idPatient, user.schema)
 
-    summary_config = memory_service.get_memory(MemoryEnum.SUMMARY_CONFIG.value)
+    summary_config = _get_summary_config()
 
     return {
         "exams": exams,
         "allergies": None,
         "drugs": None,
-        "summaryConfig": summary_config.value,
+        "summaryConfig": summary_config,
+    }
+
+
+def _get_summary_config():
+    summary_config = memory_service.get_memory(MemoryEnum.SUMMARY_CONFIG.value)
+    # temporary source
+    reason = memory_service.get_memory("summary_text1")
+    previous_drugs = memory_service.get_memory("summary_text2")
+
+    reason_payload = json.dumps(summary_config.value["reason"]).replace(
+        ":replace_text", reason.value["text"]
+    )
+
+    previous_drugs_payload = json.dumps(summary_config.value["previousDrugs"]).replace(
+        ":replace_text", previous_drugs.value["text"]
+    )
+
+    return {
+        "url": summary_config.value["url"],
+        "apikey": summary_config.value["apikey"],
+        "reason": json.loads(reason_payload),
+        "previousDrugs": json.loads(previous_drugs_payload),
     }
 
 
