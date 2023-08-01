@@ -3,7 +3,8 @@ from flask_api import status
 from models.main import db
 from models.appendix import *
 from models.prescription import *
-from models.enums import RoleEnum
+from models.enums import RoleEnum, MemoryEnum
+from services import memory_service
 from exception.validation_error import ValidationError
 
 
@@ -32,7 +33,14 @@ def get_structured_info(admission_number, user):
 
     exams = _get_exams(patient.idPatient, user.schema)
 
-    return {"exams": exams, "allergies": None, "drugs": None}
+    summary_config = memory_service.get_memory(MemoryEnum.SUMMARY_CONFIG.value)
+
+    return {
+        "exams": exams,
+        "allergies": None,
+        "drugs": None,
+        "summaryConfig": summary_config.value,
+    }
 
 
 def _get_exams(id_patient, schema):
