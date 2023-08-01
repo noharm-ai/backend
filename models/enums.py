@@ -4,8 +4,11 @@ from enum import Enum
 class MemoryEnum(Enum):
     PRESMED_FORM = "presmed-form"
     OAUTH_CONFIG = "oauth-config"
+    OAUTH_KEYS = "oauth-keys"
     FEATURES = "features"
     ADMISSION_REPORTS = "admission-reports"
+    REPORTS = "reports"
+    GETNAME = "getnameurl"
 
 
 class NoHarmENV(Enum):
@@ -17,6 +20,7 @@ class RoleEnum(Enum):
     ADMIN = "admin"
     SUPPORT = "suporte"
     STAGING = "staging"
+    TRAINING = "training"
 
 
 class FeatureEnum(Enum):
