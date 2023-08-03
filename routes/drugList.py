@@ -491,8 +491,9 @@ class DrugList:
                     result[key]["vol"] = pdDose = pd[6].amount
 
                 result[key]["speed"] = pd[0].solutionDose
-                result[key]["totalVol"] += pdDose if pdDose else 0
-                result[key]["totalVol"] = round(result[key]["totalVol"], 3)
+                if not bool(pd[0].suspendedDate):
+                    result[key]["totalVol"] += pdDose if pdDose else 0
+                    result[key]["totalVol"] = round(result[key]["totalVol"], 3)
 
         return result
 
