@@ -49,6 +49,7 @@ def _get_summary_config():
     # temporary source
     reason = memory_service.get_memory("summary_text1")
     previous_drugs = memory_service.get_memory("summary_text2")
+    diagnosis = memory_service.get_memory("summary_text_diagnosis")
 
     reason_payload = json.dumps(summary_config.value["reason"]).replace(
         ":replace_text", reason.value["text"]
@@ -58,11 +59,16 @@ def _get_summary_config():
         ":replace_text", previous_drugs.value["text"]
     )
 
+    diagnosis_payload = json.dumps(summary_config.value["diagnosis"]).replace(
+        ":replace_text", diagnosis.value["text"]
+    )
+
     return {
         "url": summary_config.value["url"],
         "apikey": summary_config.value["apikey"],
         "reason": json.loads(reason_payload),
         "previousDrugs": json.loads(previous_drugs_payload),
+        "diagnosis": json.loads(diagnosis_payload),
     }
 
 
