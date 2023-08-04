@@ -32,15 +32,33 @@ def get_structured_info(admission_number, user):
             status.HTTP_400_BAD_REQUEST,
         )
 
-    exams = _get_exams(patient.idPatient, user.schema)
-
-    summary_config = _get_summary_config()
-
     return {
-        "exams": exams,
+        "patient": _get_patient_data(patient),
+        "exams": _get_exams(patient.idPatient, user.schema),
         "allergies": None,
         "drugs": None,
-        "summaryConfig": summary_config,
+        "summaryConfig": _get_summary_config(),
+    }
+
+
+def _get_patient_data(patient: Patient):
+    return {
+        "idPatient": patient.idPatient,
+        "admissionNumber": patient.admissionNumber,
+        "admissionDate": patient.admissionDate.isoformat()
+        if patient.admissionDate
+        else None,
+        "dischargeDate": patient.dischargeDate.isoformat()
+        if patient.dischargeDate
+        else None,
+        "birthdate": patient.birthdate.isoformat() if patient.birthdate else None,
+        "gender": patient.gender,
+        "weight": patient.weight,
+        "height": patient.height,
+        "imc": round((patient.weight / pow(patient.height / 100, 2)), 2)
+        if patient.weight is not None and patient.height is not None
+        else None,
+        "color": patient.skinColor,
     }
 
 
@@ -50,6 +68,8 @@ def _get_summary_config():
     reason = memory_service.get_memory("summary_text1")
     previous_drugs = memory_service.get_memory("summary_text2")
     diagnosis = memory_service.get_memory("summary_text_diagnosis")
+    discharge_condition = memory_service.get_memory("summary_text_dischargeCondition")
+    procedures = memory_service.get_memory("summary_text_procedures")
 
     reason_payload = json.dumps(summary_config.value["reason"]).replace(
         ":replace_text", reason.value["text"]
@@ -63,12 +83,22 @@ def _get_summary_config():
         ":replace_text", diagnosis.value["text"]
     )
 
+    discharge_condition_payload = json.dumps(
+        summary_config.value["dischargeCondition"]
+    ).replace(":replace_text", discharge_condition.value["text"])
+
+    procedures_payload = json.dumps(summary_config.value["procedures"]).replace(
+        ":replace_text", procedures.value["text"]
+    )
+
     return {
         "url": summary_config.value["url"],
         "apikey": summary_config.value["apikey"],
         "reason": json.loads(reason_payload),
         "previousDrugs": json.loads(previous_drugs_payload),
         "diagnosis": json.loads(diagnosis_payload),
+        "dischargeCondition": json.loads(discharge_condition_payload),
+        "procedures": json.loads(procedures_payload),
     }
 
 
