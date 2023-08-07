@@ -5,7 +5,7 @@ from models.main import db
 from models.appendix import *
 from models.prescription import *
 from models.enums import RoleEnum, MemoryEnum
-from services import memory_service
+from services import memory_service, prescription_agg_service
 from exception.validation_error import ValidationError
 
 
@@ -36,7 +36,13 @@ def get_structured_info(admission_number, user):
         "patient": _get_patient_data(patient),
         "exams": _get_exams(patient.idPatient, user.schema),
         "allergies": None,
-        "drugs": None,
+        "drugsUsed": _get_all_drugs_used(
+            admission_number=admission_number, schema=user.schema
+        ),
+        "drugsSuspended": _get_all_drugs_suspended(
+            admission_number=admission_number, schema=user.schema
+        ),
+        "receipt": _get_receipt(admission_number=admission_number, schema=user.schema),
         "summaryConfig": _get_summary_config(),
     }
 
@@ -143,3 +149,110 @@ def _get_exams(id_patient, schema):
         )
 
     return exams_list
+
+
+def _get_all_drugs_used(admission_number, schema):
+    query = f"""
+    select 
+        distinct(coalesce(s.nome, m.nome)) as nome
+    from
+        {schema}.presmed pm
+        inner join {schema}.prescricao p on (pm.fkprescricao = p.fkprescricao)
+        inner join {schema}.medicamento m on (pm.fkmedicamento = m.fkmedicamento)
+        left join public.substancia s on (m.sctid = s.sctid)
+    where 
+        p.nratendimento = :admission_number
+        and origem <> 'Dietas'
+    order by
+        nome
+    """
+
+    result = db.session.execute(query, {"admission_number": admission_number})
+
+    list = []
+    for i in result:
+        list.append(
+            {
+                "name": i[0],
+            }
+        )
+
+    return list
+
+
+def _get_all_drugs_suspended(admission_number, schema):
+    query = f"""
+    select 
+        distinct(coalesce(s.nome, m.nome)) as nome
+    from
+        {schema}.presmed pm
+        inner join {schema}.prescricao p on (pm.fkprescricao = p.fkprescricao)
+        inner join {schema}.medicamento m on (pm.fkmedicamento = m.fkmedicamento)
+        left join public.substancia s on (m.sctid = s.sctid)
+    where 
+        p.nratendimento = :admission_number
+        and pm.origem <> 'Dietas'
+        and pm.dtsuspensao is not null 
+        and (
+            select count(*)
+            from {schema}.presmed pm2
+                inner join {schema}.prescricao p2 on (pm2.fkprescricao = p2.fkprescricao)
+            where 
+                p2.nratendimento = p.nratendimento 
+                and pm2.fkprescricao > pm.fkprescricao
+                and pm2.fkmedicamento = pm.fkmedicamento
+                and pm2.dtsuspensao is null 
+        ) = 0
+    order by
+        nome
+    """
+
+    result = db.session.execute(query, {"admission_number": admission_number})
+
+    list = []
+    for i in result:
+        list.append(
+            {
+                "name": i[0],
+            }
+        )
+
+    return list
+
+
+def _get_receipt(admission_number, schema):
+    last_agg = prescription_agg_service.get_last_agg_prescription(admission_number)
+
+    if last_agg == None:
+        return []
+
+    query = f"""
+    select distinct on (nome_sub) * from (
+        select 
+            coalesce(s.nome, m.nome) as nome_sub, p.dtprescricao, pm.fkfrequencia  , pm.doseconv, ma.fkunidademedida  
+        from
+            {schema}.presmed pm
+            inner join {schema}.prescricao p on (pm.fkprescricao = p.fkprescricao)
+            inner join {schema}.medicamento m on (pm.fkmedicamento = m.fkmedicamento)
+            left join {schema}.medatributos ma on (pm.fkmedicamento = ma.fkmedicamento and ma.idsegmento = p.idsegmento)
+            left join public.substancia s on (m.sctid = s.sctid)
+        where 
+            p.nratendimento = :admission_number
+            and pm.origem <> 'Dietas'
+            and date(:date) between p.dtprescricao::date and coalesce(p.dtvigencia, date(:date)) 
+        order by
+            nome_sub, p.dtprescricao desc
+    ) receita
+    """
+
+    result = db.session.execute(
+        query, {"admission_number": admission_number, "date": last_agg.date}
+    )
+
+    list = []
+    for i in result:
+        list.append(
+            {"name": i[0], "frequency": i[2], "dose": i[3], "measureUnit": i[4]}
+        )
+
+    return list
