@@ -227,21 +227,21 @@ def _get_receipt(admission_number, schema):
         return []
 
     query = f"""
-    select distinct on (nome_sub) * from (
+    select distinct on (nome_med, frequencia, dose, fkunidademedida, via) * from (
         select 
-            coalesce(s.nome, m.nome) as nome_sub, p.dtprescricao, pm.fkfrequencia  , pm.doseconv, ma.fkunidademedida  
+            m.nome as nome_med, p.dtprescricao, f.nome as frequencia , pm.dose, pm.fkunidademedida, pm.via
         from
             {schema}.presmed pm
             inner join {schema}.prescricao p on (pm.fkprescricao = p.fkprescricao)
             inner join {schema}.medicamento m on (pm.fkmedicamento = m.fkmedicamento)
-            left join {schema}.medatributos ma on (pm.fkmedicamento = ma.fkmedicamento and ma.idsegmento = p.idsegmento)
-            left join public.substancia s on (m.sctid = s.sctid)
+            left join {schema}.frequencia f on (pm.fkfrequencia = f.fkfrequencia)
         where 
             p.nratendimento = :admission_number
             and pm.origem <> 'Dietas'
-            and date(:date) between p.dtprescricao::date and coalesce(p.dtvigencia, date(:date)) 
+            and date(:date) between p.dtprescricao::date and p.dtvigencia 
+            and pm.dtsuspensao is null
         order by
-            nome_sub, p.dtprescricao desc
+            nome_med, p.dtprescricao desc
     ) receita
     """
 
@@ -252,7 +252,13 @@ def _get_receipt(admission_number, schema):
     list = []
     for i in result:
         list.append(
-            {"name": i[0], "frequency": i[2], "dose": i[3], "measureUnit": i[4]}
+            {
+                "name": i[0],
+                "frequency": i[2],
+                "dose": i[3],
+                "measureUnit": i[4],
+                "route": i[5],
+            }
         )
 
     return list
