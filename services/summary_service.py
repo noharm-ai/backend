@@ -113,19 +113,16 @@ def _get_exams(id_patient, schema):
         s.referencia,
         e.unidade,
         s.min,
-        s.max,
-        case
-            when resultado < s.min then 'ABAIXO'
-            when resultado > s.mAX then 'ACIMA'
-            else 'DENTRO'
-        end as referencia
+        s.max
     from
         {schema}.pessoa pe
     inner join {schema}.exame e on
         pe.fkpessoa = e.fkpessoa
     inner join {schema}.segmentoexame s on
         s.tpexame = lower(e.tpexame)
-    where e.fkpessoa = :id_patient
+    where 
+        e.fkpessoa = :id_patient
+        and (resultado < s.min or resultado > s.max)
     order by
         fkpessoa,
         abrev,
@@ -136,6 +133,13 @@ def _get_exams(id_patient, schema):
 
     exams_list = []
     for e in exams:
-        exams_list.append({"result": e[2]})
+        exams_list.append(
+            {
+                "name": e[1],
+                "date": e[3].isoformat() if e[3] else None,
+                "result": e[2],
+                "measureUnit": e[5],
+            }
+        )
 
     return exams_list
