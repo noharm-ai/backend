@@ -75,7 +75,9 @@ def _get_summary_config():
     previous_drugs = memory_service.get_memory("summary_text2")
     diagnosis = memory_service.get_memory("summary_text_diagnosis")
     discharge_condition = memory_service.get_memory("summary_text_dischargeCondition")
+    discharge_plan = memory_service.get_memory("summary_text_dischargePlan")
     procedures = memory_service.get_memory("summary_text_procedures")
+    exams = memory_service.get_memory("summary_text_exams")
 
     reason_payload = json.dumps(summary_config.value["reason"]).replace(
         ":replace_text", reason.value["text"]
@@ -93,8 +95,16 @@ def _get_summary_config():
         summary_config.value["dischargeCondition"]
     ).replace(":replace_text", discharge_condition.value["text"])
 
+    discharge_plan_payload = json.dumps(summary_config.value["dischargePlan"]).replace(
+        ":replace_text", discharge_plan.value["text"]
+    )
+
     procedures_payload = json.dumps(summary_config.value["procedures"]).replace(
         ":replace_text", procedures.value["text"]
+    )
+
+    exams_payload = json.dumps(summary_config.value["exams"]).replace(
+        ":replace_text", exams.value["text"]
     )
 
     return {
@@ -104,7 +114,9 @@ def _get_summary_config():
         "previousDrugs": json.loads(previous_drugs_payload),
         "diagnosis": json.loads(diagnosis_payload),
         "dischargeCondition": json.loads(discharge_condition_payload),
+        "dischargePlan": json.loads(discharge_plan_payload),
         "procedures": json.loads(procedures_payload),
+        "exams": json.loads(exams_payload),
     }
 
 
