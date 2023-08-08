@@ -95,8 +95,6 @@ def _get_summary_config():
         summary_config.value["dischargeCondition"]
     ).replace(":replace_text", discharge_condition.value["text"])
 
-    print("OISCHARGEPLAN", summary_config.value["dischargePlan"])
-
     discharge_plan_payload = json.dumps(summary_config.value["dischargePlan"]).replace(
         ":replace_text", discharge_plan.value["text"]
     )
