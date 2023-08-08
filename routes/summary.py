@@ -1,5 +1,5 @@
 import os
-from flask import Blueprint
+from flask import Blueprint, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from models.main import *
@@ -15,10 +15,11 @@ def get_structured_info(admission_number):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
     os.environ["TZ"] = "America/Sao_Paulo"
+    mock = request.args.get("mock", False)
 
     try:
         result = summary_service.get_structured_info(
-            admission_number=admission_number, user=user
+            admission_number=admission_number, user=user, mock=mock
         )
     except ValidationError as e:
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
