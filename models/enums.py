@@ -22,6 +22,7 @@ class RoleEnum(Enum):
     SUPPORT = "suporte"
     STAGING = "staging"
     TRAINING = "training"
+    DOCTOR = "doctor"
 
 
 class FeatureEnum(Enum):

@@ -46,7 +46,7 @@ class User(db.Model):
 
     def permission(self):
         roles = self.config["roles"] if self.config and "roles" in self.config else []
-        return "suporte" not in roles
+        return "suporte" not in roles and "readonly" not in roles
 
     def cpoe(self):
         roles = self.config["roles"] if self.config and "roles" in self.config else []
