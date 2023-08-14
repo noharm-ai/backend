@@ -254,9 +254,9 @@ def _get_annotation(admission_number, field, add, interval, compare_date):
 
     results = query.order_by(ClinicalNotes.date).all()
 
-    list = []
+    list = set()
     for i in results:
-        list.append(i[0])
+        list.add(i[0])
 
     return ". ".join(list)[:1500]
 
