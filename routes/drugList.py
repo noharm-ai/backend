@@ -473,25 +473,26 @@ class DrugList:
 
                 pdDose = pd[0].dose
 
-                if pd[6] and pd[6].amount and pd[6].amountUnit:
-                    result[key]["vol"] = pdDose
-                    result[key]["amount"] = pd[6].amount
-                    result[key]["unit"] = pd[6].amountUnit
-
-                    if (
-                        pd[2]
-                        and pd[2].id.lower() != "ml"
-                        and pd[2].id.lower() == pd[6].amountUnit.lower()
-                    ):
-                        result[key]["vol"] = pdDose = round(
-                            pd[0].dose / pd[6].amount, 3
-                        )
-
-                if pd[6] and pd[6].amount and pd[6].amountUnit is None:
-                    result[key]["vol"] = pdDose = pd[6].amount
-
-                result[key]["speed"] = pd[0].solutionDose
                 if not bool(pd[0].suspendedDate):
+                    if pd[6] and pd[6].amount and pd[6].amountUnit:
+                        result[key]["vol"] = pdDose
+                        result[key]["amount"] = pd[6].amount
+                        result[key]["unit"] = pd[6].amountUnit
+
+                        if (
+                            pd[2]
+                            and pd[2].id.lower() != "ml"
+                            and pd[2].id.lower() == pd[6].amountUnit.lower()
+                        ):
+                            result[key]["vol"] = pdDose = round(
+                                pd[0].dose / pd[6].amount, 3
+                            )
+
+                    if pd[6] and pd[6].amount and pd[6].amountUnit is None:
+                        result[key]["vol"] = pdDose = pd[6].amount
+
+                    result[key]["speed"] = pd[0].solutionDose
+
                     result[key]["totalVol"] += pdDose if pdDose else 0
                     result[key]["totalVol"] = round(result[key]["totalVol"], 3)
 
