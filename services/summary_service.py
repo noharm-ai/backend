@@ -155,7 +155,7 @@ def _get_all_annotations(admission_number):
         admission_number=admission_number,
         field="motivo",
         add=True,
-        interval="1 DAY",
+        interval="4 DAYS",
         compare_date=first.date,
     )
 
