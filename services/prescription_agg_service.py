@@ -180,6 +180,18 @@ def get_last_prescription(admission_number):
     )
 
 
+def get_last_agg_prescription(admission_number):
+    return (
+        db.session.query(Prescription)
+        .filter(Prescription.admissionNumber == admission_number)
+        .filter(Prescription.agg == True)
+        .filter(Prescription.concilia == None)
+        .filter(Prescription.idSegment != None)
+        .order_by(desc(Prescription.date))
+        .first()
+    )
+
+
 def gen_agg_id(admission_number, id_segment, pdate):
     id = (pdate.year - 2000) * 100000000000000
     id += pdate.month * 1000000000000
