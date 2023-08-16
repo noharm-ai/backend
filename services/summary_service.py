@@ -75,66 +75,41 @@ def _get_patient_data(patient: Patient):
 
 def _get_summary_config(admission_number, mock):
     summary_config = memory_service.get_memory(MemoryEnum.SUMMARY_CONFIG.value)
-    # temporary source
     annotations = _get_all_annotations(admission_number)
 
-    if mock:
-        reason = memory_service.get_memory("summary_text1")
-        previous_drugs = memory_service.get_memory("summary_text2")
-        diagnosis = memory_service.get_memory("summary_text_diagnosis")
-        discharge_condition = memory_service.get_memory(
-            "summary_text_dischargeCondition"
-        )
-        discharge_plan = memory_service.get_memory("summary_text_dischargePlan")
-        procedures = memory_service.get_memory("summary_text_procedures")
-        exams = memory_service.get_memory("summary_text_exams")
-
-    reason_payload = json.dumps(summary_config.value["reason"]).replace(
-        ":replace_text", reason.value["text"] if mock else annotations["reason"]
-    )
-
-    previous_drugs_payload = json.dumps(summary_config.value["previousDrugs"]).replace(
-        ":replace_text",
-        previous_drugs.value["text"] if mock else annotations["previousDrugs"],
-    )
-
-    diagnosis_payload = json.dumps(summary_config.value["diagnosis"]).replace(
-        ":replace_text", diagnosis.value["text"] if mock else annotations["diagnosis"]
-    )
-
-    discharge_condition_payload = json.dumps(
-        summary_config.value["dischargeCondition"]
-    ).replace(
-        ":replace_text",
-        discharge_condition.value["text"]
-        if mock
-        else annotations["dischargeCondition"],
-    )
-
-    discharge_plan_payload = json.dumps(summary_config.value["dischargePlan"]).replace(
-        ":replace_text",
-        discharge_plan.value["text"] if mock else annotations["dischargePlan"],
-    )
-
-    procedures_payload = json.dumps(summary_config.value["procedures"]).replace(
-        ":replace_text", procedures.value["text"] if mock else annotations["procedures"]
-    )
-
-    exams_payload = json.dumps(summary_config.value["exams"]).replace(
-        ":replace_text", exams.value["text"] if mock else annotations["exams"]
-    )
-
-    return {
+    config = [
+        {"key": "reason"},
+        {"key": "previousDrugs"},
+        {"key": "diagnosis"},
+        {"key": "dischargeCondition"},
+        {"key": "dischargePlan"},
+        {"key": "procedures"},
+        {"key": "exams"},
+    ]
+    prompts = {}
+    result = {
         "url": summary_config.value["url"],
         "apikey": summary_config.value["apikey"],
-        "reason": json.loads(reason_payload),
-        "previousDrugs": json.loads(previous_drugs_payload),
-        "diagnosis": json.loads(diagnosis_payload),
-        "dischargeCondition": json.loads(discharge_condition_payload),
-        "dischargePlan": json.loads(discharge_plan_payload),
-        "procedures": json.loads(procedures_payload),
-        "exams": json.loads(exams_payload),
     }
+
+    for c in config:
+        key = c["key"]
+        if mock:
+            text = memory_service.get_memory(f"summary_text_{key}")
+            prompts[key] = json.dumps(summary_config.value[key]).replace(
+                ":replace_text", text.value["text"]
+            )
+        else:
+            prompts[key] = json.dumps(summary_config.value[key]).replace(
+                ":replace_text", annotations[key]["value"]
+            )
+
+        result[key] = {
+            "prompt": json.loads(prompts[key]),
+            "audit": annotations[key]["list"],
+        }
+
+    return result
 
 
 def _get_all_annotations(admission_number):
@@ -254,11 +229,11 @@ def _get_annotation(admission_number, field, add, interval, compare_date):
 
     results = query.order_by(ClinicalNotes.date).all()
 
-    list = set()
+    uniqueList = set()
     for i in results:
-        list.add(i[0])
+        uniqueList.add(i[0])
 
-    return ". ".join(list)[:1500]
+    return {"value": ". ".join(uniqueList)[:1500], "list": list(uniqueList)}
 
 
 def _get_exams(id_patient, schema):
