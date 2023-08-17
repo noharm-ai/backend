@@ -125,6 +125,8 @@ def search_interventions():
         startDate=data.get("startDate", None),
         endDate=data.get("endDate", None),
         idSegment=data.get("idSegment", None),
+        idPrescription=data.get("idPrescription", None),
+        idPrescriptionDrug=data.get("idPrescriptionDrug", None),
     )
 
     return {"status": "success", "data": results}, status.HTTP_200_OK

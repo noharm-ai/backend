@@ -8,7 +8,12 @@ from exception.validation_error import ValidationError
 
 
 def get_interventions(
-    admissionNumber=None, startDate=None, endDate=None, idSegment=None
+    admissionNumber=None,
+    startDate=None,
+    endDate=None,
+    idSegment=None,
+    idPrescription=None,
+    idPrescriptionDrug=None,
 ):
     mReasion = db.aliased(InterventionReason)
     descript = case(
@@ -96,33 +101,37 @@ def get_interventions(
         interventions = interventions.filter(
             Intervention.admissionNumber == admissionNumber
         )
-    else:
-        # interventions = interventions.filter(Intervention.date > (date.today() - timedelta(days=60)))
-        if not startDate:
-            raise ValidationError(
-                "Data inicial inválida",
-                "errors.invalidRequest",
-                status.HTTP_400_BAD_REQUEST,
-            )
 
-        if startDate is not None:
-            interventions = interventions.filter(
-                Intervention.date >= validate(startDate)
-            )
+    if not startDate and admissionNumber == None:
+        raise ValidationError(
+            "Data inicial inválida",
+            "errors.invalidRequest",
+            status.HTTP_400_BAD_REQUEST,
+        )
 
-        if endDate is not None:
-            interventions = interventions.filter(
-                Intervention.date
-                <= (validate(endDate) + timedelta(hours=23, minutes=59))
-            )
+    if startDate is not None:
+        interventions = interventions.filter(Intervention.date >= validate(startDate))
 
-        if idSegment is not None:
-            interventions = interventions.filter(
-                or_(
-                    PrescriptionB.idSegment == idSegment,
-                    Prescription.idSegment == idSegment,
-                )
+    if endDate is not None:
+        interventions = interventions.filter(
+            Intervention.date <= (validate(endDate) + timedelta(hours=23, minutes=59))
+        )
+
+    if idSegment is not None:
+        interventions = interventions.filter(
+            or_(
+                PrescriptionB.idSegment == idSegment,
+                Prescription.idSegment == idSegment,
             )
+        )
+
+    if idPrescription is not None:
+        interventions = interventions.filter(
+            Intervention.idPrescription == idPrescription
+        )
+
+    if idPrescriptionDrug is not None:
+        interventions = interventions.filter(Intervention.id == idPrescriptionDrug)
 
     interventions = interventions.filter(
         Intervention.status.in_(["s", "a", "n", "x", "j"])
