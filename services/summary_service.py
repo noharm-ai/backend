@@ -37,6 +37,8 @@ def get_structured_info(admission_number, user, mock=False):
             status.HTTP_400_BAD_REQUEST,
         )
 
+    draft = memory_service.get_memory(f"draft_summary_{admission_number}")
+
     return {
         "patient": _get_patient_data(patient),
         "exams": _get_exams(patient.idPatient, user.schema),
@@ -49,6 +51,7 @@ def get_structured_info(admission_number, user, mock=False):
         ),
         "receipt": _get_receipt(admission_number=admission_number, schema=user.schema),
         "summaryConfig": _get_summary_config(admission_number, mock),
+        "draft": draft.value if draft else None,
     }
 
 
