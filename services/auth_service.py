@@ -137,7 +137,7 @@ def auth_local(email, password):
             if preCheckUser.config and "roles" in preCheckUser.config
             else []
         )
-        if RoleEnum.SUPPORT.value not in roles:
+        if RoleEnum.SUPPORT.value not in roles and "oauth-test" not in roles:
             raise ValidationError(
                 "Utilize o endereço {}/login/{} para fazer login na NoHarm".format(
                     Config.APP_URL, preCheckUser.schema
