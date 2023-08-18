@@ -1,5 +1,6 @@
 import os
 import random
+import json
 from flask_api import status
 from models.main import *
 from models.appendix import *
@@ -434,6 +435,115 @@ def getPrescription(
         for i in interventions
         if int(i["id"]) == 0 and int(i["idPrescription"]) == prescription[0].id
     ]
+
+    print("BEFORE RETURN2")
+    print(
+        "RETURN JSON",
+        json.dumps(
+            {
+                "data": {
+                    "idPrescription": str(prescription[0].id),
+                    "idSegment": prescription[0].idSegment,
+                    "segmentName": prescription[5],
+                    "idPatient": prescription[0].idPatient,
+                    "idHospital": prescription[0].idHospital,
+                    "name": prescription[0].admissionNumber,
+                    "agg": prescription[0].agg,
+                    "concilia": prescription[0].concilia,
+                    "conciliaList": conciliaList,
+                    "admissionNumber": prescription[0].admissionNumber,
+                    "admissionDate": patient.admissionDate.isoformat()
+                    if patient.admissionDate
+                    else None,
+                    "birthdate": patient.birthdate.isoformat()
+                    if patient.birthdate
+                    else None,
+                    "gender": patient.gender,
+                    "height": patient.height,
+                    "weight": patient.weight,
+                    "dialysis": patient.dialysis,
+                    "observation": prescription[6],
+                    "notes": prescription[7],
+                    "alert": prescription[8],
+                    "alertExpire": patient.alertExpire.isoformat()
+                    if patient.alertExpire
+                    else None,
+                    "age": age,
+                    "weightUser": bool(patient.user),
+                    "weightDate": patient.weightDate.isoformat()
+                    if patient.weightDate
+                    else None,
+                    "dischargeDate": patient.dischargeDate.isoformat()
+                    if patient.dischargeDate
+                    else None,
+                    "dischargeReason": patient.dischargeReason,
+                    "bed": prescription[0].bed,
+                    "record": prescription[0].record,
+                    "class": random.choice(["green", "yellow", "red"]),
+                    "skinColor": patient.skinColor,
+                    "department": prescription[4],
+                    "lastDepartment": lastDept[0] if lastDept else None,
+                    "patientScore": "High",
+                    "date": prescription[0].date.isoformat(),
+                    "expire": prescription[0].expire.isoformat()
+                    if prescription[0].expire
+                    else None,
+                    "prescription": pDrugs,
+                    "solution": pSolution,
+                    "procedures": pProcedures,
+                    "infusion": pInfusion,
+                    "diet": pDiet,
+                    "interventions": interventions,
+                    "alertExams": alertExams,
+                    "exams": examsJson[:10],
+                    "status": prescription[0].status,
+                    "prescriber": prescription[9],
+                    "headers": headers,
+                    "intervention": pIntervention[0] if len(pIntervention) else None,
+                    "prevIntervention": getPrevIntervention(
+                        interventions, prescription[0].date
+                    ),
+                    "existIntervention": getExistIntervention(
+                        interventions, prescription[0].date
+                    ),
+                    "clinicalNotes": notesTotal,
+                    "complication": clinicalNotesCount[2],
+                    "notesSigns": strNone(notesSigns[0]) if notesSigns else "",
+                    "notesSignsDate": notesSigns[1].isoformat() if notesSigns else None,
+                    "notesInfo": strNone(notesInfo[0]) if notesInfo else "",
+                    "notesInfoDate": notesInfo[1].isoformat() if notesInfo else None,
+                    "notesAllergies": notesAllergies,
+                    "notesAllergiesDate": notesAllergies[0]["date"]
+                    if notesAllergies
+                    else None,
+                    "notesDialysis": notesDialysis,
+                    "notesDialysisDate": notesDialysis[0]["date"]
+                    if notesDialysis
+                    else None,
+                    "clinicalNotesStats": {
+                        "medications": clinicalNotesCount[1],
+                        "complication": clinicalNotesCount[2],
+                        "symptoms": clinicalNotesCount[3],
+                        "diseases": clinicalNotesCount[4],
+                        "info": clinicalNotesCount[5],
+                        "conduct": clinicalNotesCount[6],
+                        "signs": clinicalNotesCount[7],
+                        "allergy": clinicalNotesCount[8],
+                        "total": clinicalNotesCount[9],
+                        "dialysis": clinicalNotesCount[10],
+                    },
+                    "alertStats": drugList.alertStats,
+                    "features": prescription[0].features,
+                    "user": prescription[10],
+                    "insurance": prescription[11],
+                    "formTemplate": formTemplate.value if formTemplate else None,
+                    "admissionReports": admission_reports.value
+                    if admission_reports
+                    else None,
+                }
+            }
+        ),
+    )
 
     return {
         "status": "success",
