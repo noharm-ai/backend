@@ -454,7 +454,7 @@ class DrugList:
 
     def getInfusionKey(self, pd):
         if self.is_cpoe:
-            return pd[0].cpoe_group
+            return pd[0].cpoe_group if pd[0].cpoe_group else pd[0].solutionGroup
 
         return str(pd[0].idPrescription) + str(pd[0].solutionGroup)
 
