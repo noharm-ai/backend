@@ -144,6 +144,7 @@ def get_interventions(
         intervBuffer.append(
             {
                 "id": str(i[0].id),
+                "idIntervention": str(i[0].idIntervention),
                 "idSegment": i[1].idSegment
                 if i[1]
                 else i[7].idSegment

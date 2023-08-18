@@ -64,10 +64,10 @@ class DrugList:
         return result
 
     def getIntervention(self, idPrescriptionDrug):
-        result = {}
+        result = []
         for i in self.interventions:
             if int(i["id"]) == idPrescriptionDrug:
-                result = i
+                result.append(i)
         return result
 
     def getDrugType(self, pDrugs, source, checked=False, suspended=False):

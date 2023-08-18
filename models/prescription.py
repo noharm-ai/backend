@@ -917,8 +917,9 @@ class PrescriptionDrug(db.Model):
 class Intervention(db.Model):
     __tablename__ = "intervencao"
 
-    id = db.Column("fkpresmed", db.Integer, primary_key=True)
-    idPrescription = db.Column("fkprescricao", db.Integer, primary_key=True)
+    idIntervention = db.Column("idintervencao", db.Integer, primary_key=True)
+    id = db.Column("fkpresmed", db.Integer, nullable=False)
+    idPrescription = db.Column("fkprescricao", db.Integer, nullable=False)
     admissionNumber = db.Column("nratendimento", db.Integer, nullable=False)
     idInterventionReason = db.Column(
         "idmotivointervencao", postgresql.ARRAY(db.Integer), nullable=False
