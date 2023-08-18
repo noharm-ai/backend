@@ -236,7 +236,10 @@ def _get_annotation(admission_number, field, add, interval, compare_date):
     for i in results:
         uniqueList.add(i[0])
 
-    return {"value": ". ".join(uniqueList)[:1500], "list": list(uniqueList)}
+    return {
+        "value": ". ".join(uniqueList)[:1500].replace('"', '\\"'),
+        "list": list(uniqueList),
+    }
 
 
 def _get_exams(id_patient, schema):
