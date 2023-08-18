@@ -251,7 +251,8 @@ class DrugList:
                         if (
                             pd[6].maxDose
                             and self.maxDoseAgg[keyDrugKg]["count"] > 1
-                            and pd[6].maxDose < self.maxDoseAgg[keyDrugKg]["value"]
+                            and pd[6].maxDose
+                            < none2zero(self.maxDoseAgg[keyDrugKg]["value"])
                         ):
                             alerts.append(
                                 "Dose diária prescrita SOMADA ("
@@ -284,7 +285,8 @@ class DrugList:
                         if (
                             pd[6].maxDose
                             and self.maxDoseAgg[idDrugAgg]["count"] > 1
-                            and pd[6].maxDose < self.maxDoseAgg[idDrugAgg]["value"]
+                            and pd[6].maxDose
+                            < none2zero(self.maxDoseAgg[idDrugAgg]["value"])
                         ):
                             alerts.append(
                                 "Dose diária prescrita SOMADA ("

@@ -356,6 +356,8 @@ def getPrescription(
         patient.birthdate.isoformat() if patient.birthdate else date.today().isoformat()
     )
 
+    print("after exams")
+
     examsJson = []
     alertExams = 0
     for e in exams:
@@ -387,6 +389,8 @@ def getPrescription(
     )  # refactor sort
     pDrugs.sort(key=drugList.sortDrugs)
     pDrugs = drugList.sortWhiteList(pDrugs)
+
+    print("after drug list")
 
     conciliaList = []
     if prescription[0].concilia:
@@ -428,6 +432,8 @@ def getPrescription(
             pSolution = drugList.cpoeDrugs(pSolution, idPrescription)
             pProcedures = drugList.cpoeDrugs(pProcedures, idPrescription)
             pDiet = drugList.cpoeDrugs(pDiet, idPrescription)
+
+    print("after drug list2")
 
     pIntervention = [
         i
