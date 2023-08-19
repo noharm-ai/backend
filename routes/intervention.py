@@ -6,9 +6,9 @@ from flask import Blueprint, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime
 from .utils import tryCommit
-from services import memory_service
 from services.admin import intervention_reason_service
 from services import intervention_service
+from exception.validation_error import ValidationError
 
 app_itrv = Blueprint("app_itrv", __name__)
 
@@ -42,57 +42,27 @@ def createIntervention(idPrescriptionDrug):
     else:
         idPrescription = 0
 
-    newIntervention = False
-    i = Intervention.query.get((idPrescriptionDrug, idPrescription))
-    if i is None:
-        i = Intervention()
-        i.id = idPrescriptionDrug
-        i.idPrescription = idPrescription
-        i.date = datetime.today()
-        i.update = datetime.today()
-        i.user = user.id
-        newIntervention = True
+    try:
+        intervention = intervention_service.save_intervention(
+            id_intervention=data.get("idIntervention", None),
+            id_prescription=idPrescription,
+            id_prescription_drug=idPrescriptionDrug,
+            new_status=data.get("status", "s"),
+            user=user,
+            admission_number=data.get("admissionNumber", None),
+            id_intervention_reason=data.get("idInterventionReason", None),
+            error=data.get("error", None),
+            cost=data.get("cost", None),
+            observation=data.get("observation", None),
+            interactions=data.get("interactions", None),
+            transcription=data.get("transcription", None),
+            economy_days=data.get("economyDays", None),
+            expended_dose=data.get("expendedDose", None),
+        )
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
-    if "admissionNumber" in data.keys():
-        i.admissionNumber = data.get("admissionNumber", None)
-    if "idInterventionReason" in data.keys():
-        i.idInterventionReason = data.get("idInterventionReason", None)
-    if "error" in data.keys():
-        i.error = data.get("error", None)
-    if "cost" in data.keys():
-        i.cost = data.get("cost", None)
-    if "observation" in data.keys():
-        i.notes = data.get("observation", None)
-    if "interactions" in data.keys():
-        i.interactions = data.get("interactions", None)
-    if "transcription" in data.keys():
-        i.transcription = data.get("transcription", None)
-    if "economyDays" in data.keys():
-        i.economy_days = data.get("economyDays", None)
-    if "expendedDose" in data.keys():
-        i.expended_dose = data.get("expendedDose", None)
-
-    new_status = data.get("status", "s")
-    if new_status != i.status:
-        if i.status == "0":
-            i.date = datetime.today()
-            i.user = user.id
-
-        i.status = new_status
-    else:
-        i.user = user.id
-
-        if memory_service.has_feature("PRIMARYCARE"):
-            i.date = datetime.today()
-
-    i.update = datetime.today()
-
-    if newIntervention:
-        db.session.add(i)
-
-    setDrugStatus(idPrescriptionDrug, i.status)
-
-    return tryCommit(db, str(idPrescriptionDrug), user.permission())
+    return tryCommit(db, intervention, user.permission())
 
 
 def sortReasons(e):

@@ -3,6 +3,7 @@ from models.main import db
 from models.appendix import *
 from models.prescription import *
 from routes.utils import validate
+from services import memory_service
 
 from exception.validation_error import ValidationError
 
@@ -14,6 +15,7 @@ def get_interventions(
     idSegment=None,
     idPrescription=None,
     idPrescriptionDrug=None,
+    idIntervention=None,
 ):
     mReasion = db.aliased(InterventionReason)
     descript = case(
@@ -133,11 +135,17 @@ def get_interventions(
     if idPrescriptionDrug is not None:
         interventions = interventions.filter(Intervention.id == idPrescriptionDrug)
 
-    interventions = interventions.filter(
-        Intervention.status.in_(["s", "a", "n", "x", "j"])
-    ).order_by(desc(Intervention.date))
+    if idIntervention is not None:
+        interventions = interventions.filter(
+            Intervention.idIntervention == idIntervention
+        )
 
-    interventions = interventions.limit(1500).all()
+    if not idIntervention:
+        interventions = interventions.filter(
+            Intervention.status.in_(["s", "a", "n", "x", "j"])
+        )
+
+    interventions = interventions.order_by(desc(Intervention.date)).limit(1500).all()
 
     intervBuffer = []
     for i in interventions:
@@ -194,3 +202,114 @@ def get_interventions(
     result.extend([i for i in intervBuffer if i["status"] != "s"])
 
     return result
+
+
+def save_intervention(
+    id_intervention=None,
+    id_prescription=None,
+    id_prescription_drug=None,
+    user=None,
+    admission_number=None,
+    id_intervention_reason=None,
+    error=None,
+    cost=None,
+    observation=None,
+    interactions=None,
+    transcription=None,
+    economy_days=None,
+    expended_dose=None,
+    new_status="s",
+):
+    if id_prescription != 0 and id_prescription_drug != 0:
+        raise ValidationError(
+            "Parâmetros inválidos",
+            "errors.invalidParameter",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    if not user:
+        raise ValidationError(
+            "Parâmetros inválidos",
+            "errors.invalidParameter",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    new_intv = False
+    i = None
+
+    if id_intervention:
+        i = Intervention.query.get(id_intervention)
+        if not i:
+            raise ValidationError(
+                "Registro inválido",
+                "errors.invalidRecord",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+    if not i:
+        # fallback old version.
+        # TODO: remove after transition
+        i = (
+            db.session.query(Intervention)
+            .filter(Intervention.idPrescription == id_prescription)
+            .filter(Intervention.id == id_prescription_drug)
+            .first()
+        )
+
+    if not i:
+        new_intv = True
+        i = Intervention()
+        i.id = id_prescription_drug
+        i.idPrescription = id_prescription
+        i.date = datetime.today()
+        i.update = datetime.today()
+        i.user = user.id
+
+    if admission_number:
+        i.admissionNumber = admission_number
+    if id_intervention_reason:
+        i.idInterventionReason = id_intervention_reason
+    if error:
+        i.error = error
+    if cost:
+        i.cost = cost
+    if observation:
+        i.notes = observation
+    if interactions:
+        i.interactions = interactions
+    if transcription:
+        i.transcription = transcription
+    if economy_days:
+        i.economy_days = economy_days
+    if expended_dose:
+        i.expended_dose = expended_dose
+
+    if new_status != i.status:
+        if i.status == "0":
+            i.date = datetime.today()
+            i.user = user.id
+
+        i.status = new_status
+    else:
+        i.user = user.id
+
+        if memory_service.has_feature("PRIMARYCARE"):
+            i.date = datetime.today()
+
+    i.update = datetime.today()
+
+    if new_intv:
+        db.session.add(i)
+        db.session.flush()
+
+    # TODO: is it really necessary?
+    if id_prescription_drug:
+        pd = PrescriptionDrug.query.get(id_prescription_drug)
+        if pd is not None:
+            pd.status = i.status
+            pd.update = datetime.today()
+            pd.user = user.id
+
+    return get_interventions(
+        admissionNumber=i.admissionNumber, idIntervention=i.idIntervention
+    )
