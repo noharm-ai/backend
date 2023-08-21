@@ -64,6 +64,13 @@ class DrugList:
         return result
 
     def getIntervention(self, idPrescriptionDrug):
+        result = {}
+        for i in self.interventions:
+            if int(i["id"]) == idPrescriptionDrug:
+                result = i
+        return result
+
+    def getInterventionList(self, idPrescriptionDrug):
         result = []
         for i in self.interventions:
             if int(i["id"]) == idPrescriptionDrug:
@@ -432,7 +439,9 @@ class DrugList:
                     "existIntervention": self.getExistIntervention(
                         pd[0].idDrug, pd[0].idPrescription
                     ),
+                    # remove intervention attribute after transition (new attribute = interventionList)
                     "intervention": self.getIntervention(pd[0].id),
+                    "interventionList": self.getInterventionList(pd[0].id),
                     "alerts": alerts,
                     "tubeAlert": tubeAlert,
                     "notes": pd[7],

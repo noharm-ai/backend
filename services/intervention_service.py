@@ -227,6 +227,14 @@ def save_intervention(
             status.HTTP_400_BAD_REQUEST,
         )
 
+    if id_intervention == None and id_intervention_reason == None:
+        # transition between versions
+        raise ValidationError(
+            "Parâmetros inválidos",
+            "errors.invalidParameter",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
     if not user:
         raise ValidationError(
             "Parâmetros inválidos",
@@ -245,16 +253,6 @@ def save_intervention(
                 "errors.invalidRecord",
                 status.HTTP_400_BAD_REQUEST,
             )
-
-    if not i:
-        # fallback old version.
-        # TODO: remove after transition
-        i = (
-            db.session.query(Intervention)
-            .filter(Intervention.idPrescription == id_prescription)
-            .filter(Intervention.id == id_prescription_drug)
-            .first()
-        )
 
     if not i:
         new_intv = True
