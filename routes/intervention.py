@@ -31,22 +31,25 @@ def setDrugStatus(idPrescriptionDrug, drugStatus):
 
 
 @app_itrv.route("/intervention/<int:idPrescriptionDrug>", methods=["PUT"])
+@app_itrv.route("/intervention", methods=["PUT"])
 @jwt_required()
-def createIntervention(idPrescriptionDrug):
+def createIntervention(idPrescriptionDrug=None):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
     data = request.get_json()
 
-    if idPrescriptionDrug == 0:
-        idPrescription = data.get("idPrescription", 0)
-    else:
-        idPrescription = 0
+    if idPrescriptionDrug:
+        return {
+            "status": "error",
+            "message": "Você está usando uma versão desatualizada da NoHarm. Pressione ctrl+f5 para atualizar.",
+            "code": "erros.oldVersion",
+        }, status.HTTP_400_BAD_REQUEST
 
     try:
         intervention = intervention_service.save_intervention(
             id_intervention=data.get("idIntervention", None),
-            id_prescription=idPrescription,
-            id_prescription_drug=idPrescriptionDrug,
+            id_prescription=data.get("idPrescription", 0),
+            id_prescription_drug=data.get("idPrescriptionDrug", 0),
             new_status=data.get("status", "s"),
             user=user,
             admission_number=data.get("admissionNumber", None),

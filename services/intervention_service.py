@@ -206,8 +206,8 @@ def get_interventions(
 
 def save_intervention(
     id_intervention=None,
-    id_prescription=None,
-    id_prescription_drug=None,
+    id_prescription=0,
+    id_prescription_drug=0,
     user=None,
     admission_number=None,
     id_intervention_reason=None,
@@ -220,13 +220,6 @@ def save_intervention(
     expended_dose=None,
     new_status="s",
 ):
-    if id_prescription != 0 and id_prescription_drug != 0:
-        raise ValidationError(
-            "Parâmetros inválidos",
-            "errors.invalidParameter",
-            status.HTTP_400_BAD_REQUEST,
-        )
-
     if id_intervention == None and id_intervention_reason == None:
         # transition between versions
         raise ValidationError(
@@ -242,6 +235,12 @@ def save_intervention(
             status.HTTP_400_BAD_REQUEST,
         )
 
+    if id_prescription_drug != 0:
+        id_prescription = 0
+
+    if id_prescription != 0:
+        id_prescription_drug = 0
+
     new_intv = False
     i = None
 
@@ -250,6 +249,13 @@ def save_intervention(
         if not i:
             raise ValidationError(
                 "Registro inválido",
+                "errors.invalidRecord",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+        if i.status in ["a", "n", "x", "j"] and new_status != "s":
+            raise ValidationError(
+                "Intervenção com desfecho não pode ser alterada",
                 "errors.invalidRecord",
                 status.HTTP_400_BAD_REQUEST,
             )

@@ -70,13 +70,6 @@ class DrugList:
                 result = i
         return result
 
-    def getInterventionList(self, idPrescriptionDrug):
-        result = []
-        for i in self.interventions:
-            if int(i["id"]) == idPrescriptionDrug:
-                result.append(i)
-        return result
-
     def getDrugType(self, pDrugs, source, checked=False, suspended=False):
         for pd in self.drugList:
             belong = False
@@ -441,7 +434,6 @@ class DrugList:
                     ),
                     # remove intervention attribute after transition (new attribute = interventionList)
                     "intervention": self.getIntervention(pd[0].id),
-                    "interventionList": self.getInterventionList(pd[0].id),
                     "alerts": alerts,
                     "tubeAlert": tubeAlert,
                     "notes": pd[7],
