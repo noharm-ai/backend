@@ -88,6 +88,7 @@ def _get_summary_config(admission_number, mock):
         {"key": "dischargePlan"},
         {"key": "procedures"},
         {"key": "exams"},
+        {"key": "clinicalSummary"},
     ]
     prompts = {}
     result = {
@@ -153,7 +154,7 @@ def _get_all_annotations(admission_number):
         compare_date=None,
     )
 
-    clinical_summary = _get_annotation(
+    summary_annotation = _get_annotation(
         admission_number=admission_number,
         field="resumo",
         add=False,
@@ -191,6 +192,18 @@ def _get_all_annotations(admission_number):
         add=False,
         interval="1 DAY",
         compare_date=last.date,
+    )
+
+    clinical_summary = {}
+    clinical_summary["value"] = (
+        reason["value"]
+        + ". "
+        + procedures["value"]
+        + ". "
+        + summary_annotation["value"]
+    )[:1500]
+    clinical_summary["list"] = (
+        reason["list"] + procedures["list"] + summary_annotation["list"]
     )
 
     return {
