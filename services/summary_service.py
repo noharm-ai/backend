@@ -42,7 +42,7 @@ def get_structured_info(admission_number, user, mock=False):
     return {
         "patient": _get_patient_data(patient),
         "exams": _get_exams(patient.idPatient, user.schema),
-        "allergies": None,
+        "allergies": _get_allergies(patient.idPatient, user.schema),
         "drugsUsed": _get_all_drugs_used(
             admission_number=admission_number, schema=user.schema
         ),
@@ -296,6 +296,35 @@ def _get_exams(id_patient, schema):
         )
 
     return exams_list
+
+
+def _get_allergies(id_patient, schema):
+    query = f"""
+    select
+        distinct on (a.fkpessoa, coalesce (s.nome, a.nome_medicamento) )
+        a.fkpessoa,
+        coalesce (s.nome, a.nome_medicamento) nome
+    from
+        {schema}.alergia a
+        left join {schema}.medicamento m on a.fkmedicamento = m.fkmedicamento
+        left join public.substancia s on m.sctid = s.sctid
+    where
+        a.ativo is true
+        and a.fkpessoa = :id_patient
+    order by 1
+    """
+
+    items = db.session.execute(query, {"id_patient": id_patient})
+
+    list = []
+    for i in items:
+        list.append(
+            {
+                "name": i[1],
+            }
+        )
+
+    return list
 
 
 def _get_all_drugs_used(admission_number, schema):
