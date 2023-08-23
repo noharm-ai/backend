@@ -235,11 +235,15 @@ def save_intervention(
             status.HTTP_400_BAD_REQUEST,
         )
 
-    if id_prescription_drug != 0:
+    if id_prescription_drug != "0":
         id_prescription = 0
 
-    if id_prescription != 0:
-        id_prescription_drug = 0
+    if id_prescription == 0 and id_prescription_drug == 0:
+        raise ValidationError(
+            "Parâmetros inválidos",
+            "errors.invalidParameter",
+            status.HTTP_400_BAD_REQUEST,
+        )
 
     new_intv = False
     i = None

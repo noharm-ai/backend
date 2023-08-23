@@ -48,8 +48,8 @@ def createIntervention(idPrescriptionDrug=None):
     try:
         intervention = intervention_service.save_intervention(
             id_intervention=data.get("idIntervention", None),
-            id_prescription=data.get("idPrescription", 0),
-            id_prescription_drug=data.get("idPrescriptionDrug", 0),
+            id_prescription=data.get("idPrescription", "0"),
+            id_prescription_drug=data.get("idPrescriptionDrug", "0"),
             new_status=data.get("status", "s"),
             user=user,
             admission_number=data.get("admissionNumber", None),
