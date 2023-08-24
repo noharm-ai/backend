@@ -63,7 +63,12 @@ def get_auth_provider(schema):
         "status": "success",
         "data": {
             "url": oauth_config.value["auth_url"],
+            "loginUrl": oauth_config.value["login_url"],
+            "redirectUri": oauth_config.value["redirect_uri"],
+            "clientId": oauth_config.value["client_id"],
             "company": oauth_config.value["company"],
+            "flow": oauth_config.value["flow"],
+            "codeChallengeMethod": oauth_config.value["code_challenge_method"],
         },
     }, status.HTTP_200_OK
 
