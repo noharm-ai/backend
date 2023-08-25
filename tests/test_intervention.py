@@ -58,7 +58,12 @@ def test_put_interventions(client):
         url, data=json.dumps(data), headers=make_headers(access_token)
     )
     responseData = json.loads(response.data)["data"]
-    interventions = session.query(Intervention).get((responseData, "0"))
+    interventions = (
+        session.query(Intervention)
+        .filter(Intervention.id == responseData)
+        .filter(Intervention.idPrescription == "0")
+        .first()
+    )
 
     assert response.status_code == 200
     assert interventions.status == data["status"]
