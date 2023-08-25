@@ -6,9 +6,9 @@ from flask import Blueprint, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime
 from .utils import tryCommit
-from services import memory_service
 from services.admin import intervention_reason_service
-from services import intervention_service
+from services import intervention_service, memory_service
+from exception.validation_error import ValidationError
 
 app_itrv = Blueprint("app_itrv", __name__)
 
@@ -30,9 +30,11 @@ def setDrugStatus(idPrescriptionDrug, drugStatus):
     return tryCommit(db, str(idPrescriptionDrug), user.permission())
 
 
+# endpoint deprecated use save_intervention()
+# remove after transition
 @app_itrv.route("/intervention/<int:idPrescriptionDrug>", methods=["PUT"])
 @jwt_required()
-def createIntervention(idPrescriptionDrug):
+def createInterventionDeprecated(idPrescriptionDrug=None):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
     data = request.get_json()
@@ -43,7 +45,12 @@ def createIntervention(idPrescriptionDrug):
         idPrescription = 0
 
     newIntervention = False
-    i = Intervention.query.get((idPrescriptionDrug, idPrescription))
+    i = (
+        db.session.query(Intervention)
+        .filter(Intervention.id == idPrescriptionDrug)
+        .filter(Intervention.idPrescription == idPrescription)
+        .first()
+    )
     if i is None:
         i = Intervention()
         i.id = idPrescriptionDrug
@@ -95,6 +102,36 @@ def createIntervention(idPrescriptionDrug):
     return tryCommit(db, str(idPrescriptionDrug), user.permission())
 
 
+@app_itrv.route("/intervention", methods=["PUT"])
+@jwt_required()
+def save_intervention():
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+    data = request.get_json()
+
+    try:
+        intervention = intervention_service.save_intervention(
+            id_intervention=data.get("idIntervention", None),
+            id_prescription=data.get("idPrescription", "0"),
+            id_prescription_drug=data.get("idPrescriptionDrug", "0"),
+            new_status=data.get("status", "s"),
+            user=user,
+            admission_number=data.get("admissionNumber", None),
+            id_intervention_reason=data.get("idInterventionReason", None),
+            error=data.get("error", None),
+            cost=data.get("cost", None),
+            observation=data.get("observation", None),
+            interactions=data.get("interactions", None),
+            transcription=data.get("transcription", None),
+            economy_days=data.get("economyDays", None),
+            expended_dose=data.get("expendedDose", None),
+        )
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+
+    return tryCommit(db, intervention, user.permission())
+
+
 def sortReasons(e):
     return e["description"]
 
@@ -125,6 +162,8 @@ def search_interventions():
         startDate=data.get("startDate", None),
         endDate=data.get("endDate", None),
         idSegment=data.get("idSegment", None),
+        idPrescription=data.get("idPrescription", None),
+        idPrescriptionDrug=data.get("idPrescriptionDrug", None),
     )
 
     return {"status": "success", "data": results}, status.HTTP_200_OK
