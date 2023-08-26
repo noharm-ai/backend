@@ -42,7 +42,7 @@ def get_structured_info(admission_number, user, mock=False):
     return {
         "patient": _get_patient_data(patient),
         "exams": _get_exams(patient.idPatient, user.schema),
-        "allergies": None,
+        "allergies": _get_allergies(patient.idPatient, user.schema),
         "drugsUsed": _get_all_drugs_used(
             admission_number=admission_number, schema=user.schema
         ),
@@ -88,6 +88,7 @@ def _get_summary_config(admission_number, mock):
         {"key": "dischargePlan"},
         {"key": "procedures"},
         {"key": "exams"},
+        {"key": "clinicalSummary"},
     ]
     prompts = {}
     result = {
@@ -153,7 +154,7 @@ def _get_all_annotations(admission_number):
         compare_date=None,
     )
 
-    clinical_summary = _get_annotation(
+    summary_annotation = _get_annotation(
         admission_number=admission_number,
         field="resumo",
         add=False,
@@ -191,6 +192,18 @@ def _get_all_annotations(admission_number):
         add=False,
         interval="1 DAY",
         compare_date=last.date,
+    )
+
+    clinical_summary = {}
+    clinical_summary["value"] = (
+        reason["value"]
+        + ". "
+        + procedures["value"]
+        + ". "
+        + summary_annotation["value"]
+    )[:1500]
+    clinical_summary["list"] = (
+        reason["list"] + procedures["list"] + summary_annotation["list"]
     )
 
     return {
@@ -283,6 +296,35 @@ def _get_exams(id_patient, schema):
         )
 
     return exams_list
+
+
+def _get_allergies(id_patient, schema):
+    query = f"""
+    select
+        distinct on (a.fkpessoa, coalesce (s.nome, a.nome_medicamento) )
+        a.fkpessoa,
+        coalesce (s.nome, a.nome_medicamento) nome
+    from
+        {schema}.alergia a
+        left join {schema}.medicamento m on a.fkmedicamento = m.fkmedicamento
+        left join public.substancia s on m.sctid = s.sctid
+    where
+        a.ativo is true
+        and a.fkpessoa = :id_patient
+    order by 1
+    """
+
+    items = db.session.execute(query, {"id_patient": id_patient})
+
+    list = []
+    for i in items:
+        list.append(
+            {
+                "name": i[1],
+            }
+        )
+
+    return list
 
 
 def _get_all_drugs_used(admission_number, schema):

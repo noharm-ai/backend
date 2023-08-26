@@ -434,6 +434,7 @@ class DrugList:
                     "existIntervention": self.getExistIntervention(
                         pd[0].idDrug, pd[0].idPrescription
                     ),
+                    # remove intervention attribute after transition (new attribute = interventionList)
                     "intervention": self.getIntervention(pd[0].id),
                     "alerts": alerts,
                     "tubeAlert": tubeAlert,
