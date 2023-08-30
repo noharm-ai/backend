@@ -9,6 +9,7 @@ class MemoryEnum(Enum):
     ADMISSION_REPORTS = "admission-reports"
     REPORTS = "reports"
     GETNAME = "getnameurl"
+    SUMMARY_CONFIG = "summary-config"
 
 
 class NoHarmENV(Enum):
@@ -21,6 +22,7 @@ class RoleEnum(Enum):
     SUPPORT = "suporte"
     STAGING = "staging"
     TRAINING = "training"
+    DOCTOR = "doctor"
 
 
 class FeatureEnum(Enum):

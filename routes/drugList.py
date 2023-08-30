@@ -251,7 +251,8 @@ class DrugList:
                         if (
                             pd[6].maxDose
                             and self.maxDoseAgg[keyDrugKg]["count"] > 1
-                            and pd[6].maxDose < self.maxDoseAgg[keyDrugKg]["value"]
+                            and pd[6].maxDose
+                            < none2zero(self.maxDoseAgg[keyDrugKg]["value"])
                         ):
                             alerts.append(
                                 "Dose diária prescrita SOMADA ("
@@ -284,7 +285,8 @@ class DrugList:
                         if (
                             pd[6].maxDose
                             and self.maxDoseAgg[idDrugAgg]["count"] > 1
-                            and pd[6].maxDose < self.maxDoseAgg[idDrugAgg]["value"]
+                            and pd[6].maxDose
+                            < none2zero(self.maxDoseAgg[idDrugAgg]["value"])
                         ):
                             alerts.append(
                                 "Dose diária prescrita SOMADA ("
@@ -432,6 +434,7 @@ class DrugList:
                     "existIntervention": self.getExistIntervention(
                         pd[0].idDrug, pd[0].idPrescription
                     ),
+                    # remove intervention attribute after transition (new attribute = interventionList)
                     "intervention": self.getIntervention(pd[0].id),
                     "alerts": alerts,
                     "tubeAlert": tubeAlert,
@@ -452,7 +455,7 @@ class DrugList:
 
     def getInfusionKey(self, pd):
         if self.is_cpoe:
-            return pd[0].cpoe_group
+            return pd[0].cpoe_group if pd[0].cpoe_group else pd[0].solutionGroup
 
         return str(pd[0].idPrescription) + str(pd[0].solutionGroup)
 
@@ -473,26 +476,28 @@ class DrugList:
 
                 pdDose = pd[0].dose
 
-                if pd[6] and pd[6].amount and pd[6].amountUnit:
-                    result[key]["vol"] = pdDose
-                    result[key]["amount"] = pd[6].amount
-                    result[key]["unit"] = pd[6].amountUnit
+                if not bool(pd[0].suspendedDate):
+                    if pd[6] and pd[6].amount and pd[6].amountUnit:
+                        result[key]["vol"] = pdDose
+                        result[key]["amount"] = pd[6].amount
+                        result[key]["unit"] = pd[6].amountUnit
 
-                    if (
-                        pd[2]
-                        and pd[2].id.lower() != "ml"
-                        and pd[2].id.lower() == pd[6].amountUnit.lower()
-                    ):
-                        result[key]["vol"] = pdDose = round(
-                            pd[0].dose / pd[6].amount, 3
-                        )
+                        if (
+                            pd[2]
+                            and pd[2].id.lower() != "ml"
+                            and pd[2].id.lower() == pd[6].amountUnit.lower()
+                        ):
+                            result[key]["vol"] = pdDose = round(
+                                pd[0].dose / pd[6].amount, 3
+                            )
 
-                if pd[6] and pd[6].amount and pd[6].amountUnit is None:
-                    result[key]["vol"] = pdDose = pd[6].amount
+                    if pd[6] and pd[6].amount and pd[6].amountUnit is None:
+                        result[key]["vol"] = pdDose = pd[6].amount
 
-                result[key]["speed"] = pd[0].solutionDose
-                result[key]["totalVol"] += pdDose if pdDose else 0
-                result[key]["totalVol"] = round(result[key]["totalVol"], 3)
+                    result[key]["speed"] = pd[0].solutionDose
+
+                    result[key]["totalVol"] += pdDose if pdDose else 0
+                    result[key]["totalVol"] = round(result[key]["totalVol"], 3)
 
         return result
 

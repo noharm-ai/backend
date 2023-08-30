@@ -22,6 +22,7 @@ from routes.user_crud import app_user_crud
 from routes.prescription_crud import app_pres_crud
 from routes.drugs import app_drugs
 from routes.names import app_names
+from routes.summary import app_summary
 from routes.admin.frequency import app_admin_freq
 from routes.admin.intervention_reason import app_admin_interv
 from routes.admin.memory import app_admin_memory
@@ -67,6 +68,7 @@ app.register_blueprint(app_usr)
 app.register_blueprint(app_note)
 app.register_blueprint(app_drugs)
 app.register_blueprint(app_names)
+app.register_blueprint(app_summary)
 
 app.register_blueprint(app_user_crud)
 app.register_blueprint(app_pres_crud)
@@ -84,7 +86,7 @@ if Config.ENV == NoHarmENV.STAGING.value:
 
 @app.route("/version", methods=["GET"])
 def getVersion():
-    return {"status": "success", "data": "v1.85-beta"}, status.HTTP_200_OK
+    return {"status": "success", "data": "v1.92-beta"}, status.HTTP_200_OK
 
 
 if __name__ == "__main__":

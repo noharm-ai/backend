@@ -14,6 +14,7 @@ def get_patients(
     next_appointment_end_date,
     scheduled_by_list,
     attended_by_list,
+    appointment=None,
 ):
     Pmax = db.aliased(Prescription)
 
@@ -53,6 +54,12 @@ def get_patients(
 
     if next_appointment_end_date:
         query = query.filter(sq_appointment <= next_appointment_end_date)
+
+    if appointment == "scheduled":
+        query = query.filter(sq_appointment != None)
+
+    if appointment == "not-scheduled":
+        query = query.filter(sq_appointment == None)
 
     if scheduled_by_list:
         scheduled_by_query = (
