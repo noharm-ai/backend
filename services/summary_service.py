@@ -68,6 +68,7 @@ def _get_patient_data(patient: Patient):
         "birthdate": patient.birthdate.isoformat() if patient.birthdate else None,
         "gender": patient.gender,
         "weight": patient.weight,
+        "weightDate": patient.weightDate.isoformat() if patient.weightDate else None,
         "height": patient.height,
         "imc": round((patient.weight / pow(patient.height / 100, 2)), 2)
         if patient.weight is not None and patient.height is not None
