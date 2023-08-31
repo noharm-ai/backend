@@ -330,29 +330,60 @@ def _get_allergies(id_patient, schema):
 
 def _get_all_drugs_used(admission_number, schema):
     query = f"""
-    select 
-        distinct(coalesce(s.nome, m.nome)) as nome
-    from
-        {schema}.presmed pm
-        inner join {schema}.prescricao p on (pm.fkprescricao = p.fkprescricao)
-        inner join {schema}.medicamento m on (pm.fkmedicamento = m.fkmedicamento)
-        left join public.substancia s on (m.sctid = s.sctid)
-    where 
-        p.nratendimento = :admission_number
-        and origem <> 'Dietas'
+    select
+        nome,
+        idclasse,
+        classe,
+        fkmedicamento,
+        (
+            select 
+                string_agg(concat(to_char(coalesce(p.dtvigencia, p.dtprescricao) , 'DD/MM'), ' (', pm.fkfrequencia, ' x ', pm.dose, pm.fkunidademedida, ')'), ', ')
+            from 
+                rededasa.presmed pm
+                inner join rededasa.prescricao p on (pm.fkprescricao = p.fkprescricao)
+            where 
+                p.nratendimento = :admission_number
+                and pm.fkmedicamento = meds_classes.fkmedicamento
+        ) as periodo,
+        case 
+            when idclasse = 'J1' then 0
+            else 1
+        end prioridade
+    from (
+        select
+            nome,
+            idclasse,
+            classe,
+            max(fkmedicamento) as fkmedicamento
+        from (
+            select 
+                coalesce(s.nome, m.nome) as nome,
+                coalesce (cm.idclasse, c.idclasse) as idclasse,
+                coalesce (cm.nome, c.nome) as classe,
+                pm.fkmedicamento
+            from
+                rededasa.presmed pm
+                inner join rededasa.prescricao p on (pm.fkprescricao = p.fkprescricao)
+                inner join rededasa.medicamento m on (pm.fkmedicamento = m.fkmedicamento)
+                left join public.substancia s on (m.sctid = s.sctid)
+                left join public.classe c on (s.idclasse = c.idclasse)
+                left join public.classe cm on (c.idclassemae  = cm.idclasse)
+            where 
+                p.nratendimento = :admission_number
+                and origem <> 'Dietas'
+        ) meds
+        group by
+            nome, idclasse, classe
+    ) meds_classes
     order by
-        nome
+        prioridade, classe, nome
     """
 
     result = db.session.execute(query, {"admission_number": admission_number})
 
     list = []
     for i in result:
-        list.append(
-            {
-                "name": i[0],
-            }
-        )
+        list.append({"name": i[0], "idClass": i[1], "nameClass": i[2], "period": i[4]})
 
     return list
 
