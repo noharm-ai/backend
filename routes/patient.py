@@ -16,6 +16,7 @@ from .utils import *
 from datetime import datetime
 from services import patient_service
 from converter import patient_converter
+from models.enums import RoleEnum
 
 app_pat = Blueprint("app_pat", __name__)
 
@@ -188,6 +189,7 @@ def setPatientData(admissionNumber):
     dbSession.setSchema(user.schema)
     data = request.get_json()
     os.environ["TZ"] = "America/Sao_Paulo"
+    roles = user.config["roles"] if user.config and "roles" in user.config else []
 
     p = Patient.findByAdmission(admissionNumber)
     if p is None:
@@ -198,33 +200,44 @@ def setPatientData(admissionNumber):
 
     updateWeight = False
 
-    if "weight" in data.keys():
-        weight = data.get("weight", None)
+    if RoleEnum.READONLY.value in roles:
+        return {
+            "status": "error",
+            "message": "Permissão inválida",
+        }, status.HTTP_401_UNAUTHORIZED
 
-        if weight != p.weight:
-            p.weightDate = datetime.today()
-            p.weight = weight
-            updateWeight = True
+    if RoleEnum.SUPPORT.value not in roles:
+        if "weight" in data.keys():
+            weight = data.get("weight", None)
 
-    alertExpire = data.get("alertExpire", None)
-    if alertExpire and alertExpire != p.alertExpire:
-        p.alert = data.get("alert", None)
-        p.alertExpire = alertExpire
-        p.alertDate = datetime.today()
-        p.alertBy = user.id
+            if weight != p.weight:
+                p.weightDate = datetime.today()
+                p.weight = weight
+                updateWeight = True
 
-    if "height" in data.keys():
-        p.height = data.get("height", None)
-    if "dialysis" in data.keys():
-        p.dialysis = data.get("dialysis", None)
-    if "observation" in data.keys():
-        p.observation = data.get("observation", None)
-    if "skinColor" in data.keys():
-        p.skinColor = data.get("skinColor", None)
-    if "gender" in data.keys():
-        p.gender = data.get("gender", None)
-    if "birthdate" in data.keys():
-        p.birthdate = data.get("birthdate", None)
+        alertExpire = data.get("alertExpire", None)
+        if alertExpire and alertExpire != p.alertExpire:
+            p.alert = data.get("alert", None)
+            p.alertExpire = alertExpire
+            p.alertDate = datetime.today()
+            p.alertBy = user.id
+
+        if "height" in data.keys():
+            p.height = data.get("height", None)
+        if "dialysis" in data.keys():
+            p.dialysis = data.get("dialysis", None)
+        if "observation" in data.keys():
+            p.observation = data.get("observation", None)
+        if "skinColor" in data.keys():
+            p.skinColor = data.get("skinColor", None)
+        if "gender" in data.keys():
+            p.gender = data.get("gender", None)
+        if "birthdate" in data.keys():
+            p.birthdate = data.get("birthdate", None)
+
+    if RoleEnum.ADMIN.value in roles or RoleEnum.TRAINING.value in roles:
+        if "dischargeDate" in data.keys():
+            p.dischargeDate = data.get("dischargeDate", None)
 
     p.update = datetime.today()
     p.user = user.id
@@ -247,7 +260,7 @@ def setPatientData(admissionNumber):
 
         db.engine.execute(query)
 
-    return tryCommit(db, admissionNumber, user.permission())
+    return tryCommit(db, admissionNumber)
 
 
 @app_pat.route("/patient", methods=["GET"])
