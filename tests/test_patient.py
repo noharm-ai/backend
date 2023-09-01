@@ -18,7 +18,7 @@ def test_post_patient_permission(client):
 
 
 def test_post_patient_permission_support(client):
-    """Teste post /patient/admission - Deve retornar erro [401 UNAUTHORIZED] devido ao usuário utilizado"""
+    """Teste post /patient/admission - Não deve atualizar informacao"""
     access_token = get_access(client, roles=["staging", "suporte"])
 
     admission = "5"
@@ -32,7 +32,7 @@ def test_post_patient_permission_support(client):
     responseData = json.loads(response.data)["data"]
     patient = session.query(Patient).get(admission)
     assert response.status_code == 200
-    assert data["height"] == str(patient.height)
+    assert data["height"] != str(patient.height)
     assert admission == str(responseData)
 
 
