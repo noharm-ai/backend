@@ -118,14 +118,5 @@ bash -c "curl --silent --fail ${COMMAND} > /dev/null"
 EXITSUM+=$?
 printf "\n"
 
-LINK=("intervention/${PRESCRIPTIONDRUG}")
-DATA=('{ "status": "s", "admissionNumber": 5}')
-COMMAND=("-X PUT -H 'Accept: application/json' -H 'Authorization: Bearer ${TOKEN}' -H 'Content-Type: application/json' ${HOST}/${LINK} -d '${DATA}'")
-printf "${LINK} "
-bash -c "curl ${COMMAND}"
-bash -c "curl --silent --fail ${COMMAND} > /dev/null"
-EXITSUM+=$?
-printf "\n"
-
 echo "EXITSUM = ${EXITSUM}"
 exit $EXITSUM
