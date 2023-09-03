@@ -4,7 +4,7 @@ from models.prescription import Patient
 
 def test_post_patient_permission(client):
     """Teste post /patient/admission - Deve retornar erro [401 UNAUTHORIZED] devido ao usuário utilizado"""
-    access_token = get_access(client)
+    access_token = get_access(client, roles=["staging", "readonly"])
 
     admission = "5"
     data = {"height": "15.0"}
@@ -15,6 +15,25 @@ def test_post_patient_permission(client):
     )
 
     assert response.status_code == 401
+
+
+def test_post_patient_permission_support(client):
+    """Teste post /patient/admission - Não deve atualizar informacao"""
+    access_token = get_access(client, roles=["staging", "suporte"])
+
+    admission = "5"
+    data = {"height": "18.0"}
+    url = "patient/" + admission
+
+    response = client.post(
+        url, data=json.dumps(data), headers=make_headers(access_token)
+    )
+
+    responseData = json.loads(response.data)["data"]
+    patient = session.query(Patient).get(admission)
+    assert response.status_code == 200
+    assert data["height"] != str(patient.height)
+    assert admission == str(responseData)
 
 
 def test_post_patient(client):

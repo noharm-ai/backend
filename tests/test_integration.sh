@@ -38,15 +38,6 @@ STATUSCODE=$(bash -c "curl --silent --output /dev/null --write-out '%{http_code}
 if [[ ${STATUSCODE} -ne 401 ]]; then EXITSUM+=22; fi;
 printf "\n"
 
-LINK=("patient/${ADMISSION}")
-DATA=('{ "height": 15}')
-COMMAND=("-X POST -H 'Accept: application/json' -H 'Authorization: Bearer ${TOKEN}' -H 'Content-Type: application/json' ${HOST}/${LINK} -d '${DATA}'")
-printf "${LINK} "
-bash -c "curl ${COMMAND}"
-STATUSCODE=$(bash -c "curl --silent --output /dev/null --write-out '%{http_code}' ${COMMAND}")
-if [[ ${STATUSCODE} -ne 401 ]]; then EXITSUM+=22; fi;
-printf "\n"
-
 LINK=("intervention/${PRESCRIPTIONDRUG}")
 DATA=('{ "status": "s", "admissionNumber": 5}')
 COMMAND=("-X PUT -H 'Accept: application/json' -H 'Authorization: Bearer ${TOKEN}' -H 'Content-Type: application/json' ${HOST}/${LINK} -d '${DATA}'")
