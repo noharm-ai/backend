@@ -381,13 +381,6 @@ def setDrugUnit(idSegment, idDrug):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
 
-    roles = user.config["roles"] if user.config and "roles" in user.config else []
-    if RoleEnum.ADMIN.value not in roles and RoleEnum.TRAINING.value not in roles:
-        return {
-            "status": "error",
-            "message": "Usuário não autorizado",
-        }, status.HTTP_401_UNAUTHORIZED
-
     idMeasureUnit = data.get("idMeasureUnit", 1)
     u = MeasureUnitConvert.query.get((idMeasureUnit, idDrug, idSegment))
     new = False
