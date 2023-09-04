@@ -359,8 +359,8 @@ def _get_all_drugs_used(admission_number, schema):
             select 
                 string_agg(concat(to_char(coalesce(p.dtvigencia, p.dtprescricao) , 'DD/MM'), ' (', pm.fkfrequencia, ' x ', pm.dose, pm.fkunidademedida, ')'), ', ')
             from 
-                rededasa.presmed pm
-                inner join rededasa.prescricao p on (pm.fkprescricao = p.fkprescricao)
+                {schema}.presmed pm
+                inner join {schema}.prescricao p on (pm.fkprescricao = p.fkprescricao)
             where 
                 p.nratendimento = :admission_number
                 and pm.fkmedicamento = meds_classes.fkmedicamento
@@ -382,9 +382,9 @@ def _get_all_drugs_used(admission_number, schema):
                 coalesce (cm.nome, c.nome) as classe,
                 pm.fkmedicamento
             from
-                rededasa.presmed pm
-                inner join rededasa.prescricao p on (pm.fkprescricao = p.fkprescricao)
-                inner join rededasa.medicamento m on (pm.fkmedicamento = m.fkmedicamento)
+                {schema}.presmed pm
+                inner join {schema}.prescricao p on (pm.fkprescricao = p.fkprescricao)
+                inner join {schema}.medicamento m on (pm.fkmedicamento = m.fkmedicamento)
                 left join public.substancia s on (m.sctid = s.sctid)
                 left join public.classe c on (s.idclasse = c.idclasse)
                 left join public.classe cm on (c.idclassemae  = cm.idclasse)
