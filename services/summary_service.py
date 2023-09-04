@@ -131,81 +131,94 @@ def _get_all_annotations(admission_number):
         .first()
     )
 
-    reason = _get_annotation(
-        admission_number=admission_number,
-        field="motivo",
-        add=True,
-        interval="4 DAYS",
-        compare_date=first.date,
-    )
+    if first == None:
+        empty = {"list": [], "value": ""}
 
-    previous_drugs = _get_annotation(
-        admission_number=admission_number,
-        field="medprevio",
-        add=True,
-        interval="1 DAY",
-        compare_date=first.date,
-    )
+        reason = empty
+        previous_drugs = empty
+        diagnosis = empty
+        summary_annotation = empty
+        discharge_plan = empty
+        procedures = empty
+        exams = empty
+        discharge_condition = empty
+        clinical_summary = empty
+    else:
+        reason = _get_annotation(
+            admission_number=admission_number,
+            field="motivo",
+            add=True,
+            interval="4 DAYS",
+            compare_date=first.date,
+        )
 
-    diagnosis = _get_annotation(
-        admission_number=admission_number,
-        field="diagnostico",
-        add=True,
-        interval=None,
-        compare_date=None,
-    )
+        previous_drugs = _get_annotation(
+            admission_number=admission_number,
+            field="medprevio",
+            add=True,
+            interval="1 DAY",
+            compare_date=first.date,
+        )
 
-    summary_annotation = _get_annotation(
-        admission_number=admission_number,
-        field="resumo",
-        add=False,
-        interval="1 DAY",
-        compare_date=last.date,
-    )
+        diagnosis = _get_annotation(
+            admission_number=admission_number,
+            field="diagnostico",
+            add=True,
+            interval=None,
+            compare_date=None,
+        )
 
-    discharge_plan = _get_annotation(
-        admission_number=admission_number,
-        field="planoalta",
-        add=False,
-        interval="1 DAY",
-        compare_date=last.date,
-    )
+        summary_annotation = _get_annotation(
+            admission_number=admission_number,
+            field="resumo",
+            add=False,
+            interval="1 DAY",
+            compare_date=last.date,
+        )
 
-    procedures = _get_annotation(
-        admission_number=admission_number,
-        field="procedimentos",
-        add=True,
-        interval=None,
-        compare_date=None,
-    )
+        discharge_plan = _get_annotation(
+            admission_number=admission_number,
+            field="planoalta",
+            add=False,
+            interval="1 DAY",
+            compare_date=last.date,
+        )
 
-    exams = _get_annotation(
-        admission_number=admission_number,
-        field="exames",
-        add=True,
-        interval=None,
-        compare_date=None,
-    )
+        procedures = _get_annotation(
+            admission_number=admission_number,
+            field="procedimentos",
+            add=True,
+            interval=None,
+            compare_date=None,
+        )
 
-    discharge_condition = _get_annotation(
-        admission_number=admission_number,
-        field="condicaoalta",
-        add=False,
-        interval="1 DAY",
-        compare_date=last.date,
-    )
+        exams = _get_annotation(
+            admission_number=admission_number,
+            field="exames",
+            add=True,
+            interval=None,
+            compare_date=None,
+        )
 
-    clinical_summary = {}
-    clinical_summary["value"] = (
-        reason["value"]
-        + ". "
-        + procedures["value"]
-        + ". "
-        + summary_annotation["value"]
-    )[:1500]
-    clinical_summary["list"] = (
-        reason["list"] + procedures["list"] + summary_annotation["list"]
-    )
+        discharge_condition = _get_annotation(
+            admission_number=admission_number,
+            field="condicaoalta",
+            add=False,
+            interval="1 DAY",
+            compare_date=last.date,
+        )
+
+        clinical_summary = {}
+        clinical_summary["value"] = (
+            reason["value"]
+            + ". "
+            + procedures["value"]
+            + ". "
+            + summary_annotation["value"]
+        )[:1500]
+        clinical_summary["list"] = (
+            reason["list"] + procedures["list"] + summary_annotation["list"]
+        )
 
     return {
         "reason": reason,
