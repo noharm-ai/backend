@@ -258,29 +258,36 @@ def _get_annotation(admission_number, field, add, interval, compare_date):
 
 def _get_exams(id_patient, schema):
     query = f"""
-    select
-        distinct on (e.fkpessoa,s.abrev)
-        e.fkpessoa,
-        s.abrev,
-        resultado,
-        dtexame,
-        s.referencia,
-        e.unidade,
-        s.min,
-        s.max
-    from
-        {schema}.pessoa pe
-    inner join {schema}.exame e on
-        pe.fkpessoa = e.fkpessoa
-    inner join {schema}.segmentoexame s on
-        s.tpexame = lower(e.tpexame)
+    select * from (
+        select
+            distinct on (e.fkpessoa,s.abrev)
+            e.fkpessoa,
+            s.abrev,
+            resultado,
+            dtexame,
+            s.referencia,
+            e.unidade,
+            s.min,
+            s.max,
+            s.posicao
+        from
+            {schema}.pessoa pe
+        inner join {schema}.exame e on
+            pe.fkpessoa = e.fkpessoa
+        inner join {schema}.segmentoexame s on
+            s.tpexame = lower(e.tpexame)
+        where 
+            e.fkpessoa = :id_patient
+            and (resultado < s.min or resultado > s.max)
+        order by
+            fkpessoa,
+            abrev,
+            dtexame desc
+    ) e
     where 
-        e.fkpessoa = :id_patient
-        and (resultado < s.min or resultado > s.max)
+        posicao <= 30
     order by
-        fkpessoa,
-        abrev,
-        dtexame desc
+        abrev    
     """
 
     exams = db.session.execute(query, {"id_patient": id_patient})
