@@ -131,81 +131,94 @@ def _get_all_annotations(admission_number):
         .first()
     )
 
-    reason = _get_annotation(
-        admission_number=admission_number,
-        field="motivo",
-        add=True,
-        interval="4 DAYS",
-        compare_date=first.date,
-    )
+    if first == None:
+        empty = {"list": [], "value": ""}
 
-    previous_drugs = _get_annotation(
-        admission_number=admission_number,
-        field="medprevio",
-        add=True,
-        interval="1 DAY",
-        compare_date=first.date,
-    )
+        reason = empty
+        previous_drugs = empty
+        diagnosis = empty
+        summary_annotation = empty
+        discharge_plan = empty
+        procedures = empty
+        exams = empty
+        discharge_condition = empty
+        clinical_summary = empty
+    else:
+        reason = _get_annotation(
+            admission_number=admission_number,
+            field="motivo",
+            add=True,
+            interval="4 DAYS",
+            compare_date=first.date,
+        )
 
-    diagnosis = _get_annotation(
-        admission_number=admission_number,
-        field="diagnostico",
-        add=True,
-        interval=None,
-        compare_date=None,
-    )
+        previous_drugs = _get_annotation(
+            admission_number=admission_number,
+            field="medprevio",
+            add=True,
+            interval="1 DAY",
+            compare_date=first.date,
+        )
 
-    summary_annotation = _get_annotation(
-        admission_number=admission_number,
-        field="resumo",
-        add=False,
-        interval="1 DAY",
-        compare_date=last.date,
-    )
+        diagnosis = _get_annotation(
+            admission_number=admission_number,
+            field="diagnostico",
+            add=True,
+            interval=None,
+            compare_date=None,
+        )
 
-    discharge_plan = _get_annotation(
-        admission_number=admission_number,
-        field="planoalta",
-        add=False,
-        interval="1 DAY",
-        compare_date=last.date,
-    )
+        summary_annotation = _get_annotation(
+            admission_number=admission_number,
+            field="resumo",
+            add=False,
+            interval="1 DAY",
+            compare_date=last.date,
+        )
 
-    procedures = _get_annotation(
-        admission_number=admission_number,
-        field="procedimentos",
-        add=True,
-        interval=None,
-        compare_date=None,
-    )
+        discharge_plan = _get_annotation(
+            admission_number=admission_number,
+            field="planoalta",
+            add=False,
+            interval="1 DAY",
+            compare_date=last.date,
+        )
 
-    exams = _get_annotation(
-        admission_number=admission_number,
-        field="exames",
-        add=True,
-        interval=None,
-        compare_date=None,
-    )
+        procedures = _get_annotation(
+            admission_number=admission_number,
+            field="procedimentos",
+            add=True,
+            interval=None,
+            compare_date=None,
+        )
 
-    discharge_condition = _get_annotation(
-        admission_number=admission_number,
-        field="condicaoalta",
-        add=False,
-        interval="1 DAY",
-        compare_date=last.date,
-    )
+        exams = _get_annotation(
+            admission_number=admission_number,
+            field="exames",
+            add=True,
+            interval=None,
+            compare_date=None,
+        )
 
-    clinical_summary = {}
-    clinical_summary["value"] = (
-        reason["value"]
-        + ". "
-        + procedures["value"]
-        + ". "
-        + summary_annotation["value"]
-    )[:1500]
-    clinical_summary["list"] = (
-        reason["list"] + procedures["list"] + summary_annotation["list"]
-    )
+        discharge_condition = _get_annotation(
+            admission_number=admission_number,
+            field="condicaoalta",
+            add=False,
+            interval="1 DAY",
+            compare_date=last.date,
+        )
+
+        clinical_summary = {}
+        clinical_summary["value"] = (
+            reason["value"]
+            + ". "
+            + procedures["value"]
+            + ". "
+            + summary_annotation["value"]
+        )[:1500]
+        clinical_summary["list"] = (
+            reason["list"] + procedures["list"] + summary_annotation["list"]
+        )
 
     return {
         "reason": reason,
@@ -258,29 +271,36 @@ def _get_annotation(admission_number, field, add, interval, compare_date):
 
 def _get_exams(id_patient, schema):
     query = f"""
-    select
-        distinct on (e.fkpessoa,s.abrev)
-        e.fkpessoa,
-        s.abrev,
-        resultado,
-        dtexame,
-        s.referencia,
-        e.unidade,
-        s.min,
-        s.max
-    from
-        {schema}.pessoa pe
-    inner join {schema}.exame e on
-        pe.fkpessoa = e.fkpessoa
-    inner join {schema}.segmentoexame s on
-        s.tpexame = lower(e.tpexame)
+    select * from (
+        select
+            distinct on (e.fkpessoa,s.abrev)
+            e.fkpessoa,
+            s.abrev,
+            resultado,
+            dtexame,
+            s.referencia,
+            e.unidade,
+            s.min,
+            s.max,
+            s.posicao
+        from
+            {schema}.pessoa pe
+        inner join {schema}.exame e on
+            pe.fkpessoa = e.fkpessoa
+        inner join {schema}.segmentoexame s on
+            s.tpexame = lower(e.tpexame)
+        where 
+            e.fkpessoa = :id_patient
+            and (resultado < s.min or resultado > s.max)
+        order by
+            fkpessoa,
+            abrev,
+            dtexame desc
+    ) e
     where 
-        e.fkpessoa = :id_patient
-        and (resultado < s.min or resultado > s.max)
+        posicao <= 30
     order by
-        fkpessoa,
-        abrev,
-        dtexame desc
+        abrev    
     """
 
     exams = db.session.execute(query, {"id_patient": id_patient})
@@ -339,8 +359,8 @@ def _get_all_drugs_used(admission_number, schema):
             select 
                 string_agg(concat(to_char(coalesce(p.dtvigencia, p.dtprescricao) , 'DD/MM'), ' (', pm.fkfrequencia, ' x ', pm.dose, pm.fkunidademedida, ')'), ', ')
             from 
-                rededasa.presmed pm
-                inner join rededasa.prescricao p on (pm.fkprescricao = p.fkprescricao)
+                {schema}.presmed pm
+                inner join {schema}.prescricao p on (pm.fkprescricao = p.fkprescricao)
             where 
                 p.nratendimento = :admission_number
                 and pm.fkmedicamento = meds_classes.fkmedicamento
@@ -362,9 +382,9 @@ def _get_all_drugs_used(admission_number, schema):
                 coalesce (cm.nome, c.nome) as classe,
                 pm.fkmedicamento
             from
-                rededasa.presmed pm
-                inner join rededasa.prescricao p on (pm.fkprescricao = p.fkprescricao)
-                inner join rededasa.medicamento m on (pm.fkmedicamento = m.fkmedicamento)
+                {schema}.presmed pm
+                inner join {schema}.prescricao p on (pm.fkprescricao = p.fkprescricao)
+                inner join {schema}.medicamento m on (pm.fkmedicamento = m.fkmedicamento)
                 left join public.substancia s on (m.sctid = s.sctid)
                 left join public.classe c on (s.idclasse = c.idclasse)
                 left join public.classe cm on (c.idclassemae  = cm.idclasse)
