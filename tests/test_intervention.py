@@ -63,8 +63,6 @@ def test_put_interventions(client):
 
     responseData = json.loads(response.data)["data"]
 
-    print ("Hello World!", responseData)
-
     interventions = (
         session.query(Intervention)
         .filter(Intervention.id == responseData[0]["id"])
