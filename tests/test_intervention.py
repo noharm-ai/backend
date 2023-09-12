@@ -51,16 +51,23 @@ def test_put_interventions(client):
         "cost": False,
         "observation": "teste observations",
         "interactions": [5],
+        "idPrescriptionDrug": idPrescriptionDrug
     }
-    url = "intervention/" + idPrescriptionDrug
+    url = "/intervention"
 
     response = client.put(
         url, data=json.dumps(data), headers=make_headers(access_token)
     )
+
+    assert response.status_code == 200
+
     responseData = json.loads(response.data)["data"]
+
+    print ("Hello World!", responseData)
+
     interventions = (
         session.query(Intervention)
-        .filter(Intervention.id == responseData)
+        .filter(Intervention.id == responseData[0]["id"])
         .filter(Intervention.idPrescription == "0")
         .first()
     )
@@ -80,9 +87,13 @@ def test_put_interventions_permission(client):
 
     access_token = get_access(client, roles=["suporte"])
 
-    idPrescriptionDrug = "20"
-    data = {"status": "s", "admissionNumber": "5"}
-    url = "intervention/" + idPrescriptionDrug
+    idIntervention = "1"
+    idPrescription = "0"
+    data = {"status": "s", "admissionNumber": "5",
+            "idIntervention": idIntervention,
+            "idPrescription": idPrescription}
+    
+    url = "/intervention"
 
     response = client.put(
         url, data=json.dumps(data), headers=make_headers(access_token)
