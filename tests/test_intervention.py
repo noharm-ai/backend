@@ -51,7 +51,7 @@ def test_put_interventions(client):
         "cost": False,
         "observation": "teste observations",
         "interactions": [5],
-        "idPrescriptionDrug": idPrescriptionDrug
+        "idPrescriptionDrug": idPrescriptionDrug,
     }
     url = "/intervention"
 
@@ -87,10 +87,13 @@ def test_put_interventions_permission(client):
 
     idIntervention = "1"
     idPrescription = "0"
-    data = {"status": "s", "admissionNumber": "5",
-            "idIntervention": idIntervention,
-            "idPrescription": idPrescription}
-    
+    data = {
+        "status": "s",
+        "admissionNumber": "5",
+        "idIntervention": idIntervention,
+        "idPrescription": idPrescription,
+    }
+
     url = "/intervention"
 
     response = client.put(

@@ -20,11 +20,8 @@ def test_get_prescriptions_status_code(client):
     access_token = get_access(client)
 
     response = client.get("/prescriptions", headers=make_headers(access_token))
-    # data = json.loads(response.data)
+
     assert response.status_code == 200
-    # assert data['status'] == 'success'
-    # assert data['data'][0]['description'] == 'descript'
-    # assert len(data['data']) == 3
 
 
 def test_get_prescriptions_by_idPrescription(client):

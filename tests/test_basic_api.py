@@ -3,6 +3,12 @@ from models.enums import FeatureEnum, MemoryEnum
 from models.prescription import Prescription, PrescriptionAudit
 from test_memory import add_memory
 
+SEGMENT = "1"
+DRUG = "5"
+PRESCRIPTION = "20"
+PRESCRIPTIONDRUG = "20"
+ADMISSION = "5"
+
 
 def getMem(kind, default):
     return default
@@ -10,7 +16,6 @@ def getMem(kind, default):
 
 def test_simple_get(client):
     response = client.get("/version")
-    data = json.loads(response.data)
 
     assert response.status_code == 200
 
@@ -33,13 +38,6 @@ def test_reports(user, memory, main, client):
     assert data["reports"] == []
 
 
-SEGMENT = "1"
-DRUG = "5"
-PRESCRIPTION = "20"
-PRESCRIPTIONDRUG = "20"
-ADMISSION = "5"
-
-
 def test_getInterventionReasons(client):
     """Teste get /intervention/reasons - Valida o status_code 200."""
 
@@ -48,7 +46,6 @@ def test_getInterventionReasons(client):
     access_token = get_access(client, roles=["staging"])
 
     response = client.get(url, headers=make_headers(access_token))
-    object = json.loads(response.data)
 
     assert response.status_code == 200
 
@@ -61,7 +58,6 @@ def test_getSubstance(client):
     access_token = get_access(client)
 
     response = client.get(url, headers=make_headers(access_token))
-    object = json.loads(response.data)
 
     assert response.status_code == 200
 
@@ -74,7 +70,6 @@ def test_getDrugs(client):
     access_token = get_access(client)
 
     response = client.get(url, headers=make_headers(access_token))
-    object = json.loads(response.data)
 
     assert response.status_code == 200
 
@@ -87,7 +82,6 @@ def test_getPrescriptionsSegment(client):
     access_token = get_access(client)
 
     response = client.get(url, headers=make_headers(access_token))
-    object = json.loads(response.data)
 
     assert response.status_code == 200
 
@@ -100,7 +94,6 @@ def test_getPrescriptions(client):
     access_token = get_access(client)
 
     response = client.get(url, headers=make_headers(access_token))
-    object = json.loads(response.data)
 
     assert response.status_code == 200
 
@@ -113,7 +106,6 @@ def test_getPrescriptionsDrug(client):
     access_token = get_access(client)
 
     response = client.get(url, headers=make_headers(access_token))
-    object = json.loads(response.data)
 
     assert response.status_code == 200
 
@@ -126,7 +118,6 @@ def test_getStaticPrescription(client):
     access_token = get_access(client)
 
     response = client.get(url, headers=make_headers(access_token))
-    object = json.loads(response.data)
 
     assert response.status_code == 200
 
@@ -139,7 +130,6 @@ def test_getExams(client):
     access_token = get_access(client)
 
     response = client.get(url, headers=make_headers(access_token))
-    object = json.loads(response.data)
 
     assert response.status_code == 200
 
@@ -152,7 +142,6 @@ def test_getSegments(client):
     access_token = get_access(client)
 
     response = client.get(url, headers=make_headers(access_token))
-    object = json.loads(response.data)
 
     assert response.status_code == 200
 
@@ -165,7 +154,6 @@ def test_getSegmentsID(client):
     access_token = get_access(client)
 
     response = client.get(url, headers=make_headers(access_token))
-    object = json.loads(response.data)
 
     assert response.status_code == 200
 
@@ -178,7 +166,6 @@ def test_getDepartments(client):
     access_token = get_access(client)
 
     response = client.get(url, headers=make_headers(access_token))
-    object = json.loads(response.data)
 
     assert response.status_code == 200
 
@@ -191,7 +178,6 @@ def test_getSegmentsExams(client):
     access_token = get_access(client)
 
     response = client.get(url, headers=make_headers(access_token))
-    object = json.loads(response.data)
 
     assert response.status_code == 200
 
@@ -200,28 +186,24 @@ def test_getNotes(client):
     """Teste get /notes/idAdmission - Valida o status_code 200."""
 
     url = f"/notes/{ADMISSION}"
-    # idDrug
+
     access_token = get_access(client)
 
     response = client.get(url, headers=make_headers(access_token))
-    object = json.loads(response.data)
 
     assert response.status_code == 200
 
 
-# def test_getSegmentsDrug(client):
-# 	"""Teste get /segments/idSegment/outliers/generate/drug/idDrug - Valida o status_code 200."""
+def test_getSegmentsDrug(client):
+    """Teste get /segments/idSegment/outliers/generate/drug/idDrug - Valida o status_code 200."""
 
-# 	url = f"/segments/{SEGMENT}/outliers/generate/drug/{12}"
+    url = f"/segments/{SEGMENT}/outliers/generate/drug/{12}"
 
-# 	access_token = get_access(client, roles=["staging", "suporte"])
+    access_token = get_access(client, roles=["staging", "suporte"])
 
-# 	response = client.get(url, headers=make_headers(access_token))
-# 	object=json.loads(response.data)
+    response = client.get(url, headers=make_headers(access_token))
 
-#
-
-# 	assert response.status_code == 200
+    assert response.status_code == 200
 
 
 def test_putPrescriprionsCheck(client):
@@ -240,8 +222,6 @@ def test_putPrescriprionsCheck(client):
     )
 
     assert response.status_code == 200
-
-    object = json.loads(response.data)
 
     prescription = (
         session.query(Prescription)
@@ -276,7 +256,6 @@ def test_putPrescriprionsUncheck(client):
     )
 
     assert response.status_code == 200
-    # object = json.loads(response.data)
 
     prescription = (
         session.query(Prescription)
@@ -290,8 +269,6 @@ def test_putPrescriprionsUncheck(client):
         .filter(PrescriptionAudit.auditType == "2")
         .first()
     )
-
-    print("teste", prescription)
 
     assert prescription
     assert prescriptionaudit
@@ -436,41 +413,22 @@ def test_putPrescriprions(client):
     response = client.put(
         url, data=json.dumps(data), headers=make_headers(access_token)
     )
-    object = json.loads(response.data)
 
     assert response.status_code == 401
 
 
 def test_postPatient(client):
-    """Teste post /patient/idAdmission - Assegura que o usuário com role support não tenha autorização para chamar o endpoint."""
+    """Teste post /patient/idAdmission - Assegura que o usuário com role readonly não tenha autorização para chamar o endpoint."""
 
     url = f"/patient/{ADMISSION}"
 
-    access_token = get_access(client)
+    access_token = get_access(client, roles=["staging", "readonly"])
 
     data = {"height": 15}
 
     response = client.post(
         url, data=json.dumps(data), headers=make_headers(access_token)
     )
-    object = json.loads(response.data)
-
-    assert response.status_code == 401
-
-
-def test_putIntervention(client):
-    """Teste put /intervention/idPrescriptionDrug - Assegura que o usuário com role support não tenha autorização para chamar o endpoint."""
-
-    url = f"/intervention/{PRESCRIPTIONDRUG}"
-
-    access_token = get_access(client)
-
-    data = {"status": "s", "admissionNumber": 5}
-
-    response = client.put(
-        url, data=json.dumps(data), headers=make_headers(access_token)
-    )
-    object = json.loads(response.data)
 
     assert response.status_code == 401
 
@@ -483,7 +441,6 @@ def test_getPrescriptions404(client):
     access_token = get_access(client)
 
     response = client.get(url, headers=make_headers(access_token))
-    object = json.loads(response.data)
 
     assert response.status_code == 400
 
@@ -500,7 +457,6 @@ def test_putDrug(client):
     response = client.put(
         url, data=json.dumps(data), headers=make_headers(access_token)
     )
-    object = json.loads(response.data)
 
     assert response.status_code == 200
 
@@ -517,7 +473,6 @@ def test_putPrescription(client):
     response = client.put(
         url, data=json.dumps(data), headers=make_headers(access_token)
     )
-    object = json.loads(response.data)
 
     assert response.status_code == 200
 
@@ -534,7 +489,6 @@ def test_postPatient404(client):
     response = client.post(
         url, data=json.dumps(data), headers=make_headers(access_token)
     )
-    object = json.loads(response.data)
 
     assert response.status_code == 200
 
@@ -551,23 +505,5 @@ def test_putPrescriptionsDrug(client):
     response = client.put(
         url, data=json.dumps(data), headers=make_headers(access_token)
     )
-    object = json.loads(response.data)
-
-    assert response.status_code == 200
-
-
-def test_putInterventionPDrug(client):
-    """Teste put /prescriptions/drug/idPrescriptiondrug - Deve retornar o código 200, indicando funcionamento do endpoint."""
-
-    url = f"/intervention/{PRESCRIPTIONDRUG}"
-
-    access_token = get_access(client, roles=["staging"])
-
-    data = {"status": "s", "admissionNumber": 15}
-
-    response = client.put(
-        url, data=json.dumps(data), headers=make_headers(access_token)
-    )
-    object = json.loads(response.data)
 
     assert response.status_code == 200

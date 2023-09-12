@@ -73,17 +73,6 @@ def update_roles(email, roles):
         user.config = {"roles": roles}
         session_commit()
 
-    # mem.kind = mem_kind
-    # mem.value = mem_value
-    # mem.update = datetime.today()
-    # mem.user = 0
-    # def delete_memory(key):
-    # memory = session.query(Memory).get(key)
-    # if memory:
-    #     session.delete(memory)
-    #     session_commit()ion_commit()
-    # return mem.key
-
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_makereport(item, call):
