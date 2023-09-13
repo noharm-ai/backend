@@ -62,7 +62,9 @@ def test_get_notes_by_idAdmission(client):
 
     idAdmission = "5"
 
-    response = client.get("/notes/" + idAdmission, headers=make_headers(access_token))
+    response = client.get(
+        f"/notes/{idAdmission}/v2", headers=make_headers(access_token)
+    )
     data = json.loads(response.data)
     # TODO: Add consulta ao banco de dados e comparar retorno (retornando data: [])
 

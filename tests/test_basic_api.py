@@ -185,7 +185,7 @@ def test_getSegmentsExams(client):
 def test_getNotes(client):
     """Teste get /notes/idAdmission - Valida o status_code 200."""
 
-    url = f"/notes/{ADMISSION}"
+    url = f"/notes/{ADMISSION}/v2"
 
     access_token = get_access(client)
 
