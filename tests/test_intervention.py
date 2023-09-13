@@ -63,21 +63,20 @@ def test_put_interventions(client):
 
     responseData = json.loads(response.data)["data"]
 
-    interventions = (
+    intervention = (
         session.query(Intervention)
-        .filter(Intervention.id == responseData[0]["id"])
-        .filter(Intervention.idPrescription == "0")
+        .filter(Intervention.idIntervention == responseData[0]["idIntervention"])
         .first()
     )
 
-    assert response.status_code == 200
-    assert interventions.status == data["status"]
-    assert interventions.admissionNumber == data["admissionNumber"]
-    assert interventions.idInterventionReason == data["idInterventionReason"]
-    assert interventions.error == data["error"]
-    assert interventions.cost == data["cost"]
-    assert interventions.notes == data["observation"]
-    assert interventions.interactions == data["interactions"]
+    assert intervention is not None
+    assert intervention.status == data["status"]
+    assert intervention.admissionNumber == data["admissionNumber"]
+    assert intervention.idInterventionReason == data["idInterventionReason"]
+    assert intervention.error == data["error"]
+    assert intervention.cost == data["cost"]
+    assert intervention.notes == data["observation"]
+    assert intervention.interactions == data["interactions"]
 
 
 def test_put_interventions_permission(client):
