@@ -215,8 +215,6 @@ def test_putPrescriprionsCheck(client):
 
     data = {"status": "s"}
 
-    add_memory(MemoryEnum.FEATURES.value, [FeatureEnum.AUDIT.value])
-
     response = client.put(
         url, data=json.dumps(data), headers=make_headers(access_token)
     )
@@ -248,8 +246,6 @@ def test_putPrescriprionsUncheck(client):
     access_token = get_access(client, roles=["staging"])
 
     data = {"status": "0"}
-
-    add_memory(MemoryEnum.FEATURES.value, [FeatureEnum.AUDIT.value])
 
     response = client.put(
         url, data=json.dumps(data), headers=make_headers(access_token)
@@ -366,8 +362,6 @@ def test_putAggregatePrescriprionsCheckCpoe(client):
     assert response.status_code == 200
 
     """Checagem da prescrição agregada."""
-
-    add_memory(MemoryEnum.FEATURES.value, [FeatureEnum.AUDIT.value])
 
     checkagurl = f"/prescriptions/{id}"
 

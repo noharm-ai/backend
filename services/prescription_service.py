@@ -134,10 +134,7 @@ def _check_single_prescription(prescription, p_status, user, parent_agg_date=Non
     prescription.update = datetime.today()
     prescription.user = user.id
 
-    if memory_service.has_feature(FeatureEnum.AUDIT.value):
-        _audit_check(
-            prescription=prescription, user=user, parent_agg_date=parent_agg_date
-        )
+    _audit_check(prescription=prescription, user=user, parent_agg_date=parent_agg_date)
 
     db.session.flush()
 
