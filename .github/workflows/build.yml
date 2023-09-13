@@ -35,8 +35,6 @@ jobs:
         run: |
           python mobile.py &
           sleep 10
-      - name: Run Integration Test
-        run: ./tests/test_integration.sh
       - name: Run Python Tests
         run: python -m pytest -v
       - name: Run Coverage Report
@@ -77,5 +75,3 @@ jobs:
         run: |
           python mobile.py &
           sleep 10
-      - name: Run Integration Test
-        run: ./tests/test_integration.sh

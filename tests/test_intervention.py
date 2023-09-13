@@ -51,28 +51,32 @@ def test_put_interventions(client):
         "cost": False,
         "observation": "teste observations",
         "interactions": [5],
+        "idPrescriptionDrug": idPrescriptionDrug,
     }
-    url = "intervention/" + idPrescriptionDrug
+    url = "/intervention"
 
     response = client.put(
         url, data=json.dumps(data), headers=make_headers(access_token)
     )
+
+    assert response.status_code == 200
+
     responseData = json.loads(response.data)["data"]
-    interventions = (
+
+    intervention = (
         session.query(Intervention)
-        .filter(Intervention.id == responseData)
-        .filter(Intervention.idPrescription == "0")
+        .filter(Intervention.idIntervention == responseData[0]["idIntervention"])
         .first()
     )
 
-    assert response.status_code == 200
-    assert interventions.status == data["status"]
-    assert interventions.admissionNumber == data["admissionNumber"]
-    assert interventions.idInterventionReason == data["idInterventionReason"]
-    assert interventions.error == data["error"]
-    assert interventions.cost == data["cost"]
-    assert interventions.notes == data["observation"]
-    assert interventions.interactions == data["interactions"]
+    assert intervention is not None
+    assert intervention.status == data["status"]
+    assert intervention.admissionNumber == data["admissionNumber"]
+    assert intervention.idInterventionReason == data["idInterventionReason"]
+    assert intervention.error == data["error"]
+    assert intervention.cost == data["cost"]
+    assert intervention.notes == data["observation"]
+    assert intervention.interactions == data["interactions"]
 
 
 def test_put_interventions_permission(client):
@@ -80,9 +84,16 @@ def test_put_interventions_permission(client):
 
     access_token = get_access(client, roles=["suporte"])
 
-    idPrescriptionDrug = "20"
-    data = {"status": "s", "admissionNumber": "5"}
-    url = "intervention/" + idPrescriptionDrug
+    idIntervention = "1"
+    idPrescription = "0"
+    data = {
+        "status": "s",
+        "admissionNumber": "5",
+        "idIntervention": idIntervention,
+        "idPrescription": idPrescription,
+    }
+
+    url = "/intervention"
 
     response = client.put(
         url, data=json.dumps(data), headers=make_headers(access_token)

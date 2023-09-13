@@ -277,9 +277,9 @@ def save_intervention(
         i.admissionNumber = admission_number
     if id_intervention_reason:
         i.idInterventionReason = id_intervention_reason
-    if error:
+    if error is not None:
         i.error = error
-    if cost:
+    if cost is not None:
         i.cost = cost
     if observation:
         i.notes = observation
