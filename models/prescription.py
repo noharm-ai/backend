@@ -255,7 +255,11 @@ class Prescription(db.Model):
                     .filter(p1.idSegment != None)
                     .filter(p1.concilia == None)
                     .filter(p2.concilia == None)
-                    .filter(func.date(p2.expire) == func.date(p1.expire))
+                    .filter(
+                        daterange(p1.date, p1.expire, "[]").overlaps(
+                            daterange(p2.date, p2.expire, "[]")
+                        )
+                    )
                 )
 
             else:
