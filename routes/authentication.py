@@ -1,4 +1,5 @@
 from flask import Blueprint, request, url_for, jsonify, after_this_request
+from flask_cors import cross_origin
 from flask_api import status
 from models.main import *
 from models.appendix import *
@@ -11,6 +12,7 @@ from flask_jwt_extended import (
     set_refresh_cookies,
 )
 
+from config import Config
 from models.enums import MemoryEnum
 from services import auth_service, memory_service
 from exception.validation_error import ValidationError
@@ -19,6 +21,7 @@ app_auth = Blueprint("app_auth", __name__)
 
 
 @app_auth.route("/authenticate", methods=["POST"])
+@cross_origin(Config.MAIL_HOST, supports_credentials=True)
 def auth():
     data = request.get_json()
 
@@ -39,6 +42,7 @@ def auth():
 
 
 @app_auth.route("/auth-provider", methods=["POST"])
+@cross_origin(Config.MAIL_HOST, supports_credentials=True)
 def auth_provider():
     data = request.get_json()
 
@@ -89,6 +93,7 @@ def get_auth_provider(schema):
 
 
 @app_auth.route("/refresh-token", methods=["POST"])
+@cross_origin(Config.MAIL_HOST, supports_credentials=True)
 @jwt_required(refresh=True, locations=["cookies", "headers"])
 def refreshToken():
     current_user = get_jwt_identity()

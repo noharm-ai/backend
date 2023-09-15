@@ -79,7 +79,7 @@ app.register_blueprint(app_admin_freq)
 app.register_blueprint(app_admin_interv)
 app.register_blueprint(app_admin_memory)
 
-CORS(app, supports_credentials=True)
+CORS(app)
 
 if Config.ENV == NoHarmENV.STAGING.value:
     logging.basicConfig()
