@@ -21,7 +21,7 @@ app_auth = Blueprint("app_auth", __name__)
 
 
 @app_auth.route("/authenticate", methods=["POST"])
-@cross_origin(Config.MAIL_HOST, supports_credentials=True)
+@cross_origin(origins=[Config.MAIL_HOST], supports_credentials=True)
 def auth():
     data = request.get_json()
 
@@ -42,7 +42,7 @@ def auth():
 
 
 @app_auth.route("/auth-provider", methods=["POST"])
-@cross_origin(Config.MAIL_HOST, supports_credentials=True)
+@cross_origin(origins=[Config.MAIL_HOST], supports_credentials=True)
 def auth_provider():
     data = request.get_json()
 
@@ -93,7 +93,7 @@ def get_auth_provider(schema):
 
 
 @app_auth.route("/refresh-token", methods=["POST"])
-@cross_origin(Config.MAIL_HOST, supports_credentials=True)
+@cross_origin(origins=[Config.MAIL_HOST], supports_credentials=True)
 @jwt_required(refresh=True, locations=["cookies", "headers"])
 def refreshToken():
     current_user = get_jwt_identity()
