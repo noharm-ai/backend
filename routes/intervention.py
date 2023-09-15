@@ -92,6 +92,7 @@ def search_interventions():
         idSegment=data.get("idSegment", None),
         idPrescription=data.get("idPrescription", None),
         idPrescriptionDrug=data.get("idPrescriptionDrug", None),
+        idDrug=data.get("idDrug", None),
     )
 
     return {"status": "success", "data": results}, status.HTTP_200_OK

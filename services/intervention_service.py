@@ -16,6 +16,7 @@ def get_interventions(
     idPrescription=None,
     idPrescriptionDrug=None,
     idIntervention=None,
+    idDrug=None,
 ):
     mReasion = db.aliased(InterventionReason)
     descript = case(
@@ -126,6 +127,9 @@ def get_interventions(
                 Prescription.idSegment == idSegment,
             )
         )
+
+    if idDrug is not None and len(idDrug) > 0:
+        interventions = interventions.filter(PrescriptionDrug.idDrug.in_(idDrug))
 
     if idPrescription is not None:
         interventions = interventions.filter(
