@@ -20,7 +20,7 @@ from exception.validation_error import ValidationError
 app_auth = Blueprint("app_auth", __name__)
 
 
-@app_auth.route("/authenticate", methods=["POST"])
+@app_auth.route("/authenticate", methods=["POST", "OPTIONS"])
 @cross_origin(origins=[Config.MAIL_HOST], supports_credentials=True)
 def auth():
     data = request.get_json()
@@ -41,7 +41,7 @@ def auth():
     return auth_data, status.HTTP_200_OK
 
 
-@app_auth.route("/auth-provider", methods=["POST"])
+@app_auth.route("/auth-provider", methods=["POST", "OPTIONS"])
 @cross_origin(origins=[Config.MAIL_HOST], supports_credentials=True)
 def auth_provider():
     data = request.get_json()
@@ -92,7 +92,7 @@ def get_auth_provider(schema):
     }, status.HTTP_200_OK
 
 
-@app_auth.route("/refresh-token", methods=["POST"])
+@app_auth.route("/refresh-token", methods=["POST", "OPTIONS"])
 @cross_origin(origins=[Config.MAIL_HOST], supports_credentials=True)
 @jwt_required(refresh=True, locations=["cookies", "headers"])
 def refreshToken():
