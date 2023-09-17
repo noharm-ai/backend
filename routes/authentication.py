@@ -1,5 +1,4 @@
 from flask import Blueprint, request, url_for, jsonify, after_this_request
-from flask_cors import cross_origin
 from flask_api import status
 from models.main import *
 from models.appendix import *
@@ -12,7 +11,6 @@ from flask_jwt_extended import (
     set_refresh_cookies,
 )
 
-from config import Config
 from models.enums import MemoryEnum
 from services import auth_service, memory_service
 from exception.validation_error import ValidationError
@@ -20,31 +18,35 @@ from exception.validation_error import ValidationError
 app_auth = Blueprint("app_auth", __name__)
 
 
-@app_auth.route("/authenticate", methods=["POST", "OPTIONS"])
-@cross_origin(origins=[Config.MAIL_HOST], supports_credentials=True)
+@app_auth.route("/authenticate", methods=["POST"])
 def auth():
     data = request.get_json()
 
     email = data.get("email", None)
     password = data.get("password", None)
+    refresh_token = None
 
     try:
         auth_data = auth_service.auth_local(email, password)
+
+        refresh_token = auth_data["refresh_token"]
+        auth_data.pop("refresh_token")
     except ValidationError as e:
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
     @after_this_request
     def after_auth(response):
-        set_refresh_cookies(response, auth_data["refresh_token"])
+        set_refresh_cookies(response, refresh_token)
+
         return response
 
     return auth_data, status.HTTP_200_OK
 
 
-@app_auth.route("/auth-provider", methods=["POST", "OPTIONS"])
-@cross_origin(origins=[Config.MAIL_HOST], supports_credentials=True)
+@app_auth.route("/auth-provider", methods=["POST"])
 def auth_provider():
     data = request.get_json()
+    refresh_token = None
 
     if "schema" not in data or "code" not in data:
         return {
@@ -54,12 +56,15 @@ def auth_provider():
 
     try:
         auth_data = auth_service.auth_provider(code=data["code"], schema=data["schema"])
+
+        refresh_token = auth_data["refresh_token"]
+        auth_data.pop("refresh_token")
     except ValidationError as e:
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
     @after_this_request
     def after_auth_provider(response):
-        set_refresh_cookies(response, auth_data["refresh_token"])
+        set_refresh_cookies(response, refresh_token)
         return response
 
     return tryCommit(db, auth_data)
@@ -92,8 +97,7 @@ def get_auth_provider(schema):
     }, status.HTTP_200_OK
 
 
-@app_auth.route("/refresh-token", methods=["POST", "OPTIONS"])
-@cross_origin(origins=[Config.MAIL_HOST], supports_credentials=True)
+@app_auth.route("/refresh-token", methods=["POST"])
 @jwt_required(refresh=True, locations=["cookies", "headers"])
 def refreshToken():
     current_user = get_jwt_identity()
