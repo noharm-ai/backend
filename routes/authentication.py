@@ -58,6 +58,7 @@ def auth_provider():
     try:
         auth_data = auth_service.auth_provider(code=data["code"], schema=data["schema"])
 
+        auth_data["oauth"] = True
         refresh_token = auth_data["refresh_token"]
         # temp
         # auth_data.pop("refresh_token")
