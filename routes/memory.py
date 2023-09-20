@@ -33,6 +33,7 @@ def getMemory(kind):
 
 
 @app_mem.route("/memory/", methods=["PUT"])
+@app_mem.route("/memory", methods=["PUT"])
 @app_mem.route("/memory/<int:idMemory>", methods=["PUT"])
 @jwt_required()
 def save_memory(idMemory=None):

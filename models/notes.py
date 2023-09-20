@@ -181,6 +181,10 @@ class ClinicalNotes(db.Model):
                     partition_by=func.date(ClinicalNotes.date),
                     order_by=desc(ClinicalNotes.date),
                 ),
+                func.first_value(ClinicalNotes.date).over(
+                    partition_by=func.date(ClinicalNotes.date),
+                    order_by=desc(ClinicalNotes.date),
+                ),
                 func.date(ClinicalNotes.date).label("date"),
             )
             .distinct(func.date(ClinicalNotes.date))

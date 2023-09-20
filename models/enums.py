@@ -27,7 +27,6 @@ class RoleEnum(Enum):
 
 
 class FeatureEnum(Enum):
-    AUDIT = "AUDIT"
     PRIMARY_CARE = "PRIMARYCARE"
     OAUTH = "OAUTH"
 

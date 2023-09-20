@@ -355,16 +355,19 @@ def _get_all_drugs_used(admission_number, schema):
         idclasse,
         classe,
         fkmedicamento,
-        (
-            select 
-                string_agg(concat(to_char(coalesce(p.dtvigencia, p.dtprescricao) , 'DD/MM'), ' (', pm.fkfrequencia, ' x ', pm.dose, pm.fkunidademedida, ')'), ', ')
-            from 
-                {schema}.presmed pm
-                inner join {schema}.prescricao p on (pm.fkprescricao = p.fkprescricao)
-            where 
-                p.nratendimento = :admission_number
-                and pm.fkmedicamento = meds_classes.fkmedicamento
-        ) as periodo,
+        case 
+            when idclasse = 'J1' then (
+                select 
+                    string_agg(concat(to_char(coalesce(p.dtvigencia, p.dtprescricao) , 'DD/MM'), ' (', pm.fkfrequencia, ' x ', pm.dose, pm.fkunidademedida, ')'), ', ')
+                from 
+                    {schema}.presmed pm
+                    inner join {schema}.prescricao p on (pm.fkprescricao = p.fkprescricao)
+                where 
+                    p.nratendimento = :admission_number
+                    and pm.fkmedicamento = meds_classes.fkmedicamento
+            )
+            else null
+        end as periodo,
         case 
             when idclasse = 'J1' then 0
             else 1

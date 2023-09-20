@@ -298,6 +298,24 @@ class Prescription(db.Model):
             relation = get_period_filter(relation, p1, aggDate, is_pmc, is_cpoe)
             relation = get_period_filter(relation, p2, aggDate, is_pmc, is_cpoe)
 
+            if is_pmc:
+                p_sub = db.aliased(Prescription)
+                max_date_query = (
+                    db.session.query(
+                        func.date(
+                            func.coalesce(func.max(p_sub.date), func.now())
+                            - func.cast("1 MONTH", INTERVAL)
+                        )
+                    )
+                    .select_from(p_sub)
+                    .filter(p_sub.admissionNumber == admissionNumber)
+                    .subquery()
+                )
+
+                relation = relation.filter(func.date(p1.date) > max_date_query).filter(
+                    func.date(p2.date) > max_date_query
+                )
+
         relation = (
             relation.filter(Relation.active == True)
             .filter(pd1.suspendedDate == None)
