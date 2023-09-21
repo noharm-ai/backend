@@ -13,7 +13,7 @@ from exception.validation_error import ValidationError
 
 
 def create_agg_prescription_by_prescription(
-    schema, id_prescription, is_cpoe, out_patient
+    schema, id_prescription, is_cpoe, out_patient, is_pmc=False
 ):
     set_schema(schema)
 
@@ -63,6 +63,7 @@ def create_agg_prescription_by_prescription(
             aggDate=pAgg.date,
             idSegment=p.idSegment,
             is_cpoe=is_cpoe,
+            is_pmc=is_pmc,
         )
 
         pAgg.idHospital = p.idHospital
