@@ -27,6 +27,18 @@ def has_feature(feature):
     return True
 
 
+def has_feature_nouser(feature):
+    features = db.session.query(Memory).filter(Memory.kind == "features").first()
+
+    if features is None:
+        return False
+
+    if feature not in features.value:
+        return False
+
+    return True
+
+
 def get_memory(key):
     return db.session.query(Memory).filter(Memory.kind == key).first()
 

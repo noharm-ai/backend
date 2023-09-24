@@ -70,7 +70,7 @@ def check_prescription(idPrescription, p_status, user):
 
 def _update_agg_status(prescription: Prescription, user: User):
     unchecked_prescriptions = get_query_prescriptions_by_agg(
-        agg_prescription=prescription, user=user
+        agg_prescription=prescription, is_cpoe=user.cpoe()
     )
     unchecked_prescriptions = unchecked_prescriptions.filter(Prescription.status != "s")
 
@@ -91,9 +91,10 @@ def _update_agg_status(prescription: Prescription, user: User):
         )
 
 
-def get_query_prescriptions_by_agg(agg_prescription: Prescription, user, only_id=False):
-    is_cpoe = user.cpoe()
-    is_pmc = memory_service.has_feature(FeatureEnum.PRIMARY_CARE.value)
+def get_query_prescriptions_by_agg(
+    agg_prescription: Prescription, is_cpoe=False, only_id=False
+):
+    is_pmc = memory_service.has_feature_nouser(FeatureEnum.PRIMARY_CARE.value)
 
     q = (
         db.session.query(Prescription.id if only_id else Prescription)
@@ -112,7 +113,7 @@ def get_query_prescriptions_by_agg(agg_prescription: Prescription, user, only_id
 
 def _check_agg_internal_prescriptions(prescription, p_status, user):
     q_internal_prescription = get_query_prescriptions_by_agg(
-        agg_prescription=prescription, user=user
+        agg_prescription=prescription, is_cpoe=user.cpoe()
     )
     q_internal_prescription = q_internal_prescription.filter(
         Prescription.status != p_status
