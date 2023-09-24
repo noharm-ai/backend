@@ -773,6 +773,7 @@ class PrescriptionDrug(db.Model):
     suspendedDate = db.Column("dtsuspensao", db.DateTime, nullable=True)
     checked = db.Column("checado", db.Boolean, nullable=True)
     period = db.Column("periodo", db.Integer, nullable=True)
+    processedDate = db.Column("dtprocessada", db.DateTime, nullable=True)
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.Integer, nullable=True)
 

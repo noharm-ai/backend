@@ -75,7 +75,7 @@ def count_drugs_by_prescription(
 ):
     if prescription.agg:
         prescription_query = prescription_service.get_query_prescriptions_by_agg(
-            agg_prescription=prescription, user=user, only_id=True
+            agg_prescription=prescription, is_cpoe=user.cpoe(), only_id=True
         )
 
         q = (

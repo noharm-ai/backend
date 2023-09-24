@@ -7,7 +7,7 @@ from models.appendix import *
 from models.prescription import *
 from routes.prescription import getPrescription
 from routes.utils import getFeatures
-from services import prescription_drug_service
+from services import prescription_drug_service, prescription_service
 
 from exception.validation_error import ValidationError
 
@@ -94,6 +94,8 @@ def create_agg_prescription_by_prescription(
             if newPrescAgg:
                 db.session.add(pAgg)
 
+    _set_processed_by_prescription(id_prescription=id_prescription)
+
 
 def create_agg_prescription_by_date(schema, admission_number, p_date, is_cpoe):
     create_new = False
@@ -151,6 +153,30 @@ def create_agg_prescription_by_date(schema, admission_number, p_date, is_cpoe):
 
     if create_new:
         db.session.add(agg_p)
+
+    _set_processed_by_agg(agg_prescription=agg_p, is_cpoe=is_cpoe)
+
+
+def _set_processed_by_agg(agg_prescription: Prescription, is_cpoe):
+    prescription_query = prescription_service.get_query_prescriptions_by_agg(
+        agg_prescription=agg_prescription, is_cpoe=is_cpoe, only_id=True
+    )
+
+    db.session.query(PrescriptionDrug).filter(
+        PrescriptionDrug.idPrescription.in_(prescription_query)
+    ).update(
+        {"processedDate": datetime.today()},
+        synchronize_session="fetch",
+    )
+
+
+def _set_processed_by_prescription(id_prescription):
+    db.session.query(PrescriptionDrug).filter(
+        PrescriptionDrug.idPrescription == id_prescription
+    ).update(
+        {"processedDate": datetime.today()},
+        synchronize_session="fetch",
+    )
 
 
 def set_schema(schema):
