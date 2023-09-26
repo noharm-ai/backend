@@ -48,7 +48,7 @@ class Prescription(db.Model):
             .first()
         )
 
-    def lastDeptbyAdmission(idPrescription, admissionNumber):
+    def lastDeptbyAdmission(idPrescription, admissionNumber, ref_date):
         return (
             db.session.query(Department.name)
             .select_from(Prescription)
@@ -61,6 +61,10 @@ class Prescription(db.Model):
             )
             .filter(Prescription.admissionNumber == admissionNumber)
             .filter(Prescription.id < idPrescription)
+            .filter(
+                Prescription.date
+                > (func.date(ref_date) - func.cast("1 month", INTERVAL))
+            )
             .order_by(desc(Prescription.id))
             .first()
         )
