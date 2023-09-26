@@ -166,7 +166,7 @@ def _set_processed_by_agg(agg_prescription: Prescription, is_cpoe):
         PrescriptionDrug.idPrescription.in_(prescription_query)
     ).update(
         {"processedDate": datetime.today()},
-        synchronize_session="fetch",
+        synchronize_session=False,
     )
 
 
@@ -175,7 +175,7 @@ def _set_processed_by_prescription(id_prescription):
         PrescriptionDrug.idPrescription == id_prescription
     ).update(
         {"processedDate": datetime.today()},
-        synchronize_session="fetch",
+        synchronize_session=False,
     )
 
 

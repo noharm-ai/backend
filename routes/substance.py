@@ -102,7 +102,6 @@ def setSubstance(idSubstance):
 @app_sub.route("/substance/<int:idSubstance>/relation", methods=["GET"])
 @jwt_required()
 def getRelations(idSubstance):
-    data = request.get_json()
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
 

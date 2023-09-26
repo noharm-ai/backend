@@ -296,8 +296,9 @@ def getPrescription(
         patient.admissionNumber = prescription[0].admissionNumber
 
     lastDept = Prescription.lastDeptbyAdmission(
-        prescription[0].id, patient.admissionNumber
+        prescription[0].id, patient.admissionNumber, ref_date=prescription[0].date
     )
+
     drugs = PrescriptionDrug.findByPrescription(
         prescription[0].id, patient.admissionNumber, aggDate, idSegment, is_cpoe, is_pmc
     )

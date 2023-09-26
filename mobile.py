@@ -45,6 +45,8 @@ app.config["JWT_SECRET_KEY"] = Config.SECRET_KEY
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = Config.JWT_ACCESS_TOKEN_EXPIRES
 app.config["JWT_REFRESH_TOKEN_EXPIRES"] = Config.JWT_REFRESH_TOKEN_EXPIRES
 app.config["JWT_COOKIE_SAMESITE"] = "Lax"
+# app.config["JWT_SESSION_COOKIE"] = False
+# app.config["JWT_COOKIE_DOMAIN"] = Config.APP_DOMAIN
 app.config["JWT_COOKIE_SECURE"] = True
 app.config["JWT_REFRESH_COOKIE_PATH"] = "/refresh-token"
 app.config["MAIL_SERVER"] = "email-smtp.sa-east-1.amazonaws.com"
@@ -89,7 +91,7 @@ if Config.ENV == NoHarmENV.STAGING.value:
 
 @app.route("/version", methods=["GET"])
 def getVersion():
-    return {"status": "success", "data": "v1.96-beta"}, status.HTTP_200_OK
+    return {"status": "success", "data": "v1.97-beta"}, status.HTTP_200_OK
 
 
 if __name__ == "__main__":

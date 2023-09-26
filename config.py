@@ -10,6 +10,7 @@ class Config:
     API_KEY = getenv("API_KEY") or ""
     SELF_API_URL = getenv("SELF_API_URL") or ""
     APP_URL = getenv("APP_URL")
+    APP_DOMAIN = getenv("APP_DOMAIN") or "localhost"
     POTGRESQL_CONNECTION_STRING = (
         getenv("POTGRESQL_CONNECTION_STRING")
         or "postgresql://postgres@localhost/noharm"
