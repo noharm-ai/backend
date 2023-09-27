@@ -131,7 +131,7 @@ def getPrescriptions():
                 features,
                 **{
                     "idPrescription": str(p[0].id),
-                    "idPatient": p[0].idPatient,
+                    "idPatient": str(p[0].idPatient),
                     "name": patient.admissionNumber,
                     "admissionNumber": patient.admissionNumber,
                     "birthdate": patient.birthdate.isoformat()
@@ -442,7 +442,7 @@ def getPrescription(
             "idPrescription": str(prescription[0].id),
             "idSegment": prescription[0].idSegment,
             "segmentName": prescription[5],
-            "idPatient": prescription[0].idPatient,
+            "idPatient": str(prescription[0].idPatient),
             "idHospital": prescription[0].idHospital,
             "name": prescription[0].admissionNumber,
             "agg": prescription[0].agg,
