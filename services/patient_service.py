@@ -100,3 +100,14 @@ def get_patient_allergies(id_patient):
         .limit(100)
         .all()
     )
+
+
+def get_patient_weight(id_patient):
+    return (
+        db.session.query(Patient.weight, Patient.weightDate, Patient.height)
+        .filter(Patient.idPatient == id_patient)
+        .filter(Patient.weight != None)
+        .filter(Patient.weightDate > func.now() - func.cast("1 month", INTERVAL))
+        .order_by(desc(Patient.weightDate))
+        .first()
+    )
