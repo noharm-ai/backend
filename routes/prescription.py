@@ -131,7 +131,7 @@ def getPrescriptions():
                 features,
                 **{
                     "idPrescription": str(p[0].id),
-                    "idPatient": p[0].idPatient,
+                    "idPatient": str(p[0].idPatient),
                     "name": patient.admissionNumber,
                     "admissionNumber": patient.admissionNumber,
                     "birthdate": patient.birthdate.isoformat()
@@ -290,10 +290,26 @@ def getPrescription(
         }, status.HTTP_400_BAD_REQUEST
 
     patient = prescription[1]
+    patientWeight = None
+    patientWeightDate = None
+    patientHeight = None
+
     if patient is None:
         patient = Patient()
         patient.idPatient = prescription[0].idPatient
         patient.admissionNumber = prescription[0].admissionNumber
+
+    if patient.weight != None:
+        patientWeight = patient.weight
+        patientWeightDate = patient.weightDate
+        patientHeight = patient.height
+    else:
+        patient_previous_data = patient_service.get_patient_weight(patient.idPatient)
+
+        if patient_previous_data != None:
+            patientWeight = patient_previous_data[0]
+            patientWeightDate = patient_previous_data[1]
+            patientHeight = patient_previous_data[2]
 
     lastDept = Prescription.lastDeptbyAdmission(
         prescription[0].id, patient.admissionNumber, ref_date=prescription[0].date
@@ -367,7 +383,7 @@ def getPrescription(
         exams,
         **{
             "age": age,
-            "weight": patient.weight,
+            "weight": patientWeight,
         }
     )
 
@@ -442,7 +458,7 @@ def getPrescription(
             "idPrescription": str(prescription[0].id),
             "idSegment": prescription[0].idSegment,
             "segmentName": prescription[5],
-            "idPatient": prescription[0].idPatient,
+            "idPatient": str(prescription[0].idPatient),
             "idHospital": prescription[0].idHospital,
             "name": prescription[0].admissionNumber,
             "agg": prescription[0].agg,
@@ -454,8 +470,8 @@ def getPrescription(
             else None,
             "birthdate": patient.birthdate.isoformat() if patient.birthdate else None,
             "gender": patient.gender,
-            "height": patient.height,
-            "weight": patient.weight,
+            "height": patientHeight,
+            "weight": patientWeight,
             "dialysis": patient.dialysis,
             "observation": prescription[6],
             "notes": prescription[7],
@@ -465,9 +481,7 @@ def getPrescription(
             else None,
             "age": age,
             "weightUser": bool(patient.user),
-            "weightDate": patient.weightDate.isoformat()
-            if patient.weightDate
-            else None,
+            "weightDate": patientWeightDate.isoformat() if patientWeightDate else None,
             "dischargeDate": patient.dischargeDate.isoformat()
             if patient.dischargeDate
             else None,

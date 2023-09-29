@@ -57,7 +57,7 @@ def get_structured_info(admission_number, user, mock=False):
 
 def _get_patient_data(patient: Patient):
     return {
-        "idPatient": patient.idPatient,
+        "idPatient": str(patient.idPatient),
         "admissionNumber": patient.admissionNumber,
         "admissionDate": patient.admissionDate.isoformat()
         if patient.admissionDate
