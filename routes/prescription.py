@@ -312,7 +312,9 @@ def getPrescription(
             patientHeight = patient_previous_data[2]
 
     lastDept = Prescription.lastDeptbyAdmission(
-        prescription[0].id, patient.admissionNumber, ref_date=prescription[0].date
+        prescription[0].id,
+        patient.admissionNumber,
+        ref_date=aggDate if aggDate != None else prescription[0].date,
     )
 
     drugs = PrescriptionDrug.findByPrescription(
