@@ -26,6 +26,7 @@ from routes.summary import app_summary
 from routes.admin.frequency import app_admin_freq
 from routes.admin.intervention_reason import app_admin_interv
 from routes.admin.memory import app_admin_memory
+from routes.admin.drug import app_admin_drug
 import os
 import logging
 from models.enums import NoHarmENV
@@ -45,8 +46,6 @@ app.config["JWT_SECRET_KEY"] = Config.SECRET_KEY
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = Config.JWT_ACCESS_TOKEN_EXPIRES
 app.config["JWT_REFRESH_TOKEN_EXPIRES"] = Config.JWT_REFRESH_TOKEN_EXPIRES
 app.config["JWT_COOKIE_SAMESITE"] = "Lax"
-# app.config["JWT_SESSION_COOKIE"] = False
-# app.config["JWT_COOKIE_DOMAIN"] = Config.APP_DOMAIN
 app.config["JWT_COOKIE_SECURE"] = True
 app.config["JWT_REFRESH_COOKIE_PATH"] = "/refresh-token"
 app.config["MAIL_SERVER"] = "email-smtp.sa-east-1.amazonaws.com"
@@ -81,6 +80,7 @@ app.register_blueprint(app_pres_crud)
 app.register_blueprint(app_admin_freq)
 app.register_blueprint(app_admin_interv)
 app.register_blueprint(app_admin_memory)
+app.register_blueprint(app_admin_drug)
 
 CORS(app, origins=[Config.MAIL_HOST], supports_credentials=True)
 
