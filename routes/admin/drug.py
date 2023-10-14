@@ -77,3 +77,18 @@ def update_price_factor():
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
     return tryCommit(db, {"idSegment": id_segment, "idDrug": id_drug, "factor": factor})
+
+
+@app_admin_drug.route("/admin/drug/add-default-units", methods=["POST"])
+@jwt_required()
+def add_default_units():
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+    os.environ["TZ"] = "America/Sao_Paulo"
+
+    try:
+        result = drug_service.add_default_units(user=user)
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+
+    return tryCommit(db, result.rowcount)

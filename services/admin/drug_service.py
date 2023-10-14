@@ -129,3 +129,57 @@ def update_price_factor(id_drug, id_segment, factor, user):
         conversion.factor = factor
 
         db.session.flush()
+
+
+def add_default_units(user):
+    roles = user.config["roles"] if user.config and "roles" in user.config else []
+    if RoleEnum.ADMIN.value not in roles and RoleEnum.TRAINING.value not in roles:
+        raise ValidationError(
+            "Usuário não autorizado",
+            "errors.unauthorizedUser",
+            status.HTTP_401_UNAUTHORIZED,
+        )
+    schema = user.schema
+
+    query = f"""
+        with unidades as (
+            select
+                fkmedicamento,
+                idsegmento,
+                min(fkunidademedida) as fkunidademedida
+            from (
+                select 
+                    pagg.fkmedicamento,
+                    pagg.idsegmento,
+                    pagg.fkunidademedida
+                from
+                    {schema}.prescricaoagg pagg
+                where
+                    pagg.fkmedicamento in (
+                        select fkmedicamento from {schema}.medatributos m where m.fkunidademedida is null
+                    )
+                group by
+                    pagg.fkmedicamento,
+                    pagg.idsegmento,
+                    pagg.fkunidademedida 
+            ) a
+            where 
+                fkunidademedida is not null
+            group by
+                fkmedicamento,
+                idsegmento
+            having count(*) = 1
+        )
+        update 
+            {schema}.medatributos ma
+        set 
+            fkunidademedida = unidades.fkunidademedida
+        from 
+            unidades
+        where 
+            ma.fkmedicamento = unidades.fkmedicamento
+            and ma.idsegmento = unidades.idsegmento
+            and ma.fkunidademedida is null
+    """
+
+    return db.session.execute(query)
