@@ -9,15 +9,24 @@ from models.enums import RoleEnum
 from exception.validation_error import ValidationError
 
 
-def get_conversion_list(
+def get_drug_list(
     has_substance=None,
     has_price_conversion=None,
     has_default_unit=None,
+    has_prescription=None,
     term=None,
     limit=10,
     offset=0,
     id_segment_list=None,
 ):
+    presc_query = (
+        db.session.query(
+            Outlier.idDrug.label("idDrug"), Outlier.idSegment.label("idSegment")
+        )
+        .group_by(Outlier.idDrug, Outlier.idSegment)
+        .subquery()
+    )
+
     q = (
         db.session.query(
             Drug.id,
@@ -44,13 +53,19 @@ def get_conversion_list(
             ),
         )
         .outerjoin(Substance, Drug.sctid == Substance.id)
+        .outerjoin(
+            presc_query,
+            and_(
+                presc_query.c.idDrug == Drug.id, presc_query.c.idSegment == Segment.id
+            ),
+        )
     )
 
     if has_substance != None:
         if has_substance:
-            q = q.filter(Drug.sctid != None)
+            q = q.filter(Substance.id != None)
         else:
-            q = q.filter(Drug.sctid == None)
+            q = q.filter(Substance.id == None)
 
     if has_default_unit != None:
         if has_default_unit:
@@ -75,6 +90,12 @@ def get_conversion_list(
                     DrugAttributes.idMeasureUnitPrice != None,
                 )
             )
+
+    if has_prescription != None:
+        if has_prescription:
+            q = q.filter(presc_query.c.idDrug != None)
+        else:
+            q = q.filter(presc_query.c.idDrug == None)
 
     if term:
         q = q.filter(Drug.name.ilike(term))

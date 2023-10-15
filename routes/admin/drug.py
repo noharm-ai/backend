@@ -15,15 +15,16 @@ app_admin_drug = Blueprint("app_admin_drug", __name__)
 
 @app_admin_drug.route("/admin/drug/attributes-list", methods=["POST"])
 @jwt_required()
-def get_drug_conversion_list():
+def get_drug_list():
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
     request_data = request.get_json()
 
-    list = drug_service.get_conversion_list(
+    list = drug_service.get_drug_list(
         has_price_conversion=request_data.get("hasPriceConversion", None),
         has_substance=request_data.get("hasSubstance", None),
         has_default_unit=request_data.get("hasDefaultUnit", None),
+        has_prescription=request_data.get("hasPrescription", None),
         term=request_data.get("term", None),
         id_segment_list=request_data.get("idSegmentList", None),
         limit=request_data.get("limit", 10),
@@ -47,9 +48,13 @@ def get_drug_conversion_list():
             }
         )
 
+    count = 0
+    if len(list) > 0:
+        count = list[0][9]
+
     return {
         "status": "success",
-        "count": list[0][9] if list != None else 0,
+        "count": count,
         "data": result,
     }, status.HTTP_200_OK
 
