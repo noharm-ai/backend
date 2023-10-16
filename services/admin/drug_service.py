@@ -204,3 +204,62 @@ def add_default_units(user):
     """
 
     return db.session.execute(query)
+
+
+def copy_unit_conversion(id_segment_origin, id_segment_destiny, user):
+    roles = user.config["roles"] if user.config and "roles" in user.config else []
+    if RoleEnum.ADMIN.value not in roles and RoleEnum.TRAINING.value not in roles:
+        raise ValidationError(
+            "Usuário não autorizado",
+            "errors.unauthorizedUser",
+            status.HTTP_401_UNAUTHORIZED,
+        )
+    schema = user.schema
+
+    if id_segment_origin == None or id_segment_destiny == None:
+        raise ValidationError(
+            "Segmento Inválido", "errors.invalidRecord", status.HTTP_400_BAD_REQUEST
+        )
+
+    if id_segment_origin == id_segment_destiny:
+        raise ValidationError(
+            "Segmento origem deve ser diferente do segmento destino",
+            "errors.invalidRecord",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    query = f"""
+        with conversao_origem as (
+            select 
+                ma.fkmedicamento, ma.idsegmento, ma.fkunidademedida
+            from
+                {schema}.medatributos ma
+                inner join {schema}.medatributos madestino on (
+                    ma.fkmedicamento = madestino.fkmedicamento
+                    and madestino.idsegmento  = :idSegmentDestiny
+                    and ma.fkunidademedida = madestino.fkunidademedida 
+                )
+            where 
+                ma.idsegmento = :idSegmentOrigin
+        )
+        insert into {schema}.unidadeconverte (idsegmento, fkunidademedida, fator, fkmedicamento) (
+            select 
+                :idSegmentDestiny as idsegmento,
+                u.fkunidademedida,
+                u.fator,
+                u.fkmedicamento
+            from
+                {schema}.unidadeconverte u
+                inner join conversao_origem on (
+                    u.fkmedicamento = conversao_origem.fkmedicamento 
+                    and u.idsegmento = conversao_origem.idsegmento
+                )
+        )
+        on conflict (fkunidademedida, idsegmento, fkmedicamento)
+        do update set fator = excluded.fator
+    """
+
+    return db.session.execute(
+        query,
+        {"idSegmentOrigin": id_segment_origin, "idSegmentDestiny": id_segment_destiny},
+    )

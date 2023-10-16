@@ -97,3 +97,23 @@ def add_default_units():
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
     return tryCommit(db, result.rowcount)
+
+
+@app_admin_drug.route("/admin/drug/copy-unit-conversion", methods=["POST"])
+@jwt_required()
+def copy_unit_conversion():
+    data = request.get_json()
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+    os.environ["TZ"] = "America/Sao_Paulo"
+
+    try:
+        result = drug_service.copy_unit_conversion(
+            user=user,
+            id_segment_origin=data.get("idSegmentOrigin", None),
+            id_segment_destiny=data.get("idSegmentDestiny", None),
+        )
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+
+    return tryCommit(db, result.rowcount)
