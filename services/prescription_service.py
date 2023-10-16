@@ -1,4 +1,4 @@
-from sqlalchemy import desc
+from sqlalchemy import desc, nullsfirst
 from datetime import date
 from flask_api import status
 
@@ -11,12 +11,14 @@ from services import prescription_drug_service, memory_service
 
 
 def search(search_key):
-    return (
+    q_presc_admission = (
         db.session.query(
             Prescription,
             Patient.birthdate.label("birthdate"),
             Patient.gender.label("gender"),
             Department.name.label("department"),
+            Patient.admissionDate.label("admission_date"),
+            func.row_number().over(order_by=desc(Prescription.date)).label("priority"),
         )
         .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)
         .outerjoin(
@@ -38,6 +40,38 @@ def search(search_key):
         )
         .order_by(desc(Prescription.date))
         .limit(5)
+    )
+
+    q_concilia = (
+        db.session.query(
+            Prescription,
+            Patient.birthdate.label("birthdate"),
+            Patient.gender.label("gender"),
+            Department.name.label("department"),
+            Patient.admissionDate.label("admission_date"),
+            func.row_number().over(order_by=desc(Prescription.date)).label("priority"),
+        )
+        .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)
+        .outerjoin(
+            Department,
+            and_(
+                Department.id == Prescription.idDepartment,
+                Department.idHospital == Prescription.idHospital,
+            ),
+        )
+        .filter(
+            and_(
+                Prescription.admissionNumber == search_key,
+                Prescription.concilia != None,
+            ),
+        )
+        .order_by(desc(Prescription.date))
+        .limit(1)
+    )
+
+    return (
+        q_presc_admission.union_all(q_concilia)
+        .order_by("priority", nullsfirst(Prescription.concilia))
         .all()
     )
 

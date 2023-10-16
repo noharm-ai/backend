@@ -159,7 +159,7 @@ def getOutliers(idSegment=1, idDrug=1):
             "maxTime": drugAttr.maxTime,
             "whiteList": drugAttr.whiteList,
             "chemo": drugAttr.chemo,
-            "sctidA": d[0].sctid if d else "",
+            "sctidA": str(d[0].sctid) if d else "",
             "sctNameA": strNone(d[1]).upper() if d else "",
             "relations": relations,
             "relationTypes": [

@@ -154,11 +154,26 @@ class DrugList:
                             "ckd" in self.exams
                             and self.exams["ckd"]["value"]
                             and pd[6].kidney > self.exams["ckd"]["value"]
+                            and self.exams["age"] > 17
                         ):
                             alerts.append(
                                 "Medicamento deve sofrer ajuste de posologia ou contraindicado, já que a função renal do paciente ("
                                 + str(self.exams["ckd"]["value"])
                                 + " mL/min) está abaixo de "
+                                + str(pd[6].kidney)
+                                + " mL/min."
+                            )
+                            self.alertStats["kidney"] += 1
+                        elif (
+                            "swrtz2" in self.exams
+                            and self.exams["swrtz2"]["value"]
+                            and pd[6].kidney > self.exams["swrtz2"]["value"]
+                            and self.exams["age"] <= 17
+                        ):
+                            alerts.append(
+                                "Medicamento deve sofrer ajuste de posologia ou contraindicado, já que a função renal do paciente ("
+                                + str(self.exams["swrtz2"]["value"])
+                                + " mL/min/1.73m²) está abaixo de "
                                 + str(pd[6].kidney)
                                 + " mL/min."
                             )

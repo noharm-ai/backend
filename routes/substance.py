@@ -18,7 +18,9 @@ def getSubstance():
 
     results = []
     for d in drugs:
-        results.append({"sctid": d.id, "name": d.name.upper(), "idclass": d.idclass})
+        results.append(
+            {"sctid": str(d.id), "name": d.name.upper(), "idclass": d.idclass}
+        )
 
     results.sort(key=sortSubstance)
 
