@@ -152,6 +152,26 @@ def update_price_factor(id_drug, id_segment, factor, user):
         db.session.flush()
 
 
+def update_substance(id_drug, sctid, user):
+    roles = user.config["roles"] if user.config and "roles" in user.config else []
+    if RoleEnum.ADMIN.value not in roles and RoleEnum.TRAINING.value not in roles:
+        raise ValidationError(
+            "Usuário não autorizado",
+            "errors.unauthorizedUser",
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
+    drug = Drug.query.get(id_drug)
+
+    if drug == None:
+        raise ValidationError(
+            "Registro inexistente", "errors.invalidRecord", status.HTTP_400_BAD_REQUEST
+        )
+
+    drug.sctid = sctid
+    db.session.flush()
+
+
 def add_default_units(user):
     roles = user.config["roles"] if user.config and "roles" in user.config else []
     if RoleEnum.ADMIN.value not in roles and RoleEnum.TRAINING.value not in roles:
