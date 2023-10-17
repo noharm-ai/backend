@@ -24,6 +24,7 @@ def get_drug_list():
         has_price_conversion=request_data.get("hasPriceConversion", None),
         has_substance=request_data.get("hasSubstance", None),
         has_default_unit=request_data.get("hasDefaultUnit", None),
+        has_price_unit=request_data.get("hasPriceUnit", None),
         has_prescription=request_data.get("hasPrescription", None),
         term=request_data.get("term", None),
         id_segment_list=request_data.get("idSegmentList", None),

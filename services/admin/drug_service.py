@@ -13,6 +13,7 @@ def get_drug_list(
     has_substance=None,
     has_price_conversion=None,
     has_default_unit=None,
+    has_price_unit=None,
     has_prescription=None,
     term=None,
     limit=10,
@@ -72,6 +73,12 @@ def get_drug_list(
             q = q.filter(DrugAttributes.idMeasureUnit != None)
         else:
             q = q.filter(DrugAttributes.idMeasureUnit == None)
+
+    if has_price_unit != None:
+        if has_price_unit:
+            q = q.filter(DrugAttributes.idMeasureUnitPrice != None)
+        else:
+            q = q.filter(DrugAttributes.idMeasureUnitPrice == None)
 
     if has_price_conversion != None:
         if has_price_conversion:
