@@ -13,6 +13,7 @@ def get_drug_list(
     has_substance=None,
     has_price_conversion=None,
     has_default_unit=None,
+    has_price_unit=None,
     has_prescription=None,
     term=None,
     limit=10,
@@ -72,6 +73,12 @@ def get_drug_list(
             q = q.filter(DrugAttributes.idMeasureUnit != None)
         else:
             q = q.filter(DrugAttributes.idMeasureUnit == None)
+
+    if has_price_unit != None:
+        if has_price_unit:
+            q = q.filter(DrugAttributes.idMeasureUnitPrice != None)
+        else:
+            q = q.filter(DrugAttributes.idMeasureUnitPrice == None)
 
     if has_price_conversion != None:
         if has_price_conversion:
@@ -150,6 +157,26 @@ def update_price_factor(id_drug, id_segment, factor, user):
         conversion.factor = factor
 
         db.session.flush()
+
+
+def update_substance(id_drug, sctid, user):
+    roles = user.config["roles"] if user.config and "roles" in user.config else []
+    if RoleEnum.ADMIN.value not in roles and RoleEnum.TRAINING.value not in roles:
+        raise ValidationError(
+            "Usuário não autorizado",
+            "errors.unauthorizedUser",
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
+    drug = Drug.query.get(id_drug)
+
+    if drug == None:
+        raise ValidationError(
+            "Registro inexistente", "errors.invalidRecord", status.HTTP_400_BAD_REQUEST
+        )
+
+    drug.sctid = sctid
+    db.session.flush()
 
 
 def add_default_units(user):

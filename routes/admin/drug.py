@@ -24,6 +24,7 @@ def get_drug_list():
         has_price_conversion=request_data.get("hasPriceConversion", None),
         has_substance=request_data.get("hasSubstance", None),
         has_default_unit=request_data.get("hasDefaultUnit", None),
+        has_price_unit=request_data.get("hasPriceUnit", None),
         has_prescription=request_data.get("hasPrescription", None),
         term=request_data.get("term", None),
         id_segment_list=request_data.get("idSegmentList", None),
@@ -82,6 +83,29 @@ def update_price_factor():
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
     return tryCommit(db, {"idSegment": id_segment, "idDrug": id_drug, "factor": factor})
+
+
+@app_admin_drug.route("/admin/drug/substance", methods=["POST"])
+@jwt_required()
+def update_substance():
+    data = request.get_json()
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+    os.environ["TZ"] = "America/Sao_Paulo"
+
+    id_drug = data.get("idDrug", None)
+    sctid = data.get("sctid", None)
+
+    try:
+        drug_service.update_substance(
+            id_drug=id_drug,
+            sctid=sctid,
+            user=user,
+        )
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+
+    return tryCommit(db, {"idDrug": id_drug, "sctid": str(sctid)})
 
 
 @app_admin_drug.route("/admin/drug/add-default-units", methods=["POST"])
