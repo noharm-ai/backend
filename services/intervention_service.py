@@ -1,4 +1,5 @@
 from models.main import db
+from sqlalchemy import case
 
 from models.appendix import *
 from models.prescription import *
@@ -55,7 +56,10 @@ def get_interventions(
             Intervention,
             PrescriptionDrug,
             func.array(reason).label("reason"),
-            Drug.name,
+            case(
+                [(PrescriptionB.concilia != None, PrescriptionDrug.interval)],
+                else_=Drug.name,
+            ),
             func.array(interactions).label("interactions"),
             MeasureUnit,
             Frequency,
