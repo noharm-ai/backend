@@ -321,8 +321,7 @@ def getPrescription(
         prescription[0].id, patient.admissionNumber, aggDate, idSegment, is_cpoe, is_pmc
     )
     interventions = intervention_service.get_interventions(
-        admissionNumber=patient.admissionNumber,
-        concilia=prescription[0].concilia != None,
+        admissionNumber=patient.admissionNumber
     )
     relations = Prescription.findRelation(
         prescription[0].id,
