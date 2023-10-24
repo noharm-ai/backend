@@ -17,6 +17,7 @@ def get_interventions(
     idPrescriptionDrug=None,
     idIntervention=None,
     idDrug=None,
+    concilia=False,
 ):
     mReasion = db.aliased(InterventionReason)
     descript = case(
@@ -55,7 +56,7 @@ def get_interventions(
             Intervention,
             PrescriptionDrug,
             func.array(reason).label("reason"),
-            Drug.name,
+            Drug.name if not concilia else PrescriptionDrug.interval,
             func.array(interactions).label("interactions"),
             MeasureUnit,
             Frequency,
