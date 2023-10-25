@@ -64,6 +64,7 @@ class Substance(db.Model):
     name = db.Column("nome", db.String(255), nullable=False)
     link = db.Column("link", db.String(255), nullable=False)
     idclass = db.Column("idclasse", db.String(255), nullable=False)
+    active = db.Column("ativo", db.Boolean, nullable=False)
 
 
 class SubstanceClass(db.Model):
