@@ -17,4 +17,4 @@ flask-mail
 random-password-generator
 pyjwt[crypto]
 cryptography==3.4.8
-Werkzeug==2.3.7
+Werkzeug==3.0.1
