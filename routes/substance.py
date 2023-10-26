@@ -19,7 +19,12 @@ def getSubstance():
     results = []
     for d in drugs:
         results.append(
-            {"sctid": str(d.id), "name": d.name.upper(), "idclass": d.idclass}
+            {
+                "sctid": str(d.id),
+                "name": d.name.upper(),
+                "idclass": d.idclass,
+                "active": d.active,
+            }
         )
 
     results.sort(key=sortSubstance)
@@ -37,7 +42,12 @@ def get_substance_single(idSubstance):
 
     return {
         "status": "success",
-        "data": {"sctid": subs.id, "name": subs.name.upper(), "idclass": subs.idclass},
+        "data": {
+            "sctid": subs.id,
+            "name": subs.name.upper(),
+            "idclass": subs.idclass,
+            "active": subs.active,
+        },
     }, status.HTTP_200_OK
 
 
@@ -94,6 +104,7 @@ def setSubstance(idSubstance):
 
     subs.name = data.get("name", None)
     subs.idclass = data.get("idclass", None)
+    subs.active = data.get("active", None)
 
     if newSubs:
         db.session.add(subs)
