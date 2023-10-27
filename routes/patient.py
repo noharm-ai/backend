@@ -52,6 +52,8 @@ def historyCalc(typeExam, examsList, patient):
                 patient.height,
                 patient.weight,
             )
+        elif typeExam == "ckd21":
+            item = ckd_calc_21(e["value"], patient.birthdate, patient.gender)
         elif typeExam == "swrtz2":
             item = schwartz2_calc(e["value"], patient.height)
 
@@ -106,7 +108,7 @@ def getExamsbyAdmission(admissionNumber):
                 perc[key]["total"] = float(e.value)
 
             if segExam[key].initials.lower() == "creatinina":
-                for keyCalc in ["mdrd", "ckd", "cg", "swrtz2"]:
+                for keyCalc in ["mdrd", "ckd", "ckd21", "cg", "swrtz2"]:
                     if keyCalc in segExam and patient:
                         if keyCalc == "mdrd":
                             itemCalc = mdrd_calc(
@@ -130,6 +132,10 @@ def getExamsbyAdmission(admissionNumber):
                                 patient.skinColor,
                                 patient.height,
                                 patient.weight,
+                            )
+                        elif keyCalc == "ckd21":
+                            itemCalc = ckd_calc_21(
+                                e.value, patient.birthdate, patient.gender
                             )
                         elif keyCalc == "swrtz2":
                             itemCalc = schwartz2_calc(e.value, patient.height)

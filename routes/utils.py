@@ -308,6 +308,43 @@ def ckd_calc(cr, birthdate, gender, skinColor, height, weight):
     }
 
 
+# Chronic Kidney Disease Epidemiology Collaboration (2021)
+def ckd_calc_21(cr, birthdate, gender):
+    if not is_float(cr):
+        return copy.deepcopy(ckdEmpty)
+    if birthdate is None:
+        return copy.deepcopy(ckdEmpty)
+
+    age = data2age(birthdate.isoformat())
+    if age == 0:
+        return copy.deepcopy(ckdEmpty)
+
+    if gender == "F":
+        g = 0.7
+        s = 1.012
+        e = -1.200 if float(cr) > g else -0.241
+    else:
+        g = 0.9
+        s = 1
+        e = -1.200 if float(cr) > g else -0.302
+
+    eGFR = 142 * (float(cr) / g) ** (e) * (0.9938) ** (age) * s if cr > 0 else 0
+
+    unit = "ml/min/1.73"
+
+    return {
+        "value": round(eGFR, 1),
+        "ref": "maior que 50 " + unit,
+        "unit": unit,
+        "alert": (eGFR < 50),
+        "name": "Chronic Kidney Disease Epidemiology 2021",
+        "initials": "CKD 2021",
+        "min": 50,
+        "max": 120,
+        "adjust": False,
+    }
+
+
 # Schwartz (2) Formula
 # based on https://link.springer.com/article/10.1007%2Fs00467-014-3002-5
 def schwartz2_calc(cr, height):
