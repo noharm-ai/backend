@@ -14,7 +14,8 @@ def get_drug_list(
     has_price_conversion=None,
     has_default_unit=None,
     has_price_unit=None,
-    has_prescription=None,
+    has_inconsistency=None,
+    missing_attributes=None,
     term=None,
     limit=10,
     offset=0,
@@ -27,6 +28,8 @@ def get_drug_list(
         .group_by(Outlier.idDrug, Outlier.idSegment)
         .subquery()
     )
+
+    SegmentOutlier = db.aliased(Segment)
 
     q = (
         db.session.query(
@@ -41,10 +44,18 @@ def get_drug_list(
             MeasureUnitConvert.factor,
             func.count().over(),
             Substance.name,
+            SegmentOutlier.description,
         )
-        .select_from(Drug)
-        .join(DrugAttributes, DrugAttributes.idDrug == Drug.id)
-        .join(Segment, Segment.id == DrugAttributes.idSegment)
+        .select_from(presc_query)
+        .join(Drug, presc_query.c.idDrug == Drug.id)
+        .outerjoin(
+            DrugAttributes,
+            and_(
+                DrugAttributes.idDrug == Drug.id,
+                DrugAttributes.idSegment == presc_query.c.idSegment,
+            ),
+        )
+        .outerjoin(Segment, Segment.id == DrugAttributes.idSegment)
         .outerjoin(
             MeasureUnitConvert,
             and_(
@@ -54,12 +65,7 @@ def get_drug_list(
             ),
         )
         .outerjoin(Substance, Drug.sctid == Substance.id)
-        .outerjoin(
-            presc_query,
-            and_(
-                presc_query.c.idDrug == Drug.id, presc_query.c.idSegment == Segment.id
-            ),
-        )
+        .outerjoin(SegmentOutlier, SegmentOutlier.id == presc_query.c.idSegment)
     )
 
     if has_substance != None:
@@ -98,11 +104,15 @@ def get_drug_list(
                 )
             )
 
-    if has_prescription != None:
-        if has_prescription:
-            q = q.filter(presc_query.c.idDrug != None)
+    if has_inconsistency != None:
+        if has_inconsistency:
+            q = q.filter(DrugAttributes.idDrug == None)
         else:
-            q = q.filter(presc_query.c.idDrug == None)
+            q = q.filter(DrugAttributes.idDrug != None)
+
+    if missing_attributes != None:
+        if missing_attributes:
+            q = q.filter(and_(DrugAttributes.user == None))
 
     if term:
         q = q.filter(Drug.name.ilike(term))
@@ -290,3 +300,33 @@ def copy_unit_conversion(id_segment_origin, id_segment_destiny, user):
         query,
         {"idSegmentOrigin": id_segment_origin, "idSegmentDestiny": id_segment_destiny},
     )
+
+
+def fix_inconsistency(user):
+    roles = user.config["roles"] if user.config and "roles" in user.config else []
+    if RoleEnum.ADMIN.value not in roles and RoleEnum.TRAINING.value not in roles:
+        raise ValidationError(
+            "Usuário não autorizado",
+            "errors.unauthorizedUser",
+            status.HTTP_401_UNAUTHORIZED,
+        )
+    schema = user.schema
+
+    query = f"""
+        with inconsistentes as (
+            select 
+                distinct o.fkmedicamento, o.idsegmento 
+            from 
+                {schema}.outlier o 
+                inner join {schema}.medicamento m on (o.fkmedicamento = m.fkmedicamento)
+                left join {schema}.medatributos ma on (o.fkmedicamento = ma.fkmedicamento and o.idsegmento = ma.idsegmento)
+            where 
+                ma.fkmedicamento is null
+        )
+        insert into {schema}.medatributos (fkmedicamento, idsegmento)
+        select fkmedicamento, idsegmento from inconsistentes
+        on conflict 
+        do nothing
+    """
+
+    return db.session.execute(query)
