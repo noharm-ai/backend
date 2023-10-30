@@ -83,6 +83,13 @@ def createUser(idUser=None):
         else:
             template = "new_user.html"
 
+        if "admin" in newUser.config["roles"] or "suporte" in newUser.config["roles"]:
+            return {
+                "status": "error",
+                "message": "As permissões Administrador e Suporte não podem ser concedidas.",
+                "code": "errors.unauthorizedUser",
+            }, status.HTTP_401_UNAUTHORIZED
+
         db.session.add(newUser)
         db.session.flush()
 
@@ -138,6 +145,16 @@ def createUser(idUser=None):
 
             if password != None and password != "":
                 updatedUser.password = func.crypt(password, func.gen_salt("bf", 8))
+
+        if (
+            "admin" in updatedUser.config["roles"]
+            or "suporte" in updatedUser.config["roles"]
+        ):
+            return {
+                "status": "error",
+                "message": "As permissões Administrador e Suporte não podem ser concedidas.",
+                "code": "errors.unauthorizedUser",
+            }, status.HTTP_401_UNAUTHORIZED
 
         db.session.add(updatedUser)
         db.session.flush()
