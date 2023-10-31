@@ -36,6 +36,11 @@ class PrescriptionAuditTypeEnum(Enum):
     UNCHECK = 2
 
 
+class DrugAdminSegment(Enum):
+    ADULT = 5
+    KIDS = 7
+
+
 class DrugTypeEnum(Enum):
     DRUG = "Medicamentos"
     SOLUTION = "Soluções"

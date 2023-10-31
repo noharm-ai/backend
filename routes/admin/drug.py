@@ -158,3 +158,26 @@ def fix_inconsistency():
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
     return tryCommit(db, result.rowcount)
+
+
+@app_admin_drug.route("/admin/drug/copy-attributes", methods=["POST"])
+@jwt_required()
+def copy_attributes():
+    data = request.get_json()
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+    os.environ["TZ"] = "America/Sao_Paulo"
+
+    try:
+        result = drug_service.copy_drug_attributes(
+            user=user,
+            id_segment_origin=data.get("idSegmentOrigin", None),
+            id_segment_destiny=data.get("idSegmentDestiny", None),
+            attributes=data.get("attributes", None),
+            from_admin_schema=data.get("fromAdminSchema", True),
+            overwrite_all=data.get("overwriteAll", False),
+        )
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+
+    return tryCommit(db, result.rowcount)

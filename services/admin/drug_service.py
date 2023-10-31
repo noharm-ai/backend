@@ -4,7 +4,7 @@ from sqlalchemy import and_, or_, func
 from models.main import *
 from models.appendix import *
 from models.segment import *
-from models.enums import RoleEnum
+from models.enums import RoleEnum, DrugAdminSegment
 
 from exception.validation_error import ValidationError
 
@@ -330,3 +330,140 @@ def fix_inconsistency(user):
     """
 
     return db.session.execute(query)
+
+
+def copy_drug_attributes(
+    id_segment_origin,
+    id_segment_destiny,
+    user,
+    attributes,
+    from_admin_schema=True,
+    overwrite_all=False,
+):
+    raise ValidationError(
+        "Aguardando validação",
+        "errors.unauthorizedUser",
+        status.HTTP_401_UNAUTHORIZED,
+    )
+
+    roles = user.config["roles"] if user.config and "roles" in user.config else []
+    if RoleEnum.ADMIN.value not in roles and RoleEnum.TRAINING.value not in roles:
+        raise ValidationError(
+            "Usuário não autorizado",
+            "errors.unauthorizedUser",
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
+    if overwrite_all and RoleEnum.ADMIN.value not in roles:
+        raise ValidationError(
+            "Usuário não autorizado",
+            "errors.unauthorizedUser",
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
+    if (
+        from_admin_schema
+        and id_segment_origin != DrugAdminSegment.ADULT.value
+        and id_segment_origin != DrugAdminSegment.KIDS.value
+    ):
+        raise ValidationError(
+            "Segmento origem inválido",
+            "errors.invalidParams",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    if not from_admin_schema and id_segment_origin == id_segment_destiny:
+        raise ValidationError(
+            "Segmento origem igual ao segmento destino",
+            "errors.invalidParams",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    origin_schema = "hsc_test" if from_admin_schema else user.schema
+    schema = user.schema
+
+    only_support_filter = """
+        and (
+            ma.update_by = 0
+            or ma.update_by is null
+            or u.config::text like :supportRole
+        )
+    """
+
+    base_attributes = [
+        "renal",
+        "hepatico",
+        "plaquetas",
+        "mav",
+        "idoso",
+        "controlados",
+        "antimicro",
+        "quimio",
+        "sonda",
+        "naopadronizado",
+        "linhabranca",
+        "dosemaxima",
+    ]
+    set_attributes = []
+    for a in attributes:
+        if a in base_attributes:
+            set_attributes.append(f"{a} = destino.{a},")
+
+    query = f"""
+        with modelo as (
+            select
+                m.sctid,
+                ma.renal,
+                ma.hepatico,
+                ma.plaquetas,
+                ma.dosemaxima,
+                coalesce(ma.mav, false) as mav,
+                coalesce(ma.idoso, false) as idoso,
+                coalesce(ma.controlados, false) as controlados,
+                coalesce(ma.antimicro, false) as antimicro,
+                coalesce(ma.quimio, false) as quimio,
+                coalesce(ma.sonda, false) as sonda,
+                coalesce(ma.naopadronizado, false) as naopadronizado,
+                coalesce(ma.linhabranca, false) as linhabranca
+            from
+                {origin_schema}.medatributos ma
+                inner join {origin_schema}.medicamento m on (ma.fkmedicamento = m.fkmedicamento)
+                inner join public.substancia s on (m.sctid = s.sctid)
+            where 
+                ma.idsegmento = :idSegmentOrigin
+        ),
+        destino as (
+            select 
+                ma.fkmedicamento, ma.idsegmento, mo.*
+            from
+                {schema}.medatributos ma
+                inner join {schema}.medicamento m on (ma.fkmedicamento = m.fkmedicamento)
+                inner join public.substancia s on (m.sctid = s.sctid)
+                inner join modelo mo on (s.sctid = mo.sctid)
+                left join public.usuario u on (ma.update_by = u.idusuario)
+            where 
+                ma.idsegmento = :idSegmentDestiny
+                {only_support_filter if not overwrite_all else ''}
+        )
+        update 
+            {schema}.medatributos origem
+        set 
+            {''.join(set_attributes)}
+            update_at = now(),
+            update_by = :idUser
+        from 
+            destino
+        where 
+            origem.fkmedicamento = destino.fkmedicamento
+            and origem.idsegmento = destino.idsegmento
+    """
+
+    return db.session.execute(
+        query,
+        {
+            "idSegmentOrigin": id_segment_origin,
+            "idSegmentDestiny": id_segment_destiny,
+            "supportRole": f"%{RoleEnum.SUPPORT.value}%",
+            "idUser": user.id,
+        },
+    )
