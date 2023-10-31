@@ -130,6 +130,18 @@ def generateOutliers(idSegment, fold=None, idDrug=None, clean=None):
             result = db.engine.execute(queryDelete)
             print("RowCount Delete Drug", result.rowcount)
 
+            queryRefresh = text(
+                f"""
+                    insert into {user.schema}.prescricaoagg
+                    select * from {user.schema}.prescricaoagg where fkmedicamento = :idDrug and idsegmento = :idSegment
+                """
+            )
+
+            result = db.engine.execute(
+                queryRefresh, {"idSegment": idSegment, "idDrug": idDrug}
+            )
+            print("RowCount Refresg Agg", result.rowcount)
+
         queryInsert = text(
             """
             INSERT INTO {schema}.outlier (idsegmento, fkmedicamento, doseconv, frequenciadia, contagem, escore, update_at)
