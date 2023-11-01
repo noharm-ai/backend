@@ -44,3 +44,21 @@ def refresh_prescriptions():
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
     return tryCommit(db, result.rowcount)
+
+
+@app_admin_integration.route(
+    "/admin/integration/init-intervention-reason", methods=["POST"]
+)
+@jwt_required()
+def init_intervention_reason():
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+    os.environ["TZ"] = "America/Sao_Paulo"
+    try:
+        result = integration_service.init_intervention_reason(
+            user=user,
+        )
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+
+    return tryCommit(db, result.rowcount)

@@ -340,21 +340,8 @@ def copy_drug_attributes(
     from_admin_schema=True,
     overwrite_all=False,
 ):
-    raise ValidationError(
-        "Aguardando validação",
-        "errors.unauthorizedUser",
-        status.HTTP_401_UNAUTHORIZED,
-    )
-
     roles = user.config["roles"] if user.config and "roles" in user.config else []
-    if RoleEnum.ADMIN.value not in roles and RoleEnum.TRAINING.value not in roles:
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-
-    if overwrite_all and RoleEnum.ADMIN.value not in roles:
+    if RoleEnum.ADMIN.value not in roles:
         raise ValidationError(
             "Usuário não autorizado",
             "errors.unauthorizedUser",

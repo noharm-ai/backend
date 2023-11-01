@@ -85,3 +85,40 @@ def refresh_prescriptions(user):
 
     db.session.execute(queryPrescription)
     return db.session.execute(queryPresmed)
+
+
+def init_intervention_reason(user):
+    roles = user.config["roles"] if user.config and "roles" in user.config else []
+    if RoleEnum.ADMIN.value not in roles:
+        raise ValidationError(
+            "Usuário não autorizado",
+            "errors.unauthorizedUser",
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
+    schema = user.schema
+
+    if db.session.query(InterventionReason).count() > 0:
+        raise ValidationError(
+            "A tabela motivointervencao já está preenchida",
+            "errors.notSupported",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    insert = text(
+        f"""
+            insert into {schema}.motivointervencao
+            (fkhospital, idmotivointervencao,nome, idmotivomae, ativo, suspensao, substituicao, tp_relacao)
+            select fkhospital, idmotivointervencao,nome, idmotivomae, ativo, suspensao, substituicao, tp_relacao
+            from hsc_test.motivointervencao
+        """
+    )
+
+    reset_seq = text(
+        f"""
+            SELECT setval('{schema}.motivointervencao_idmotivointervencao_seq', (SELECT max(idmotivointervencao) + 1 from hsc_test.motivointervencao), true);
+        """
+    )
+
+    db.session.execute(insert)
+    return db.session.execute(reset_seq)
