@@ -49,3 +49,39 @@ def refresh_agg(user):
     )
 
     return db.session.execute(query)
+
+
+def refresh_prescriptions(user):
+    roles = user.config["roles"] if user.config and "roles" in user.config else []
+    if RoleEnum.ADMIN.value not in roles:
+        raise ValidationError(
+            "Usuário não autorizado",
+            "errors.unauthorizedUser",
+            status.HTTP_401_UNAUTHORIZED,
+        )
+    schema = user.schema
+    max_table_count = 100000
+
+    if get_table_count(schema, "prescricao") > max_table_count:
+        raise ValidationError(
+            "A tabela possui muitos registros. A operação deve ser feita manualmente, fora do horário comercial.",
+            "errors.notSupported",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    queryPrescription = text(
+        f"""
+            insert into {schema}.prescricao
+            select * from {schema}.prescricao
+        """
+    )
+
+    queryPresmed = text(
+        f"""
+            insert into {schema}.presmed
+            select * from {schema}.presmed
+        """
+    )
+
+    db.session.execute(queryPrescription)
+    return db.session.execute(queryPresmed)
