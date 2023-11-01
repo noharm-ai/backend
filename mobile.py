@@ -27,6 +27,7 @@ from routes.admin.frequency import app_admin_freq
 from routes.admin.intervention_reason import app_admin_interv
 from routes.admin.memory import app_admin_memory
 from routes.admin.drug import app_admin_drug
+from routes.admin.integration import app_admin_integration
 import os
 import logging
 from models.enums import NoHarmENV
@@ -81,6 +82,7 @@ app.register_blueprint(app_admin_freq)
 app.register_blueprint(app_admin_interv)
 app.register_blueprint(app_admin_memory)
 app.register_blueprint(app_admin_drug)
+app.register_blueprint(app_admin_integration)
 
 CORS(app, origins=[Config.MAIL_HOST], supports_credentials=True)
 
