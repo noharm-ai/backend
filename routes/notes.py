@@ -96,7 +96,7 @@ def convert_notes(notes, has_primary_care):
         "form": notes.form if has_primary_care else None,
         "template": notes.template if has_primary_care else None,
         "date": notes.date.isoformat(),
-        "prescriber": "", # notes.prescriber,
+        "prescriber": notes.prescriber,
         "position": notes.position,
         "medications": notes.medications,
         "complication": notes.complication,
