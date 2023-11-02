@@ -15,7 +15,7 @@ def get_drug_list(
     has_default_unit=None,
     has_price_unit=None,
     has_inconsistency=None,
-    missing_attributes=None,
+    attribute_list=[],
     term=None,
     limit=10,
     offset=0,
@@ -110,9 +110,28 @@ def get_drug_list(
         else:
             q = q.filter(DrugAttributes.idDrug != None)
 
-    if missing_attributes != None:
-        if missing_attributes:
-            q = q.filter(and_(DrugAttributes.user == None))
+    if len(attribute_list) > 0:
+        bool_attributes = [
+            ["mav", DrugAttributes.mav],
+            ["idoso", DrugAttributes.elderly],
+            ["controlados", DrugAttributes.controlled],
+            ["antimicro", DrugAttributes.antimicro],
+            ["quimio", DrugAttributes.chemo],
+            ["sonda", DrugAttributes.tube],
+            ["naopadronizado", DrugAttributes.notdefault],
+            ["linhabranca", DrugAttributes.whiteList],
+            ["renal", DrugAttributes.kidney],
+            ["hepatico", DrugAttributes.liver],
+            ["plaquetas", DrugAttributes.platelets],
+            ["dosemaxima", DrugAttributes.maxDose],
+        ]
+
+        for a in bool_attributes:
+            if a[0] in attribute_list:
+                if str(a[1].type) == "BOOLEAN":
+                    q = q.filter(a[1] == True)
+                else:
+                    q = q.filter(a[1] != None)
 
     if term:
         q = q.filter(Drug.name.ilike(term))

@@ -26,7 +26,7 @@ def get_drug_list():
         has_default_unit=request_data.get("hasDefaultUnit", None),
         has_price_unit=request_data.get("hasPriceUnit", None),
         has_inconsistency=request_data.get("hasInconsistency", None),
-        missing_attributes=request_data.get("missingAttributes", None),
+        attribute_list=request_data.get("attributeList", []),
         term=request_data.get("term", None),
         id_segment_list=request_data.get("idSegmentList", None),
         limit=request_data.get("limit", 10),
