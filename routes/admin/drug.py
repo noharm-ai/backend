@@ -26,6 +26,7 @@ def get_drug_list():
         has_default_unit=request_data.get("hasDefaultUnit", None),
         has_price_unit=request_data.get("hasPriceUnit", None),
         has_inconsistency=request_data.get("hasInconsistency", None),
+        has_missing_conversion=request_data.get("hasMissingConversion", None),
         attribute_list=request_data.get("attributeList", []),
         term=request_data.get("term", None),
         id_segment_list=request_data.get("idSegmentList", None),
@@ -139,21 +140,6 @@ def copy_unit_conversion():
             id_segment_origin=data.get("idSegmentOrigin", None),
             id_segment_destiny=data.get("idSegmentDestiny", None),
         )
-    except ValidationError as e:
-        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
-
-    return tryCommit(db, result.rowcount)
-
-
-@app_admin_drug.route("/admin/drug/fix-inconsistency", methods=["POST"])
-@jwt_required()
-def fix_inconsistency():
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
-    os.environ["TZ"] = "America/Sao_Paulo"
-
-    try:
-        result = drug_service.fix_inconsistency(user=user)
     except ValidationError as e:
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 

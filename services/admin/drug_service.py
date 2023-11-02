@@ -15,12 +15,16 @@ def get_drug_list(
     has_default_unit=None,
     has_price_unit=None,
     has_inconsistency=None,
+    has_missing_conversion=None,
     attribute_list=[],
     term=None,
     limit=10,
     offset=0,
     id_segment_list=None,
 ):
+    SegmentOutlier = db.aliased(Segment)
+    ConversionsAgg = db.aliased(MeasureUnitConvert)
+
     presc_query = (
         db.session.query(
             Outlier.idDrug.label("idDrug"), Outlier.idSegment.label("idSegment")
@@ -29,7 +33,26 @@ def get_drug_list(
         .subquery()
     )
 
-    SegmentOutlier = db.aliased(Segment)
+    conversions_query = (
+        db.session.query(
+            PrescriptionAgg.idDrug.label("idDrug"),
+            PrescriptionAgg.idSegment.label("idSegment"),
+        )
+        .select_from(PrescriptionAgg)
+        .outerjoin(
+            ConversionsAgg,
+            and_(
+                ConversionsAgg.idSegment == PrescriptionAgg.idSegment,
+                ConversionsAgg.idDrug == PrescriptionAgg.idDrug,
+                ConversionsAgg.idMeasureUnit == PrescriptionAgg.idMeasureUnit,
+            ),
+        )
+        .filter(PrescriptionAgg.idSegment != None)
+        .filter(PrescriptionAgg.idMeasureUnit != None)
+        .filter(ConversionsAgg.factor == None)
+        .group_by(PrescriptionAgg.idDrug, PrescriptionAgg.idSegment)
+        .subquery()
+    )
 
     q = (
         db.session.query(
@@ -67,6 +90,15 @@ def get_drug_list(
         .outerjoin(Substance, Drug.sctid == Substance.id)
         .outerjoin(SegmentOutlier, SegmentOutlier.id == presc_query.c.idSegment)
     )
+
+    if has_missing_conversion:
+        q = q.outerjoin(
+            conversions_query,
+            and_(
+                conversions_query.c.idDrug == presc_query.c.idDrug,
+                conversions_query.c.idSegment == presc_query.c.idSegment,
+            ),
+        ).filter(conversions_query.c.idDrug != None)
 
     if has_substance != None:
         if has_substance:
@@ -218,6 +250,8 @@ def add_default_units(user):
         )
     schema = user.schema
 
+    fix_inconsistency(user)
+
     query = f"""
         with unidades as (
             select
@@ -259,7 +293,25 @@ def add_default_units(user):
             and ma.fkunidademedida is null
     """
 
-    return db.session.execute(query)
+    insert_units = f"""
+        insert into {schema}.unidadeconverte
+            (idsegmento, fkmedicamento, fkunidademedida, fator)
+        select 
+            m.idsegmento, m.fkmedicamento, m.fkunidademedida, 1
+        from 
+            {schema}.medatributos m 
+        where 
+            m.fkunidademedida is not null 
+            and m.fkunidademedida != ''
+        on conflict (idsegmento, fkmedicamento, fkunidademedida)
+        do nothing
+    """
+
+    result = db.session.execute(query)
+
+    db.session.execute(insert_units)
+
+    return result
 
 
 def copy_unit_conversion(id_segment_origin, id_segment_destiny, user):
