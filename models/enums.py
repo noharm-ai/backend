@@ -10,6 +10,13 @@ class MemoryEnum(Enum):
     REPORTS = "reports"
     GETNAME = "getnameurl"
     SUMMARY_CONFIG = "summary-config"
+    MAP_TUBE = "map-tube"
+    MAP_IV = "map-iv"
+    MAP_ORIGIN_DRUG = "map-origin-drug"
+    MAP_ORIGIN_SOLUTION = "map-origin-solution"
+    MAP_ORIGIN_PROCEDURE = "map-origin-procedure"
+    MAP_ORIGIN_DIET = "map-origin-diet"
+    MAP_ORIGIN_CUSTOM = "map-origin-custom"
 
 
 class NoHarmENV(Enum):

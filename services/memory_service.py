@@ -113,4 +113,11 @@ def is_admin_memory(key):
         MemoryEnum.REPORTS.value,
         MemoryEnum.ADMISSION_REPORTS.value,
         MemoryEnum.SUMMARY_CONFIG.value,
+        MemoryEnum.MAP_IV.value,
+        MemoryEnum.MAP_TUBE.value,
+        MemoryEnum.MAP_ORIGIN_DRUG.value,
+        MemoryEnum.MAP_ORIGIN_SOLUTION.value,
+        MemoryEnum.MAP_ORIGIN_PROCEDURE.value,
+        MemoryEnum.MAP_ORIGIN_DIET.value,
+        MemoryEnum.MAP_ORIGIN_CUSTOM.value,
     ]
