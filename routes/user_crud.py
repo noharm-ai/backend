@@ -9,10 +9,19 @@ from flask import render_template
 from config import Config
 
 from services import memory_service
-from models.enums import FeatureEnum
+from models.enums import FeatureEnum, RoleEnum
 
 
 app_user_crud = Blueprint("app_user_crud", __name__)
+
+
+def _has_special_role(roles):
+    return (
+        RoleEnum.ADMIN.value in roles
+        or RoleEnum.SUPPORT.value in roles
+        or RoleEnum.TRAINING.value in roles
+        or RoleEnum.MULTI_SCHEMA.value in roles
+    )
 
 
 @app_user_crud.route("/editUser", methods=["PUT"])
@@ -32,7 +41,7 @@ def createUser(idUser=None):
     dbSession.setSchema(user.schema)
 
     roles = user.config["roles"] if user.config and "roles" in user.config else []
-    if "userAdmin" not in roles:
+    if RoleEnum.USER_ADMIN.value not in roles:
         return {
             "status": "error",
             "message": "Usuário não autorizado",
@@ -64,15 +73,17 @@ def createUser(idUser=None):
         password = pwo.generate()
         newUser.password = func.crypt(password, func.gen_salt("bf", 8))
 
-        if "admin" in roles:
+        if RoleEnum.ADMIN.value in roles:
             newUser.config = {"roles": data.get("roles", [])}
         else:
             newUserRoles = roles.copy()
             # remove administration roles
             try:
-                newUserRoles.remove("userAdmin")
-                newUserRoles.remove("admin")
-                newUserRoles.remove("suporte")
+                newUserRoles.remove(RoleEnum.USER_ADMIN.value)
+                newUserRoles.remove(RoleEnum.ADMIN.value)
+                newUserRoles.remove(RoleEnum.SUPPORT.value)
+                newUserRoles.remove(RoleEnum.TRAINING.value)
+                newUserRoles.remove(RoleEnum.MULTI_SCHEMA.value)
             except ValueError:
                 pass
 
@@ -83,7 +94,7 @@ def createUser(idUser=None):
         else:
             template = "new_user.html"
 
-        if "admin" in newUser.config["roles"] or "suporte" in newUser.config["roles"]:
+        if _has_special_role(newUser.config["roles"]):
             return {
                 "status": "error",
                 "message": "As permissões Administrador e Suporte não podem ser concedidas.",
@@ -132,7 +143,7 @@ def createUser(idUser=None):
         updatedUser.external = data.get("external", None)
         updatedUser.active = bool(data.get("active", True))
 
-        if "admin" in roles:
+        if RoleEnum.ADMIN.value in roles:
             if updatedUser.config is None:
                 updatedUser.config = {"roles": data.get("roles", [])}
             else:
@@ -146,10 +157,7 @@ def createUser(idUser=None):
             if password != None and password != "":
                 updatedUser.password = func.crypt(password, func.gen_salt("bf", 8))
 
-        if (
-            "admin" in updatedUser.config["roles"]
-            or "suporte" in updatedUser.config["roles"]
-        ):
+        if _has_special_role(updatedUser.config["roles"]):
             return {
                 "status": "error",
                 "message": "As permissões Administrador e Suporte não podem ser concedidas.",
