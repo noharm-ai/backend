@@ -31,6 +31,7 @@ class RoleEnum(Enum):
     TRAINING = "training"
     DOCTOR = "doctor"
     READONLY = "readonly"
+    MULTI_SCHEMA = "multi-schema"
 
 
 class FeatureEnum(Enum):

@@ -18,9 +18,19 @@ from config import Config
 from exception.validation_error import ValidationError
 
 
-def _auth_user(user, db_session):
+def _has_force_schema_permission(roles, schema):
+    if schema != "hsc_test":
+        return False
+
+    return (
+        RoleEnum.ADMIN.value in roles or RoleEnum.TRAINING.value in roles
+    ) and RoleEnum.MULTI_SCHEMA.value in roles
+
+
+def _auth_user(user, force_schema=None):
+    roles = user.config["roles"] if user.config and "roles" in user.config else []
+
     if Config.ENV == NoHarmENV.STAGING.value:
-        roles = user.config["roles"] if user.config and "roles" in user.config else []
         if (
             RoleEnum.SUPPORT.value not in roles
             and RoleEnum.ADMIN.value not in roles
@@ -34,11 +44,20 @@ def _auth_user(user, db_session):
                 status.HTTP_401_UNAUTHORIZED,
             )
 
-    claims = {"schema": user.schema, "config": user.config}
+    user_schema = user.schema
+    if force_schema and _has_force_schema_permission(roles, user.schema):
+        user_schema = force_schema
+
+    claims = {"schema": user_schema, "config": user.config}
     access_token = create_access_token(identity=user.id, additional_claims=claims)
     refresh_token = create_refresh_token(identity=user.id, additional_claims=claims)
 
-    notification = Notify.getNotification(schema=user.schema)
+    db_session = db.create_scoped_session()
+    db_session.connection(
+        execution_options={"schema_translate_map": {None: user_schema}}
+    )
+
+    notification = Notify.getNotification(schema=user_schema)
 
     if notification is not None:
         notificationMemory = (
@@ -55,7 +74,7 @@ def _auth_user(user, db_session):
 
     features = db_session.query(Memory).filter(Memory.kind == "features").first()
 
-    nameUrl = Memory.getNameUrl(user.schema)
+    nameUrl = Memory.getNameUrl(user_schema)
 
     hospitals = db_session.query(Hospital).order_by(asc(Hospital.name)).all()
     hospitalList = []
@@ -85,7 +104,7 @@ def _auth_user(user, db_session):
         "userName": user.name,
         "userId": user.id,
         "email": user.email,
-        "schema": user.schema,
+        "schema": user_schema,
         "roles": user.config["roles"] if user.config and "roles" in user.config else [],
         "userFeatures": user.config["features"]
         if user.config and "features" in user.config
@@ -109,7 +128,34 @@ def _auth_user(user, db_session):
     }
 
 
-def auth_local(email, password):
+def pre_auth(email, password):
+    user = User.authenticate(email, password)
+
+    if user is None:
+        raise ValidationError(
+            "Usuário inválido",
+            "errors.unauthorizedUser",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    roles = user.config["roles"] if user.config and "roles" in user.config else []
+
+    if _has_force_schema_permission(roles, user.schema):
+        result = db.session.execute(
+            """
+            SELECT schema_name FROM information_schema.schemata where schema_name not in ('pg_catalog', 'information_schema') order by schema_name                   
+        """
+        )
+        schemas = []
+        for r in result:
+            schemas.append(r[0])
+
+        return {"maintainer": True, "schemas": schemas}
+
+    return {"maintainer": False, "schemas": []}
+
+
+def auth_local(email, password, force_schema=None):
     preCheckUser = User.query.filter_by(email=email).first()
 
     if preCheckUser is None:
@@ -155,7 +201,7 @@ def auth_local(email, password):
             status.HTTP_400_BAD_REQUEST,
         )
 
-    return _auth_user(user, db_session)
+    return _auth_user(user, force_schema=force_schema)
 
 
 def auth_provider(code, schema):
@@ -292,7 +338,7 @@ def auth_provider(code, schema):
                 status.HTTP_401_UNAUTHORIZED,
             )
 
-    return _auth_user(nh_user, db.session)
+    return _auth_user(nh_user)
 
 
 def _get_oauth_user(email, name, schema, oauth_config):
