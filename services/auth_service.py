@@ -27,7 +27,7 @@ def _has_force_schema_permission(roles, schema):
     ) and RoleEnum.MULTI_SCHEMA.value in roles
 
 
-def _auth_user(user, force_schema=None):
+def _auth_user(user, force_schema=None, default_roles=[]):
     roles = user.config["roles"] if user.config and "roles" in user.config else []
 
     if Config.ENV == NoHarmENV.STAGING.value:
@@ -45,10 +45,12 @@ def _auth_user(user, force_schema=None):
             )
 
     user_schema = user.schema
+    user_config = user.config
     if force_schema and _has_force_schema_permission(roles, user.schema):
         user_schema = force_schema
+        user_config = dict(user.config, **{"roles": roles + default_roles})
 
-    claims = {"schema": user_schema, "config": user.config}
+    claims = {"schema": user_schema, "config": user_config}
     access_token = create_access_token(identity=user.id, additional_claims=claims)
     refresh_token = create_refresh_token(identity=user.id, additional_claims=claims)
 
@@ -105,9 +107,9 @@ def _auth_user(user, force_schema=None):
         "userId": user.id,
         "email": user.email,
         "schema": user_schema,
-        "roles": user.config["roles"] if user.config and "roles" in user.config else [],
-        "userFeatures": user.config["features"]
-        if user.config and "features" in user.config
+        "roles": user_config["roles"] if user_config and "roles" in user_config else [],
+        "userFeatures": user_config["features"]
+        if user_config and "features" in user_config
         else [],
         "features": features.value if features is not None else [],
         "nameUrl": nameUrl["value"]
@@ -141,21 +143,30 @@ def pre_auth(email, password):
     roles = user.config["roles"] if user.config and "roles" in user.config else []
 
     if _has_force_schema_permission(roles, user.schema):
-        result = db.session.execute(
-            """
-            SELECT schema_name FROM information_schema.schemata where schema_name not in ('pg_catalog', 'information_schema') order by schema_name                   
-        """
+        schema_results = db.session.query(SchemaConfig).order_by(
+            SchemaConfig.schemaName
         )
+
         schemas = []
-        for r in result:
-            schemas.append(r[0])
+        for s in schema_results:
+            schemas.append(
+                {
+                    "name": s.schemaName,
+                    "defaultRoles": s.config["defaultRoles"]
+                    if s.config != None and "defaultRoles" in s.config
+                    else [],
+                    "extraRoles": s.config["extraRoles"]
+                    if s.config != None and "extraRoles" in s.config
+                    else [],
+                }
+            )
 
         return {"maintainer": True, "schemas": schemas}
 
     return {"maintainer": False, "schemas": []}
 
 
-def auth_local(email, password, force_schema=None):
+def auth_local(email, password, force_schema=None, default_roles=[]):
     preCheckUser = User.query.filter_by(email=email).first()
 
     if preCheckUser is None:
@@ -201,7 +212,7 @@ def auth_local(email, password, force_schema=None):
             status.HTTP_400_BAD_REQUEST,
         )
 
-    return _auth_user(user, force_schema=force_schema)
+    return _auth_user(user, force_schema=force_schema, default_roles=default_roles)
 
 
 def auth_provider(code, schema):
