@@ -24,6 +24,7 @@ def get_drug_list(
 ):
     SegmentOutlier = db.aliased(Segment)
     ConversionsAgg = db.aliased(MeasureUnitConvert)
+    MeasureUnitAgg = db.aliased(MeasureUnit)
 
     presc_query = (
         db.session.query(
@@ -39,6 +40,10 @@ def get_drug_list(
             PrescriptionAgg.idSegment.label("idSegment"),
         )
         .select_from(PrescriptionAgg)
+        .join(
+            MeasureUnitAgg,
+            PrescriptionAgg.idMeasureUnit == MeasureUnitAgg.id,
+        )
         .outerjoin(
             ConversionsAgg,
             and_(
