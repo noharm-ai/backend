@@ -50,6 +50,13 @@ def _auth_user(user, force_schema=None, default_roles=[]):
         user_schema = force_schema
         user_config = dict(user.config, **{"roles": roles + default_roles})
 
+        if RoleEnum.ADMIN.value in default_roles:
+            raise ValidationError(
+                "Permissão extra inválida",
+                "errors.unauthorizedUser",
+                status.HTTP_401_UNAUTHORIZED,
+            )
+
     claims = {"schema": user_schema, "config": user_config}
     access_token = create_access_token(identity=user.id, additional_claims=claims)
     refresh_token = create_refresh_token(identity=user.id, additional_claims=claims)
