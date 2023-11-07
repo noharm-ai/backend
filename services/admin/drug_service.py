@@ -265,6 +265,7 @@ def add_default_units(user):
                     pagg.fkunidademedida
                 from
                     {schema}.prescricaoagg pagg
+                    inner join {schema}.unidademedida u on (pagg.fkunidademedida = u.fkunidademedida)
                 where
                     pagg.fkmedicamento in (
                         select fkmedicamento from {schema}.medatributos m where m.fkunidademedida is null
