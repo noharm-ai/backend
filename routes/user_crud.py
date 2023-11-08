@@ -73,7 +73,7 @@ def createUser(idUser=None):
         password = pwo.generate()
         newUser.password = func.crypt(password, func.gen_salt("bf", 8))
 
-        if RoleEnum.ADMIN.value in roles:
+        if RoleEnum.ADMIN.value in roles or RoleEnum.TRAINING.value in roles:
             newUser.config = {"roles": data.get("roles", [])}
         else:
             newUserRoles = roles.copy()
@@ -143,7 +143,7 @@ def createUser(idUser=None):
         updatedUser.external = data.get("external", None)
         updatedUser.active = bool(data.get("active", True))
 
-        if RoleEnum.ADMIN.value in roles:
+        if RoleEnum.ADMIN.value in roles or RoleEnum.TRAINING.value in roles:
             if updatedUser.config is None:
                 updatedUser.config = {"roles": data.get("roles", [])}
             else:
@@ -151,11 +151,12 @@ def createUser(idUser=None):
                 newConfig["roles"] = data.get("roles", [])
                 updatedUser.config = newConfig
 
-            # force password
-            password = data.get("password", None)
+            if RoleEnum.ADMIN.value in roles:
+                # force password
+                password = data.get("password", None)
 
-            if password != None and password != "":
-                updatedUser.password = func.crypt(password, func.gen_salt("bf", 8))
+                if password != None and password != "":
+                    updatedUser.password = func.crypt(password, func.gen_salt("bf", 8))
 
         if _has_special_role(updatedUser.config["roles"]):
             return {
