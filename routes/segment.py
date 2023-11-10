@@ -4,12 +4,10 @@ from models.appendix import *
 from models.prescription import *
 from flask import Blueprint, request
 from flask_jwt_extended import (
-    create_access_token,
-    create_refresh_token,
     jwt_required,
     get_jwt_identity,
 )
-from sqlalchemy import asc, func
+from sqlalchemy import asc
 from .utils import tryCommit
 from datetime import date, datetime, timedelta
 
@@ -39,65 +37,11 @@ def getSegmentsId(idSegment, idHospital=None):
 
     s = Segment.query.get(idSegment)
 
-    sd = db.aliased(SegmentDepartment)
-    q_department = (
-        db.session.query(func.count(sd.id).label("count"))
-        .select_from(sd)
-        .filter(sd.idHospital == idHospital)
-        .filter(sd.idDepartment == Department.id)
-    )
-
-    if idHospital != None:
-        departments = (
-            db.session.query(
-                Department, SegmentDepartment, q_department.as_scalar().label("total")
-            )
-            .outerjoin(
-                SegmentDepartment,
-                and_(
-                    SegmentDepartment.idDepartment == Department.id,
-                    SegmentDepartment.idHospital == idHospital,
-                    SegmentDepartment.id == idSegment,
-                ),
-            )
-            .filter(Department.idHospital == idHospital)
-            .order_by(asc(Department.name))
-            .all()
-        )
-    else:
-        departments = (
-            db.session.query(
-                Department, SegmentDepartment, literal_column("0").label("total")
-            )
-            .join(
-                SegmentDepartment,
-                and_(
-                    SegmentDepartment.idDepartment == Department.id,
-                    SegmentDepartment.idHospital == Department.idHospital,
-                    SegmentDepartment.id == idSegment,
-                ),
-            )
-            .order_by(asc(Department.name))
-            .all()
-        )
-
     segExams = (
         SegmentExam.query.filter(SegmentExam.idSegment == idSegment)
         .order_by(asc(SegmentExam.order))
         .all()
     )
-
-    deps = []
-    for d in departments:
-        deps.append(
-            {
-                "idHospital": d[0].idHospital,
-                "idDepartment": d[0].id,
-                "name": d[0].name,
-                "checked": d[1] is not None,
-                "uses": d[2],
-            }
-        )
 
     exams = []
     for e in segExams:
@@ -121,59 +65,9 @@ def getSegmentsId(idSegment, idHospital=None):
             "idHospital": idHospital,
             "description": s.description if s else None,
             "status": s.status if s else None,
-            "departments": deps,
             "exams": exams,
         },
     }, status.HTTP_200_OK
-
-
-@app_seg.route("/segments/<int:idSegment>/<int:idHospital>", methods=["PUT"])
-@jwt_required()
-def setSegment(idSegment, idHospital):
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
-    data = request.get_json()
-
-    s = Segment.query.get(idSegment)
-
-    if "description" in data:
-        s.description = data.get("description", None)
-    if "status" in data:
-        s.status = data.get("status", None)
-
-    idSegment = s.id
-    deps_new = data.get("departments", None)
-
-    deps_old = (
-        SegmentDepartment.query.filter(SegmentDepartment.id == idSegment)
-        .filter(SegmentDepartment.idHospital == idHospital)
-        .all()
-    )
-
-    deps_idx = {}
-    for d in deps_old:
-        deps_idx[int(d.idDepartment)] = 1
-
-    if deps_new:
-        for d in deps_new:
-            sd = SegmentDepartment()
-            sd.id = idSegment
-            sd.idHospital = idHospital
-            sd.idDepartment = d
-
-            if not sd.idDepartment in deps_idx:
-                db.session.add(sd)
-            else:
-                del deps_idx[sd.idDepartment]
-
-    for d in deps_idx:
-        db.session.query(SegmentDepartment).filter(
-            SegmentDepartment.id == idSegment
-        ).filter(SegmentDepartment.idHospital == idHospital).filter(
-            SegmentDepartment.idDepartment == d
-        ).delete()
-
-    return tryCommit(db, idSegment)
 
 
 @app_seg.route("/departments", methods=["GET"])
