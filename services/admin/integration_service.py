@@ -23,6 +23,12 @@ def get_table_count(schema, table):
     return ([row[0] for row in result])[0]
 
 
+def can_refresh_agg(schema):
+    max_table_count = 500000
+
+    return get_table_count(schema, "prescricaoagg") <= max_table_count
+
+
 def refresh_agg(user):
     roles = user.config["roles"] if user.config and "roles" in user.config else []
     if RoleEnum.ADMIN.value not in roles:
@@ -32,9 +38,8 @@ def refresh_agg(user):
             status.HTTP_401_UNAUTHORIZED,
         )
     schema = user.schema
-    max_table_count = 500000
 
-    if get_table_count(schema, "prescricaoagg") > max_table_count:
+    if not can_refresh_agg(user.schema):
         raise ValidationError(
             "A tabela possui muitos registros. A operação deve ser feita manualmente, fora do horário comercial.",
             "errors.notSupported",

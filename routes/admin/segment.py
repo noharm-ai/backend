@@ -44,3 +44,23 @@ def upsert_record():
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
     return tryCommit(db, data.get("idSegment"))
+
+
+@app_admin_segment.route("/admin/segments/outliers/process-list", methods=["POST"])
+@jwt_required()
+def get_outliers_process_list():
+    data = request.get_json()
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+    os.environ["TZ"] = "America/Sao_Paulo"
+    process_list = []
+
+    try:
+        process_list = segment_service.get_outliers_process_list(
+            id_segment=data.get("idSegment", None),
+            user=user,
+        )
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+
+    return tryCommit(db, process_list)
