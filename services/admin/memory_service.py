@@ -23,6 +23,13 @@ def get_admin_memory_itens(user):
         MemoryEnum.REPORTS.value,
         MemoryEnum.GETNAME.value,
         MemoryEnum.ADMISSION_REPORTS.value,
+        MemoryEnum.MAP_IV.value,
+        MemoryEnum.MAP_TUBE.value,
+        MemoryEnum.MAP_ORIGIN_DRUG.value,
+        MemoryEnum.MAP_ORIGIN_SOLUTION.value,
+        MemoryEnum.MAP_ORIGIN_PROCEDURE.value,
+        MemoryEnum.MAP_ORIGIN_DIET.value,
+        MemoryEnum.MAP_ORIGIN_CUSTOM.value,
     ]
 
     memory_itens = db.session.query(Memory).filter(Memory.kind.in_(kinds)).all()

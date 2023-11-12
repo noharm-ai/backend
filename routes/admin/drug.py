@@ -26,7 +26,8 @@ def get_drug_list():
         has_default_unit=request_data.get("hasDefaultUnit", None),
         has_price_unit=request_data.get("hasPriceUnit", None),
         has_inconsistency=request_data.get("hasInconsistency", None),
-        missing_attributes=request_data.get("missingAttributes", None),
+        has_missing_conversion=request_data.get("hasMissingConversion", None),
+        attribute_list=request_data.get("attributeList", []),
         term=request_data.get("term", None),
         id_segment_list=request_data.get("idSegmentList", None),
         limit=request_data.get("limit", 10),
@@ -145,15 +146,23 @@ def copy_unit_conversion():
     return tryCommit(db, result.rowcount)
 
 
-@app_admin_drug.route("/admin/drug/fix-inconsistency", methods=["POST"])
+@app_admin_drug.route("/admin/drug/copy-attributes", methods=["POST"])
 @jwt_required()
-def fix_inconsistency():
+def copy_attributes():
+    data = request.get_json()
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
     os.environ["TZ"] = "America/Sao_Paulo"
 
     try:
-        result = drug_service.fix_inconsistency(user=user)
+        result = drug_service.copy_drug_attributes(
+            user=user,
+            id_segment_origin=data.get("idSegmentOrigin", None),
+            id_segment_destiny=data.get("idSegmentDestiny", None),
+            attributes=data.get("attributes", None),
+            from_admin_schema=data.get("fromAdminSchema", True),
+            overwrite_all=data.get("overwriteAll", False),
+        )
     except ValidationError as e:
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 

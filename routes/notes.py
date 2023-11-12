@@ -35,6 +35,13 @@ def get_notes_v2(admissionNumber):
                 func.sum(ClinicalNotes.complication),
                 func.sum(ClinicalNotes.symptoms),
                 func.sum(ClinicalNotes.conduct),
+                func.array_agg(func.distinct(ClinicalNotes.position)),
+                func.sum(ClinicalNotes.allergy),
+                func.sum(ClinicalNotes.info),
+                func.sum(ClinicalNotes.medications),
+                func.sum(ClinicalNotes.names),
+                func.sum(ClinicalNotes.signs),
+                func.sum(ClinicalNotes.dialysis),
             )
             .select_from(ClinicalNotes)
             .filter(ClinicalNotes.admissionNumber == admissionNumber)
@@ -45,11 +52,16 @@ def get_notes_v2(admissionNumber):
         )
 
         if len(dates) > 0:
-            notes = get_notes_by_date(admissionNumber, dates[0][0], has_primary_care)
+            dates_list = []
+            for row in range(3):
+                if len(dates) > row:
+                    dates_list.append(dates[row][0])
+
+            notes = get_notes_by_date(admissionNumber, dates_list, has_primary_care)
         else:
             notes = []
     else:
-        notes = get_notes_by_date(admissionNumber, filter_date, has_primary_care)
+        notes = get_notes_by_date(admissionNumber, [filter_date], has_primary_care)
 
     noteResults = []
     for n in notes:
@@ -66,6 +78,13 @@ def get_notes_v2(admissionNumber):
                     "complication": d[3],
                     "symptoms": d[4],
                     "conduct": d[5],
+                    "roles": d[6],
+                    "allergy": d[7],
+                    "info": d[8],
+                    "medications": d[9],
+                    "names": d[10],
+                    "signs": d[11],
+                    "dialysis": d[12],
                 }
             )
 
@@ -75,11 +94,11 @@ def get_notes_v2(admissionNumber):
     }, status.HTTP_200_OK
 
 
-def get_notes_by_date(admissionNumber, date, has_primary_care):
+def get_notes_by_date(admissionNumber, dateList, has_primary_care):
     query = (
         ClinicalNotes.query.filter(ClinicalNotes.admissionNumber == admissionNumber)
         .filter(or_(ClinicalNotes.isExam == None, ClinicalNotes.isExam == False))
-        .filter(func.date(ClinicalNotes.date) == date)
+        .filter(func.date(ClinicalNotes.date).in_(dateList))
     )
 
     if has_primary_care:

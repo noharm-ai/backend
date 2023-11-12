@@ -13,11 +13,7 @@ from exception.validation_error import ValidationError
 
 def get_structured_info(admission_number, user, mock=False):
     roles = user.config["roles"] if user.config and "roles" in user.config else []
-    if (
-        RoleEnum.SUPPORT.value not in roles
-        and RoleEnum.ADMIN.value not in roles
-        and RoleEnum.DOCTOR.value not in roles
-    ):
+    if RoleEnum.SUMMARY.value not in roles and RoleEnum.DOCTOR.value not in roles:
         raise ValidationError(
             "Usuário não autorizado",
             "errors.unauthorizedUser",

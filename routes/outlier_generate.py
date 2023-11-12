@@ -22,57 +22,6 @@ def compute_outlier(idDrug, drugsItem, poolDict, fold):
     print("End...", fold, idDrug)
 
 
-@app_gen.route("/segments/<int:idSegment>/outliers/generate", methods=["GET"])
-@jwt_required()
-def callOutliers(idSegment):
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
-
-    auth_token = create_access_token(get_jwt_identity())
-    header = {"Authorization": "Bearer " + auth_token}
-
-    conn = db.engine.raw_connection()
-    cursor = conn.cursor()
-
-    print("Init Schema:", user.schema, "Segment:", idSegment)
-
-    query = (
-        "INSERT INTO "
-        + user.schema
-        + ".outlier (idsegmento, fkmedicamento, doseconv, frequenciadia, contagem)\
-            SELECT idsegmento, fkmedicamento, ROUND(doseconv::numeric,2) as doseconv, frequenciadia, SUM(contagem)\
-            FROM "
-        + user.schema
-        + ".prescricaoagg\
-            WHERE idsegmento = "
-        + str(int(idSegment))
-        + " and frequenciadia is not null and doseconv is not null\
-            GROUP BY idsegmento, fkmedicamento, ROUND(doseconv::numeric,2), frequenciadia\
-            ON CONFLICT DO nothing;"
-    )
-
-    result = db.engine.execute(query)
-    print("RowCount", result.rowcount)
-
-    totalCount = (
-        db.session.query(func.count(distinct(Outlier.idDrug)))
-        .select_from(Outlier)
-        .filter(Outlier.idSegment == idSegment)
-        .scalar()
-    )
-    folds = ceil(totalCount / fold_size)
-    print("Total Count:", totalCount, folds)
-
-    processesUrl = []
-    for fold in range(1, folds + 1):
-        processUrl = (
-            "/segments/" + str(int(idSegment)) + "/outliers/generate/fold/" + str(fold)
-        )
-        processesUrl.append(processUrl)
-
-    return {"status": "success", "data": processesUrl}, status.HTTP_200_OK
-
-
 @app_gen.route(
     "/segments/<int:idSegment>/outliers/generate/fold/<int:fold>", methods=["GET"]
 )
@@ -129,6 +78,18 @@ def generateOutliers(idSegment, fold=None, idDrug=None, clean=None):
             )
             result = db.engine.execute(queryDelete)
             print("RowCount Delete Drug", result.rowcount)
+
+            queryRefresh = text(
+                f"""
+                    insert into {user.schema}.prescricaoagg
+                    select * from {user.schema}.prescricaoagg where fkmedicamento = :idDrug and idsegmento = :idSegment
+                """
+            )
+
+            result = db.engine.execute(
+                queryRefresh, {"idSegment": idSegment, "idDrug": idDrug}
+            )
+            print("RowCount Refresg Agg", result.rowcount)
 
         queryInsert = text(
             """
