@@ -7,7 +7,7 @@ from flask_jwt_extended import (
     jwt_required,
     get_jwt_identity,
 )
-from sqlalchemy import asc
+from sqlalchemy import asc, func
 from .utils import tryCommit
 from datetime import date, datetime, timedelta
 
@@ -37,11 +37,65 @@ def getSegmentsId(idSegment, idHospital=None):
 
     s = Segment.query.get(idSegment)
 
+    sd = db.aliased(SegmentDepartment)
+    q_department = (
+        db.session.query(func.count(sd.id).label("count"))
+        .select_from(sd)
+        .filter(sd.idHospital == idHospital)
+        .filter(sd.idDepartment == Department.id)
+    )
+
+    if idHospital != None:
+        departments = (
+            db.session.query(
+                Department, SegmentDepartment, q_department.as_scalar().label("total")
+            )
+            .outerjoin(
+                SegmentDepartment,
+                and_(
+                    SegmentDepartment.idDepartment == Department.id,
+                    SegmentDepartment.idHospital == idHospital,
+                    SegmentDepartment.id == idSegment,
+                ),
+            )
+            .filter(Department.idHospital == idHospital)
+            .order_by(asc(Department.name))
+            .all()
+        )
+    else:
+        departments = (
+            db.session.query(
+                Department, SegmentDepartment, literal_column("0").label("total")
+            )
+            .join(
+                SegmentDepartment,
+                and_(
+                    SegmentDepartment.idDepartment == Department.id,
+                    SegmentDepartment.idHospital == Department.idHospital,
+                    SegmentDepartment.id == idSegment,
+                ),
+            )
+            .order_by(asc(Department.name))
+            .all()
+        )
+
     segExams = (
         SegmentExam.query.filter(SegmentExam.idSegment == idSegment)
         .order_by(asc(SegmentExam.order))
         .all()
     )
+
+    deps = []
+    for d in departments:
+        deps.append(
+            {
+                "idHospital": d[0].idHospital,
+                "idDepartment": d[0].id,
+                "name": d[0].name,
+                "checked": d[1] is not None,
+                "uses": d[2],
+            }
+        )
 
     exams = []
     for e in segExams:
@@ -65,6 +119,7 @@ def getSegmentsId(idSegment, idHospital=None):
             "idHospital": idHospital,
             "description": s.description if s else None,
             "status": s.status if s else None,
+            "departments": deps,
             "exams": exams,
         },
     }, status.HTTP_200_OK
