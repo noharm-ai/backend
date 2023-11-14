@@ -119,12 +119,8 @@ def _auth_user(user, force_schema=None, default_roles=[]):
         if user_config and "features" in user_config
         else [],
         "features": features.value if features is not None else [],
-        "nameUrl": nameUrl["value"]
-        if user.permission()
-        else "http://localhost/{idPatient}",
-        "multipleNameUrl": nameUrl["multiple"]
-        if "multiple" in nameUrl and user.permission()
-        else None,
+        "nameUrl": nameUrl["value"] if "value" in nameUrl else None,
+        "multipleNameUrl": nameUrl["multiple"] if "multiple" in nameUrl else None,
         "nameHeaders": nameUrl["headers"] if "headers" in nameUrl else {},
         "proxy": True if "to" in nameUrl else False,
         "notify": notification,
