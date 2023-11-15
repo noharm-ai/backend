@@ -10,6 +10,32 @@ from services.admin import drug_service, integration_service
 from exception.validation_error import ValidationError
 
 
+def upsert_segment(id_segment, description, active, user):
+    roles = user.config["roles"] if user.config and "roles" in user.config else []
+    if RoleEnum.ADMIN.value not in roles and RoleEnum.TRAINING.value not in roles:
+        raise ValidationError(
+            "Usuário não autorizado",
+            "errors.unauthorizedUser",
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
+    if id_segment:
+        segment = db.session.query(Segment).filter(Segment.id == id_segment).first()
+        if segment == None:
+            raise ValidationError(
+                "Registro inválido",
+                "errors.invalidRecord",
+                status.HTTP_400_BAD_REQUEST,
+            )
+    else:
+        segment = Segment()
+
+    segment.description = description
+    segment.status = 1 if active else 0
+
+    db.session.add(segment)
+
+
 def get_departments(id_segment):
     sd = db.aliased(SegmentDepartment)
     q_department = (

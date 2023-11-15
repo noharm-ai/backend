@@ -13,6 +13,27 @@ from exception.validation_error import ValidationError
 app_admin_segment = Blueprint("app_admin_segment", __name__)
 
 
+@app_admin_segment.route("/admin/segments", methods=["POST"])
+@jwt_required()
+def upsert_segment():
+    data = request.get_json()
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+    os.environ["TZ"] = "America/Sao_Paulo"
+
+    try:
+        segment_service.upsert_segment(
+            id_segment=data.get("idSegment", None),
+            description=data.get("description", None),
+            active=data.get("active", None),
+            user=user,
+        )
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+
+    return tryCommit(db, data.get("idSegment"))
+
+
 @app_admin_segment.route(
     "/admin/segments/departments/<int:id_segment>", methods=["GET"]
 )
@@ -28,7 +49,7 @@ def get_departments(id_segment):
 
 @app_admin_segment.route("/admin/segments/departments", methods=["POST"])
 @jwt_required()
-def upsert_record():
+def upsert_department():
     data = request.get_json()
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
