@@ -90,7 +90,7 @@ def update_segment_departments(id_segment, department_list, user):
 
 def get_outliers_process_list(id_segment, user):
     roles = user.config["roles"] if user.config and "roles" in user.config else []
-    if RoleEnum.ADMIN.value not in roles:
+    if RoleEnum.ADMIN.value not in roles and RoleEnum.TRAINING.value not in roles:
         raise ValidationError(
             "Usuário não autorizado",
             "errors.unauthorizedUser",

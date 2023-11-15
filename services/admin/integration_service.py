@@ -31,7 +31,7 @@ def can_refresh_agg(schema):
 
 def refresh_agg(user):
     roles = user.config["roles"] if user.config and "roles" in user.config else []
-    if RoleEnum.ADMIN.value not in roles:
+    if RoleEnum.ADMIN.value not in roles and RoleEnum.TRAINING.value not in roles:
         raise ValidationError(
             "Usuário não autorizado",
             "errors.unauthorizedUser",
@@ -94,7 +94,7 @@ def refresh_prescriptions(user):
 
 def init_intervention_reason(user):
     roles = user.config["roles"] if user.config and "roles" in user.config else []
-    if RoleEnum.ADMIN.value not in roles:
+    if RoleEnum.ADMIN.value not in roles and RoleEnum.TRAINING.value not in roles:
         raise ValidationError(
             "Usuário não autorizado",
             "errors.unauthorizedUser",
