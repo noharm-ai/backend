@@ -404,7 +404,7 @@ def tryCommit(db, recId, allow=True):
 
         return {
             "status": "error",
-            "message": str(e),
+            "message": "Ocorreu um erro inesperado.",
         }, status.HTTP_500_INTERNAL_SERVER_ERROR
 
 

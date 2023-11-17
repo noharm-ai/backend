@@ -30,3 +30,40 @@ def copy_exams():
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
     return tryCommit(db, result.rowcount)
+
+
+@app_admin_exam.route("/admin/exam/most-frequent", methods=["GET"])
+@jwt_required()
+def get_most_frequent():
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+
+    try:
+        list = exam_service.get_most_frequent(user=user)
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+
+    return {
+        "status": "success",
+        "data": list,
+    }, status.HTTP_200_OK
+
+
+@app_admin_exam.route("/admin/exam/most-frequent/add", methods=["POST"])
+@jwt_required()
+def add_most_frequent():
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+    os.environ["TZ"] = "America/Sao_Paulo"
+    data = request.get_json()
+
+    try:
+        exam_service.add_most_frequent(
+            id_segment=data.get("idSegment", None),
+            exam_types=data.get("examTypes", None),
+            user=user,
+        )
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+
+    return tryCommit(db, True)
