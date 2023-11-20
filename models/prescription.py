@@ -246,7 +246,6 @@ class Prescription(db.Model):
                         and_(
                             pd2.idPrescription == p2.id,
                             pd2.id != pd1.id,
-                            pd2.cpoe_group != pd1.cpoe_group,
                         ),
                     )
                     .join(m1, m1.id == pd1.idDrug)
@@ -326,7 +325,25 @@ class Prescription(db.Model):
             .filter(pd2.suspendedDate == None)
         )
 
-        interaction = relation.filter(Relation.kind.in_(["it", "dt", "dm", "iy"]))
+        if is_cpoe:
+            interaction = relation.filter(
+                or_(
+                    Relation.kind.in_(["it", "dt", "dm", "iy"]),
+                    and_(Relation.kind == "sl", pd1.cpoe_group == pd2.cpoe_group),
+                )
+            )
+        else:
+            interaction = relation.filter(
+                or_(
+                    Relation.kind.in_(["it", "dt", "dm", "iy"]),
+                    (
+                        and_(
+                            Relation.kind == "sl",
+                            pd1.solutionGroup == pd2.solutionGroup,
+                        )
+                    ),
+                )
+            )
 
         q_allergy = (
             db.session.query(Allergy.idDrug.label("idDrug"))
