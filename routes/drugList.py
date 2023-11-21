@@ -19,6 +19,7 @@ class DrugList:
             "int": 0,
             "inc": 0,
             "rea": 0,
+            "isl": 0,
             "maxTime": 0,
             "maxDose": 0,
             "kidney": 0,
@@ -465,6 +466,7 @@ class DrugList:
                     "formValues": pd[0].form,
                 }
             )
+
         return pDrugs
 
     def sortWhiteList(self, pDrugs):

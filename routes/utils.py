@@ -132,7 +132,7 @@ typeRelations["dt"] = "Duplicidade Terapêutica"
 typeRelations["it"] = "Interação Medicamentosa"
 typeRelations["iy"] = "Incompatibilidade em Y"
 typeRelations["rx"] = "Reatividade Cruzada"
-typeRelations["sl"] = "Incompatibilidade em Solução"
+typeRelations["sl"] = "ISL Incompatibilidade em Solução"
 
 examEmpty = {"value": None, "alert": False, "ref": None, "name": None}
 mdrdEmpty = dict(
