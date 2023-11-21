@@ -27,7 +27,7 @@ def _has_force_schema_permission(roles, schema):
     ) and RoleEnum.MULTI_SCHEMA.value in roles
 
 
-def _auth_user(user, force_schema=None, default_roles=[]):
+def _auth_user(user, force_schema=None, default_roles=[], run_as_basic_user=False):
     roles = user.config["roles"] if user.config and "roles" in user.config else []
 
     if Config.ENV == NoHarmENV.STAGING.value:
@@ -50,12 +50,29 @@ def _auth_user(user, force_schema=None, default_roles=[]):
         user_schema = force_schema
         user_config = dict(user.config, **{"roles": roles + default_roles})
 
-        if RoleEnum.ADMIN.value in default_roles:
+        if (
+            RoleEnum.ADMIN.value in default_roles
+            or RoleEnum.TRAINING.value in default_roles
+        ):
             raise ValidationError(
                 "Permissão extra inválida",
                 "errors.unauthorizedUser",
                 status.HTTP_401_UNAUTHORIZED,
             )
+
+        if run_as_basic_user:
+            basic_user_roles = roles + default_roles
+            if RoleEnum.ADMIN.value in basic_user_roles:
+                basic_user_roles.remove(RoleEnum.ADMIN.value)
+            if RoleEnum.TRAINING.value in basic_user_roles:
+                basic_user_roles.remove(RoleEnum.TRAINING.value)
+            if RoleEnum.SUPPORT.value in basic_user_roles:
+                basic_user_roles.remove(RoleEnum.SUPPORT.value)
+
+            if RoleEnum.READONLY.value not in basic_user_roles:
+                basic_user_roles.append(RoleEnum.READONLY.value)
+
+            user_config = dict(user.config, **{"roles": basic_user_roles})
 
     claims = {"schema": user_schema, "config": user_config}
     access_token = create_access_token(identity=user.id, additional_claims=claims)
@@ -119,12 +136,8 @@ def _auth_user(user, force_schema=None, default_roles=[]):
         if user_config and "features" in user_config
         else [],
         "features": features.value if features is not None else [],
-        "nameUrl": nameUrl["value"]
-        if user.permission()
-        else "http://localhost/{idPatient}",
-        "multipleNameUrl": nameUrl["multiple"]
-        if "multiple" in nameUrl and user.permission()
-        else None,
+        "nameUrl": nameUrl["value"] if "value" in nameUrl else None,
+        "multipleNameUrl": nameUrl["multiple"] if "multiple" in nameUrl else None,
         "nameHeaders": nameUrl["headers"] if "headers" in nameUrl else {},
         "proxy": True if "to" in nameUrl else False,
         "notify": notification,
@@ -173,7 +186,9 @@ def pre_auth(email, password):
     return {"maintainer": False, "schemas": []}
 
 
-def auth_local(email, password, force_schema=None, default_roles=[]):
+def auth_local(
+    email, password, force_schema=None, default_roles=[], run_as_basic_user=False
+):
     preCheckUser = User.query.filter_by(email=email).first()
 
     if preCheckUser is None:
@@ -219,7 +234,12 @@ def auth_local(email, password, force_schema=None, default_roles=[]):
             status.HTTP_400_BAD_REQUEST,
         )
 
-    return _auth_user(user, force_schema=force_schema, default_roles=default_roles)
+    return _auth_user(
+        user,
+        force_schema=force_schema,
+        default_roles=default_roles,
+        run_as_basic_user=run_as_basic_user,
+    )
 
 
 def auth_provider(code, schema):

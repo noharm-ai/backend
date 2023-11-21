@@ -418,7 +418,7 @@ def copy_drug_attributes(
     overwrite_all=False,
 ):
     roles = user.config["roles"] if user.config and "roles" in user.config else []
-    if RoleEnum.ADMIN.value not in roles:
+    if RoleEnum.ADMIN.value not in roles and RoleEnum.TRAINING.value not in roles:
         raise ValidationError(
             "Usuário não autorizado",
             "errors.unauthorizedUser",
@@ -441,6 +441,13 @@ def copy_drug_attributes(
             "Segmento origem igual ao segmento destino",
             "errors.invalidParams",
             status.HTTP_400_BAD_REQUEST,
+        )
+
+    if overwrite_all and RoleEnum.ADMIN.value not in roles:
+        raise ValidationError(
+            "Usuário não autorizado",
+            "errors.unauthorizedUser",
+            status.HTTP_401_UNAUTHORIZED,
         )
 
     origin_schema = "hsc_test" if from_admin_schema else user.schema

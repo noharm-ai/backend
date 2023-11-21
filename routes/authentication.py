@@ -41,11 +41,16 @@ def auth():
     password = data.get("password", None)
     schema = data.get("schema", None)
     default_roles = data.get("defaultRoles", [])
+    run_as_basic_user = data.get("runAsBasicUser", False)
     refresh_token = None
 
     try:
         auth_data = auth_service.auth_local(
-            email, password, force_schema=schema, default_roles=default_roles
+            email,
+            password,
+            force_schema=schema,
+            default_roles=default_roles,
+            run_as_basic_user=run_as_basic_user,
         )
 
         refresh_token = auth_data["refresh_token"]

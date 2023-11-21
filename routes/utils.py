@@ -132,6 +132,7 @@ typeRelations["dt"] = "Duplicidade Terapêutica"
 typeRelations["it"] = "Interação Medicamentosa"
 typeRelations["iy"] = "Incompatibilidade em Y"
 typeRelations["rx"] = "Reatividade Cruzada"
+typeRelations["sl"] = "Incompatibilidade em Solução"
 
 examEmpty = {"value": None, "alert": False, "ref": None, "name": None}
 mdrdEmpty = dict(
@@ -404,7 +405,7 @@ def tryCommit(db, recId, allow=True):
 
         return {
             "status": "error",
-            "message": str(e),
+            "message": "Ocorreu um erro inesperado.",
         }, status.HTTP_500_INTERNAL_SERVER_ERROR
 
 

@@ -12,6 +12,7 @@ class MemoryEnum(Enum):
     SUMMARY_CONFIG = "summary-config"
     MAP_TUBE = "map-tube"
     MAP_IV = "map-iv"
+    MAP_ROUTES = "map-routes"
     MAP_ORIGIN_DRUG = "map-origin-drug"
     MAP_ORIGIN_SOLUTION = "map-origin-solution"
     MAP_ORIGIN_PROCEDURE = "map-origin-procedure"

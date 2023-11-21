@@ -8,8 +8,16 @@ from models.enums import RoleEnum
 from exception.validation_error import ValidationError
 
 
-def get_frequencies():
-    return db.session.query(Frequency).order_by(asc(Frequency.description)).all()
+def get_frequencies(has_daily_frequency=None):
+    q = db.session.query(Frequency)
+
+    if has_daily_frequency != None:
+        if has_daily_frequency:
+            q = q.filter(Frequency.dailyFrequency != None)
+        else:
+            q = q.filter(Frequency.dailyFrequency == None)
+
+    return q.order_by(asc(Frequency.description)).all()
 
 
 def update_daily_frequency(id, daily_frequency, user):

@@ -328,6 +328,26 @@ class Prescription(db.Model):
 
         interaction = relation.filter(Relation.kind.in_(["it", "dt", "dm", "iy"]))
 
+        # if is_cpoe:
+        #     interaction = relation.filter(
+        #         or_(
+        #             Relation.kind.in_(["it", "dt", "dm", "iy"]),
+        #             and_(Relation.kind == "sl", pd1.cpoe_group == pd2.cpoe_group),
+        #         )
+        #     )
+        # else:
+        #     interaction = relation.filter(
+        #         or_(
+        #             Relation.kind.in_(["it", "dt", "dm", "iy"]),
+        #             (
+        #                 and_(
+        #                     Relation.kind == "sl",
+        #                     pd1.solutionGroup == pd2.solutionGroup,
+        #                 )
+        #             ),
+        #         )
+        #     )
+
         q_allergy = (
             db.session.query(Allergy.idDrug.label("idDrug"))
             .select_from(Allergy)

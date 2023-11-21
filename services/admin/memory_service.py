@@ -8,30 +8,38 @@ from models.enums import MemoryEnum, RoleEnum
 
 from exception.validation_error import ValidationError
 
+KIND_ADMIN = [
+    MemoryEnum.FEATURES.value,
+    MemoryEnum.REPORTS.value,
+    MemoryEnum.GETNAME.value,
+    MemoryEnum.ADMISSION_REPORTS.value,
+    MemoryEnum.MAP_ORIGIN_DRUG.value,
+    MemoryEnum.MAP_ORIGIN_SOLUTION.value,
+    MemoryEnum.MAP_ORIGIN_PROCEDURE.value,
+    MemoryEnum.MAP_ORIGIN_DIET.value,
+    MemoryEnum.MAP_ORIGIN_CUSTOM.value,
+]
 
-def get_admin_memory_itens(user):
+KIND_ROUTES = [
+    MemoryEnum.MAP_IV.value,
+    MemoryEnum.MAP_TUBE.value,
+    MemoryEnum.MAP_ROUTES.value,
+]
+
+
+def get_admin_entries(user, kinds=[]):
     roles = user.config["roles"] if user.config and "roles" in user.config else []
-    if RoleEnum.ADMIN.value not in roles:
+    if RoleEnum.ADMIN.value not in roles and RoleEnum.TRAINING.value not in roles:
         raise ValidationError(
             "Usuário não autorizado",
             "errors.unauthorizedUser",
             status.HTTP_401_UNAUTHORIZED,
         )
 
-    kinds = [
-        MemoryEnum.FEATURES.value,
-        MemoryEnum.REPORTS.value,
-        MemoryEnum.GETNAME.value,
-        MemoryEnum.ADMISSION_REPORTS.value,
-        MemoryEnum.MAP_IV.value,
-        MemoryEnum.MAP_TUBE.value,
-        MemoryEnum.MAP_ORIGIN_DRUG.value,
-        MemoryEnum.MAP_ORIGIN_SOLUTION.value,
-        MemoryEnum.MAP_ORIGIN_PROCEDURE.value,
-        MemoryEnum.MAP_ORIGIN_DIET.value,
-        MemoryEnum.MAP_ORIGIN_CUSTOM.value,
-    ]
+    return _get_memory_itens(kinds)
 
+
+def _get_memory_itens(kinds):
     memory_itens = db.session.query(Memory).filter(Memory.kind.in_(kinds)).all()
 
     itens = []
@@ -47,21 +55,30 @@ def get_admin_memory_itens(user):
     return itens
 
 
-def update_memory(key, kind, value, user):
+def update_memory(key, kind, value, user, unique=False):
     roles = user.config["roles"] if user.config and "roles" in user.config else []
-    if "admin" not in roles:
+    authorized = True
+    if kind in KIND_ADMIN and RoleEnum.ADMIN.value not in roles:
+        authorized = False
+    elif RoleEnum.ADMIN.value not in roles and RoleEnum.TRAINING.value not in roles:
+        authorized = False
+
+    if not authorized:
         raise ValidationError(
             "Usuário não autorizado",
             "errors.unauthorizedUser",
             status.HTTP_401_UNAUTHORIZED,
         )
 
-    memory_item = (
-        db.session.query(Memory)
-        .filter(Memory.key == key)
-        .filter(Memory.kind == kind)
-        .first()
-    )
+    if unique:
+        memory_item = db.session.query(Memory).filter(Memory.kind == kind).first()
+    else:
+        memory_item = (
+            db.session.query(Memory)
+            .filter(Memory.key == key)
+            .filter(Memory.kind == kind)
+            .first()
+        )
 
     if memory_item == None:
         memory_item = Memory()

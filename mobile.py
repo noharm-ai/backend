@@ -29,6 +29,7 @@ from routes.admin.memory import app_admin_memory
 from routes.admin.drug import app_admin_drug
 from routes.admin.integration import app_admin_integration
 from routes.admin.segment import app_admin_segment
+from routes.admin.exam import app_admin_exam
 import os
 import logging
 from models.enums import NoHarmENV
@@ -85,6 +86,7 @@ app.register_blueprint(app_admin_memory)
 app.register_blueprint(app_admin_drug)
 app.register_blueprint(app_admin_integration)
 app.register_blueprint(app_admin_segment)
+app.register_blueprint(app_admin_exam)
 
 CORS(app, origins=[Config.MAIL_HOST], supports_credentials=True)
 
@@ -95,7 +97,7 @@ if Config.ENV == NoHarmENV.STAGING.value:
 
 @app.route("/version", methods=["GET"])
 def getVersion():
-    return {"status": "success", "data": "v2.04-beta"}, status.HTTP_200_OK
+    return {"status": "success", "data": "v2.05-beta"}, status.HTTP_200_OK
 
 
 if __name__ == "__main__":
