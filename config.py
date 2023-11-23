@@ -15,6 +15,9 @@ class Config:
         getenv("POTGRESQL_CONNECTION_STRING")
         or "postgresql://postgres@localhost/noharm"
     )
+    REPORT_CONNECTION_STRING = (
+        getenv("REPORT_CONNECTION_STRING") or "postgresql://postgres@localhost/noharm"
+    )
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(
         minutes=int(getenv("JWT_ACCESS_TOKEN_EXPIRES", 20))
     )
