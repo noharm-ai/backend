@@ -16,7 +16,6 @@ app_rpt_general = Blueprint("app_rpt_general", __name__)
 @jwt_required()
 def general_prescription():
     user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
 
     try:
         report_url = general_report_service.get_prescription_report(user=user)

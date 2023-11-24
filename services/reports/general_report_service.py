@@ -1,41 +1,29 @@
 from sqlalchemy import func
-from datetime import date
 
 from models.main import *
 from models.appendix import *
 from models.segment import *
 from models.enums import ReportEnum
-from services import memory_service
 from services.reports import cache_service
 
 
 def get_prescription_report(user):
-    cache_data = (
-        db.session.query(Memory)
-        .filter(Memory.kind == ReportEnum.RPT_GENERAL.value)
-        .filter(func.date(Memory.update) == date.today())
-        .first()
+    is_cached = cache_service.is_cached(
+        report=ReportEnum.RPT_GENERAL.value, schema=user.schema
     )
 
-    if cache_data != None:
-        return cache_service.generate_link(
-            cache_data.key, ReportEnum.RPT_GENERAL.value, user.schema
-        )
+    if is_cached:
+        return cache_service.generate_link(ReportEnum.RPT_GENERAL.value, user.schema)
 
     list = _get_prescription_list(user)
 
-    cache = memory_service.save_unique_memory(ReportEnum.RPT_GENERAL.value, {}, user)
-
     cache_service.save_cache(
-        cache_id=cache.key,
         report=ReportEnum.RPT_GENERAL.value,
         schema=user.schema,
         data=list,
     )
 
-    return cache_service.generate_link(
-        cache.key, ReportEnum.RPT_GENERAL.value, user.schema
-    )
+    return cache_service.generate_link(ReportEnum.RPT_GENERAL.value, user.schema)
 
 
 def _get_prescription_list(user):
