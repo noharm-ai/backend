@@ -28,3 +28,7 @@ class Config:
     MAIL_PASSWORD = getenv("MAIL_PASSWORD") or "password"
     MAIL_SENDER = getenv("MAIL_SENDER") or "user@gmail.com"
     MAIL_HOST = getenv("MAIL_HOST") or "localhost"
+
+    CACHE_BUCKET_NAME = getenv("CACHE_BUCKET_NAME") or ""
+    CACHE_BUCKET_ID = getenv("CACHE_BUCKET_ID") or ""
+    CACHE_BUCKET_KEY = getenv("CACHE_BUCKET_KEY") or ""

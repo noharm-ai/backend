@@ -57,3 +57,8 @@ class DrugTypeEnum(Enum):
     SOLUTION = "Soluções"
     PROCEDURE = "Proced/Exames"
     DIET = "Dietas"
+
+
+class ReportEnum(Enum):
+    RPT_BIND = "report"
+    RPT_GENERAL = "rpt_general"
