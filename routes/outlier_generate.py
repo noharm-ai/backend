@@ -79,17 +79,28 @@ def generateOutliers(idSegment, fold=None, idDrug=None, clean=None):
             result = db.engine.execute(queryDelete)
             print("RowCount Delete Drug", result.rowcount)
 
-            # queryRefresh = text(
-            #     f"""
-            #         insert into {user.schema}.prescricaoagg
-            #         select * from {user.schema}.prescricaoagg where fkmedicamento = :idDrug and idsegmento = :idSegment
-            #     """
-            # )
+            refresh_agg = True
+            drugAttribute = (
+                db.session.query(DrugAttributes)
+                .filter(DrugAttributes.idDrug == idDrug)
+                .filter(DrugAttributes.idSegment == idSegment)
+                .first()
+            )
+            if drugAttribute != None and drugAttribute.useWeight:
+                refresh_agg = False
 
-            # result = db.engine.execute(
-            #     queryRefresh, {"idSegment": idSegment, "idDrug": idDrug}
-            # )
-            # print("RowCount Refresg Agg", result.rowcount)
+            if refresh_agg:
+                queryRefresh = text(
+                    f"""
+                        insert into {user.schema}.prescricaoagg
+                        select * from {user.schema}.prescricaoagg where fkmedicamento = :idDrug and idsegmento = :idSegment
+                    """
+                )
+
+                result = db.engine.execute(
+                    queryRefresh, {"idSegment": idSegment, "idDrug": idDrug}
+                )
+                print("RowCount Refresh Agg", result.rowcount)
 
         queryInsert = text(
             """
