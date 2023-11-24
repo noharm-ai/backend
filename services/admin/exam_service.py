@@ -1,5 +1,6 @@
 from flask_api import status
 from sqlalchemy import desc
+from datetime import datetime
 
 from models.main import *
 from models.appendix import *
@@ -132,5 +133,7 @@ def add_most_frequent(user, exam_types, id_segment):
             se.name = e
             se.user = user.id
             se.active = False
+            se.update = datetime.today()
+            se.order = 99
 
             db.session.add(se)
