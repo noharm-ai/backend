@@ -1,4 +1,4 @@
-import gzip, requests, io
+import gzip, requests, io, os
 from flask_api import status
 from flask import Blueprint, request
 from multiprocessing import Process, Manager
@@ -12,6 +12,9 @@ from sqlalchemy import distinct, func, text
 from math import ceil
 from .outlier_lib import add_score
 
+from services import outlier_service
+from exception.validation_error import ValidationError
+
 app_gen = Blueprint("app_gen", __name__)
 fold_size = 25
 
@@ -20,6 +23,45 @@ def compute_outlier(idDrug, drugsItem, poolDict, fold):
     print("Starting...", fold, idDrug)
     poolDict[idDrug] = add_score(drugsItem)
     print("End...", fold, idDrug)
+
+
+@app_gen.route(
+    "/outliers/generate/prepare/<int:id_segment>/<int:id_drug>", methods=["GET"]
+)
+@jwt_required()
+def prepare(id_segment, id_drug):
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+    os.environ["TZ"] = "America/Sao_Paulo"
+
+    try:
+        result = outlier_service.prepare(
+            id_drug=id_drug, id_segment=id_segment, user=user
+        )
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+
+    return tryCommit(db, result.rowcount)
+
+
+@app_gen.route(
+    "/outliers/generate/single/<int:id_segment>/<int:id_drug>", methods=["GET"]
+)
+@app_gen.route("/outliers/generate/fold/<int:id_segment>/<int:fold>", methods=["GET"])
+@jwt_required()
+def generate(id_segment, id_drug=None, fold=None):
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+    os.environ["TZ"] = "America/Sao_Paulo"
+
+    try:
+        outlier_service.generate(
+            id_drug=id_drug, id_segment=id_segment, fold=fold, user=user
+        )
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+
+    return tryCommit(db, True)
 
 
 @app_gen.route(
