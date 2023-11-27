@@ -6,7 +6,9 @@ from datetime import datetime
 from models.main import db
 from models.appendix import *
 from models.prescription import *
+from models.enums import RoleEnum
 from routes.outlier_lib import add_score
+from exception.validation_error import ValidationError
 
 FOLD_SIZE = 25
 
@@ -33,8 +35,16 @@ def prepare(id_drug, id_segment, user):
 
 
 def generate(id_drug, id_segment, fold, user):
-    # call prepare before generate score
-    # its not here for performance issues
+    # call prepare before generate score (only for wizard)
+
+    if fold != None:
+        roles = user.config["roles"] if user.config and "roles" in user.config else []
+        if RoleEnum.ADMIN.value not in roles and RoleEnum.TRAINING.value not in roles:
+            raise ValidationError(
+                "Usuário não autorizado",
+                "errors.unauthorizedUser",
+                status.HTTP_401_UNAUTHORIZED,
+            )
 
     csv_buffer = _get_csv_buffer(
         id_segment=id_segment, schema=user.schema, id_drug=id_drug, fold=fold
