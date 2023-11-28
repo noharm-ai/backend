@@ -2,6 +2,7 @@ import io
 import pandas
 from multiprocessing import Process, Manager
 from datetime import datetime
+from math import ceil
 
 from models.main import db
 from models.appendix import *
@@ -9,6 +10,7 @@ from models.prescription import *
 from models.enums import RoleEnum
 from routes.outlier_lib import add_score
 from exception.validation_error import ValidationError
+from services.admin import drug_service, integration_service
 
 FOLD_SIZE = 25
 
@@ -159,7 +161,7 @@ def _get_csv_buffer(id_segment, schema, id_drug=None, fold=None):
         query += " and fkmedicamento = %s "
     else:
         params.append(id_segment)
-        params.apppend(FOLD_SIZE)
+        params.append(FOLD_SIZE)
         params.append((fold - 1) * FOLD_SIZE)
         query += f""" 
             and fkmedicamento IN (
@@ -248,3 +250,49 @@ def _refresh_agg(id_drug, id_segment, schema):
     """
 
     return db.session.execute(query, {"idSegment": id_segment, "idDrug": id_drug})
+
+
+def get_outliers_process_list(id_segment, user):
+    roles = user.config["roles"] if user.config and "roles" in user.config else []
+    if RoleEnum.ADMIN.value not in roles and RoleEnum.TRAINING.value not in roles:
+        raise ValidationError(
+            "Usuário não autorizado",
+            "errors.unauthorizedUser",
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
+    print("Init Schema:", user.schema, "Segment:", id_segment)
+    fold_size = 25
+
+    result = refresh_outliers(id_segment=id_segment, user=user)
+    print("RowCount", result.rowcount)
+
+    # fix inconsistencies after outlier insert
+    drug_service.fix_inconsistency(user)
+
+    totalCount = (
+        db.session.query(func.count(distinct(Outlier.idDrug)))
+        .select_from(Outlier)
+        .filter(Outlier.idSegment == id_segment)
+        .scalar()
+    )
+    folds = ceil(totalCount / fold_size)
+    print("Total Count:", totalCount, folds)
+
+    processesUrl = []
+
+    if integration_service.can_refresh_agg(user.schema):
+        processesUrl.append(
+            {"url": "/admin/integration/refresh-agg", "method": "POST", "params": {}}
+        )
+
+    for fold in range(1, folds + 1):
+        processesUrl.append(
+            {
+                "url": f"/outliers/generate/fold/{str(int(id_segment))}/{str(fold)}",
+                "method": "POST",
+                "params": {},
+            }
+        )
+
+    return processesUrl

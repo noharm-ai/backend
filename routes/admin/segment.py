@@ -8,6 +8,7 @@ from models.appendix import *
 from models.segment import *
 from models.prescription import *
 from services.admin import segment_service
+from services import outlier_service
 from exception.validation_error import ValidationError
 
 app_admin_segment = Blueprint("app_admin_segment", __name__)
@@ -77,7 +78,7 @@ def get_outliers_process_list():
     process_list = []
 
     try:
-        process_list = segment_service.get_outliers_process_list(
+        process_list = outlier_service.get_outliers_process_list(
             id_segment=data.get("idSegment", None),
             user=user,
         )
