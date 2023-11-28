@@ -26,6 +26,12 @@ def prepare(id_drug, id_segment, user):
         _add_prescription_history(
             id_drug=id_drug, id_segment=id_segment, schema=user.schema
         )
+    elif history_count > 20000:
+        raise ValidationError(
+            "A quantidade de registros impede a geração de escore. Entre em contato com a ajuda e informe o medicamento e segmento selecionado.",
+            "errors.invalidParams",
+            status.HTTP_400_BAD_REQUEST,
+        )
 
     # refresh history to update frequency and dose
     _refresh_agg(id_drug=id_drug, id_segment=id_segment, schema=user.schema)

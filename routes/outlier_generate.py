@@ -1,18 +1,16 @@
-import gzip, requests, io, os
+import io, os
+import pandas as pd
 from flask_api import status
 from flask import Blueprint, request
 from multiprocessing import Process, Manager
 from models.main import *
 from models.appendix import *
 from models.prescription import *
-from flask_jwt_extended import jwt_required, get_jwt_identity, create_access_token
-from config import Config
-import pandas as pd
-from sqlalchemy import distinct, func, text
-from math import ceil
-from .outlier_lib import add_score
+from flask_jwt_extended import jwt_required, get_jwt_identity
+from sqlalchemy import text
 
-from services import outlier_service
+from .outlier_lib import add_score
+from services import outlier_service, drug_service
 from exception.validation_error import ValidationError
 
 app_gen = Blueprint("app_gen", __name__)
@@ -26,7 +24,33 @@ def compute_outlier(idDrug, drugsItem, poolDict, fold):
 
 
 @app_gen.route(
-    "/outliers/generate/prepare/<int:id_segment>/<int:id_drug>", methods=["GET"]
+    "/outliers/generate/config/<int:id_segment>/<int:id_drug>", methods=["POST"]
+)
+@jwt_required()
+def config(id_segment, id_drug):
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+    os.environ["TZ"] = "America/Sao_Paulo"
+    data = request.get_json()
+
+    try:
+        drug_service.drug_config_to_generate_score(
+            id_drug=id_drug,
+            id_segment=id_segment,
+            id_measure_unit=data.get("idMeasureUnit", None),
+            division=data.get("division", None),
+            use_weight=data.get("useWeight", False),
+            measure_unit_list=data.get("measureUnitList"),
+            user=user,
+        )
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+
+    return tryCommit(db, True)
+
+
+@app_gen.route(
+    "/outliers/generate/prepare/<int:id_segment>/<int:id_drug>", methods=["POST"]
 )
 @jwt_required()
 def prepare(id_segment, id_drug):
@@ -45,9 +69,9 @@ def prepare(id_segment, id_drug):
 
 
 @app_gen.route(
-    "/outliers/generate/single/<int:id_segment>/<int:id_drug>", methods=["GET"]
+    "/outliers/generate/single/<int:id_segment>/<int:id_drug>", methods=["POST"]
 )
-@app_gen.route("/outliers/generate/fold/<int:id_segment>/<int:fold>", methods=["GET"])
+@app_gen.route("/outliers/generate/fold/<int:id_segment>/<int:fold>", methods=["POST"])
 @jwt_required()
 def generate(id_segment, id_drug=None, fold=None):
     user = User.find(get_jwt_identity())
