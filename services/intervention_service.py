@@ -300,10 +300,9 @@ def save_intervention(
         i.interactions = interactions
     if transcription:
         i.transcription = transcription
-    if economy_days:
-        i.economy_days = economy_days
-    if expended_dose:
-        i.expended_dose = expended_dose
+
+    i.economy_days = economy_days
+    i.expended_dose = expended_dose
 
     if new_status != i.status:
         if i.status == "0":

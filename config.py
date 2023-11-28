@@ -15,6 +15,9 @@ class Config:
         getenv("POTGRESQL_CONNECTION_STRING")
         or "postgresql://postgres@localhost/noharm"
     )
+    REPORT_CONNECTION_STRING = (
+        getenv("REPORT_CONNECTION_STRING") or "postgresql://postgres@localhost/noharm"
+    )
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(
         minutes=int(getenv("JWT_ACCESS_TOKEN_EXPIRES", 20))
     )
@@ -25,3 +28,7 @@ class Config:
     MAIL_PASSWORD = getenv("MAIL_PASSWORD") or "password"
     MAIL_SENDER = getenv("MAIL_SENDER") or "user@gmail.com"
     MAIL_HOST = getenv("MAIL_HOST") or "localhost"
+
+    CACHE_BUCKET_NAME = getenv("CACHE_BUCKET_NAME") or ""
+    CACHE_BUCKET_ID = getenv("CACHE_BUCKET_ID") or ""
+    CACHE_BUCKET_KEY = getenv("CACHE_BUCKET_KEY") or ""

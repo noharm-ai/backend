@@ -30,6 +30,7 @@ from routes.admin.drug import app_admin_drug
 from routes.admin.integration import app_admin_integration
 from routes.admin.segment import app_admin_segment
 from routes.admin.exam import app_admin_exam
+from routes.reports.general import app_rpt_general
 import os
 import logging
 from models.enums import NoHarmENV
@@ -38,6 +39,7 @@ os.environ["TZ"] = "America/Sao_Paulo"
 
 app = FlaskAPI(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = Config.POTGRESQL_CONNECTION_STRING
+app.config["SQLALCHEMY_BINDS"] = {"report": Config.REPORT_CONNECTION_STRING}
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "pool_recycle": 500,
@@ -88,6 +90,8 @@ app.register_blueprint(app_admin_integration)
 app.register_blueprint(app_admin_segment)
 app.register_blueprint(app_admin_exam)
 
+app.register_blueprint(app_rpt_general)
+
 CORS(app, origins=[Config.MAIL_HOST], supports_credentials=True)
 
 if Config.ENV == NoHarmENV.STAGING.value:
@@ -97,7 +101,7 @@ if Config.ENV == NoHarmENV.STAGING.value:
 
 @app.route("/version", methods=["GET"])
 def getVersion():
-    return {"status": "success", "data": "v2.05-beta"}, status.HTTP_200_OK
+    return {"status": "success", "data": "v2.06-beta"}, status.HTTP_200_OK
 
 
 if __name__ == "__main__":

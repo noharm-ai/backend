@@ -6,6 +6,7 @@ from models.appendix import *
 from models.segment import *
 from models.enums import RoleEnum
 from services.admin import drug_service, integration_service
+from services import outlier_service
 
 from exception.validation_error import ValidationError
 
@@ -126,22 +127,7 @@ def get_outliers_process_list(id_segment, user):
     print("Init Schema:", user.schema, "Segment:", id_segment)
     fold_size = 25
 
-    query = f"""
-        INSERT INTO {user.schema}.outlier 
-        (idsegmento, fkmedicamento, doseconv, frequenciadia, contagem)
-        SELECT 
-            idsegmento, fkmedicamento, ROUND(doseconv::numeric,2) as doseconv, frequenciadia, SUM(contagem)
-        FROM
-            {user.schema}.prescricaoagg
-        WHERE 
-            idsegmento = :idSegment
-            and frequenciadia is not null and doseconv is not null
-        GROUP BY 
-            idsegmento, fkmedicamento, ROUND(doseconv::numeric,2), frequenciadia
-        ON CONFLICT DO nothing
-    """
-
-    result = db.session.execute(query, {"idSegment": id_segment})
+    result = outlier_service.refresh_outliers(id_segment=id_segment, schema=user.schema)
     print("RowCount", result.rowcount)
 
     # fix inconsistencies after outlier insert
