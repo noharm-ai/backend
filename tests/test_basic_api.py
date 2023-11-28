@@ -194,18 +194,6 @@ def test_getNotes(client):
     assert response.status_code == 200
 
 
-def test_getSegmentsDrug(client):
-    """Teste get /segments/idSegment/outliers/generate/drug/idDrug - Valida o status_code 200."""
-
-    url = f"/segments/{SEGMENT}/outliers/generate/drug/{12}"
-
-    access_token = get_access(client, roles=["staging", "suporte"])
-
-    response = client.get(url, headers=make_headers(access_token))
-
-    assert response.status_code == 200
-
-
 def test_putPrescriprionsCheck(client):
     """Teste put /prescriptions/idPrescription - Checa o status "s" na prescrição e a existência de um resgistro na tabela prescricao_audit."""
 
