@@ -127,7 +127,7 @@ def get_outliers_process_list(id_segment, user):
     print("Init Schema:", user.schema, "Segment:", id_segment)
     fold_size = 25
 
-    result = outlier_service.refresh_outliers(id_segment=id_segment, schema=user.schema)
+    result = outlier_service.refresh_outliers(id_segment=id_segment, user=user)
     print("RowCount", result.rowcount)
 
     # fix inconsistencies after outlier insert
