@@ -28,6 +28,20 @@ def prepare(id_drug, id_segment, user):
         _add_prescription_history(
             id_drug=id_drug, id_segment=id_segment, schema=user.schema
         )
+
+        history_count = (
+            db.session.query(PrescriptionAgg)
+            .filter(PrescriptionAgg.idDrug == id_drug)
+            .filter(PrescriptionAgg.idSegment == id_segment)
+            .count()
+        )
+
+        if history_count == 0:
+            raise ValidationError(
+                "Este medicamento não possui histórico de prescrição. Por isso, não foi possível gerar escores.",
+                "errors.invalidParams",
+                status.HTTP_400_BAD_REQUEST,
+            )
     elif history_count > 20000:
         raise ValidationError(
             "A quantidade de registros impede a geração de escore. Entre em contato com a ajuda e informe o medicamento e segmento selecionado.",
