@@ -13,6 +13,25 @@ app_gen = Blueprint("app_gen", __name__)
 
 
 @app_gen.route(
+    "/outliers/generate/add-history/<int:id_segment>/<int:id_drug>", methods=["POST"]
+)
+@jwt_required()
+def add_history(id_segment, id_drug):
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+    os.environ["TZ"] = "America/Sao_Paulo"
+
+    try:
+        rowcount = outlier_service.add_prescription_history(
+            id_drug=id_drug, id_segment=id_segment, schema=user.schema
+        )
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+
+    return tryCommit(db, rowcount)
+
+
+@app_gen.route(
     "/outliers/generate/config/<int:id_segment>/<int:id_drug>", methods=["POST"]
 )
 @jwt_required()

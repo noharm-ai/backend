@@ -25,20 +25,13 @@ def prepare(id_drug, id_segment, user):
 
     if history_count == 0:
         # add history if none found
-        _add_prescription_history(
+        history_count = add_prescription_history(
             id_drug=id_drug, id_segment=id_segment, schema=user.schema
-        )
-
-        history_count = (
-            db.session.query(PrescriptionAgg)
-            .filter(PrescriptionAgg.idDrug == id_drug)
-            .filter(PrescriptionAgg.idSegment == id_segment)
-            .count()
         )
 
         if history_count == 0:
             raise ValidationError(
-                "Este medicamento não possui histórico de prescrição. Por isso, não foi possível gerar escores.",
+                "Este medicamento não possui histórico de prescrição no último ano. Por isso, não foi possível gerar escores.",
                 "errors.invalidParams",
                 status.HTTP_400_BAD_REQUEST,
             )
@@ -218,7 +211,7 @@ def _clean_outliers(id_drug, id_segment):
     q.delete()
 
 
-def _add_prescription_history(id_drug, id_segment, schema):
+def add_prescription_history(id_drug, id_segment, schema):
     query = f"""
         INSERT INTO 
             {schema}.prescricaoagg 
@@ -254,7 +247,14 @@ def _add_prescription_history(id_drug, id_segment, schema):
             1,2,3,4,5,6,7,8,9,10
     """
 
-    return db.session.execute(query, {"idSegment": id_segment, "idDrug": id_drug})
+    db.session.execute(query, {"idSegment": id_segment, "idDrug": id_drug})
+
+    return (
+        db.session.query(PrescriptionAgg)
+        .filter(PrescriptionAgg.idDrug == id_drug)
+        .filter(PrescriptionAgg.idSegment == id_segment)
+        .count()
+    )
 
 
 def _refresh_agg(id_drug, id_segment, schema):
