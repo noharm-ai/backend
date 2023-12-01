@@ -16,15 +16,7 @@ FOLD_SIZE = 25
 
 
 def prepare(id_drug, id_segment, user):
-    history_count = (
-        db.session.query(PrescriptionAgg)
-        .filter(PrescriptionAgg.idDrug == id_drug)
-        .filter(PrescriptionAgg.idSegment == id_segment)
-        .count()
-    )
-
-    if history_count == 0:
-        # add history if none found
+    def add_history_and_validate():
         history_count = add_prescription_history(
             id_drug=id_drug, id_segment=id_segment, schema=user.schema
         )
@@ -35,15 +27,29 @@ def prepare(id_drug, id_segment, user):
                 "errors.invalidParams",
                 status.HTTP_400_BAD_REQUEST,
             )
-    elif history_count > 20000:
-        raise ValidationError(
-            "A quantidade de registros impede a geração de escore. Entre em contato com a ajuda e informe o medicamento e segmento selecionado.",
-            "errors.invalidParams",
-            status.HTTP_400_BAD_REQUEST,
-        )
 
-    # refresh history to update frequency and dose
-    _refresh_agg(id_drug=id_drug, id_segment=id_segment, schema=user.schema)
+    history_count = (
+        db.session.query(PrescriptionAgg)
+        .filter(PrescriptionAgg.idDrug == id_drug)
+        .filter(PrescriptionAgg.idSegment == id_segment)
+        .count()
+    )
+
+    if history_count == 0:
+        # add history if none found
+        add_history_and_validate()
+
+    elif history_count > 20000:
+        # clean and insert again
+        db.session.query(PrescriptionAgg).filter(
+            PrescriptionAgg.idDrug == id_drug
+        ).filter(PrescriptionAgg.idSegment == id_segment).delete()
+
+        add_history_and_validate()
+
+    else:
+        # refresh history to update frequency and dose
+        _refresh_agg(id_drug=id_drug, id_segment=id_segment, schema=user.schema)
 
     # refresh outliers
     return refresh_outliers(id_drug=id_drug, id_segment=id_segment, user=user)
