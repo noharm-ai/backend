@@ -51,7 +51,7 @@ def save_cache(report, schema, data):
     )
 
 
-def is_cached(report, schema):
+def get_cache_data(report, schema):
     client = _get_client()
 
     try:
@@ -64,6 +64,9 @@ def is_cached(report, schema):
             resource_info["ResponseMetadata"]["HTTPHeaders"]["last-modified"],
         ) - timedelta(hours=3)
 
-        return datetime.today().date() == resource_date.date()
+        return {
+            "isCached": datetime.today().date() == resource_date.date(),
+            "updatedAt": resource_date.isoformat(),
+        }
     except ClientError:
-        return False
+        return {"isCached": False, "updatedAt": None}
