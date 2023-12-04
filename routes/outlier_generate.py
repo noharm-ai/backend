@@ -23,7 +23,11 @@ def add_history(id_segment, id_drug):
 
     try:
         rowcount = outlier_service.add_prescription_history(
-            id_drug=id_drug, id_segment=id_segment, schema=user.schema
+            id_drug=id_drug,
+            id_segment=id_segment,
+            schema=user.schema,
+            clean=True,
+            rollback_when_empty=True,
         )
     except ValidationError as e:
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus

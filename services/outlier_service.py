@@ -217,7 +217,14 @@ def _clean_outliers(id_drug, id_segment):
     q.delete()
 
 
-def add_prescription_history(id_drug, id_segment, schema):
+def add_prescription_history(
+    id_drug, id_segment, schema, clean=False, rollback_when_empty=False
+):
+    if clean:
+        db.session.query(PrescriptionAgg).filter(
+            PrescriptionAgg.idDrug == id_drug
+        ).filter(PrescriptionAgg.idSegment == id_segment).delete()
+
     query = f"""
         INSERT INTO 
             {schema}.prescricaoagg 
@@ -255,12 +262,21 @@ def add_prescription_history(id_drug, id_segment, schema):
 
     db.session.execute(query, {"idSegment": id_segment, "idDrug": id_drug})
 
-    return (
+    count = (
         db.session.query(PrescriptionAgg)
         .filter(PrescriptionAgg.idDrug == id_drug)
         .filter(PrescriptionAgg.idSegment == id_segment)
         .count()
     )
+
+    if rollback_when_empty and count == 0:
+        raise ValidationError(
+            "Este medicamento não foi prescrito no último ano neste segmento",
+            "errors.invalidParams",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    return count
 
 
 def _refresh_agg(id_drug, id_segment, schema):
