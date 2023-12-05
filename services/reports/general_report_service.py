@@ -64,7 +64,11 @@ def _get_prescription_list(user):
                 when p.status <> 's' and pa.fkprescricao is null then 'Não Checado'
                 when pa.fkprescricao is not null then user_pa.nome
                 else user_p.nome
-            end as userNome
+            end as userNome,
+            case 
+                when p.evolucao is not null then 1
+                else 0
+            end as evolucao
         from 
             {user.schema}.prescricao p 
             inner join {user.schema}.setor s on s.fksetor = p.fksetor
@@ -100,6 +104,7 @@ def _get_prescription_list(user):
                 "itens": i[7],
                 "checkedItens": i[8],
                 "responsible": i[9],
+                "clinicalNote": i[10],
             }
         )
 
