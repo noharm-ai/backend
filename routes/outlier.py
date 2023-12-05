@@ -9,6 +9,7 @@ from flask_jwt_extended import (
     jwt_required,
     get_jwt_identity,
 )
+from decimal import Decimal, ROUND_HALF_UP
 from .utils import freqValue, tryCommit, typeRelations, sortSubstance, strNone
 from datetime import datetime
 from math import ceil
@@ -58,8 +59,14 @@ def getOutliers(idSegment=1, idDrug=1):
     frequency = request.args.get("f", None)
     dose = request.args.get("d", None)
 
-    if drugAttr.division and dose:
-        dose = round(ceil(((float(dose)) / drugAttr.division)) * drugAttr.division, 2)
+    if dose:
+        if drugAttr.division and dose:
+            dose = round(
+                ceil(((float(dose)) / drugAttr.division)) * drugAttr.division, 2
+            )
+        else:
+            rounded = Decimal(dose).quantize(Decimal("1e-2"), rounding=ROUND_HALF_UP)
+            dose = rounded
 
     units = getUnits(idDrug, idSegment)  # TODO: Refactor
     defaultUnit = "unlikely big name for a measure unit"
@@ -75,6 +82,7 @@ def getOutliers(idSegment=1, idDrug=1):
     newOutlier = True
     results = []
     for o in outliers:
+        selected = False
         if (
             dose is not None
             and frequency is not None
@@ -83,6 +91,7 @@ def getOutliers(idSegment=1, idDrug=1):
         ):
             if float(dose) == o[0].dose and float(frequency) == o[0].frequency:
                 newOutlier = False
+                selected = True
 
         results.append(
             {
@@ -96,6 +105,7 @@ def getOutliers(idSegment=1, idDrug=1):
                 "manualScore": o[0].manualScore,
                 "obs": o[1].notes if o[1] != None else "",
                 "updatedAt": o[0].update.isoformat() if o[0].update else None,
+                "selected": selected,
             }
         )
 
@@ -132,6 +142,7 @@ def getOutliers(idSegment=1, idDrug=1):
                 "manualScore": None,
                 "obs": "",
                 "updatedAt": o.update.isoformat() if o.update else None,
+                "selected": True,
             }
         )
 

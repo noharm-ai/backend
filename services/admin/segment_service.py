@@ -1,12 +1,9 @@
 from flask_api import status
-from math import ceil
 
 from models.main import *
 from models.appendix import *
 from models.segment import *
 from models.enums import RoleEnum
-from services.admin import drug_service, integration_service
-from services import outlier_service
 
 from exception.validation_error import ValidationError
 
@@ -113,49 +110,3 @@ def update_segment_departments(id_segment, department_list, user):
         sd.idDepartment = d["idDepartment"]
 
         db.session.add(sd)
-
-
-def get_outliers_process_list(id_segment, user):
-    roles = user.config["roles"] if user.config and "roles" in user.config else []
-    if RoleEnum.ADMIN.value not in roles and RoleEnum.TRAINING.value not in roles:
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-
-    print("Init Schema:", user.schema, "Segment:", id_segment)
-    fold_size = 25
-
-    result = outlier_service.refresh_outliers(id_segment=id_segment, schema=user.schema)
-    print("RowCount", result.rowcount)
-
-    # fix inconsistencies after outlier insert
-    drug_service.fix_inconsistency(user)
-
-    totalCount = (
-        db.session.query(func.count(distinct(Outlier.idDrug)))
-        .select_from(Outlier)
-        .filter(Outlier.idSegment == id_segment)
-        .scalar()
-    )
-    folds = ceil(totalCount / fold_size)
-    print("Total Count:", totalCount, folds)
-
-    processesUrl = []
-
-    if integration_service.can_refresh_agg(user.schema):
-        processesUrl.append(
-            {"url": "/admin/integration/refresh-agg", "method": "POST", "params": {}}
-        )
-
-    for fold in range(1, folds + 1):
-        processesUrl.append(
-            {
-                "url": f"/segments/{str(int(id_segment))}/outliers/generate/fold/{str(fold)}",
-                "method": "GET",
-                "params": {},
-            }
-        )
-
-    return processesUrl

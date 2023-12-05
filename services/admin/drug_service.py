@@ -389,6 +389,19 @@ def fix_inconsistency(user):
         )
     schema = user.schema
 
+    # normalize medatributos
+    query_normalize = f"""
+        update 
+            {schema}.medatributos 
+        set 
+            fkunidademedida = null 
+        where 
+            fkunidademedida = ''
+    """
+
+    db.session.execute(query_normalize)
+
+    # include medatributos
     query = f"""
         with inconsistentes as (
             select 

@@ -1,4 +1,5 @@
 from sqlalchemy import func
+from datetime import datetime
 
 from models.main import *
 from models.appendix import *
@@ -7,13 +8,19 @@ from models.enums import ReportEnum
 from services.reports import cache_service
 
 
-def get_prescription_report(user):
-    is_cached = cache_service.is_cached(
-        report=ReportEnum.RPT_GENERAL.value, schema=user.schema
-    )
+def get_prescription_report(user, clearCache=False):
+    if not clearCache:
+        cache_data = cache_service.get_cache_data(
+            report=ReportEnum.RPT_GENERAL.value, schema=user.schema
+        )
 
-    if is_cached:
-        return cache_service.generate_link(ReportEnum.RPT_GENERAL.value, user.schema)
+        if cache_data["isCached"]:
+            return {
+                "url": cache_service.generate_link(
+                    ReportEnum.RPT_GENERAL.value, user.schema
+                ),
+                "updatedAt": cache_data["updatedAt"],
+            }
 
     list = _get_prescription_list(user)
 
@@ -23,7 +30,10 @@ def get_prescription_report(user):
         data=list,
     )
 
-    return cache_service.generate_link(ReportEnum.RPT_GENERAL.value, user.schema)
+    return {
+        "url": cache_service.generate_link(ReportEnum.RPT_GENERAL.value, user.schema),
+        "updatedAt": datetime.today().isoformat(),
+    }
 
 
 def _get_prescription_list(user):
