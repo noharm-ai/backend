@@ -66,7 +66,7 @@ def get_cache_data(report, schema):
 
         return {
             "isCached": datetime.today().date() == resource_date.date(),
-            "updatedAt": resource_date.isoformat(),
+            "updatedAt": resource_date.replace(tzinfo=None).isoformat(),
         }
     except ClientError:
         return {"isCached": False, "updatedAt": None}
