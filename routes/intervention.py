@@ -51,8 +51,10 @@ def save_intervention():
             observation=data.get("observation", None),
             interactions=data.get("interactions", None),
             transcription=data.get("transcription", None),
-            economy_days=data.get("economyDays", None),
-            expended_dose=data.get("expendedDose", None),
+            economy_days=data.get("economyDays", None) if "economyDays" in data else -1,
+            expended_dose=data.get("expendedDose", None)
+            if "expendedDose" in data
+            else -1,
         )
     except ValidationError as e:
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
