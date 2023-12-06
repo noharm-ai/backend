@@ -68,10 +68,12 @@ def _get_prescription_list(user):
             case 
                 when p.evolucao is not null then 1
                 else 0
-            end as evolucao
+            end as evolucao,
+            coalesce(seg.nome, 'Indefinido') as segmento
         from 
             {user.schema}.prescricao p 
             inner join {user.schema}.setor s on s.fksetor = p.fksetor
+            left join {user.schema}.segmento seg on seg.idsegmento = p.idsegmento
             left join (
                 select * from {user.schema}.prescricao_audit pa where pa.tp_audit = 1
             ) pa on pa.fkprescricao = p.fkprescricao
@@ -105,6 +107,7 @@ def _get_prescription_list(user):
                 "checkedItens": i[8],
                 "responsible": i[9],
                 "clinicalNote": i[10],
+                "segment": i[11],
             }
         )
 
