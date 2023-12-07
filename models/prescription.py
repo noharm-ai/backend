@@ -408,7 +408,7 @@ class Prescription(db.Model):
         pairs = []
         for r in relations:
             if aggDate is None:
-                key = str(r[1].sctida) + "-" + str(r[1].sctidb)
+                key = str(r[1].sctida) + "-" + str(r[1].sctidb) + str(r[1].kind)
             else:
                 key = (
                     str(r[1].sctida)
