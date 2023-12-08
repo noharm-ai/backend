@@ -61,4 +61,4 @@ class DrugTypeEnum(Enum):
 
 class ReportEnum(Enum):
     RPT_BIND = "report"
-    RPT_GENERAL = "rpt_general"
+    RPT_PATIENT_DAY = "rpt_patient_day"

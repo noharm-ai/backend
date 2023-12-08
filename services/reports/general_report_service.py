@@ -8,35 +8,37 @@ from models.enums import ReportEnum
 from services.reports import cache_service
 
 
-def get_prescription_report(user, clearCache=False):
+def get_patient_day_report(user, clearCache=False):
     if not clearCache:
         cache_data = cache_service.get_cache_data(
-            report=ReportEnum.RPT_GENERAL.value, schema=user.schema
+            report=ReportEnum.RPT_PATIENT_DAY.value, schema=user.schema
         )
 
         if cache_data["isCached"]:
             return {
                 "url": cache_service.generate_link(
-                    ReportEnum.RPT_GENERAL.value, user.schema
+                    ReportEnum.RPT_PATIENT_DAY.value, user.schema
                 ),
                 "updatedAt": cache_data["updatedAt"],
             }
 
-    list = _get_prescription_list(user)
+    list = _get_patient_day_list(user)
 
     cache_service.save_cache(
-        report=ReportEnum.RPT_GENERAL.value,
+        report=ReportEnum.RPT_PATIENT_DAY.value,
         schema=user.schema,
         data=list,
     )
 
     return {
-        "url": cache_service.generate_link(ReportEnum.RPT_GENERAL.value, user.schema),
+        "url": cache_service.generate_link(
+            ReportEnum.RPT_PATIENT_DAY.value, user.schema
+        ),
         "updatedAt": datetime.today().isoformat(),
     }
 
 
-def _get_prescription_list(user):
+def _get_patient_day_list(user):
     sql = f"""
         select 
             distinct on (p.fkprescricao)
