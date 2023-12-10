@@ -211,6 +211,7 @@ class Prescription(db.Model):
                 pd1.update,
                 pd1.intravenous,
                 pd2.intravenous,
+                DrugAttributes.whiteList,
             )
             relation = (
                 relation.join(
@@ -219,6 +220,13 @@ class Prescription(db.Model):
                 )
                 .join(m1, m1.id == pd1.idDrug)
                 .join(m2, m2.id == pd2.idDrug)
+                .outerjoin(
+                    DrugAttributes,
+                    and_(
+                        DrugAttributes.idDrug == pd1.idDrug,
+                        DrugAttributes.idSegment == pd1.idSegment,
+                    ),
+                )
                 .join(
                     Relation,
                     and_(Relation.sctida == m1.sctid, Relation.sctidb == m2.sctid),
@@ -237,6 +245,7 @@ class Prescription(db.Model):
                         p1.expire,
                         pd1.intravenous,
                         pd2.intravenous,
+                        DrugAttributes.whiteList,
                     )
                     .select_from(p1)
                     .join(p2, p2.admissionNumber == admissionNumber)
@@ -250,6 +259,13 @@ class Prescription(db.Model):
                     .join(
                         Relation,
                         and_(Relation.sctida == m1.sctid, Relation.sctidb == m2.sctid),
+                    )
+                    .outerjoin(
+                        DrugAttributes,
+                        and_(
+                            DrugAttributes.idDrug == pd1.idDrug,
+                            DrugAttributes.idSegment == pd1.idSegment,
+                        ),
                     )
                     .filter(p1.admissionNumber == admissionNumber)
                     .filter(p1.idSegment != None)
@@ -272,6 +288,7 @@ class Prescription(db.Model):
                         p1.expire,
                         pd1.intravenous,
                         pd2.intravenous,
+                        DrugAttributes.whiteList,
                     )
                     .select_from(p1)
                     .join(p2, p2.admissionNumber == admissionNumber)
@@ -288,6 +305,13 @@ class Prescription(db.Model):
                             and_(
                                 Relation.sctidb == m1.sctid, Relation.sctida == m2.sctid
                             ),
+                        ),
+                    )
+                    .outerjoin(
+                        DrugAttributes,
+                        and_(
+                            DrugAttributes.idDrug == pd1.idDrug,
+                            DrugAttributes.idSegment == pd1.idSegment,
                         ),
                     )
                     .filter(p1.admissionNumber == admissionNumber)
@@ -337,6 +361,7 @@ class Prescription(db.Model):
                         and_(
                             Relation.kind == "sl",
                             pd1.solutionGroup == pd2.solutionGroup,
+                            pd1.idPrescription == pd2.idPrescription,
                         )
                     ),
                 )
@@ -361,6 +386,7 @@ class Prescription(db.Model):
                 pd1.update,
                 pd1.intravenous,
                 pd1.intravenous.label("intravenous2"),
+                DrugAttributes.whiteList,
             )
             .join(al, al.c.idDrug != pd1.idDrug)
             .join(m1, m1.id == pd1.idDrug)
@@ -370,6 +396,13 @@ class Prescription(db.Model):
                 or_(
                     and_(Relation.sctida == m1.sctid, Relation.sctidb == m2.sctid),
                     and_(Relation.sctida == m2.sctid, Relation.sctidb == m1.sctid),
+                ),
+            )
+            .outerjoin(
+                DrugAttributes,
+                and_(
+                    DrugAttributes.idDrug == pd1.idDrug,
+                    DrugAttributes.idSegment == pd1.idSegment,
                 ),
             )
             .filter(Relation.active == True)
@@ -400,7 +433,9 @@ class Prescription(db.Model):
         else:
             relations = (
                 interaction.union(xreactivity)
-                .order_by(desc(Relation.kind), desc(pd1.id))
+                .order_by(
+                    desc(Relation.kind), desc(DrugAttributes.whiteList), desc(pd1.id)
+                )
                 .all()
             )
 
