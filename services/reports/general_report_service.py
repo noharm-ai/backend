@@ -58,6 +58,31 @@ def get_prescription_report(user, clearCache=False):
     }
 
 
+def get_intervention_report(user, clearCache=False):
+    report = ReportEnum.RPT_INTERVENTION.value
+
+    if not clearCache:
+        cached_link = cache_service.generate_link_from_cache(
+            report=report, schema=user.schema
+        )
+
+        if cached_link != None:
+            return cached_link
+
+    list = _get_intervention_list(user)
+
+    cache_service.save_cache(
+        report=report,
+        schema=user.schema,
+        data=list,
+    )
+
+    return {
+        "url": cache_service.generate_link(report, user.schema),
+        "updatedAt": datetime.today().isoformat(),
+    }
+
+
 def _get_patient_day_list(user):
     sql = f"""
         select 
@@ -212,6 +237,90 @@ def _get_prescription_list(user):
                 "responsible": i[9],
                 "clinicalNote": i[10],
                 "segment": i[11],
+            }
+        )
+
+    return itens
+
+
+def _get_intervention_list(user):
+    sql = f"""
+        select 
+            i.fkprescricao,
+            i.fkpresmed,
+            i.nratendimento,
+            i.dtintervencao::date,
+            i.erro ,
+            i.custo,
+            i.status,
+            i.dose_despendida,
+            i.dias_economia,
+            u.nome as responsavel,
+            coalesce(setor_med.nome, setor_pac.nome) as setor,
+            coalesce(seg_med.nome, seg_pac.nome) as segmento,
+            m.nome as medicamento,
+            (
+                select
+                    case
+                        when (motivointervencao_1.nome IS NOT NULL) then 
+                            concat(motivointervencao_1.nome, ' - ', {user.schema}.motivointervencao.nome)
+                        ELSE 
+                            {user.schema}.motivointervencao.nome
+                    END AS nome
+                from
+                    {user.schema}.motivointervencao
+                    LEFT JOIN {user.schema}.motivointervencao AS motivointervencao_1 ON motivointervencao_1.idmotivointervencao = {user.schema}.motivointervencao.idmotivomae
+                where
+                    {user.schema}.motivointervencao.idmotivointervencao = i.idmotivointervencao_unico
+            ) as motivo
+        from
+            (
+                select
+                    *,
+                    unnest(idmotivointervencao) as idmotivointervencao_unico
+                from
+                    {user.schema}.intervencao
+                where 
+                    status <> '0'
+            ) i
+            left join public.usuario u on i.update_by = u.idusuario
+            left join {user.schema}.presmed pm on i.fkpresmed = pm.fkpresmed
+            left join {user.schema}.prescricao presc_med on presc_med.fkprescricao = pm.fkprescricao
+            left join {user.schema}.prescricao presc_pac on presc_pac.fkprescricao = i.fkprescricao
+            left join {user.schema}.medicamento m on pm.fkmedicamento = m.fkmedicamento
+            left join {user.schema}.setor setor_med on setor_med.fksetor = presc_med.fksetor
+            left join {user.schema}.setor setor_pac on setor_pac.fksetor = presc_pac.fksetor
+            left join {user.schema}.segmento seg_med on seg_med.idsegmento = presc_med.idsegmento
+            left join {user.schema}.segmento seg_pac on seg_pac.idsegmento = presc_pac.idsegmento
+        where 
+            i.dtintervencao::date > now()::date - interval '2 months'
+        order by 
+            i.dtintervencao asc
+    """
+
+    db_session = db.create_scoped_session(
+        options={"bind": db.get_engine(db.get_app(), ReportEnum.RPT_BIND.value)}
+    )
+
+    results = db_session.execute(sql).fetchall()
+    itens = []
+    for i in results:
+        itens.append(
+            {
+                "idPrescription": str(i[0]),
+                "idPrescriptionDrug": str(i[1]),
+                "admissionNUmber": str(i[2]),
+                "date": i[3].isoformat(),
+                "error": i[4],
+                "cost": i[5],
+                "status": i[6],
+                "expendedDose": i[7],
+                "economyDays": i[8],
+                "responsible": i[9],
+                "department": i[10],
+                "segment": i[11],
+                "drug": i[12],
+                "reason": i[13],
             }
         )
 
