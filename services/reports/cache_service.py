@@ -70,3 +70,15 @@ def get_cache_data(report, schema):
         }
     except ClientError:
         return {"isCached": False, "updatedAt": None}
+
+
+def generate_link_from_cache(report, schema):
+    cache_data = get_cache_data(report=report, schema=schema)
+
+    if cache_data["isCached"]:
+        return {
+            "url": generate_link(report, schema),
+            "updatedAt": cache_data["updatedAt"],
+        }
+
+    return None
