@@ -9,7 +9,7 @@ from services.reports import cache_service
 
 
 def get_patient_day_report(user, clearCache=False):
-    report = ReportEnum.RPT_PRESCRIPTION.value
+    report = ReportEnum.RPT_PATIENT_DAY.value
 
     if not clearCache:
         cached_link = cache_service.generate_link_from_cache(
