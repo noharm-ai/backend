@@ -12,7 +12,7 @@ from routes.outlier_lib import add_score
 from exception.validation_error import ValidationError
 from services.admin import drug_service, integration_service
 
-FOLD_SIZE = 25
+FOLD_SIZE = 15
 
 
 def prepare(id_drug, id_segment, user):
@@ -73,28 +73,6 @@ def generate(id_drug, id_segment, fold, user):
 
     manager = Manager()
     drugs = pandas.read_csv(csv_buffer)
-    poolDict = manager.dict()
-
-    processes = []
-    for idDrug in drugs["medication"].unique():
-        drugsItem = drugs[drugs["medication"] == idDrug]
-        process = Process(
-            target=_compute_outlier,
-            args=(
-                idDrug,
-                drugsItem,
-                poolDict,
-                fold,
-            ),
-        )
-        processes.append(process)
-
-    for process in processes:
-        process.start()
-
-    for process in processes:
-        process.join()
-
     drugs_list = drugs["medication"].unique().astype(float)
     outliers = (
         Outlier.query.filter(Outlier.idSegment == id_segment)
@@ -102,10 +80,33 @@ def generate(id_drug, id_segment, fold, user):
         .all()
     )
 
-    new_os = pandas.DataFrame()
+    with Manager() as manager:
+        poolDict = manager.dict()
 
-    for drug in poolDict:
-        new_os = new_os.append(poolDict[drug])
+        processes = []
+        for idDrug in drugs["medication"].unique():
+            drugsItem = drugs[drugs["medication"] == idDrug]
+            process = Process(
+                target=_compute_outlier,
+                args=(
+                    idDrug,
+                    drugsItem,
+                    poolDict,
+                    fold,
+                ),
+            )
+            processes.append(process)
+
+        for process in processes:
+            process.start()
+
+        for process in processes:
+            process.join()
+
+        new_os = pandas.DataFrame()
+
+        for drug in poolDict:
+            new_os = new_os.append(poolDict[drug])
 
     for o in outliers:
         no = new_os[
@@ -298,7 +299,6 @@ def get_outliers_process_list(id_segment, user):
         )
 
     print("Init Schema:", user.schema, "Segment:", id_segment)
-    fold_size = 25
 
     result = refresh_outliers(id_segment=id_segment, user=user)
     print("RowCount", result.rowcount)
@@ -312,7 +312,7 @@ def get_outliers_process_list(id_segment, user):
         .filter(Outlier.idSegment == id_segment)
         .scalar()
     )
-    folds = ceil(totalCount / fold_size)
+    folds = ceil(totalCount / FOLD_SIZE)
     print("Total Count:", totalCount, folds)
 
     processesUrl = []

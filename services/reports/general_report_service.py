@@ -253,6 +253,14 @@ def _get_intervention_list(user):
             i.erro ,
             i.custo,
             i.status,
+            case i.status 
+                when 'a' then 'Aceita'
+                when 'n' then 'Não Aceita'
+                when 'x' then 'Não se Aplica'
+                when 's' then 'Pendente'
+                when 'j' then 'Justificada'
+                else '' 
+            end as status_descricao,
             i.dose_despendida,
             i.dias_economia,
             u.nome as responsavel,
@@ -261,28 +269,22 @@ def _get_intervention_list(user):
             m.nome as medicamento,
             (
                 select
-                    case
-                        when (motivointervencao_1.nome IS NOT NULL) then 
-                            concat(motivointervencao_1.nome, ' - ', {user.schema}.motivointervencao.nome)
-                        ELSE 
-                            {user.schema}.motivointervencao.nome
-                    END AS nome
+                    array_agg(
+                        case
+                            when (motivointervencao_1.nome IS NOT NULL) then 
+                                concat(motivointervencao_1.nome, ' - ', {user.schema}.motivointervencao.nome)
+                            ELSE 
+                                {user.schema}.motivointervencao.nome
+                        end
+                    ) AS nome
                 from
                     {user.schema}.motivointervencao
                     LEFT JOIN {user.schema}.motivointervencao AS motivointervencao_1 ON motivointervencao_1.idmotivointervencao = {user.schema}.motivointervencao.idmotivomae
                 where
-                    {user.schema}.motivointervencao.idmotivointervencao = i.idmotivointervencao_unico
+                    {user.schema}.motivointervencao.idmotivointervencao in (select unnest(i.idmotivointervencao))
             ) as motivo
         from
-            (
-                select
-                    *,
-                    unnest(idmotivointervencao) as idmotivointervencao_unico
-                from
-                    {user.schema}.intervencao
-                where 
-                    status <> '0'
-            ) i
+            {user.schema}.intervencao i
             left join public.usuario u on i.update_by = u.idusuario
             left join {user.schema}.presmed pm on i.fkpresmed = pm.fkpresmed
             left join {user.schema}.prescricao presc_med on presc_med.fkprescricao = pm.fkprescricao
@@ -294,6 +296,7 @@ def _get_intervention_list(user):
             left join {user.schema}.segmento seg_pac on seg_pac.idsegmento = presc_pac.idsegmento
         where 
             i.dtintervencao::date > now()::date - interval '2 months'
+            and i.status <> '0'
         order by 
             i.dtintervencao asc
     """
@@ -314,13 +317,14 @@ def _get_intervention_list(user):
                 "error": i[4],
                 "cost": i[5],
                 "status": i[6],
-                "expendedDose": i[7],
-                "economyDays": i[8],
-                "responsible": i[9],
-                "department": i[10],
-                "segment": i[11],
-                "drug": i[12],
-                "reason": i[13],
+                "statusDescription": i[7],
+                "expendedDose": i[8],
+                "economyDays": i[9],
+                "responsible": i[10],
+                "department": i[11],
+                "segment": i[12],
+                "drug": i[13],
+                "reason": i[14],
             }
         )
 
