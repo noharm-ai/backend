@@ -116,7 +116,12 @@ def _get_patient_day_list(user):
                 when p.evolucao is not null then 1
                 else 0
             end as evolucao,
-            coalesce(seg.nome, 'Indefinido') as segmento
+            coalesce(seg.nome, 'Indefinido') as segmento,
+            (
+                (p.indicadores::json->>'prescriptionScore')::int + (p.indicadores::json->>'alerts')::int + 
+                (p.indicadores::json->>'am')::int + (p.indicadores::json->>'alertExams')::int + 
+                (p.indicadores::json->>'av')::int + (p.indicadores::json->>'diff')::int
+            ) as escore_global
         from 
             {user.schema}.prescricao p 
             inner join {user.schema}.setor s on s.fksetor = p.fksetor
@@ -155,6 +160,7 @@ def _get_patient_day_list(user):
                 "responsible": i[9],
                 "clinicalNote": i[10],
                 "segment": i[11],
+                "globalScore": i[12],
             }
         )
 
@@ -198,7 +204,12 @@ def _get_prescription_list(user):
                 when p.evolucao is not null then 1
                 else 0
             end as evolucao,
-            coalesce(seg.nome, 'Indefinido') as segmento
+            coalesce(seg.nome, 'Indefinido') as segmento,
+            (
+                (p.indicadores::json->>'prescriptionScore')::int + (p.indicadores::json->>'alerts')::int + 
+                (p.indicadores::json->>'am')::int + (p.indicadores::json->>'alertExams')::int + 
+                (p.indicadores::json->>'av')::int + (p.indicadores::json->>'diff')::int
+            ) as escore_global
         from 
             {user.schema}.prescricao p 
             inner join {user.schema}.setor s on s.fksetor = p.fksetor
@@ -237,6 +248,7 @@ def _get_prescription_list(user):
                 "responsible": i[9],
                 "clinicalNote": i[10],
                 "segment": i[11],
+                "globalScore": i[12],
             }
         )
 
