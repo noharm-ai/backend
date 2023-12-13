@@ -78,7 +78,7 @@ def get_most_frequent(user):
             status.HTTP_401_UNAUTHORIZED,
         )
 
-    if integration_service.get_table_count(user.schema, "exame") > 500000:
+    if integration_service.get_table_count(user.schema, "exame") > 1000000:
         raise ValidationError(
             "A tabela é grande demais para ser consultada",
             "errors.invalidParams",
