@@ -312,7 +312,7 @@ def _get_intervention_list(user):
             {
                 "idPrescription": str(i[0]),
                 "idPrescriptionDrug": str(i[1]),
-                "admissionNUmber": str(i[2]),
+                "admissionNumber": str(i[2]),
                 "date": i[3].isoformat(),
                 "error": i[4],
                 "cost": i[5],
