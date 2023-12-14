@@ -8,6 +8,7 @@ class MemoryEnum(Enum):
     FEATURES = "features"
     ADMISSION_REPORTS = "admission-reports"
     REPORTS = "reports"
+    REPORTS_INTERNAL = "reports-internal"
     GETNAME = "getnameurl"
     SUMMARY_CONFIG = "summary-config"
     MAP_TUBE = "map-tube"

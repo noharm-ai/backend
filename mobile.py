@@ -31,6 +31,7 @@ from routes.admin.integration import app_admin_integration
 from routes.admin.segment import app_admin_segment
 from routes.admin.exam import app_admin_exam
 from routes.reports.general import app_rpt_general
+from routes.reports.config import app_rpt_config
 import os
 import logging
 from models.enums import NoHarmENV
@@ -91,6 +92,7 @@ app.register_blueprint(app_admin_segment)
 app.register_blueprint(app_admin_exam)
 
 app.register_blueprint(app_rpt_general)
+app.register_blueprint(app_rpt_config)
 
 CORS(app, origins=[Config.MAIL_HOST], supports_credentials=True)
 

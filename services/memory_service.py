@@ -121,3 +121,13 @@ def is_admin_memory(key):
         MemoryEnum.MAP_ORIGIN_DIET.value,
         MemoryEnum.MAP_ORIGIN_CUSTOM.value,
     ]
+
+
+def get_reports():
+    external = get_memory(MemoryEnum.REPORTS.value)
+    internal = get_memory(MemoryEnum.REPORTS_INTERNAL.value)
+
+    return {
+        "external": external.value if external else [],
+        "internal": internal.value if internal else [],
+    }
