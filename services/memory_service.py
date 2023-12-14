@@ -111,6 +111,7 @@ def is_admin_memory(key):
         MemoryEnum.OAUTH_KEYS.value,
         MemoryEnum.PRESMED_FORM.value,
         MemoryEnum.REPORTS.value,
+        MemoryEnum.REPORTS_INTERNAL.value,
         MemoryEnum.ADMISSION_REPORTS.value,
         MemoryEnum.SUMMARY_CONFIG.value,
         MemoryEnum.MAP_IV.value,
