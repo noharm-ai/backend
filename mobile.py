@@ -31,7 +31,7 @@ from routes.admin.integration import app_admin_integration
 from routes.admin.segment import app_admin_segment
 from routes.admin.exam import app_admin_exam
 from routes.reports.general import app_rpt_general
-from routes.reports.config import app_rpt_config
+from routes.reports.config_rpt import app_rpt_config
 import os
 import logging
 from models.enums import NoHarmENV
