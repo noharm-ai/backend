@@ -332,3 +332,31 @@ def get_outliers_process_list(id_segment, user):
         )
 
     return processesUrl
+
+
+def remove_outlier(id_drug, id_segment, user):
+    roles = user.config["roles"] if user.config and "roles" in user.config else []
+    if RoleEnum.ADMIN.value not in roles:
+        raise ValidationError(
+            "Usuário não autorizado",
+            "errors.unauthorizedUser",
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
+    count = (
+        db.session.query(PrescriptionAgg)
+        .filter(PrescriptionAgg.idDrug == id_drug)
+        .filter(PrescriptionAgg.idSegment == id_segment)
+        .count()
+    )
+
+    if count > 0:
+        raise ValidationError(
+            "Não é possível remover este outlier, pois possui histórico de prescrição.",
+            "errors.invalid",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    db.session.query(Outlier).filter(Outlier.idDrug == id_drug).filter(
+        Outlier.idSegment == id_segment
+    ).delete()

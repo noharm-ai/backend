@@ -98,3 +98,22 @@ def generate(id_segment, id_drug=None, fold=None):
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
     return tryCommit(db, True)
+
+
+@app_gen.route(
+    "/outliers/generate/remove-outlier/<int:id_segment>/<int:id_drug>", methods=["POST"]
+)
+@jwt_required()
+def remove_outlier(id_segment, id_drug):
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+    os.environ["TZ"] = "America/Sao_Paulo"
+
+    try:
+        outlier_service.remove_outlier(
+            id_drug=id_drug, id_segment=id_segment, user=user
+        )
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+
+    return tryCommit(db, True)
