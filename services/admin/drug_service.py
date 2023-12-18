@@ -18,6 +18,7 @@ def get_drug_list(
     has_missing_conversion=None,
     attribute_list=[],
     term=None,
+    substance=None,
     limit=10,
     offset=0,
     id_segment_list=None,
@@ -172,6 +173,9 @@ def get_drug_list(
 
     if term:
         q = q.filter(Drug.name.ilike(term))
+
+    if substance:
+        q = q.filter(Substance.name.ilike(substance))
 
     if id_segment_list and len(id_segment_list) > 0:
         q = q.filter(DrugAttributes.idSegment.in_(id_segment_list))
