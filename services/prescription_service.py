@@ -207,3 +207,63 @@ def _audit_check(prescription: Prescription, user: User, parent_agg_date=None):
     db.session.add(a)
 
     return a.totalItens
+
+
+def start_evaluation(id_prescription, user):
+    roles = user.config["roles"] if user.config and "roles" in user.config else []
+    if (
+        RoleEnum.SUPPORT.value in roles
+        or RoleEnum.ADMIN.value in roles
+        or RoleEnum.READONLY.value in roles
+        or RoleEnum.TRAINING.value in roles
+    ):
+        return
+
+    p = Prescription.query.get(id_prescription)
+    if p is None:
+        raise ValidationError(
+            "Prescrição inexistente",
+            "errors.invalidRegister",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    if p.features == None:
+        raise ValidationError(
+            "Esta prescrição ainda não possui indicadores.",
+            "errors.invalidRegister",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    if is_being_evaluated(p.features):
+        return p.features["evaluation"] if "evaluation" in p.features else None
+    else:
+        current_user = db.session.query(User).filter(User.id == user.id).first()
+        evaluation_object = {
+            "userId": user.id,
+            "userName": current_user.name,
+            "startDate": datetime.today().isoformat(),
+        }
+
+        p.features = dict(p.features, **{"evaluation": evaluation_object})
+
+        db.session.flush()
+
+        return evaluation_object
+
+
+def is_being_evaluated(features):
+    max_evaluation_minutes = 10
+
+    if (
+        features != None
+        and "evaluation" in features
+        and "startDate" in features["evaluation"]
+    ):
+        evaluation_date = features["evaluation"]["startDate"]
+        current_evaluation_minutes = (
+            datetime.today() - datetime.fromisoformat(evaluation_date)
+        ).total_seconds() / 60
+
+        return current_evaluation_minutes <= max_evaluation_minutes
+
+    return False

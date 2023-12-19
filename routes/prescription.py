@@ -150,6 +150,9 @@ def getPrescriptions():
                     "insurance": p[0].insurance,
                     "bed": p[0].bed,
                     "status": p[0].status,
+                    "isBeingEvaluated": prescription_service.is_being_evaluated(
+                        p[0].features
+                    ),
                 }
             )
         )
@@ -541,6 +544,9 @@ def getPrescription(
             },
             "alertStats": drugList.alertStats,
             "features": prescription[0].features,
+            "isBeingEvaluated": prescription_service.is_being_evaluated(
+                prescription[0].features
+            ),
             "user": prescription[10],
             "insurance": prescription[11],
             "formTemplate": formTemplate.value if formTemplate else None,
@@ -808,3 +814,20 @@ def search_prescriptions():
         "status": "success",
         "data": prescription_converter.search_results(results),
     }, status.HTTP_200_OK
+
+
+@app_pres.route("/prescriptions/start-evaluation", methods=["POST"])
+@jwt_required()
+def start_evaluation():
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+    data = request.get_json()
+
+    try:
+        result = prescription_service.start_evaluation(
+            id_prescription=data.get("idPrescription", None), user=user
+        )
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+
+    return tryCommit(db, result)
