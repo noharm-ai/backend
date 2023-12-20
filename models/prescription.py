@@ -3,7 +3,7 @@ from .appendix import *
 from .segment import *
 from routes.utils import *
 from datetime import datetime
-from sqlalchemy.orm import deferred
+from sqlalchemy.orm import deferred, undefer
 from sqlalchemy import case, BigInteger, cast, between, outerjoin
 from sqlalchemy.sql.expression import literal_column, case
 from functools import partial
@@ -660,6 +660,8 @@ class Patient(db.Model):
         )
 
         q = q.order_by(desc(Prescription.date))
+
+        q = q.options(undefer(Patient.observation))
 
         return q.limit(500).all()
 

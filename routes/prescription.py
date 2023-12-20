@@ -126,6 +126,14 @@ def getPrescriptions():
             features["globalScore"] = 0
             features["class"] = "blue"
 
+        observation = None
+        if p[1]:
+            observation = (
+                p[1].observation[:300] + "..."
+                if p[1].observation != None and len(p[1].observation) > 300
+                else p[1].observation
+            )
+
         results.append(
             dict(
                 features,
@@ -153,6 +161,7 @@ def getPrescriptions():
                     "isBeingEvaluated": prescription_service.is_being_evaluated(
                         p[0].features
                     ),
+                    "observation": observation,
                 }
             )
         )
