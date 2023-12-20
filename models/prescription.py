@@ -183,6 +183,7 @@ class Prescription(db.Model):
                 "procedures": {},
                 "solutions": {},
                 "user": p[2],
+                "userId": p[0].user,
             }
 
         return headers

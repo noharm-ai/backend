@@ -548,6 +548,7 @@ def getPrescription(
                 prescription[0].features
             ),
             "user": prescription[10],
+            "userId": prescription[0].user,
             "insurance": prescription[11],
             "formTemplate": formTemplate.value if formTemplate else None,
             "admissionReports": admission_reports.value if admission_reports else None,
@@ -557,7 +558,7 @@ def getPrescription(
 
 @app_pres.route("/prescriptions/<int:idPrescription>", methods=["PUT"])
 @jwt_required()
-def setPrescriptionStatus(idPrescription):
+def setPrescriptionData(idPrescription):
     data = request.get_json()
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
@@ -571,18 +572,10 @@ def setPrescriptionStatus(idPrescription):
         }, status.HTTP_400_BAD_REQUEST
 
     if "status" in data.keys():
-        try:
-            prescription_service.check_prescription(
-                idPrescription=idPrescription,
-                p_status=data.get("status", None),
-                user=user,
-            )
-        except ValidationError as e:
-            return {
-                "status": "error",
-                "message": str(e),
-                "code": e.code,
-            }, e.httpStatus
+        return {
+            "status": "error",
+            "message": "Você está usando uma versão desatualizada. Por favor, aperte ctrl+f5 para atualizar.",
+        }, status.HTTP_400_BAD_REQUEST
 
     if "notes" in data.keys():
         p.notes = data.get("notes", None)
@@ -595,6 +588,33 @@ def setPrescriptionStatus(idPrescription):
     p.user = user.id
 
     return tryCommit(db, str(idPrescription), user.permission())
+
+
+@app_pres.route("/prescriptions/status", methods=["POST"])
+@jwt_required()
+def setPrescriptionStatus():
+    data = request.get_json()
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+    os.environ["TZ"] = "America/Sao_Paulo"
+
+    id_prescription = data.get("idPrescription", None)
+    p_status = data.get("status", None)
+
+    try:
+        result = prescription_service.check_prescription(
+            idPrescription=id_prescription,
+            p_status=p_status,
+            user=user,
+        )
+    except ValidationError as e:
+        return {
+            "status": "error",
+            "message": str(e),
+            "code": e.code,
+        }, e.httpStatus
+
+    return tryCommit(db, result, user.permission())
 
 
 @app_pres.route("/prescriptions/drug/<int:idPrescriptionDrug>/period", methods=["GET"])

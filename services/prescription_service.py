@@ -93,13 +93,52 @@ def check_prescription(idPrescription, p_status, user):
             status.HTTP_400_BAD_REQUEST,
         )
 
+    has_lock_feature = memory_service.has_feature(
+        FeatureEnum.LOCK_CHECKED_PRESCRIPTION.value
+    )
+
+    if p_status == "0" and p.user != user.id:
+        if has_lock_feature and RoleEnum.UNLOCK_CHECKED_PRESCRIPTION.value not in roles:
+            raise ValidationError(
+                "A checagem não pode ser desfeita, pois foi efetuada por outro usuário",
+                "errors.businessError",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+    results = []
+
     if p.agg:
-        _check_agg_internal_prescriptions(prescription=p, p_status=p_status, user=user)
-        _check_single_prescription(prescription=p, p_status=p_status, user=user)
+        internals = _check_agg_internal_prescriptions(
+            prescription=p,
+            p_status=p_status,
+            user=user,
+            has_lock_feature=has_lock_feature,
+        )
+        single = _check_single_prescription(
+            prescription=p,
+            p_status=p_status,
+            user=user,
+            has_lock_feature=has_lock_feature,
+        )
+
+        for i in internals:
+            results.append(i)
+        if single:
+            results.append(single)
 
     else:
-        _check_single_prescription(prescription=p, p_status=p_status, user=user)
+        single = _check_single_prescription(
+            prescription=p,
+            p_status=p_status,
+            user=user,
+            has_lock_feature=has_lock_feature,
+        )
         _update_agg_status(prescription=p, user=user)
+
+        if single:
+            results.append(single)
+
+    return results
 
 
 def _update_agg_status(prescription: Prescription, user: User):
@@ -145,7 +184,9 @@ def get_query_prescriptions_by_agg(
     return q
 
 
-def _check_agg_internal_prescriptions(prescription, p_status, user):
+def _check_agg_internal_prescriptions(
+    prescription, p_status, user, has_lock_feature=False
+):
     q_internal_prescription = get_query_prescriptions_by_agg(
         agg_prescription=prescription, is_cpoe=user.cpoe()
     )
@@ -155,16 +196,33 @@ def _check_agg_internal_prescriptions(prescription, p_status, user):
 
     prescriptions = q_internal_prescription.all()
 
+    results = []
+
     for p in prescriptions:
-        _check_single_prescription(
+        result = _check_single_prescription(
             prescription=p,
             p_status=p_status,
             user=user,
             parent_agg_date=prescription.date,
+            has_lock_feature=has_lock_feature,
         )
 
+        if result:
+            results.append(result)
 
-def _check_single_prescription(prescription, p_status, user, parent_agg_date=None):
+    return results
+
+
+def _check_single_prescription(
+    prescription, p_status, user, parent_agg_date=None, has_lock_feature=False
+):
+    roles = user.config["roles"] if user.config and "roles" in user.config else []
+
+    if p_status == "0" and prescription.user != user.id:
+        if has_lock_feature and RoleEnum.UNLOCK_CHECKED_PRESCRIPTION.value not in roles:
+            # skip this one
+            return None
+
     prescription.status = p_status
     prescription.update = datetime.today()
     prescription.user = user.id
@@ -172,6 +230,8 @@ def _check_single_prescription(prescription, p_status, user, parent_agg_date=Non
     _audit_check(prescription=prescription, user=user, parent_agg_date=parent_agg_date)
 
     db.session.flush()
+
+    return {"idPrescription": str(prescription.id), "status": p_status}
 
 
 def _audit_check(prescription: Prescription, user: User, parent_agg_date=None):
