@@ -158,12 +158,13 @@ def createUser(idUser=None):
                 if password != None and password != "":
                     updatedUser.password = func.crypt(password, func.gen_salt("bf", 8))
 
-        if _has_special_role(updatedUser.config["roles"]):
-            return {
-                "status": "error",
-                "message": "As permissões Administrador e Suporte não podem ser concedidas.",
-                "code": "errors.unauthorizedUser",
-            }, status.HTTP_401_UNAUTHORIZED
+        if updatedUser.config != None and "roles" in updatedUser.config:
+            if _has_special_role(updatedUser.config["roles"]):
+                return {
+                    "status": "error",
+                    "message": "As permissões Administrador e Suporte não podem ser concedidas.",
+                    "code": "errors.unauthorizedUser",
+                }, status.HTTP_401_UNAUTHORIZED
 
         db.session.add(updatedUser)
         db.session.flush()
