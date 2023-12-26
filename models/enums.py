@@ -8,6 +8,7 @@ class MemoryEnum(Enum):
     FEATURES = "features"
     ADMISSION_REPORTS = "admission-reports"
     REPORTS = "reports"
+    REPORTS_INTERNAL = "reports-internal"
     GETNAME = "getnameurl"
     SUMMARY_CONFIG = "summary-config"
     MAP_TUBE = "map-tube"
@@ -35,11 +36,13 @@ class RoleEnum(Enum):
     MULTI_SCHEMA = "multi-schema"
     USER_ADMIN = "userAdmin"
     SUMMARY = "summary"
+    UNLOCK_CHECKED_PRESCRIPTION = "unlock-checked-prescription"
 
 
 class FeatureEnum(Enum):
     PRIMARY_CARE = "PRIMARYCARE"
     OAUTH = "OAUTH"
+    LOCK_CHECKED_PRESCRIPTION = "LOCK_CHECKED_PRESCRIPTION"
 
 
 class PrescriptionAuditTypeEnum(Enum):

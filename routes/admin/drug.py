@@ -29,6 +29,7 @@ def get_drug_list():
         has_missing_conversion=request_data.get("hasMissingConversion", None),
         attribute_list=request_data.get("attributeList", []),
         term=request_data.get("term", None),
+        substance=request_data.get("substance", None),
         id_segment_list=request_data.get("idSegmentList", None),
         limit=request_data.get("limit", 10),
         offset=request_data.get("offset", 0),

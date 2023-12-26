@@ -197,13 +197,13 @@ def test_getNotes(client):
 def test_putPrescriprionsCheck(client):
     """Teste put /prescriptions/idPrescription - Checa o status "s" na prescrição e a existência de um resgistro na tabela prescricao_audit."""
 
-    url = f"/prescriptions/{PRESCRIPTION}"
+    url = f"/prescriptions/status"
 
     access_token = get_access(client, roles=["staging"])
 
-    data = {"status": "s"}
+    data = {"status": "s", "idPrescription": PRESCRIPTION}
 
-    response = client.put(
+    response = client.post(
         url, data=json.dumps(data), headers=make_headers(access_token)
     )
 
@@ -229,13 +229,13 @@ def test_putPrescriprionsCheck(client):
 def test_putPrescriprionsUncheck(client):
     """Teste put /prescriptions/idPrescription - Checa o status "0" na prescrição e a existência de um resgistro na tabela prescricao_audit."""
 
-    url = f"/prescriptions/{PRESCRIPTION}"
+    url = f"/prescriptions/status"
 
     access_token = get_access(client, roles=["staging"])
 
-    data = {"status": "0"}
+    data = {"status": "0", "idPrescription": PRESCRIPTION}
 
-    response = client.put(
+    response = client.post(
         url, data=json.dumps(data), headers=make_headers(access_token)
     )
 
@@ -279,11 +279,13 @@ def test_putAggregatePrescriprionsCheckStaging(client):
 
     """Checagem da prescrição agregada."""
 
-    checkagurl = f"/prescriptions/{id}"
+    checkagurl = f"/prescriptions/status"
 
-    datachk = {"status": "s"}
+    datachk = {"status": "s", "idPrescription": id}
 
-    client.put(checkagurl, data=json.dumps(datachk), headers=make_headers(access_token))
+    client.post(
+        checkagurl, data=json.dumps(datachk), headers=make_headers(access_token)
+    )
 
     """Verificação do status esperado em cada prescrição e existência dos
     respectivos registros."""
@@ -351,11 +353,11 @@ def test_putAggregatePrescriprionsCheckCpoe(client):
 
     """Checagem da prescrição agregada."""
 
-    checkagurl = f"/prescriptions/{id}"
+    checkagurl = f"/prescriptions/status"
 
-    datachk = {"status": "s"}
+    datachk = {"status": "s", "idPrescription": id}
 
-    response = client.put(
+    response = client.post(
         checkagurl, data=json.dumps(datachk), headers=make_headers(access_token)
     )
 
@@ -386,13 +388,13 @@ def test_putAggregatePrescriprionsCheckCpoe(client):
 def test_putPrescriprions(client):
     """Teste put /prescriptions/idPrescription - Assegura que o usuário com role support não tenha autorização para chamar o endpoint."""
 
-    url = f"/prescriptions/{PRESCRIPTION}"
+    url = f"/prescriptions/status"
 
     access_token = get_access(client, roles=["staging", "suporte"])
 
-    data = {"status": "s"}
+    data = {"status": "s", "idPrescription": PRESCRIPTION}
 
-    response = client.put(
+    response = client.post(
         url, data=json.dumps(data), headers=make_headers(access_token)
     )
 
@@ -446,13 +448,13 @@ def test_putDrug(client):
 def test_putPrescription(client):
     """Teste put /prescriptions/idPrescription - Deve retornar o código 200, indicando funcionamento do endpoint."""
 
-    url = f"/prescriptions/{PRESCRIPTION}"
+    url = f"/prescriptions/status"
 
     access_token = get_access(client, roles=["staging"])
 
-    data = {"status": "s"}
+    data = {"status": "s", "idPrescription": PRESCRIPTION}
 
-    response = client.put(
+    response = client.post(
         url, data=json.dumps(data), headers=make_headers(access_token)
     )
 

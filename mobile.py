@@ -31,6 +31,7 @@ from routes.admin.integration import app_admin_integration
 from routes.admin.segment import app_admin_segment
 from routes.admin.exam import app_admin_exam
 from routes.reports.general import app_rpt_general
+from routes.reports.config_rpt import app_rpt_config
 import os
 import logging
 from models.enums import NoHarmENV
@@ -91,6 +92,7 @@ app.register_blueprint(app_admin_segment)
 app.register_blueprint(app_admin_exam)
 
 app.register_blueprint(app_rpt_general)
+app.register_blueprint(app_rpt_config)
 
 CORS(app, origins=[Config.MAIL_HOST], supports_credentials=True)
 
@@ -101,7 +103,7 @@ if Config.ENV == NoHarmENV.STAGING.value:
 
 @app.route("/version", methods=["GET"])
 def getVersion():
-    return {"status": "success", "data": "v2.09-beta"}, status.HTTP_200_OK
+    return {"status": "success", "data": "v2.10-beta"}, status.HTTP_200_OK
 
 
 if __name__ == "__main__":

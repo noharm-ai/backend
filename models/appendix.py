@@ -6,7 +6,7 @@ class Department(db.Model):
     __tablename__ = "setor"
 
     id = db.Column("fksetor", db.Integer, primary_key=True)
-    idHospital = db.Column("fkhospital", db.Integer, nullable=False)
+    idHospital = db.Column("fkhospital", db.Integer, primary_key=True)
     name = db.Column("nome", db.String, nullable=False)
 
     def getAll():

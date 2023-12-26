@@ -126,6 +126,14 @@ def getPrescriptions():
             features["globalScore"] = 0
             features["class"] = "blue"
 
+        observation = None
+        if p[1]:
+            observation = (
+                p[1].observation[:300] + "..."
+                if p[1].observation != None and len(p[1].observation) > 300
+                else p[1].observation
+            )
+
         results.append(
             dict(
                 features,
@@ -150,6 +158,10 @@ def getPrescriptions():
                     "insurance": p[0].insurance,
                     "bed": p[0].bed,
                     "status": p[0].status,
+                    "isBeingEvaluated": prescription_service.is_being_evaluated(
+                        p[0].features
+                    ),
+                    "observation": observation,
                 }
             )
         )
@@ -541,7 +553,11 @@ def getPrescription(
             },
             "alertStats": drugList.alertStats,
             "features": prescription[0].features,
+            "isBeingEvaluated": prescription_service.is_being_evaluated(
+                prescription[0].features
+            ),
             "user": prescription[10],
+            "userId": prescription[0].user,
             "insurance": prescription[11],
             "formTemplate": formTemplate.value if formTemplate else None,
             "admissionReports": admission_reports.value if admission_reports else None,
@@ -551,7 +567,7 @@ def getPrescription(
 
 @app_pres.route("/prescriptions/<int:idPrescription>", methods=["PUT"])
 @jwt_required()
-def setPrescriptionStatus(idPrescription):
+def setPrescriptionData(idPrescription):
     data = request.get_json()
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
@@ -565,6 +581,7 @@ def setPrescriptionStatus(idPrescription):
         }, status.HTTP_400_BAD_REQUEST
 
     if "status" in data.keys():
+        # deprecated
         try:
             prescription_service.check_prescription(
                 idPrescription=idPrescription,
@@ -589,6 +606,33 @@ def setPrescriptionStatus(idPrescription):
     p.user = user.id
 
     return tryCommit(db, str(idPrescription), user.permission())
+
+
+@app_pres.route("/prescriptions/status", methods=["POST"])
+@jwt_required()
+def setPrescriptionStatus():
+    data = request.get_json()
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+    os.environ["TZ"] = "America/Sao_Paulo"
+
+    id_prescription = data.get("idPrescription", None)
+    p_status = data.get("status", None)
+
+    try:
+        result = prescription_service.check_prescription(
+            idPrescription=id_prescription,
+            p_status=p_status,
+            user=user,
+        )
+    except ValidationError as e:
+        return {
+            "status": "error",
+            "message": str(e),
+            "code": e.code,
+        }, e.httpStatus
+
+    return tryCommit(db, result, user.permission())
 
 
 @app_pres.route("/prescriptions/drug/<int:idPrescriptionDrug>/period", methods=["GET"])
@@ -808,3 +852,20 @@ def search_prescriptions():
         "status": "success",
         "data": prescription_converter.search_results(results),
     }, status.HTTP_200_OK
+
+
+@app_pres.route("/prescriptions/start-evaluation", methods=["POST"])
+@jwt_required()
+def start_evaluation():
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+    data = request.get_json()
+
+    try:
+        result = prescription_service.start_evaluation(
+            id_prescription=data.get("idPrescription", None), user=user
+        )
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+
+    return tryCommit(db, result)

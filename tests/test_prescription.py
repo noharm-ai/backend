@@ -67,7 +67,7 @@ def test_put_prescriptions_by_id(client):
     access_token = get_access(client, roles=["staging"])
 
     idPrescription = "20"
-    data = {"status": "s", "notes": "note test", "concilia": "s"}
+    data = {"notes": "note test", "concilia": "s"}
     url = "prescriptions/" + idPrescription
 
     response = client.put(
@@ -78,7 +78,6 @@ def test_put_prescriptions_by_id(client):
 
     assert response.status_code == 200
     assert responseData == str(prescription.id)
-    assert data["status"] == prescription.status
     assert data["notes"] == prescription.notes
     assert data["concilia"] == prescription.concilia
 
@@ -89,7 +88,7 @@ def test_put_prescriptions_by_id_permission(client):
     access_token = get_access(client)
 
     idPrescription = "20"
-    data = {"status": "s", "notes": "note test", "concilia": "s"}
+    data = {"notes": "note test", "concilia": "s"}
     url = "prescriptions/" + idPrescription
 
     response = client.put(
