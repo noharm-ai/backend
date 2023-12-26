@@ -581,10 +581,19 @@ def setPrescriptionData(idPrescription):
         }, status.HTTP_400_BAD_REQUEST
 
     if "status" in data.keys():
-        return {
-            "status": "error",
-            "message": "Você está usando uma versão desatualizada. Por favor, aperte ctrl+f5 para atualizar.",
-        }, status.HTTP_400_BAD_REQUEST
+        # deprecated
+        try:
+            prescription_service.check_prescription(
+                idPrescription=idPrescription,
+                p_status=data.get("status", None),
+                user=user,
+            )
+        except ValidationError as e:
+            return {
+                "status": "error",
+                "message": str(e),
+                "code": e.code,
+            }, e.httpStatus
 
     if "notes" in data.keys():
         p.notes = data.get("notes", None)
