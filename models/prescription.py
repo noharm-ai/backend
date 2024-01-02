@@ -883,7 +883,7 @@ class PrescriptionDrug(db.Model):
                 prevNotes.label("prevNotes"),
                 Prescription.status,
                 Prescription.expire,
-                Substance.link,
+                Substance,
                 period_cpoe.label("period_cpoe"),
             )
             .outerjoin(Outlier, Outlier.id == PrescriptionDrug.idOutlier)

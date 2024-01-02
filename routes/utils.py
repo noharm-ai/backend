@@ -417,9 +417,16 @@ def getFeatures(result):
     allergy = alerts = pScore = score1 = score2 = score3 = 0
     am = av = control = np = tube = diff = 0
     drugIDs = []
+    substanceIDs = []
+    substanceClassIDs = []
     frequencies = []
     for d in drugList:
         drugIDs.append(d["idDrug"])
+        if d["idSubstance"] != None:
+            substanceIDs.append(d["idSubstance"])
+        if d["idSubstanceClass"] != None:
+            substanceClassIDs.append(d["idSubstanceClass"])
+
         if d["whiteList"] or d["suspended"]:
             continue
 
@@ -464,6 +471,8 @@ def getFeatures(result):
         "interventions": interventions,
         "complication": complicationCount,
         "drugIDs": list(set(drugIDs)),
+        "substanceIDs": list(set(substanceIDs)),
+        "substanceClassIDs": list(set(substanceClassIDs)),
         "alertStats": result["data"]["alertStats"]
         if "alertStats" in result["data"]
         else None,
