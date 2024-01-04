@@ -62,7 +62,7 @@ def _auth_user(
             **{
                 "roles": roles + default_roles,
                 "features": user_features + extra_features,
-            }
+            },
         )
 
         if (
@@ -114,6 +114,11 @@ def _auth_user(
             notification = None
 
     features = db_session.query(Memory).filter(Memory.kind == "features").first()
+    preferences = (
+        db_session.query(Memory)
+        .filter(Memory.kind == f"user-preferences-{user.id}")
+        .first()
+    )
 
     nameUrl = Memory.getNameUrl(user_schema)
 
@@ -151,6 +156,7 @@ def _auth_user(
         if user_config and "features" in user_config
         else [],
         "features": features.value if features is not None else [],
+        "preferences": preferences.value if preferences is not None else None,
         "nameUrl": nameUrl["value"] if "value" in nameUrl else None,
         "multipleNameUrl": nameUrl["multiple"] if "multiple" in nameUrl else None,
         "nameHeaders": nameUrl["headers"] if "headers" in nameUrl else {},
