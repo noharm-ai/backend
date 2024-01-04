@@ -936,11 +936,7 @@ class PrescriptionDrug(db.Model):
                 q = q.filter(Prescription.idSegment == idSegment)
 
         if is_cpoe:
-            return q.order_by(
-                asc(Prescription.expire),
-                desc(PrescriptionDrug.cpoe_group),
-                asc(Drug.name),
-            ).all()
+            return q.order_by(asc(Drug.name)).all()
         else:
             return q.order_by(
                 asc(Prescription.expire),

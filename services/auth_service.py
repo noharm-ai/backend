@@ -27,8 +27,17 @@ def _has_force_schema_permission(roles, schema):
     ) and RoleEnum.MULTI_SCHEMA.value in roles
 
 
-def _auth_user(user, force_schema=None, default_roles=[], run_as_basic_user=False):
+def _auth_user(
+    user,
+    force_schema=None,
+    default_roles=[],
+    run_as_basic_user=False,
+    extra_features=[],
+):
     roles = user.config["roles"] if user.config and "roles" in user.config else []
+    user_features = (
+        user.config["features"] if user.config and "features" in user.config else []
+    )
 
     if Config.ENV == NoHarmENV.STAGING.value:
         if (
@@ -48,7 +57,13 @@ def _auth_user(user, force_schema=None, default_roles=[], run_as_basic_user=Fals
     user_config = user.config
     if force_schema and _has_force_schema_permission(roles, user.schema):
         user_schema = force_schema
-        user_config = dict(user.config, **{"roles": roles + default_roles})
+        user_config = dict(
+            user.config,
+            **{
+                "roles": roles + default_roles,
+                "features": user_features + extra_features,
+            }
+        )
 
         if (
             RoleEnum.ADMIN.value in default_roles
@@ -187,7 +202,12 @@ def pre_auth(email, password):
 
 
 def auth_local(
-    email, password, force_schema=None, default_roles=[], run_as_basic_user=False
+    email,
+    password,
+    force_schema=None,
+    default_roles=[],
+    run_as_basic_user=False,
+    extra_features=[],
 ):
     preCheckUser = User.query.filter_by(email=email).first()
 
@@ -239,6 +259,7 @@ def auth_local(
         force_schema=force_schema,
         default_roles=default_roles,
         run_as_basic_user=run_as_basic_user,
+        extra_features=extra_features,
     )
 
 
