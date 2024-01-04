@@ -579,21 +579,6 @@ def setPrescriptionData(idPrescription):
             "message": "Prescrição Inexistente!",
         }, status.HTTP_400_BAD_REQUEST
 
-    if "status" in data.keys():
-        # deprecated
-        try:
-            prescription_service.check_prescription(
-                idPrescription=idPrescription,
-                p_status=data.get("status", None),
-                user=user,
-            )
-        except ValidationError as e:
-            return {
-                "status": "error",
-                "message": str(e),
-                "code": e.code,
-            }, e.httpStatus
-
     if "notes" in data.keys():
         p.notes = data.get("notes", None)
         p.notes_at = datetime.today()

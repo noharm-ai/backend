@@ -13,25 +13,6 @@ from config import Config
 app_usr = Blueprint("app_usr", __name__)
 
 
-# TODO: deprecated
-@app_usr.route("/reports", methods=["GET"])
-@jwt_required()
-def getReports():
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
-
-    if user:
-        return {
-            "status": "success",
-            "reports": Memory.getMem("reports", []),
-        }, status.HTTP_200_OK
-    else:
-        return {
-            "status": "error",
-            "message": "HTTP_401_UNAUTHORIZED",
-        }, status.HTTP_401_UNAUTHORIZED
-
-
 @app_usr.route("/user", methods=["GET"])
 @jwt_required()
 def getUser():
