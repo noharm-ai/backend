@@ -8,10 +8,13 @@ from exception.validation_error import ValidationError
 
 
 def has_feature(feature):
-    user = User.query.get(get_jwt_identity())
-    user_features = (
-        user.config["features"] if user.config and "features" in user.config else []
-    )
+    try:
+        user = User.find(get_jwt_identity())
+        user_features = (
+            user.config["features"] if user.config and "features" in user.config else []
+        )
+    except:
+        user_features = []
 
     if feature in user_features:
         return True

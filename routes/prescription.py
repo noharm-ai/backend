@@ -411,12 +411,15 @@ def getPrescription(
         is_cpoe,
     )
 
-    pDrugs = drugList.getDrugType([], "Medicamentos")  # refactor sort
-    pDrugs = drugList.getDrugType(pDrugs, "Medicamentos", checked=True)  # refactor sort
-    pDrugs = drugList.getDrugType(
-        pDrugs, "Medicamentos", suspended=True
-    )  # refactor sort
-    pDrugs.sort(key=drugList.sortDrugs)
+    disable_solution_tab = memory_service.has_feature(
+        FeatureEnum.DISABLE_SOLUTION_TAB.value
+    )
+
+    if disable_solution_tab:
+        pDrugs = drugList.getDrugType([], ["Medicamentos", "Soluções"])
+    else:
+        pDrugs = drugList.getDrugType([], ["Medicamentos"])
+
     pDrugs = drugList.sortWhiteList(pDrugs)
 
     conciliaList = []
@@ -437,16 +440,12 @@ def getPrescription(
         conciliaList = drugList.conciliaList(conciliaDrugsT, [])
         conciliaList = drugList.conciliaList(conciliaDrugsY, conciliaList)
 
-    pSolution = drugList.getDrugType([], "Soluções")
+    pSolution = drugList.getDrugType([], ["Soluções"])
     pInfusion = drugList.getInfusionList()
 
-    pProcedures = drugList.getDrugType([], "Proced/Exames")
-    pProcedures = drugList.getDrugType(pProcedures, "Proced/Exames", checked=True)
-    pProcedures = drugList.getDrugType(pProcedures, "Proced/Exames", suspended=True)
+    pProcedures = drugList.getDrugType([], ["Proced/Exames"])
 
-    pDiet = drugList.getDrugType([], "Dietas")
-    pDiet = drugList.getDrugType(pDiet, "Dietas", checked=True)
-    pDiet = drugList.getDrugType(pDiet, "Dietas", suspended=True)
+    pDiet = drugList.getDrugType([], ["Dietas"])
 
     drugList.sumAlerts()
 

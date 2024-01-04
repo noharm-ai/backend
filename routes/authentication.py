@@ -41,6 +41,7 @@ def auth():
     password = data.get("password", None)
     schema = data.get("schema", None)
     default_roles = data.get("defaultRoles", [])
+    extra_features = data.get("extraFeatures", [])
     run_as_basic_user = data.get("runAsBasicUser", False)
     refresh_token = None
 
@@ -51,6 +52,7 @@ def auth():
             force_schema=schema,
             default_roles=default_roles,
             run_as_basic_user=run_as_basic_user,
+            extra_features=extra_features,
         )
 
         refresh_token = auth_data["refresh_token"]
