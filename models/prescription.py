@@ -570,6 +570,7 @@ class Patient(db.Model):
         indicators=[],
         frequencies=[],
         patientStatus=None,
+        substances=[],
     ):
         q = (
             db.session.query(Prescription, Patient, Department.name.label("department"))
@@ -648,6 +649,24 @@ class Patient(db.Model):
             q = q.filter(
                 cast(Prescription.features["frequencies"], db.String).op("~*")(
                     "|".join(map(re.escape, frequencies))
+                )
+            )
+
+        if len(substances) > 0:
+            elm = db.Column("elm", type_=postgresql.JSONB)
+            subs_query = (
+                db.session.query(elm.cast(postgresql.TEXT))
+                .select_from(
+                    func.json_array_elements(
+                        Prescription.features["substanceIDs"]
+                    ).alias("elm")
+                )
+                .as_scalar()
+            )
+
+            q = q.filter(
+                cast(func.array(subs_query), postgresql.ARRAY(BigInteger)).overlap(
+                    cast(substances, postgresql.ARRAY(BigInteger))
                 )
             )
 
