@@ -935,18 +935,7 @@ class PrescriptionDrug(db.Model):
             else:
                 q = q.filter(Prescription.idSegment == idSegment)
 
-        if is_cpoe:
-            return q.order_by(asc(Drug.name)).all()
-        else:
-            return q.order_by(
-                asc(Prescription.expire),
-                asc(
-                    func.concat(
-                        PrescriptionDrug.idPrescription, PrescriptionDrug.solutionGroup
-                    )
-                ),
-                asc(Drug.name),
-            ).all()
+        return q.order_by(asc(Drug.name)).all()
 
     def findByPrescriptionDrug(idPrescriptionDrug, future, is_cpoe=False):
         pd = PrescriptionDrug.query.get(idPrescriptionDrug)

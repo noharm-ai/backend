@@ -453,11 +453,6 @@ class DrugList:
 
         return pDrugs
 
-    def sortWhiteList(self, pDrugs):
-        result = [p for p in pDrugs if p["whiteList"] is False]
-        result.extend([p for p in pDrugs if p["whiteList"]])
-        return result
-
     def getInfusionKey(self, pd):
         if self.is_cpoe:
             return pd[0].cpoe_group if pd[0].cpoe_group else pd[0].solutionGroup

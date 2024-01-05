@@ -420,8 +420,6 @@ def getPrescription(
     else:
         pDrugs = drugList.getDrugType([], ["Medicamentos"])
 
-    pDrugs = drugList.sortWhiteList(pDrugs)
-
     conciliaList = []
     if prescription[0].concilia:
         pDrugs = drugList.changeDrugName(pDrugs)
@@ -454,7 +452,6 @@ def getPrescription(
 
         if is_cpoe:
             pDrugs = drugList.cpoeDrugs(pDrugs, idPrescription)
-            pDrugs = drugList.sortWhiteList(pDrugs)
             pSolution = drugList.cpoeDrugs(pSolution, idPrescription)
             pProcedures = drugList.cpoeDrugs(pProcedures, idPrescription)
             pDiet = drugList.cpoeDrugs(pDiet, idPrescription)
