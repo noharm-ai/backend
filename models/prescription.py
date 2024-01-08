@@ -571,6 +571,7 @@ class Patient(db.Model):
         frequencies=[],
         patientStatus=None,
         substances=[],
+        substanceClasses=[],
     ):
         q = (
             db.session.query(Prescription, Patient, Department.name.label("department"))
@@ -667,6 +668,24 @@ class Patient(db.Model):
             q = q.filter(
                 cast(func.array(subs_query), postgresql.ARRAY(BigInteger)).overlap(
                     cast(substances, postgresql.ARRAY(BigInteger))
+                )
+            )
+
+        if len(substanceClasses) > 0:
+            elm_substance_class = db.Column("elmSubstanceClass", type_=postgresql.JSONB)
+            subs_query = (
+                db.session.query(elm_substance_class.cast(postgresql.TEXT))
+                .select_from(
+                    func.json_array_elements_text(
+                        Prescription.features["substanceClassIDs"]
+                    ).alias("elmSubstanceClass")
+                )
+                .as_scalar()
+            )
+
+            q = q.filter(
+                cast(func.array(subs_query), postgresql.ARRAY(postgresql.TEXT)).overlap(
+                    substanceClasses
                 )
             )
 

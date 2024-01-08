@@ -52,7 +52,11 @@ def find_substance_class(term):
             ).label("concat_field"),
         )
         .filter(
-            or_(SubstanceClass.name.ilike(f"%{term}%"), parent.name.ilike(f"%{term}%"))
+            or_(
+                SubstanceClass.name.ilike(f"%{term}%"),
+                parent.name.ilike(f"%{term}%"),
+                SubstanceClass.id.ilike(f"%{term}%"),
+            )
         )
         .outerjoin(parent, SubstanceClass.idParent == parent.id)
         .order_by(asc("concat_field"))

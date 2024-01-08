@@ -52,6 +52,7 @@ def getPrescriptions():
     indicators = request.args.getlist("indicators[]")
     frequencies = request.args.getlist("frequencies[]")
     substances = request.args.getlist("substances[]")
+    substanceClasses = request.args.getlist("substanceClasses[]")
     patientStatus = request.args.get("patientStatus", None)
 
     patients = Patient.getPatients(
@@ -70,7 +71,8 @@ def getPrescriptions():
         indicators=indicators,
         frequencies=frequencies,
         patientStatus=patientStatus,
-        substances=substances
+        substances=substances,
+        substanceClasses=substanceClasses,
     )
 
     results = []
