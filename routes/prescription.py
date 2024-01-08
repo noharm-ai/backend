@@ -51,6 +51,8 @@ def getPrescriptions():
     insurance = request.args.get("insurance", None)
     indicators = request.args.getlist("indicators[]")
     frequencies = request.args.getlist("frequencies[]")
+    substances = request.args.getlist("substances[]")
+    substanceClasses = request.args.getlist("substanceClasses[]")
     patientStatus = request.args.get("patientStatus", None)
 
     patients = Patient.getPatients(
@@ -69,6 +71,8 @@ def getPrescriptions():
         indicators=indicators,
         frequencies=frequencies,
         patientStatus=patientStatus,
+        substances=substances,
+        substanceClasses=substanceClasses,
     )
 
     results = []
@@ -411,13 +415,14 @@ def getPrescription(
         is_cpoe,
     )
 
-    pDrugs = drugList.getDrugType([], "Medicamentos")  # refactor sort
-    pDrugs = drugList.getDrugType(pDrugs, "Medicamentos", checked=True)  # refactor sort
-    pDrugs = drugList.getDrugType(
-        pDrugs, "Medicamentos", suspended=True
-    )  # refactor sort
-    pDrugs.sort(key=drugList.sortDrugs)
-    pDrugs = drugList.sortWhiteList(pDrugs)
+    disable_solution_tab = memory_service.has_feature(
+        FeatureEnum.DISABLE_SOLUTION_TAB.value
+    )
+
+    if disable_solution_tab:
+        pDrugs = drugList.getDrugType([], ["Medicamentos", "Soluções"])
+    else:
+        pDrugs = drugList.getDrugType([], ["Medicamentos"])
 
     conciliaList = []
     if prescription[0].concilia:
@@ -437,16 +442,12 @@ def getPrescription(
         conciliaList = drugList.conciliaList(conciliaDrugsT, [])
         conciliaList = drugList.conciliaList(conciliaDrugsY, conciliaList)
 
-    pSolution = drugList.getDrugType([], "Soluções")
+    pSolution = drugList.getDrugType([], ["Soluções"])
     pInfusion = drugList.getInfusionList()
 
-    pProcedures = drugList.getDrugType([], "Proced/Exames")
-    pProcedures = drugList.getDrugType(pProcedures, "Proced/Exames", checked=True)
-    pProcedures = drugList.getDrugType(pProcedures, "Proced/Exames", suspended=True)
+    pProcedures = drugList.getDrugType([], ["Proced/Exames"])
 
-    pDiet = drugList.getDrugType([], "Dietas")
-    pDiet = drugList.getDrugType(pDiet, "Dietas", checked=True)
-    pDiet = drugList.getDrugType(pDiet, "Dietas", suspended=True)
+    pDiet = drugList.getDrugType([], ["Dietas"])
 
     drugList.sumAlerts()
 
@@ -455,7 +456,6 @@ def getPrescription(
 
         if is_cpoe:
             pDrugs = drugList.cpoeDrugs(pDrugs, idPrescription)
-            pDrugs = drugList.sortWhiteList(pDrugs)
             pSolution = drugList.cpoeDrugs(pSolution, idPrescription)
             pProcedures = drugList.cpoeDrugs(pProcedures, idPrescription)
             pDiet = drugList.cpoeDrugs(pDiet, idPrescription)
@@ -579,21 +579,6 @@ def setPrescriptionData(idPrescription):
             "status": "error",
             "message": "Prescrição Inexistente!",
         }, status.HTTP_400_BAD_REQUEST
-
-    if "status" in data.keys():
-        # deprecated
-        try:
-            prescription_service.check_prescription(
-                idPrescription=idPrescription,
-                p_status=data.get("status", None),
-                user=user,
-            )
-        except ValidationError as e:
-            return {
-                "status": "error",
-                "message": str(e),
-                "code": e.code,
-            }, e.httpStatus
 
     if "notes" in data.keys():
         p.notes = data.get("notes", None)

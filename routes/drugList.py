@@ -71,29 +71,11 @@ class DrugList:
                 result = i
         return result
 
-    def getDrugType(self, pDrugs, source, checked=False, suspended=False):
+    def getDrugType(self, pDrugs, source):
         for pd in self.drugList:
-            belong = False
             if pd[0].source is None:
                 pd[0].source = "Medicamentos"
-            if pd[0].source != source:
-                continue
-            if source == "Soluções":
-                belong = True
-            if (
-                checked
-                and bool(pd[0].checked) == True
-                and bool(pd[0].suspendedDate) == False
-            ):
-                belong = True
-            if suspended and (bool(pd[0].suspendedDate) == True):
-                belong = True
-            if (not checked and not suspended) and (
-                bool(pd[0].checked) == False and bool(pd[0].suspendedDate) == False
-            ):
-                belong = True
-
-            if not belong:
+            if pd[0].source not in source:
                 continue
 
             pdFrequency = (
@@ -470,11 +452,6 @@ class DrugList:
             )
 
         return pDrugs
-
-    def sortWhiteList(self, pDrugs):
-        result = [p for p in pDrugs if p["whiteList"] is False]
-        result.extend([p for p in pDrugs if p["whiteList"]])
-        return result
 
     def getInfusionKey(self, pd):
         if self.is_cpoe:

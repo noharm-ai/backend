@@ -206,13 +206,15 @@ def setPatientData(admissionNumber):
 
     updateWeight = False
 
-    if RoleEnum.READONLY.value in roles:
+    if RoleEnum.READONLY.value in roles and not (
+        RoleEnum.ADMIN.value in roles or RoleEnum.TRAINING.value in roles
+    ):
         return {
             "status": "error",
             "message": "Permissão inválida",
         }, status.HTTP_401_UNAUTHORIZED
 
-    if RoleEnum.SUPPORT.value not in roles:
+    if RoleEnum.SUPPORT.value not in roles and RoleEnum.READONLY.value not in roles:
         if "weight" in data.keys():
             weight = data.get("weight", None)
 

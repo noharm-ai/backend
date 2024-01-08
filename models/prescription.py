@@ -570,6 +570,8 @@ class Patient(db.Model):
         indicators=[],
         frequencies=[],
         patientStatus=None,
+        substances=[],
+        substanceClasses=[],
     ):
         q = (
             db.session.query(Prescription, Patient, Department.name.label("department"))
@@ -648,6 +650,42 @@ class Patient(db.Model):
             q = q.filter(
                 cast(Prescription.features["frequencies"], db.String).op("~*")(
                     "|".join(map(re.escape, frequencies))
+                )
+            )
+
+        if len(substances) > 0:
+            elm = db.Column("elm", type_=postgresql.JSONB)
+            subs_query = (
+                db.session.query(elm.cast(postgresql.TEXT))
+                .select_from(
+                    func.json_array_elements(
+                        Prescription.features["substanceIDs"]
+                    ).alias("elm")
+                )
+                .as_scalar()
+            )
+
+            q = q.filter(
+                cast(func.array(subs_query), postgresql.ARRAY(BigInteger)).overlap(
+                    cast(substances, postgresql.ARRAY(BigInteger))
+                )
+            )
+
+        if len(substanceClasses) > 0:
+            elm_substance_class = db.Column("elmSubstanceClass", type_=postgresql.JSONB)
+            subs_query = (
+                db.session.query(elm_substance_class.cast(postgresql.TEXT))
+                .select_from(
+                    func.json_array_elements_text(
+                        Prescription.features["substanceClassIDs"]
+                    ).alias("elmSubstanceClass")
+                )
+                .as_scalar()
+            )
+
+            q = q.filter(
+                cast(func.array(subs_query), postgresql.ARRAY(postgresql.TEXT)).overlap(
+                    substanceClasses
                 )
             )
 
@@ -935,22 +973,7 @@ class PrescriptionDrug(db.Model):
             else:
                 q = q.filter(Prescription.idSegment == idSegment)
 
-        if is_cpoe:
-            return q.order_by(
-                asc(Prescription.expire),
-                desc(PrescriptionDrug.cpoe_group),
-                asc(Drug.name),
-            ).all()
-        else:
-            return q.order_by(
-                asc(Prescription.expire),
-                asc(
-                    func.concat(
-                        PrescriptionDrug.idPrescription, PrescriptionDrug.solutionGroup
-                    )
-                ),
-                asc(Drug.name),
-            ).all()
+        return q.order_by(asc(Drug.name)).all()
 
     def findByPrescriptionDrug(idPrescriptionDrug, future, is_cpoe=False):
         pd = PrescriptionDrug.query.get(idPrescriptionDrug)
