@@ -827,7 +827,7 @@ def getPrevNotes(admissionNumber):
                 " (",
                 prevUser.name,
                 " em ",
-                func.to_char(prevNotes.update, "DD/MM/YYYY HH:MI"),
+                func.to_char(prevNotes.update, "DD/MM/YYYY HH24:MI"),
                 ")",
             )
         )
