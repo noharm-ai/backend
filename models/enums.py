@@ -68,3 +68,4 @@ class ReportEnum(Enum):
     RPT_PATIENT_DAY = "rpt_patient_day"
     RPT_PRESCRIPTION = "rpt_prescription"
     RPT_INTERVENTION = "rpt_intervention"
+    RPT_PRESCRIPTION_AUDIT = "rpt_prescription_audit"

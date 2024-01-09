@@ -818,13 +818,25 @@ def getDrugFuture(idPrescription, admissionNumber):
 
 def getPrevNotes(admissionNumber):
     prevNotes = db.aliased(Notes)
+    prevUser = db.aliased(User)
 
     return (
-        db.session.query(prevNotes.notes)
+        db.session.query(
+            func.concat(
+                prevNotes.notes,
+                " (",
+                prevUser.name,
+                " em ",
+                func.to_char(prevNotes.update, "DD/MM/YYYY HH24:MI"),
+                ")",
+            )
+        )
         .select_from(prevNotes)
+        .outerjoin(prevUser, prevNotes.user == prevUser.id)
         .filter(prevNotes.admissionNumber == admissionNumber)
         .filter(prevNotes.idDrug == PrescriptionDrug.idDrug)
         .filter(prevNotes.idPrescriptionDrug < PrescriptionDrug.id)
+        .filter(and_(prevNotes.notes != None, prevNotes.notes != ""))
         .order_by(desc(prevNotes.update))
         .limit(1)
         .as_scalar()

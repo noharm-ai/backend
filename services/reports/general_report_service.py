@@ -83,6 +83,31 @@ def get_intervention_report(user, clearCache=False):
     }
 
 
+def get_audit_report(user, clearCache=False):
+    report = ReportEnum.RPT_PRESCRIPTION_AUDIT.value
+
+    if not clearCache:
+        cached_link = cache_service.generate_link_from_cache(
+            report=report, schema=user.schema
+        )
+
+        if cached_link != None:
+            return cached_link
+
+    list = _get_audit_list(user)
+
+    cache_service.save_cache(
+        report=report,
+        schema=user.schema,
+        data=list,
+    )
+
+    return {
+        "url": cache_service.generate_link(report, user.schema),
+        "updatedAt": datetime.today().isoformat(),
+    }
+
+
 def _get_patient_day_list(user):
     sql = f"""
         select 
@@ -337,6 +362,56 @@ def _get_intervention_list(user):
                 "segment": i[12],
                 "drug": i[13],
                 "reason": i[14],
+            }
+        )
+
+    return itens
+
+
+def _get_audit_list(user):
+    sql = f"""
+        select 
+            case
+                when tp_audit = 1 then 'checagem'
+                when tp_audit = 2 then 'deschecagem'
+            end as tipo,
+            pa.created_at as dtevento,
+            u.nome,
+            pa.nratendimento,
+            pa.fkprescricao,
+            s.nome,
+            seg.nome,
+            pa.total_itens,
+            pa.agregada
+        from
+            {user.schema}.prescricao_audit pa 
+            left join {user.schema}.setor s on s.fksetor = pa.fksetor
+            left join {user.schema}.segmento seg on seg.idsegmento = pa.idsegmento
+            left join public.usuario u on pa.created_by = u.idusuario
+        where 
+            pa.created_at > now() - interval '2 months'
+        order by
+            pa.created_at
+    """
+
+    db_session = db.create_scoped_session(
+        options={"bind": db.get_engine(db.get_app(), ReportEnum.RPT_BIND.value)}
+    )
+
+    results = db_session.execute(sql).fetchall()
+    itens = []
+    for i in results:
+        itens.append(
+            {
+                "type": i[0],
+                "date": i[1].isoformat(),
+                "responsible": i[2],
+                "admissionNumber": i[3],
+                "idPrescription": i[4],
+                "department": i[5],
+                "segment": i[6],
+                "itens": i[7],
+                "agg": i[8],
             }
         )
 
