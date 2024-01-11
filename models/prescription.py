@@ -822,13 +822,21 @@ def getPrevNotes(admissionNumber):
 
     return (
         db.session.query(
-            func.concat(
-                prevNotes.notes,
-                " (",
-                prevUser.name,
-                " em ",
-                func.to_char(prevNotes.update, "DD/MM/YYYY HH24:MI"),
-                ")",
+            case(
+                [
+                    (
+                        and_(prevNotes.notes != None, prevNotes.notes != ""),
+                        func.concat(
+                            prevNotes.notes,
+                            " ##@",
+                            prevUser.name,
+                            " em ",
+                            func.to_char(prevNotes.update, "DD/MM/YYYY HH24:MI"),
+                            "@##",
+                        ),
+                    ),
+                ],
+                else_=None,
             )
         )
         .select_from(prevNotes)
@@ -836,7 +844,6 @@ def getPrevNotes(admissionNumber):
         .filter(prevNotes.admissionNumber == admissionNumber)
         .filter(prevNotes.idDrug == PrescriptionDrug.idDrug)
         .filter(prevNotes.idPrescriptionDrug < PrescriptionDrug.id)
-        .filter(and_(prevNotes.notes != None, prevNotes.notes != ""))
         .order_by(desc(prevNotes.update))
         .limit(1)
         .as_scalar()
