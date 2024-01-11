@@ -1,3 +1,4 @@
+import re
 from .utils import *
 from models.appendix import *
 
@@ -365,6 +366,12 @@ class DrugList:
                 period = (str(pd[0].period) + "D" if pd[0].period else "",)
                 total_period = none2zero(pd[0].period)
 
+            prevNotes = None
+            prevNotesUser = None
+            if pd[8]:
+                prevNotesUser = str(pd[8]).replace("##@", "(").replace("@##", ")")
+                prevNotes = re.sub(r"##@(.*)@##", "", str(pd[8]))
+
             pDrugs.append(
                 {
                     "idPrescription": str(pd[0].idPrescription),
@@ -441,7 +448,8 @@ class DrugList:
                     "alerts": alerts,
                     "tubeAlert": tubeAlert,
                     "notes": pd[7],
-                    "prevNotes": pd[8],
+                    "prevNotes": prevNotes,
+                    "prevNotesUser": prevNotesUser,
                     "drugInfoLink": pd[11].link if pd[11] != None else None,
                     "idSubstance": pd[11].id if pd[11] != None else None,
                     "idSubstanceClass": pd[11].idclass if pd[11] != None else None,
