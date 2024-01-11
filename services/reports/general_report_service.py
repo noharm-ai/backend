@@ -149,7 +149,7 @@ def _get_patient_day_list(user):
             ) as escore_global
         from 
             {user.schema}.prescricao p 
-            inner join {user.schema}.setor s on s.fksetor = p.fksetor
+            inner join {user.schema}.setor s on s.fksetor = p.fksetor and s.fkhospital = p.fkhospital
             left join {user.schema}.segmento seg on seg.idsegmento = p.idsegmento
             left join (
                 select * from {user.schema}.prescricao_audit pa where pa.tp_audit = 1
@@ -237,7 +237,7 @@ def _get_prescription_list(user):
             ) as escore_global
         from 
             {user.schema}.prescricao p 
-            inner join {user.schema}.setor s on s.fksetor = p.fksetor
+            inner join {user.schema}.setor s on s.fksetor = p.fksetor and s.fkhospital = p.fkhospital
             left join {user.schema}.segmento seg on seg.idsegmento = p.idsegmento
             left join (
                 select * from {user.schema}.prescricao_audit pa where pa.tp_audit = 1
@@ -327,8 +327,8 @@ def _get_intervention_list(user):
             left join {user.schema}.prescricao presc_med on presc_med.fkprescricao = pm.fkprescricao
             left join {user.schema}.prescricao presc_pac on presc_pac.fkprescricao = i.fkprescricao
             left join {user.schema}.medicamento m on pm.fkmedicamento = m.fkmedicamento
-            left join {user.schema}.setor setor_med on setor_med.fksetor = presc_med.fksetor
-            left join {user.schema}.setor setor_pac on setor_pac.fksetor = presc_pac.fksetor
+            left join {user.schema}.setor setor_med on setor_med.fksetor = presc_med.fksetor and setor_med.fkhospital = presc_med.fkhospital
+            left join {user.schema}.setor setor_pac on setor_pac.fksetor = presc_pac.fksetor and setor_pac.fkhospital = presc_pac.fkhospital
             left join {user.schema}.segmento seg_med on seg_med.idsegmento = presc_med.idsegmento
             left join {user.schema}.segmento seg_pac on seg_pac.idsegmento = presc_pac.idsegmento
         where 
@@ -385,7 +385,8 @@ def _get_audit_list(user):
             pa.agregada
         from
             {user.schema}.prescricao_audit pa 
-            left join {user.schema}.setor s on s.fksetor = pa.fksetor
+            inner join {user.schema}.prescricao p on (pa.fkprescricao = p.fkprescricao) 
+            left join {user.schema}.setor s on s.fksetor = pa.fksetor and s.fkhospital = p.fkhospital
             left join {user.schema}.segmento seg on seg.idsegmento = pa.idsegmento
             left join public.usuario u on pa.created_by = u.idusuario
         where 
