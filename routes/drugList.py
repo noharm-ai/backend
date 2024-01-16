@@ -106,12 +106,12 @@ class DrugList:
             if idDrugAgg not in self.maxDoseAgg:
                 self.maxDoseAgg[idDrugAgg] = {"value": 0, "count": 0}
 
-            self.maxDoseAgg[idDrugAgg]["value"] += pdDoseconv
-            self.maxDoseAgg[idDrugAgg]["count"] += 1
-
             tubeAlert = False
             alerts = []
             if not bool(pd[0].suspendedDate):
+                self.maxDoseAgg[idDrugAgg]["value"] += pdDoseconv
+                self.maxDoseAgg[idDrugAgg]["count"] += 1
+
                 if self.exams and pd[6]:
                     if pd[6].kidney:
                         if self.dialysis == "c":
