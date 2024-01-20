@@ -32,6 +32,9 @@ def prepare(id_drug, id_segment, user):
         db.session.query(PrescriptionAgg)
         .filter(PrescriptionAgg.idDrug == id_drug)
         .filter(PrescriptionAgg.idSegment == id_segment)
+        .filter(PrescriptionAgg.frequency != None)
+        .filter(PrescriptionAgg.doseconv != None)
+        .filter(PrescriptionAgg.dose > 0)
         .count()
     )
 
@@ -142,7 +145,7 @@ def refresh_outliers(id_segment, user, id_drug=None):
             {user.schema}.prescricaoagg
         WHERE 
             idsegmento = :idSegment
-            and frequenciadia is not null and doseconv is not null
+            and frequenciadia is not null and doseconv is not null and dose > 0
         
     """
 

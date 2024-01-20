@@ -147,7 +147,11 @@ class Exams(db.Model):
                 )
 
             if e.typeExam.lower() in segExam:
-                if segExam[e.typeExam.lower()].initials.lower().strip() == "creatinina":
+                if (
+                    segExam[e.typeExam.lower()].initials.lower().strip() == "creatinina"
+                    and "cr" in exams
+                    and exams["cr"]["value"] == None
+                ):
                     exams["cr"] = formatExam(e, e.typeExam.lower(), segExam, prevValue)
                 if segExam[e.typeExam.lower()].initials.lower().strip() == "tgo":
                     examsExtra["tgo"] = formatExam(
