@@ -7,7 +7,7 @@ from models.main import *
 from models.appendix import *
 from models.segment import *
 from models.prescription import *
-from services.admin import drug_service
+from services.admin import drug_service, ia_service
 from exception.validation_error import ValidationError
 
 app_admin_drug = Blueprint("app_admin_drug", __name__)
@@ -168,3 +168,18 @@ def copy_attributes():
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
     return tryCommit(db, result.rowcount)
+
+
+@app_admin_drug.route("/admin/drug/ia-set-substance", methods=["GET"])
+@jwt_required()
+def ia_set_drug_substance():
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+    os.environ["TZ"] = "America/Sao_Paulo"
+
+    try:
+        result = ia_service.get_substance()
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+
+    return result, status.HTTP_200_OK
