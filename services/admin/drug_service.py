@@ -1,5 +1,6 @@
 from flask_api import status
 from sqlalchemy import and_, or_, func
+from typing import List
 
 from models.main import *
 from models.appendix import *
@@ -576,7 +577,7 @@ def copy_drug_attributes(
     )
 
 
-def predict_substance(id_drugs: list[int], user: User):
+def predict_substance(id_drugs: List[int], user: User):
     roles = user.config["roles"] if user.config and "roles" in user.config else []
     if RoleEnum.ADMIN.value not in roles and RoleEnum.TRAINING.value not in roles:
         raise ValidationError(
