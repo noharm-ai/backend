@@ -5,25 +5,25 @@ import numpy
 
 from config import Config
 from models.main import *
+from exception.validation_error import ValidationError
 
 
-def get_substance():
+def get_substance(drugs: list[Drug]):
+    if len(drugs) == 0:
+        raise ValidationError(
+            "Nenhum item selecionado",
+            "errors.invalidParams",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
     model_subst = _get_model("models/noharm-ml-subst.gz")
     token_subst = _get_model("models/noharm-tk-subst.gz")
 
-    drugs = (
-        db.session.query(Outlier, Drug)
-        .join(Drug, Drug.id == Outlier.idDrug)
-        .filter(Drug.sctid == None)
-        .order_by(Drug.id)
-        .limit(100)
-        .all()
-    )
     drugs_array = []
 
     drug_names = []
     for d in drugs:
-        drug_names.append(d[1].name)
+        drug_names.append(d.name)
 
     vector = token_subst.transform(drug_names)
 
@@ -36,9 +36,9 @@ def get_substance():
         drugs_array.append(
             {
                 "sctid": p,
-                "idDrug": drugs[idx][1].id,
-                "drug": drugs[idx][1].name,
-                "probability": subst_prob,
+                "idDrug": drugs[idx].id,
+                "drug": drugs[idx].name,
+                "accuracy": subst_prob * 100,
             }
         )
 

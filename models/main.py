@@ -170,6 +170,11 @@ class Drug(db.Model):
     idHospital = db.Column("fkhospital", db.Integer, nullable=False)
     name = db.Column("nome", db.String, nullable=False)
     sctid = db.Column("sctid", db.Integer, nullable=True)
+    ai_accuracy = db.Column("ia_acuracia", db.Float, nullable=True)
+    created_by = db.Column("created_by", db.Integer, nullable=True)
+    updated_by = db.Column("updated_by", db.Integer, nullable=True)
+    created_at = db.Column("created_at", db.DateTime, nullable=False)
+    updated_at = db.Column("updated_at", db.DateTime, nullable=True)
 
     def getBySegment(idSegment, qDrug=None, idDrug=None):
         segDrubs = (

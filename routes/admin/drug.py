@@ -7,7 +7,7 @@ from models.main import *
 from models.appendix import *
 from models.segment import *
 from models.prescription import *
-from services.admin import drug_service, ia_service
+from services.admin import drug_service
 from exception.validation_error import ValidationError
 
 app_admin_drug = Blueprint("app_admin_drug", __name__)
@@ -27,6 +27,8 @@ def get_drug_list():
         has_price_unit=request_data.get("hasPriceUnit", None),
         has_inconsistency=request_data.get("hasInconsistency", None),
         has_missing_conversion=request_data.get("hasMissingConversion", None),
+        has_ai_substance=request_data.get("hasAISubstance", None),
+        ai_accuracy_range=request_data.get("aiAccuracyRange", None),
         attribute_list=request_data.get("attributeList", []),
         term=request_data.get("term", None),
         substance=request_data.get("substance", None),
@@ -50,6 +52,7 @@ def get_drug_list():
                 "sctid": i[7],
                 "substance": i[10],
                 "segmentOutlier": i[11],
+                "substanceAccuracy": i[12],
             }
         )
 
@@ -170,16 +173,36 @@ def copy_attributes():
     return tryCommit(db, result.rowcount)
 
 
-@app_admin_drug.route("/admin/drug/ia-set-substance", methods=["GET"])
+@app_admin_drug.route("/admin/drug/predict-substance", methods=["POST"])
 @jwt_required()
-def ia_set_drug_substance():
+def predict_substance():
+    data = request.get_json()
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
     os.environ["TZ"] = "America/Sao_Paulo"
 
     try:
-        result = ia_service.get_substance()
+        result = drug_service.predict_substance(data.get("idDrugs", []), user)
     except ValidationError as e:
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
-    return result, status.HTTP_200_OK
+    return tryCommit(db, result)
+
+
+@app_admin_drug.route("/admin/drug/get-missing-substance", methods=["GET"])
+@jwt_required()
+def get_drugs_missing_substance():
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+    os.environ["TZ"] = "America/Sao_Paulo"
+
+    try:
+        result = drug_service.get_drugs_missing_substance()
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+
+    return {
+        "status": "success",
+        "count": len(result),
+        "data": result,
+    }, status.HTTP_200_OK

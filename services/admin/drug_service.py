@@ -5,6 +5,7 @@ from models.main import *
 from models.appendix import *
 from models.segment import *
 from models.enums import RoleEnum, DrugAdminSegment
+from services.admin import ai_service
 
 from exception.validation_error import ValidationError
 
@@ -22,6 +23,8 @@ def get_drug_list(
     limit=10,
     offset=0,
     id_segment_list=None,
+    has_ai_substance=None,
+    ai_accuracy_range=None,
 ):
     SegmentOutlier = db.aliased(Segment)
     ConversionsAgg = db.aliased(MeasureUnitConvert)
@@ -74,6 +77,7 @@ def get_drug_list(
             func.count().over(),
             Substance.name,
             SegmentOutlier.description,
+            Drug.ai_accuracy,
         )
         .select_from(presc_query)
         .join(Drug, presc_query.c.idDrug == Drug.id)
@@ -147,6 +151,17 @@ def get_drug_list(
             q = q.filter(DrugAttributes.idDrug == None)
         else:
             q = q.filter(DrugAttributes.idDrug != None)
+
+    if has_ai_substance != None:
+        if has_ai_substance:
+            q = q.filter(Drug.ai_accuracy != None)
+
+            if ai_accuracy_range != None and len(ai_accuracy_range) == 2:
+                q = q.filter(Drug.ai_accuracy >= ai_accuracy_range[0]).filter(
+                    Drug.ai_accuracy <= ai_accuracy_range[1]
+                )
+        else:
+            q = q.filter(Drug.ai_accuracy == None)
 
     if len(attribute_list) > 0:
         bool_attributes = [
@@ -246,6 +261,10 @@ def update_substance(id_drug, sctid, user):
         )
 
     drug.sctid = sctid
+    drug.ai_accuracy = None
+    drug.updated_at = datetime.today()
+    drug.updated_by = user.id
+
     db.session.flush()
 
 
@@ -555,3 +574,60 @@ def copy_drug_attributes(
             "idUser": user.id,
         },
     )
+
+
+def predict_substance(id_drugs: list[int], user: User):
+    roles = user.config["roles"] if user.config and "roles" in user.config else []
+    if RoleEnum.ADMIN.value not in roles and RoleEnum.TRAINING.value not in roles:
+        raise ValidationError(
+            "Usuário não autorizado",
+            "errors.unauthorizedUser",
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
+    if len(id_drugs) == 0 or len(id_drugs) > 200:
+        raise ValidationError(
+            "Parâmetro inválido (min=1; max=200)",
+            "errors.invalidParams",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    drugs = (
+        db.session.query(Drug)
+        .filter(Drug.sctid == None)
+        .filter(Drug.id.in_(id_drugs))
+        .order_by(Drug.id)
+        .all()
+    )
+
+    ia_results = ai_service.get_substance(drugs)
+
+    for i in ia_results:
+        db.session.query(Drug).filter(Drug.id == i["idDrug"]).update(
+            {
+                "sctid": i["sctid"],
+                "ai_accuracy": i["accuracy"],
+                "updated_at": datetime.today(),
+                "updated_by": user.id,
+            },
+            synchronize_session="fetch",
+        )
+
+    return ia_results
+
+
+def get_drugs_missing_substance():
+    drugs = (
+        db.session.query(func.distinct(Drug.id))
+        .select_from(Outlier)
+        .join(Drug, Drug.id == Outlier.idDrug)
+        .filter(Drug.sctid == None)
+        .order_by(Drug.id)
+        .all()
+    )
+
+    id_drugs = []
+    for d in drugs:
+        id_drugs.append(d[0])
+
+    return id_drugs
