@@ -632,3 +632,23 @@ def get_drugs_missing_substance():
         id_drugs.append(d[0])
 
     return id_drugs
+
+
+def static_update_substances(user):
+    limit = 100
+
+    drugs = (
+        db.session.query(func.distinct(Drug.id))
+        .select_from(Outlier)
+        .join(Drug, Drug.id == Outlier.idDrug)
+        .filter(Drug.sctid == None)
+        .order_by(Drug.id)
+        .limit(limit)
+        .all()
+    )
+
+    id_drugs = []
+    for d in drugs:
+        id_drugs.append(d[0])
+
+    return predict_substance(id_drugs=id_drugs, user=user)

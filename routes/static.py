@@ -1,10 +1,12 @@
 from flask import Blueprint, request
 from datetime import datetime
+from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from models.main import *
 from models.prescription import *
 from .utils import tryCommit
 from services import prescription_agg_service
+from services.admin import drug_service
 
 from exception.validation_error import ValidationError
 
@@ -49,3 +51,17 @@ def create_aggregated_prescription_by_date(schema, admission_number):
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
     return tryCommit(db, str(admission_number))
+
+
+@app_stc.route("/static/drug/update-substances")
+@jwt_required()
+def update_substances():
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+
+    try:
+        result = drug_service.static_update_substances(user)
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+
+    return tryCommit(db, result)
