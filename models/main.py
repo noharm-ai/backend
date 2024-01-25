@@ -202,9 +202,7 @@ class Drug(db.Model):
         return drugs.order_by(asc(Drug.name)).all()
 
 
-class DrugAttributes(db.Model):
-    __tablename__ = "medatributos"
-
+class DrugAttributesBase:
     idDrug = db.Column("fkmedicamento", db.Integer, primary_key=True)
     idSegment = db.Column("idsegmento", db.Integer, primary_key=True)
     antimicro = db.Column("antimicro", db.Boolean, nullable=True)
@@ -229,6 +227,15 @@ class DrugAttributes(db.Model):
     maxTime = db.Column("tempotratamento", db.Integer, nullable=True)
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.Integer, nullable=True)
+
+
+class DrugAttributes(db.Model, DrugAttributesBase):
+    __tablename__ = "medatributos"
+
+
+class DrugAttributesReference(db.Model, DrugAttributesBase):
+    __tablename__ = "medatributos"
+    __table_args__ = {"schema": "hsc_test"}
 
 
 class Allergy(db.Model):

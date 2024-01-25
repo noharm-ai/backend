@@ -268,6 +268,58 @@ def update_substance(id_drug, sctid, user):
 
     db.session.flush()
 
+    _copy_substance_default_attributes(drug.id, drug.sctid, user)
+
+
+def _copy_substance_default_attributes(id_drug, sctid, user: User):
+    reference = (
+        db.session.query(DrugAttributesReference)
+        .filter(DrugAttributesReference.idDrug == sctid)
+        .filter(DrugAttributesReference.idSegment == DrugAdminSegment.ADULT.value)
+        .first()
+    )
+
+    if reference != None:
+        segments = db.session.query(Segment).all()
+
+        for s in segments:
+            add = False
+            da = (
+                db.session.query(DrugAttributes)
+                .filter(DrugAttributes.idDrug == id_drug)
+                .filter(DrugAttributes.idSegment == s.id)
+                .first()
+            )
+            if da == None:
+                add = True
+                da = DrugAttributes()
+
+                # pk
+                da.idDrug = id_drug
+                da.idSegment = s.id
+
+            # attributes
+            da.antimicro = reference.antimicro
+            da.mav = reference.mav
+            da.controlled = reference.controlled
+            da.tube = reference.tube
+            da.chemo = reference.chemo
+            da.elderly = reference.elderly
+            da.whiteList = reference.whiteList
+
+            da.kidney = reference.kidney
+            da.liver = reference.liver
+            da.platelets = reference.platelets
+
+            # controls
+            da.update = datetime.today()
+            da.user = user.id
+
+            if add:
+                db.session.add(da)
+            else:
+                db.session.flush()
+
 
 def add_default_units(user):
     roles = user.config["roles"] if user.config and "roles" in user.config else []
@@ -613,6 +665,8 @@ def predict_substance(id_drugs: List[int], user: User):
             },
             synchronize_session="fetch",
         )
+
+        _copy_substance_default_attributes(i["idDrug"], i["sctid"], user)
 
     return ia_results
 
