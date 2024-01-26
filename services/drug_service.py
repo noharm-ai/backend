@@ -3,7 +3,8 @@ from sqlalchemy import asc, distinct
 
 from models.appendix import *
 from models.prescription import *
-
+from models.enums import DrugAdminSegment
+from services import permission_service
 from exception.validation_error import ValidationError
 
 
@@ -139,3 +140,195 @@ def _setDrugUnit(idDrug, idMeasureUnit, idSegment, factor):
 
     if new:
         db.session.add(u)
+
+
+def get_attributes(id_segment, id_drug, user):
+    drug = Drug.query.get(id_drug)
+
+    if drug == None:
+        raise ValidationError(
+            "Parâmetro inválido",
+            "errors.invalidParams",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    attr = DrugAttributes.query.get((id_drug, id_segment))
+    drug_ref = None
+    if drug.sctid != None and permission_service.has_maintainer_permission(user):
+        drug_ref = Notes.getDefaultNote(drug.sctid)
+
+    if attr == None:
+        return {"drugRef": drug_ref}
+
+    return {
+        "antimicro": attr.antimicro,
+        "mav": attr.mav,
+        "controlled": attr.controlled,
+        "notdefault": attr.notdefault,
+        "maxDose": attr.maxDose,
+        "kidney": attr.kidney,
+        "liver": attr.liver,
+        "platelets": attr.platelets,
+        "elderly": attr.elderly,
+        "tube": attr.tube,
+        "division": attr.division,
+        "useWeight": attr.useWeight,
+        "idMeasureUnit": attr.idMeasureUnit,
+        "idMeasureUnitPrice": attr.idMeasureUnitPrice,
+        "amount": attr.amount,
+        "amountUnit": attr.amountUnit,
+        "price": attr.price,
+        "maxTime": attr.maxTime,
+        "whiteList": attr.whiteList,
+        "chemo": attr.chemo,
+        "sctid": str(drug.sctid),
+        "drugRef": drug_ref,
+    }
+
+
+def save_attributes(id_segment, id_drug, data, user):
+    if id_drug == None or id_segment == None:
+        raise ValidationError(
+            "Parâmetro inválido",
+            "errors.invalidParams",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    attr = DrugAttributes.query.get((id_drug, id_segment))
+    add = False
+    if attr is None:
+        add = True
+        attr = DrugAttributes()
+        attr.idDrug = id_drug
+        attr.idSegment = id_segment
+
+    if "antimicro" in data.keys():
+        attr.antimicro = bool(data.get("antimicro", 0))
+    if "mav" in data.keys():
+        attr.mav = bool(data.get("mav", 0))
+    if "controlled" in data.keys():
+        attr.controlled = bool(data.get("controlled", 0))
+    if "idMeasureUnit" in data.keys():
+        attr.idMeasureUnit = data.get("idMeasureUnit", None)
+    if "notdefault" in data.keys():
+        attr.notdefault = data.get("notdefault", 0)
+    if "maxDose" in data.keys():
+        attr.maxDose = data.get("maxDose", None)
+        if attr.maxDose == "":
+            attr.maxDose = None
+    if "kidney" in data.keys():
+        attr.kidney = data.get("kidney", None)
+        if attr.kidney == "":
+            attr.kidney = None
+    if "liver" in data.keys():
+        attr.liver = data.get("liver", None)
+        if attr.liver == "":
+            attr.liver = None
+    if "platelets" in data.keys():
+        attr.platelets = data.get("platelets", None)
+        if attr.platelets == "":
+            attr.platelets = None
+    if "elderly" in data.keys():
+        attr.elderly = data.get("elderly", 0)
+    if "chemo" in data.keys():
+        attr.chemo = data.get("chemo", 0)
+    if "tube" in data.keys():
+        attr.tube = data.get("tube", 0)
+    if "division" in data.keys():
+        attr.division = data.get("division", None)
+    if "price" in data.keys():
+        attr.price = data.get("price", None)
+        if attr.price == "":
+            attr.price = None
+    if "maxTime" in data.keys():
+        attr.maxTime = data.get("maxTime", None)
+    if "useWeight" in data.keys():
+        attr.useWeight = data.get("useWeight", 0)
+    if "amount" in data.keys():
+        attr.amount = data.get("amount", None)
+        if attr.amount == "":
+            attr.amount = None
+    if "amountUnit" in data.keys():
+        attr.amountUnit = data.get("amountUnit", None)
+    if "whiteList" in data.keys():
+        attr.whiteList = data.get("whiteList", None)
+        if not attr.whiteList:
+            attr.whiteList = None
+
+    attr.update = datetime.today()
+    attr.user = user.id
+
+    if add:
+        db.session.add(attr)
+
+    db.session.flush()
+
+
+def update_substance(id_drug, sctid, user):
+    drug = Drug.query.get(id_drug)
+
+    if drug == None:
+        raise ValidationError(
+            "Registro inexistente", "errors.invalidRecord", status.HTTP_400_BAD_REQUEST
+        )
+
+    drug.sctid = sctid
+    drug.ai_accuracy = None
+    drug.updated_at = datetime.today()
+    drug.updated_by = user.id
+
+    db.session.flush()
+
+    copy_substance_default_attributes(drug.id, drug.sctid, user)
+
+
+def copy_substance_default_attributes(id_drug, sctid, user: User):
+    # TODO: enable
+    return False
+    # reference = (
+    #     db.session.query(DrugAttributesReference)
+    #     .filter(DrugAttributesReference.idDrug == sctid)
+    #     .filter(DrugAttributesReference.idSegment == DrugAdminSegment.ADULT.value)
+    #     .first()
+    # )
+
+    # if reference != None:
+    #     segments = db.session.query(Segment).all()
+
+    #     for s in segments:
+    #         add = False
+    #         da = (
+    #             db.session.query(DrugAttributes)
+    #             .filter(DrugAttributes.idDrug == id_drug)
+    #             .filter(DrugAttributes.idSegment == s.id)
+    #             .first()
+    #         )
+    #         if da == None:
+    #             add = True
+    #             da = DrugAttributes()
+
+    #             # pk
+    #             da.idDrug = id_drug
+    #             da.idSegment = s.id
+
+    #         # attributes
+    #         da.antimicro = reference.antimicro
+    #         da.mav = reference.mav
+    #         da.controlled = reference.controlled
+    #         da.tube = reference.tube
+    #         da.chemo = reference.chemo
+    #         da.elderly = reference.elderly
+    #         da.whiteList = reference.whiteList
+
+    #         da.kidney = reference.kidney
+    #         da.liver = reference.liver
+    #         da.platelets = reference.platelets
+
+    #         # controls
+    #         da.update = datetime.today()
+    #         da.user = user.id
+
+    #         if add:
+    #             db.session.add(da)
+    #         else:
+    #             db.session.flush()

@@ -27,6 +27,8 @@ def get_drug_list():
         has_price_unit=request_data.get("hasPriceUnit", None),
         has_inconsistency=request_data.get("hasInconsistency", None),
         has_missing_conversion=request_data.get("hasMissingConversion", None),
+        has_ai_substance=request_data.get("hasAISubstance", None),
+        ai_accuracy_range=request_data.get("aiAccuracyRange", None),
         attribute_list=request_data.get("attributeList", []),
         term=request_data.get("term", None),
         substance=request_data.get("substance", None),
@@ -50,6 +52,7 @@ def get_drug_list():
                 "sctid": i[7],
                 "substance": i[10],
                 "segmentOutlier": i[11],
+                "substanceAccuracy": i[12],
             }
         )
 
@@ -87,29 +90,6 @@ def update_price_factor():
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
     return tryCommit(db, {"idSegment": id_segment, "idDrug": id_drug, "factor": factor})
-
-
-@app_admin_drug.route("/admin/drug/substance", methods=["POST"])
-@jwt_required()
-def update_substance():
-    data = request.get_json()
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
-    os.environ["TZ"] = "America/Sao_Paulo"
-
-    id_drug = data.get("idDrug", None)
-    sctid = data.get("sctid", None)
-
-    try:
-        drug_service.update_substance(
-            id_drug=id_drug,
-            sctid=sctid,
-            user=user,
-        )
-    except ValidationError as e:
-        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
-
-    return tryCommit(db, {"idDrug": id_drug, "sctid": str(sctid)})
 
 
 @app_admin_drug.route("/admin/drug/add-default-units", methods=["POST"])
@@ -168,3 +148,38 @@ def copy_attributes():
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
     return tryCommit(db, result.rowcount)
+
+
+@app_admin_drug.route("/admin/drug/predict-substance", methods=["POST"])
+@jwt_required()
+def predict_substance():
+    data = request.get_json()
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+    os.environ["TZ"] = "America/Sao_Paulo"
+
+    try:
+        result = drug_service.predict_substance(data.get("idDrugs", []), user)
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+
+    return tryCommit(db, result)
+
+
+@app_admin_drug.route("/admin/drug/get-missing-substance", methods=["GET"])
+@jwt_required()
+def get_drugs_missing_substance():
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+    os.environ["TZ"] = "America/Sao_Paulo"
+
+    try:
+        result = drug_service.get_drugs_missing_substance()
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+
+    return {
+        "status": "success",
+        "count": len(result),
+        "data": result,
+    }, status.HTTP_200_OK

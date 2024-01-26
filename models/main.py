@@ -170,6 +170,11 @@ class Drug(db.Model):
     idHospital = db.Column("fkhospital", db.Integer, nullable=False)
     name = db.Column("nome", db.String, nullable=False)
     sctid = db.Column("sctid", db.Integer, nullable=True)
+    ai_accuracy = db.Column("ia_acuracia", db.Float, nullable=True)
+    created_by = db.Column("created_by", db.Integer, nullable=True)
+    updated_by = db.Column("updated_by", db.Integer, nullable=True)
+    created_at = db.Column("created_at", db.DateTime, nullable=False)
+    updated_at = db.Column("updated_at", db.DateTime, nullable=True)
 
     def getBySegment(idSegment, qDrug=None, idDrug=None):
         segDrubs = (
@@ -197,9 +202,7 @@ class Drug(db.Model):
         return drugs.order_by(asc(Drug.name)).all()
 
 
-class DrugAttributes(db.Model):
-    __tablename__ = "medatributos"
-
+class DrugAttributesBase:
     idDrug = db.Column("fkmedicamento", db.Integer, primary_key=True)
     idSegment = db.Column("idsegmento", db.Integer, primary_key=True)
     antimicro = db.Column("antimicro", db.Boolean, nullable=True)
@@ -224,6 +227,15 @@ class DrugAttributes(db.Model):
     maxTime = db.Column("tempotratamento", db.Integer, nullable=True)
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.Integer, nullable=True)
+
+
+class DrugAttributes(db.Model, DrugAttributesBase):
+    __tablename__ = "medatributos"
+
+
+class DrugAttributesReference(db.Model, DrugAttributesBase):
+    __tablename__ = "medatributos"
+    __table_args__ = {"schema": "hsc_test"}
 
 
 class Allergy(db.Model):
