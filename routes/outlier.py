@@ -223,6 +223,7 @@ def setManualOutlier(idOutlier):
     return tryCommit(db, idOutlier)
 
 
+# deprecated
 @app_out.route("/drugs/<int:idDrug>", methods=["PUT"])
 @jwt_required()
 def setDrugClass(idDrug):

@@ -7,6 +7,7 @@ from models.appendix import *
 from models.segment import *
 from models.enums import RoleEnum, DrugAdminSegment
 from services.admin import ai_service
+from services import drug_service as main_drug_service
 
 from exception.validation_error import ValidationError
 
@@ -243,82 +244,6 @@ def update_price_factor(id_drug, id_segment, factor, user):
         conversion.factor = factor
 
         db.session.flush()
-
-
-def update_substance(id_drug, sctid, user):
-    roles = user.config["roles"] if user.config and "roles" in user.config else []
-    if RoleEnum.ADMIN.value not in roles and RoleEnum.TRAINING.value not in roles:
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-
-    drug = Drug.query.get(id_drug)
-
-    if drug == None:
-        raise ValidationError(
-            "Registro inexistente", "errors.invalidRecord", status.HTTP_400_BAD_REQUEST
-        )
-
-    drug.sctid = sctid
-    drug.ai_accuracy = None
-    drug.updated_at = datetime.today()
-    drug.updated_by = user.id
-
-    db.session.flush()
-
-    _copy_substance_default_attributes(drug.id, drug.sctid, user)
-
-
-def _copy_substance_default_attributes(id_drug, sctid, user: User):
-    reference = (
-        db.session.query(DrugAttributesReference)
-        .filter(DrugAttributesReference.idDrug == sctid)
-        .filter(DrugAttributesReference.idSegment == DrugAdminSegment.ADULT.value)
-        .first()
-    )
-
-    if reference != None:
-        segments = db.session.query(Segment).all()
-
-        for s in segments:
-            add = False
-            da = (
-                db.session.query(DrugAttributes)
-                .filter(DrugAttributes.idDrug == id_drug)
-                .filter(DrugAttributes.idSegment == s.id)
-                .first()
-            )
-            if da == None:
-                add = True
-                da = DrugAttributes()
-
-                # pk
-                da.idDrug = id_drug
-                da.idSegment = s.id
-
-            # attributes
-            da.antimicro = reference.antimicro
-            da.mav = reference.mav
-            da.controlled = reference.controlled
-            da.tube = reference.tube
-            da.chemo = reference.chemo
-            da.elderly = reference.elderly
-            da.whiteList = reference.whiteList
-
-            da.kidney = reference.kidney
-            da.liver = reference.liver
-            da.platelets = reference.platelets
-
-            # controls
-            da.update = datetime.today()
-            da.user = user.id
-
-            if add:
-                db.session.add(da)
-            else:
-                db.session.flush()
 
 
 def add_default_units(user):
@@ -666,7 +591,9 @@ def predict_substance(id_drugs: List[int], user: User):
             synchronize_session="fetch",
         )
 
-        _copy_substance_default_attributes(i["idDrug"], i["sctid"], user)
+        main_drug_service.copy_substance_default_attributes(
+            i["idDrug"], i["sctid"], user
+        )
 
     return ia_results
 
