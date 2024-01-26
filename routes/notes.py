@@ -109,7 +109,7 @@ def get_notes_by_date(admissionNumber, dateList, has_primary_care):
 
 def convert_notes(notes, has_primary_care):
     return {
-        "id": notes.id,
+        "id": str(notes.id),
         "admissionNumber": notes.admissionNumber,
         "text": notes.text,
         "form": notes.form if has_primary_care else None,
