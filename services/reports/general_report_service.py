@@ -382,7 +382,8 @@ def _get_audit_list(user):
             s.nome,
             seg.nome,
             pa.total_itens,
-            pa.agregada
+            pa.agregada,
+            pa.dtprescricao
         from
             {user.schema}.prescricao_audit pa 
             inner join {user.schema}.prescricao p on (pa.fkprescricao = p.fkprescricao) 
@@ -413,6 +414,7 @@ def _get_audit_list(user):
                 "segment": i[6],
                 "itens": i[7],
                 "agg": i[8],
+                "prescriptionDate": i[9].isoformat(),
             }
         )
 
