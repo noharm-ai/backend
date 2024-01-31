@@ -320,11 +320,6 @@ def get_outliers_process_list(id_segment, user):
 
     processesUrl = []
 
-    if integration_service.can_refresh_agg(user.schema):
-        processesUrl.append(
-            {"url": "/admin/integration/refresh-agg", "method": "POST", "params": {}}
-        )
-
     for fold in range(1, folds + 1):
         processesUrl.append(
             {

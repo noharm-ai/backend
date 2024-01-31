@@ -283,52 +283,50 @@ def update_substance(id_drug, sctid, user):
 
 
 def copy_substance_default_attributes(id_drug, sctid, user: User):
-    # TODO: enable
-    return False
-    # reference = (
-    #     db.session.query(DrugAttributesReference)
-    #     .filter(DrugAttributesReference.idDrug == sctid)
-    #     .filter(DrugAttributesReference.idSegment == DrugAdminSegment.ADULT.value)
-    #     .first()
-    # )
+    reference = (
+        db.session.query(DrugAttributesReference)
+        .filter(DrugAttributesReference.idDrug == sctid)
+        .filter(DrugAttributesReference.idSegment == DrugAdminSegment.ADULT.value)
+        .first()
+    )
 
-    # if reference != None:
-    #     segments = db.session.query(Segment).all()
+    if reference != None:
+        segments = db.session.query(Segment).all()
 
-    #     for s in segments:
-    #         add = False
-    #         da = (
-    #             db.session.query(DrugAttributes)
-    #             .filter(DrugAttributes.idDrug == id_drug)
-    #             .filter(DrugAttributes.idSegment == s.id)
-    #             .first()
-    #         )
-    #         if da == None:
-    #             add = True
-    #             da = DrugAttributes()
+        for s in segments:
+            add = False
+            da = (
+                db.session.query(DrugAttributes)
+                .filter(DrugAttributes.idDrug == id_drug)
+                .filter(DrugAttributes.idSegment == s.id)
+                .first()
+            )
+            if da == None:
+                add = True
+                da = DrugAttributes()
 
-    #             # pk
-    #             da.idDrug = id_drug
-    #             da.idSegment = s.id
+                # pk
+                da.idDrug = id_drug
+                da.idSegment = s.id
 
-    #         # attributes
-    #         da.antimicro = reference.antimicro
-    #         da.mav = reference.mav
-    #         da.controlled = reference.controlled
-    #         da.tube = reference.tube
-    #         da.chemo = reference.chemo
-    #         da.elderly = reference.elderly
-    #         da.whiteList = reference.whiteList
+            # attributes
+            da.antimicro = reference.antimicro
+            da.mav = reference.mav
+            da.controlled = reference.controlled
+            da.tube = reference.tube
+            da.chemo = reference.chemo
+            da.elderly = reference.elderly
+            da.whiteList = reference.whiteList
 
-    #         da.kidney = reference.kidney
-    #         da.liver = reference.liver
-    #         da.platelets = reference.platelets
+            da.kidney = reference.kidney
+            da.liver = reference.liver
+            da.platelets = reference.platelets
 
-    #         # controls
-    #         da.update = datetime.today()
-    #         da.user = user.id
+            # controls
+            da.update = datetime.today()
+            da.user = user.id
 
-    #         if add:
-    #             db.session.add(da)
-    #         else:
-    #             db.session.flush()
+            if add:
+                db.session.add(da)
+            else:
+                db.session.flush()
