@@ -199,10 +199,28 @@ def setPatientData(admissionNumber):
 
     p = Patient.findByAdmission(admissionNumber)
     if p is None:
-        return {
-            "status": "error",
-            "message": "Paciente Inexistente!",
-        }, status.HTTP_400_BAD_REQUEST
+        first_prescription = (
+            db.session.query(Prescription)
+            .filter(Prescription.admissionNumber == admissionNumber)
+            .filter(Prescription.agg == None)
+            .filter(Prescription.concilia == None)
+            .filter(Prescription.idSegment != None)
+            .order_by(asc(Prescription.date))
+            .first()
+        )
+
+        if first_prescription == None:
+            return {
+                "status": "error",
+                "message": "Paciente Inexistente!",
+            }, status.HTTP_400_BAD_REQUEST
+
+        p = Patient()
+        p.admissionNumber = admissionNumber
+        p.admissionDate = first_prescription.date
+        p.idHospital = first_prescription.idHospital
+        p.idPatient = first_prescription.idPatient
+        db.session.add(p)
 
     updateWeight = False
 
