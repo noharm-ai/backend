@@ -70,7 +70,7 @@ class Exams(db.Model):
         return (
             db.session.query(Exams)
             .filter(Exams.idPatient == idPatient)
-            .filter(Exams.date >= (func.now() - func.cast("90 DAYS", INTERVAL)))
+            .filter(Exams.date >= (date.today() - timedelta(days=90)))
             .order_by(asc(Exams.typeExam), desc(Exams.date))
             .all()
         )
@@ -81,7 +81,7 @@ class Exams(db.Model):
             .select_from(Exams)
             .distinct(Exams.typeExam)
             .filter(Exams.idPatient == patient.idPatient)
-            .filter(Exams.date >= (func.now() - func.cast("90 DAYS", INTERVAL)))
+            .filter(Exams.date >= (date.today() - timedelta(days=90)))
             .order_by(Exams.typeExam, Exams.date.desc())
             .subquery()
         )
@@ -91,7 +91,7 @@ class Exams(db.Model):
         results = (
             Exams.query.distinct(Exams.typeExam)
             .filter(Exams.idPatient == patient.idPatient)
-            .filter(Exams.date >= (func.now() - func.cast("15 DAYS", INTERVAL)))
+            .filter(Exams.date >= (date.today() - timedelta(days=15)))
             .order_by(Exams.typeExam, Exams.date.desc())
         )
 
@@ -99,7 +99,7 @@ class Exams(db.Model):
             Exams.query.distinct(Exams.typeExam)
             .join(el, and_(Exams.typeExam == el.c.typeExam, Exams.date < el.c.date))
             .filter(Exams.idPatient == patient.idPatient)
-            .filter(Exams.date >= (func.now() - func.cast("90 DAYS", INTERVAL)))
+            .filter(Exams.date >= (date.today() - timedelta(days=90)))
             .order_by(Exams.typeExam, Exams.date.desc())
         )
 
