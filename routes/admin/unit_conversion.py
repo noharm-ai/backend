@@ -19,7 +19,9 @@ def get_unit_conversion_list():
     os.environ["TZ"] = "America/Sao_Paulo"
     request_data = request.get_json()
 
-    list = unit_conversion_service.get_conversion_list()
+    list = unit_conversion_service.get_conversion_list(
+        id_segment=request_data.get("idSegment")
+    )
 
     result = []
     for i in list:
@@ -29,7 +31,7 @@ def get_unit_conversion_list():
                 "name": i[2],
                 "idMeasureUnit": i[3],
                 "factor": i[4],
-                "idSegment": 1,
+                "idSegment": request_data.get("idSegment"),
                 "measureUnit": i[5],
             }
         )
@@ -54,8 +56,9 @@ def get_outliers_process_list():
     os.environ["TZ"] = "America/Sao_Paulo"
 
     try:
-        unit_conversion_service.save_conversions(
+        result = unit_conversion_service.save_conversions(
             id_drug=data.get("idDrug", None),
+            id_segment=data.get("idSegment", None),
             id_measure_unit_default=data.get("idMeasureUnitDefault", None),
             conversion_list=data.get("conversionList", []),
             user=user,
@@ -63,4 +66,4 @@ def get_outliers_process_list():
     except ValidationError as e:
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
-    return tryCommit(db, True)
+    return tryCommit(db, result)

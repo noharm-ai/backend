@@ -8,7 +8,7 @@ from services import permission_service
 from exception.validation_error import ValidationError
 
 
-def get_conversion_list():
+def get_conversion_list(id_segment):
     active_drugs = db.session.query(distinct(Outlier.idDrug).label("idDrug")).cte(
         "active_drugs"
     )
@@ -50,7 +50,7 @@ def get_conversion_list():
             MeasureUnitConvert,
             and_(
                 MeasureUnitConvert.idDrug == Drug.id,
-                MeasureUnitConvert.idSegment == 1,
+                MeasureUnitConvert.idSegment == id_segment,
                 MeasureUnitConvert.idMeasureUnit == units.c.idMeasureUnit,
             ),
         )
@@ -62,7 +62,9 @@ def get_conversion_list():
     return q
 
 
-def save_conversions(id_drug, id_measure_unit_default, conversion_list, user):
+def save_conversions(
+    id_drug, id_segment, id_measure_unit_default, conversion_list, user
+):
     if not permission_service.has_maintainer_permission(user):
         raise ValidationError(
             "Usuário não autorizado",
@@ -72,6 +74,7 @@ def save_conversions(id_drug, id_measure_unit_default, conversion_list, user):
 
     if (
         id_drug == None
+        or id_segment == None
         or id_measure_unit_default == None
         or conversion_list == None
         or len(conversion_list) == 0
@@ -90,9 +93,48 @@ def save_conversions(id_drug, id_measure_unit_default, conversion_list, user):
                 status.HTTP_400_BAD_REQUEST,
             )
 
+    da = (
+        db.session.query(DrugAttributes)
+        .filter(DrugAttributes.idDrug == id_drug)
+        .filter(DrugAttributes.idSegment == id_segment)
+        .first()
+    )
+    if da == None:
+        da = DrugAttributes()
+        db.session.add(da)
+
+        # pk
+        da.idDrug = id_drug
+        da.idSegment = id_segment
+    else:
+        if da.idMeasureUnit != id_measure_unit_default:
+            raise ValidationError(
+                "A alteração de Unidade Padrão deve ser executada através do Assistente para Geração de Escores.",
+                "errors.businessRule",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+    da.idMeasureUnit = id_measure_unit_default
+    da.update = datetime.today()
+    da.user = user.id
+
+    db.session.flush()
+
+    # set conversions
+    _update_conversion_list(
+        conversion_list=conversion_list, id_drug=id_drug, id_segment=id_segment
+    )
+
+    # update other segments
+    rejected_segments = []
+    updated_segments = []
     segments = db.session.query(Segment).all()
 
     for s in segments:
+        if s.id == id_segment:
+            updated_segments.append(s.description)
+            continue
+
         # set drug attributes
         da = (
             db.session.query(DrugAttributes)
@@ -100,6 +142,17 @@ def save_conversions(id_drug, id_measure_unit_default, conversion_list, user):
             .filter(DrugAttributes.idSegment == s.id)
             .first()
         )
+        if (
+            da != None
+            and da.idMeasureUnit != None
+            and da.idMeasureUnit != id_measure_unit_default
+        ):
+            # do not update
+            rejected_segments.append(s.description)
+            continue
+        else:
+            updated_segments.append(s.description)
+
         if da == None:
             da = DrugAttributes()
             db.session.add(da)
@@ -114,23 +167,31 @@ def save_conversions(id_drug, id_measure_unit_default, conversion_list, user):
 
         db.session.flush()
 
-        # set conversions
-        for uc in conversion_list:
-            conversion = (
-                db.session.query(MeasureUnitConvert)
-                .filter(MeasureUnitConvert.idDrug == id_drug)
-                .filter(MeasureUnitConvert.idSegment == s.id)
-                .filter(MeasureUnitConvert.idMeasureUnit == uc["idMeasureUnit"])
-                .first()
-            )
-            if conversion == None:
-                conversion = MeasureUnitConvert()
-                conversion.idDrug = id_drug
-                conversion.idSegment = s.id
-                conversion.idMeasureUnit = uc["idMeasureUnit"]
+        # update conversions
+        _update_conversion_list(
+            conversion_list=conversion_list, id_drug=id_drug, id_segment=s.id
+        )
 
-                db.session.add(conversion)
+    return {"updated": updated_segments, "rejected": rejected_segments}
 
-            conversion.factor = uc["factor"]
 
-            db.session.flush()
+def _update_conversion_list(conversion_list, id_drug, id_segment):
+    for uc in conversion_list:
+        conversion = (
+            db.session.query(MeasureUnitConvert)
+            .filter(MeasureUnitConvert.idDrug == id_drug)
+            .filter(MeasureUnitConvert.idSegment == id_segment)
+            .filter(MeasureUnitConvert.idMeasureUnit == uc["idMeasureUnit"])
+            .first()
+        )
+        if conversion == None:
+            conversion = MeasureUnitConvert()
+            conversion.idDrug = id_drug
+            conversion.idSegment = id_segment
+            conversion.idMeasureUnit = uc["idMeasureUnit"]
+
+            db.session.add(conversion)
+
+        conversion.factor = uc["factor"]
+
+        db.session.flush()
