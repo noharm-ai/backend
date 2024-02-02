@@ -1,4 +1,3 @@
-from sqlalchemy import func
 from datetime import datetime
 
 from models.main import *

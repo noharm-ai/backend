@@ -30,6 +30,7 @@ from routes.admin.drug import app_admin_drug
 from routes.admin.integration import app_admin_integration
 from routes.admin.segment import app_admin_segment
 from routes.admin.exam import app_admin_exam
+from routes.admin.unit_conversion import app_admin_unit_conversion
 from routes.reports.general import app_rpt_general
 from routes.reports.config_rpt import app_rpt_config
 import os
@@ -90,6 +91,7 @@ app.register_blueprint(app_admin_drug)
 app.register_blueprint(app_admin_integration)
 app.register_blueprint(app_admin_segment)
 app.register_blueprint(app_admin_exam)
+app.register_blueprint(app_admin_unit_conversion)
 
 app.register_blueprint(app_rpt_general)
 app.register_blueprint(app_rpt_config)
