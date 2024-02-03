@@ -67,3 +67,42 @@ def get_outliers_process_list():
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
     return tryCommit(db, result)
+
+
+@app_admin_unit_conversion.route(
+    "/admin/unit-conversion/add-default-units", methods=["POST"]
+)
+@jwt_required()
+def add_default_units():
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+    os.environ["TZ"] = "America/Sao_Paulo"
+
+    try:
+        result = unit_conversion_service.add_default_units(user=user)
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+
+    return tryCommit(db, result.rowcount)
+
+
+@app_admin_unit_conversion.route(
+    "/admin/unit-conversion/copy-unit-conversion", methods=["POST"]
+)
+@jwt_required()
+def copy_unit_conversion():
+    data = request.get_json()
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+    os.environ["TZ"] = "America/Sao_Paulo"
+
+    try:
+        result = unit_conversion_service.copy_unit_conversion(
+            user=user,
+            id_segment_origin=data.get("idSegmentOrigin", None),
+            id_segment_destiny=data.get("idSegmentDestiny", None),
+        )
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+
+    return tryCommit(db, result.rowcount)

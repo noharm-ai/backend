@@ -92,41 +92,6 @@ def update_price_factor():
     return tryCommit(db, {"idSegment": id_segment, "idDrug": id_drug, "factor": factor})
 
 
-@app_admin_drug.route("/admin/drug/add-default-units", methods=["POST"])
-@jwt_required()
-def add_default_units():
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
-    os.environ["TZ"] = "America/Sao_Paulo"
-
-    try:
-        result = drug_service.add_default_units(user=user)
-    except ValidationError as e:
-        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
-
-    return tryCommit(db, result.rowcount)
-
-
-@app_admin_drug.route("/admin/drug/copy-unit-conversion", methods=["POST"])
-@jwt_required()
-def copy_unit_conversion():
-    data = request.get_json()
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
-    os.environ["TZ"] = "America/Sao_Paulo"
-
-    try:
-        result = drug_service.copy_unit_conversion(
-            user=user,
-            id_segment_origin=data.get("idSegmentOrigin", None),
-            id_segment_destiny=data.get("idSegmentDestiny", None),
-        )
-    except ValidationError as e:
-        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
-
-    return tryCommit(db, result.rowcount)
-
-
 @app_admin_drug.route("/admin/drug/copy-attributes", methods=["POST"])
 @jwt_required()
 def copy_attributes():
