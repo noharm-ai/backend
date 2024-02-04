@@ -282,7 +282,7 @@ def update_substance(id_drug, sctid, user):
     copy_substance_default_attributes(drug.id, drug.sctid, user)
 
 
-def copy_substance_default_attributes(id_drug, sctid, user: User):
+def copy_substance_default_attributes(id_drug, sctid, user: User, overwrite=True):
     reference = (
         db.session.query(DrugAttributesReference)
         .filter(DrugAttributesReference.idDrug == sctid)
@@ -308,6 +308,8 @@ def copy_substance_default_attributes(id_drug, sctid, user: User):
                 # pk
                 da.idDrug = id_drug
                 da.idSegment = s.id
+            elif not overwrite:
+                continue
 
             # attributes
             da.antimicro = reference.antimicro
