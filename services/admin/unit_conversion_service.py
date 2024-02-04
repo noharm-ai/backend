@@ -213,42 +213,33 @@ def add_default_units(user):
     query = f"""
         with unidades as (
             select
-                fkmedicamento,
-                idsegmento,
-                min(fkunidademedida) as fkunidademedida
-            from (
+                fkmedicamento, min(fkunidademedida) as fkunidademedida
+            from ( 
                 select 
-                    pagg.fkmedicamento,
-                    pagg.idsegmento,
-                    pagg.fkunidademedida
-                from
-                    {schema}.prescricaoagg pagg
-                    inner join {schema}.unidademedida u on (pagg.fkunidademedida = u.fkunidademedida)
-                where
-                    pagg.fkmedicamento in (
+                    fkmedicamento, fkunidademedida  
+                from {schema}.prescricaoagg p 
+                where 
+                    p.fkunidademedida is not null 
+                    and p.fkunidademedida <> ''
+                    and p.fkmedicamento in (
                         select fkmedicamento from {schema}.medatributos m where m.fkunidademedida is null
                     )
-                group by
-                    pagg.fkmedicamento,
-                    pagg.idsegmento,
-                    pagg.fkunidademedida 
+                group by fkmedicamento, fkunidademedida
             ) a
-            where 
-                fkunidademedida is not null
-            group by
-                fkmedicamento,
-                idsegmento
+            group by fkmedicamento 
             having count(*) = 1
+        ), unidades_segmento as (
+            select fkmedicamento, fkunidademedida, s.idsegmento  from unidades, {schema}.segmento s
         )
         update 
             {schema}.medatributos ma
         set 
-            fkunidademedida = unidades.fkunidademedida
+            fkunidademedida = unidades_segmento.fkunidademedida
         from 
-            unidades
+            unidades_segmento
         where 
-            ma.fkmedicamento = unidades.fkmedicamento
-            and ma.idsegmento = unidades.idsegmento
+            ma.fkmedicamento = unidades_segmento.fkmedicamento
+            and ma.idsegmento = unidades_segmento.idsegmento
             and ma.fkunidademedida is null
     """
 
