@@ -97,7 +97,7 @@ def drug_config_to_generate_score(
 
     if division != None and division == 1:
         raise ValidationError(
-            "Divisor de faixas deve ser maior que 1",
+            "Divisor de faixas deve ser diferente de 1",
             "errors.invalidParams",
             status.HTTP_400_BAD_REQUEST,
         )

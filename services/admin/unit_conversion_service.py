@@ -24,6 +24,16 @@ def get_conversion_list(id_segment):
         .group_by(PrescriptionAgg.idDrug, PrescriptionAgg.idMeasureUnit)
     )
 
+    current_units = (
+        db.session.query(
+            MeasureUnitConvert.idDrug.label("idDrug"),
+            MeasureUnitConvert.idMeasureUnit.label("idMeasureUnit"),
+        )
+        .filter(MeasureUnitConvert.idMeasureUnit != None)
+        .filter(MeasureUnitConvert.idMeasureUnit != "")
+        .group_by(MeasureUnitConvert.idDrug, MeasureUnitConvert.idMeasureUnit)
+    )
+
     price_units = (
         db.session.query(
             DrugAttributes.idDrug.label("idDrug"),
@@ -34,7 +44,7 @@ def get_conversion_list(id_segment):
         .group_by(DrugAttributes.idDrug, DrugAttributes.idMeasureUnitPrice)
     )
 
-    units = prescribed_units.union(price_units).cte("units")
+    units = prescribed_units.union(price_units, current_units).cte("units")
 
     q = (
         db.session.query(
