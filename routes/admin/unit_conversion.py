@@ -49,7 +49,7 @@ def get_unit_conversion_list():
 
 @app_admin_unit_conversion.route("/admin/unit-conversion/save", methods=["POST"])
 @jwt_required()
-def get_outliers_process_list():
+def save_conversions():
     data = request.get_json()
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)

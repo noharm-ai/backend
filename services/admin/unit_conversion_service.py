@@ -4,8 +4,7 @@ from sqlalchemy import func, and_
 from models.main import *
 from models.appendix import *
 from models.segment import *
-from models.enums import RoleEnum
-from services import permission_service
+from services import permission_service, drug_service as main_drug_service
 from services.admin import drug_service as admin_drug_service
 from exception.validation_error import ValidationError
 
@@ -102,12 +101,9 @@ def save_conversions(
         .first()
     )
     if da == None:
-        da = DrugAttributes()
-        db.session.add(da)
-
-        # pk
-        da.idDrug = id_drug
-        da.idSegment = id_segment
+        da = main_drug_service.create_attributes_from_reference(
+            id_drug=id_drug, id_segment=id_segment, user=user
+        )
     else:
         if da.idMeasureUnit != id_measure_unit_default:
             raise ValidationError(
@@ -156,12 +152,9 @@ def save_conversions(
             updated_segments.append(s.description)
 
         if da == None:
-            da = DrugAttributes()
-            db.session.add(da)
-
-            # pk
-            da.idDrug = id_drug
-            da.idSegment = s.id
+            da = main_drug_service.create_attributes_from_reference(
+                id_drug=id_drug, id_segment=s.id, user=user
+            )
 
         da.idMeasureUnit = id_measure_unit_default
         da.update = datetime.today()

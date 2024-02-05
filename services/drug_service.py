@@ -108,12 +108,10 @@ def drug_config_to_generate_score(
 
     drugAttr = DrugAttributes.query.get((id_drug, id_segment))
 
-    newDrugAttr = False
     if drugAttr is None:
-        newDrugAttr = True
-        drugAttr = DrugAttributes()
-        drugAttr.idDrug = id_drug
-        drugAttr.idSegment = id_segment
+        drugAttr = create_attributes_from_reference(
+            id_drug=id_drug, id_segment=id_segment, user=user
+        )
 
     drugAttr.idMeasureUnit = id_measure_unit
     drugAttr.division = division if division != 0 else None
@@ -121,8 +119,7 @@ def drug_config_to_generate_score(
     drugAttr.update = datetime.today()
     drugAttr.user = user.id
 
-    if newDrugAttr:
-        db.session.add(drugAttr)
+    db.session.flush()
 
 
 def _setDrugUnit(idDrug, idMeasureUnit, idSegment, factor):
@@ -332,3 +329,56 @@ def copy_substance_default_attributes(id_drug, sctid, user: User, overwrite=True
                 db.session.add(da)
             else:
                 db.session.flush()
+
+
+def create_attributes_from_reference(id_drug, id_segment, user):
+    da = (
+        db.session.query(DrugAttributes)
+        .filter(DrugAttributes.idDrug == id_drug)
+        .filter(DrugAttributes.idSegment == id_segment)
+        .first()
+    )
+    drug = db.session.query(Drug).filter(Drug.id == id_drug).first()
+    if drug == None:
+        raise ValidationError(
+            "Registro inexistente", "errors.invalidRecord", status.HTTP_400_BAD_REQUEST
+        )
+
+    reference = (
+        db.session.query(DrugAttributesReference)
+        .filter(DrugAttributesReference.idDrug == drug.sctid)
+        .filter(DrugAttributesReference.idSegment == DrugAdminSegment.ADULT.value)
+        .first()
+    )
+
+    if da == None:
+        da = DrugAttributes()
+
+        # pk
+        da.idDrug = id_drug
+        da.idSegment = id_segment
+
+        if reference != None:
+            # attributes
+            da.antimicro = reference.antimicro
+            da.mav = reference.mav
+            da.controlled = reference.controlled
+            da.tube = reference.tube
+            da.chemo = reference.chemo
+            da.elderly = reference.elderly
+            da.whiteList = reference.whiteList
+
+            da.kidney = reference.kidney
+            da.liver = reference.liver
+            da.platelets = reference.platelets
+
+        # controls
+        da.update = datetime.today()
+        da.user = user.id
+
+        db.session.add(da)
+        db.session.flush()
+
+        return da
+
+    return None
