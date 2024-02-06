@@ -1,5 +1,5 @@
 import os
-from flask import Blueprint
+from flask import Blueprint, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from models.main import *
@@ -72,6 +72,26 @@ def get_status():
     os.environ["TZ"] = "America/Sao_Paulo"
     try:
         result = integration_status_service.get_status(
+            user=user,
+        )
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+
+    return tryCommit(db, result)
+
+
+@app_admin_integration.route("/admin/integration/update", methods=["POST"])
+@jwt_required()
+def update_config():
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+    os.environ["TZ"] = "America/Sao_Paulo"
+    request_data = request.get_json()
+
+    try:
+        result = integration_service.update_integration_config(
+            schema=request_data.get("schema", None),
+            status=request_data.get("status", None),
             user=user,
         )
     except ValidationError as e:

@@ -4,6 +4,7 @@ from models.main import *
 from models.appendix import *
 from models.segment import *
 from models.enums import RoleEnum
+from services import permission_service
 
 from exception.validation_error import ValidationError
 
@@ -127,3 +128,29 @@ def init_intervention_reason(user):
 
     db.session.execute(insert)
     return db.session.execute(reset_seq)
+
+
+def update_integration_config(schema, status, user):
+    if not permission_service.is_admin(user):
+        raise ValidationError(
+            "Usuário não autorizado",
+            "errors.unauthorizedUser",
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
+    config = (
+        db.session.query(SchemaConfig).filter(SchemaConfig.schemaName == schema).first()
+    )
+
+    if config == None:
+        raise ValidationError(
+            "Schema inválido",
+            "errors.unauthorizedUser",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    config.status = status
+    config.updatedAt = datetime.today()
+    config.updatedBy = user.id
+
+    db.session.flush()

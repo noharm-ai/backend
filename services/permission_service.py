@@ -1,6 +1,10 @@
-from typing import List
-
 from models.enums import RoleEnum
+
+
+def is_admin(user):
+    user_roles = set(_get_roles(user))
+
+    return RoleEnum.ADMIN.value in user_roles
 
 
 def has_maintainer_permission(user):
