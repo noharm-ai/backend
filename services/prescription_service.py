@@ -180,6 +180,20 @@ def get_query_prescriptions_by_agg(
 
     if not is_cpoe:
         q = q.filter(Prescription.idSegment == agg_prescription.idSegment)
+    else:
+        # discard all suspended
+        active_count = (
+            db.session.query(func.count().label("count"))
+            .filter(PrescriptionDrug.idPrescription == Prescription.id)
+            .filter(
+                or_(
+                    PrescriptionDrug.suspendedDate == None,
+                    func.date(PrescriptionDrug.suspendedDate) >= agg_prescription.date,
+                )
+            )
+            .as_scalar()
+        )
+        q = q.filter(active_count > 0)
 
     return q
 

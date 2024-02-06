@@ -246,140 +246,6 @@ def update_price_factor(id_drug, id_segment, factor, user):
         db.session.flush()
 
 
-def add_default_units(user):
-    roles = user.config["roles"] if user.config and "roles" in user.config else []
-    if RoleEnum.ADMIN.value not in roles and RoleEnum.TRAINING.value not in roles:
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-    schema = user.schema
-
-    fix_inconsistency(user)
-
-    query = f"""
-        with unidades as (
-            select
-                fkmedicamento,
-                idsegmento,
-                min(fkunidademedida) as fkunidademedida
-            from (
-                select 
-                    pagg.fkmedicamento,
-                    pagg.idsegmento,
-                    pagg.fkunidademedida
-                from
-                    {schema}.prescricaoagg pagg
-                    inner join {schema}.unidademedida u on (pagg.fkunidademedida = u.fkunidademedida)
-                where
-                    pagg.fkmedicamento in (
-                        select fkmedicamento from {schema}.medatributos m where m.fkunidademedida is null
-                    )
-                group by
-                    pagg.fkmedicamento,
-                    pagg.idsegmento,
-                    pagg.fkunidademedida 
-            ) a
-            where 
-                fkunidademedida is not null
-            group by
-                fkmedicamento,
-                idsegmento
-            having count(*) = 1
-        )
-        update 
-            {schema}.medatributos ma
-        set 
-            fkunidademedida = unidades.fkunidademedida
-        from 
-            unidades
-        where 
-            ma.fkmedicamento = unidades.fkmedicamento
-            and ma.idsegmento = unidades.idsegmento
-            and ma.fkunidademedida is null
-    """
-
-    insert_units = f"""
-        insert into {schema}.unidadeconverte
-            (idsegmento, fkmedicamento, fkunidademedida, fator)
-        select 
-            m.idsegmento, m.fkmedicamento, m.fkunidademedida, 1
-        from 
-            {schema}.medatributos m 
-        where 
-            m.fkunidademedida is not null 
-            and m.fkunidademedida != ''
-        on conflict (idsegmento, fkmedicamento, fkunidademedida)
-        do nothing
-    """
-
-    result = db.session.execute(query)
-
-    db.session.execute(insert_units)
-
-    return result
-
-
-def copy_unit_conversion(id_segment_origin, id_segment_destiny, user):
-    roles = user.config["roles"] if user.config and "roles" in user.config else []
-    if RoleEnum.ADMIN.value not in roles and RoleEnum.TRAINING.value not in roles:
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-    schema = user.schema
-
-    if id_segment_origin == None or id_segment_destiny == None:
-        raise ValidationError(
-            "Segmento Inválido", "errors.invalidRecord", status.HTTP_400_BAD_REQUEST
-        )
-
-    if id_segment_origin == id_segment_destiny:
-        raise ValidationError(
-            "Segmento origem deve ser diferente do segmento destino",
-            "errors.invalidRecord",
-            status.HTTP_400_BAD_REQUEST,
-        )
-
-    query = f"""
-        with conversao_origem as (
-            select 
-                ma.fkmedicamento, ma.idsegmento, ma.fkunidademedida
-            from
-                {schema}.medatributos ma
-                inner join {schema}.medatributos madestino on (
-                    ma.fkmedicamento = madestino.fkmedicamento
-                    and madestino.idsegmento  = :idSegmentDestiny
-                    and ma.fkunidademedida = madestino.fkunidademedida 
-                )
-            where 
-                ma.idsegmento = :idSegmentOrigin
-        )
-        insert into {schema}.unidadeconverte (idsegmento, fkunidademedida, fator, fkmedicamento) (
-            select 
-                :idSegmentDestiny as idsegmento,
-                u.fkunidademedida,
-                u.fator,
-                u.fkmedicamento
-            from
-                {schema}.unidadeconverte u
-                inner join conversao_origem on (
-                    u.fkmedicamento = conversao_origem.fkmedicamento 
-                    and u.idsegmento = conversao_origem.idsegmento
-                )
-        )
-        on conflict (fkunidademedida, idsegmento, fkmedicamento)
-        do update set fator = excluded.fator
-    """
-
-    return db.session.execute(
-        query,
-        {"idSegmentOrigin": id_segment_origin, "idSegmentDestiny": id_segment_destiny},
-    )
-
-
 def fix_inconsistency(user):
     roles = user.config["roles"] if user.config and "roles" in user.config else []
     if RoleEnum.ADMIN.value not in roles and RoleEnum.TRAINING.value not in roles:
@@ -402,25 +268,28 @@ def fix_inconsistency(user):
 
     db.session.execute(query_normalize)
 
-    # include medatributos
-    query = f"""
-        with inconsistentes as (
-            select 
-                distinct o.fkmedicamento, o.idsegmento 
-            from 
-                {schema}.outlier o 
-                inner join {schema}.medicamento m on (o.fkmedicamento = m.fkmedicamento)
-                left join {schema}.medatributos ma on (o.fkmedicamento = ma.fkmedicamento and o.idsegmento = ma.idsegmento)
-            where 
-                ma.fkmedicamento is null
+    inconsistent_drugs = (
+        db.session.query(distinct(Outlier.idDrug), Drug.sctid)
+        .select_from(Outlier)
+        .join(Drug, Drug.id == Outlier.idDrug)
+        .outerjoin(
+            DrugAttributes,
+            and_(
+                Outlier.idDrug == DrugAttributes.idDrug,
+                Outlier.idSegment == DrugAttributes.idSegment,
+            ),
         )
-        insert into {schema}.medatributos (fkmedicamento, idsegmento)
-        select fkmedicamento, idsegmento from inconsistentes
-        on conflict 
-        do nothing
-    """
+        .filter(DrugAttributes.idDrug == None)
+        .filter(Drug.sctid != None)
+        .all()
+    )
 
-    return db.session.execute(query)
+    for d in inconsistent_drugs:
+        main_drug_service.copy_substance_default_attributes(
+            id_drug=d[0], sctid=d[1], user=user, overwrite=False
+        )
+
+    return len(inconsistent_drugs)
 
 
 def copy_drug_attributes(
