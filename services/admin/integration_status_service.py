@@ -33,6 +33,7 @@ def get_status(user):
         )
 
     return {
+        "status": get_integration_status(user.schema),
         "memory": _get_memory_status(),
         "segments": _get_segments(),
         "pendingFrequencies": _get_pending_frequencies(),
@@ -173,64 +174,59 @@ def _get_outlier_status():
 
 
 def _get_conversion_status():
-    pending_conversions = (
+    active_drugs = db.session.query(
+        distinct(Outlier.idDrug).label("idDrug"),
+        Outlier.idSegment.label("idSegment"),
+    ).cte("active_drugs")
+
+    prescribed_units = (
         db.session.query(
-            PrescriptionAgg.idSegment,
-            PrescriptionAgg.idDrug,
-            PrescriptionAgg.idMeasureUnit,
-        )
-        .outerjoin(
-            MeasureUnitConvert,
-            and_(
-                MeasureUnitConvert.idSegment == PrescriptionAgg.idSegment,
-                MeasureUnitConvert.idDrug == PrescriptionAgg.idDrug,
-                MeasureUnitConvert.idMeasureUnit == PrescriptionAgg.idMeasureUnit,
-            ),
+            PrescriptionAgg.idDrug.label("idDrug"),
+            PrescriptionAgg.idMeasureUnit.label("idMeasureUnit"),
         )
         .filter(PrescriptionAgg.idMeasureUnit != None)
         .filter(PrescriptionAgg.idMeasureUnit != "")
-        .filter(MeasureUnitConvert.factor == None)
-        .group_by(
-            PrescriptionAgg.idSegment,
-            PrescriptionAgg.idDrug,
-            PrescriptionAgg.idMeasureUnit,
-        )
-        .subquery()
+        .group_by(PrescriptionAgg.idDrug, PrescriptionAgg.idMeasureUnit)
     )
 
-    active_drugs = (
-        db.session.query(Outlier.idDrug)
-        .filter(Outlier.idSegment == DrugAttributes.idSegment)
-        .as_scalar()
-    )
-
-    pending_price_conversions = (
+    current_units = (
         db.session.query(
-            DrugAttributes.idSegment,
-            DrugAttributes.idDrug,
-            DrugAttributes.idMeasureUnitPrice,
+            MeasureUnitConvert.idDrug.label("idDrug"),
+            MeasureUnitConvert.idMeasureUnit.label("idMeasureUnit"),
         )
-        .outerjoin(
-            MeasureUnitConvert,
-            and_(
-                MeasureUnitConvert.idSegment == DrugAttributes.idSegment,
-                MeasureUnitConvert.idDrug == DrugAttributes.idDrug,
-                MeasureUnitConvert.idMeasureUnit == DrugAttributes.idMeasureUnitPrice,
-            ),
+        .filter(MeasureUnitConvert.idMeasureUnit != None)
+        .filter(MeasureUnitConvert.idMeasureUnit != "")
+        .group_by(MeasureUnitConvert.idDrug, MeasureUnitConvert.idMeasureUnit)
+    )
+
+    price_units = (
+        db.session.query(
+            DrugAttributes.idDrug.label("idDrug"),
+            DrugAttributes.idMeasureUnitPrice.label("idMeasureUnit"),
         )
         .filter(DrugAttributes.idMeasureUnitPrice != None)
         .filter(DrugAttributes.idMeasureUnitPrice != "")
-        .filter(MeasureUnitConvert.factor == None)
-        .filter(DrugAttributes.idDrug.in_(active_drugs))
-        .group_by(
-            DrugAttributes.idSegment,
-            DrugAttributes.idDrug,
-            DrugAttributes.idMeasureUnitPrice,
+        .group_by(DrugAttributes.idDrug, DrugAttributes.idMeasureUnitPrice)
+    )
+
+    units = prescribed_units.union(price_units, current_units).cte("units")
+
+    count = (
+        db.session.query(Drug)
+        .join(active_drugs, Drug.id == active_drugs.c.idDrug)
+        .join(units, Drug.id == units.c.idDrug)
+        .outerjoin(
+            MeasureUnitConvert,
+            and_(
+                MeasureUnitConvert.idDrug == Drug.id,
+                MeasureUnitConvert.idSegment == active_drugs.c.idSegment,
+                MeasureUnitConvert.idMeasureUnit == units.c.idMeasureUnit,
+            ),
         )
-        .subquery()
+        .filter(MeasureUnitConvert.factor == None)
+        .count()
     )
 
     return {
-        "pendingConversions": db.session.query(pending_conversions).count(),
-        "pendingPriceConversions": db.session.query(pending_price_conversions).count(),
+        "pendingConversions": count,
     }
