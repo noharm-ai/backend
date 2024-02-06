@@ -6,7 +6,7 @@ from models.main import *
 from models.appendix import *
 from models.segment import *
 from models.prescription import *
-from services.admin import integration_service
+from services.admin import integration_service, integration_status_service
 from exception.validation_error import ValidationError
 
 app_admin_integration = Blueprint("app_admin_integration", __name__)
@@ -62,3 +62,19 @@ def init_intervention_reason():
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
     return tryCommit(db, result.rowcount)
+
+
+@app_admin_integration.route("/admin/integration/status", methods=["GET"])
+@jwt_required()
+def get_status():
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+    os.environ["TZ"] = "America/Sao_Paulo"
+    try:
+        result = integration_status_service.get_status(
+            user=user,
+        )
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+
+    return tryCommit(db, result)
