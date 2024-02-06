@@ -126,3 +126,4 @@ class SchemaConfig(db.Model):
     createdAt = db.Column("created_at", db.Date, nullable=False)
     updatedAt = db.Column("updated_at", db.Date, nullable=True)
     config = db.Column("configuracao", postgresql.JSONB, nullable=True)
+    status = db.Column("status", db.Integer, nullable=False)

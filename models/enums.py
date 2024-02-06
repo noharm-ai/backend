@@ -26,6 +26,12 @@ class NoHarmENV(Enum):
     PRODUCTION = "production"
 
 
+class IntegrationStatusEnum(Enum):
+    INTEGRATION = 0
+    PRODUCTION = 1
+    CANCELED = 2
+
+
 class RoleEnum(Enum):
     ADMIN = "admin"
     SUPPORT = "suporte"

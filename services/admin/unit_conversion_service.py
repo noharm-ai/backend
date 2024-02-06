@@ -4,12 +4,23 @@ from sqlalchemy import func, and_
 from models.main import *
 from models.appendix import *
 from models.segment import *
+from models.enums import IntegrationStatusEnum
 from services import permission_service, drug_service as main_drug_service
-from services.admin import drug_service as admin_drug_service
+from services.admin import (
+    drug_service as admin_drug_service,
+    integration_status_service,
+)
 from exception.validation_error import ValidationError
 
 
-def get_conversion_list(id_segment):
+def get_conversion_list(id_segment, user):
+    if not permission_service.has_maintainer_permission(user):
+        raise ValidationError(
+            "Usuário não autorizado",
+            "errors.unauthorizedUser",
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
     active_drugs = db.session.query(distinct(Outlier.idDrug).label("idDrug")).cte(
         "active_drugs"
     )
@@ -83,6 +94,13 @@ def save_conversions(
             status.HTTP_401_UNAUTHORIZED,
         )
 
+    overwrite = False
+    if (
+        integration_status_service.get_integration_status(user.schema)
+        != IntegrationStatusEnum.PRODUCTION.value
+    ):
+        overwrite = True
+
     if (
         id_drug == None
         or id_segment == None
@@ -115,7 +133,7 @@ def save_conversions(
             id_drug=id_drug, id_segment=id_segment, user=user
         )
     else:
-        if da.idMeasureUnit != id_measure_unit_default:
+        if not overwrite and da.idMeasureUnit != id_measure_unit_default:
             raise ValidationError(
                 "A alteração de Unidade Padrão deve ser executada através do Assistente para Geração de Escores.",
                 "errors.businessRule",
@@ -151,7 +169,8 @@ def save_conversions(
             .first()
         )
         if (
-            da != None
+            not overwrite
+            and da != None
             and da.idMeasureUnit != None
             and da.idMeasureUnit != id_measure_unit_default
         ):
