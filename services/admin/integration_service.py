@@ -1,4 +1,5 @@
 from flask_api import status
+from sqlalchemy import case
 
 from models.main import *
 from models.appendix import *
@@ -154,3 +155,35 @@ def update_integration_config(schema, status, user):
     config.updatedBy = user.id
 
     db.session.flush()
+
+    return _object_to_dto(config)
+
+
+def list_integrations(user):
+    if not permission_service.is_admin(user):
+        raise ValidationError(
+            "Usuário não autorizado",
+            "errors.unauthorizedUser",
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
+    integrations = (
+        db.session.query(
+            SchemaConfig,
+            case([(SchemaConfig.schemaName == user.schema, 0)], else_=1).label(
+                "priority"
+            ),
+        )
+        .order_by("priority", SchemaConfig.schemaName)
+        .all()
+    )
+
+    results = []
+    for i in integrations:
+        results.append(_object_to_dto(i[0]))
+
+    return results
+
+
+def _object_to_dto(schemaConfig: SchemaConfig):
+    return {"schema": schemaConfig.schemaName, "status": schemaConfig.status}

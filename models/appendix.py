@@ -128,3 +128,12 @@ class SchemaConfig(db.Model):
     updatedBy = db.Column("updated_by", db.Integer, nullable=True)
     config = db.Column("configuracao", postgresql.JSONB, nullable=True)
     status = db.Column("status", db.Integer, nullable=False)
+    nh_care = db.Column("tp_noharm_care", db.Integer, nullable=False)
+
+    fl1 = db.Column("fl1_atualiza_indicadores_cpoe", db.Boolean, nullable=False)
+    fl2 = db.Column("fl2_atualiza_indicadores_prescricao", db.Boolean, nullable=False)
+    fl3 = db.Column("fl3_atualiza_prescricaoagg", db.Boolean, nullable=False)
+    fl3_segments = db.Column(
+        "fl3_segmentos", postgresql.ARRAY(db.Integer), nullable=True
+    )
+    fl4 = db.Column("fl4_cria_conciliacao", db.Boolean, nullable=False)

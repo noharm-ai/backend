@@ -98,3 +98,20 @@ def update_config():
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
     return tryCommit(db, result)
+
+
+@app_admin_integration.route("/admin/integration/list", methods=["GET"])
+@jwt_required()
+def list_integrations():
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+    os.environ["TZ"] = "America/Sao_Paulo"
+
+    try:
+        results = integration_service.list_integrations(
+            user=user,
+        )
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+
+    return {"status": "success", "data": results}, status.HTTP_200_OK

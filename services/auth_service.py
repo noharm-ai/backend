@@ -14,6 +14,7 @@ from models.appendix import *
 from models.prescription import *
 from models.enums import NoHarmENV, MemoryEnum, FeatureEnum, RoleEnum
 from services import memory_service
+from services.admin import integration_status_service
 from config import Config
 from exception.validation_error import ValidationError
 
@@ -145,6 +146,8 @@ def _auth_user(
             oauth_config.value["logout_url"] if oauth_config is not None else None
         )
 
+    integration_status = integration_status_service.get_integration_status(user_schema)
+
     return {
         "status": "success",
         "userName": user.name,
@@ -168,6 +171,7 @@ def _auth_user(
         "segments": segmentList,
         "hospitals": hospitalList,
         "logoutUrl": logout_url,
+        "integrationStatus": integration_status,
     }
 
 
