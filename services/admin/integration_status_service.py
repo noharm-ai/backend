@@ -118,11 +118,6 @@ def _get_exams_status():
     return result
 
 
-#     select se.idsegmento, count(*) as total from josemaria.segmentoexame  se
-# inner join josemaria.segmento s on (se.idsegmento = s.idsegmento)
-# group by se.idsegmento
-
-
 def _get_pending_frequencies():
     return db.session.query(Frequency).filter(Frequency.dailyFrequency == None).count()
 
