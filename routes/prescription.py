@@ -736,6 +736,11 @@ def getPrescriptionUpdate(idPrescription):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
 
+    return {
+        "status": "error",
+        "message": "Funcionalidade desligada temporariamente",
+    }, status.HTTP_400_BAD_REQUEST
+
     p = Prescription.query.get(idPrescription)
     if p is None:
         return {
