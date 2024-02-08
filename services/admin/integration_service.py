@@ -131,7 +131,9 @@ def init_intervention_reason(user):
     return db.session.execute(reset_seq)
 
 
-def update_integration_config(schema, status, user):
+def update_integration_config(
+    schema, status, nh_care, fl1, fl2, fl3, fl4, config, user
+):
     if not permission_service.is_admin(user):
         raise ValidationError(
             "Usuário não autorizado",
@@ -139,24 +141,31 @@ def update_integration_config(schema, status, user):
             status.HTTP_401_UNAUTHORIZED,
         )
 
-    config = (
+    schema_config = (
         db.session.query(SchemaConfig).filter(SchemaConfig.schemaName == schema).first()
     )
 
-    if config == None:
+    if schema_config == None:
         raise ValidationError(
             "Schema inválido",
             "errors.unauthorizedUser",
             status.HTTP_400_BAD_REQUEST,
         )
 
-    config.status = status
-    config.updatedAt = datetime.today()
-    config.updatedBy = user.id
+    schema_config.status = status if status != None else schema_config.status
+    schema_config.nh_care = nh_care if nh_care != None else schema_config.nh_care
+    schema_config.config = config if config != None else schema_config.config
+    schema_config.fl1 = fl1 if fl1 != None else schema_config.fl1
+    schema_config.fl2 = fl2 if fl2 != None else schema_config.fl2
+    schema_config.fl3 = fl3 if fl3 != None else schema_config.fl3
+    schema_config.fl4 = fl4 if fl4 != None else schema_config.fl4
+
+    schema_config.updatedAt = datetime.today()
+    schema_config.updatedBy = user.id
 
     db.session.flush()
 
-    return _object_to_dto(config)
+    return _object_to_dto(schema_config)
 
 
 def list_integrations(user):
@@ -185,5 +194,14 @@ def list_integrations(user):
     return results
 
 
-def _object_to_dto(schemaConfig: SchemaConfig):
-    return {"schema": schemaConfig.schemaName, "status": schemaConfig.status}
+def _object_to_dto(schema_config: SchemaConfig):
+    return {
+        "schema": schema_config.schemaName,
+        "status": schema_config.status,
+        "nhCare": schema_config.nh_care,
+        "config": schema_config.config,
+        "fl1": schema_config.fl1,
+        "fl2": schema_config.fl2,
+        "fl3": schema_config.fl3,
+        "fl4": schema_config.fl4,
+    }
