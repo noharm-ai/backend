@@ -36,10 +36,10 @@ def get_admin_entries(user, kinds=[]):
             status.HTTP_401_UNAUTHORIZED,
         )
 
-    return _get_memory_itens(kinds)
+    return get_memory_itens(kinds)
 
 
-def _get_memory_itens(kinds):
+def get_memory_itens(kinds):
     memory_itens = db.session.query(Memory).filter(Memory.kind.in_(kinds)).all()
 
     itens = []

@@ -4,7 +4,7 @@ def search_results(prescriptions):
     for p in prescriptions:
         list.append(
             {
-                "idPrescription": p[0].id,
+                "idPrescription": str(p[0].id),
                 "admissionNumber": p[0].admissionNumber,
                 "date": p[0].date.isoformat() if p[0].date else None,
                 "status": p[0].status,

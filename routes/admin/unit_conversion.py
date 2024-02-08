@@ -20,7 +20,7 @@ def get_unit_conversion_list():
     request_data = request.get_json()
 
     list = unit_conversion_service.get_conversion_list(
-        id_segment=request_data.get("idSegment")
+        id_segment=request_data.get("idSegment"), user=user
     )
 
     result = []
