@@ -44,6 +44,7 @@ def get_status(user):
         "users": _get_users(user.schema),
         "exams": _get_exams_status(),
         "conversions": _get_conversion_status(),
+        "tables": _get_table_stats(user.schema),
     }
 
 
@@ -225,3 +226,25 @@ def _get_conversion_status():
     return {
         "pendingConversions": count,
     }
+
+
+def _get_table_stats(schema):
+    query = f"""
+        select 
+            n_live_tup as total_rows, relname
+        from
+            pg_stat_user_tables 
+        where 
+            schemaname = :schemaname
+            and relname in ('alergia', 'evolucao', 'exame', 'frequencia', 'medicamento', 'pessoa', 'prescricao', 'prescricaoagg', 'presmed', 'setor', 'unidademedida')
+        order by 
+            relname
+    """
+
+    results = db.session.execute(query, {"schemaname": schema})
+
+    list = []
+    for i in results:
+        list.append({"table": i[1], "count": i[0]})
+
+    return list
