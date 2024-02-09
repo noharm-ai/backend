@@ -148,7 +148,10 @@ def save_conversions(
 
     # set conversions
     _update_conversion_list(
-        conversion_list=conversion_list, id_drug=id_drug, id_segment=id_segment
+        conversion_list=conversion_list,
+        id_drug=id_drug,
+        id_segment=id_segment,
+        user=user,
     )
 
     # update other segments
@@ -193,32 +196,32 @@ def save_conversions(
 
         # update conversions
         _update_conversion_list(
-            conversion_list=conversion_list, id_drug=id_drug, id_segment=s.id
+            conversion_list=conversion_list, id_drug=id_drug, id_segment=s.id, user=user
         )
 
     return {"updated": updated_segments, "rejected": rejected_segments}
 
 
-def _update_conversion_list(conversion_list, id_drug, id_segment):
+def _update_conversion_list(conversion_list, id_drug, id_segment, user):
     for uc in conversion_list:
-        conversion = (
-            db.session.query(MeasureUnitConvert)
-            .filter(MeasureUnitConvert.idDrug == id_drug)
-            .filter(MeasureUnitConvert.idSegment == id_segment)
-            .filter(MeasureUnitConvert.idMeasureUnit == uc["idMeasureUnit"])
-            .first()
+        insert_units = f"""
+            insert into {user.schema}.unidadeconverte
+                (idsegmento, fkmedicamento, fkunidademedida, fator)
+            values 
+                (:id_segment, :id_drug, :id_measure_unit, :factor)
+            on conflict (idsegmento, fkmedicamento, fkunidademedida)
+            do update set fator = :factor
+        """
+
+        db.session.execute(
+            insert_units,
+            {
+                "id_segment": id_segment,
+                "id_drug": id_drug,
+                "id_measure_unit": uc["idMeasureUnit"],
+                "factor": uc["factor"],
+            },
         )
-        if conversion == None:
-            conversion = MeasureUnitConvert()
-            conversion.idDrug = id_drug
-            conversion.idSegment = id_segment
-            conversion.idMeasureUnit = uc["idMeasureUnit"]
-
-            db.session.add(conversion)
-
-        conversion.factor = uc["factor"]
-
-        db.session.flush()
 
 
 def add_default_units(user):
