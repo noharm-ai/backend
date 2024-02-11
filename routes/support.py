@@ -15,7 +15,11 @@ def create_ticket():
     dbSession.setSchema(user.schema)
 
     try:
-        result = support_service.create_ticket(user=user, from_url="http://example.com")
+        result = support_service.create_ticket(
+            user=user,
+            from_url=request.form.get("fromUrl"),
+            attachment=request.files.get("attachment", None),
+        )
     except ValidationError as e:
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 

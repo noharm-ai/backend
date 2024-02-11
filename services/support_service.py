@@ -5,7 +5,7 @@ from models.main import *
 from config import Config
 
 
-def create_ticket(user, from_url):
+def create_ticket(user, from_url, attachment):
     db_user = db.session.query(User).filter(User.id == user.id).first()
 
     apiUrl = Config.ODOO_API_URL
@@ -34,33 +34,32 @@ def create_ticket(user, from_url):
     #     # print("image", image)
     #     imageBase64 = base64.b64encode(image)
 
-    result = models.execute_kw(
-        apiDB,
-        uid,
-        apiKey,
-        "helpdesk.ticket",
-        "web_save",
-        [[], ticket],
-        {"specification": {}},
-    )
-
-    return result
-
-    # print(image)
-
-    # models.execute_kw(
+    # result = models.execute_kw(
     #     apiDB,
     #     uid,
     #     apiKey,
-    #     "ir.attachment",
-    #     "create",
-    #     [
-    #         {
-    #             "name": "Anexo",
-    #             "res_model": "helpdesk.ticket",
-    #             "res_id": 217,
-    #             "type": "binary",
-    #             "datas": str(imageBase64)[2:],
-    #         }
-    #     ],
+    #     "helpdesk.ticket",
+    #     "web_save",
+    #     [[], ticket],
+    #     {"specification": {}},
     # )
+
+    # print(image)
+
+    if attachment:
+        models.execute_kw(
+            apiDB,
+            uid,
+            apiKey,
+            "ir.attachment",
+            "create",
+            [
+                {
+                    "name": "Anexo",
+                    "res_model": "helpdesk.ticket",
+                    "res_id": 217,
+                    "type": "binary",
+                    "datas": str(base64.b64encode(attachment.read()))[2:],
+                }
+            ],
+        )
