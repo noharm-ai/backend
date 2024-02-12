@@ -24,3 +24,19 @@ def create_ticket():
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
     return {"status": "success", "data": result}, status.HTTP_200_OK
+
+
+@app_support.route("/support/list-tickets", methods=["GET"])
+@jwt_required()
+def list_tickets():
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+
+    try:
+        result = support_service.list_tickets(
+            user=user,
+        )
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+
+    return {"status": "success", "data": result}, status.HTTP_200_OK

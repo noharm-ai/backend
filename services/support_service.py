@@ -5,61 +5,89 @@ from models.main import *
 from config import Config
 
 
-def create_ticket(user, from_url, attachment):
+def _get_client():
+    common = xmlrpc.client.ServerProxy(Config.ODOO_API_URL + "common")
+    uid = common.authenticate(
+        Config.ODOO_API_DB, Config.ODOO_API_USER, Config.ODOO_API_KEY, {}
+    )
+    models = xmlrpc.client.ServerProxy(Config.ODOO_API_URL + "object")
+
+    def execute(model, action, payload, options):
+        return models.execute_kw(
+            Config.ODOO_API_DB,
+            uid,
+            Config.ODOO_API_KEY,
+            model,
+            action,
+            payload,
+            options,
+        )
+
+    return execute
+
+
+def create_ticket(user, from_url, attachment, category, description):
     db_user = db.session.query(User).filter(User.id == user.id).first()
 
-    apiUrl = Config.ODOO_API_URL
-    apiDB = Config.ODOO_API_DB
-    apiUser = Config.ODOO_API_USER
-    apiKey = Config.ODOO_API_KEY
-
-    common = xmlrpc.client.ServerProxy(apiUrl + "common")
-    uid = common.authenticate(apiDB, apiUser, apiKey, {})
-    models = xmlrpc.client.ServerProxy(apiUrl + "object")
+    client = _get_client()
 
     ticket = {
-        "name": f"[Dúvida] {db_user.name}",
+        "name": f"[{category or 'Geral'}] {db_user.name}",
         "partner_name": db_user.name,
         "partner_email": db_user.email,
-        "description": "teste description",
+        "description": description,
         "x_studio_schema_1": db_user.schema,
         "x_studio_fromurl": from_url,
         "team_id": 1,
     }
 
-    # print("ticket", ticket)
-
-    # with open("image.png", "rb") as image_file:
-    #     image = image_file.read()
-    #     # print("image", image)
-    #     imageBase64 = base64.b64encode(image)
-
-    # result = models.execute_kw(
-    #     apiDB,
-    #     uid,
-    #     apiKey,
-    #     "helpdesk.ticket",
-    #     "web_save",
-    #     [[], ticket],
-    #     {"specification": {}},
-    # )
-
-    # print(image)
+    result = client(
+        model="helpdesk.ticket",
+        action="web_save",
+        payload=[[], ticket],
+        options={"specification": {}},
+    )
 
     if attachment:
-        models.execute_kw(
-            apiDB,
-            uid,
-            apiKey,
-            "ir.attachment",
-            "create",
-            [
+        client(
+            model="ir.attachment",
+            action="create",
+            payload=[
                 {
                     "name": "Anexo",
                     "res_model": "helpdesk.ticket",
-                    "res_id": 217,
+                    "res_id": result[0]["id"],
                     "type": "binary",
                     "datas": str(base64.b64encode(attachment.read()))[2:],
                 }
             ],
         )
+
+    return result
+
+
+def list_tickets(user):
+    db_user = db.session.query(User).filter(User.id == user.id).first()
+
+    client = _get_client()
+
+    tickets = client(
+        model="helpdesk.ticket",
+        action="search_read",
+        payload=[[["partner_email", "=", db_user.email]]],
+        options={
+            "fields": [
+                "name",
+                "partner_name",
+                "access_token",
+                "message_needaction",
+                "has_message",
+                "create_date",
+                "stage_id",
+                "date_last_stage_update",
+            ],
+            "limit": 100,
+        },
+    )
+
+    return tickets
