@@ -17,7 +17,9 @@ def create_ticket():
     try:
         result = support_service.create_ticket(
             user=user,
-            from_url=request.form.get("fromUrl"),
+            from_url=request.form.get("fromUrl", None),
+            category=request.form.get("category", None),
+            description=request.form.get("description", None),
             attachment=request.files.get("attachment", None),
         )
     except ValidationError as e:
