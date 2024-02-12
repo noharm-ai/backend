@@ -61,6 +61,7 @@ def create_ticket(user, from_url, attachment, category, description):
                     "datas": str(base64.b64encode(attachment.read()))[2:],
                 }
             ],
+            options={},
         )
 
     return result
