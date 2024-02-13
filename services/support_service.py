@@ -82,12 +82,15 @@ def list_tickets(user):
                 "partner_name",
                 "access_token",
                 "message_needaction",
+                "message_needaction_counter",
                 "has_message",
                 "create_date",
                 "stage_id",
                 "date_last_stage_update",
+                "description",
+                "ticket_ref",
             ],
-            "limit": 100,
+            "limit": 50,
         },
     )
 
