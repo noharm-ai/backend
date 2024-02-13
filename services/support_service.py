@@ -65,7 +65,21 @@ def create_ticket(user, from_url, filelist, category, description):
                 options={},
             )
 
-    return result
+    ticket = client(
+        model="helpdesk.ticket",
+        action="search_read",
+        payload=[[["id", "=", result[0]["id"]]]],
+        options={
+            "fields": [
+                "id",
+                "access_token",
+                "ticket_ref",
+            ],
+            "limit": 50,
+        },
+    )
+
+    return ticket
 
 
 def list_tickets(user):
