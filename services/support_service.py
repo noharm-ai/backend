@@ -26,7 +26,7 @@ def _get_client():
     return execute
 
 
-def create_ticket(user, from_url, attachment, category, description):
+def create_ticket(user, from_url, filelist, category, description):
     db_user = db.session.query(User).filter(User.id == user.id).first()
 
     client = _get_client()
@@ -48,21 +48,22 @@ def create_ticket(user, from_url, attachment, category, description):
         options={"specification": {}},
     )
 
-    if attachment:
-        client(
-            model="ir.attachment",
-            action="create",
-            payload=[
-                {
-                    "name": "Anexo",
-                    "res_model": "helpdesk.ticket",
-                    "res_id": result[0]["id"],
-                    "type": "binary",
-                    "datas": str(base64.b64encode(attachment.read()))[2:],
-                }
-            ],
-            options={},
-        )
+    if filelist:
+        for f in filelist:
+            client(
+                model="ir.attachment",
+                action="create",
+                payload=[
+                    {
+                        "name": "Anexo",
+                        "res_model": "helpdesk.ticket",
+                        "res_id": result[0]["id"],
+                        "type": "binary",
+                        "datas": str(base64.b64encode(f.read()))[2:],
+                    }
+                ],
+                options={},
+            )
 
     return result
 

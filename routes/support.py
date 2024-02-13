@@ -20,7 +20,7 @@ def create_ticket():
             from_url=request.form.get("fromUrl", None),
             category=request.form.get("category", None),
             description=request.form.get("description", None),
-            attachment=request.files.get("attachment", None),
+            filelist=request.files.getlist("fileList[]"),
         )
     except ValidationError as e:
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
