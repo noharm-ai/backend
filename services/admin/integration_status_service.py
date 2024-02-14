@@ -236,7 +236,7 @@ def _get_table_stats(schema):
             pg_stat_user_tables 
         where 
             schemaname = :schemaname
-            and relname in ('alergia', 'evolucao', 'exame', 'frequencia', 'medicamento', 'pessoa', 'prescricao', 'prescricaoagg', 'presmed', 'setor', 'unidademedida')
+            and relname in ('alergia', 'cultura', 'evolucao', 'exame', 'frequencia', 'medicamento', 'pessoa', 'prescricao', 'prescricaoagg', 'presmed', 'setor', 'unidademedida')
         order by 
             relname
     """
