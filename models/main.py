@@ -225,6 +225,7 @@ class DrugAttributesBase:
     chemo = db.Column("quimio", db.Boolean, nullable=True)
     price = db.Column("custo", db.Float, nullable=True)
     maxTime = db.Column("tempotratamento", db.Integer, nullable=True)
+    fallRisk = db.Column("risco_queda", db.Integer, nullable=True)
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.Integer, nullable=True)
 

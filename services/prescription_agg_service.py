@@ -207,7 +207,7 @@ def get_last_prescription(admission_number):
     )
 
 
-def get_last_agg_prescription(admission_number):
+def get_last_agg_prescription(admission_number) -> Prescription:
     return (
         db.session.query(Prescription)
         .filter(Prescription.admissionNumber == admission_number)

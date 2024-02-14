@@ -12,8 +12,14 @@ from cryptography.hazmat.primitives import serialization
 from models.main import *
 from models.appendix import *
 from models.prescription import *
-from models.enums import NoHarmENV, MemoryEnum, FeatureEnum, RoleEnum
-from services import memory_service
+from models.enums import (
+    NoHarmENV,
+    MemoryEnum,
+    FeatureEnum,
+    RoleEnum,
+    IntegrationStatusEnum,
+)
+from services import memory_service, permission_service
 from services.admin import integration_status_service
 from config import Config
 from exception.validation_error import ValidationError
@@ -147,6 +153,15 @@ def _auth_user(
         )
 
     integration_status = integration_status_service.get_integration_status(user_schema)
+    if (
+        integration_status == IntegrationStatusEnum.CANCELED.value
+        and not permission_service.has_maintainer_permission(user)
+    ):
+        raise ValidationError(
+            "Integração Cancelada",
+            "errors.unauthorizedUser",
+            status.HTTP_401_UNAUTHORIZED,
+        )
 
     return {
         "status": "success",

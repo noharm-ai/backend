@@ -427,20 +427,16 @@ def getPrescription(
     conciliaList = []
     if prescription[0].concilia:
         pDrugs = drugList.changeDrugName(pDrugs)
-        conciliaDrugsT = PrescriptionDrug.findByPrescription(
-            prescription[0].id,
-            patient.admissionNumber,
-            date.today(),
-            prescription[0].idSegment,
-        )
-        conciliaDrugsY = PrescriptionDrug.findByPrescription(
-            prescription[0].id,
-            patient.admissionNumber,
-            (date.today() - timedelta(days=1)),
-            prescription[0].idSegment,
-        )
-        conciliaList = drugList.conciliaList(conciliaDrugsT, [])
-        conciliaList = drugList.conciliaList(conciliaDrugsY, conciliaList)
+        last_agg_prescription = _get_last_agg_prescription(patient.admissionNumber)
+        if last_agg_prescription != None:
+            concilia_drugs = PrescriptionDrug.findByPrescription(
+                last_agg_prescription.id,
+                patient.admissionNumber,
+                last_agg_prescription.date,
+                idSegment=None,
+                is_cpoe=is_cpoe,
+            )
+            conciliaList = drugList.conciliaList(concilia_drugs, [])
 
     pSolution = drugList.getDrugType([], ["Soluções"])
     pInfusion = drugList.getInfusionList()
@@ -854,3 +850,16 @@ def start_evaluation():
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
     return tryCommit(db, result)
+
+
+# remove after solving circular dependency
+def _get_last_agg_prescription(admission_number) -> Prescription:
+    return (
+        db.session.query(Prescription)
+        .filter(Prescription.admissionNumber == admission_number)
+        .filter(Prescription.agg == True)
+        .filter(Prescription.concilia == None)
+        .filter(Prescription.idSegment != None)
+        .order_by(desc(Prescription.date))
+        .first()
+    )

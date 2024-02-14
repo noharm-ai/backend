@@ -990,7 +990,8 @@ class PrescriptionDrug(db.Model):
                     )
                 )
             else:
-                q = q.filter(Prescription.idSegment == idSegment)
+                if idSegment != None:
+                    q = q.filter(Prescription.idSegment == idSegment)
 
         return q.order_by(asc(Drug.name)).all()
 

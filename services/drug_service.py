@@ -176,6 +176,7 @@ def get_attributes(id_segment, id_drug, user):
         "amountUnit": attr.amountUnit,
         "price": attr.price,
         "maxTime": attr.maxTime,
+        "fallRisk": attr.fallRisk,
         "whiteList": attr.whiteList,
         "chemo": attr.chemo,
         "sctid": str(drug.sctid),
@@ -239,6 +240,8 @@ def save_attributes(id_segment, id_drug, data, user):
             attr.price = None
     if "maxTime" in data.keys():
         attr.maxTime = data.get("maxTime", None)
+    if "fallRisk" in data.keys():
+        attr.fallRisk = data.get("fallRisk", None)
     if "useWeight" in data.keys():
         attr.useWeight = data.get("useWeight", 0)
     if "amount" in data.keys():
@@ -320,6 +323,7 @@ def copy_substance_default_attributes(id_drug, sctid, user: User, overwrite=True
             da.kidney = reference.kidney
             da.liver = reference.liver
             da.platelets = reference.platelets
+            da.fallRisk = reference.fallRisk
 
             # controls
             da.update = datetime.today()
@@ -371,6 +375,7 @@ def create_attributes_from_reference(id_drug, id_segment, user):
             da.kidney = reference.kidney
             da.liver = reference.liver
             da.platelets = reference.platelets
+            da.fallRisk = reference.fallRisk
 
         # controls
         da.update = datetime.today()
