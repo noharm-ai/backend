@@ -46,6 +46,34 @@ def get_substance(drugs: List[Drug]):
     return drugs_array
 
 
+def get_factors(conversions):
+    if len(conversions) == 0:
+        return conversions
+
+    model_factor = _get_model("models/noharm-ml-unit.gz")
+    token_med = _get_model("models/noharm-tkm-unit.gz")
+    token_unit = _get_model("models/noharm-tku-unit.gz")
+
+    for c in conversions:
+        if c["factor"] == None:
+            vector_med = token_med.transform([c["name"]])
+            vector_unit = token_unit.transform([c["idMeasureUnit"]])
+            vector_factor = numpy.concatenate(
+                (vector_med.toarray(), vector_unit.toarray()), axis=1
+            )
+
+            prediction = model_factor.predict(vector_factor)[0]
+            factor_idx = numpy.where(model_factor.classes_ == prediction)[0][0]
+            factor_prob = model_factor.predict_proba(vector_factor).round(2)[0][
+                factor_idx
+            ]
+
+            c["prediction"] = prediction
+            c["accuracy"] = factor_prob
+
+    return conversions
+
+
 def _get_client():
     return boto3.client(
         "s3",

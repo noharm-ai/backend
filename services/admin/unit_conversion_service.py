@@ -9,11 +9,12 @@ from services import permission_service, drug_service as main_drug_service
 from services.admin import (
     drug_service as admin_drug_service,
     integration_status_service,
+    ai_service,
 )
 from exception.validation_error import ValidationError
 
 
-def get_conversion_list(id_segment, user):
+def get_conversion_list(id_segment, user, show_prediction=False):
     if not permission_service.has_maintainer_permission(user):
         raise ValidationError(
             "Usuário não autorizado",
@@ -57,7 +58,7 @@ def get_conversion_list(id_segment, user):
 
     units = prescribed_units.union(price_units, current_units).cte("units")
 
-    q = (
+    conversion_list = (
         db.session.query(
             func.count().over(),
             Drug.id,
@@ -81,7 +82,23 @@ def get_conversion_list(id_segment, user):
         .all()
     )
 
-    return q
+    result = []
+    for i in conversion_list:
+        result.append(
+            {
+                "idDrug": i[1],
+                "name": i[2],
+                "idMeasureUnit": i[3],
+                "factor": i[4],
+                "idSegment": id_segment,
+                "measureUnit": i[5],
+            }
+        )
+
+    if show_prediction:
+        return ai_service.get_factors(result)
+
+    return result
 
 
 def save_conversions(
