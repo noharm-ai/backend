@@ -57,7 +57,7 @@ def get_factors(conversions):
 
     for c in conversions:
         if c["factor"] == None:
-            name = re.sub(r"\w{6,}", "", c["name"])
+            name = re.sub(r"\w{6,}", "", c["name"]).lower()
             measure_unit = c["idMeasureUnit"].lower()
 
             vector_med = token_med.transform([name])
