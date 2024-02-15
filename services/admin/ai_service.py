@@ -74,8 +74,8 @@ def get_factors(conversions):
 
             c["prediction"] = prediction
             c["accuracy"] = factor_prob
-            # c["predictionName"] = name
-            # c["predictionUnit"] = measure_unit
+            c["predictionName"] = name
+            c["predictionUnit"] = measure_unit
 
     return conversions
 
