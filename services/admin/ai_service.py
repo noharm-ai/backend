@@ -2,6 +2,7 @@ import joblib
 import boto3
 import tempfile
 import numpy
+import re
 from typing import List
 
 from config import Config
@@ -56,8 +57,11 @@ def get_factors(conversions):
 
     for c in conversions:
         if c["factor"] == None:
-            vector_med = token_med.transform([c["name"]])
-            vector_unit = token_unit.transform([c["idMeasureUnit"]])
+            name = re.sub(r"\w{6,}", "", c["name"])
+            measure_unit = c["idMeasureUnit"].lower()
+
+            vector_med = token_med.transform([name])
+            vector_unit = token_unit.transform([measure_unit])
             vector_factor = numpy.concatenate(
                 (vector_med.toarray(), vector_unit.toarray()), axis=1
             )
@@ -70,6 +74,8 @@ def get_factors(conversions):
 
             c["prediction"] = prediction
             c["accuracy"] = factor_prob
+            # c["predictionName"] = name
+            # c["predictionUnit"] = measure_unit
 
     return conversions
 
