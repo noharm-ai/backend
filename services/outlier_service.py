@@ -10,7 +10,7 @@ from models.prescription import *
 from models.enums import RoleEnum
 from routes.outlier_lib import add_score
 from exception.validation_error import ValidationError
-from services.admin import drug_service, integration_service
+from services.admin import drug_service, integration_status_service
 
 FOLD_SIZE = 15
 
@@ -299,6 +299,14 @@ def get_outliers_process_list(id_segment, user):
             "Usuário não autorizado",
             "errors.unauthorizedUser",
             status.HTTP_401_UNAUTHORIZED,
+        )
+
+    pending_frequencies = integration_status_service._get_pending_frequencies()
+    if pending_frequencies > 0:
+        raise ValidationError(
+            "Existem frequências pendentes de conversão. Configure todas as frequências antes de gerar os escores.",
+            "errors.business",
+            status.HTTP_400_BAD_REQUEST,
         )
 
     print("Init Schema:", user.schema, "Segment:", id_segment)

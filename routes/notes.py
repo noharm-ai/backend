@@ -25,6 +25,7 @@ def get_notes_v2(admissionNumber):
     has_primary_care = memory_service.has_feature("PRIMARYCARE")
     filter_date = request.args.get("date", None)
     dates = None
+    previous_admissions = []
 
     if filter_date is None:
         dates = (
@@ -60,6 +61,35 @@ def get_notes_v2(admissionNumber):
             notes = get_notes_by_date(admissionNumber, dates_list, has_primary_care)
         else:
             notes = []
+
+        admission = (
+            db.session.query(Patient)
+            .filter(Patient.admissionNumber == admissionNumber)
+            .first()
+        )
+
+        if admission != None:
+            admission_list = (
+                db.session.query(Patient)
+                .filter(Patient.idPatient == admission.idPatient)
+                .filter(Patient.admissionNumber < admissionNumber)
+                .order_by(desc(Patient.admissionDate))
+                .limit(10)
+                .all()
+            )
+
+            for pa in admission_list:
+                previous_admissions.append(
+                    {
+                        "admissionNumber": pa.admissionNumber,
+                        "admissionDate": pa.admissionDate.isoformat()
+                        if pa.admissionDate
+                        else None,
+                        "dischargeDate": pa.dischargeDate.isoformat()
+                        if pa.dischargeDate
+                        else None,
+                    }
+                )
     else:
         notes = get_notes_by_date(admissionNumber, [filter_date], has_primary_care)
 
@@ -90,7 +120,11 @@ def get_notes_v2(admissionNumber):
 
     return {
         "status": "success",
-        "data": {"dates": dateResults, "notes": noteResults},
+        "data": {
+            "dates": dateResults,
+            "notes": noteResults,
+            "previousAdmissions": previous_admissions,
+        },
     }, status.HTTP_200_OK
 
 

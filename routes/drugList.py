@@ -541,6 +541,7 @@ class DrugList:
                         if pd[3]
                         else "",
                         "time": timeValue(pd[0].interval),
+                        "recommendation": pd[0].notes,
                     }
                 )
 

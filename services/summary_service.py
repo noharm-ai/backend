@@ -6,7 +6,7 @@ from models.main import db
 from models.appendix import *
 from models.prescription import *
 from models.notes import *
-from models.enums import RoleEnum, MemoryEnum
+from models.enums import RoleEnum, MemoryEnum, GlobalMemoryEnum
 from services import memory_service, prescription_agg_service
 from exception.validation_error import ValidationError
 
@@ -74,8 +74,22 @@ def _get_patient_data(patient: Patient):
 
 
 def _get_summary_config(admission_number, mock):
-    summary_config = memory_service.get_memory(MemoryEnum.SUMMARY_CONFIG.value)
-    annotations = _get_all_annotations(admission_number)
+    summary_config = (
+        db.session.query(GlobalMemory)
+        .filter(GlobalMemory.kind == GlobalMemoryEnum.SUMMARY_CONFIG.value)
+        .first()
+    )
+    summary_prompt = (
+        db.session.query(GlobalMemory)
+        .filter(GlobalMemory.kind == summary_config.value["prompt-config"])
+        .first()
+    )
+    annotations = _get_all_annotations(
+        admission_number,
+        field_suffix="_text"
+        if summary_config.value["prompt-config"] == "summary-prompt-sentence"
+        else "",
+    )
 
     config = [
         {"key": "reason"},
@@ -88,20 +102,17 @@ def _get_summary_config(admission_number, mock):
         {"key": "clinicalSummary"},
     ]
     prompts = {}
-    result = {
-        "url": summary_config.value["url"],
-        "apikey": summary_config.value["apikey"],
-    }
+    result = {}
 
     for c in config:
         key = c["key"]
         if mock:
             text = memory_service.get_memory(f"summary_text_{key}")
-            prompts[key] = json.dumps(summary_config.value[key]).replace(
+            prompts[key] = json.dumps(summary_prompt.value[key]).replace(
                 ":replace_text", text.value["text"]
             )
         else:
-            prompts[key] = json.dumps(summary_config.value[key]).replace(
+            prompts[key] = json.dumps(summary_prompt.value[key]).replace(
                 ":replace_text", annotations[key]["value"]
             )
 
@@ -113,7 +124,7 @@ def _get_summary_config(admission_number, mock):
     return result
 
 
-def _get_all_annotations(admission_number):
+def _get_all_annotations(admission_number, field_suffix=""):
     first = (
         db.session.query(ClinicalNotes)
         .filter(ClinicalNotes.admissionNumber == admission_number)
@@ -142,7 +153,7 @@ def _get_all_annotations(admission_number):
     else:
         reason = _get_annotation(
             admission_number=admission_number,
-            field="motivo",
+            field="motivo" + field_suffix,
             add=True,
             interval="4 DAYS",
             compare_date=first.date,
@@ -150,7 +161,7 @@ def _get_all_annotations(admission_number):
 
         previous_drugs = _get_annotation(
             admission_number=admission_number,
-            field="medprevio",
+            field="medprevio" + field_suffix,
             add=True,
             interval="1 DAY",
             compare_date=first.date,
@@ -158,7 +169,7 @@ def _get_all_annotations(admission_number):
 
         diagnosis = _get_annotation(
             admission_number=admission_number,
-            field="diagnostico",
+            field="diagnostico" + field_suffix,
             add=True,
             interval=None,
             compare_date=None,
@@ -166,7 +177,7 @@ def _get_all_annotations(admission_number):
 
         summary_annotation = _get_annotation(
             admission_number=admission_number,
-            field="resumo",
+            field="resumo" + field_suffix,
             add=False,
             interval="1 DAY",
             compare_date=last.date,
@@ -174,7 +185,7 @@ def _get_all_annotations(admission_number):
 
         discharge_plan = _get_annotation(
             admission_number=admission_number,
-            field="planoalta",
+            field="planoalta" + field_suffix,
             add=False,
             interval="1 DAY",
             compare_date=last.date,
@@ -182,7 +193,7 @@ def _get_all_annotations(admission_number):
 
         procedures = _get_annotation(
             admission_number=admission_number,
-            field="procedimentos",
+            field="procedimentos" + field_suffix,
             add=True,
             interval=None,
             compare_date=None,
@@ -190,7 +201,7 @@ def _get_all_annotations(admission_number):
 
         exams = _get_annotation(
             admission_number=admission_number,
-            field="exames",
+            field="exames" + field_suffix,
             add=True,
             interval=None,
             compare_date=None,
@@ -198,7 +209,7 @@ def _get_all_annotations(admission_number):
 
         discharge_condition = _get_annotation(
             admission_number=admission_number,
-            field="condicaoalta",
+            field="condicaoalta" + field_suffix,
             add=False,
             interval="1 DAY",
             compare_date=last.date,

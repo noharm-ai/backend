@@ -21,6 +21,10 @@ class MemoryEnum(Enum):
     MAP_ORIGIN_CUSTOM = "map-origin-custom"
 
 
+class GlobalMemoryEnum(Enum):
+    SUMMARY_CONFIG = "summary-config"
+
+
 class NoHarmENV(Enum):
     STAGING = "staging"
     PRODUCTION = "production"

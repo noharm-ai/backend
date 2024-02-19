@@ -118,6 +118,17 @@ class Memory(db.Model):
         return mem.value if mem else {"value": "http://localhost/{idPatient}"}
 
 
+class GlobalMemory(db.Model):
+    __tablename__ = "memoria"
+    __table_args__ = {"schema": "public"}
+
+    key = db.Column("idmemoria", db.Integer, primary_key=True, autoincrement=True)
+    kind = db.Column("tipo", db.String(100), nullable=False)
+    value = db.Column("valor", postgresql.JSON, nullable=False)
+    update = db.Column("update_at", db.DateTime, nullable=False)
+    user = db.Column("update_by", db.Integer, nullable=False)
+
+
 class SchemaConfig(db.Model):
     __tablename__ = "schema_config"
     __table_args__ = {"schema": "public"}

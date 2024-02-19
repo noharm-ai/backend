@@ -20,30 +20,14 @@ def get_unit_conversion_list():
     request_data = request.get_json()
 
     list = unit_conversion_service.get_conversion_list(
-        id_segment=request_data.get("idSegment"), user=user
+        id_segment=request_data.get("idSegment"),
+        user=user,
+        show_prediction=request_data.get("showPrediction", False),
     )
-
-    result = []
-    for i in list:
-        result.append(
-            {
-                "idDrug": i[1],
-                "name": i[2],
-                "idMeasureUnit": i[3],
-                "factor": i[4],
-                "idSegment": request_data.get("idSegment"),
-                "measureUnit": i[5],
-            }
-        )
-
-    count = 0
-    if len(list) > 0:
-        count = list[0][0]
 
     return {
         "status": "success",
-        "count": count,
-        "data": result,
+        "data": list,
     }, status.HTTP_200_OK
 
 

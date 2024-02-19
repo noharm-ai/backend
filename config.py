@@ -37,3 +37,10 @@ class Config:
     ODOO_API_KEY = getenv("ODOO_API_KEY") or ""
     ODOO_API_URL = getenv("ODOO_API_URL") or ""
     ODOO_API_USER = getenv("ODOO_API_USER") or ""
+
+    OPEN_AI_API_ENDPOINT = getenv("OPEN_AI_API_ENDPOINT") or ""
+    OPEN_AI_API_KEY = getenv("OPEN_AI_API_KEY") or ""
+    OPEN_AI_API_VERSION = getenv("OPEN_AI_API_VERSION") or ""
+    OPEN_AI_API_MODEL = getenv("OPEN_AI_API_MODEL") or ""
+
+    MARITACA_API_KEY = getenv("MARITACA_API_KEY") or ""
