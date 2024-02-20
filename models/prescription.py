@@ -594,7 +594,7 @@ class Patient(db.Model):
 
         if len(idDept) > 0:
             idDept = list(map(int, idDept))
-            if currentDepartment:
+            if currentDepartment or concilia:
                 q = q.filter(Prescription.idDepartment.in_(idDept))
             else:
                 q = q.filter(postgresql.array(idDept).overlap(Prescription.aggDeps))
