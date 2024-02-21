@@ -76,7 +76,7 @@ def search(search_key):
     )
 
 
-def check_prescription(idPrescription, p_status, user):
+def check_prescription(idPrescription, p_status, user, evaluation_time):
     roles = user.config["roles"] if user.config and "roles" in user.config else []
     if RoleEnum.SUPPORT.value in roles:
         raise ValidationError(
@@ -105,6 +105,17 @@ def check_prescription(idPrescription, p_status, user):
                 status.HTTP_400_BAD_REQUEST,
             )
 
+    extra_info = {
+        "main_prescription": str(p.id),
+        "main_is_agg": bool(p.agg),
+        "main_evaluationStartDate": p.features["evaluation"]["startDate"]
+        if p.features != None
+        and "evaluation" in p.features
+        and "startDate" in p.features["evaluation"]
+        else None,
+        "evaluationTime": evaluation_time or 0,
+    }
+
     results = []
 
     if p.agg:
@@ -113,12 +124,14 @@ def check_prescription(idPrescription, p_status, user):
             p_status=p_status,
             user=user,
             has_lock_feature=has_lock_feature,
+            extra=extra_info,
         )
         single = _check_single_prescription(
             prescription=p,
             p_status=p_status,
             user=user,
             has_lock_feature=has_lock_feature,
+            extra=extra_info,
         )
 
         for i in internals:
@@ -132,8 +145,9 @@ def check_prescription(idPrescription, p_status, user):
             p_status=p_status,
             user=user,
             has_lock_feature=has_lock_feature,
+            extra=extra_info,
         )
-        _update_agg_status(prescription=p, user=user)
+        _update_agg_status(prescription=p, user=user, extra=extra_info)
 
         if single:
             results.append(single)
@@ -141,7 +155,7 @@ def check_prescription(idPrescription, p_status, user):
     return results
 
 
-def _update_agg_status(prescription: Prescription, user: User):
+def _update_agg_status(prescription: Prescription, user: User, extra={}):
     unchecked_prescriptions = get_query_prescriptions_by_agg(
         agg_prescription=prescription, is_cpoe=user.cpoe()
     )
@@ -160,7 +174,7 @@ def _update_agg_status(prescription: Prescription, user: User):
 
     if agg_prescription is not None and agg_prescription.status != agg_status:
         _check_single_prescription(
-            prescription=agg_prescription, p_status=agg_status, user=user
+            prescription=agg_prescription, p_status=agg_status, user=user, extra=extra
         )
 
 
@@ -199,7 +213,7 @@ def get_query_prescriptions_by_agg(
 
 
 def _check_agg_internal_prescriptions(
-    prescription, p_status, user, has_lock_feature=False
+    prescription, p_status, user, has_lock_feature=False, extra={}
 ):
     q_internal_prescription = get_query_prescriptions_by_agg(
         agg_prescription=prescription, is_cpoe=user.cpoe()
@@ -219,6 +233,7 @@ def _check_agg_internal_prescriptions(
             user=user,
             parent_agg_date=prescription.date,
             has_lock_feature=has_lock_feature,
+            extra=extra,
         )
 
         if result:
@@ -228,7 +243,7 @@ def _check_agg_internal_prescriptions(
 
 
 def _check_single_prescription(
-    prescription, p_status, user, parent_agg_date=None, has_lock_feature=False
+    prescription, p_status, user, parent_agg_date=None, has_lock_feature=False, extra={}
 ):
     roles = user.config["roles"] if user.config and "roles" in user.config else []
 
@@ -241,14 +256,21 @@ def _check_single_prescription(
     prescription.update = datetime.today()
     prescription.user = user.id
 
-    _audit_check(prescription=prescription, user=user, parent_agg_date=parent_agg_date)
+    _audit_check(
+        prescription=prescription,
+        user=user,
+        parent_agg_date=parent_agg_date,
+        extra=extra,
+    )
 
     db.session.flush()
 
     return {"idPrescription": str(prescription.id), "status": p_status}
 
 
-def _audit_check(prescription: Prescription, user: User, parent_agg_date=None):
+def _audit_check(
+    prescription: Prescription, user: User, parent_agg_date=None, extra={}
+):
     a = PrescriptionAudit()
     a.auditType = (
         PrescriptionAuditTypeEnum.CHECK.value
@@ -275,6 +297,7 @@ def _audit_check(prescription: Prescription, user: User, parent_agg_date=None):
     a.agg = prescription.agg
     a.concilia = prescription.concilia
     a.bed = prescription.bed
+    a.extra = extra
     a.createdAt = datetime.today()
     a.createdBy = user.id
 
@@ -326,7 +349,7 @@ def start_evaluation(id_prescription, user):
 
 
 def is_being_evaluated(features):
-    max_evaluation_minutes = 10
+    max_evaluation_minutes = 5
 
     if (
         features != None

@@ -519,6 +519,7 @@ class PrescriptionAudit(db.Model):
     agg = db.Column("agregada", db.Boolean, nullable=True)
     concilia = db.Column("concilia", db.String(1), nullable=True)
     bed = db.Column("leito", db.String, nullable=True)
+    extra = db.Column("extra", postgresql.JSON, nullable=True)
     createdAt = db.Column("created_at", db.DateTime, nullable=False)
     createdBy = db.Column("created_by", db.Integer, nullable=False)
 
