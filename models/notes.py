@@ -94,8 +94,14 @@ class ClinicalNotes(db.Model):
         else:
             return empty_return
 
-    def getTotalIfExists(admissionNumber):
+    def getTotalIfExists(admissionNumber, admission_date=None):
         if ClinicalNotes.exists():
+            cutoff_date = (
+                datetime.today() - timedelta(days=120)
+                if admission_date == None
+                else admission_date
+            )
+
             qNotes = (
                 db.session.query(
                     func.count().label("total"),
@@ -103,7 +109,7 @@ class ClinicalNotes(db.Model):
                 .select_from(ClinicalNotes)
                 .filter(ClinicalNotes.admissionNumber == admissionNumber)
                 .filter(ClinicalNotes.isExam == None)
-                .filter(ClinicalNotes.date > (datetime.today() - timedelta(days=60)))
+                .filter(ClinicalNotes.date >= cutoff_date)
             )
 
             total = qNotes.scalar()
@@ -163,7 +169,13 @@ class ClinicalNotes(db.Model):
             .first()
         )
 
-    def getAllergies(admissionNumber):
+    def getAllergies(admissionNumber, admission_date=None):
+        cutoff_date = (
+            datetime.today() - timedelta(days=120)
+            if admission_date == None
+            else admission_date
+        )
+
         return (
             db.session.query(
                 ClinicalNotes.allergyText, func.max(ClinicalNotes.date).label("maxdate")
@@ -171,7 +183,7 @@ class ClinicalNotes(db.Model):
             .select_from(ClinicalNotes)
             .filter(ClinicalNotes.admissionNumber == admissionNumber)
             .filter(func.length(ClinicalNotes.allergyText) > 0)
-            .filter(ClinicalNotes.date > (datetime.today() - timedelta(days=60)))
+            .filter(ClinicalNotes.date >= cutoff_date)
             .group_by(ClinicalNotes.allergyText)
             .order_by(desc("maxdate"))
             .limit(50)

@@ -358,7 +358,9 @@ def getPrescription(
     clinicalNotesCount = ClinicalNotes.getCountIfExists(
         prescription[0].admissionNumber, is_pmc
     )
-    notesTotal = ClinicalNotes.getTotalIfExists(prescription[0].admissionNumber)
+    notesTotal = ClinicalNotes.getTotalIfExists(
+        prescription[0].admissionNumber, admission_date=patient.admissionDate
+    )
     notesSigns = None
     notesInfo = None
     notesAllergies = []
@@ -368,7 +370,9 @@ def getPrescription(
         notesSigns = ClinicalNotes.getSigns(prescription[0].admissionNumber)
         notesInfo = ClinicalNotes.getInfo(prescription[0].admissionNumber)
 
-        allergies = ClinicalNotes.getAllergies(prescription[0].admissionNumber)
+        allergies = ClinicalNotes.getAllergies(
+            prescription[0].admissionNumber, admission_date=patient.admissionDate
+        )
         dialysis = ClinicalNotes.getDialysis(prescription[0].admissionNumber)
 
         for a in allergies:
