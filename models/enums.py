@@ -61,6 +61,10 @@ class PrescriptionAuditTypeEnum(Enum):
     UNCHECK = 2
 
 
+class PrescriptionDrugAuditTypeEnum(Enum):
+    PROCESSED = 1
+
+
 class DrugAdminSegment(Enum):
     ADULT = 5
     KIDS = 7

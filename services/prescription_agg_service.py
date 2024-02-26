@@ -5,6 +5,7 @@ from datetime import date, timedelta
 from models.main import db
 from models.appendix import *
 from models.prescription import *
+from models.enums import PrescriptionDrugAuditTypeEnum
 from routes.prescription import getPrescription
 from routes.utils import getFeatures
 from services import prescription_drug_service, prescription_service
@@ -94,7 +95,7 @@ def create_agg_prescription_by_prescription(
             if newPrescAgg:
                 db.session.add(pAgg)
 
-    _set_processed_by_prescription(id_prescription=id_prescription)
+    _log_processed_date(id_prescription_array=[id_prescription], schema=schema)
 
 
 def create_agg_prescription_by_date(schema, admission_number, p_date, is_cpoe):
@@ -151,31 +152,41 @@ def create_agg_prescription_by_date(schema, admission_number, p_date, is_cpoe):
             )
         )
 
+        internal_prescription_ids = []
+        for h in resultAgg["data"]["headers"]:
+            internal_prescription_ids.append(h)
+
+        _log_processed_date(
+            id_prescription_array=internal_prescription_ids, schema=schema
+        )
+
     if create_new:
         db.session.add(agg_p)
 
-    _set_processed_by_agg(agg_prescription=agg_p, is_cpoe=is_cpoe)
 
+def _log_processed_date(id_prescription_array, schema):
+    query = f"""
+        insert into {schema}.presmed_audit (
+            tp_audit, fkpresmed, created_at, created_by
+        )
+        select
+            :auditType,
+            fkpresmed,
+            :createdAt,
+            0
+        from
+            {schema}.presmed
+        where
+            fkprescricao = any(:prescriptionArray)
+    """
 
-def _set_processed_by_agg(agg_prescription: Prescription, is_cpoe):
-    prescription_query = prescription_service.get_query_prescriptions_by_agg(
-        agg_prescription=agg_prescription, is_cpoe=is_cpoe, only_id=True
-    )
-
-    db.session.query(PrescriptionDrug).filter(
-        PrescriptionDrug.idPrescription.in_(prescription_query)
-    ).update(
-        {"processedDate": datetime.today()},
-        synchronize_session=False,
-    )
-
-
-def _set_processed_by_prescription(id_prescription):
-    db.session.query(PrescriptionDrug).filter(
-        PrescriptionDrug.idPrescription == id_prescription
-    ).update(
-        {"processedDate": datetime.today()},
-        synchronize_session=False,
+    db.session.execute(
+        query,
+        {
+            "auditType": PrescriptionDrugAuditTypeEnum.PROCESSED.value,
+            "prescriptionArray": id_prescription_array,
+            "createdAt": datetime.today(),
+        },
     )
 
 
