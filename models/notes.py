@@ -100,7 +100,7 @@ class ClinicalNotes(db.Model):
                 datetime.today() - timedelta(days=120)
                 if admission_date == None
                 else admission_date
-            )
+            ) - timedelta(days=1)
 
             qNotes = (
                 db.session.query(
@@ -174,7 +174,7 @@ class ClinicalNotes(db.Model):
             datetime.today() - timedelta(days=120)
             if admission_date == None
             else admission_date
-        )
+        ) - timedelta(days=1)
 
         return (
             db.session.query(
