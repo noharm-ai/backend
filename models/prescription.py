@@ -164,6 +164,20 @@ class Prescription(db.Model):
 
         if not is_cpoe:
             q = q.filter(Prescription.idSegment == idSegment)
+        else:
+            # discard all suspended
+            active_count = (
+                db.session.query(func.count().label("count"))
+                .filter(PrescriptionDrug.idPrescription == Prescription.id)
+                .filter(
+                    or_(
+                        PrescriptionDrug.suspendedDate == None,
+                        func.date(PrescriptionDrug.suspendedDate) >= aggDate,
+                    )
+                )
+                .as_scalar()
+            )
+            q = q.filter(active_count > 0)
 
         prescriptions = q.all()
 
@@ -887,7 +901,6 @@ class PrescriptionDrug(db.Model):
     suspendedDate = db.Column("dtsuspensao", db.DateTime, nullable=True)
     checked = db.Column("checado", db.Boolean, nullable=True)
     period = db.Column("periodo", db.Integer, nullable=True)
-    processedDate = db.Column("dtprocessada", db.DateTime, nullable=True)
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.Integer, nullable=True)
 
@@ -1031,6 +1044,17 @@ class PrescriptionDrug(db.Model):
                 .all(),
                 admissionHistory,
             )
+
+
+class PrescriptionDrugAudit(db.Model):
+    __tablename__ = "presmed_audit"
+
+    id = db.Column("idpresmed_audit", db.Integer, nullable=False, primary_key=True)
+    auditType = db.Column("tp_audit", db.Integer, nullable=False)
+    idPrescriptionDrug = db.Column("fkpresmed", db.Integer, nullable=False)
+    extra = db.Column("extra", postgresql.JSON, nullable=True)
+    createdAt = db.Column("created_at", db.DateTime, nullable=False)
+    createdBy = db.Column("created_by", db.Integer, nullable=False)
 
 
 class Intervention(db.Model):
