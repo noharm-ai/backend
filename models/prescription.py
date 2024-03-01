@@ -1067,6 +1067,7 @@ class Intervention(db.Model):
     idInterventionReason = db.Column(
         "idmotivointervencao", postgresql.ARRAY(db.Integer), nullable=False
     )
+    idDepartment = db.Column("fksetor", db.Integer, nullable=False)
     error = db.Column("erro", db.Boolean, nullable=True)
     cost = db.Column("custo", db.Boolean, nullable=True)
     notes = db.Column("observacao", db.String, nullable=True)

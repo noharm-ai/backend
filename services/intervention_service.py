@@ -166,29 +166,31 @@ def get_interventions(
             {
                 "id": str(i[0].id),
                 "idIntervention": str(i[0].idIntervention),
-                "idSegment": i[1].idSegment
-                if i[1]
-                else i[7].idSegment
-                if i[7]
-                else None,
+                "idSegment": (
+                    i[1].idSegment if i[1] else i[7].idSegment if i[7] else None
+                ),
                 "idInterventionReason": i[0].idInterventionReason,
                 "reasonDescription": (", ").join(i[2]),
                 "idPrescription": str(
                     i[1].idPrescription if i[1] else i[0].idPrescription
                 ),
                 "idDrug": i[1].idDrug if i[1] else None,
-                "drugName": i[3]
-                if i[3] is not None
-                else "Medicamento " + str(i[1].idDrug)
-                if i[1]
-                else "Intervenção no Paciente",
+                "drugName": (
+                    i[3]
+                    if i[3] is not None
+                    else (
+                        "Medicamento " + str(i[1].idDrug)
+                        if i[1]
+                        else "Intervenção no Paciente"
+                    )
+                ),
                 "dose": i[1].dose if i[1] else None,
-                "measureUnit": {"value": i[5].id, "label": i[5].description}
-                if i[5]
-                else "",
-                "frequency": {"value": i[6].id, "label": i[6].description}
-                if i[6]
-                else "",
+                "measureUnit": (
+                    {"value": i[5].id, "label": i[5].description} if i[5] else ""
+                ),
+                "frequency": (
+                    {"value": i[6].id, "label": i[6].description} if i[6] else ""
+                ),
                 "time": timeValue(i[1].interval) if i[1] else None,
                 "route": i[1].route if i[1] else "None",
                 "admissionNumber": i[0].admissionNumber,
@@ -304,6 +306,17 @@ def save_intervention(
         i.economy_days = economy_days
     if expended_dose != -1:
         i.expended_dose = expended_dose
+
+    if i.admissionNumber != None and i.idDepartment == None:
+        currentDepartment = (
+            db.session.query(Prescription.idDepartment)
+            .filter(Prescription.admissionNumber == i.admissionNumber)
+            .order_by(desc(Prescription.date))
+            .first()
+        )
+
+        if currentDepartment != None:
+            i.idDepartment = currentDepartment[0]
 
     if new_status != i.status:
         if i.status == "0":
