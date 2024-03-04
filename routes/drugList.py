@@ -100,6 +100,7 @@ class DrugList:
             pdUnit = strNone(pd[2].id) if pd[2] else ""
             pdWhiteList = bool(pd[6].whiteList) if pd[6] is not None else False
             doseWeightStr = None
+            doseBodySurfaceStr = None
             expireDay = pd[10].day if pd[10] else 0
 
             idDrugAgg = pd[0].idDrug * 10 + expireDay
@@ -200,6 +201,14 @@ class DrugList:
                             "Medicamento potencialmente inapropriado para idosos, independente das comorbidades do paciente."
                         )
                         self.alertStats["elderly"] += 1
+
+                    if pd[6].chemo:
+                        bs_weight = none2zero(self.exams["weight"])
+                        bs_height = none2zero(self.exams["height"])
+
+                        if bs_weight != 0 and bs_height != 0:
+                            body_surface = math.sqrt((bs_weight * bs_height) / 3600)
+                            doseBodySurfaceStr = f"""{strFormatBR(round(pd[0].dose / body_surface, 2))} {pdUnit}/m²"""
 
                     if pd[6].useWeight and pd[0].dose:
                         weight = none2zero(self.exams["weight"])
@@ -377,9 +386,11 @@ class DrugList:
                     "idPrescription": str(pd[0].idPrescription),
                     "idPrescriptionDrug": str(pd[0].id),
                     "idDrug": pd[0].idDrug,
-                    "drug": pd[1].name
-                    if pd[1] is not None
-                    else "Medicamento " + str(pd[0].idDrug),
+                    "drug": (
+                        pd[1].name
+                        if pd[1] is not None
+                        else "Medicamento " + str(pd[0].idDrug)
+                    ),
                     "np": pd[6].notdefault if pd[6] is not None else False,
                     "am": pd[6].antimicro if pd[6] is not None else False,
                     "av": pd[6].mav if pd[6] is not None else False,
@@ -389,48 +400,57 @@ class DrugList:
                     "allergy": bool(pd[0].allergy == "S"),
                     "whiteList": pdWhiteList,
                     "doseWeight": doseWeightStr,
+                    "doseBodySurface": doseBodySurfaceStr,
                     "dose": pd[0].dose,
-                    "measureUnit": {"value": pd[2].id, "label": pd[2].description}
-                    if pd[2]
-                    else {
-                        "value": strNone(pd[0].idMeasureUnit),
-                        "label": strNone(pd[0].idMeasureUnit),
-                    },
-                    "frequency": {"value": pd[3].id, "label": pd[3].description}
-                    if pd[3]
-                    else {
-                        "value": strNone(pd[0].idFrequency),
-                        "label": strNone(pd[0].idFrequency),
-                    },
+                    "measureUnit": (
+                        {"value": pd[2].id, "label": pd[2].description}
+                        if pd[2]
+                        else {
+                            "value": strNone(pd[0].idMeasureUnit),
+                            "label": strNone(pd[0].idMeasureUnit),
+                        }
+                    ),
+                    "frequency": (
+                        {"value": pd[3].id, "label": pd[3].description}
+                        if pd[3]
+                        else {
+                            "value": strNone(pd[0].idFrequency),
+                            "label": strNone(pd[0].idFrequency),
+                        }
+                    ),
                     "dayFrequency": pd[0].frequency,
                     "doseconv": pd[0].doseconv,
                     "time": timeValue(pd[0].interval),
                     "interval": pd[0].interval,
-                    "recommendation": pd[0].notes
-                    if pd[0].notes and len(pd[0].notes.strip()) > 0
-                    else None,
+                    "recommendation": (
+                        pd[0].notes
+                        if pd[0].notes and len(pd[0].notes.strip()) > 0
+                        else None
+                    ),
                     "period": period,
                     "periodFixed": pd[0].period,
                     "totalPeriod": total_period,
                     "periodDates": [],
                     "route": pd[0].route,
-                    "grp_solution": pd[0].cpoe_group
-                    if self.is_cpoe
-                    else pd[0].solutionGroup,
-                    "stage": "ACM"
-                    if pd[0].solutionACM == "S"
-                    else strNone(pd[0].solutionPhase)
-                    + " x "
-                    + strNone(pd[0].solutionTime)
-                    + " ("
-                    + strNone(pd[0].solutionTotalTime)
-                    + ")",
+                    "grp_solution": (
+                        pd[0].cpoe_group if self.is_cpoe else pd[0].solutionGroup
+                    ),
+                    "stage": (
+                        "ACM"
+                        if pd[0].solutionACM == "S"
+                        else strNone(pd[0].solutionPhase)
+                        + " x "
+                        + strNone(pd[0].solutionTime)
+                        + " ("
+                        + strNone(pd[0].solutionTotalTime)
+                        + ")"
+                    ),
                     "infusion": strNone(pd[0].solutionDose)
                     + " "
                     + strNone(pd[0].solutionUnit),
-                    "score": str(pd[5])
-                    if not pdWhiteList and source != "Dietas"
-                    else "0",
+                    "score": (
+                        str(pd[5]) if not pdWhiteList and source != "Dietas" else "0"
+                    ),
                     "source": pd[0].source,
                     "checked": bool(pd[0].checked or pd[9] == "s"),
                     "suspended": bool(pd[0].suspendedDate),
@@ -530,16 +550,22 @@ class DrugList:
                         "idPrescription": str(pd[0].idPrescription),
                         "idPrescriptionDrug": str(pd[0].id),
                         "idDrug": pd[0].idDrug,
-                        "drug": pd[1].name
-                        if pd[1] is not None
-                        else "Medicamento " + str(pd[0].idDrug),
+                        "drug": (
+                            pd[1].name
+                            if pd[1] is not None
+                            else "Medicamento " + str(pd[0].idDrug)
+                        ),
                         "dose": pd[0].dose,
-                        "measureUnit": {"value": pd[2].id, "label": pd[2].description}
-                        if pd[2]
-                        else "",
-                        "frequency": {"value": pd[3].id, "label": pd[3].description}
-                        if pd[3]
-                        else "",
+                        "measureUnit": (
+                            {"value": pd[2].id, "label": pd[2].description}
+                            if pd[2]
+                            else ""
+                        ),
+                        "frequency": (
+                            {"value": pd[3].id, "label": pd[3].description}
+                            if pd[3]
+                            else ""
+                        ),
                         "time": timeValue(pd[0].interval),
                         "recommendation": pd[0].notes,
                     }
