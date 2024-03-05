@@ -63,6 +63,7 @@ class PrescriptionAuditTypeEnum(Enum):
 
 class PrescriptionDrugAuditTypeEnum(Enum):
     PROCESSED = 1
+    UPSERT = 2
 
 
 class DrugAdminSegment(Enum):
