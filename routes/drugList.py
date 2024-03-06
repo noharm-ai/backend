@@ -381,6 +381,16 @@ class DrugList:
                 prevNotesUser = str(pd[8]).replace("##@", "(").replace("@##", ")")
                 prevNotes = re.sub(r"##@(.*)@##", "", str(pd[8]))
 
+            dialyzable = False
+            if (
+                pd[6] != None
+                and pd[6].dialyzable
+                and self.dialysis != None
+                and self.dialysis != "0"
+            ):
+                # dialyzable drug and dialysis patient
+                dialyzable = True
+
             pDrugs.append(
                 {
                     "idPrescription": str(pd[0].idPrescription),
@@ -396,6 +406,7 @@ class DrugList:
                     "av": pd[6].mav if pd[6] is not None else False,
                     "c": pd[6].controlled if pd[6] is not None else False,
                     "q": pd[6].chemo if pd[6] is not None else False,
+                    "dialyzable": dialyzable,
                     "alergy": bool(pd[0].allergy == "S"),
                     "allergy": bool(pd[0].allergy == "S"),
                     "whiteList": pdWhiteList,

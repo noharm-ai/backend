@@ -485,6 +485,7 @@ def getPrescription(
             "height": patientHeight,
             "weight": patientWeight,
             "dialysis": patient.dialysis,
+            "patient": {"lactating": patient.lactating, "pregnant": patient.pregnant},
             "observation": prescription[6],
             "notes": prescription[7],
             "alert": prescription[8],

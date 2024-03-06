@@ -561,6 +561,8 @@ class Patient(db.Model):
     dischargeReason = db.Column("motivoalta", db.String, nullable=True)
     dischargeDate = db.Column("dtalta", db.DateTime, nullable=True)
     dialysis = db.Column("dialise", db.String(1), nullable=True)
+    lactating = db.Column("lactante", db.Boolean, nullable=True)
+    pregnant = db.Column("gestante", db.Boolean, nullable=True)
 
     def findByAdmission(admissionNumber):
         return (

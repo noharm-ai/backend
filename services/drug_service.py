@@ -181,6 +181,9 @@ def get_attributes(id_segment, id_drug, user):
         "chemo": attr.chemo,
         "sctid": str(drug.sctid),
         "drugRef": drug_ref,
+        "dialyzable": attr.dialyzable,
+        "pregnant": attr.pregnant,
+        "lactating": attr.lactating,
     }
 
 
@@ -254,6 +257,12 @@ def save_attributes(id_segment, id_drug, data, user):
         attr.whiteList = data.get("whiteList", None)
         if not attr.whiteList:
             attr.whiteList = None
+    if "dialyzable" in data.keys():
+        attr.dialyzable = bool(data.get("dialyzable", 0))
+    if "pregnant" in data.keys():
+        attr.pregnant = data.get("pregnant", None)
+    if "lactating" in data.keys():
+        attr.lactating = data.get("lactating", None)
 
     attr.update = datetime.today()
     attr.user = user.id
@@ -319,11 +328,14 @@ def copy_substance_default_attributes(id_drug, sctid, user: User, overwrite=True
             da.chemo = reference.chemo
             da.elderly = reference.elderly
             da.whiteList = reference.whiteList
+            da.dialyzable = reference.dialyzable
 
             da.kidney = reference.kidney
             da.liver = reference.liver
             da.platelets = reference.platelets
             da.fallRisk = reference.fallRisk
+            da.lactating = reference.lactating
+            da.pregnant = reference.pregnant
 
             # controls
             da.update = datetime.today()
@@ -371,11 +383,14 @@ def create_attributes_from_reference(id_drug, id_segment, user):
             da.chemo = reference.chemo
             da.elderly = reference.elderly
             da.whiteList = reference.whiteList
+            da.dialyzable = reference.dialyzable
 
             da.kidney = reference.kidney
             da.liver = reference.liver
             da.platelets = reference.platelets
             da.fallRisk = reference.fallRisk
+            da.lactating = reference.lactating
+            da.pregnant = reference.pregnant
 
         # controls
         da.update = datetime.today()

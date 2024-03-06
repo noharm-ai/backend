@@ -252,6 +252,10 @@ def setPatientData(admissionNumber):
             p.height = data.get("height", None)
         if "dialysis" in data.keys():
             p.dialysis = data.get("dialysis", None)
+        if "lactating" in data.keys():
+            p.lactating = data.get("lactating", None)
+        if "pregnant" in data.keys():
+            p.pregnant = data.get("pregnant", None)
         if "observation" in data.keys():
             p.observation = data.get("observation", None)
         if "skinColor" in data.keys():

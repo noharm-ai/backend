@@ -175,10 +175,14 @@ def get_drug_list(
             ["sonda", DrugAttributes.tube],
             ["naopadronizado", DrugAttributes.notdefault],
             ["linhabranca", DrugAttributes.whiteList],
+            ["dialisavel", DrugAttributes.dialyzable],
             ["renal", DrugAttributes.kidney],
             ["hepatico", DrugAttributes.liver],
             ["plaquetas", DrugAttributes.platelets],
             ["dosemaxima", DrugAttributes.maxDose],
+            ["risco_queda", DrugAttributes.fallRisk],
+            ["lactante", DrugAttributes.lactating],
+            ["gestante", DrugAttributes.pregnant],
         ]
 
         for a in bool_attributes:
@@ -357,6 +361,10 @@ def copy_drug_attributes(
         "naopadronizado",
         "linhabranca",
         "dosemaxima",
+        "risco_queda",
+        "dialisavel",
+        "lactante",
+        "gestante",
     ]
     set_attributes = []
     for a in attributes:
@@ -371,6 +379,9 @@ def copy_drug_attributes(
                 ma.hepatico,
                 ma.plaquetas,
                 ma.dosemaxima,
+                ma.risco_queda,
+                ma.lactante,
+                ma.gestante,
                 coalesce(ma.mav, false) as mav,
                 coalesce(ma.idoso, false) as idoso,
                 coalesce(ma.controlados, false) as controlados,
@@ -378,7 +389,8 @@ def copy_drug_attributes(
                 coalesce(ma.quimio, false) as quimio,
                 coalesce(ma.sonda, false) as sonda,
                 coalesce(ma.naopadronizado, false) as naopadronizado,
-                coalesce(ma.linhabranca, false) as linhabranca
+                coalesce(ma.linhabranca, false) as linhabranca,
+                coalesce(ma.dialisavel, false) as dialisavel,
             from
                 {origin_schema}.medatributos ma
                 inner join {origin_schema}.medicamento m on (ma.fkmedicamento = m.fkmedicamento)
