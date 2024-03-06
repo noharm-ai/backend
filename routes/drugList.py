@@ -202,7 +202,7 @@ class DrugList:
                         )
                         self.alertStats["elderly"] += 1
 
-                    if pd[6].chemo:
+                    if pd[6].chemo and pd[0].dose:
                         bs_weight = none2zero(self.exams["weight"])
                         bs_height = none2zero(self.exams["height"])
 
