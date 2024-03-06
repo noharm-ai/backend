@@ -554,7 +554,15 @@ class DrugList:
     @staticmethod
     def conciliaList(pDrugs, result=[]):
         for pd in pDrugs:
-            existsDrug = next((d for d in result if d["idDrug"] == pd[0].idDrug), False)
+            existsDrug = next(
+                (
+                    d
+                    for d in result
+                    if d["idDrug"] == pd[0].idDrug
+                    and d["recommendation"] == pd[0].notes
+                ),
+                False,
+            )
             if not existsDrug and not bool(pd[0].suspendedDate):
                 result.append(
                     {
