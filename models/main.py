@@ -226,6 +226,9 @@ class DrugAttributesBase:
     price = db.Column("custo", db.Float, nullable=True)
     maxTime = db.Column("tempotratamento", db.Integer, nullable=True)
     fallRisk = db.Column("risco_queda", db.Integer, nullable=True)
+    dialyzable = db.Column("dialisavel", db.Boolean, nullable=True)
+    pregnant = db.Column("gestante", db.String, nullable=True)
+    lactating = db.Column("lactante", db.String, nullable=True)
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.Integer, nullable=True)
 

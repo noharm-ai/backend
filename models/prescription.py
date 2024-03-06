@@ -561,6 +561,8 @@ class Patient(db.Model):
     dischargeReason = db.Column("motivoalta", db.String, nullable=True)
     dischargeDate = db.Column("dtalta", db.DateTime, nullable=True)
     dialysis = db.Column("dialise", db.String(1), nullable=True)
+    lactating = db.Column("lactante", db.Boolean, nullable=True)
+    pregnant = db.Column("gestante", db.Boolean, nullable=True)
 
     def findByAdmission(admissionNumber):
         return (
@@ -1067,6 +1069,7 @@ class Intervention(db.Model):
     idInterventionReason = db.Column(
         "idmotivointervencao", postgresql.ARRAY(db.Integer), nullable=False
     )
+    idDepartment = db.Column("fksetor", db.Integer, nullable=False)
     error = db.Column("erro", db.Boolean, nullable=True)
     cost = db.Column("custo", db.Boolean, nullable=True)
     notes = db.Column("observacao", db.String, nullable=True)

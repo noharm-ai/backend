@@ -146,16 +146,18 @@ def getPrescriptions():
                     "idPatient": str(p[0].idPatient),
                     "name": patient.admissionNumber,
                     "admissionNumber": patient.admissionNumber,
-                    "birthdate": patient.birthdate.isoformat()
-                    if patient.birthdate
-                    else None,
+                    "birthdate": (
+                        patient.birthdate.isoformat() if patient.birthdate else None
+                    ),
                     "gender": patient.gender,
                     "weight": patient.weight,
                     "skinColor": patient.skinColor,
                     "lengthStay": lenghStay(patient.admissionDate),
-                    "dischargeDate": patient.dischargeDate.isoformat()
-                    if patient.dischargeDate
-                    else None,
+                    "dischargeDate": (
+                        patient.dischargeDate.isoformat()
+                        if patient.dischargeDate
+                        else None
+                    ),
                     "dischargeReason": patient.dischargeReason,
                     "date": p[0].date.isoformat(),
                     "department": str(p[2]),
@@ -402,11 +404,7 @@ def getPrescription(
         alertExams += int(exams[e]["alert"])
 
     exams = dict(
-        exams,
-        **{
-            "age": age,
-            "weight": patientWeight,
-        }
+        exams, **{"age": age, "weight": patientWeight, "height": patientHeight}
     )
 
     drugList = DrugList(
@@ -479,26 +477,27 @@ def getPrescription(
             "concilia": prescription[0].concilia,
             "conciliaList": conciliaList,
             "admissionNumber": prescription[0].admissionNumber,
-            "admissionDate": patient.admissionDate.isoformat()
-            if patient.admissionDate
-            else None,
+            "admissionDate": (
+                patient.admissionDate.isoformat() if patient.admissionDate else None
+            ),
             "birthdate": patient.birthdate.isoformat() if patient.birthdate else None,
             "gender": patient.gender,
             "height": patientHeight,
             "weight": patientWeight,
             "dialysis": patient.dialysis,
+            "patient": {"lactating": patient.lactating, "pregnant": patient.pregnant},
             "observation": prescription[6],
             "notes": prescription[7],
             "alert": prescription[8],
-            "alertExpire": patient.alertExpire.isoformat()
-            if patient.alertExpire
-            else None,
+            "alertExpire": (
+                patient.alertExpire.isoformat() if patient.alertExpire else None
+            ),
             "age": age,
             "weightUser": bool(patient.user),
             "weightDate": patientWeightDate.isoformat() if patientWeightDate else None,
-            "dischargeDate": patient.dischargeDate.isoformat()
-            if patient.dischargeDate
-            else None,
+            "dischargeDate": (
+                patient.dischargeDate.isoformat() if patient.dischargeDate else None
+            ),
             "dischargeReason": patient.dischargeReason,
             "bed": prescription[0].bed,
             "record": prescription[0].record,
@@ -508,9 +507,9 @@ def getPrescription(
             "lastDepartment": lastDept[0] if lastDept else None,
             "patientScore": "High",
             "date": prescription[0].date.isoformat(),
-            "expire": prescription[0].expire.isoformat()
-            if prescription[0].expire
-            else None,
+            "expire": (
+                prescription[0].expire.isoformat() if prescription[0].expire else None
+            ),
             "prescription": pDrugs,
             "solution": pSolution,
             "procedures": pProcedures,
