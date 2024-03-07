@@ -55,7 +55,7 @@ def create_ticket(user, from_url, filelist, category, description):
                 action="create",
                 payload=[
                     {
-                        "name": "Anexo",
+                        "name": f.filename,
                         "res_model": "helpdesk.ticket",
                         "res_id": result[0]["id"],
                         "type": "binary",
