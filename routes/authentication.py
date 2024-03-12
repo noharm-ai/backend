@@ -134,22 +134,17 @@ def get_auth_provider(schema):
 @jwt_required(refresh=True, locations=["cookies", "headers"])
 def refreshToken():
     current_user = get_jwt_identity()
+    current_claims = get_jwt()
 
-    user = (
-        db.session.query(User)
-        .filter(User.id == current_user)
-        .filter(User.active == True)
-        .first()
-    )
-    if user != None:
+    if "schema" in current_claims:
+        claims = {
+            "schema": current_claims["schema"],
+            "config": current_claims["config"],
+        }
+    else:
+        db_session = db.create_scoped_session()
+        user = db_session.query(User).filter(User.id == current_user).first()
         claims = {"schema": user.schema, "config": user.config}
 
-        access_token = create_access_token(
-            identity=current_user, additional_claims=claims
-        )
-        return {"access_token": access_token}
-    else:
-        return {
-            "status": "error",
-            "message": "Usuário inválido",
-        }, status.HTTP_401_UNAUTHORIZED
+    access_token = create_access_token(identity=current_user, additional_claims=claims)
+    return {"access_token": access_token}
