@@ -170,9 +170,9 @@ def _auth_user(
         "email": user.email,
         "schema": user_schema,
         "roles": user_config["roles"] if user_config and "roles" in user_config else [],
-        "userFeatures": user_config["features"]
-        if user_config and "features" in user_config
-        else [],
+        "userFeatures": (
+            user_config["features"] if user_config and "features" in user_config else []
+        ),
         "features": features.value if features is not None else [],
         "preferences": preferences.value if preferences is not None else None,
         "nameUrl": nameUrl["value"] if "value" in nameUrl else None,
@@ -212,12 +212,16 @@ def pre_auth(email, password):
             schemas.append(
                 {
                     "name": s.schemaName,
-                    "defaultRoles": s.config["defaultRoles"]
-                    if s.config != None and "defaultRoles" in s.config
-                    else [],
-                    "extraRoles": s.config["extraRoles"]
-                    if s.config != None and "extraRoles" in s.config
-                    else [],
+                    "defaultRoles": (
+                        s.config["defaultRoles"]
+                        if s.config != None and "defaultRoles" in s.config
+                        else []
+                    ),
+                    "extraRoles": (
+                        s.config["extraRoles"]
+                        if s.config != None and "extraRoles" in s.config
+                        else []
+                    ),
                 }
             )
 
@@ -234,7 +238,7 @@ def auth_local(
     run_as_basic_user=False,
     extra_features=[],
 ):
-    preCheckUser = User.query.filter_by(email=email).first()
+    preCheckUser = User.query.filter_by(email=email.lower()).first()
 
     if preCheckUser is None:
         raise ValidationError(
@@ -426,7 +430,7 @@ def auth_provider(code, schema):
 
 
 def _get_oauth_user(email, name, schema, oauth_config):
-    db_user = User.query.filter_by(email=email).first()
+    db_user = User.query.filter_by(email=email.lower()).first()
 
     if db_user is None:
         if not oauth_config["create_user"]:
@@ -438,7 +442,7 @@ def _get_oauth_user(email, name, schema, oauth_config):
 
         nh_user = User()
         nh_user.name = name
-        nh_user.email = email
+        nh_user.email = email.lower()
         nh_user.schema = schema
         nh_user.config = {"roles": []}
         nh_user.active = True
