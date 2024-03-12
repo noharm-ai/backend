@@ -116,12 +116,16 @@ def get_auth_provider(schema):
             "redirectUri": oauth_config.value["redirect_uri"],
             "clientId": oauth_config.value["client_id"],
             "company": oauth_config.value["company"],
-            "flow": oauth_config.value["flow"]
-            if "flow" in oauth_config.value
-            else "implicit",
-            "codeChallengeMethod": oauth_config.value["code_challenge_method"]
-            if "code_challenge_method" in oauth_config.value
-            else None,
+            "flow": (
+                oauth_config.value["flow"]
+                if "flow" in oauth_config.value
+                else "implicit"
+            ),
+            "codeChallengeMethod": (
+                oauth_config.value["code_challenge_method"]
+                if "code_challenge_method" in oauth_config.value
+                else None
+            ),
         },
     }, status.HTTP_200_OK
 
@@ -130,17 +134,22 @@ def get_auth_provider(schema):
 @jwt_required(refresh=True, locations=["cookies", "headers"])
 def refreshToken():
     current_user = get_jwt_identity()
-    current_claims = get_jwt()
 
-    if "schema" in current_claims:
-        claims = {
-            "schema": current_claims["schema"],
-            "config": current_claims["config"],
-        }
-    else:
-        db_session = db.create_scoped_session()
-        user = db_session.query(User).filter(User.id == current_user).first()
+    user = (
+        db.session.query(User)
+        .filter(User.id == current_user)
+        .filter(User.active == True)
+        .first()
+    )
+    if user != None:
         claims = {"schema": user.schema, "config": user.config}
 
-    access_token = create_access_token(identity=current_user, additional_claims=claims)
-    return {"access_token": access_token}
+        access_token = create_access_token(
+            identity=current_user, additional_claims=claims
+        )
+        return {"access_token": access_token}
+    else:
+        return {
+            "status": "error",
+            "message": "Usuário inválido",
+        }, status.HTTP_401_UNAUTHORIZED
