@@ -54,16 +54,24 @@ class FeatureEnum(Enum):
     OAUTH = "OAUTH"
     LOCK_CHECKED_PRESCRIPTION = "LOCK_CHECKED_PRESCRIPTION"
     DISABLE_SOLUTION_TAB = "DISABLE_SOLUTION_TAB"
+    PATIENT_REVISION = "PATIENT_REVISION"
 
 
 class PrescriptionAuditTypeEnum(Enum):
     CHECK = 1
     UNCHECK = 2
+    REVISION = 3
+    UNDO_REVISION = 4
 
 
 class PrescriptionDrugAuditTypeEnum(Enum):
     PROCESSED = 1
     UPSERT = 2
+
+
+class PrescriptionReviewTypeEnum(Enum):
+    PENDING = 0
+    REVIEWED = 1
 
 
 class DrugAdminSegment(Enum):

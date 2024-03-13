@@ -5,9 +5,15 @@ from flask_api import status
 from models.main import db
 from models.appendix import *
 from models.prescription import *
-from models.enums import RoleEnum, PrescriptionAuditTypeEnum, DrugTypeEnum, FeatureEnum
+from models.enums import (
+    RoleEnum,
+    PrescriptionAuditTypeEnum,
+    DrugTypeEnum,
+    FeatureEnum,
+    PrescriptionReviewTypeEnum,
+)
 from exception.validation_error import ValidationError
-from services import prescription_drug_service, memory_service
+from services import prescription_drug_service, memory_service, permission_service
 
 
 def search(search_key):
@@ -78,7 +84,7 @@ def search(search_key):
 
 def check_prescription(idPrescription, p_status, user, evaluation_time):
     roles = user.config["roles"] if user.config and "roles" in user.config else []
-    if RoleEnum.SUPPORT.value in roles:
+    if not permission_service.is_pharma(user):
         raise ValidationError(
             "Usuário não autorizado",
             "errors.unauthorizedUser",
@@ -108,11 +114,13 @@ def check_prescription(idPrescription, p_status, user, evaluation_time):
     extra_info = {
         "main_prescription": str(p.id),
         "main_is_agg": bool(p.agg),
-        "main_evaluationStartDate": p.features["evaluation"]["startDate"]
-        if p.features != None
-        and "evaluation" in p.features
-        and "startDate" in p.features["evaluation"]
-        else None,
+        "main_evaluationStartDate": (
+            p.features["evaluation"]["startDate"]
+            if p.features != None
+            and "evaluation" in p.features
+            and "startDate" in p.features["evaluation"]
+            else None
+        ),
         "evaluationTime": evaluation_time or 0,
     }
 
@@ -364,3 +372,91 @@ def is_being_evaluated(features):
         return current_evaluation_minutes <= max_evaluation_minutes
 
     return False
+
+
+def review_prescription(idPrescription, user, review_type, evaluation_time):
+    if not permission_service.is_pharma(user):
+        raise ValidationError(
+            "Usuário não autorizado",
+            "errors.unauthorizedUser",
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
+    prescription = Prescription.query.get(idPrescription)
+    if prescription is None:
+        raise ValidationError(
+            "Prescrição inexistente",
+            "errors.invalidRegister",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    if not prescription.agg:
+        raise ValidationError(
+            "A revisão somente está disponível para Pacientes. Não é possível revisar prescrições individuais.",
+            "errors.invalidRegister",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    if (
+        review_type != PrescriptionReviewTypeEnum.REVIEWED.value
+        and review_type != PrescriptionReviewTypeEnum.PENDING.value
+    ):
+        raise ValidationError(
+            "Status de revisão inexistente",
+            "errors.invalidRegister",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    prescription.reviewType = review_type
+    db.session.flush()
+
+    a = PrescriptionAudit()
+    a.auditType = (
+        PrescriptionAuditTypeEnum.REVISION.value
+        if review_type == PrescriptionReviewTypeEnum.REVIEWED.value
+        else PrescriptionAuditTypeEnum.UNDO_REVISION.value
+    )
+    a.admissionNumber = prescription.admissionNumber
+    a.idPrescription = prescription.id
+    a.prescriptionDate = prescription.date
+    a.idDepartment = prescription.idDepartment
+    a.idSegment = prescription.idSegment
+
+    a.totalItens = prescription_drug_service.count_drugs_by_prescription(
+        prescription=prescription,
+        drug_types=[
+            DrugTypeEnum.DRUG.value,
+            DrugTypeEnum.PROCEDURE.value,
+            DrugTypeEnum.SOLUTION.value,
+        ],
+        user=user,
+    )
+
+    a.extra = {
+        "main_evaluationStartDate": (
+            prescription.features["evaluation"]["startDate"]
+            if prescription.features != None
+            and "evaluation" in prescription.features
+            and "startDate" in prescription.features["evaluation"]
+            else None
+        ),
+        "evaluationTime": evaluation_time or 0,
+    }
+
+    a.agg = prescription.agg
+    a.concilia = prescription.concilia
+    a.bed = prescription.bed
+    a.createdAt = datetime.today()
+    a.createdBy = user.id
+
+    db.session.add(a)
+
+    db_user = db.session.query(User).filter(User.id == user.id).first()
+
+    return {
+        "reviewed": (
+            True if review_type == PrescriptionReviewTypeEnum.REVIEWED.value else False
+        ),
+        "reviewedAt": datetime.today().isoformat(),
+        "reviewedBy": db_user.name,
+    }

@@ -9,6 +9,8 @@ from sqlalchemy.sql.expression import literal_column, case
 from functools import partial
 from sqlalchemy.dialects.postgresql import TSRANGE
 
+from models.enums import PrescriptionReviewTypeEnum
+
 
 class Prescription(db.Model):
     __tablename__ = "prescricao"
@@ -37,6 +39,7 @@ class Prescription(db.Model):
     )
     concilia = db.Column("concilia", db.String(1), nullable=True)
     insurance = db.Column("convenio", db.String, nullable=True)
+    reviewType = db.Column("tp_revisao", db.Integer, nullable=True)
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.Integer, nullable=True)
 
@@ -589,6 +592,7 @@ class Patient(db.Model):
         patientStatus=None,
         substances=[],
         substanceClasses=[],
+        patientReviewType=None,
     ):
         q = (
             db.session.query(Prescription, Patient, Department.name.label("department"))
@@ -639,6 +643,17 @@ class Patient(db.Model):
 
         if patientStatus == "ACTIVE":
             q = q.filter(Patient.dischargeDate == None)
+
+        if bool(int(none2zero(agg))) and patientReviewType != None:
+            if int(patientReviewType) == PrescriptionReviewTypeEnum.PENDING.value:
+                q = q.filter(
+                    Prescription.reviewType == PrescriptionReviewTypeEnum.PENDING.value
+                )
+
+            if int(patientReviewType) == PrescriptionReviewTypeEnum.REVIEWED.value:
+                q = q.filter(
+                    Prescription.reviewType == PrescriptionReviewTypeEnum.REVIEWED.value
+                )
 
         if bool(int(none2zero(agg))):
             q = q.filter(Prescription.agg == True)
