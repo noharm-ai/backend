@@ -116,12 +116,16 @@ def get_auth_provider(schema):
             "redirectUri": oauth_config.value["redirect_uri"],
             "clientId": oauth_config.value["client_id"],
             "company": oauth_config.value["company"],
-            "flow": oauth_config.value["flow"]
-            if "flow" in oauth_config.value
-            else "implicit",
-            "codeChallengeMethod": oauth_config.value["code_challenge_method"]
-            if "code_challenge_method" in oauth_config.value
-            else None,
+            "flow": (
+                oauth_config.value["flow"]
+                if "flow" in oauth_config.value
+                else "implicit"
+            ),
+            "codeChallengeMethod": (
+                oauth_config.value["code_challenge_method"]
+                if "code_challenge_method" in oauth_config.value
+                else None
+            ),
         },
     }, status.HTTP_200_OK
 

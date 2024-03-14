@@ -11,6 +11,12 @@ def has_maintainer_permission(user):
     return has_any_role(user, RoleEnum.ADMIN.value, RoleEnum.TRAINING.value)
 
 
+def is_pharma(user):
+    return not has_any_role(
+        user, RoleEnum.ADMIN.value, RoleEnum.TRAINING.value, RoleEnum.SUPPORT.value
+    )
+
+
 def has_any_role(user, *roles):
     user_roles = set(_get_roles(user))
 

@@ -391,6 +391,7 @@ def _get_audit_list(user):
             left join public.usuario u on pa.created_by = u.idusuario
         where 
             pa.created_at > now() - interval '2 months'
+            and pa.tp_audit in (1, 2)
         order by
             pa.created_at
     """

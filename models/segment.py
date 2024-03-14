@@ -91,7 +91,7 @@ class Exams(db.Model):
         results = (
             Exams.query.distinct(Exams.typeExam)
             .filter(Exams.idPatient == patient.idPatient)
-            .filter(Exams.date >= (date.today() - timedelta(days=15)))
+            .filter(Exams.date >= (date.today() - timedelta(days=5)))
             .order_by(Exams.typeExam, Exams.date.desc())
         )
 

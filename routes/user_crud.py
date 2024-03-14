@@ -52,6 +52,9 @@ def createUser(idUser=None):
         userEmail = data.get("email", None)
         userName = data.get("name", None)
 
+        if userEmail != None:
+            userEmail = userEmail.lower()
+
         emailExists = User.findByEmail(userEmail) != None
 
         if emailExists:

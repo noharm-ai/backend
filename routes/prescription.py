@@ -26,7 +26,12 @@ from services import (
     patient_service,
 )
 from converter import prescription_converter
-from models.enums import MemoryEnum, FeatureEnum
+from models.enums import (
+    MemoryEnum,
+    FeatureEnum,
+    PrescriptionAuditTypeEnum,
+    PrescriptionReviewTypeEnum,
+)
 from exception.validation_error import ValidationError
 
 app_pres = Blueprint("app_pres", __name__)
@@ -54,6 +59,7 @@ def getPrescriptions():
     substances = request.args.getlist("substances[]")
     substanceClasses = request.args.getlist("substanceClasses[]")
     patientStatus = request.args.get("patientStatus", None)
+    patientReviewType = request.args.get("patientReviewType", None)
 
     patients = Patient.getPatients(
         idSegment=idSegment,
@@ -73,6 +79,7 @@ def getPrescriptions():
         patientStatus=patientStatus,
         substances=substances,
         substanceClasses=substanceClasses,
+        patientReviewType=patientReviewType,
     )
 
     results = []
@@ -426,6 +433,29 @@ def getPrescription(
     else:
         pDrugs = drugList.getDrugType([], ["Medicamentos"])
 
+    reviewed = False
+    reviewed_by = None
+    reviewed_at = None
+    if prescription[0].reviewType == PrescriptionReviewTypeEnum.REVIEWED.value:
+        reviewed = True
+
+        if is_complete:
+            reviewed_log = (
+                db.session.query(PrescriptionAudit, User)
+                .join(User, PrescriptionAudit.createdBy == User.id)
+                .filter(PrescriptionAudit.idPrescription == prescription[0].id)
+                .filter(
+                    PrescriptionAudit.auditType
+                    == PrescriptionAuditTypeEnum.REVISION.value
+                )
+                .order_by(desc(PrescriptionAudit.createdAt))
+                .first()
+            )
+
+            if reviewed_log != None:
+                reviewed_by = reviewed_log[1].name
+                reviewed_at = reviewed_log[0].createdAt.isoformat()
+
     conciliaList = []
     if prescription[0].concilia:
         pDrugs = drugList.changeDrugName(pDrugs)
@@ -560,6 +590,11 @@ def getPrescription(
             "insurance": prescription[11],
             "formTemplate": formTemplate.value if formTemplate else None,
             "admissionReports": admission_reports.value if admission_reports else None,
+            "review": {
+                "reviewed": reviewed,
+                "reviewedAt": reviewed_at,
+                "reviewedBy": reviewed_by,
+            },
         },
     }, status.HTTP_200_OK
 
@@ -610,6 +645,35 @@ def setPrescriptionStatus():
             p_status=p_status,
             user=user,
             evaluation_time=evaluation_time,
+        )
+    except ValidationError as e:
+        return {
+            "status": "error",
+            "message": str(e),
+            "code": e.code,
+        }, e.httpStatus
+
+    return tryCommit(db, result, user.permission())
+
+
+@app_pres.route("/prescriptions/review", methods=["POST"])
+@jwt_required()
+def review_prescription():
+    data = request.get_json()
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+    os.environ["TZ"] = "America/Sao_Paulo"
+
+    id_prescription = data.get("idPrescription", None)
+    evaluation_time = data.get("evaluationTime", None)
+    review_type = data.get("reviewType", None)
+
+    try:
+        result = prescription_service.review_prescription(
+            idPrescription=id_prescription,
+            evaluation_time=evaluation_time,
+            review_type=review_type,
+            user=user,
         )
     except ValidationError as e:
         return {

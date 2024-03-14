@@ -40,9 +40,12 @@ class User(db.Model):
         return user
 
     def authenticate(email, password):
-        return User.query.filter_by(
-            email=email, password=func.crypt(password, User.password), active=True
-        ).first()
+        return (
+            User.query.filter(func.lower(User.email) == email.lower())
+            .filter(User.password == func.crypt(password, User.password))
+            .filter(User.active == True)
+            .first()
+        )
 
     def permission(self):
         roles = self.config["roles"] if self.config and "roles" in self.config else []
