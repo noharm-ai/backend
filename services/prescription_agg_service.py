@@ -75,6 +75,7 @@ def create_agg_prescription_by_prescription(
         pAgg.prescriber = "Prescrição Agregada"
         pAgg.insurance = p.insurance
         pAgg.agg = True
+        pAgg.update = datetime.today()
 
         if p.concilia is None and pAgg.status == "s":
             prescalc_user = User()
@@ -148,6 +149,7 @@ def create_agg_prescription_by_date(schema, admission_number, p_date, is_cpoe):
         agg_p.prescriber = "Prescrição Agregada"
         agg_p.insurance = last_prescription.insurance
         agg_p.agg = True
+        agg_p.update = datetime.today()
 
     resultAgg, stat = getPrescription(
         admissionNumber=admission_number,
@@ -157,6 +159,7 @@ def create_agg_prescription_by_date(schema, admission_number, p_date, is_cpoe):
     )
 
     if "data" in resultAgg:
+        agg_p.update = datetime.today()
         agg_p.features = getFeatures(resultAgg)
         agg_p.aggDrugs = agg_p.features["drugIDs"]
         agg_p.aggDeps = list(
