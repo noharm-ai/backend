@@ -2,8 +2,7 @@ from models.main import db
 
 from models.appendix import *
 from models.prescription import *
-from models.enums import FeatureEnum
-from services import memory_service, prescription_service
+from services import prescription_service
 from exception.validation_error import ValidationError
 
 
@@ -51,23 +50,6 @@ def getPrescriptionDrug(idPrescriptionDrug):
         .filter(PrescriptionDrug.id == idPrescriptionDrug)
         .first()
     )
-
-
-def has_unchecked_drugs(idPrescription):
-    count = (
-        db.session.query(PrescriptionDrug)
-        .filter(PrescriptionDrug.idPrescription == idPrescription)
-        .filter(
-            or_(
-                PrescriptionDrug.checked == False,
-                PrescriptionDrug.checked == None,
-                PrescriptionDrug.cpoe_group == None,
-            )
-        )
-        .count()
-    )
-
-    return count > 0
 
 
 def count_drugs_by_prescription(
