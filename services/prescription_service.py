@@ -264,7 +264,7 @@ def _check_single_prescription(
     prescription.update = datetime.today()
     prescription.user = user.id
 
-    _audit_check(
+    audit_check(
         prescription=prescription,
         user=user,
         parent_agg_date=parent_agg_date,
@@ -276,9 +276,7 @@ def _check_single_prescription(
     return {"idPrescription": str(prescription.id), "status": p_status}
 
 
-def _audit_check(
-    prescription: Prescription, user: User, parent_agg_date=None, extra={}
-):
+def audit_check(prescription: Prescription, user: User, parent_agg_date=None, extra={}):
     a = PrescriptionAudit()
     a.auditType = (
         PrescriptionAuditTypeEnum.CHECK.value

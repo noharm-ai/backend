@@ -5,10 +5,10 @@ from datetime import date, timedelta
 from models.main import db
 from models.appendix import *
 from models.prescription import *
-from models.enums import PrescriptionDrugAuditTypeEnum
+from models.enums import PrescriptionDrugAuditTypeEnum, DrugTypeEnum
 from routes.prescription import getPrescription
 from routes.utils import getFeatures
-from services import prescription_drug_service, prescription_service
+from services import prescription_service, prescription_drug_service
 
 from exception.validation_error import ValidationError
 
@@ -76,10 +76,26 @@ def create_agg_prescription_by_prescription(
         pAgg.insurance = p.insurance
         pAgg.agg = True
 
-        if p.concilia is None and prescription_drug_service.has_unchecked_drugs(
-            id_prescription
-        ):
-            pAgg.status = 0
+        if p.concilia is None and pAgg.status == "s":
+            prescalc_user = User()
+            prescalc_user.id = 0
+
+            drug_count = prescription_drug_service.count_drugs_by_prescription(
+                prescription=p,
+                drug_types=[
+                    DrugTypeEnum.DRUG.value,
+                    DrugTypeEnum.PROCEDURE.value,
+                    DrugTypeEnum.SOLUTION.value,
+                ],
+                user=prescalc_user,
+            )
+
+            if drug_count > 0:
+                pAgg.status = 0
+
+                prescription_service.audit_check(
+                    prescription=pAgg, user=prescalc_user, extra={"prescalc": True}
+                )
 
         if "data" in resultAgg:
             pAgg.features = getFeatures(resultAgg)
