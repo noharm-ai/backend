@@ -1,11 +1,7 @@
 import boto3
-import json
-import io
-import gzip
 import dateutil
-from dateutil.tz import tzoffset
+from datetime import timedelta, datetime
 from botocore.exceptions import ClientError
-from datetime import datetime, timedelta
 
 from config import Config
 
@@ -18,46 +14,35 @@ def _get_client():
     )
 
 
-def get_resource_name(report, schema):
-    return f"reports/{schema}/{report}.gz"
+def get_resource_name(report, schema, filename="current"):
+    return f"reports/{schema}/{report}/{filename}.gz"
 
 
-def generate_link(report, schema):
+def generate_link(report, schema, filename="current"):
     client = _get_client()
 
-    return client.generate_presigned_url(
-        "get_object",
-        Params={
-            "Bucket": Config.CACHE_BUCKET_NAME,
-            "Key": get_resource_name(report, schema),
-        },
-        ExpiresIn=100,
-    )
+    cache_data = get_cache_data(report=report, schema=schema, filename=filename)
+
+    if cache_data["exists"]:
+        return client.generate_presigned_url(
+            "get_object",
+            Params={
+                "Bucket": Config.CACHE_BUCKET_NAME,
+                "Key": get_resource_name(report, schema, filename),
+            },
+            ExpiresIn=100,
+        )
+
+    return None
 
 
-def save_cache(report, schema, data):
-    client = _get_client()
-
-    file = io.BytesIO()
-    with gzip.GzipFile(fileobj=file, mode="wb") as fh:
-        with io.TextIOWrapper(fh, encoding="utf-8") as wrapper:
-            wrapper.write(json.dumps(data, ensure_ascii=False))
-    file.seek(0)
-
-    client.put_object(
-        Body=file,
-        Bucket=Config.CACHE_BUCKET_NAME,
-        Key=get_resource_name(report, schema),
-    )
-
-
-def get_cache_data(report, schema):
+def get_cache_data(report, schema, filename="current"):
     client = _get_client()
 
     try:
         resource_info = client.head_object(
             Bucket=Config.CACHE_BUCKET_NAME,
-            Key=get_resource_name(report=report, schema=schema),
+            Key=get_resource_name(report=report, schema=schema, filename=filename),
         )
 
         resource_date = dateutil.parser.parse(
@@ -65,20 +50,8 @@ def get_cache_data(report, schema):
         ) - timedelta(hours=3)
 
         return {
-            "isCached": datetime.today().date() == resource_date.date(),
+            "exists": True,
             "updatedAt": resource_date.replace(tzinfo=None).isoformat(),
         }
     except ClientError:
-        return {"isCached": False, "updatedAt": None}
-
-
-def generate_link_from_cache(report, schema):
-    cache_data = get_cache_data(report=report, schema=schema)
-
-    if cache_data["isCached"]:
-        return {
-            "url": generate_link(report, schema),
-            "updatedAt": cache_data["updatedAt"],
-        }
-
-    return None
+        return {"exists": False, "updatedAt": None}
