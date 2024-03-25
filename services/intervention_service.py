@@ -1,5 +1,5 @@
 from models.main import db
-from sqlalchemy import case
+from sqlalchemy import case, and_
 
 from models.appendix import *
 from models.prescription import *
@@ -347,3 +347,92 @@ def save_intervention(
     return get_interventions(
         admissionNumber=i.admissionNumber, idIntervention=i.idIntervention
     )
+
+
+def get_outcome_data(id_intervention, user):
+    intervention = (
+        db.session.query(Intervention)
+        .filter(Intervention.idIntervention == id_intervention)
+        .first()
+    )
+
+    PrescriptionDrugConvert = db.aliased(MeasureUnitConvert)
+    PrescriptionDrugPriceConvert = db.aliased(MeasureUnitConvert)
+
+    if not intervention:
+        raise ValidationError(
+            "Registro inválido",
+            "errors.invalidRecord",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    origin = (
+        db.session.query(
+            PrescriptionDrug,
+            Drug,
+            DrugAttributes,
+            PrescriptionDrugConvert,
+            PrescriptionDrugPriceConvert,
+        )
+        .join(Drug, PrescriptionDrug.idDrug == Drug.id)
+        .outerjoin(
+            DrugAttributes,
+            and_(
+                PrescriptionDrug.idDrug == DrugAttributes.idDrug,
+                PrescriptionDrug.idSegment == DrugAttributes.idSegment,
+            ),
+        )
+        .outerjoin(
+            PrescriptionDrugConvert,
+            and_(
+                PrescriptionDrugConvert.idDrug == PrescriptionDrug.idDrug,
+                PrescriptionDrugConvert.idSegment == PrescriptionDrug.idSegment,
+                PrescriptionDrugConvert.idMeasureUnit == PrescriptionDrug.idMeasureUnit,
+            ),
+        )
+        .outerjoin(
+            PrescriptionDrugPriceConvert,
+            and_(
+                PrescriptionDrugPriceConvert.idDrug == PrescriptionDrug.idDrug,
+                PrescriptionDrugPriceConvert.idSegment == PrescriptionDrug.idSegment,
+                PrescriptionDrugPriceConvert.idMeasureUnit
+                == DrugAttributes.idMeasureUnitPrice,
+            ),
+        )
+        .filter(PrescriptionDrug.id == intervention.id)
+    ).first()
+
+    origin_price = None
+    dose = None
+    errors = {
+        "origin_price_error": False,
+        "origin_price_conversion_error": False,
+        "origin_dose_conversion_error": False,
+    }
+
+    if origin[2].price != None and origin[2].idMeasureUnitPrice != None:
+        if origin[2].idMeasureUnitPrice == origin[2].idMeasureUnit:
+            origin_price = origin[2].price
+        elif origin[4] != None and origin[4].factor != None:
+            origin_price = origin[2].price * origin[4].factor
+        else:
+            errors["origin_price_conversion_error"] = True
+    else:
+        errors["origin_price_error"] = True
+
+    if origin[2].useWeight:
+        if origin[3] != None and origin[3].factor != None:
+            dose = origin[0].dose * origin[3].factor
+        else:
+            errors["origin_dose_conversion_error"] = True
+    else:
+        dose = origin[0].doseconv
+
+    return {
+        "errors": errors,
+        "origin": {
+            "price": origin_price,
+            "dose": dose,
+            "priceByDose": none2zero(origin_price) * none2zero(dose),
+        },
+    }

@@ -52,9 +52,9 @@ def save_intervention():
             interactions=data.get("interactions", None),
             transcription=data.get("transcription", None),
             economy_days=data.get("economyDays", None) if "economyDays" in data else -1,
-            expended_dose=data.get("expendedDose", None)
-            if "expendedDose" in data
-            else -1,
+            expended_dose=(
+                data.get("expendedDose", None) if "expendedDose" in data else -1
+            ),
         )
     except ValidationError as e:
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
@@ -98,3 +98,19 @@ def search_interventions():
     )
 
     return {"status": "success", "data": results}, status.HTTP_200_OK
+
+
+@app_itrv.route("/intervention/outcome-data", methods=["GET"])
+@jwt_required()
+def outcome_data():
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+
+    try:
+        intervention = intervention_service.get_outcome_data(
+            id_intervention=request.args.get("idIntervention", None), user=user
+        )
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+
+    return {"status": "success", "data": intervention}, status.HTTP_200_OK
