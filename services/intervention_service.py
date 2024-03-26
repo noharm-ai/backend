@@ -366,15 +366,17 @@ def get_outcome_data(id_intervention, user):
             status.HTTP_400_BAD_REQUEST,
         )
 
-    origin = (
+    base_query = (
         db.session.query(
             PrescriptionDrug,
             Drug,
             DrugAttributes,
             PrescriptionDrugConvert,
             PrescriptionDrugPriceConvert,
+            Prescription,
         )
         .join(Drug, PrescriptionDrug.idDrug == Drug.id)
+        .join(Prescription, PrescriptionDrug.idPrescription == Prescription.id)
         .outerjoin(
             DrugAttributes,
             and_(
@@ -399,40 +401,100 @@ def get_outcome_data(id_intervention, user):
                 == DrugAttributes.idMeasureUnitPrice,
             ),
         )
-        .filter(PrescriptionDrug.id == intervention.id)
-    ).first()
+    )
 
-    origin_price = None
-    dose = None
-    errors = {
-        "origin_price_error": False,
-        "origin_price_conversion_error": False,
-        "origin_dose_conversion_error": False,
-    }
+    origin_query = base_query.filter(PrescriptionDrug.id == intervention.id)
+    origin = _outcome_calc(origin_query.all())
 
-    if origin[2].price != None and origin[2].idMeasureUnitPrice != None:
-        if origin[2].idMeasureUnitPrice == origin[2].idMeasureUnit:
-            origin_price = origin[2].price
-        elif origin[4] != None and origin[4].factor != None:
-            origin_price = origin[2].price * origin[4].factor
-        else:
-            errors["origin_price_conversion_error"] = True
-    else:
-        errors["origin_price_error"] = True
+    destiny_query = (
+        base_query.filter(Prescription.admissionNumber == intervention.admissionNumber)
+        .filter(PrescriptionDrug.idDrug == origin[0]["item"]["idDrug"])
+        .filter(Prescription.date > origin[0]["item"]["prescriptionDate"])
+        .filter(PrescriptionDrug.suspendedDate == None)
+        .order_by(Prescription.date)
+        .limit(10)
+    )
 
-    if origin[2].useWeight:
-        if origin[3] != None and origin[3].factor != None:
-            dose = origin[0].dose * origin[3].factor
-        else:
-            errors["origin_dose_conversion_error"] = True
-    else:
-        dose = origin[0].doseconv
+    destiny = _outcome_calc(destiny_query.all())
 
     return {
-        "errors": errors,
-        "origin": {
-            "price": origin_price,
-            "dose": dose,
-            "priceByDose": none2zero(origin_price) * none2zero(dose),
-        },
+        "idIntervention": id_intervention,
+        "date": intervention.date.isoformat(),
+        "origin": origin[0],
+        "destiny": destiny,
     }
+
+
+def _outcome_calc(list):
+    results = []
+
+    for item in list:
+        origin_price = None
+        dose = None
+        errors = {
+            "origin_price_error": False,
+            "origin_price_conversion_error": False,
+            "origin_dose_conversion_error": False,
+        }
+
+        prescription_drug = item[0]
+        drug = item[1]
+        drug_attr = item[2]
+        dose_convert = item[3]
+        price_dose_convert = item[4]
+        prescription = item[5]
+
+        if drug_attr.price != None and drug_attr.idMeasureUnitPrice != None:
+            if drug_attr.idMeasureUnitPrice == drug_attr.idMeasureUnit:
+                origin_price = drug_attr.price
+            elif price_dose_convert != None and price_dose_convert.factor != None:
+                origin_price = drug_attr.price / price_dose_convert.factor
+            else:
+                errors["origin_price_conversion_error"] = True
+        else:
+            errors["origin_price_error"] = True
+
+        if drug_attr.useWeight:
+            if dose_convert != None and dose_convert.factor != None:
+                dose = prescription_drug.dose * dose_convert.factor
+            else:
+                errors["origin_dose_conversion_error"] = True
+        else:
+            dose = prescription_drug.doseconv
+
+        results.append(
+            {
+                "errors": errors,
+                "item": {
+                    "idPrescription": prescription.id,
+                    "prescriptionDate": prescription.date.isoformat(),
+                    "idDrug": drug.id,
+                    "name": drug.name,
+                    "price": origin_price,
+                    "dose": dose,
+                    "idMeasureUnit": drug_attr.idMeasureUnit,
+                    "idFrequency": prescription_drug.idFrequency,
+                    "frequencyDay": prescription_drug.frequency,
+                    "pricePerDose": none2zero(origin_price) * none2zero(dose),
+                    "priceKit": 0,
+                    "beforeConversion": {
+                        "price": drug_attr.price,
+                        "idMeasureUnitPrice": drug_attr.idMeasureUnitPrice,
+                        "dose": prescription_drug.dose,
+                        "idMeasureUnit": prescription_drug.idMeasureUnit,
+                    },
+                    "conversion": {
+                        "doseFactor": (
+                            dose_convert.factor if dose_convert != None else None
+                        ),
+                        "priceFactor": (
+                            price_dose_convert.factor
+                            if price_dose_convert != None
+                            else None
+                        ),
+                    },
+                },
+            }
+        )
+
+    return results
