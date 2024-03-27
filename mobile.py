@@ -45,7 +45,7 @@ app.config["SQLALCHEMY_DATABASE_URI"] = Config.POTGRESQL_CONNECTION_STRING
 app.config["SQLALCHEMY_BINDS"] = {"report": Config.REPORT_CONNECTION_STRING}
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-    "pool_recycle": 500,
+    "pool_recycle": 250,
     "pool_pre_ping": True,
     "pool_size": 20,
     "max_overflow": 30,
@@ -107,7 +107,7 @@ if Config.ENV == NoHarmENV.STAGING.value:
 
 @app.route("/version", methods=["GET"])
 def getVersion():
-    return {"status": "success", "data": "v2.30-beta"}, status.HTTP_200_OK
+    return {"status": "success", "data": "v2.31-beta"}, status.HTTP_200_OK
 
 
 if __name__ == "__main__":
