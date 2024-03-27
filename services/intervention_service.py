@@ -406,9 +406,13 @@ def get_outcome_data(id_intervention, user):
     origin_query = base_query.filter(PrescriptionDrug.id == intervention.id)
     origin = _outcome_calc(origin_query.all())
 
+    destiny_drug = origin[0]["item"]["idDrug"]
+    if intervention.interactions != None and len(intervention.interactions) > 0:
+        destiny_drug = intervention.interactions[0]
+
     destiny_query = (
         base_query.filter(Prescription.admissionNumber == intervention.admissionNumber)
-        .filter(PrescriptionDrug.idDrug == origin[0]["item"]["idDrug"])
+        .filter(PrescriptionDrug.idDrug == destiny_drug)
         .filter(Prescription.date > origin[0]["item"]["prescriptionDate"])
         .filter(PrescriptionDrug.suspendedDate == None)
         .order_by(Prescription.date)
@@ -466,7 +470,7 @@ def _outcome_calc(list):
             {
                 "errors": errors,
                 "item": {
-                    "idPrescription": prescription.id,
+                    "idPrescription": str(prescription.id),
                     "prescriptionDate": prescription.date.isoformat(),
                     "idDrug": drug.id,
                     "name": drug.name,
