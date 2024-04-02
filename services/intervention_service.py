@@ -477,27 +477,35 @@ def _get_outcome_data_query():
 
 
 def get_outcome_data(id_intervention):
-    intervention = (
-        db.session.query(Intervention)
+    record = (
+        db.session.query(Intervention, PrescriptionDrug)
+        .join(PrescriptionDrug, PrescriptionDrug.id == Intervention.id)
         .filter(Intervention.idIntervention == id_intervention)
         .first()
     )
 
-    if not intervention:
+    if not record:
         raise ValidationError(
             "Registro inválido",
             "errors.invalidRecord",
             status.HTTP_400_BAD_REQUEST,
         )
 
+    intervention = record[0]
+    prescription_drug = record[1]
+
+    # origin
+    origin_query = _get_outcome_data_query().filter(
+        PrescriptionDrug.id == intervention.id
+    )
+    base_origin = _outcome_calc(origin_query.all())
+
     if intervention.status == InterventionStatusEnum.PENDING.value:
-        origin_query = _get_outcome_data_query().filter(
-            PrescriptionDrug.id == intervention.id
-        )
-        origin = _outcome_calc(origin_query.all())
+        origin = base_origin
     else:
         origin = [{"item": intervention.origin}]
 
+    # destiny
     if intervention.economy_type == InterventionEconomyTypeEnum.SUBSTITUTION.value:
         destiny_id_drug = origin[0]["item"]["idDrug"]
         if intervention.interactions != None and len(intervention.interactions) > 0:
@@ -505,24 +513,28 @@ def get_outcome_data(id_intervention):
 
         destiny_drug = db.session.query(Drug).filter(Drug.id == destiny_id_drug).first()
 
-        if intervention.status == InterventionStatusEnum.PENDING.value:
-            destiny_query = (
-                _get_outcome_data_query()
-                .filter(Prescription.admissionNumber == intervention.admissionNumber)
-                .filter(PrescriptionDrug.idDrug == destiny_id_drug)
-                .filter(Prescription.date > origin[0]["item"]["prescriptionDate"])
-                .filter(PrescriptionDrug.suspendedDate == None)
-                .order_by(Prescription.date)
-                .limit(10)
-            )
+        destiny_query = (
+            _get_outcome_data_query()
+            .filter(Prescription.admissionNumber == intervention.admissionNumber)
+            .filter(PrescriptionDrug.idDrug == destiny_id_drug)
+            .filter(Prescription.date > origin[0]["item"]["prescriptionDate"])
+            .filter(PrescriptionDrug.suspendedDate == None)
+            .order_by(Prescription.date)
+            .limit(10)
+        )
 
-            destiny = _outcome_calc(destiny_query.all())
+        base_destiny = _outcome_calc(destiny_query.all())
+
+        if intervention.status == InterventionStatusEnum.PENDING.value:
+            destiny = base_destiny
         else:
             destiny = [{"item": intervention.destiny}]
     else:
+        base_destiny = None
         destiny = None
         destiny_drug = None
 
+    # calc
     readonly = intervention.status != "s"
     economy_day_value = (
         intervention.economy_day_value
@@ -536,6 +548,7 @@ def get_outcome_data(id_intervention):
     return {
         "idIntervention": id_intervention,
         "header": {
+            "idSegment": prescription_drug.idSegment,
             "status": intervention.status,
             "readonly": readonly,
             "date": intervention.date.isoformat(),
@@ -547,6 +560,7 @@ def get_outcome_data(id_intervention):
             "economyDayAmountManual": intervention.economy_days != None,
             "economyType": intervention.economy_type,
         },
+        "original": {"origin": base_origin[0], "destiny": base_destiny},
         "origin": origin[0],
         "destiny": destiny,
     }
@@ -576,11 +590,6 @@ def _outcome_calc(list):
     for item in list:
         origin_price = None
         dose = None
-        errors = {
-            "origin_price_error": False,
-            "origin_price_conversion_error": False,
-            "origin_dose_conversion_error": False,
-        }
 
         prescription_drug = item[0]
         drug = item[1]
@@ -600,19 +609,14 @@ def _outcome_calc(list):
                 origin_price = drug_attr.price / price_dose_convert.factor
             else:
                 origin_price = drug_attr.price
-                errors["origin_price_conversion_error"] = True
-        else:
-            errors["origin_price_error"] = True
 
         if dose_convert != None and dose_convert.factor != None:
             dose = prescription_drug.dose * dose_convert.factor
         else:
             dose = prescription_drug.dose
-            errors["origin_dose_conversion_error"] = True
 
         results.append(
             {
-                "errors": errors,
                 "item": {
                     "idPrescription": str(prescription.id),
                     "prescriptionDate": prescription.date.isoformat(),
