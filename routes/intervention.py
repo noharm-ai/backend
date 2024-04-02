@@ -108,9 +108,35 @@ def outcome_data():
 
     try:
         intervention = intervention_service.get_outcome_data(
-            id_intervention=request.args.get("idIntervention", None), user=user
+            id_intervention=request.args.get("idIntervention", None)
         )
     except ValidationError as e:
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
     return {"status": "success", "data": intervention}, status.HTTP_200_OK
+
+
+@app_itrv.route("/intervention/set-outcome", methods=["POST"])
+@jwt_required()
+def set_outcome():
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+    data = request.get_json()
+
+    try:
+        intervention_service.set_intervention_outcome(
+            id_intervention=data.get("idIntervention", None),
+            outcome=data.get("outcome", None),
+            user=user,
+            economy_day_amount=data.get("economyDayAmount", None),
+            economy_day_amount_manual=data.get("economyDayAmountManual", None),
+            economy_day_value=data.get("economyDayValue", None),
+            economy_day_value_manual=data.get("economyDayValueManual", None),
+            id_prescription_destiny=data.get("idPrescriptionDestiny", None),
+            origin_data=data.get("origin"),
+            destiny_data=data.get("destiny"),
+        )
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+
+    return tryCommit(db, True, user.permission())

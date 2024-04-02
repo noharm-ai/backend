@@ -92,3 +92,13 @@ class ReportEnum(Enum):
     RPT_PRESCRIPTION = "PRESCRIPTION"
     RPT_INTERVENTION = "INTERVENTION"
     RPT_PRESCRIPTION_AUDIT = "PRESCRIPTION_AUDIT"
+
+
+class InterventionEconomyTypeEnum(Enum):
+    SUSPENSION = 1
+    SUBSTITUTION = 2
+
+
+class InterventionStatusEnum(Enum):
+    PENDING = "s"
+    REMOVED = "0"

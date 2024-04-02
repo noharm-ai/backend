@@ -3,8 +3,9 @@ from sqlalchemy import case, and_
 
 from models.appendix import *
 from models.prescription import *
+from models.enums import InterventionEconomyTypeEnum, InterventionStatusEnum
 from routes.utils import validate
-from services import memory_service
+from services import memory_service, permission_service
 
 from exception.validation_error import ValidationError
 
@@ -219,6 +220,76 @@ def get_interventions(
     return result
 
 
+def set_intervention_outcome(
+    user,
+    id_intervention,
+    outcome,
+    economy_day_value,
+    economy_day_value_manual,
+    economy_day_amount,
+    economy_day_amount_manual,
+    origin_data,
+    destiny_data,
+    id_prescription_destiny,
+):
+    if not permission_service.is_pharma(user):
+        raise ValidationError(
+            "Usuário não autorizado",
+            "errors.unauthorizedUser",
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
+    intervention = Intervention.query.get(id_intervention)
+    if not intervention:
+        raise ValidationError(
+            "Registro inválido",
+            "errors.invalidRecord",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    if outcome not in ["a", "n", "x", "j", "s"]:
+        raise ValidationError(
+            "Desfecho inválido",
+            "errors.businessRule",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    if (
+        intervention.status != InterventionStatusEnum.PENDING.value
+        and outcome != InterventionStatusEnum.PENDING.value
+    ):
+        raise ValidationError(
+            "Esta intervenção já possui um desfecho registrado",
+            "errors.businessRule",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    intervention.date = datetime.today()
+    intervention.user = user.id
+    intervention.status = outcome
+
+    if intervention.status != "s":
+        intervention.idPrescriptionDestiny = id_prescription_destiny
+
+        intervention.economy_day_value = economy_day_value
+        intervention.economy_day_value_manual = economy_day_value_manual
+
+        intervention.economy_days = (
+            economy_day_amount if economy_day_amount_manual else None
+        )
+
+        intervention.origin = origin_data
+        intervention.destiny = destiny_data
+    else:
+        # cleanup
+        intervention.idPrescriptionDestiny = None
+        intervention.economy_day_value = None
+        intervention.economy_day_value_manual = False
+        intervention.economy_days = None
+        intervention.origin = None
+        intervention.destiny = None
+
+
 def save_intervention(
     id_intervention=None,
     id_prescription=0,
@@ -307,6 +378,20 @@ def save_intervention(
     if expended_dose != -1:
         i.expended_dose = expended_dose
 
+    economy_type = None
+    reasons = (
+        db.session.query(InterventionReason)
+        .filter(InterventionReason.id.in_(i.idInterventionReason))
+        .all()
+    )
+    for r in reasons:
+        if r.suspension:
+            economy_type = InterventionEconomyTypeEnum.SUSPENSION.value
+        elif r.substitution:
+            economy_type = InterventionEconomyTypeEnum.SUBSTITUTION.value
+
+    i.economy_type = economy_type
+
     if i.admissionNumber != None and i.idDepartment == None:
         currentDepartment = (
             db.session.query(Prescription.idDepartment)
@@ -349,24 +434,11 @@ def save_intervention(
     )
 
 
-def get_outcome_data(id_intervention, user):
-    intervention = (
-        db.session.query(Intervention)
-        .filter(Intervention.idIntervention == id_intervention)
-        .first()
-    )
-
+def _get_outcome_data_query():
     PrescriptionDrugConvert = db.aliased(MeasureUnitConvert)
     PrescriptionDrugPriceConvert = db.aliased(MeasureUnitConvert)
 
-    if not intervention:
-        raise ValidationError(
-            "Registro inválido",
-            "errors.invalidRecord",
-            status.HTTP_400_BAD_REQUEST,
-        )
-
-    base_query = (
+    return (
         db.session.query(
             PrescriptionDrug,
             Drug,
@@ -403,30 +475,99 @@ def get_outcome_data(id_intervention, user):
         )
     )
 
-    origin_query = base_query.filter(PrescriptionDrug.id == intervention.id)
-    origin = _outcome_calc(origin_query.all())
 
-    destiny_drug = origin[0]["item"]["idDrug"]
-    if intervention.interactions != None and len(intervention.interactions) > 0:
-        destiny_drug = intervention.interactions[0]
-
-    destiny_query = (
-        base_query.filter(Prescription.admissionNumber == intervention.admissionNumber)
-        .filter(PrescriptionDrug.idDrug == destiny_drug)
-        .filter(Prescription.date > origin[0]["item"]["prescriptionDate"])
-        .filter(PrescriptionDrug.suspendedDate == None)
-        .order_by(Prescription.date)
-        .limit(10)
+def get_outcome_data(id_intervention):
+    intervention = (
+        db.session.query(Intervention)
+        .filter(Intervention.idIntervention == id_intervention)
+        .first()
     )
 
-    destiny = _outcome_calc(destiny_query.all())
+    if not intervention:
+        raise ValidationError(
+            "Registro inválido",
+            "errors.invalidRecord",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    if intervention.status == InterventionStatusEnum.PENDING.value:
+        origin_query = _get_outcome_data_query().filter(
+            PrescriptionDrug.id == intervention.id
+        )
+        origin = _outcome_calc(origin_query.all())
+    else:
+        origin = [{"item": intervention.origin}]
+
+    if intervention.economy_type == InterventionEconomyTypeEnum.SUBSTITUTION.value:
+        destiny_id_drug = origin[0]["item"]["idDrug"]
+        if intervention.interactions != None and len(intervention.interactions) > 0:
+            destiny_id_drug = intervention.interactions[0]
+
+        destiny_drug = db.session.query(Drug).filter(Drug.id == destiny_id_drug).first()
+
+        if intervention.status == InterventionStatusEnum.PENDING.value:
+            destiny_query = (
+                _get_outcome_data_query()
+                .filter(Prescription.admissionNumber == intervention.admissionNumber)
+                .filter(PrescriptionDrug.idDrug == destiny_id_drug)
+                .filter(Prescription.date > origin[0]["item"]["prescriptionDate"])
+                .filter(PrescriptionDrug.suspendedDate == None)
+                .order_by(Prescription.date)
+                .limit(10)
+            )
+
+            destiny = _outcome_calc(destiny_query.all())
+        else:
+            destiny = [{"item": intervention.destiny}]
+    else:
+        destiny = None
+        destiny_drug = None
+
+    readonly = intervention.status != "s"
+    economy_day_value = (
+        intervention.economy_day_value
+        if readonly
+        else _calc_economy(
+            origin=origin[0],
+            destiny=destiny[0] if destiny != None and len(destiny) > 0 else None,
+        )
+    )
 
     return {
         "idIntervention": id_intervention,
-        "date": intervention.date.isoformat(),
+        "header": {
+            "status": intervention.status,
+            "readonly": readonly,
+            "date": intervention.date.isoformat(),
+            "originDrug": origin[0]["item"]["name"],
+            "destinyDrug": destiny_drug.name if destiny_drug != None else None,
+            "economyDayValueManual": intervention.economy_day_value_manual,
+            "economyDayValue": economy_day_value,
+            "economyDayAmount": intervention.economy_days,
+            "economyDayAmountManual": intervention.economy_days != None,
+            "economyType": intervention.economy_type,
+        },
         "origin": origin[0],
         "destiny": destiny,
     }
+
+
+def _calc_economy(origin, destiny):
+    if origin == None:
+        return 0
+
+    if destiny != None:
+        economy = none2zero(origin["item"]["pricePerDose"]) * none2zero(
+            origin["item"]["frequencyDay"]
+        ) - none2zero(destiny["item"]["pricePerDose"]) * none2zero(
+            destiny["item"]["frequencyDay"]
+        )
+    else:
+        economy = none2zero(origin["item"]["pricePerDose"]) * none2zero(
+            origin["item"]["frequencyDay"]
+        )
+
+    return economy if economy > 0 else 0
 
 
 def _outcome_calc(list):
@@ -448,23 +589,26 @@ def _outcome_calc(list):
         price_dose_convert = item[4]
         prescription = item[5]
 
-        if drug_attr.price != None and drug_attr.idMeasureUnitPrice != None:
+        if (
+            drug_attr != None
+            and drug_attr.price != None
+            and drug_attr.idMeasureUnitPrice != None
+        ):
             if drug_attr.idMeasureUnitPrice == drug_attr.idMeasureUnit:
                 origin_price = drug_attr.price
             elif price_dose_convert != None and price_dose_convert.factor != None:
                 origin_price = drug_attr.price / price_dose_convert.factor
             else:
+                origin_price = drug_attr.price
                 errors["origin_price_conversion_error"] = True
         else:
             errors["origin_price_error"] = True
 
-        if drug_attr.useWeight:
-            if dose_convert != None and dose_convert.factor != None:
-                dose = prescription_drug.dose * dose_convert.factor
-            else:
-                errors["origin_dose_conversion_error"] = True
+        if dose_convert != None and dose_convert.factor != None:
+            dose = prescription_drug.dose * dose_convert.factor
         else:
-            dose = prescription_drug.doseconv
+            dose = prescription_drug.dose
+            errors["origin_dose_conversion_error"] = True
 
         results.append(
             {
@@ -476,14 +620,18 @@ def _outcome_calc(list):
                     "name": drug.name,
                     "price": origin_price,
                     "dose": dose,
-                    "idMeasureUnit": drug_attr.idMeasureUnit,
+                    "idMeasureUnit": (
+                        drug_attr.idMeasureUnit if drug_attr != None else None
+                    ),
                     "idFrequency": prescription_drug.idFrequency,
                     "frequencyDay": prescription_drug.frequency,
                     "pricePerDose": none2zero(origin_price) * none2zero(dose),
                     "priceKit": 0,
                     "beforeConversion": {
-                        "price": drug_attr.price,
-                        "idMeasureUnitPrice": drug_attr.idMeasureUnitPrice,
+                        "price": drug_attr.price if drug_attr != None else None,
+                        "idMeasureUnitPrice": (
+                            drug_attr.idMeasureUnitPrice if drug_attr != None else None
+                        ),
                         "dose": prescription_drug.dose,
                         "idMeasureUnit": prescription_drug.idMeasureUnit,
                     },
