@@ -3,7 +3,11 @@ from sqlalchemy import case, and_
 
 from models.appendix import *
 from models.prescription import *
-from models.enums import InterventionEconomyTypeEnum, InterventionStatusEnum
+from models.enums import (
+    InterventionEconomyTypeEnum,
+    InterventionStatusEnum,
+    FeatureEnum,
+)
 from routes.utils import validate
 from services import memory_service, permission_service
 
@@ -268,26 +272,28 @@ def set_intervention_outcome(
     intervention.user = user.id
     intervention.status = outcome
 
-    if intervention.status != "s":
-        intervention.idPrescriptionDestiny = id_prescription_destiny
+    if intervention.economy_type != None:
+        # intervention v2
+        if intervention.status != "s":
+            intervention.idPrescriptionDestiny = id_prescription_destiny
 
-        intervention.economy_day_value = economy_day_value
-        intervention.economy_day_value_manual = economy_day_value_manual
+            intervention.economy_day_value = economy_day_value
+            intervention.economy_day_value_manual = economy_day_value_manual
 
-        intervention.economy_days = (
-            economy_day_amount if economy_day_amount_manual else None
-        )
+            intervention.economy_days = (
+                economy_day_amount if economy_day_amount_manual else None
+            )
 
-        intervention.origin = origin_data
-        intervention.destiny = destiny_data
-    else:
-        # cleanup
-        intervention.idPrescriptionDestiny = None
-        intervention.economy_day_value = None
-        intervention.economy_day_value_manual = False
-        intervention.economy_days = None
-        intervention.origin = None
-        intervention.destiny = None
+            intervention.origin = origin_data
+            intervention.destiny = destiny_data
+        else:
+            # cleanup
+            intervention.idPrescriptionDestiny = None
+            intervention.economy_day_value = None
+            intervention.economy_day_value_manual = False
+            intervention.economy_days = None
+            intervention.origin = None
+            intervention.destiny = None
 
 
 def save_intervention(
@@ -378,19 +384,20 @@ def save_intervention(
     if expended_dose != -1:
         i.expended_dose = expended_dose
 
-    economy_type = None
-    reasons = (
-        db.session.query(InterventionReason)
-        .filter(InterventionReason.id.in_(i.idInterventionReason))
-        .all()
-    )
-    for r in reasons:
-        if r.suspension:
-            economy_type = InterventionEconomyTypeEnum.SUSPENSION.value
-        elif r.substitution:
-            economy_type = InterventionEconomyTypeEnum.SUBSTITUTION.value
+    if memory_service.has_feature(FeatureEnum.INTERVENTION_V2.value):
+        economy_type = None
+        reasons = (
+            db.session.query(InterventionReason)
+            .filter(InterventionReason.id.in_(i.idInterventionReason))
+            .all()
+        )
+        for r in reasons:
+            if r.suspension:
+                economy_type = InterventionEconomyTypeEnum.SUSPENSION.value
+            elif r.substitution:
+                economy_type = InterventionEconomyTypeEnum.SUBSTITUTION.value
 
-    i.economy_type = economy_type
+        i.economy_type = economy_type
 
     if i.admissionNumber != None and i.idDepartment == None:
         currentDepartment = (
@@ -416,6 +423,7 @@ def save_intervention(
             i.date = datetime.today()
 
     i.update = datetime.today()
+    i.economy_day_value_manual = False
 
     if new_intv:
         db.session.add(i)
@@ -479,7 +487,7 @@ def _get_outcome_data_query():
 def get_outcome_data(id_intervention):
     record = (
         db.session.query(Intervention, PrescriptionDrug)
-        .join(PrescriptionDrug, PrescriptionDrug.id == Intervention.id)
+        .outerjoin(PrescriptionDrug, PrescriptionDrug.id == Intervention.id)
         .filter(Intervention.idIntervention == id_intervention)
         .first()
     )
@@ -493,6 +501,18 @@ def get_outcome_data(id_intervention):
 
     intervention = record[0]
     prescription_drug = record[1]
+    readonly = intervention.status != "s"
+
+    if prescription_drug == None or intervention.economy_type == None:
+        return {
+            "idIntervention": id_intervention,
+            "header": {
+                "patient": prescription_drug == None,
+                "status": intervention.status,
+                "readonly": readonly,
+                "date": intervention.date.isoformat(),
+            },
+        }
 
     # origin
     origin_query = _get_outcome_data_query().filter(
@@ -500,7 +520,10 @@ def get_outcome_data(id_intervention):
     )
     base_origin = _outcome_calc(origin_query.all())
 
-    if intervention.status == InterventionStatusEnum.PENDING.value:
+    if (
+        intervention.status == InterventionStatusEnum.PENDING.value
+        or intervention.origin == None
+    ):
         origin = base_origin
     else:
         origin = [{"item": intervention.origin}]
@@ -535,7 +558,6 @@ def get_outcome_data(id_intervention):
         destiny_drug = None
 
     # calc
-    readonly = intervention.status != "s"
     economy_day_value = (
         intervention.economy_day_value
         if readonly
@@ -548,6 +570,7 @@ def get_outcome_data(id_intervention):
     return {
         "idIntervention": id_intervention,
         "header": {
+            "patient": False,
             "idSegment": prescription_drug.idSegment,
             "status": intervention.status,
             "readonly": readonly,
@@ -615,6 +638,10 @@ def _outcome_calc(list):
         else:
             dose = prescription_drug.dose
 
+        frequency_day = prescription_drug.frequency
+        if frequency_day in [33, 44, 55, 66, 99]:
+            frequency_day = 1
+
         results.append(
             {
                 "item": {
@@ -628,7 +655,7 @@ def _outcome_calc(list):
                         drug_attr.idMeasureUnit if drug_attr != None else None
                     ),
                     "idFrequency": prescription_drug.idFrequency,
-                    "frequencyDay": prescription_drug.frequency,
+                    "frequencyDay": frequency_day,
                     "pricePerDose": none2zero(origin_price) * none2zero(dose),
                     "priceKit": 0,
                     "beforeConversion": {

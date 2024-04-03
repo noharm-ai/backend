@@ -1099,7 +1099,7 @@ class Intervention(db.Model):
     economy_type = db.Column("tp_economia", db.Integer, nullable=True)
     economy_day_value = db.Column("vl_economia_dia", db.Float, nullable=True)
     economy_day_value_manual = db.Column(
-        "vl_economia_dia_manual", db.Boolean, nullable=True
+        "vl_economia_dia_manual", db.Boolean, nullable=False
     )
     idPrescriptionDestiny = db.Column("fkprescricao_destino", db.Integer, nullable=True)
 
