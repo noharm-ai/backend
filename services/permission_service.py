@@ -21,6 +21,10 @@ def is_pharma(user):
     )
 
 
+def is_cpoe(user):
+    return has_any_role(user, RoleEnum.CPOE.value)
+
+
 def has_any_role(user, *roles):
     user_roles = set(_get_roles(user))
 

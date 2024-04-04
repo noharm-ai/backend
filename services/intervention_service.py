@@ -484,7 +484,7 @@ def _get_outcome_data_query():
     )
 
 
-def get_outcome_data(id_intervention):
+def get_outcome_data(id_intervention, user: User):
     record = (
         db.session.query(Intervention, PrescriptionDrug)
         .outerjoin(PrescriptionDrug, PrescriptionDrug.id == Intervention.id)
@@ -518,7 +518,7 @@ def get_outcome_data(id_intervention):
     origin_query = _get_outcome_data_query().filter(
         PrescriptionDrug.id == intervention.id
     )
-    base_origin = _outcome_calc(origin_query.all())
+    base_origin = _outcome_calc(origin_query.all(), user)
 
     if (
         intervention.status == InterventionStatusEnum.PENDING.value
@@ -546,7 +546,7 @@ def get_outcome_data(id_intervention):
             .limit(10)
         )
 
-        base_destiny = _outcome_calc(destiny_query.all())
+        base_destiny = _outcome_calc(destiny_query.all(), user)
 
         if intervention.status == InterventionStatusEnum.PENDING.value:
             destiny = base_destiny
@@ -607,7 +607,55 @@ def _calc_economy(origin, destiny):
     return economy if economy > 0 else 0
 
 
-def _outcome_calc(list):
+def _get_price_kit(id_prescription, prescription_drug: PrescriptionDrug, user: User):
+    group = None
+    if permission_service.is_cpoe(user):
+        group = prescription_drug.cpoe_group
+    else:
+        group = prescription_drug.solutionGroup
+
+    if group == None:
+        return {"price": 0, "list": []}
+
+    components = (
+        db.session.query(PrescriptionDrug, Drug, DrugAttributes)
+        .join(Drug, PrescriptionDrug.idDrug == Drug.id)
+        .outerjoin(
+            DrugAttributes,
+            and_(
+                DrugAttributes.idDrug == Drug.id,
+                DrugAttributes.idSegment == PrescriptionDrug.idSegment,
+            ),
+        )
+        .filter(PrescriptionDrug.idPrescription == id_prescription)
+        .filter(PrescriptionDrug.id != prescription_drug.id)
+        .filter(
+            or_(
+                PrescriptionDrug.solutionGroup == group,
+                PrescriptionDrug.cpoe_group == group,
+            )
+        )
+    )
+
+    drugs = []
+    kit_price = 0
+
+    for c in components:
+        drug_price = c[2].price if c[2] != None and c[2].price != None else 0
+
+        drugs.append(
+            {
+                "name": c[1].name,
+                "price": drug_price,
+                "idMeasureUnit": c[2].idMeasureUnitPrice if c[2] != None else None,
+            }
+        )
+        kit_price += c[2].price if c[2] != None and c[2].price != None else 0
+
+    return {"price": kit_price, "list": drugs}
+
+
+def _outcome_calc(list, user: User):
     results = []
 
     for item in list:
@@ -642,6 +690,12 @@ def _outcome_calc(list):
         if frequency_day in [33, 44, 55, 66, 99]:
             frequency_day = 1
 
+        kit = _get_price_kit(
+            id_prescription=prescription.id,
+            prescription_drug=prescription_drug,
+            user=user,
+        )
+
         results.append(
             {
                 "item": {
@@ -657,7 +711,7 @@ def _outcome_calc(list):
                     "idFrequency": prescription_drug.idFrequency,
                     "frequencyDay": frequency_day,
                     "pricePerDose": none2zero(origin_price) * none2zero(dose),
-                    "priceKit": 0,
+                    "priceKit": kit["price"],
                     "beforeConversion": {
                         "price": drug_attr.price if drug_attr != None else None,
                         "idMeasureUnitPrice": (
@@ -676,6 +730,7 @@ def _outcome_calc(list):
                             else None
                         ),
                     },
+                    "kit": kit,
                 },
             }
         )

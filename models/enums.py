@@ -47,6 +47,7 @@ class RoleEnum(Enum):
     USER_ADMIN = "userAdmin"
     SUMMARY = "summary"
     UNLOCK_CHECKED_PRESCRIPTION = "unlock-checked-prescription"
+    CPOE = "cpoe"
 
 
 class FeatureEnum(Enum):
