@@ -648,13 +648,13 @@ def _get_price_kit(id_prescription, prescription_drug: PrescriptionDrug, user: U
         drugs.append(
             {
                 "name": c[1].name,
-                "price": drug_price,
+                "price": str(drug_price),
                 "idMeasureUnit": c[2].idMeasureUnitPrice if c[2] != None else None,
             }
         )
         kit_price += c[2].price if c[2] != None and c[2].price != None else 0
 
-    return {"price": kit_price, "list": drugs}
+    return {"price": str(kit_price), "list": drugs}
 
 
 def _outcome_calc(list, user: User):
@@ -705,29 +705,37 @@ def _outcome_calc(list, user: User):
                     "prescriptionDate": prescription.date.isoformat(),
                     "idDrug": drug.id,
                     "name": drug.name,
-                    "price": origin_price,
-                    "dose": dose,
+                    "price": str(origin_price) if origin_price != None else None,
+                    "dose": str(dose),
                     "idMeasureUnit": (
                         drug_attr.idMeasureUnit if drug_attr != None else None
                     ),
                     "idFrequency": prescription_drug.idFrequency,
                     "frequencyDay": frequency_day,
-                    "pricePerDose": none2zero(origin_price) * none2zero(dose),
+                    "pricePerDose": str(none2zero(origin_price) * none2zero(dose)),
                     "priceKit": kit["price"],
                     "beforeConversion": {
-                        "price": drug_attr.price if drug_attr != None else None,
+                        "price": (
+                            str(drug_attr.price)
+                            if drug_attr != None and drug_attr.price != None
+                            else None
+                        ),
                         "idMeasureUnitPrice": (
                             drug_attr.idMeasureUnitPrice if drug_attr != None else None
                         ),
-                        "dose": prescription_drug.dose,
+                        "dose": (
+                            str(prescription_drug.dose)
+                            if prescription_drug.dose != None
+                            else 0
+                        ),
                         "idMeasureUnit": prescription_drug.idMeasureUnit,
                     },
                     "conversion": {
                         "doseFactor": (
-                            dose_convert.factor if dose_convert != None else None
+                            str(dose_convert.factor) if dose_convert != None else None
                         ),
                         "priceFactor": (
-                            price_dose_convert.factor
+                            str(price_dose_convert.factor)
                             if price_dose_convert != None
                             else None
                         ),
