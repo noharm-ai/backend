@@ -234,7 +234,7 @@ def set_intervention_outcome(
     economy_day_amount_manual,
     origin_data,
     destiny_data,
-    id_prescription_destiny,
+    id_prescription_drug_destiny,
 ):
     if not permission_service.is_pharma(user):
         raise ValidationError(
@@ -275,7 +275,7 @@ def set_intervention_outcome(
     if intervention.economy_type != None:
         # intervention v2
         if intervention.status != "s":
-            intervention.idPrescriptionDestiny = id_prescription_destiny
+            intervention.idPrescriptionDrugDestiny = id_prescription_drug_destiny
 
             intervention.economy_day_value = economy_day_value
             intervention.economy_day_value_manual = economy_day_value_manual
@@ -288,7 +288,7 @@ def set_intervention_outcome(
             intervention.destiny = destiny_data
         else:
             # cleanup
-            intervention.idPrescriptionDestiny = None
+            intervention.idPrescriptionDrugDestiny = None
             intervention.economy_day_value = None
             intervention.economy_day_value_manual = False
             intervention.economy_days = None
@@ -539,7 +539,12 @@ def get_outcome_data(id_intervention, user: User):
         destiny_query = (
             _get_outcome_data_query()
             .filter(Prescription.admissionNumber == intervention.admissionNumber)
-            .filter(PrescriptionDrug.idDrug == destiny_id_drug)
+            .filter(
+                or_(
+                    PrescriptionDrug.idDrug == destiny_id_drug,
+                    Drug.sctid == destiny_drug.sctid,
+                )
+            )
             .filter(Prescription.date > origin[0]["item"]["prescriptionDate"])
             .filter(PrescriptionDrug.suspendedDate == None)
             .order_by(Prescription.date)
@@ -702,6 +707,7 @@ def _outcome_calc(list, user: User):
             {
                 "item": {
                     "idPrescription": str(prescription.id),
+                    "idPrescriptionDrug": str(prescription_drug.id),
                     "prescriptionDate": prescription.date.isoformat(),
                     "idDrug": drug.id,
                     "name": drug.name,
@@ -712,6 +718,7 @@ def _outcome_calc(list, user: User):
                     ),
                     "idFrequency": prescription_drug.idFrequency,
                     "frequencyDay": frequency_day,
+                    "route": prescription_drug.route,
                     "pricePerDose": str(none2zero(origin_price) * none2zero(dose)),
                     "priceKit": kit["price"],
                     "beforeConversion": {

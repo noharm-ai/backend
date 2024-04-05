@@ -132,7 +132,7 @@ def set_outcome():
             economy_day_amount_manual=data.get("economyDayAmountManual", None),
             economy_day_value=data.get("economyDayValue", None),
             economy_day_value_manual=data.get("economyDayValueManual", None),
-            id_prescription_destiny=data.get("idPrescriptionDestiny", None),
+            id_prescription_drug_destiny=data.get("idPrescriptionDrugDestiny", None),
             origin_data=data.get("origin"),
             destiny_data=data.get("destiny"),
         )
