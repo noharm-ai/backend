@@ -473,11 +473,12 @@ def getFeatures(result):
         "drugIDs": list(set(drugIDs)),
         "substanceIDs": list(set(substanceIDs)),
         "substanceClassIDs": list(set(substanceClassIDs)),
-        "alertStats": result["data"]["alertStats"]
-        if "alertStats" in result["data"]
-        else None,
+        "alertStats": (
+            result["data"]["alertStats"] if "alertStats" in result["data"] else None
+        ),
         "frequencies": list(set(frequencies)),
         "processedDate": datetime.today().isoformat(),
+        "totalItens": len(drugList),
     }
 
 

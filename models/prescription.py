@@ -483,7 +483,8 @@ class Prescription(db.Model):
             )
 
             if r[0] in results:
-                results[r[0]].append(alert)
+                if alert not in results[r[0]]:
+                    results[r[0]].append(alert)
             else:
                 results[r[0]] = [alert]
 
