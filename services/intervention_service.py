@@ -268,7 +268,7 @@ def set_intervention_outcome(
             status.HTTP_400_BAD_REQUEST,
         )
 
-    intervention.date = datetime.today()
+    intervention.update = datetime.today()
     intervention.user = user.id
     intervention.status = outcome
 
