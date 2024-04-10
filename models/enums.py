@@ -94,6 +94,7 @@ class ReportEnum(Enum):
     RPT_PRESCRIPTION = "PRESCRIPTION"
     RPT_INTERVENTION = "INTERVENTION"
     RPT_PRESCRIPTION_AUDIT = "PRESCRIPTION_AUDIT"
+    RPT_ECONOMY = "ECONOMY"
 
 
 class InterventionEconomyTypeEnum(Enum):
