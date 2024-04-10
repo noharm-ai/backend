@@ -445,6 +445,8 @@ def save_intervention(
 def _get_outcome_data_query():
     PrescriptionDrugConvert = db.aliased(MeasureUnitConvert)
     PrescriptionDrugPriceConvert = db.aliased(MeasureUnitConvert)
+    PrescriptionDrugFrequency = db.aliased(Frequency)
+    DefaultMeasureUnit = db.aliased(MeasureUnit)
 
     return (
         db.session.query(
@@ -454,6 +456,8 @@ def _get_outcome_data_query():
             PrescriptionDrugConvert,
             PrescriptionDrugPriceConvert,
             Prescription,
+            DefaultMeasureUnit,
+            PrescriptionDrugFrequency,
         )
         .join(Drug, PrescriptionDrug.idDrug == Drug.id)
         .join(Prescription, PrescriptionDrug.idPrescription == Prescription.id)
@@ -480,6 +484,14 @@ def _get_outcome_data_query():
                 PrescriptionDrugPriceConvert.idMeasureUnit
                 == DrugAttributes.idMeasureUnitPrice,
             ),
+        )
+        .outerjoin(
+            DefaultMeasureUnit,
+            DrugAttributes.idMeasureUnit == DefaultMeasureUnit.id,
+        )
+        .outerjoin(
+            PrescriptionDrugFrequency,
+            PrescriptionDrug.idFrequency == PrescriptionDrugFrequency.id,
         )
     )
 
@@ -675,6 +687,8 @@ def _outcome_calc(list, user: User):
         dose_convert = item[3]
         price_dose_convert = item[4]
         prescription = item[5]
+        default_measure_unit = item[6]
+        frequency = item[7]
 
         if (
             drug_attr != None
@@ -716,8 +730,16 @@ def _outcome_calc(list, user: User):
                     "idMeasureUnit": (
                         drug_attr.idMeasureUnit if drug_attr != None else None
                     ),
+                    "measureUnitDescription": (
+                        default_measure_unit.description
+                        if default_measure_unit != None
+                        else None
+                    ),
                     "idFrequency": prescription_drug.idFrequency,
                     "frequencyDay": frequency_day,
+                    "frequencyDescription": (
+                        frequency.description if frequency != None else None
+                    ),
                     "route": prescription_drug.route,
                     "pricePerDose": str(none2zero(origin_price) * none2zero(dose)),
                     "priceKit": kit["price"],
