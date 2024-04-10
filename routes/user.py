@@ -1,3 +1,4 @@
+import re
 from models.main import *
 from models.appendix import *
 from flask import Blueprint, request, render_template
@@ -53,6 +54,12 @@ def setUser():
         return {
             "status": "error",
             "message": "Usuário Inexistente!",
+        }, status.HTTP_400_BAD_REQUEST
+
+    if not re.fullmatch(r"^(?=.*[A-Z])(?=.*[0-9])(?=.*[a-z]).{8,}$", newpassword):
+        return {
+            "status": "error",
+            "message": "A senha deve possuir, no mínimo, 8 caracteres, letras maíusculas, minúsculas e números",
         }, status.HTTP_400_BAD_REQUEST
 
     update = {"password": func.crypt(newpassword, func.gen_salt("bf", 8))}
@@ -117,6 +124,12 @@ def resetPassword():
         return {
             "status": "error",
             "message": "Usuário Inexistente!",
+        }, status.HTTP_400_BAD_REQUEST
+
+    if not re.fullmatch(r"^(?=.*[A-Z])(?=.*[0-9])(?=.*[a-z]).{8,}$", newpassword):
+        return {
+            "status": "error",
+            "message": "A senha deve possuir, no mínimo, 8 caracteres, letras maíusculas, minúsculas e números",
         }, status.HTTP_400_BAD_REQUEST
 
     update = {"password": func.crypt(newpassword, func.gen_salt("bf", 8))}
