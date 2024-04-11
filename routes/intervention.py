@@ -109,7 +109,9 @@ def outcome_data():
 
     try:
         intervention = intervention_service.get_outcome_data(
-            id_intervention=request.args.get("idIntervention", None), user=user
+            id_intervention=request.args.get("idIntervention", None),
+            user=user,
+            edit=request.args.get("edit", False),
         )
     except ValidationError as e:
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus

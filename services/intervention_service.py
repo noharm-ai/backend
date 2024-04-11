@@ -258,16 +258,6 @@ def set_intervention_outcome(
             status.HTTP_400_BAD_REQUEST,
         )
 
-    if (
-        intervention.status != InterventionStatusEnum.PENDING.value
-        and outcome != InterventionStatusEnum.PENDING.value
-    ):
-        raise ValidationError(
-            "Esta intervenção já possui um desfecho registrado",
-            "errors.businessRule",
-            status.HTTP_400_BAD_REQUEST,
-        )
-
     intervention.update = datetime.today()
     intervention.user = user.id
     intervention.status = outcome
@@ -535,7 +525,7 @@ def _get_outcome_data_query():
     )
 
 
-def get_outcome_data(id_intervention, user: User):
+def get_outcome_data(id_intervention, user: User, edit=False):
     record = (
         db.session.query(Intervention, PrescriptionDrug)
         .outerjoin(PrescriptionDrug, PrescriptionDrug.id == Intervention.id)
@@ -552,7 +542,7 @@ def get_outcome_data(id_intervention, user: User):
 
     intervention = record[0]
     prescription_drug = record[1]
-    readonly = intervention.status != "s"
+    readonly = intervention.status != InterventionStatusEnum.PENDING.value and not edit
 
     if prescription_drug == None or intervention.economy_type == None:
         return {
@@ -571,10 +561,7 @@ def get_outcome_data(id_intervention, user: User):
     )
     base_origin = _outcome_calc(origin_query.all(), user)
 
-    if (
-        intervention.status == InterventionStatusEnum.PENDING.value
-        or intervention.origin == None
-    ):
+    if not readonly or intervention.origin == None:
         origin = base_origin
     else:
         origin = [{"item": intervention.origin}]
@@ -604,7 +591,7 @@ def get_outcome_data(id_intervention, user: User):
 
         base_destiny = _outcome_calc(destiny_query.all(), user)
 
-        if intervention.status == InterventionStatusEnum.PENDING.value:
+        if not readonly:
             destiny = base_destiny
         else:
             destiny = [{"item": intervention.destiny}]
@@ -638,6 +625,9 @@ def get_outcome_data(id_intervention, user: User):
             "economyDayAmount": intervention.economy_days,
             "economyDayAmountManual": intervention.economy_days != None,
             "economyType": intervention.economy_type,
+            "updatedAt": (
+                intervention.update.isoformat() if intervention.update != None else None
+            ),
         },
         "original": {"origin": base_origin[0], "destiny": base_destiny},
         "origin": origin[0],
