@@ -1105,6 +1105,7 @@ class Intervention(db.Model):
     idPrescriptionDrugDestiny = db.Column(
         "fkpresmed_destino", db.Integer, nullable=True
     )
+    date_base_economy = db.Column("dt_base_economia", db.DateTime, nullable=True)
 
     origin = db.Column("origem", postgresql.JSONB, nullable=True)
     destiny = db.Column("destino", postgresql.JSONB, nullable=True)
