@@ -332,7 +332,7 @@ def save_intervention(
         raise ValidationError(
             "Permissão inválida",
             "errors.invalidPermission",
-            status.HTTP_400_BAD_REQUEST,
+            status.HTTP_401_UNAUTHORIZED,
         )
 
     if id_prescription_drug != "0":
@@ -411,26 +411,22 @@ def save_intervention(
         if economy_type != None and i.date_base_economy == None:
             if permission_service.is_cpoe(user):
                 if agg_id_prescription == None:
-                    raise ValidationError(
-                        "Data base economia inválida",
-                        "errors.invalidParameter",
-                        status.HTTP_400_BAD_REQUEST,
+                    i.date_base_economy = i.date
+                else:
+                    presc = (
+                        db.session.query(Prescription)
+                        .filter(Prescription.id == agg_id_prescription)
+                        .first()
                     )
 
-                presc = (
-                    db.session.query(Prescription)
-                    .filter(Prescription.id == agg_id_prescription)
-                    .first()
-                )
+                    if presc == None:
+                        raise ValidationError(
+                            "Registro inválido: data base economia",
+                            "errors.businessRule",
+                            status.HTTP_400_BAD_REQUEST,
+                        )
 
-                if presc == None:
-                    raise ValidationError(
-                        "Registro inválido: data base economia",
-                        "errors.invalidRecord",
-                        status.HTTP_400_BAD_REQUEST,
-                    )
-
-                i.date_base_economy = presc.date
+                    i.date_base_economy = presc.date
             else:
                 presc = (
                     db.session.query(PrescriptionDrug, Prescription)
