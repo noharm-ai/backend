@@ -543,8 +543,9 @@ def get_outcome_data(id_intervention, user: User, edit=False):
     intervention = record[0]
     prescription_drug = record[1]
     readonly = intervention.status != InterventionStatusEnum.PENDING.value and not edit
+    economy_type = intervention.economy_type
 
-    if prescription_drug == None or intervention.economy_type == None:
+    if prescription_drug == None or economy_type == None:
         return {
             "idIntervention": id_intervention,
             "header": {
@@ -567,7 +568,7 @@ def get_outcome_data(id_intervention, user: User, edit=False):
         origin = [{"item": intervention.origin}]
 
     # destiny
-    if intervention.economy_type == InterventionEconomyTypeEnum.SUBSTITUTION.value:
+    if economy_type == InterventionEconomyTypeEnum.SUBSTITUTION.value:
         destiny_id_drug = origin[0]["item"]["idDrug"]
         if intervention.interactions != None and len(intervention.interactions) > 0:
             destiny_id_drug = intervention.interactions[0]
@@ -624,7 +625,7 @@ def get_outcome_data(id_intervention, user: User, edit=False):
             "economyDayValue": economy_day_value,
             "economyDayAmount": intervention.economy_days,
             "economyDayAmountManual": intervention.economy_days != None,
-            "economyType": intervention.economy_type,
+            "economyType": economy_type,
             "updatedAt": (
                 intervention.update.isoformat() if intervention.update != None else None
             ),
@@ -746,6 +747,26 @@ def _outcome_calc(list, user: User):
             user=user,
         )
 
+        dose_factor = None
+        if (
+            drug_attr != None
+            and prescription_drug.idMeasureUnit == drug_attr.idMeasureUnit
+        ):
+            dose_factor = 1
+        else:
+            dose_factor = dose_convert.factor if dose_convert != None else None
+
+        price_factor = None
+        if (
+            drug_attr != None
+            and drug_attr.idMeasureUnitPrice == drug_attr.idMeasureUnit
+        ):
+            price_factor = 1
+        else:
+            price_factor = (
+                price_dose_convert.factor if price_dose_convert != None else None
+            )
+
         results.append(
             {
                 "item": {
@@ -790,12 +811,10 @@ def _outcome_calc(list, user: User):
                     },
                     "conversion": {
                         "doseFactor": (
-                            str(dose_convert.factor) if dose_convert != None else None
+                            str(dose_factor) if dose_factor != None else None
                         ),
                         "priceFactor": (
-                            str(price_dose_convert.factor)
-                            if price_dose_convert != None
-                            else None
+                            str(price_factor) if price_factor != None else None
                         ),
                     },
                     "kit": kit,
