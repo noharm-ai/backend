@@ -642,6 +642,16 @@ def get_outcome_data(id_intervention, user: User, edit=False):
             "updatedAt": (
                 intervention.update.isoformat() if intervention.update != None else None
             ),
+            "economyIniDate": (
+                intervention.date_base_economy.isoformat()
+                if intervention.date_base_economy != None
+                else None
+            ),
+            "economyEndDate": (
+                intervention.date_end_economy.isoformat()
+                if intervention.date_end_economy != None
+                else None
+            ),
         },
         "original": {"origin": base_origin[0], "destiny": base_destiny},
         "origin": origin[0],
