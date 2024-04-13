@@ -258,6 +258,15 @@ def set_intervention_outcome(
             status.HTTP_400_BAD_REQUEST,
         )
 
+    if economy_day_amount_manual and (
+        economy_day_amount == None or economy_day_amount == 0
+    ):
+        raise ValidationError(
+            "Quantidade de Dias de Economia deve ser especificado",
+            "errors.businessRule",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
     intervention.update = datetime.today()
     intervention.user = user.id
     intervention.status = outcome
@@ -270,9 +279,12 @@ def set_intervention_outcome(
             intervention.economy_day_value = economy_day_value
             intervention.economy_day_value_manual = economy_day_value_manual
 
-            intervention.economy_days = (
-                economy_day_amount if economy_day_amount_manual else None
-            )
+            if economy_day_amount_manual:
+                intervention.economy_days = economy_day_amount
+                intervention.date_end_economy = (
+                    intervention.date_base_economy
+                    + timedelta(days=economy_day_amount - 1)
+                )
 
             intervention.origin = origin_data
             intervention.destiny = destiny_data
@@ -284,6 +296,7 @@ def set_intervention_outcome(
             intervention.economy_days = None
             intervention.origin = None
             intervention.destiny = None
+            intervention.date_end_economy = None
 
 
 def save_intervention(
