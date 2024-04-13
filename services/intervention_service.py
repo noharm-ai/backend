@@ -8,7 +8,7 @@ from models.enums import (
     InterventionStatusEnum,
     FeatureEnum,
 )
-from routes.utils import validate
+from routes.utils import validate, gen_agg_id
 from services import memory_service, permission_service
 
 from exception.validation_error import ValidationError
@@ -553,8 +553,8 @@ def get_outcome_data(id_intervention, user: User, edit=False):
             status.HTTP_400_BAD_REQUEST,
         )
 
-    intervention = record[0]
-    prescription_drug = record[1]
+    intervention: Intervention = record[0]
+    prescription_drug: PrescriptionDrug = record[1]
     readonly = intervention.status != InterventionStatusEnum.PENDING.value and not edit
     economy_type = intervention.economy_type
 
@@ -573,7 +573,15 @@ def get_outcome_data(id_intervention, user: User, edit=False):
     origin_query = _get_outcome_data_query().filter(
         PrescriptionDrug.id == intervention.id
     )
-    base_origin = _outcome_calc(origin_query.all(), user)
+    base_origin = _outcome_calc(
+        list=origin_query.all(),
+        user=user,
+        date_base_economy=(
+            intervention.date_base_economy
+            if intervention.date_base_economy != None
+            else intervention.date
+        ),
+    )
 
     if not readonly or intervention.origin == None:
         origin = base_origin
@@ -603,7 +611,15 @@ def get_outcome_data(id_intervention, user: User, edit=False):
             .limit(10)
         )
 
-        base_destiny = _outcome_calc(destiny_query.all(), user)
+        base_destiny = _outcome_calc(
+            list=destiny_query.all(),
+            user=user,
+            date_base_economy=(
+                intervention.date_base_economy
+                if intervention.date_base_economy != None
+                else intervention.date
+            ),
+        )
 
         if not readonly:
             destiny = base_destiny
@@ -645,7 +661,7 @@ def get_outcome_data(id_intervention, user: User, edit=False):
             "economyIniDate": (
                 intervention.date_base_economy.isoformat()
                 if intervention.date_base_economy != None
-                else None
+                else intervention.date.isoformat()
             ),
             "economyEndDate": (
                 intervention.date_end_economy.isoformat()
@@ -727,21 +743,21 @@ def _get_price_kit(id_prescription, prescription_drug: PrescriptionDrug, user: U
     return {"price": str(kit_price), "list": drugs}
 
 
-def _outcome_calc(list, user: User):
+def _outcome_calc(list, user: User, date_base_economy):
     results = []
 
     for item in list:
         origin_price = None
         dose = None
 
-        prescription_drug = item[0]
-        drug = item[1]
-        drug_attr = item[2]
-        dose_convert = item[3]
-        price_dose_convert = item[4]
-        prescription = item[5]
-        default_measure_unit = item[6]
-        frequency = item[7]
+        prescription_drug: PrescriptionDrug = item[0]
+        drug: Drug = item[1]
+        drug_attr: DrugAttributes = item[2]
+        dose_convert: MeasureUnitConvert = item[3]
+        price_dose_convert: MeasureUnitConvert = item[4]
+        prescription: Prescription = item[5]
+        default_measure_unit: MeasureUnit = item[6]
+        frequency: Frequency = item[7]
 
         if (
             drug_attr != None
@@ -790,10 +806,17 @@ def _outcome_calc(list, user: User):
                 price_dose_convert.factor if price_dose_convert != None else None
             )
 
+        id_prescription_aggregate = gen_agg_id(
+            admission_number=prescription.admissionNumber,
+            id_segment=prescription.idSegment,
+            pdate=date_base_economy,
+        )
+
         results.append(
             {
                 "item": {
                     "idPrescription": str(prescription.id),
+                    "idPrescriptionAggregate": str(id_prescription_aggregate),
                     "idPrescriptionDrug": str(prescription_drug.id),
                     "prescriptionDate": prescription.date.isoformat(),
                     "idDrug": drug.id,

@@ -7,7 +7,7 @@ from models.appendix import *
 from models.prescription import *
 from models.enums import PrescriptionDrugAuditTypeEnum, DrugTypeEnum
 from routes.prescription import getPrescription
-from routes.utils import getFeatures
+from routes.utils import getFeatures, gen_agg_id
 from services import prescription_service, prescription_drug_service
 
 from exception.validation_error import ValidationError
@@ -247,16 +247,6 @@ def get_last_agg_prescription(admission_number) -> Prescription:
         .order_by(desc(Prescription.date))
         .first()
     )
-
-
-def gen_agg_id(admission_number, id_segment, pdate):
-    id = (pdate.year - 2000) * 100000000000000
-    id += pdate.month * 1000000000000
-    id += pdate.day * 10000000000
-    id += id_segment * 1000000000
-    id += admission_number
-
-    return id
 
 
 def get_date_range(p):
