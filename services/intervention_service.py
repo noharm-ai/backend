@@ -561,7 +561,13 @@ def get_outcome_data(id_intervention, user: User, edit=False):
     readonly = False
     economy_type = 2
 
-    if prescription_drug == None or economy_type == None:
+    # origin
+    origin_query = _get_outcome_data_query().filter(
+        PrescriptionDrug.id == intervention.id
+    )
+    origin_list = origin_query.all()
+
+    if prescription_drug == None or economy_type == None or len(origin_list) == 0:
         return {
             "idIntervention": id_intervention,
             "header": {
@@ -572,10 +578,6 @@ def get_outcome_data(id_intervention, user: User, edit=False):
             },
         }
 
-    # origin
-    origin_query = _get_outcome_data_query().filter(
-        PrescriptionDrug.id == intervention.id
-    )
     base_origin = _outcome_calc(
         list=origin_query.all(),
         user=user,
