@@ -267,6 +267,30 @@ def set_intervention_outcome(
             status.HTTP_400_BAD_REQUEST,
         )
 
+    if economy_day_value_manual and (
+        economy_day_value == None or economy_day_value < 0
+    ):
+        raise ValidationError(
+            "Economia/Dia inválido",
+            "errors.businessRule",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    if intervention.economy_type == InterventionEconomyTypeEnum.SUBSTITUTION.value:
+        if not economy_day_value_manual:
+            raise ValidationError(
+                "Economia/Dia deve ser especificado manualmente quando não houver prescrição substituta selecionada",
+                "errors.businessRule",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not economy_day_amount_manual:
+            raise ValidationError(
+                "Qtd. de dias de economia deve ser especificado manualmente quando não houver prescrição substituta selecionada",
+                "errors.businessRule",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
     intervention.update = datetime.today()
     intervention.user = user.id
     intervention.status = outcome
@@ -555,8 +579,8 @@ def get_outcome_data(id_intervention, user: User, edit=False):
 
     intervention: Intervention = record[0]
     prescription_drug: PrescriptionDrug = record[1]
-    # readonly = intervention.status != InterventionStatusEnum.PENDING.value and not edit
-    # economy_type = intervention.economy_type
+    readonly = intervention.status != InterventionStatusEnum.PENDING.value and not edit
+    economy_type = intervention.economy_type
     # todo: test (remove)
     readonly = False
     economy_type = 2
@@ -822,7 +846,7 @@ def _outcome_calc(list, user: User, date_base_economy):
                     "idDrug": drug.id,
                     "name": drug.name,
                     "price": str(origin_price) if origin_price != None else None,
-                    "dose": str(dose),
+                    "dose": str(dose) if dose != None else None,
                     "idMeasureUnit": (
                         drug_attr.idMeasureUnit if drug_attr != None else None
                     ),
