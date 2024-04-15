@@ -555,8 +555,11 @@ def get_outcome_data(id_intervention, user: User, edit=False):
 
     intervention: Intervention = record[0]
     prescription_drug: PrescriptionDrug = record[1]
-    readonly = intervention.status != InterventionStatusEnum.PENDING.value and not edit
-    economy_type = intervention.economy_type
+    # readonly = intervention.status != InterventionStatusEnum.PENDING.value and not edit
+    # economy_type = intervention.economy_type
+    # todo: test (remove)
+    readonly = False
+    economy_type = 2
 
     if prescription_drug == None or economy_type == None:
         return {
@@ -606,7 +609,6 @@ def get_outcome_data(id_intervention, user: User, edit=False):
                 )
             )
             .filter(Prescription.date > origin[0]["item"]["prescriptionDate"])
-            .filter(PrescriptionDrug.suspendedDate == None)
             .order_by(Prescription.date)
             .limit(10)
         )
@@ -614,11 +616,7 @@ def get_outcome_data(id_intervention, user: User, edit=False):
         base_destiny = _outcome_calc(
             list=destiny_query.all(),
             user=user,
-            date_base_economy=(
-                intervention.date_base_economy
-                if intervention.date_base_economy != None
-                else intervention.date
-            ),
+            date_base_economy=None,
         )
 
         if not readonly:
@@ -809,7 +807,7 @@ def _outcome_calc(list, user: User, date_base_economy):
         id_prescription_aggregate = gen_agg_id(
             admission_number=prescription.admissionNumber,
             id_segment=prescription.idSegment,
-            pdate=date_base_economy,
+            pdate=date_base_economy if date_base_economy != None else prescription.date,
         )
 
         results.append(
