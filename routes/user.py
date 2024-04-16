@@ -1,15 +1,19 @@
 import re
-from models.main import *
-from models.appendix import *
 from flask import Blueprint, request, render_template
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from flask_jwt_extended import create_access_token, decode_token
-from .utils import tryCommit
 from datetime import datetime, timedelta
 from sqlalchemy import func
-from flask import render_template
+from flask import render_template, escape
 from flask_mail import Message
+
 from config import Config
+from models.main import *
+from models.appendix import *
+from models.enums import UserAuditTypeEnum
+from services import user_service
+from .utils import tryCommit
+from exception.validation_error import ValidationError
 
 app_usr = Blueprint("app_usr", __name__)
 
@@ -56,7 +60,7 @@ def setUser():
             "message": "Usuário Inexistente!",
         }, status.HTTP_400_BAD_REQUEST
 
-    if not re.fullmatch(r"^(?=.*[A-Z])(?=.*[0-9])(?=.*[a-z]).{8,}$", newpassword):
+    if not user_service.is_valid_password(newpassword):
         return {
             "status": "error",
             "message": "A senha deve possuir, no mínimo, 8 caracteres, letras maíusculas, minúsculas e números",
@@ -80,21 +84,50 @@ def forgetPassword():
             "message": "Usuário Inexistente!",
         }, status.HTTP_400_BAD_REQUEST
 
-    expires = timedelta(hours=24)
+    expires = timedelta(hours=6)
     reset_token = create_access_token(identity=user.id, expires_delta=expires)
+
+    audit_count = (
+        db.session.query(UserAudit)
+        .filter(UserAudit.idUser == user.id)
+        .filter(UserAudit.auditType == UserAuditTypeEnum.FORGOT_PASSWORD.value)
+        .filter(func.date(UserAudit.createdAt) == datetime.today().date())
+        .count()
+    )
+
+    if audit_count > 5:
+        return {
+            "status": "error",
+            "message": "O limite de requisições foi atingido.",
+        }, status.HTTP_400_BAD_REQUEST
+
+    user_service.create_audit(
+        auditType=UserAuditTypeEnum.FORGOT_PASSWORD,
+        id_user=user.id,
+        responsible=user,
+        pw_token=reset_token,
+    )
 
     msg = Message()
     msg.subject = "NoHarm: Esqueci a senha"
     msg.sender = Config.MAIL_SENDER
     msg.recipients = [user.email]
     msg.html = render_template(
-        "reset_email.html", user=user.name, token=reset_token, host=Config.MAIL_HOST
+        "reset_email.html",
+        user=user.name,
+        email=user.email,
+        token=reset_token,
+        host=Config.MAIL_HOST,
     )
     mail.send(msg)
 
+    db.session.commit()
+    db.session.close()
+    db.session.remove()
+
     return {
         "status": "success",
-        "message": "Email enviado com sucesso para: " + email,
+        "message": "Email enviado com sucesso para: " + escape(email),
     }, status.HTTP_200_OK
 
 
@@ -102,42 +135,15 @@ def forgetPassword():
 def resetPassword():
     data = request.get_json()
 
-    reset_token = data.get("reset_token", None)
-    newpassword = data.get("newpassword", None)
+    try:
+        user_service.reset_password(
+            token=data.get("reset_token", None),
+            password=data.get("newpassword", None),
+        )
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
-    if not reset_token or not newpassword:
-        return {
-            "status": "error",
-            "message": "Token Inexistente!",
-        }, status.HTTP_400_BAD_REQUEST
-
-    user_token = decode_token(reset_token)
-    if not "sub" in user_token:
-        return {
-            "status": "error",
-            "message": "Token Expirou!",
-        }, status.HTTP_400_BAD_REQUEST
-
-    user_id = user_token["sub"]
-    user = User.query.get(user_id)
-    if not user:
-        return {
-            "status": "error",
-            "message": "Usuário Inexistente!",
-        }, status.HTTP_400_BAD_REQUEST
-
-    if not re.fullmatch(r"^(?=.*[A-Z])(?=.*[0-9])(?=.*[a-z]).{8,}$", newpassword):
-        return {
-            "status": "error",
-            "message": "A senha deve possuir, no mínimo, 8 caracteres, letras maíusculas, minúsculas e números",
-        }, status.HTTP_400_BAD_REQUEST
-
-    update = {"password": func.crypt(newpassword, func.gen_salt("bf", 8))}
-    db.session.query(User).filter(User.id == user.id).update(
-        update, synchronize_session="fetch"
-    )
-
-    return tryCommit(db, user.id)
+    return tryCommit(db, True)
 
 
 @app_usr.route("/users/search", methods=["GET"])
