@@ -106,3 +106,11 @@ class InterventionEconomyTypeEnum(Enum):
 class InterventionStatusEnum(Enum):
     PENDING = "s"
     REMOVED = "0"
+
+
+class UserAuditTypeEnum(Enum):
+    LOGIN = 1
+    CREATE = 2
+    UPDATE = 3
+    FORGOT_PASSWORD = 4
+    UPDATE_PASSWORD = 5

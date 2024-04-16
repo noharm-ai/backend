@@ -8,8 +8,8 @@ from sqlalchemy import func, or_
 from flask import render_template
 from config import Config
 
-from services import memory_service
-from models.enums import FeatureEnum, RoleEnum
+from services import memory_service, user_service
+from models.enums import FeatureEnum, RoleEnum, UserAuditTypeEnum
 
 
 app_user_crud = Blueprint("app_user_crud", __name__)
@@ -107,6 +107,16 @@ def createUser(idUser=None):
         db.session.add(newUser)
         db.session.flush()
 
+        extra_audit = {
+            "config": newUser.config,
+        }
+        user_service.create_audit(
+            auditType=UserAuditTypeEnum.CREATE,
+            id_user=newUser.id,
+            responsible=user,
+            extra=extra_audit,
+        )
+
         response, rstatus = tryCommit(db, newUser.id)
 
         if rstatus == status.HTTP_200_OK:
@@ -146,6 +156,8 @@ def createUser(idUser=None):
         updatedUser.external = data.get("external", None)
         updatedUser.active = bool(data.get("active", True))
 
+        pw_changed = False
+
         if RoleEnum.ADMIN.value in roles or RoleEnum.TRAINING.value in roles:
             if updatedUser.config is None:
                 updatedUser.config = {"roles": data.get("roles", [])}
@@ -159,6 +171,7 @@ def createUser(idUser=None):
                 password = data.get("password", None)
 
                 if password != None and password != "":
+                    pw_changed = True
                     updatedUser.password = func.crypt(password, func.gen_salt("bf", 8))
 
         if updatedUser.config != None and "roles" in updatedUser.config:
@@ -168,6 +181,23 @@ def createUser(idUser=None):
                     "message": "As permissões Administrador e Suporte não podem ser concedidas.",
                     "code": "errors.unauthorizedUser",
                 }, status.HTTP_401_UNAUTHORIZED
+
+        extra_audit = {
+            "config": updatedUser.config,
+        }
+        user_service.create_audit(
+            auditType=UserAuditTypeEnum.UPDATE,
+            id_user=updatedUser.id,
+            responsible=user,
+            extra=extra_audit,
+        )
+
+        if pw_changed:
+            user_service.create_audit(
+                auditType=UserAuditTypeEnum.UPDATE_PASSWORD,
+                id_user=updatedUser.id,
+                responsible=user,
+            )
 
         db.session.add(updatedUser)
         db.session.flush()
