@@ -67,7 +67,11 @@ def auth():
 
         return response
 
-    return tryCommit(db, auth_data)
+    db.session.commit()
+    db.session.close()
+    db.session.remove()
+
+    return auth_data, status.HTTP_200_OK
 
 
 @app_auth.route("/auth-provider", methods=["POST"])
