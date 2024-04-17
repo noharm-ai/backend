@@ -167,6 +167,7 @@ def _auth_user(
 
     extra_audit = {
         "schema": user_schema,
+        "env": Config.ENV,
         "userAgent": request.headers.get("User-Agent"),
     }
     user_service.create_audit(
