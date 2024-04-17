@@ -100,7 +100,7 @@ app.register_blueprint(app_rpt_config)
 
 CORS(app, origins=[Config.MAIL_HOST], supports_credentials=True)
 
-if Config.ENV == NoHarmENV.STAGING.value:
+if Config.ENV != NoHarmENV.PRODUCTION.value:
     logging.basicConfig()
     logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)
 
@@ -117,7 +117,12 @@ def get_exception():
 
 
 if __name__ == "__main__":
-    app.run(debug=False, host="0.0.0.0")
+    if Config.ENV == NoHarmENV.DEVELOPMENT.value:
+        app.debug = True
+    else:
+        app.debug = False
+
+    app.run(host="0.0.0.0")
 
 
 @app.after_request

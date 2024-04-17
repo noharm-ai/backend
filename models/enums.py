@@ -27,6 +27,7 @@ class GlobalMemoryEnum(Enum):
 
 
 class NoHarmENV(Enum):
+    DEVELOPMENT = "development"
     STAGING = "staging"
     PRODUCTION = "production"
 
