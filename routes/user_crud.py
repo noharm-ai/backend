@@ -10,6 +10,7 @@ from config import Config
 
 from services import memory_service, user_service
 from models.enums import FeatureEnum, RoleEnum, UserAuditTypeEnum
+from exception.validation_error import ValidationError
 
 
 app_user_crud = Blueprint("app_user_crud", __name__)
@@ -156,8 +157,6 @@ def createUser(idUser=None):
         updatedUser.external = data.get("external", None)
         updatedUser.active = bool(data.get("active", True))
 
-        pw_changed = False
-
         if RoleEnum.ADMIN.value in roles or RoleEnum.TRAINING.value in roles:
             if updatedUser.config is None:
                 updatedUser.config = {"roles": data.get("roles", [])}
@@ -165,14 +164,6 @@ def createUser(idUser=None):
                 newConfig = updatedUser.config.copy()
                 newConfig["roles"] = data.get("roles", [])
                 updatedUser.config = newConfig
-
-            if RoleEnum.ADMIN.value in roles:
-                # force password
-                password = data.get("password", None)
-
-                if password != None and password != "":
-                    pw_changed = True
-                    updatedUser.password = func.crypt(password, func.gen_salt("bf", 8))
 
         if updatedUser.config != None and "roles" in updatedUser.config:
             if _has_special_role(updatedUser.config["roles"]):
@@ -191,13 +182,6 @@ def createUser(idUser=None):
             responsible=user,
             extra=extra_audit,
         )
-
-        if pw_changed:
-            user_service.create_audit(
-                auditType=UserAuditTypeEnum.UPDATE_PASSWORD,
-                id_user=updatedUser.id,
-                responsible=user,
-            )
 
         db.session.add(updatedUser)
         db.session.flush()
@@ -246,3 +230,16 @@ def getUsers():
         )
 
     return {"status": "success", "data": results}, status.HTTP_200_OK
+
+
+@app_user_crud.route("/user/reset-token", methods=["POST"])
+@jwt_required()
+def get_reset_token():
+    data = request.get_json()
+
+    try:
+        token = user_service.admin_get_reset_token(data.get("idUser", None))
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+
+    return tryCommit(db, token)

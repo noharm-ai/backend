@@ -1,13 +1,16 @@
 import re
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask_api import status
-from flask import request
-from flask_jwt_extended import decode_token
+from flask import request, render_template
+from flask_jwt_extended import decode_token, create_access_token, get_jwt_identity
+from flask_mail import Message
 from sqlalchemy import desc, func
 
-from models.main import User, UserAudit, db
+from models.main import User, UserAudit, db, mail
 from models.enums import UserAuditTypeEnum
+from services import permission_service
+from config import Config
 
 from exception.validation_error import ValidationError
 
@@ -119,3 +122,126 @@ def reset_password(token: str, password: str):
 
 def is_valid_password(password):
     return re.fullmatch(r"^(?=.*[A-Z])(?=.*[0-9])(?=.*[a-z]).{8,}$", password)
+
+
+def admin_get_reset_token(id_user: int):
+    user = User.find(get_jwt_identity())
+
+    if not user:
+        raise ValidationError(
+            "Usuário inexistente.",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    if not permission_service.is_admin(user):
+        raise ValidationError(
+            "Usuário inválido.",
+            "errors.businessRules",
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
+    reset_user = db.session.query(User).filter(User.id == id_user).first()
+    if not reset_user:
+        raise ValidationError(
+            "Usuário inexistente.",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    return get_reset_token(email=reset_user.email, send_email=False)
+
+
+def get_reset_token(email: str, send_email=True):
+    user = (
+        db.session.query(User)
+        .filter(User.email == email)
+        .filter(User.active == True)
+        .first()
+    )
+    if not user:
+        raise ValidationError(
+            "Usuário inválido",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    expires = timedelta(hours=6)
+    reset_token = create_access_token(identity=user.id, expires_delta=expires)
+
+    audit_count = (
+        db.session.query(UserAudit)
+        .filter(UserAudit.idUser == user.id)
+        .filter(UserAudit.auditType == UserAuditTypeEnum.FORGOT_PASSWORD.value)
+        .filter(func.date(UserAudit.createdAt) == datetime.today().date())
+        .count()
+    )
+
+    if audit_count > 20:
+        raise ValidationError(
+            "O limite de requisições foi atingido.",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    create_audit(
+        auditType=UserAuditTypeEnum.FORGOT_PASSWORD,
+        id_user=user.id,
+        responsible=user,
+        pw_token=reset_token,
+    )
+
+    if send_email:
+        msg = Message()
+        msg.subject = "NoHarm: Esqueci a senha"
+        msg.sender = Config.MAIL_SENDER
+        msg.recipients = [user.email]
+        msg.html = render_template(
+            "reset_email.html",
+            user=user.name,
+            email=user.email,
+            token=reset_token,
+            host=Config.MAIL_HOST,
+        )
+
+        mail.send(msg)
+
+    return reset_token
+
+
+def update_password(password, newpassword):
+    user = db.session.query(User).filter(User.id == get_jwt_identity()).first()
+
+    if not user:
+        raise ValidationError(
+            "Usuário inexistente.",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    auth_user = User.authenticate(user.email, password)
+
+    if not auth_user or not newpassword:
+        raise ValidationError(
+            "Usuário inexistente.",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    if not is_valid_password(newpassword):
+        raise ValidationError(
+            "A senha deve possuir, no mínimo, 8 caracteres, letras maíusculas, minúsculas e números",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    update = {"password": func.crypt(newpassword, func.gen_salt("bf", 8))}
+    db.session.query(User).filter(User.id == user.id).update(
+        update, synchronize_session="fetch"
+    )
+
+    create_audit(
+        auditType=UserAuditTypeEnum.UPDATE_PASSWORD,
+        id_user=user.id,
+        responsible=user,
+    )
