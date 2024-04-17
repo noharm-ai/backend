@@ -149,10 +149,10 @@ def admin_get_reset_token(id_user: int):
             status.HTTP_400_BAD_REQUEST,
         )
 
-    return get_reset_token(email=reset_user.email, send_email=False)
+    return get_reset_token(email=reset_user.email, send_email=False, responsible=user)
 
 
-def get_reset_token(email: str, send_email=True):
+def get_reset_token(email: str, send_email=True, responsible: User = None):
     user = (
         db.session.query(User)
         .filter(User.email == email)
@@ -177,7 +177,7 @@ def get_reset_token(email: str, send_email=True):
         .count()
     )
 
-    if audit_count > 20:
+    if audit_count > 5:
         raise ValidationError(
             "O limite de requisições foi atingido.",
             "errors.businessRules",
@@ -187,7 +187,7 @@ def get_reset_token(email: str, send_email=True):
     create_audit(
         auditType=UserAuditTypeEnum.FORGOT_PASSWORD,
         id_user=user.id,
-        responsible=user,
+        responsible=responsible if responsible != None else user,
         pw_token=reset_token,
     )
 
