@@ -1,5 +1,5 @@
 from flask_api import status
-from sqlalchemy import desc
+from sqlalchemy import desc, text
 from datetime import date, timedelta
 
 from models.main import db
@@ -184,7 +184,8 @@ def create_agg_prescription_by_date(schema, admission_number, p_date, is_cpoe):
 
 
 def _log_processed_date(id_prescription_array, schema):
-    query = f"""
+    query = text(
+        f"""
         insert into {schema}.presmed_audit (
             tp_audit, fkpresmed, created_at, created_by
         )
@@ -198,6 +199,7 @@ def _log_processed_date(id_prescription_array, schema):
         where
             fkprescricao = any(:prescriptionArray)
     """
+    )
 
     db.session.execute(
         query,
