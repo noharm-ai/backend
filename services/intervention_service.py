@@ -243,7 +243,7 @@ def set_intervention_outcome(
             status.HTTP_401_UNAUTHORIZED,
         )
 
-    intervention = Intervention.query.get(id_intervention)
+    intervention: Intervention = Intervention.query.get(id_intervention)
     if not intervention:
         raise ValidationError(
             "Registro inválido",
@@ -267,16 +267,18 @@ def set_intervention_outcome(
             status.HTTP_400_BAD_REQUEST,
         )
 
-    if economy_day_value_manual and (
-        economy_day_value == None or economy_day_value < 0
-    ):
+    if economy_day_value_manual and (economy_day_value == None):
         raise ValidationError(
             "Economia/Dia inválido",
             "errors.businessRule",
             status.HTTP_400_BAD_REQUEST,
         )
 
-    if intervention.economy_type == InterventionEconomyTypeEnum.SUBSTITUTION.value:
+    if (
+        intervention.economy_type == InterventionEconomyTypeEnum.SUBSTITUTION.value
+        and outcome != InterventionStatusEnum.PENDING.value
+        and id_prescription_drug_destiny == None
+    ):
         if not economy_day_value_manual:
             raise ValidationError(
                 "Economia/Dia deve ser especificado manualmente quando não houver prescrição substituta selecionada",
@@ -312,6 +314,31 @@ def set_intervention_outcome(
 
             intervention.origin = origin_data
             intervention.destiny = destiny_data
+
+            if (
+                intervention.economy_type
+                == InterventionEconomyTypeEnum.SUBSTITUTION.value
+                and id_prescription_drug_destiny != None
+            ):
+                # update date_base_economy based on substitution date
+                presc_destiny: Prescription = (
+                    db.session.query(Prescription)
+                    .join(
+                        PrescriptionDrug,
+                        PrescriptionDrug.idPrescription == Prescription.id,
+                    )
+                    .filter(PrescriptionDrug.id == id_prescription_drug_destiny)
+                    .first()
+                )
+
+                if presc_destiny == None:
+                    raise ValidationError(
+                        "Prescrição destino não encontrada",
+                        "errors.businessRule",
+                        status.HTTP_400_BAD_REQUEST,
+                    )
+
+                intervention.date_base_economy = presc_destiny.date.date()
         else:
             # cleanup
             intervention.idPrescriptionDrugDestiny = None
@@ -581,9 +608,6 @@ def get_outcome_data(id_intervention, user: User, edit=False):
     prescription_drug: PrescriptionDrug = record[1]
     readonly = intervention.status != InterventionStatusEnum.PENDING.value and not edit
     economy_type = intervention.economy_type
-    # todo: test (remove)
-    readonly = False
-    economy_type = 2
 
     # origin
     origin_query = _get_outcome_data_query().filter(
@@ -714,7 +738,7 @@ def _calc_economy(origin, destiny):
             origin["item"]["frequencyDay"]
         )
 
-    return economy if economy > 0 else 0
+    return economy
 
 
 def _get_price_kit(id_prescription, prescription_drug: PrescriptionDrug, user: User):
