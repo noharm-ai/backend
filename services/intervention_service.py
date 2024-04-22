@@ -689,7 +689,7 @@ def get_outcome_data(id_intervention, user: User, edit=False):
     )
 
     return {
-        "idIntervention": id_intervention,
+        "idIntervention": intervention.idIntervention,
         "header": {
             "patient": False,
             "idSegment": prescription_drug.idSegment,
