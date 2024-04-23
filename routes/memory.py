@@ -5,6 +5,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from .utils import tryCommit
 
 from services import memory_service
+from models.enums import MemoryEnum
 from exception.validation_error import ValidationError
 
 app_mem = Blueprint("app_mem", __name__)
@@ -16,7 +17,10 @@ def getMemory(kind):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
 
-    if memory_service.is_admin_memory(kind):
+    if (
+        memory_service.is_admin_memory(kind)
+        and not kind == MemoryEnum.CUSTOM_FORMS.value
+    ):
         return {
             "status": "error",
             "message": "Registro inválido",
