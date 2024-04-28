@@ -11,8 +11,9 @@ from flask_jwt_extended import (
     set_refresh_cookies,
 )
 
-from models.enums import MemoryEnum
-from services import auth_service, memory_service
+from models.enums import MemoryEnum, IntegrationStatusEnum
+from services import auth_service, memory_service, permission_service
+from services.admin import integration_status_service
 from exception.validation_error import ValidationError
 
 app_auth = Blueprint("app_auth", __name__)
@@ -66,6 +67,10 @@ def auth():
         set_refresh_cookies(response, refresh_token)
 
         return response
+
+    db.session.commit()
+    db.session.close()
+    db.session.remove()
 
     return auth_data, status.HTTP_200_OK
 
@@ -142,9 +147,33 @@ def refreshToken():
             "config": current_claims["config"],
         }
     else:
-        db_session = db.create_scoped_session()
-        user = db_session.query(User).filter(User.id == current_user).first()
-        claims = {"schema": user.schema, "config": user.config}
+        return {"status": "error"}, status.HTTP_401_UNAUTHORIZED
+
+    user = db.session.query(User).filter(User.id == get_jwt_identity()).first()
+    if user == None:
+        return {
+            "status": "error",
+            "message": "Usuário inválido",
+        }, status.HTTP_401_UNAUTHORIZED
+
+    if user.active == False:
+        return {
+            "status": "error",
+            "message": "Usuário inativo",
+        }, status.HTTP_401_UNAUTHORIZED
+
+    integration_status = integration_status_service.get_integration_status(
+        current_claims["schema"]
+    )
+    if (
+        integration_status == IntegrationStatusEnum.CANCELED.value
+        and not permission_service.has_maintainer_permission(user)
+    ):
+        return {
+            "status": "error",
+            "message": "Cliente desativado",
+        }, status.HTTP_401_UNAUTHORIZED
 
     access_token = create_access_token(identity=current_user, additional_claims=claims)
+
     return {"access_token": access_token}

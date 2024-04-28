@@ -1,5 +1,6 @@
 from .main import db
 from sqlalchemy.dialects import postgresql
+from sqlalchemy.orm import deferred
 
 
 class Department(db.Model):
@@ -148,3 +149,9 @@ class SchemaConfig(db.Model):
         "fl3_segmentos", postgresql.ARRAY(db.Integer), nullable=True
     )
     fl4 = db.Column("fl4_cria_conciliacao", db.Boolean, nullable=False)
+
+    nifi_status = deferred(db.Column("nifi_status", postgresql.JSON, nullable=True))
+    nifi_template = deferred(db.Column("nifi_template", postgresql.JSON, nullable=True))
+    nifi_diagnostics = deferred(
+        db.Column("nifi_diagnostics", postgresql.JSON, nullable=True)
+    )

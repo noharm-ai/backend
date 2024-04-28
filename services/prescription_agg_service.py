@@ -1,5 +1,5 @@
 from flask_api import status
-from sqlalchemy import desc
+from sqlalchemy import desc, text
 from datetime import date, timedelta
 
 from models.main import db
@@ -7,7 +7,7 @@ from models.appendix import *
 from models.prescription import *
 from models.enums import PrescriptionDrugAuditTypeEnum, DrugTypeEnum
 from routes.prescription import getPrescription
-from routes.utils import getFeatures
+from routes.utils import getFeatures, gen_agg_id
 from services import prescription_service, prescription_drug_service
 
 from exception.validation_error import ValidationError
@@ -184,7 +184,8 @@ def create_agg_prescription_by_date(schema, admission_number, p_date, is_cpoe):
 
 
 def _log_processed_date(id_prescription_array, schema):
-    query = f"""
+    query = text(
+        f"""
         insert into {schema}.presmed_audit (
             tp_audit, fkpresmed, created_at, created_by
         )
@@ -198,6 +199,7 @@ def _log_processed_date(id_prescription_array, schema):
         where
             fkprescricao = any(:prescriptionArray)
     """
+    )
 
     db.session.execute(
         query,
@@ -247,16 +249,6 @@ def get_last_agg_prescription(admission_number) -> Prescription:
         .order_by(desc(Prescription.date))
         .first()
     )
-
-
-def gen_agg_id(admission_number, id_segment, pdate):
-    id = (pdate.year - 2000) * 100000000000000
-    id += pdate.month * 1000000000000
-    id += pdate.day * 10000000000
-    id += id_segment * 1000000000
-    id += admission_number
-
-    return id
 
 
 def get_date_range(p):

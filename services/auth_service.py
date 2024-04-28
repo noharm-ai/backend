@@ -1,6 +1,7 @@
 import jwt
 import json
 import logging
+from flask import request
 from password_generator import PasswordGenerator
 from http.client import HTTPConnection
 from flask_jwt_extended import (
@@ -18,8 +19,9 @@ from models.enums import (
     FeatureEnum,
     RoleEnum,
     IntegrationStatusEnum,
+    UserAuditTypeEnum,
 )
-from services import memory_service, permission_service
+from services import memory_service, permission_service, user_service
 from services.admin import integration_status_service
 from config import Config
 from exception.validation_error import ValidationError
@@ -162,6 +164,18 @@ def _auth_user(
             "errors.unauthorizedUser",
             status.HTTP_401_UNAUTHORIZED,
         )
+
+    extra_audit = {
+        "schema": user_schema,
+        "env": Config.ENV,
+        "userAgent": request.headers.get("User-Agent"),
+    }
+    user_service.create_audit(
+        auditType=UserAuditTypeEnum.LOGIN,
+        id_user=user.id,
+        responsible=user,
+        extra=extra_audit,
+    )
 
     return {
         "status": "success",

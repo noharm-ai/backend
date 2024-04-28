@@ -19,6 +19,7 @@ class MemoryEnum(Enum):
     MAP_ORIGIN_PROCEDURE = "map-origin-procedure"
     MAP_ORIGIN_DIET = "map-origin-diet"
     MAP_ORIGIN_CUSTOM = "map-origin-custom"
+    CUSTOM_FORMS = "custom-forms"
 
 
 class GlobalMemoryEnum(Enum):
@@ -26,6 +27,7 @@ class GlobalMemoryEnum(Enum):
 
 
 class NoHarmENV(Enum):
+    DEVELOPMENT = "development"
     STAGING = "staging"
     PRODUCTION = "production"
 
@@ -47,6 +49,7 @@ class RoleEnum(Enum):
     USER_ADMIN = "userAdmin"
     SUMMARY = "summary"
     UNLOCK_CHECKED_PRESCRIPTION = "unlock-checked-prescription"
+    CPOE = "cpoe"
 
 
 class FeatureEnum(Enum):
@@ -55,6 +58,7 @@ class FeatureEnum(Enum):
     LOCK_CHECKED_PRESCRIPTION = "LOCK_CHECKED_PRESCRIPTION"
     DISABLE_SOLUTION_TAB = "DISABLE_SOLUTION_TAB"
     PATIENT_REVISION = "PATIENT_REVISION"
+    INTERVENTION_V2 = "INTERVENTION_V2"
 
 
 class PrescriptionAuditTypeEnum(Enum):
@@ -92,3 +96,22 @@ class ReportEnum(Enum):
     RPT_PRESCRIPTION = "PRESCRIPTION"
     RPT_INTERVENTION = "INTERVENTION"
     RPT_PRESCRIPTION_AUDIT = "PRESCRIPTION_AUDIT"
+    RPT_ECONOMY = "ECONOMY"
+
+
+class InterventionEconomyTypeEnum(Enum):
+    SUSPENSION = 1
+    SUBSTITUTION = 2
+
+
+class InterventionStatusEnum(Enum):
+    PENDING = "s"
+    REMOVED = "0"
+
+
+class UserAuditTypeEnum(Enum):
+    LOGIN = 1
+    CREATE = 2
+    UPDATE = 3
+    FORGOT_PASSWORD = 4
+    UPDATE_PASSWORD = 5

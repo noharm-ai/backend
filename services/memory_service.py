@@ -56,6 +56,14 @@ def save_memory(id, kind, value, user):
                 "errors.invalidRecord",
                 status.HTTP_400_BAD_REQUEST,
             )
+
+        if is_private(key=kind) and user.id != mem.user:
+            raise ValidationError(
+                "Usuário não possui permissão para alterar este registro",
+                "errors.unauthorizedUser",
+                status.HTTP_401_UNAUTHORIZED,
+            )
+
     else:
         newMem = True
         mem = Memory()
@@ -93,6 +101,13 @@ def save_unique_memory(kind, value, user):
     if mem is None:
         newMem = True
         mem = Memory()
+    else:
+        if is_private(key=kind) and user.id != mem.user:
+            raise ValidationError(
+                "Usuário não possui permissão para alterar este registro",
+                "errors.unauthorizedUser",
+                status.HTTP_401_UNAUTHORIZED,
+            )
 
     mem.kind = kind
     mem.value = value
@@ -124,7 +139,18 @@ def is_admin_memory(key):
         MemoryEnum.MAP_ORIGIN_PROCEDURE.value,
         MemoryEnum.MAP_ORIGIN_DIET.value,
         MemoryEnum.MAP_ORIGIN_CUSTOM.value,
+        MemoryEnum.CUSTOM_FORMS.value,
     ]
+
+
+def is_private(key):
+    private_keys = ["config-signature", "filter-private", "user-preferences"]
+
+    for k in private_keys:
+        if k in key:
+            return True
+
+    return False
 
 
 def get_reports():

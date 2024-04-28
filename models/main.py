@@ -59,6 +59,20 @@ class User(db.Model):
         return User.query.filter_by(email=email).first()
 
 
+class UserAudit(db.Model):
+    __tablename__ = "usuario_audit"
+    __table_args__ = {"schema": "public"}
+
+    id = db.Column("idusuario_audit", db.Integer, primary_key=True)
+    idUser = db.Column("idusuario", db.Integer, nullable=False)
+    auditType = db.Column("tp_audit", db.Integer, nullable=False)
+    pwToken = db.Column("pw_token", db.String, nullable=True)
+    extra = db.Column("extra", postgresql.JSON, nullable=True)
+    auditIp = db.Column("audit_ip", db.String, nullable=True)
+    createdAt = db.Column("created_at", db.DateTime, nullable=False)
+    createdBy = db.Column("created_by", db.Integer, nullable=False)
+
+
 class Substance(db.Model):
     __tablename__ = "substancia"
     __table_args__ = {"schema": "public"}

@@ -13,8 +13,16 @@ def has_maintainer_permission(user):
 
 def is_pharma(user):
     return not has_any_role(
-        user, RoleEnum.ADMIN.value, RoleEnum.TRAINING.value, RoleEnum.SUPPORT.value
+        user,
+        RoleEnum.ADMIN.value,
+        RoleEnum.TRAINING.value,
+        RoleEnum.SUPPORT.value,
+        RoleEnum.READONLY.value,
     )
+
+
+def is_cpoe(user):
+    return has_any_role(user, RoleEnum.CPOE.value)
 
 
 def has_any_role(user, *roles):

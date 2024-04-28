@@ -1097,3 +1097,16 @@ class Intervention(db.Model):
     transcription = db.Column("transcricao", postgresql.JSON, nullable=True)
     economy_days = db.Column("dias_economia", db.Integer, nullable=True)
     expended_dose = db.Column("dose_despendida", db.Float, nullable=True)
+    economy_type = db.Column("tp_economia", db.Integer, nullable=True)
+    economy_day_value = db.Column("vl_economia_dia", db.Float, nullable=True)
+    economy_day_value_manual = db.Column(
+        "vl_economia_dia_manual", db.Boolean, nullable=False
+    )
+    idPrescriptionDrugDestiny = db.Column(
+        "fkpresmed_destino", db.Integer, nullable=True
+    )
+    date_base_economy = db.Column("dt_base_economia", db.DateTime, nullable=True)
+    date_end_economy = db.Column("dt_fim_economia", db.DateTime, nullable=True)
+
+    origin = db.Column("origem", postgresql.JSONB, nullable=True)
+    destiny = db.Column("destino", postgresql.JSONB, nullable=True)

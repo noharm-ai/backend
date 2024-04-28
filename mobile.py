@@ -100,18 +100,29 @@ app.register_blueprint(app_rpt_config)
 
 CORS(app, origins=[Config.MAIL_HOST], supports_credentials=True)
 
-if Config.ENV == NoHarmENV.STAGING.value:
+if Config.ENV != NoHarmENV.PRODUCTION.value:
     logging.basicConfig()
     logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)
 
 
 @app.route("/version", methods=["GET"])
 def getVersion():
-    return {"status": "success", "data": "v2.32-beta"}, status.HTTP_200_OK
+    return {"status": "success", "data": "v2.33-beta"}, status.HTTP_200_OK
+
+
+@app.route("/exc", methods=["GET"])
+def get_exception():
+    results = []
+    return results[1]
 
 
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0")
+    if Config.ENV == NoHarmENV.DEVELOPMENT.value:
+        app.debug = True
+    else:
+        app.debug = False
+
+    app.run(host="0.0.0.0")
 
 
 @app.after_request
@@ -127,3 +138,12 @@ def add_security_headers(response):
     for key, content in headers.items():
         response.headers[key] = ";".join(content)
     return response
+
+
+# register the error handler
+@app.errorhandler(Exception)
+def handle_exception(e):
+    logger = logging.getLogger("noharm.backend")
+    logger.exception(str(e))
+
+    return {"status": "error", "message": "Erro inesperado"}, 500
