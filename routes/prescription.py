@@ -470,7 +470,11 @@ def getPrescription(
             )
             conciliaList = drugList.conciliaList(concilia_drugs, [])
 
-    pSolution = drugList.getDrugType([], ["Soluções"])
+    if disable_solution_tab:
+        pSolution = []
+    else:
+        pSolution = drugList.getDrugType([], ["Soluções"])
+
     pInfusion = drugList.getInfusionList()
 
     pProcedures = drugList.getDrugType([], ["Proced/Exames"])
