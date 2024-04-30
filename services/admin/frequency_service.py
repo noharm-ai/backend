@@ -35,7 +35,7 @@ def update_daily_frequency(id, daily_frequency, user):
             "Registro inexistente", "errors.invalidRecord", status.HTTP_401_UNAUTHORIZED
         )
 
-    freq.dailyFrequency = daily_frequency
+    freq.dailyFrequency = float(daily_frequency)
 
     db.session.add(freq)
     db.session.flush()

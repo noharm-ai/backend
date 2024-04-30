@@ -1,7 +1,7 @@
 import os
 from flask_api import status
 from models.main import *
-from flask import Blueprint, request
+from flask import Blueprint, request, escape as escape_html
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from .utils import *
@@ -46,7 +46,7 @@ def getDrugSummary(idDrug, idSegment, idHospital):
         frequencyResults.append({"id": f.id, "description": f.description, "amount": 0})
 
     results = {
-        "drug": {"id": idDrug, "name": drug.name if drug else ""},
+        "drug": {"id": int(idDrug), "name": drug.name if drug else ""},
         "units": unitResults,
         "frequencies": frequencyResults,
     }
@@ -133,4 +133,6 @@ def update_substance():
     except ValidationError as e:
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
-    return tryCommit(db, {"idDrug": id_drug, "sctid": str(sctid)})
+    return tryCommit(
+        db, {"idDrug": escape_html(id_drug), "sctid": escape_html(str(sctid))}
+    )

@@ -1,3 +1,4 @@
+from flask import escape as escape_html
 from flask_api import status
 from sqlalchemy import or_
 
@@ -50,7 +51,7 @@ def get_memory_itens(kinds):
 
     for k in kinds:
         if k not in foundKinds:
-            itens.append({"key": None, "kind": k, "value": []})
+            itens.append({"key": None, "kind": escape_html(k), "value": []})
 
     return itens
 

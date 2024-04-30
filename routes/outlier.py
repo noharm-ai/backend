@@ -2,7 +2,7 @@ from flask_api import status
 from models.main import *
 from models.prescription import *
 from sqlalchemy import desc, asc, and_, func
-from flask import Blueprint, request
+from flask import Blueprint, request, escape as escape_html
 from flask_jwt_extended import (
     create_access_token,
     create_refresh_token,
@@ -220,92 +220,7 @@ def setManualOutlier(idOutlier):
         if newObs:
             db.session.add(obs)
 
-    return tryCommit(db, idOutlier)
-
-
-# deprecated
-@app_out.route("/drugs/<int:idDrug>", methods=["PUT"])
-@jwt_required()
-def setDrugClass(idDrug):
-    data = request.get_json()
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
-
-    idSegment = data.get("idSegment", 1)
-    drugAttr = DrugAttributes.query.get((idDrug, idSegment))
-
-    newDrugAttr = False
-    if drugAttr is None:
-        newDrugAttr = True
-        drugAttr = DrugAttributes()
-        drugAttr.idDrug = idDrug
-        drugAttr.idSegment = idSegment
-
-    if "antimicro" in data.keys():
-        drugAttr.antimicro = bool(data.get("antimicro", 0))
-    if "mav" in data.keys():
-        drugAttr.mav = bool(data.get("mav", 0))
-    if "controlled" in data.keys():
-        drugAttr.controlled = bool(data.get("controlled", 0))
-    if "idMeasureUnit" in data.keys():
-        drugAttr.idMeasureUnit = data.get("idMeasureUnit", None)
-    if "notdefault" in data.keys():
-        drugAttr.notdefault = data.get("notdefault", 0)
-    if "maxDose" in data.keys():
-        drugAttr.maxDose = data.get("maxDose", None)
-        if drugAttr.maxDose == "":
-            drugAttr.maxDose = None
-    if "kidney" in data.keys():
-        drugAttr.kidney = data.get("kidney", None)
-        if drugAttr.kidney == "":
-            drugAttr.kidney = None
-    if "liver" in data.keys():
-        drugAttr.liver = data.get("liver", None)
-        if drugAttr.liver == "":
-            drugAttr.liver = None
-    if "platelets" in data.keys():
-        drugAttr.platelets = data.get("platelets", None)
-        if drugAttr.platelets == "":
-            drugAttr.platelets = None
-    if "elderly" in data.keys():
-        drugAttr.elderly = data.get("elderly", 0)
-    if "chemo" in data.keys():
-        drugAttr.chemo = data.get("chemo", 0)
-    if "tube" in data.keys():
-        drugAttr.tube = data.get("tube", 0)
-    if "division" in data.keys():
-        drugAttr.division = data.get("division", None)
-    if "price" in data.keys():
-        drugAttr.price = data.get("price", None)
-        if drugAttr.price == "":
-            drugAttr.price = None
-    if "maxTime" in data.keys():
-        drugAttr.maxTime = data.get("maxTime", None)
-    if "useWeight" in data.keys():
-        drugAttr.useWeight = data.get("useWeight", 0)
-    if "amount" in data.keys():
-        drugAttr.amount = data.get("amount", None)
-        if drugAttr.amount == "":
-            drugAttr.amount = None
-    if "amountUnit" in data.keys():
-        drugAttr.amountUnit = data.get("amountUnit", None)
-    if "whiteList" in data.keys():
-        drugAttr.whiteList = data.get("whiteList", None)
-        if not drugAttr.whiteList:
-            drugAttr.whiteList = None
-
-    if "sctid" in data.keys():
-        drug = Drug.query.get(idDrug)
-        if drug is not None:
-            drug.sctid = data.get("sctid")
-
-    drugAttr.update = datetime.today()
-    drugAttr.user = user.id
-
-    if newDrugAttr:
-        db.session.add(drugAttr)
-
-    return tryCommit(db, idDrug)
+    return tryCommit(db, escape_html(idOutlier))
 
 
 @app_out.route("/drugs", methods=["GET"])
@@ -409,7 +324,7 @@ def setDrugUnit(idSegment, idDrug):
     if new:
         db.session.add(u)
 
-    return tryCommit(db, idMeasureUnit)
+    return tryCommit(db, escape_html(idMeasureUnit))
 
 
 @app_out.route("/drugs/summary/<int:idSegment>/<int:idDrug>", methods=["GET"])

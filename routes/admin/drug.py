@@ -1,5 +1,5 @@
 import os
-from flask import Blueprint, request
+from flask import Blueprint, request, escape as escape_html
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from flask_api import status
@@ -89,7 +89,14 @@ def update_price_factor():
     except ValidationError as e:
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
-    return tryCommit(db, {"idSegment": id_segment, "idDrug": id_drug, "factor": factor})
+    return tryCommit(
+        db,
+        {
+            "idSegment": escape_html(id_segment),
+            "idDrug": escape_html(id_drug),
+            "factor": float(factor),
+        },
+    )
 
 
 @app_admin_drug.route("/admin/drug/copy-attributes", methods=["POST"])

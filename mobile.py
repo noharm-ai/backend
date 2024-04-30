@@ -107,12 +107,13 @@ if Config.ENV != NoHarmENV.PRODUCTION.value:
 
 @app.route("/version", methods=["GET"])
 def getVersion():
-    return {"status": "success", "data": "v2.34-beta"}, status.HTTP_200_OK
+    return {"status": "success", "data": "v2.35-beta"}, status.HTTP_200_OK
 
 
 @app.route("/exc", methods=["GET"])
 def get_exception():
     results = []
+
     return results[1]
 
 

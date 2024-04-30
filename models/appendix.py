@@ -36,7 +36,7 @@ class MeasureUnitConvert(db.Model):
     idMeasureUnit = db.Column("fkunidademedida", db.String, primary_key=True)
     idDrug = db.Column("fkmedicamento", db.Integer, primary_key=True)
     idSegment = db.Column("idsegmento", db.Integer, primary_key=True)
-    factor = db.Column("fator", db.String, nullable=False)
+    factor = db.Column("fator", db.Float, nullable=False)
 
 
 class InterventionReason(db.Model):

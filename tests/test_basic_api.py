@@ -411,22 +411,6 @@ def test_getPrescriptions404(client):
     assert response.status_code == 400
 
 
-def test_putDrug(client):
-    """Teste put /drugs/idDrug - Deve retornar o código 200, indicando funcionamento do endpoint."""
-
-    url = f"/drugs/{DRUG}"
-
-    access_token = get_access(client)
-
-    data = {"idSegment": 1, "mav": True}
-
-    response = client.put(
-        url, data=json.dumps(data), headers=make_headers(access_token)
-    )
-
-    assert response.status_code == 200
-
-
 def test_putPrescription(client):
     """Teste put /prescriptions/idPrescription - Deve retornar o código 200, indicando funcionamento do endpoint."""
 

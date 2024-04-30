@@ -1,4 +1,10 @@
-from flask import Blueprint, request, url_for, jsonify, after_this_request
+from flask import (
+    Blueprint,
+    request,
+    url_for,
+    jsonify,
+    after_this_request,
+)
 from flask_api import status
 from models.main import *
 from models.appendix import *
@@ -40,7 +46,7 @@ def auth():
 
     email = data.get("email", None)
     password = data.get("password", None)
-    schema = data.get("schema", None)
+    schema = data.get("schema", None) if data.get("schema", None) != None else None
     default_roles = data.get("defaultRoles", [])
     extra_features = data.get("extraFeatures", [])
     run_as_basic_user = data.get("runAsBasicUser", False)

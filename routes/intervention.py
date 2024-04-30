@@ -2,7 +2,7 @@ from flask_api import status
 from models.main import *
 from models.appendix import *
 from models.prescription import *
-from flask import Blueprint, request
+from flask import Blueprint, request, escape as escape_html
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime
 from .utils import tryCommit
@@ -27,7 +27,7 @@ def setDrugStatus(idPrescriptionDrug, drugStatus):
         pd.update = datetime.today()
         pd.user = user.id
 
-    return tryCommit(db, str(idPrescriptionDrug), user.permission())
+    return tryCommit(db, escape_html(str(idPrescriptionDrug)), user.permission())
 
 
 @app_itrv.route("/intervention", methods=["PUT"])

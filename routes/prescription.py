@@ -6,7 +6,7 @@ from models.appendix import *
 from models.segment import *
 from models.prescription import *
 from models.notes import ClinicalNotes
-from flask import Blueprint, request
+from flask import Blueprint, request, escape as escape_html
 from flask_jwt_extended import (
     create_access_token,
     create_refresh_token,
@@ -628,7 +628,7 @@ def setPrescriptionData(idPrescription):
 
     p.user = user.id
 
-    return tryCommit(db, str(idPrescription), user.permission())
+    return tryCommit(db, escape_html(str(idPrescription)), user.permission())
 
 
 @app_pres.route("/prescriptions/status", methods=["POST"])
@@ -640,7 +640,11 @@ def setPrescriptionStatus():
     os.environ["TZ"] = "America/Sao_Paulo"
 
     id_prescription = data.get("idPrescription", None)
-    p_status = data.get("status", None)
+    p_status = (
+        escape_html(data.get("status", None))
+        if data.get("status", None) != None
+        else None
+    )
     evaluation_time = data.get("evaluationTime", None)
 
     try:
@@ -780,7 +784,7 @@ def setPrescriptionDrugNote(idPrescriptionDrug):
         drug.update = datetime.today()
         drug.user = user.id
 
-    return tryCommit(db, str(idPrescriptionDrug), user.permission())
+    return tryCommit(db, escape_html(str(idPrescriptionDrug)), user.permission())
 
 
 @app_pres.route("/prescriptions/drug/form", methods=["PUT"])
@@ -883,7 +887,7 @@ def getPrescriptionUpdate(idPrescription):
 
     db.engine.execute(query)
 
-    return tryCommit(db, str(idPrescription))
+    return tryCommit(db, escape_html(str(idPrescription)))
 
 
 @app_pres.route("/prescriptions/search", methods=["GET"])
