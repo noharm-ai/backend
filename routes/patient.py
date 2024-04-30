@@ -5,7 +5,7 @@ from models.appendix import *
 from models.segment import *
 from models.prescription import *
 from models.notes import ClinicalNotes
-from flask import Blueprint, request
+from flask import Blueprint, request, escape
 from flask_jwt_extended import (
     create_access_token,
     create_refresh_token,
@@ -290,7 +290,7 @@ def setPatientData(admissionNumber):
 
         db.engine.execute(query)
 
-    return tryCommit(db, admissionNumber)
+    return tryCommit(db, escape(admissionNumber))
 
 
 @app_pat.route("/patient", methods=["GET"])

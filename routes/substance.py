@@ -1,6 +1,6 @@
 from models.main import *
 from models.prescription import *
-from flask import Blueprint, request
+from flask import Blueprint, request, escape
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from .utils import tryCommit
 
@@ -119,7 +119,7 @@ def setSubstance(idSubstance):
     if newSubs:
         db.session.add(subs)
 
-    return tryCommit(db, idSubstance)
+    return tryCommit(db, escape(idSubstance))
 
 
 @app_sub.route("/substance/<int:idSubstance>/relation", methods=["GET"])
@@ -183,4 +183,4 @@ def setRelation(sctidA, sctidB, kind):
     if newRelation:
         db.session.add(relation)
 
-    return tryCommit(db, sctidA)
+    return tryCommit(db, escape(sctidA))

@@ -2,7 +2,7 @@ import os
 from models.main import db, dbSession, User
 from models.notes import ClinicalNotes
 from models.prescription import Patient
-from flask import Blueprint, request
+from flask import Blueprint, request, escape
 from flask_api import status
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from .utils import tryCommit
@@ -82,12 +82,12 @@ def get_notes_v2(admissionNumber):
                 previous_admissions.append(
                     {
                         "admissionNumber": pa.admissionNumber,
-                        "admissionDate": pa.admissionDate.isoformat()
-                        if pa.admissionDate
-                        else None,
-                        "dischargeDate": pa.dischargeDate.isoformat()
-                        if pa.dischargeDate
-                        else None,
+                        "admissionDate": (
+                            pa.admissionDate.isoformat() if pa.admissionDate else None
+                        ),
+                        "dischargeDate": (
+                            pa.dischargeDate.isoformat() if pa.dischargeDate else None
+                        ),
                     }
                 )
     else:
@@ -208,7 +208,7 @@ def changeNote(idNote):
         if "form" in data.keys() and data.get("form", None) != None:
             n.form = data.get("form")
 
-    return tryCommit(db, idNote)
+    return tryCommit(db, escape(idNote))
 
 
 @app_note.route("/notes", methods=["POST"])

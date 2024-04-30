@@ -1,4 +1,4 @@
-from flask import Blueprint, request
+from flask import Blueprint, request, escape
 from datetime import datetime
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
@@ -28,7 +28,7 @@ def computePrescription(schema, id_prescription):
     except ValidationError as e:
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
-    return tryCommit(db, str(id_prescription))
+    return tryCommit(db, escape(str(id_prescription)))
 
 
 @app_stc.route(
@@ -50,7 +50,7 @@ def create_aggregated_prescription_by_date(schema, admission_number):
     except ValidationError as e:
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
-    return tryCommit(db, str(admission_number))
+    return tryCommit(db, escape(str(admission_number)))
 
 
 @app_stc.route("/static/drug/update-substances")

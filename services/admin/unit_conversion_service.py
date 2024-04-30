@@ -1,5 +1,6 @@
 from sqlalchemy.sql import distinct
 from sqlalchemy import func, and_
+from flask import escape
 
 from models.main import *
 from models.appendix import *
@@ -90,7 +91,7 @@ def get_conversion_list(id_segment, user, show_prediction=False):
                 "name": i[2],
                 "idMeasureUnit": i[3],
                 "factor": i[4],
-                "idSegment": id_segment,
+                "idSegment": escape(id_segment),
                 "measureUnit": i[5],
             }
         )
