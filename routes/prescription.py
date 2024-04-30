@@ -640,7 +640,9 @@ def setPrescriptionStatus():
     os.environ["TZ"] = "America/Sao_Paulo"
 
     id_prescription = data.get("idPrescription", None)
-    p_status = data.get("status", None)
+    p_status = (
+        escape(data.get("status", None)) if data.get("status", None) != None else None
+    )
     evaluation_time = data.get("evaluationTime", None)
 
     try:

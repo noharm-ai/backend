@@ -94,7 +94,7 @@ def update_price_factor():
         {
             "idSegment": escape(id_segment),
             "idDrug": escape(id_drug),
-            "factor": escape(factor),
+            "factor": float(factor),
         },
     )
 

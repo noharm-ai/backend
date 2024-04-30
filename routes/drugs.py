@@ -46,7 +46,7 @@ def getDrugSummary(idDrug, idSegment, idHospital):
         frequencyResults.append({"id": f.id, "description": f.description, "amount": 0})
 
     results = {
-        "drug": {"id": idDrug, "name": drug.name if drug else ""},
+        "drug": {"id": int(idDrug), "name": drug.name if drug else ""},
         "units": unitResults,
         "frequencies": frequencyResults,
     }

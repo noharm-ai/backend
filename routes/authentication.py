@@ -1,4 +1,4 @@
-from flask import Blueprint, request, url_for, jsonify, after_this_request
+from flask import Blueprint, request, url_for, jsonify, after_this_request, escape
 from flask_api import status
 from models.main import *
 from models.appendix import *
@@ -87,7 +87,9 @@ def auth_provider():
         }, status.HTTP_400_BAD_REQUEST
 
     try:
-        auth_data = auth_service.auth_provider(code=data["code"], schema=data["schema"])
+        auth_data = auth_service.auth_provider(
+            code=data["code"], schema=escape(data["schema"])
+        )
 
         auth_data["oauth"] = True
         refresh_token = auth_data["refresh_token"]

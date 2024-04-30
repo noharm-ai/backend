@@ -155,10 +155,10 @@ def update_integration_config(
     schema_config.status = status if status != None else schema_config.status
     schema_config.nh_care = nh_care if nh_care != None else schema_config.nh_care
     schema_config.config = config if config != None else schema_config.config
-    schema_config.fl1 = fl1 if fl1 != None else schema_config.fl1
-    schema_config.fl2 = fl2 if fl2 != None else schema_config.fl2
-    schema_config.fl3 = fl3 if fl3 != None else schema_config.fl3
-    schema_config.fl4 = fl4 if fl4 != None else schema_config.fl4
+    schema_config.fl1 = bool(fl1) if fl1 != None else schema_config.fl1
+    schema_config.fl2 = bool(fl2) if fl2 != None else schema_config.fl2
+    schema_config.fl3 = bool(fl3) if fl3 != None else schema_config.fl3
+    schema_config.fl4 = bool(fl4) if fl4 != None else schema_config.fl4
 
     schema_config.updatedAt = datetime.today()
     schema_config.updatedBy = user.id
