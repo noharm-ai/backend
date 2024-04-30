@@ -2,7 +2,7 @@ from flask_api import status
 from models.main import *
 from models.appendix import *
 from models.prescription import *
-from flask import Blueprint, request, escape
+from flask import Blueprint, request, escape as escape_html
 from flask_jwt_extended import (
     jwt_required,
     get_jwt_identity,
@@ -116,7 +116,7 @@ def getSegmentsId(idSegment, idHospital=None):
         "status": "success",
         "data": {
             "id": s.id if s else None,
-            "idHospital": escape(idHospital),
+            "idHospital": escape_html(idHospital),
             "description": s.description if s else None,
             "status": s.status if s else None,
             "departments": deps,
@@ -236,7 +236,7 @@ def setExams(idSegment):
     if newSegExam:
         db.session.add(segExam)
 
-    return tryCommit(db, escape(typeExam))
+    return tryCommit(db, escape_html(typeExam))
 
 
 @app_seg.route("/segments/<int:idSegment>/exams-order", methods=["PUT"])

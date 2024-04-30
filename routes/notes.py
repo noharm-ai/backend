@@ -2,7 +2,7 @@ import os
 from models.main import db, dbSession, User
 from models.notes import ClinicalNotes
 from models.prescription import Patient
-from flask import Blueprint, request, escape
+from flask import Blueprint, request, escape as escape_html
 from flask_api import status
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from .utils import tryCommit
@@ -208,7 +208,7 @@ def changeNote(idNote):
         if "form" in data.keys() and data.get("form", None) != None:
             n.form = data.get("form")
 
-    return tryCommit(db, escape(idNote))
+    return tryCommit(db, escape_html(idNote))
 
 
 @app_note.route("/notes", methods=["POST"])

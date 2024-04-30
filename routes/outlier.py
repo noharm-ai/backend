@@ -2,7 +2,7 @@ from flask_api import status
 from models.main import *
 from models.prescription import *
 from sqlalchemy import desc, asc, and_, func
-from flask import Blueprint, request, escape
+from flask import Blueprint, request, escape as escape_html
 from flask_jwt_extended import (
     create_access_token,
     create_refresh_token,
@@ -220,7 +220,7 @@ def setManualOutlier(idOutlier):
         if newObs:
             db.session.add(obs)
 
-    return tryCommit(db, escape(idOutlier))
+    return tryCommit(db, escape_html(idOutlier))
 
 
 @app_out.route("/drugs", methods=["GET"])
@@ -324,7 +324,7 @@ def setDrugUnit(idSegment, idDrug):
     if new:
         db.session.add(u)
 
-    return tryCommit(db, escape(idMeasureUnit))
+    return tryCommit(db, escape_html(idMeasureUnit))
 
 
 @app_out.route("/drugs/summary/<int:idSegment>/<int:idDrug>", methods=["GET"])

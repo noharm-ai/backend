@@ -1,5 +1,5 @@
 import os
-from flask import Blueprint, request, escape
+from flask import Blueprint, request, escape as escape_html
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from flask_api import status
@@ -92,8 +92,8 @@ def update_price_factor():
     return tryCommit(
         db,
         {
-            "idSegment": escape(id_segment),
-            "idDrug": escape(id_drug),
+            "idSegment": escape_html(id_segment),
+            "idDrug": escape_html(id_drug),
             "factor": float(factor),
         },
     )

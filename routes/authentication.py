@@ -1,4 +1,11 @@
-from flask import Blueprint, request, url_for, jsonify, after_this_request, escape
+from flask import (
+    Blueprint,
+    request,
+    url_for,
+    jsonify,
+    after_this_request,
+    escape as escape_html,
+)
 from flask_api import status
 from models.main import *
 from models.appendix import *
@@ -41,7 +48,9 @@ def auth():
     email = data.get("email", None)
     password = data.get("password", None)
     schema = (
-        escape(data.get("schema", None)) if data.get("schema", None) != None else None
+        escape_html(data.get("schema", None))
+        if data.get("schema", None) != None
+        else None
     )
     default_roles = data.get("defaultRoles", [])
     extra_features = data.get("extraFeatures", [])
@@ -90,7 +99,7 @@ def auth_provider():
 
     try:
         auth_data = auth_service.auth_provider(
-            code=data["code"], schema=escape(data["schema"])
+            code=data["code"], schema=escape_html(data["schema"])
         )
 
         auth_data["oauth"] = True
