@@ -113,6 +113,7 @@ def getVersion():
 @app.route("/exc", methods=["GET"])
 def get_exception():
     results = []
+
     return results[1]
 
 
