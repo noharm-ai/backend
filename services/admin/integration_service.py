@@ -165,7 +165,11 @@ def update_integration_config(
 
     db.session.flush()
 
-    return _object_to_dto(schema_config)
+    schema_config_db = (
+        db.session.query(SchemaConfig).filter(SchemaConfig.schemaName == schema).first()
+    )
+
+    return _object_to_dto(schema_config_db)
 
 
 def list_integrations(user):
