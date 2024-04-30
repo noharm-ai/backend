@@ -4,7 +4,6 @@ from flask import (
     url_for,
     jsonify,
     after_this_request,
-    escape as escape_html,
 )
 from flask_api import status
 from models.main import *
@@ -47,11 +46,7 @@ def auth():
 
     email = data.get("email", None)
     password = data.get("password", None)
-    schema = (
-        escape_html(data.get("schema", None))
-        if data.get("schema", None) != None
-        else None
-    )
+    schema = data.get("schema", None) if data.get("schema", None) != None else None
     default_roles = data.get("defaultRoles", [])
     extra_features = data.get("extraFeatures", [])
     run_as_basic_user = data.get("runAsBasicUser", False)
@@ -98,9 +93,7 @@ def auth_provider():
         }, status.HTTP_400_BAD_REQUEST
 
     try:
-        auth_data = auth_service.auth_provider(
-            code=data["code"], schema=escape_html(data["schema"])
-        )
+        auth_data = auth_service.auth_provider(code=data["code"], schema=data["schema"])
 
         auth_data["oauth"] = True
         refresh_token = auth_data["refresh_token"]
