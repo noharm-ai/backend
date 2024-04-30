@@ -658,7 +658,8 @@ def get_outcome_data(id_intervention, user: User, edit=False):
                     Drug.sctid == destiny_drug.sctid,
                 )
             )
-            .filter(Prescription.date > origin[0]["item"]["prescriptionDate"])
+            .filter(Prescription.date >= origin[0]["item"]["prescriptionDate"])
+            .filter(Prescription.id != origin[0]["item"]["idPrescription"])
             .order_by(Prescription.date)
             .limit(10)
         )
