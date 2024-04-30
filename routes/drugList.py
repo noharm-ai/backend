@@ -103,7 +103,7 @@ class DrugList:
             doseBodySurfaceStr = None
             expireDay = pd[10].day if pd[10] else 0
 
-            idDrugAgg = pd[0].idDrug * 10 + expireDay
+            idDrugAgg = str(pd[0].idDrug) + "_" + str(expireDay)
             if idDrugAgg not in self.maxDoseAgg:
                 self.maxDoseAgg[idDrugAgg] = {"value": 0, "count": 0}
 
