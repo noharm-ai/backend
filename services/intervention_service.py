@@ -520,7 +520,7 @@ def save_intervention(
 
         if new_status != "0" and new_status != "s":
             raise ValidationError(
-                "O desfecho não pode ser aplicado nesta interface",
+                "O desfecho não pode ser aplicado nesta interface.",
                 "errors.invalidRecord",
                 status.HTTP_400_BAD_REQUEST,
             )
