@@ -517,6 +517,13 @@ def save_intervention(
             i.user = user.id
 
         i.status = new_status
+
+        if new_status != "0" and new_status != "s":
+            raise ValidationError(
+                "O desfecho não pode ser aplicado.",
+                "errors.invalidRecord",
+                status.HTTP_400_BAD_REQUEST,
+            )
     else:
         i.user = user.id
 
