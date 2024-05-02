@@ -1,5 +1,4 @@
 Flask==2.2.5
-Flask-API
 Flask-JWT-Extended==4.2.1
 SQLAlchemy==2.0.29
 Flask-SQLAlchemy==3.1.1

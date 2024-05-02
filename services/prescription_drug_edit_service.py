@@ -1,4 +1,4 @@
-from flask_api import status
+from utils import status
 from sqlalchemy import distinct, text
 
 from models.main import db

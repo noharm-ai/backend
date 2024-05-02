@@ -3,7 +3,7 @@ from models.main import db, dbSession, User
 from models.notes import ClinicalNotes
 from models.prescription import Patient
 from flask import Blueprint, request, escape as escape_html
-from flask_api import status
+from utils import status
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from .utils import tryCommit
 from sqlalchemy import desc, or_, func

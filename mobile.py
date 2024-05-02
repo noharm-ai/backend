@@ -1,5 +1,4 @@
-from flask import request, url_for, jsonify
-from flask_api import FlaskAPI, status, exceptions
+from flask import request, url_for, jsonify, Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager
 from flask_jwt_extended import jwt_required, get_jwt_identity
@@ -40,7 +39,7 @@ from models.enums import NoHarmENV
 
 os.environ["TZ"] = "America/Sao_Paulo"
 
-app = FlaskAPI(__name__)
+app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = Config.POTGRESQL_CONNECTION_STRING
 app.config["SQLALCHEMY_BINDS"] = {"report": Config.REPORT_CONNECTION_STRING}
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False

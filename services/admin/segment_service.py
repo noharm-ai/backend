@@ -1,4 +1,4 @@
-from flask_api import status
+from utils import status
 
 from models.main import *
 from models.appendix import *

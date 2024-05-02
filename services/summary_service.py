@@ -1,5 +1,5 @@
 import json
-from flask_api import status
+from utils import status
 from sqlalchemy import asc, desc, func, between, text
 
 from models.main import db
