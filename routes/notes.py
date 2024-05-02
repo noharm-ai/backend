@@ -136,7 +136,9 @@ def get_notes_by_date(admissionNumber, dateList, has_primary_care):
     )
 
     if has_primary_care:
-        query = query.options(undefer("form"), undefer("template"))
+        query = query.options(
+            undefer(ClinicalNotes.form), undefer(ClinicalNotes.template)
+        )
 
     return query.order_by(desc(ClinicalNotes.date)).all()
 

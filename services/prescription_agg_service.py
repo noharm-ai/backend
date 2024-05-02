@@ -212,7 +212,9 @@ def _log_processed_date(id_prescription_array, schema):
 
 
 def set_schema(schema):
-    result = db.engine.execute("SELECT schema_name FROM information_schema.schemata")
+    result = db.engine.execute(
+        text("SELECT schema_name FROM information_schema.schemata")
+    )
 
     schemaExists = False
     for r in result:

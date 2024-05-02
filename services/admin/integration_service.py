@@ -1,5 +1,5 @@
 from flask_api import status
-from sqlalchemy import case
+from sqlalchemy import case, text
 
 from models.main import *
 from models.appendix import *
@@ -11,7 +11,8 @@ from exception.validation_error import ValidationError
 
 
 def get_table_count(schema, table):
-    query = f"""
+    query = text(
+        f"""
         select 
             n_live_tup as total_rows
         from
@@ -19,6 +20,7 @@ def get_table_count(schema, table):
         where 
             schemaname = :schemaname and relname = :table
     """
+    )
 
     result = db.session.execute(query, {"schemaname": schema, "table": table})
 
@@ -183,7 +185,7 @@ def list_integrations(user):
     integrations = (
         db.session.query(
             SchemaConfig,
-            case([(SchemaConfig.schemaName == user.schema, 0)], else_=1).label(
+            case((SchemaConfig.schemaName == user.schema, 0), else_=1).label(
                 "priority"
             ),
         )

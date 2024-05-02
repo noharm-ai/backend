@@ -3,6 +3,7 @@ import pandas
 from multiprocessing import Process, Manager
 from datetime import datetime
 from math import ceil
+from sqlalchemy import text
 
 from models.main import db
 from models.appendix import *
@@ -159,7 +160,7 @@ def refresh_outliers(id_segment, user, id_drug=None):
         ON CONFLICT DO nothing
     """
 
-    return db.session.execute(query, params)
+    return db.session.execute(text(query), params)
 
 
 def _get_csv_buffer(id_segment, schema, id_drug=None, fold=None):
@@ -229,7 +230,8 @@ def add_prescription_history(
             PrescriptionAgg.idDrug == id_drug
         ).filter(PrescriptionAgg.idSegment == id_segment).delete()
 
-    query = f"""
+    query = text(
+        f"""
         INSERT INTO 
             {schema}.prescricaoagg 
             (
@@ -263,6 +265,7 @@ def add_prescription_history(
         group by 
             1,2,3,4,5,6,7,8,9,10
     """
+    )
 
     db.session.execute(query, {"idSegment": id_segment, "idDrug": id_drug})
 
@@ -284,10 +287,12 @@ def add_prescription_history(
 
 
 def _refresh_agg(id_drug, id_segment, schema):
-    query = f"""
+    query = text(
+        f"""
         insert into {schema}.prescricaoagg
         select * from {schema}.prescricaoagg where fkmedicamento = :idDrug and idsegmento = :idSegment
     """
+    )
 
     return db.session.execute(query, {"idSegment": id_segment, "idDrug": id_drug})
 

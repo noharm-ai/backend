@@ -1,5 +1,5 @@
 from sqlalchemy.sql import distinct
-from sqlalchemy import func, and_
+from sqlalchemy import func, and_, text
 from flask import escape as escape_html
 
 from models.main import *
@@ -222,7 +222,8 @@ def save_conversions(
 
 def _update_conversion_list(conversion_list, id_drug, id_segment, user):
     for uc in conversion_list:
-        insert_units = f"""
+        insert_units = text(
+            f"""
             insert into {user.schema}.unidadeconverte
                 (idsegmento, fkmedicamento, fkunidademedida, fator)
             values 
@@ -230,6 +231,7 @@ def _update_conversion_list(conversion_list, id_drug, id_segment, user):
             on conflict (idsegmento, fkmedicamento, fkunidademedida)
             do update set fator = :factor
         """
+        )
 
         db.session.execute(
             insert_units,
@@ -286,7 +288,8 @@ def add_default_units(user):
             and ma.fkunidademedida is null
     """
 
-    insert_units = f"""
+    insert_units = text(
+        f"""
         insert into {schema}.unidadeconverte
             (idsegmento, fkmedicamento, fkunidademedida, fator)
         select 
@@ -299,6 +302,7 @@ def add_default_units(user):
         on conflict (idsegmento, fkmedicamento, fkunidademedida)
         do nothing
     """
+    )
 
     result = db.session.execute(query)
 
@@ -328,7 +332,8 @@ def copy_unit_conversion(id_segment_origin, id_segment_destiny, user):
             status.HTTP_400_BAD_REQUEST,
         )
 
-    query = f"""
+    query = text(
+        f"""
         with conversao_origem as (
             select 
                 ma.fkmedicamento, ma.idsegmento, ma.fkunidademedida
@@ -358,6 +363,7 @@ def copy_unit_conversion(id_segment_origin, id_segment_destiny, user):
         on conflict (fkunidademedida, idsegmento, fkmedicamento)
         do update set fator = excluded.fator
     """
+    )
 
     return db.session.execute(
         query,

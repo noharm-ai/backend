@@ -41,11 +41,7 @@ class ClinicalNotes(db.Model):
     summary = deferred(db.Column("sumario", postgresql.JSONB, nullable=True))
 
     def exists():
-        tMap = db.session.connection()._execution_options.get(
-            "schema_translate_map", {None: None}
-        )
-        schemaName = tMap[None]
-        return db.engine.has_table("evolucao", schema=schemaName)
+        return True
 
     def getCountIfExists(admissionNumber, pmc=False):
         empty_return = [

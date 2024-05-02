@@ -1,6 +1,6 @@
 import json
 from flask_api import status
-from sqlalchemy import asc, desc, func, between
+from sqlalchemy import asc, desc, func, between, text
 
 from models.main import db
 from models.appendix import *
@@ -55,20 +55,22 @@ def _get_patient_data(patient: Patient):
     return {
         "idPatient": str(patient.idPatient),
         "admissionNumber": patient.admissionNumber,
-        "admissionDate": patient.admissionDate.isoformat()
-        if patient.admissionDate
-        else None,
-        "dischargeDate": patient.dischargeDate.isoformat()
-        if patient.dischargeDate
-        else None,
+        "admissionDate": (
+            patient.admissionDate.isoformat() if patient.admissionDate else None
+        ),
+        "dischargeDate": (
+            patient.dischargeDate.isoformat() if patient.dischargeDate else None
+        ),
         "birthdate": patient.birthdate.isoformat() if patient.birthdate else None,
         "gender": patient.gender,
         "weight": patient.weight,
         "weightDate": patient.weightDate.isoformat() if patient.weightDate else None,
         "height": patient.height,
-        "imc": round((patient.weight / pow(patient.height / 100, 2)), 2)
-        if patient.weight is not None and patient.height is not None
-        else None,
+        "imc": (
+            round((patient.weight / pow(patient.height / 100, 2)), 2)
+            if patient.weight is not None and patient.height is not None
+            else None
+        ),
         "color": patient.skinColor,
     }
 
@@ -86,9 +88,11 @@ def _get_summary_config(admission_number, mock):
     )
     annotations = _get_all_annotations(
         admission_number,
-        field_suffix="_text"
-        if summary_config.value["prompt-config"] == "summary-prompt-sentence"
-        else "",
+        field_suffix=(
+            "_text"
+            if summary_config.value["prompt-config"] == "summary-prompt-sentence"
+            else ""
+        ),
     )
 
     config = [
@@ -277,7 +281,8 @@ def _get_annotation(admission_number, field, add, interval, compare_date):
 
 
 def _get_exams(id_patient, schema):
-    query = f"""
+    query = text(
+        f"""
     select * from (
         select
             distinct on (e.fkpessoa,s.abrev)
@@ -309,6 +314,7 @@ def _get_exams(id_patient, schema):
     order by
         abrev    
     """
+    )
 
     exams = db.session.execute(query, {"id_patient": id_patient})
 
@@ -327,7 +333,8 @@ def _get_exams(id_patient, schema):
 
 
 def _get_allergies(id_patient, schema):
-    query = f"""
+    query = text(
+        f"""
     select
         distinct on (a.fkpessoa, coalesce (s.nome, a.nome_medicamento) )
         a.fkpessoa,
@@ -341,6 +348,7 @@ def _get_allergies(id_patient, schema):
         and a.fkpessoa = :id_patient
     order by 1
     """
+    )
 
     items = db.session.execute(query, {"id_patient": id_patient})
 
@@ -356,7 +364,8 @@ def _get_allergies(id_patient, schema):
 
 
 def _get_all_drugs_used(admission_number, schema):
-    query = f"""
+    query = text(
+        f"""
     select
         nome,
         idclasse,
@@ -408,6 +417,7 @@ def _get_all_drugs_used(admission_number, schema):
     order by
         prioridade, classe, nome
     """
+    )
 
     result = db.session.execute(query, {"admission_number": admission_number})
 
@@ -419,7 +429,8 @@ def _get_all_drugs_used(admission_number, schema):
 
 
 def _get_all_drugs_suspended(admission_number, schema):
-    query = f"""
+    query = text(
+        f"""
     select 
         distinct(coalesce(s.nome, m.nome)) as nome
     from
@@ -444,6 +455,7 @@ def _get_all_drugs_suspended(admission_number, schema):
     order by
         nome
     """
+    )
 
     result = db.session.execute(query, {"admission_number": admission_number})
 
@@ -464,7 +476,8 @@ def _get_receipt(admission_number, schema):
     if last_agg == None:
         return []
 
-    query = f"""
+    query = text(
+        f"""
     select distinct on (nome_med, frequencia, dose, fkunidademedida, via) * from (
         select 
             m.nome as nome_med, p.dtprescricao, f.nome as frequencia , pm.dose, pm.fkunidademedida, pm.via
@@ -482,6 +495,7 @@ def _get_receipt(admission_number, schema):
             nome_med, p.dtprescricao desc
     ) receita
     """
+    )
 
     result = db.session.execute(
         query, {"admission_number": admission_number, "date": last_agg.date}

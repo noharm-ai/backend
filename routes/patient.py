@@ -1,5 +1,6 @@
 import os, copy
 from flask_api import status
+from sqlalchemy import text
 from models.main import *
 from models.appendix import *
 from models.segment import *
@@ -275,7 +276,7 @@ def setPatientData(admissionNumber):
     if "idPrescription" in data.keys() and updateWeight:
         idPrescription = data.get("idPrescription")
 
-        query = (
+        query = text(
             "INSERT INTO "
             + user.schema
             + ".presmed \
@@ -283,12 +284,10 @@ def setPatientData(admissionNumber):
                     FROM "
             + user.schema
             + ".presmed\
-                    WHERE fkprescricao = "
-            + str(int(idPrescription))
-            + ";"
+                    WHERE fkprescricao = :idPrescription ;"
         )
 
-        db.engine.execute(query)
+        db.session.execute(query, {"idPrescription": idPrescription})
 
     return tryCommit(db, escape_html(admissionNumber))
 
