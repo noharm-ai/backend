@@ -57,6 +57,7 @@ app.config["JWT_COOKIE_SAMESITE"] = "Lax"
 app.config["JWT_COOKIE_SECURE"] = True
 app.config["JWT_REFRESH_COOKIE_PATH"] = "/refresh-token"
 app.config["JWT_REFRESH_CSRF_COOKIE_PATH"] = "/refresh-token"
+app.config["JWT_COOKIE_CSRF_PROTECT"] = False
 app.config["MAIL_SERVER"] = "email-smtp.sa-east-1.amazonaws.com"
 app.config["MAIL_PORT"] = 465
 app.config["MAIL_USE_SSL"] = True
