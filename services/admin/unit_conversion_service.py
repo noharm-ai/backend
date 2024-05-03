@@ -1,6 +1,6 @@
 from sqlalchemy.sql import distinct
 from sqlalchemy import func, and_, text
-from flask import escape as escape_html
+from markupsafe import escape as escape_html
 
 from models.main import *
 from models.appendix import *

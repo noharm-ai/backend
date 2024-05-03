@@ -1,8 +1,9 @@
 import os
 from utils import status
 from models.main import *
-from flask import Blueprint, request, escape as escape_html
+from flask import Blueprint, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
+from markupsafe import escape as escape_html
 
 from .utils import *
 from services import drug_service

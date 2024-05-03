@@ -6,7 +6,8 @@ from models.appendix import *
 from models.segment import *
 from models.prescription import *
 from models.notes import ClinicalNotes
-from flask import Blueprint, request, escape as escape_html
+from flask import Blueprint, request
+from markupsafe import escape as escape_html
 from flask_jwt_extended import (
     create_access_token,
     create_refresh_token,

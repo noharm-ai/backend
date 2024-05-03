@@ -6,7 +6,8 @@ from models.appendix import *
 from models.segment import *
 from models.prescription import *
 from models.notes import ClinicalNotes
-from flask import Blueprint, request, escape as escape_html
+from flask import Blueprint, request
+from markupsafe import escape as escape_html
 from flask_jwt_extended import (
     create_access_token,
     create_refresh_token,
@@ -836,7 +837,7 @@ def getPrescriptionUpdate(idPrescription):
                             AND p.idsegmento IS NOT NULL \
                             AND "
                 + "date(:prescDate)\
-                            BETWEEN p.dtprescricao::date AND COALESCE(zp.dtvigencia::date, "
+                            BETWEEN p.dtprescricao::date AND COALESCE(p.dtvigencia::date, "
                 + "date(:prescDate))\
                         );"
             )

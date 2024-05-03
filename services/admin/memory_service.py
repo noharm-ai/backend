@@ -1,4 +1,4 @@
-from flask import escape as escape_html
+from markupsafe import escape as escape_html
 from utils import status
 from sqlalchemy import or_
 
