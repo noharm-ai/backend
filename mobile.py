@@ -36,6 +36,7 @@ from routes.reports.config_rpt import app_rpt_config
 import os
 import logging
 from models.enums import NoHarmENV
+from utils import status
 
 os.environ["TZ"] = "America/Sao_Paulo"
 
@@ -106,7 +107,7 @@ if Config.ENV != NoHarmENV.PRODUCTION.value:
 
 @app.route("/version", methods=["GET"])
 def getVersion():
-    return {"status": "success", "data": "v2.35-beta"}, status.HTTP_200_OK
+    return {"status": "success", "data": "v2.35-beta-snapshot"}, status.HTTP_200_OK
 
 
 @app.route("/exc", methods=["GET"])
