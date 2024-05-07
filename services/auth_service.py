@@ -10,6 +10,7 @@ from flask_jwt_extended import (
 )
 from cryptography.hazmat.primitives import serialization
 from flask_sqlalchemy.session import Session
+from markupsafe import escape as escape_html
 
 from models.main import *
 from models.appendix import *
@@ -186,7 +187,7 @@ def _auth_user(
         "userName": user.name,
         "userId": user.id,
         "email": user.email,
-        "schema": user_schema,
+        "schema": escape_html(user_schema),
         "roles": user_config["roles"] if user_config and "roles" in user_config else [],
         "userFeatures": (
             user_config["features"] if user_config and "features" in user_config else []
