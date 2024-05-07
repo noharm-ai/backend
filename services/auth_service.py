@@ -453,28 +453,10 @@ def _get_oauth_user(email, name, schema, oauth_config):
     db_user = User.query.filter_by(email=email.lower()).first()
 
     if db_user is None:
-        if not oauth_config["create_user"]:
-            raise ValidationError(
-                "OAUTH: o usuário deve ser cadastrado previamente na NoHarm",
-                "errors.unauthorizedUser",
-                status.HTTP_401_UNAUTHORIZED,
-            )
-
-        nh_user = User()
-        nh_user.name = name
-        nh_user.email = email.lower()
-        nh_user.schema = schema
-        nh_user.config = {"roles": []}
-        nh_user.active = True
-
-        pwo = PasswordGenerator()
-        pwo.minlen = 6
-        pwo.maxlen = 16
-        # do not crypt
-        nh_user.password = pwo.generate()
-
-        db.session.add(nh_user)
-
-        return nh_user
+        raise ValidationError(
+            "OAUTH: o usuário deve ser cadastrado previamente na NoHarm",
+            "errors.unauthorizedUser",
+            status.HTTP_401_UNAUTHORIZED,
+        )
 
     return db_user
