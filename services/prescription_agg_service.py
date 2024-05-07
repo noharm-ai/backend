@@ -1,5 +1,6 @@
-from flask_api import status
+from utils import status
 from sqlalchemy import desc, text
+from flask_sqlalchemy.session import Session
 from datetime import date, timedelta
 
 from models.main import db
@@ -212,7 +213,10 @@ def _log_processed_date(id_prescription_array, schema):
 
 
 def set_schema(schema):
-    result = db.engine.execute("SELECT schema_name FROM information_schema.schemata")
+    db_session = Session(db)
+    result = db_session.execute(
+        text("SELECT schema_name FROM information_schema.schemata")
+    )
 
     schemaExists = False
     for r in result:
@@ -223,6 +227,8 @@ def set_schema(schema):
         raise ValidationError(
             "Schema Inexistente", "errors.invalidSchema", status.HTTP_400_BAD_REQUEST
         )
+
+    db_session.close()
 
     dbSession.setSchema(schema)
 

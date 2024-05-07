@@ -1,11 +1,13 @@
 import os, copy
-from flask_api import status
+from utils import status
+from sqlalchemy import text
 from models.main import *
 from models.appendix import *
 from models.segment import *
 from models.prescription import *
 from models.notes import ClinicalNotes
-from flask import Blueprint, request, escape as escape_html
+from flask import Blueprint, request
+from markupsafe import escape as escape_html
 from flask_jwt_extended import (
     create_access_token,
     create_refresh_token,
@@ -275,7 +277,7 @@ def setPatientData(admissionNumber):
     if "idPrescription" in data.keys() and updateWeight:
         idPrescription = data.get("idPrescription")
 
-        query = (
+        query = text(
             "INSERT INTO "
             + user.schema
             + ".presmed \
@@ -283,12 +285,10 @@ def setPatientData(admissionNumber):
                     FROM "
             + user.schema
             + ".presmed\
-                    WHERE fkprescricao = "
-            + str(int(idPrescription))
-            + ";"
+                    WHERE fkprescricao = :idPrescription ;"
         )
 
-        db.engine.execute(query)
+        db.session.execute(query, {"idPrescription": idPrescription})
 
     return tryCommit(db, escape_html(admissionNumber))
 

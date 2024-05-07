@@ -1,8 +1,9 @@
-from flask_api import status
+from utils import status
 from models.main import *
 from models.prescription import *
 from sqlalchemy import desc, asc, and_, func
-from flask import Blueprint, request, escape as escape_html
+from flask import Blueprint, request
+from markupsafe import escape as escape_html
 from flask_jwt_extended import (
     create_access_token,
     create_refresh_token,

@@ -40,7 +40,7 @@ def get_patients(
             .filter(Pmax.agg == True),
         )
         .order_by(desc("appointment"))
-        .options(undefer("observation"))
+        .options(undefer(Patient.observation))
     )
 
     if id_segment:

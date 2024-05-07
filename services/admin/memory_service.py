@@ -1,5 +1,5 @@
-from flask import escape as escape_html
-from flask_api import status
+from markupsafe import escape as escape_html
+from utils import status
 from sqlalchemy import or_
 
 from models.main import db

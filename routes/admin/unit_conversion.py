@@ -1,7 +1,7 @@
 import os
 from flask import Blueprint, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from flask_api import status
+from utils import status
 
 
 from models.main import *

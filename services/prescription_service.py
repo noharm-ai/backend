@@ -1,6 +1,6 @@
 from sqlalchemy import desc, nullsfirst
 from datetime import date
-from flask_api import status
+from utils import status
 
 from models.main import db
 from models.appendix import *

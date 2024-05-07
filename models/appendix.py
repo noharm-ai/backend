@@ -1,6 +1,8 @@
 from .main import db
+from sqlalchemy import text
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import deferred
+from flask_sqlalchemy.session import Session
 
 
 class Department(db.Model):
@@ -76,25 +78,14 @@ class Notes(db.Model):
     user = db.Column("update_by", db.Integer, nullable=True)
 
     def getDefaultNote(sctid):
-        result = db.engine.execute(
-            "SELECT schema_name FROM information_schema.schemata"
-        )
         defaultSchema = "hsc_test"
 
-        schemaExists = False
-        for r in result:
-            if r[0] == defaultSchema:
-                schemaExists = True
-
-        if schemaExists:
-            db_session = db.create_scoped_session()
-            db_session.connection(
-                execution_options={"schema_translate_map": {None: defaultSchema}}
-            )
-            note = db_session.query(Notes).filter_by(idDrug=sctid, idSegment=5).first()
-            return note.notes if note else None
-        else:
-            return None
+        db_session = Session(db)
+        db_session.connection(
+            execution_options={"schema_translate_map": {None: defaultSchema}}
+        )
+        note = db_session.query(Notes).filter_by(idDrug=sctid, idSegment=5).first()
+        return note.notes if note else None
 
 
 class Memory(db.Model):
@@ -105,18 +96,6 @@ class Memory(db.Model):
     value = db.Column("valor", postgresql.JSON, nullable=False)
     update = db.Column("update_at", db.DateTime, nullable=False)
     user = db.Column("update_by", db.Integer, nullable=False)
-
-    def getMem(kind, default):
-        mem = Memory.query.filter_by(kind=kind).first()
-        return mem.value if mem else default
-
-    def getNameUrl(schema):
-        db_session = db.create_scoped_session()
-        db_session.connection(
-            execution_options={"schema_translate_map": {None: schema}}
-        )
-        mem = db_session.query(Memory).filter_by(kind="getnameurl").first()
-        return mem.value if mem else {"value": "http://localhost/{idPatient}"}
 
 
 class GlobalMemory(db.Model):

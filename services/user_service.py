@@ -1,7 +1,7 @@
 import re
 
 from datetime import datetime, timedelta
-from flask_api import status
+from utils import status
 from flask import request, render_template
 from flask_jwt_extended import decode_token, create_access_token, get_jwt_identity
 from flask_mail import Message

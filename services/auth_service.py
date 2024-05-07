@@ -9,6 +9,7 @@ from flask_jwt_extended import (
     create_refresh_token,
 )
 from cryptography.hazmat.primitives import serialization
+from flask_sqlalchemy.session import Session
 
 from models.main import *
 from models.appendix import *
@@ -102,7 +103,7 @@ def _auth_user(
     access_token = create_access_token(identity=user.id, additional_claims=claims)
     refresh_token = create_refresh_token(identity=user.id, additional_claims=claims)
 
-    db_session = db.create_scoped_session()
+    db_session = Session(db)
     db_session.connection(
         execution_options={"schema_translate_map": {None: user_schema}}
     )
@@ -129,7 +130,8 @@ def _auth_user(
         .first()
     )
 
-    nameUrl = Memory.getNameUrl(user_schema)
+    mem = db_session.query(Memory).filter_by(kind="getnameurl").first()
+    nameUrl = mem.value if mem else {"value": "http://localhost/{idPatient}"}
 
     hospitals = db_session.query(Hospital).order_by(asc(Hospital.name)).all()
     hospitalList = []
@@ -153,6 +155,8 @@ def _auth_user(
         logout_url = (
             oauth_config.value["logout_url"] if oauth_config is not None else None
         )
+
+    db_session.close()
 
     integration_status = integration_status_service.get_integration_status(user_schema)
     if (
@@ -262,7 +266,7 @@ def auth_local(
         )
 
     # need to create a new session to set schema
-    db_session = db.create_scoped_session()
+    db_session = Session(db)
     db_session.connection(
         execution_options={"schema_translate_map": {None: preCheckUser.schema}}
     )
@@ -272,6 +276,8 @@ def auth_local(
         .filter(Memory.kind == MemoryEnum.FEATURES.value)
         .first()
     )
+
+    db_session.close()
 
     if features is not None and FeatureEnum.OAUTH.value in features.value:
         roles = (
