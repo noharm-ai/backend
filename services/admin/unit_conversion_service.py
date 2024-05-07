@@ -255,7 +255,8 @@ def add_default_units(user):
 
     admin_drug_service.fix_inconsistency(user)
 
-    query = f"""
+    query = text(
+        f"""
         with unidades as (
             select
                 fkmedicamento, min(fkunidademedida) as fkunidademedida
@@ -287,6 +288,7 @@ def add_default_units(user):
             and ma.idsegmento = unidades_segmento.idsegmento
             and ma.fkunidademedida is null
     """
+    )
 
     insert_units = text(
         f"""
