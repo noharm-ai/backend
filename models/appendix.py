@@ -134,3 +134,37 @@ class SchemaConfig(db.Model):
     nifi_diagnostics = deferred(
         db.Column("nifi_diagnostics", postgresql.JSON, nullable=True)
     )
+
+
+class CultureHeader(db.Model):
+    __tablename__ = "cultura_cabecalho"
+
+    id = db.Column("idculturacab", db.Integer, primary_key=True)
+    idPatient = db.Column("fkpessoa", db.Integer, nullable=False)
+    idDepartment = db.Column("fksetor", db.Integer, nullable=True)
+    admissionNumber = db.Column("nratendimento", db.Integer, nullable=True)
+    idExam = db.Column("fkexame", db.Integer, nullable=True)
+    idExamItem = db.Column("fkitemexame", db.Integer, nullable=True)
+    examName = db.Column("nomeexame", db.String, nullable=True)
+    examMaterialName = db.Column("nomematerial", db.String, nullable=True)
+    examMaterialTypeName = db.Column("nomematerialtipo", db.String, nullable=True)
+    previousResult = db.Column("resultprevio", db.String, nullable=True)
+    colony = db.Column("dscolonia", db.String, nullable=True)
+    extraInfo = db.Column("complemento", db.String, nullable=True)
+    gram = db.Column("gram", db.String, nullable=True)
+
+    requestDate = db.Column("dtpedido", db.Date, nullable=True)
+    collectionDate = db.Column("dtcoleta", db.Date, nullable=True)
+    releaseDate = db.Column("dtliberacao", db.Date, nullable=True)
+
+
+class Culture(db.Model):
+    __tablename__ = "cultura"
+
+    id = db.Column("idcultura", db.Integer, primary_key=True)
+    idExam = db.Column("fkexame", db.Integer, nullable=True)
+    idExamItem = db.Column("fkitemexame", db.Integer, nullable=True)
+    microorganism = db.Column("nomemicroorganismo", db.String, nullable=True)
+    drug = db.Column("nomemedicamento", db.String, nullable=True)
+    result = db.Column("resultado", db.String, nullable=True)
+    microorganismAmount = db.Column("qtmicroorganismo", db.String, nullable=True)

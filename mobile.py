@@ -33,6 +33,7 @@ from routes.admin.exam import app_admin_exam
 from routes.admin.unit_conversion import app_admin_unit_conversion
 from routes.reports.general import app_rpt_general
 from routes.reports.config_rpt import app_rpt_config
+from routes.reports.culture import app_rpt_culture
 import os
 import logging
 from models.enums import NoHarmENV
@@ -85,6 +86,7 @@ app.register_blueprint(app_names)
 app.register_blueprint(app_summary)
 app.register_blueprint(app_support)
 
+
 app.register_blueprint(app_user_crud)
 app.register_blueprint(app_pres_crud)
 
@@ -98,6 +100,7 @@ app.register_blueprint(app_admin_exam)
 app.register_blueprint(app_admin_unit_conversion)
 
 app.register_blueprint(app_rpt_general)
+app.register_blueprint(app_rpt_culture)
 app.register_blueprint(app_rpt_config)
 
 CORS(app, origins=[Config.MAIL_HOST], supports_credentials=True)
