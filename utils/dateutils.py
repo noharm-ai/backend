@@ -1,7 +1,7 @@
 from datetime import datetime
 
 
-def toIso(date: datetime):
+def to_iso(date: datetime):
     if date != None:
         return date.isoformat()
 

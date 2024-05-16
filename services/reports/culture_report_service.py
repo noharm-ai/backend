@@ -9,9 +9,7 @@ from utils import dateutils, status
 def get_cultures(idPatient: int, user: User):
     if idPatient == None:
         raise ValidationError(
-            "idPatient inválido",
-            "errors.invalidParams",
-            status.HTTP_401_UNAUTHORIZED,
+            "idPatient inválido", "errors.invalidParams", status.HTTP_400_BAD_REQUEST
         )
 
     query = (
@@ -66,8 +64,8 @@ def _group_culture_results(results):
             headers[row.id] = {
                 "id": row.id,
                 "idExamItem": row.idExamItem,
-                "collectionDate": dateutils.toIso(row.collectionDate),
-                "releaseDate": dateutils.toIso(row.releaseDate),
+                "collectionDate": dateutils.to_iso(row.collectionDate),
+                "releaseDate": dateutils.to_iso(row.releaseDate),
                 "examName": row.examName,
                 "examMaterialName": row.examMaterialName,
                 "previousResult": row.previousResult,

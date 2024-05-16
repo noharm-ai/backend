@@ -34,6 +34,7 @@ from routes.admin.unit_conversion import app_admin_unit_conversion
 from routes.reports.general import app_rpt_general
 from routes.reports.config_rpt import app_rpt_config
 from routes.reports.culture import app_rpt_culture
+from routes.reports.antimicrobial import app_rpt_antimicrobial
 import os
 import logging
 from models.enums import NoHarmENV
@@ -101,6 +102,7 @@ app.register_blueprint(app_admin_unit_conversion)
 
 app.register_blueprint(app_rpt_general)
 app.register_blueprint(app_rpt_culture)
+app.register_blueprint(app_rpt_antimicrobial)
 app.register_blueprint(app_rpt_config)
 
 CORS(app, origins=[Config.MAIL_HOST], supports_credentials=True)
