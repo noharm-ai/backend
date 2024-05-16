@@ -2,6 +2,7 @@ from sqlalchemy import select, and_
 
 from models.main import db, desc, User
 from models.prescription import (
+    Patient,
     Prescription,
     PrescriptionDrug,
     Drug,
@@ -21,11 +22,33 @@ def get_history(admission_number: int, user: User):
             status.HTTP_400_BAD_REQUEST,
         )
 
+    admission_list = [admission_number]
+    admission = db.session.execute(
+        select(Patient.idPatient)
+        .select_from(Patient)
+        .where(Patient.admissionNumber == admission_number)
+    ).first()
+
+    if admission != None:
+        admissions_query = (
+            select(Patient.admissionNumber)
+            .select_from(Patient)
+            .where(Patient.idPatient == admission.idPatient)
+            .where(Patient.admissionNumber < admission_number)
+            .order_by(desc(Patient.admissionDate))
+            .limit(2)
+        )
+
+        a_list = db.session.execute(admissions_query).all()
+        for a in a_list:
+            admission_list.append(a.admissionNumber)
+
     query = (
         select(
             Prescription.id,
             Prescription.date,
             Prescription.expire,
+            Prescription.admissionNumber,
             PrescriptionDrug.suspendedDate,
             PrescriptionDrug.id.label("idPrescriptionDrug"),
             PrescriptionDrug.dose,
@@ -46,7 +69,7 @@ def get_history(admission_number: int, user: User):
         )
         .outerjoin(Frequency, Frequency.id == PrescriptionDrug.idFrequency)
         .outerjoin(MeasureUnit, MeasureUnit.id == PrescriptionDrug.idMeasureUnit)
-        .where(Prescription.admissionNumber == admission_number)
+        .where(Prescription.admissionNumber.in_(admission_list))
         .where(DrugAttributes.antimicro == True)
         .order_by(desc(Prescription.date))
         .limit(2000)
@@ -60,6 +83,7 @@ def get_history(admission_number: int, user: User):
             {
                 "idPrescription": str(row.id),
                 "idPrescriptionDrug": str(row.idPrescriptionDrug),
+                "admissionNumber": row.admissionNumber,
                 "prescriptionDate": dateutils.to_iso(row.date),
                 "prescriptionExpirationDate": dateutils.to_iso(row.expire),
                 "suspensionDate": dateutils.to_iso(row.suspendedDate),
