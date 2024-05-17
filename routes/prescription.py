@@ -56,6 +56,7 @@ def getPrescriptions():
     concilia = request.args.get("concilia", 0)
     insurance = request.args.get("insurance", None)
     indicators = request.args.getlist("indicators[]")
+    drugAttributes = request.args.getlist("drugAttributes[]")
     frequencies = request.args.getlist("frequencies[]")
     substances = request.args.getlist("substances[]")
     substanceClasses = request.args.getlist("substanceClasses[]")
@@ -81,6 +82,7 @@ def getPrescriptions():
         substances=substances,
         substanceClasses=substanceClasses,
         patientReviewType=patientReviewType,
+        drugAttributes=drugAttributes,
     )
 
     results = []

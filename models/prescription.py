@@ -594,6 +594,7 @@ class Patient(db.Model):
         substances=[],
         substanceClasses=[],
         patientReviewType=None,
+        drugAttributes=[],
     ):
         q = (
             db.session.query(Prescription, Patient, Department.name.label("department"))
@@ -678,6 +679,12 @@ class Patient(db.Model):
         if len(indicators) > 0:
             for i in indicators:
                 q = q.filter(Prescription.features["alertStats"][i].as_integer() > 0)
+
+        if len(drugAttributes) > 0:
+            for a in drugAttributes:
+                q = q.filter(
+                    Prescription.features["drugAttributes"][a].as_integer() > 0
+                )
 
         if len(frequencies) > 0:
             q = q.filter(

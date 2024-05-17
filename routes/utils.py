@@ -409,6 +409,21 @@ def tryCommit(db, recId, allow=True):
         }, status.HTTP_500_INTERNAL_SERVER_ERROR
 
 
+def get_bool_drug_attributes_list():
+    return [
+        "antimicro",
+        "mav",
+        "controlled",
+        "notdefault",
+        "elderly",
+        "tube",
+        "useWeight",
+        "whiteList",
+        "chemo",
+        "dialyzable",
+    ]
+
+
 def getFeatures(result):
     drugList = result["data"]["prescription"]
     drugList.extend(result["data"]["solution"])
@@ -420,12 +435,22 @@ def getFeatures(result):
     substanceIDs = []
     substanceClassIDs = []
     frequencies = []
+    drug_attributes = {}
+
+    for attr in get_bool_drug_attributes_list():
+        drug_attributes[attr] = 0
+
     for d in drugList:
         drugIDs.append(d["idDrug"])
         if d["idSubstance"] != None:
             substanceIDs.append(d["idSubstance"])
         if d["idSubstanceClass"] != None:
             substanceClassIDs.append(d["idSubstanceClass"])
+
+        if "drugAttributes" in d:
+            for attr in d["drugAttributes"]:
+                if attr in drug_attributes:
+                    drug_attributes[attr] += int(d["drugAttributes"][attr])
 
         if d["whiteList"] or d["suspended"]:
             continue
@@ -479,6 +504,7 @@ def getFeatures(result):
         "frequencies": list(set(frequencies)),
         "processedDate": datetime.today().isoformat(),
         "totalItens": len(drugList),
+        "drugAttributes": drug_attributes,
     }
 
 
