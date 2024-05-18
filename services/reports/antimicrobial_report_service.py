@@ -9,6 +9,7 @@ from models.prescription import (
     DrugAttributes,
     Frequency,
     MeasureUnit,
+    Substance,
 )
 from exception.validation_error import ValidationError
 from utils import dateutils, status
@@ -54,6 +55,7 @@ def get_history(admission_number: int, user: User):
             PrescriptionDrug.dose,
             PrescriptionDrug.route,
             Drug.name,
+            Substance.name.label("substance"),
             MeasureUnit.description.label("measureUnit"),
             Frequency.description.label("frequency"),
         )
@@ -67,6 +69,7 @@ def get_history(admission_number: int, user: User):
                 DrugAttributes.idSegment == PrescriptionDrug.idSegment,
             ),
         )
+        .outerjoin(Substance, Drug.sctid == Substance.id)
         .outerjoin(Frequency, Frequency.id == PrescriptionDrug.idFrequency)
         .outerjoin(MeasureUnit, MeasureUnit.id == PrescriptionDrug.idMeasureUnit)
         .where(Prescription.admissionNumber.in_(admission_list))
@@ -88,6 +91,7 @@ def get_history(admission_number: int, user: User):
                 "prescriptionExpirationDate": dateutils.to_iso(row.expire),
                 "suspensionDate": dateutils.to_iso(row.suspendedDate),
                 "drug": row.name,
+                "substance": row.substance,
                 "dose": row.dose,
                 "measureUnit": row.measureUnit,
                 "frequency": row.frequency,
