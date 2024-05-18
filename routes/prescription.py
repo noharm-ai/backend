@@ -1,12 +1,13 @@
 import os
 import random
-from flask_api import status
+from utils import status
 from models.main import *
 from models.appendix import *
 from models.segment import *
 from models.prescription import *
 from models.notes import ClinicalNotes
-from flask import Blueprint, request, escape as escape_html
+from flask import Blueprint, request
+from markupsafe import escape as escape_html
 from flask_jwt_extended import (
     create_access_token,
     create_refresh_token,
@@ -15,7 +16,7 @@ from flask_jwt_extended import (
     verify_jwt_in_request,
 )
 from .utils import *
-from sqlalchemy import func, between
+from sqlalchemy import func, between, text
 from datetime import date, datetime
 from .drugList import DrugList
 from services import (
@@ -55,6 +56,7 @@ def getPrescriptions():
     concilia = request.args.get("concilia", 0)
     insurance = request.args.get("insurance", None)
     indicators = request.args.getlist("indicators[]")
+    drugAttributes = request.args.getlist("drugAttributes[]")
     frequencies = request.args.getlist("frequencies[]")
     substances = request.args.getlist("substances[]")
     substanceClasses = request.args.getlist("substanceClasses[]")
@@ -80,6 +82,7 @@ def getPrescriptions():
         substances=substances,
         substanceClasses=substanceClasses,
         patientReviewType=patientReviewType,
+        drugAttributes=drugAttributes,
     )
 
     results = []
@@ -363,6 +366,9 @@ def getPrescription(
     )
     formTemplate = memory_service.get_memory(MemoryEnum.PRESMED_FORM.value)
     admission_reports = memory_service.get_memory(MemoryEnum.ADMISSION_REPORTS.value)
+    admission_reports_internal = memory_service.get_memory(
+        MemoryEnum.ADMISSION_REPORTS_INTERNAL.value
+    )
 
     clinicalNotesCount = ClinicalNotes.getCountIfExists(
         prescription[0].admissionNumber, is_pmc
@@ -594,6 +600,9 @@ def getPrescription(
             "insurance": prescription[11],
             "formTemplate": formTemplate.value if formTemplate else None,
             "admissionReports": admission_reports.value if admission_reports else None,
+            "admissionReportsInternal": (
+                admission_reports_internal.value if admission_reports_internal else []
+            ),
             "review": {
                 "reviewed": reviewed,
                 "reviewedAt": reviewed_at,
@@ -818,7 +827,7 @@ def getPrescriptionUpdate(idPrescription):
 
     if p.agg:
         if user.cpoe():
-            query = (
+            query = text(
                 "INSERT INTO "
                 + user.schema
                 + ".presmed \
@@ -831,20 +840,21 @@ def getPrescriptionUpdate(idPrescription):
                             FROM "
                 + user.schema
                 + ".prescricao p\
-                            WHERE p.nratendimento = "
-                + str(p.admissionNumber)
+                            WHERE p.nratendimento = :admissionNumber"
                 + "\
                             AND p.idsegmento IS NOT NULL \
-                            AND '"
-                + str(p.date)
-                + "'::date\
-                            BETWEEN p.dtprescricao::date AND COALESCE(p.dtvigencia::date, '"
-                + str(p.date)
-                + "'::date)\
+                            AND "
+                + "date(:prescDate)\
+                            BETWEEN p.dtprescricao::date AND COALESCE(p.dtvigencia::date, "
+                + "date(:prescDate))\
                         );"
             )
+
+            db.session.execute(
+                query, {"admissionNumber": p.admissionNumber, "prescDate": p.date}
+            )
         else:
-            query = (
+            query = text(
                 "INSERT INTO "
                 + user.schema
                 + ".presmed \
@@ -857,22 +867,23 @@ def getPrescriptionUpdate(idPrescription):
                         FROM "
                 + user.schema
                 + ".prescricao p\
-                        WHERE p.nratendimento = "
-                + str(p.admissionNumber)
+                        WHERE p.nratendimento = :admissionNumber"
                 + "\
                         AND p.idsegmento IS NOT NULL \
                         AND (\
-                            p.dtprescricao::date = '"
-                + str(p.date)
-                + "'::date OR\
-                            p.dtvigencia::date = '"
-                + str(p.date)
-                + "'::date\
+                            p.dtprescricao::date = "
+                + "date(:prescDate) OR\
+                            p.dtvigencia::date = "
+                + "date(:prescDate)\
                         )\
                     );"
             )
+
+            db.session.execute(
+                query, {"admissionNumber": p.admissionNumber, "prescDate": p.date}
+            )
     else:
-        query = (
+        query = text(
             "INSERT INTO "
             + user.schema
             + ".presmed \
@@ -880,12 +891,11 @@ def getPrescriptionUpdate(idPrescription):
                     FROM "
             + user.schema
             + ".presmed\
-                    WHERE fkprescricao = "
-            + str(int(idPrescription))
+                    WHERE fkprescricao = :idPrescription"
             + ";"
         )
 
-    db.engine.execute(query)
+        db.session.execute(query, {"idPrescription": idPrescription})
 
     return tryCommit(db, escape_html(str(idPrescription)))
 

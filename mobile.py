@@ -1,5 +1,4 @@
-from flask import request, url_for, jsonify
-from flask_api import FlaskAPI, status, exceptions
+from flask import request, url_for, jsonify, Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager
 from flask_jwt_extended import jwt_required, get_jwt_identity
@@ -34,13 +33,16 @@ from routes.admin.exam import app_admin_exam
 from routes.admin.unit_conversion import app_admin_unit_conversion
 from routes.reports.general import app_rpt_general
 from routes.reports.config_rpt import app_rpt_config
+from routes.reports.culture import app_rpt_culture
+from routes.reports.antimicrobial import app_rpt_antimicrobial
 import os
 import logging
 from models.enums import NoHarmENV
+from utils import status
 
 os.environ["TZ"] = "America/Sao_Paulo"
 
-app = FlaskAPI(__name__)
+app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = Config.POTGRESQL_CONNECTION_STRING
 app.config["SQLALCHEMY_BINDS"] = {"report": Config.REPORT_CONNECTION_STRING}
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
@@ -56,6 +58,8 @@ app.config["JWT_REFRESH_TOKEN_EXPIRES"] = Config.JWT_REFRESH_TOKEN_EXPIRES
 app.config["JWT_COOKIE_SAMESITE"] = "Lax"
 app.config["JWT_COOKIE_SECURE"] = True
 app.config["JWT_REFRESH_COOKIE_PATH"] = "/refresh-token"
+app.config["JWT_REFRESH_CSRF_COOKIE_PATH"] = "/refresh-token"
+app.config["JWT_COOKIE_CSRF_PROTECT"] = False
 app.config["MAIL_SERVER"] = "email-smtp.sa-east-1.amazonaws.com"
 app.config["MAIL_PORT"] = 465
 app.config["MAIL_USE_SSL"] = True
@@ -83,6 +87,7 @@ app.register_blueprint(app_names)
 app.register_blueprint(app_summary)
 app.register_blueprint(app_support)
 
+
 app.register_blueprint(app_user_crud)
 app.register_blueprint(app_pres_crud)
 
@@ -96,6 +101,8 @@ app.register_blueprint(app_admin_exam)
 app.register_blueprint(app_admin_unit_conversion)
 
 app.register_blueprint(app_rpt_general)
+app.register_blueprint(app_rpt_culture)
+app.register_blueprint(app_rpt_antimicrobial)
 app.register_blueprint(app_rpt_config)
 
 CORS(app, origins=[Config.MAIL_HOST], supports_credentials=True)
@@ -107,7 +114,7 @@ if Config.ENV != NoHarmENV.PRODUCTION.value:
 
 @app.route("/version", methods=["GET"])
 def getVersion():
-    return {"status": "success", "data": "v2.35-beta"}, status.HTTP_200_OK
+    return {"status": "success", "data": "v2.36-beta"}, status.HTTP_200_OK
 
 
 @app.route("/exc", methods=["GET"])

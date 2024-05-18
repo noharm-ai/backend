@@ -7,6 +7,7 @@ class MemoryEnum(Enum):
     OAUTH_KEYS = "oauth-keys"
     FEATURES = "features"
     ADMISSION_REPORTS = "admission-reports"
+    ADMISSION_REPORTS_INTERNAL = "admission-reports-internal"
     REPORTS = "reports"
     REPORTS_INTERNAL = "reports-internal"
     GETNAME = "getnameurl"

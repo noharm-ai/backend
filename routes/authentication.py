@@ -5,7 +5,7 @@ from flask import (
     jsonify,
     after_this_request,
 )
-from flask_api import status
+from utils import status
 from models.main import *
 from models.appendix import *
 from models.prescription import *

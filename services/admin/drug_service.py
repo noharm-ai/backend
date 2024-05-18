@@ -1,5 +1,5 @@
-from flask_api import status
-from sqlalchemy import and_, or_, func
+from utils import status
+from sqlalchemy import and_, or_, func, text
 from typing import List
 
 from models.main import *
@@ -261,7 +261,8 @@ def fix_inconsistency(user):
     schema = user.schema
 
     # normalize medatributos
-    query_normalize = f"""
+    query_normalize = text(
+        f"""
         update 
             {schema}.medatributos 
         set 
@@ -269,6 +270,7 @@ def fix_inconsistency(user):
         where 
             fkunidademedida = ''
     """
+    )
 
     db.session.execute(query_normalize)
 
@@ -371,7 +373,8 @@ def copy_drug_attributes(
         if a in base_attributes:
             set_attributes.append(f"{a} = destino.{a},")
 
-    query = f"""
+    query = text(
+        f"""
         with modelo as (
             select
                 m.sctid,
@@ -423,6 +426,7 @@ def copy_drug_attributes(
             origem.fkmedicamento = destino.fkmedicamento
             and origem.idsegmento = destino.idsegmento
     """
+    )
 
     return db.session.execute(
         query,

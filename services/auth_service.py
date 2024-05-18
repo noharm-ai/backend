@@ -9,6 +9,8 @@ from flask_jwt_extended import (
     create_refresh_token,
 )
 from cryptography.hazmat.primitives import serialization
+from flask_sqlalchemy.session import Session
+from markupsafe import escape as escape_html
 
 from models.main import *
 from models.appendix import *
@@ -102,7 +104,7 @@ def _auth_user(
     access_token = create_access_token(identity=user.id, additional_claims=claims)
     refresh_token = create_refresh_token(identity=user.id, additional_claims=claims)
 
-    db_session = db.create_scoped_session()
+    db_session = Session(db)
     db_session.connection(
         execution_options={"schema_translate_map": {None: user_schema}}
     )
@@ -129,7 +131,8 @@ def _auth_user(
         .first()
     )
 
-    nameUrl = Memory.getNameUrl(user_schema)
+    mem = db_session.query(Memory).filter_by(kind="getnameurl").first()
+    nameUrl = mem.value if mem else {"value": "http://localhost/{idPatient}"}
 
     hospitals = db_session.query(Hospital).order_by(asc(Hospital.name)).all()
     hospitalList = []
@@ -153,6 +156,8 @@ def _auth_user(
         logout_url = (
             oauth_config.value["logout_url"] if oauth_config is not None else None
         )
+
+    db_session.close()
 
     integration_status = integration_status_service.get_integration_status(user_schema)
     if (
@@ -182,7 +187,7 @@ def _auth_user(
         "userName": user.name,
         "userId": user.id,
         "email": user.email,
-        "schema": user_schema,
+        "schema": escape_html(user_schema),
         "roles": user_config["roles"] if user_config and "roles" in user_config else [],
         "userFeatures": (
             user_config["features"] if user_config and "features" in user_config else []
@@ -262,7 +267,7 @@ def auth_local(
         )
 
     # need to create a new session to set schema
-    db_session = db.create_scoped_session()
+    db_session = Session(db)
     db_session.connection(
         execution_options={"schema_translate_map": {None: preCheckUser.schema}}
     )
@@ -272,6 +277,8 @@ def auth_local(
         .filter(Memory.kind == MemoryEnum.FEATURES.value)
         .first()
     )
+
+    db_session.close()
 
     if features is not None and FeatureEnum.OAUTH.value in features.value:
         roles = (
@@ -447,28 +454,10 @@ def _get_oauth_user(email, name, schema, oauth_config):
     db_user = User.query.filter_by(email=email.lower()).first()
 
     if db_user is None:
-        if not oauth_config["create_user"]:
-            raise ValidationError(
-                "OAUTH: o usuário deve ser cadastrado previamente na NoHarm",
-                "errors.unauthorizedUser",
-                status.HTTP_401_UNAUTHORIZED,
-            )
-
-        nh_user = User()
-        nh_user.name = name
-        nh_user.email = email.lower()
-        nh_user.schema = schema
-        nh_user.config = {"roles": []}
-        nh_user.active = True
-
-        pwo = PasswordGenerator()
-        pwo.minlen = 6
-        pwo.maxlen = 16
-        # do not crypt
-        nh_user.password = pwo.generate()
-
-        db.session.add(nh_user)
-
-        return nh_user
+        raise ValidationError(
+            "OAUTH: o usuário deve ser cadastrado previamente na NoHarm",
+            "errors.unauthorizedUser",
+            status.HTTP_401_UNAUTHORIZED,
+        )
 
     return db_user

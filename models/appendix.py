@@ -1,6 +1,8 @@
 from .main import db
+from sqlalchemy import text
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import deferred
+from flask_sqlalchemy.session import Session
 
 
 class Department(db.Model):
@@ -76,25 +78,14 @@ class Notes(db.Model):
     user = db.Column("update_by", db.Integer, nullable=True)
 
     def getDefaultNote(sctid):
-        result = db.engine.execute(
-            "SELECT schema_name FROM information_schema.schemata"
-        )
         defaultSchema = "hsc_test"
 
-        schemaExists = False
-        for r in result:
-            if r[0] == defaultSchema:
-                schemaExists = True
-
-        if schemaExists:
-            db_session = db.create_scoped_session()
-            db_session.connection(
-                execution_options={"schema_translate_map": {None: defaultSchema}}
-            )
-            note = db_session.query(Notes).filter_by(idDrug=sctid, idSegment=5).first()
-            return note.notes if note else None
-        else:
-            return None
+        db_session = Session(db)
+        db_session.connection(
+            execution_options={"schema_translate_map": {None: defaultSchema}}
+        )
+        note = db_session.query(Notes).filter_by(idDrug=sctid, idSegment=5).first()
+        return note.notes if note else None
 
 
 class Memory(db.Model):
@@ -105,18 +96,6 @@ class Memory(db.Model):
     value = db.Column("valor", postgresql.JSON, nullable=False)
     update = db.Column("update_at", db.DateTime, nullable=False)
     user = db.Column("update_by", db.Integer, nullable=False)
-
-    def getMem(kind, default):
-        mem = Memory.query.filter_by(kind=kind).first()
-        return mem.value if mem else default
-
-    def getNameUrl(schema):
-        db_session = db.create_scoped_session()
-        db_session.connection(
-            execution_options={"schema_translate_map": {None: schema}}
-        )
-        mem = db_session.query(Memory).filter_by(kind="getnameurl").first()
-        return mem.value if mem else {"value": "http://localhost/{idPatient}"}
 
 
 class GlobalMemory(db.Model):
@@ -155,3 +134,37 @@ class SchemaConfig(db.Model):
     nifi_diagnostics = deferred(
         db.Column("nifi_diagnostics", postgresql.JSON, nullable=True)
     )
+
+
+class CultureHeader(db.Model):
+    __tablename__ = "cultura_cabecalho"
+
+    id = db.Column("idculturacab", db.Integer, primary_key=True)
+    idPatient = db.Column("fkpessoa", db.Integer, nullable=False)
+    idDepartment = db.Column("fksetor", db.Integer, nullable=True)
+    admissionNumber = db.Column("nratendimento", db.Integer, nullable=True)
+    idExam = db.Column("fkexame", db.Integer, nullable=True)
+    idExamItem = db.Column("fkitemexame", db.Integer, nullable=True)
+    examName = db.Column("nomeexame", db.String, nullable=True)
+    examMaterialName = db.Column("nomematerial", db.String, nullable=True)
+    examMaterialTypeName = db.Column("nomematerialtipo", db.String, nullable=True)
+    previousResult = db.Column("resultprevio", db.String, nullable=True)
+    colony = db.Column("dscolonia", db.String, nullable=True)
+    extraInfo = db.Column("complemento", db.String, nullable=True)
+    gram = db.Column("gram", db.String, nullable=True)
+
+    requestDate = db.Column("dtpedido", db.Date, nullable=True)
+    collectionDate = db.Column("dtcoleta", db.Date, nullable=True)
+    releaseDate = db.Column("dtliberacao", db.Date, nullable=True)
+
+
+class Culture(db.Model):
+    __tablename__ = "cultura"
+
+    id = db.Column("idcultura", db.Integer, primary_key=True)
+    idExam = db.Column("fkexame", db.Integer, nullable=True)
+    idExamItem = db.Column("fkitemexame", db.Integer, nullable=True)
+    microorganism = db.Column("nomemicroorganismo", db.String, nullable=True)
+    drug = db.Column("nomemedicamento", db.String, nullable=True)
+    result = db.Column("resultado", db.String, nullable=True)
+    microorganismAmount = db.Column("qtmicroorganismo", db.String, nullable=True)

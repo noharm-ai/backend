@@ -4,7 +4,7 @@ from .segment import *
 from routes.utils import *
 from datetime import datetime
 from sqlalchemy.orm import deferred, undefer
-from sqlalchemy import case, BigInteger, cast, between, outerjoin
+from sqlalchemy import case, BigInteger, cast, between, outerjoin, literal
 from sqlalchemy.sql.expression import literal_column, case
 from functools import partial
 from sqlalchemy.dialects.postgresql import TSRANGE
@@ -77,8 +77,8 @@ class Prescription(db.Model):
             db.session.query(
                 Prescription,
                 Patient,
-                "0",
-                "0",
+                literal("0"),
+                literal("0"),
                 Department.name.label("department"),
                 Segment.description,
                 Patient.observation,
@@ -594,6 +594,7 @@ class Patient(db.Model):
         substances=[],
         substanceClasses=[],
         patientReviewType=None,
+        drugAttributes=[],
     ):
         q = (
             db.session.query(Prescription, Patient, Department.name.label("department"))
@@ -678,6 +679,12 @@ class Patient(db.Model):
         if len(indicators) > 0:
             for i in indicators:
                 q = q.filter(Prescription.features["alertStats"][i].as_integer() > 0)
+
+        if len(drugAttributes) > 0:
+            for a in drugAttributes:
+                q = q.filter(
+                    Prescription.features["drugAttributes"][a].as_integer() > 0
+                )
 
         if len(frequencies) > 0:
             q = q.filter(
@@ -808,7 +815,7 @@ def getDrugHistory(idPrescription, admissionNumber, id_drug, is_cpoe):
                 " ",
                 cpoeperiods.c.idMeasureUnit,
                 ")",
-                case([(cpoeperiods.c.suspension != None, " - suspenso")], else_=""),
+                case((cpoeperiods.c.suspension != None, " - suspenso"), else_=""),
             )
         ).select_from(cpoeperiods)
 
@@ -856,19 +863,17 @@ def getPrevNotes(admissionNumber):
     return (
         db.session.query(
             case(
-                [
-                    (
-                        and_(prevNotes.notes != None, prevNotes.notes != ""),
-                        func.concat(
-                            prevNotes.notes,
-                            " ##@",
-                            prevUser.name,
-                            " em ",
-                            func.to_char(prevNotes.update, "DD/MM/YYYY HH24:MI"),
-                            "@##",
-                        ),
+                (
+                    and_(prevNotes.notes != None, prevNotes.notes != ""),
+                    func.concat(
+                        prevNotes.notes,
+                        " ##@",
+                        prevUser.name,
+                        " em ",
+                        func.to_char(prevNotes.update, "DD/MM/YYYY HH24:MI"),
+                        "@##",
                     ),
-                ],
+                ),
                 else_=None,
             )
         )
@@ -947,9 +952,7 @@ class PrescriptionDrug(db.Model):
                 func.extract("epoch", Prescription.expire - Prescription.date) / 86400
             )
             period_cpoe = case(
-                [
-                    (agg_date_with_time > Prescription.expire, max_period),
-                ],
+                (agg_date_with_time > Prescription.expire, max_period),
                 else_=period_calc,
             )
 
@@ -962,7 +965,7 @@ class PrescriptionDrug(db.Model):
                 Drug,
                 MeasureUnit,
                 Frequency,
-                "0",
+                literal("0"),
                 func.coalesce(
                     PrescriptionDrug.finalscore,
                     func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4),

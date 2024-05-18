@@ -26,14 +26,10 @@ def get_interventions(
 ):
     mReasion = db.aliased(InterventionReason)
     descript = case(
-        [
-            (
-                mReasion.description != None,
-                func.concat(
-                    mReasion.description, " - ", InterventionReason.description
-                ),
-            ),
-        ],
+        (
+            mReasion.description != None,
+            func.concat(mReasion.description, " - ", InterventionReason.description),
+        ),
         else_=InterventionReason.description,
     )
 
@@ -62,12 +58,10 @@ def get_interventions(
             PrescriptionDrug,
             func.array(reason).label("reason"),
             case(
-                [
-                    (
-                        PrescriptionB.concilia != None,
-                        func.coalesce(PrescriptionDrug.interval, Drug.name),
-                    )
-                ],
+                (
+                    PrescriptionB.concilia != None,
+                    func.coalesce(PrescriptionDrug.interval, Drug.name),
+                ),
                 else_=Drug.name,
             ),
             func.array(interactions).label("interactions"),

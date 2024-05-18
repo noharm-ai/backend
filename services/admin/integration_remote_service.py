@@ -1,4 +1,4 @@
-from flask_api import status
+from utils import status
 from sqlalchemy.orm import undefer
 
 from models.main import User, db

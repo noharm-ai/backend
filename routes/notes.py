@@ -2,8 +2,9 @@ import os
 from models.main import db, dbSession, User
 from models.notes import ClinicalNotes
 from models.prescription import Patient
-from flask import Blueprint, request, escape as escape_html
-from flask_api import status
+from flask import Blueprint, request
+from markupsafe import escape as escape_html
+from utils import status
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from .utils import tryCommit
 from sqlalchemy import desc, or_, func
@@ -136,7 +137,9 @@ def get_notes_by_date(admissionNumber, dateList, has_primary_care):
     )
 
     if has_primary_care:
-        query = query.options(undefer("form"), undefer("template"))
+        query = query.options(
+            undefer(ClinicalNotes.form), undefer(ClinicalNotes.template)
+        )
 
     return query.order_by(desc(ClinicalNotes.date)).all()
 

@@ -1,4 +1,4 @@
-from sqlalchemy import func
+from sqlalchemy import func, text
 
 from models.main import *
 from models.appendix import *
@@ -229,7 +229,8 @@ def _get_conversion_status():
 
 
 def _get_table_stats(schema):
-    query = f"""
+    query = text(
+        f"""
         select 
             n_live_tup as total_rows, relname
         from
@@ -240,6 +241,7 @@ def _get_table_stats(schema):
         order by 
             relname
     """
+    )
 
     results = db.session.execute(query, {"schemaname": schema})
 
