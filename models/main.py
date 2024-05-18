@@ -22,7 +22,7 @@ class User(db.Model):
     __tablename__ = "usuario"
     __table_args__ = {"schema": "public"}
 
-    id = db.Column("idusuario", db.Integer, primary_key=True)
+    id = db.Column("idusuario", db.BigInteger, primary_key=True)
     name = db.Column("nome", db.String(250), nullable=False)
     email = db.Column("email", db.String(254), unique=True, nullable=False)
     password = db.Column("senha", db.String(128), nullable=False)
@@ -63,21 +63,21 @@ class UserAudit(db.Model):
     __tablename__ = "usuario_audit"
     __table_args__ = {"schema": "public"}
 
-    id = db.Column("idusuario_audit", db.Integer, primary_key=True)
-    idUser = db.Column("idusuario", db.Integer, nullable=False)
+    id = db.Column("idusuario_audit", db.BigInteger, primary_key=True)
+    idUser = db.Column("idusuario", db.BigInteger, nullable=False)
     auditType = db.Column("tp_audit", db.Integer, nullable=False)
     pwToken = db.Column("pw_token", db.String, nullable=True)
     extra = db.Column("extra", postgresql.JSON, nullable=True)
     auditIp = db.Column("audit_ip", db.String, nullable=True)
     createdAt = db.Column("created_at", db.DateTime, nullable=False)
-    createdBy = db.Column("created_by", db.Integer, nullable=False)
+    createdBy = db.Column("created_by", db.BigInteger, nullable=False)
 
 
 class Substance(db.Model):
     __tablename__ = "substancia"
     __table_args__ = {"schema": "public"}
 
-    id = db.Column("sctid", db.Integer, primary_key=True)
+    id = db.Column("sctid", db.BigInteger, primary_key=True)
     name = db.Column("nome", db.String(255), nullable=False)
     link = db.Column("link", db.String(255), nullable=False)
     idclass = db.Column("idclasse", db.String(255), nullable=False)
@@ -97,14 +97,14 @@ class Relation(db.Model):
     __tablename__ = "relacao"
     __table_args__ = {"schema": "public"}
 
-    sctida = db.Column("sctida", db.Integer, primary_key=True)
-    sctidb = db.Column("sctidb", db.Integer, primary_key=True)
+    sctida = db.Column("sctida", db.BigInteger, primary_key=True)
+    sctidb = db.Column("sctidb", db.BigInteger, primary_key=True)
     kind = db.Column("tprelacao", db.String(2), primary_key=True)
     text = db.Column("texto", db.String, nullable=True)
     active = db.Column("ativo", db.Boolean, nullable=True)
     update = db.Column("update_at", db.DateTime, nullable=True)
-    user = db.Column("update_by", db.Integer, nullable=True)
-    creator = db.Column("create_by", db.Integer, nullable=True)
+    user = db.Column("update_by", db.BigInteger, nullable=True)
+    creator = db.Column("create_by", db.BigInteger, nullable=True)
 
     def findBySctid(sctid, user):
         SubstA = db.aliased(Substance)
@@ -148,7 +148,7 @@ class Notify(db.Model):
     __tablename__ = "notifica"
     __table_args__ = {"schema": "public"}
 
-    id = db.Column("idnotifica", db.Integer, primary_key=True, autoincrement=True)
+    id = db.Column("idnotifica", db.BigInteger, primary_key=True, autoincrement=True)
     title = db.Column("titulo", db.String(100), nullable=False)
     tooltip = db.Column("tooltip", db.String(255), nullable=False)
     link = db.Column("link", db.String(100), nullable=False)
@@ -183,13 +183,13 @@ class Notify(db.Model):
 class Drug(db.Model):
     __tablename__ = "medicamento"
 
-    id = db.Column("fkmedicamento", db.Integer, primary_key=True)
-    idHospital = db.Column("fkhospital", db.Integer, nullable=False)
+    id = db.Column("fkmedicamento", db.BigInteger, primary_key=True)
+    idHospital = db.Column("fkhospital", db.BigInteger, nullable=False)
     name = db.Column("nome", db.String, nullable=False)
-    sctid = db.Column("sctid", db.Integer, nullable=True)
+    sctid = db.Column("sctid", db.BigInteger, nullable=True)
     ai_accuracy = db.Column("ia_acuracia", db.Float, nullable=True)
-    created_by = db.Column("created_by", db.Integer, nullable=True)
-    updated_by = db.Column("updated_by", db.Integer, nullable=True)
+    created_by = db.Column("created_by", db.BigInteger, nullable=True)
+    updated_by = db.Column("updated_by", db.BigInteger, nullable=True)
     created_at = db.Column("created_at", db.DateTime, nullable=False)
     updated_at = db.Column("updated_at", db.DateTime, nullable=True)
 
@@ -220,8 +220,8 @@ class Drug(db.Model):
 
 
 class DrugAttributesBase:
-    idDrug = db.Column("fkmedicamento", db.Integer, primary_key=True)
-    idSegment = db.Column("idsegmento", db.Integer, primary_key=True)
+    idDrug = db.Column("fkmedicamento", db.BigInteger, primary_key=True)
+    idSegment = db.Column("idsegmento", db.BigInteger, primary_key=True)
     antimicro = db.Column("antimicro", db.Boolean, nullable=True)
     mav = db.Column("mav", db.Boolean, nullable=True)
     controlled = db.Column("controlados", db.Boolean, nullable=True)
@@ -247,7 +247,7 @@ class DrugAttributesBase:
     pregnant = db.Column("gestante", db.String, nullable=True)
     lactating = db.Column("lactante", db.String, nullable=True)
     update = db.Column("update_at", db.DateTime, nullable=True)
-    user = db.Column("update_by", db.Integer, nullable=True)
+    user = db.Column("update_by", db.BigInteger, nullable=True)
 
 
 class DrugAttributes(db.Model, DrugAttributesBase):
@@ -262,8 +262,8 @@ class DrugAttributesReference(db.Model, DrugAttributesBase):
 class Allergy(db.Model):
     __tablename__ = "alergia"
 
-    idDrug = db.Column("fkmedicamento", db.Integer, primary_key=True)
-    idPatient = db.Column("fkpessoa", db.Integer, primary_key=True)
+    idDrug = db.Column("fkmedicamento", db.BigInteger, primary_key=True)
+    idPatient = db.Column("fkpessoa", db.BigInteger, primary_key=True)
     drugName = db.Column("nome_medicamento", db.String, nullable=True)
     active = db.Column("ativo", db.Boolean, nullable=False)
     createdAt = db.Column("created_at", db.DateTime, nullable=True)
@@ -272,25 +272,25 @@ class Allergy(db.Model):
 class Outlier(db.Model):
     __tablename__ = "outlier"
 
-    id = db.Column("idoutlier", db.Integer, primary_key=True)
-    idDrug = db.Column("fkmedicamento", db.Integer, nullable=False)
-    idSegment = db.Column("idsegmento", db.Integer, nullable=False)
+    id = db.Column("idoutlier", db.BigInteger, primary_key=True)
+    idDrug = db.Column("fkmedicamento", db.BigInteger, nullable=False)
+    idSegment = db.Column("idsegmento", db.BigInteger, nullable=False)
     countNum = db.Column("contagem", db.Integer, nullable=True)
     dose = db.Column("doseconv", db.Float, nullable=True)
     frequency = db.Column("frequenciadia", db.Float, nullable=True)
     score = db.Column("escore", db.Integer, nullable=True)
     manualScore = db.Column("escoremanual", db.Integer, nullable=True)
     update = db.Column("update_at", db.DateTime, nullable=True)
-    user = db.Column("update_by", db.Integer, nullable=True)
+    user = db.Column("update_by", db.BigInteger, nullable=True)
 
 
 class PrescriptionAgg(db.Model):
     __tablename__ = "prescricaoagg"
 
-    idHospital = db.Column("fkhospital", db.Integer, nullable=False)
-    idDepartment = db.Column("fksetor", db.Integer, primary_key=True)
-    idSegment = db.Column("idsegmento", db.Integer, nullable=False)
-    idDrug = db.Column("fkmedicamento", db.Integer, primary_key=True)
+    idHospital = db.Column("fkhospital", db.BigInteger, nullable=False)
+    idDepartment = db.Column("fksetor", db.BigInteger, primary_key=True)
+    idSegment = db.Column("idsegmento", db.BigInteger, nullable=False)
+    idDrug = db.Column("fkmedicamento", db.BigInteger, primary_key=True)
     idMeasureUnit = db.Column("fkunidademedida", db.String, nullable=False)
     idFrequency = db.Column("fkfrequencia", db.String, primary_key=True)
     dose = db.Column("dose", db.Float, primary_key=True)

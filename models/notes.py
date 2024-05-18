@@ -8,14 +8,14 @@ from datetime import datetime, timedelta
 class ClinicalNotes(db.Model):
     __tablename__ = "evolucao"
 
-    id = db.Column("fkevolucao", db.Integer, primary_key=True)
-    admissionNumber = db.Column("nratendimento", db.Integer, nullable=False)
+    id = db.Column("fkevolucao", db.BigInteger, primary_key=True)
+    admissionNumber = db.Column("nratendimento", db.BigInteger, nullable=False)
     text = db.Column("texto", db.String, nullable=False)
     date = db.Column("dtevolucao", db.DateTime, nullable=False)
     prescriber = db.Column("prescritor", db.String, nullable=True)
     position = db.Column("cargo", db.String, nullable=True)
     update = db.Column("update_at", db.DateTime, nullable=True)
-    user = db.Column("update_by", db.Integer, nullable=True)
+    user = db.Column("update_by", db.BigInteger, nullable=True)
 
     medications = db.Column("medicamentos", db.Integer, nullable=True)
     complication = db.Column("complicacoes", db.Integer, nullable=True)

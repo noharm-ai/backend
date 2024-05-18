@@ -7,7 +7,7 @@ from routes.utils import *
 class Segment(db.Model):
     __tablename__ = "segmento"
 
-    id = db.Column("idsegmento", db.Integer, primary_key=True)
+    id = db.Column("idsegmento", db.BigInteger, primary_key=True)
     description = db.Column("nome", db.String, nullable=False)
     status = db.Column("status", db.Integer, nullable=False)
 
@@ -18,7 +18,7 @@ class Segment(db.Model):
 class SegmentExam(db.Model):
     __tablename__ = "segmentoexame"
 
-    idSegment = db.Column("idsegmento", db.Integer, primary_key=True)
+    idSegment = db.Column("idsegmento", db.BigInteger, primary_key=True)
     typeExam = db.Column("tpexame", db.String(100), primary_key=True)
     initials = db.Column("abrev", db.String(50), nullable=False)
     name = db.Column("nome", db.String(250), nullable=False)
@@ -28,7 +28,7 @@ class SegmentExam(db.Model):
     order = db.Column("posicao", db.Integer, nullable=False)
     active = db.Column("ativo", db.Boolean, nullable=False)
     update = db.Column("update_at", db.DateTime, nullable=False)
-    user = db.Column("update_by", db.Integer, nullable=False)
+    user = db.Column("update_by", db.BigInteger, nullable=False)
 
     def refDict(idSegment):
         exams = (
@@ -50,17 +50,17 @@ class SegmentExam(db.Model):
 class Hospital(db.Model):
     __tablename__ = "hospital"
 
-    id = db.Column("fkhospital", db.Integer, primary_key=True)
+    id = db.Column("fkhospital", db.BigInteger, primary_key=True)
     name = db.Column("nome", db.String, nullable=False)
 
 
 class Exams(db.Model):
     __tablename__ = "exame"
 
-    idExame = db.Column("fkexame", db.Integer, primary_key=True)
-    idPatient = db.Column("fkpessoa", db.Integer, nullable=False)
-    idPrescription = db.Column("fkprescricao", db.Integer, nullable=False)
-    admissionNumber = db.Column("nratendimento", db.Integer, nullable=False)
+    idExame = db.Column("fkexame", db.BigInteger, primary_key=True)
+    idPatient = db.Column("fkpessoa", db.BigInteger, nullable=False)
+    idPrescription = db.Column("fkprescricao", db.BigInteger, nullable=False)
+    admissionNumber = db.Column("nratendimento", db.BigInteger, nullable=False)
     date = db.Column("dtexame", db.DateTime, nullable=False)
     typeExam = db.Column("tpexame", db.String, primary_key=True)
     value = db.Column("resultado", db.Float, nullable=False)
