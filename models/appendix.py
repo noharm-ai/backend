@@ -8,8 +8,8 @@ from flask_sqlalchemy.session import Session
 class Department(db.Model):
     __tablename__ = "setor"
 
-    id = db.Column("fksetor", db.Integer, primary_key=True)
-    idHospital = db.Column("fkhospital", db.Integer, primary_key=True)
+    id = db.Column("fksetor", db.BigInteger, primary_key=True)
+    idHospital = db.Column("fkhospital", db.BigInteger, primary_key=True)
     name = db.Column("nome", db.String, nullable=False)
 
     def getAll():
@@ -19,16 +19,16 @@ class Department(db.Model):
 class SegmentDepartment(db.Model):
     __tablename__ = "segmentosetor"
 
-    id = db.Column("idsegmento", db.Integer, primary_key=True)
-    idHospital = db.Column("fkhospital", db.Integer, primary_key=True)
-    idDepartment = db.Column("fksetor", db.Integer, primary_key=True)
+    id = db.Column("idsegmento", db.BigInteger, primary_key=True)
+    idHospital = db.Column("fkhospital", db.BigInteger, primary_key=True)
+    idDepartment = db.Column("fksetor", db.BigInteger, primary_key=True)
 
 
 class MeasureUnit(db.Model):
     __tablename__ = "unidademedida"
 
     id = db.Column("fkunidademedida", db.String, primary_key=True)
-    idHospital = db.Column("fkhospital", db.Integer, nullable=False)
+    idHospital = db.Column("fkhospital", db.BigInteger, nullable=False)
     description = db.Column("nome", db.String, nullable=False)
 
 
@@ -36,29 +36,29 @@ class MeasureUnitConvert(db.Model):
     __tablename__ = "unidadeconverte"
 
     idMeasureUnit = db.Column("fkunidademedida", db.String, primary_key=True)
-    idDrug = db.Column("fkmedicamento", db.Integer, primary_key=True)
-    idSegment = db.Column("idsegmento", db.Integer, primary_key=True)
+    idDrug = db.Column("fkmedicamento", db.BigInteger, primary_key=True)
+    idSegment = db.Column("idsegmento", db.BigInteger, primary_key=True)
     factor = db.Column("fator", db.Float, nullable=False)
 
 
 class InterventionReason(db.Model):
     __tablename__ = "motivointervencao"
 
-    id = db.Column("idmotivointervencao", db.Integer, primary_key=True)
-    idHospital = db.Column("fkhospital", db.Integer, nullable=False)
+    id = db.Column("idmotivointervencao", db.BigInteger, primary_key=True)
+    idHospital = db.Column("fkhospital", db.BigInteger, nullable=False)
     description = db.Column("nome", db.String, nullable=False)
-    mamy = db.Column("idmotivomae", db.Integer, nullable=False)
+    mamy = db.Column("idmotivomae", db.BigInteger, nullable=False)
     active = db.Column("ativo", db.Boolean, nullable=False)
     suspension = db.Column("suspensao", db.Boolean, nullable=False)
     substitution = db.Column("substituicao", db.Boolean, nullable=False)
-    relation_type = db.Column("tp_relacao", db.Integer, nullable=False)
+    relation_type = db.Column("tp_relacao", db.BigInteger, nullable=False)
 
 
 class Frequency(db.Model):
     __tablename__ = "frequencia"
 
     id = db.Column("fkfrequencia", db.String, primary_key=True)
-    idHospital = db.Column("fkhospital", db.Integer, nullable=False)
+    idHospital = db.Column("fkhospital", db.BigInteger, nullable=False)
     description = db.Column("nome", db.String, nullable=False)
     dailyFrequency = db.Column("frequenciadia", db.Float, nullable=True)
 
@@ -66,16 +66,16 @@ class Frequency(db.Model):
 class Notes(db.Model):
     __tablename__ = "observacao"
 
-    idOutlier = db.Column("idoutlier", db.Integer, primary_key=True)
-    idPrescriptionDrug = db.Column("fkpresmed", db.Integer, primary_key=True)
-    admissionNumber = db.Column("nratendimento", db.Integer, nullable=False)
-    idSegment = db.Column("idsegmento", db.Integer, nullable=False)
-    idDrug = db.Column("fkmedicamento", db.Integer, nullable=False)
+    idOutlier = db.Column("idoutlier", db.BigInteger, primary_key=True)
+    idPrescriptionDrug = db.Column("fkpresmed", db.BigInteger, primary_key=True)
+    admissionNumber = db.Column("nratendimento", db.BigInteger, nullable=False)
+    idSegment = db.Column("idsegmento", db.BigInteger, nullable=False)
+    idDrug = db.Column("fkmedicamento", db.BigInteger, nullable=False)
     dose = db.Column("doseconv", db.Float, nullable=True)
     frequency = db.Column("frequenciadia", db.Float, nullable=True)
     notes = db.Column("text", db.String, nullable=True)
     update = db.Column("update_at", db.DateTime, nullable=True)
-    user = db.Column("update_by", db.Integer, nullable=True)
+    user = db.Column("update_by", db.BigInteger, nullable=True)
 
     def getDefaultNote(sctid):
         defaultSchema = "hsc_test"
@@ -91,22 +91,22 @@ class Notes(db.Model):
 class Memory(db.Model):
     __tablename__ = "memoria"
 
-    key = db.Column("idmemoria", db.Integer, primary_key=True, autoincrement=True)
+    key = db.Column("idmemoria", db.BigInteger, primary_key=True, autoincrement=True)
     kind = db.Column("tipo", db.String(100), nullable=False)
     value = db.Column("valor", postgresql.JSON, nullable=False)
     update = db.Column("update_at", db.DateTime, nullable=False)
-    user = db.Column("update_by", db.Integer, nullable=False)
+    user = db.Column("update_by", db.BigInteger, nullable=False)
 
 
 class GlobalMemory(db.Model):
     __tablename__ = "memoria"
     __table_args__ = {"schema": "public"}
 
-    key = db.Column("idmemoria", db.Integer, primary_key=True, autoincrement=True)
+    key = db.Column("idmemoria", db.BigInteger, primary_key=True, autoincrement=True)
     kind = db.Column("tipo", db.String(100), nullable=False)
     value = db.Column("valor", postgresql.JSON, nullable=False)
     update = db.Column("update_at", db.DateTime, nullable=False)
-    user = db.Column("update_by", db.Integer, nullable=False)
+    user = db.Column("update_by", db.BigInteger, nullable=False)
 
 
 class SchemaConfig(db.Model):
@@ -116,7 +116,7 @@ class SchemaConfig(db.Model):
     schemaName = db.Column("schema_name", db.String, primary_key=True)
     createdAt = db.Column("created_at", db.Date, nullable=False)
     updatedAt = db.Column("updated_at", db.Date, nullable=True)
-    updatedBy = db.Column("updated_by", db.Integer, nullable=True)
+    updatedBy = db.Column("updated_by", db.BigInteger, nullable=True)
     config = db.Column("configuracao", postgresql.JSONB, nullable=True)
     status = db.Column("status", db.Integer, nullable=False)
     nh_care = db.Column("tp_noharm_care", db.Integer, nullable=False)
@@ -125,7 +125,7 @@ class SchemaConfig(db.Model):
     fl2 = db.Column("fl2_atualiza_indicadores_prescricao", db.Boolean, nullable=False)
     fl3 = db.Column("fl3_atualiza_prescricaoagg", db.Boolean, nullable=False)
     fl3_segments = db.Column(
-        "fl3_segmentos", postgresql.ARRAY(db.Integer), nullable=True
+        "fl3_segmentos", postgresql.ARRAY(db.BigInteger), nullable=True
     )
     fl4 = db.Column("fl4_cria_conciliacao", db.Boolean, nullable=False)
 

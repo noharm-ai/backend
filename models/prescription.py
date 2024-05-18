@@ -15,12 +15,12 @@ from models.enums import PrescriptionReviewTypeEnum
 class Prescription(db.Model):
     __tablename__ = "prescricao"
 
-    id = db.Column("fkprescricao", db.Integer, primary_key=True)
-    idPatient = db.Column("fkpessoa", db.Integer, nullable=False)
-    admissionNumber = db.Column("nratendimento", db.Integer, nullable=True)
-    idHospital = db.Column("fkhospital", db.Integer, nullable=False)
-    idDepartment = db.Column("fksetor", db.Integer, nullable=False)
-    idSegment = db.Column("idsegmento", db.Integer, nullable=False)
+    id = db.Column("fkprescricao", db.BigInteger, primary_key=True)
+    idPatient = db.Column("fkpessoa", db.BigInteger, nullable=False)
+    admissionNumber = db.Column("nratendimento", db.BigInteger, nullable=True)
+    idHospital = db.Column("fkhospital", db.BigInteger, nullable=False)
+    idDepartment = db.Column("fksetor", db.BigInteger, nullable=False)
+    idSegment = db.Column("idsegmento", db.BigInteger, nullable=False)
     date = db.Column("dtprescricao", db.DateTime, nullable=False)
     expire = db.Column("dtvigencia", db.DateTime, nullable=True)
     status = db.Column("status", db.String(1), nullable=False)
@@ -32,16 +32,16 @@ class Prescription(db.Model):
     prescriber = db.Column("prescritor", db.String, nullable=True)
     agg = db.Column("agregada", db.Boolean, nullable=True)
     aggDeps = deferred(
-        db.Column("aggsetor", postgresql.ARRAY(db.Integer), nullable=True)
+        db.Column("aggsetor", postgresql.ARRAY(db.BigInteger), nullable=True)
     )
     aggDrugs = deferred(
-        db.Column("aggmedicamento", postgresql.ARRAY(db.Integer), nullable=True)
+        db.Column("aggmedicamento", postgresql.ARRAY(db.BigInteger), nullable=True)
     )
     concilia = db.Column("concilia", db.String(1), nullable=True)
     insurance = db.Column("convenio", db.String, nullable=True)
     reviewType = db.Column("tp_revisao", db.Integer, nullable=True)
     update = db.Column("update_at", db.DateTime, nullable=True)
-    user = db.Column("update_by", db.Integer, nullable=True)
+    user = db.Column("update_by", db.BigInteger, nullable=True)
 
     def getFuturePrescription(idPrescription, admissionNumber):
         return (
@@ -526,28 +526,30 @@ class Prescription(db.Model):
 class PrescriptionAudit(db.Model):
     __tablename__ = "prescricao_audit"
 
-    id = db.Column("idprescricao_audit", db.Integer, nullable=False, primary_key=True)
+    id = db.Column(
+        "idprescricao_audit", db.BigInteger, nullable=False, primary_key=True
+    )
     auditType = db.Column("tp_audit", db.Integer, nullable=False)
-    admissionNumber = db.Column("nratendimento", db.Integer, nullable=False)
-    idPrescription = db.Column("fkprescricao", db.Integer, nullable=False)
+    admissionNumber = db.Column("nratendimento", db.BigInteger, nullable=False)
+    idPrescription = db.Column("fkprescricao", db.BigInteger, nullable=False)
     prescriptionDate = db.Column("dtprescricao", db.DateTime, nullable=False)
-    idDepartment = db.Column("fksetor", db.Integer, nullable=False)
-    idSegment = db.Column("idsegmento", db.Integer, nullable=True)
-    totalItens = db.Column("total_itens", db.Integer, nullable=False)
+    idDepartment = db.Column("fksetor", db.BigInteger, nullable=False)
+    idSegment = db.Column("idsegmento", db.BigInteger, nullable=True)
+    totalItens = db.Column("total_itens", db.BigInteger, nullable=False)
     agg = db.Column("agregada", db.Boolean, nullable=True)
     concilia = db.Column("concilia", db.String(1), nullable=True)
     bed = db.Column("leito", db.String, nullable=True)
     extra = db.Column("extra", postgresql.JSON, nullable=True)
     createdAt = db.Column("created_at", db.DateTime, nullable=False)
-    createdBy = db.Column("created_by", db.Integer, nullable=False)
+    createdBy = db.Column("created_by", db.BigInteger, nullable=False)
 
 
 class Patient(db.Model):
     __tablename__ = "pessoa"
 
-    idPatient = db.Column("fkpessoa", db.Integer, nullable=False)
-    idHospital = db.Column("fkhospital", db.Integer, nullable=False)
-    admissionNumber = db.Column("nratendimento", db.Integer, primary_key=True)
+    idPatient = db.Column("fkpessoa", db.BigInteger, nullable=False)
+    idHospital = db.Column("fkhospital", db.BigInteger, nullable=False)
+    admissionNumber = db.Column("nratendimento", db.BigInteger, primary_key=True)
     admissionDate = db.Column("dtinternacao", db.DateTime, nullable=True)
     birthdate = db.Column("dtnascimento", db.DateTime, nullable=True)
     gender = db.Column("sexo", db.String(1), nullable=True)
@@ -557,11 +559,11 @@ class Patient(db.Model):
     observation = deferred(db.Column("anotacao", db.String, nullable=True))
     skinColor = db.Column("cor", db.String, nullable=True)
     update = db.Column("update_at", db.DateTime, nullable=True)
-    user = db.Column("update_by", db.Integer, nullable=True)
+    user = db.Column("update_by", db.BigInteger, nullable=True)
     alert = deferred(db.Column("alertatexto", db.String, nullable=True))
     alertDate = db.Column("alertadata", db.DateTime, nullable=True)
     alertExpire = db.Column("alertavigencia", db.DateTime, nullable=True)
-    alertBy = db.Column("alerta_by", db.Integer, nullable=True)
+    alertBy = db.Column("alerta_by", db.BigInteger, nullable=True)
     dischargeReason = db.Column("motivoalta", db.String, nullable=True)
     dischargeDate = db.Column("dtalta", db.DateTime, nullable=True)
     dialysis = db.Column("dialise", db.String(1), nullable=True)
@@ -891,13 +893,13 @@ def getPrevNotes(admissionNumber):
 class PrescriptionDrug(db.Model):
     __tablename__ = "presmed"
 
-    id = db.Column("fkpresmed", db.Integer, primary_key=True)
-    idOutlier = db.Column("idoutlier", db.Integer, nullable=False)
-    idPrescription = db.Column("fkprescricao", db.Integer, nullable=False)
-    idDrug = db.Column("fkmedicamento", db.Integer, nullable=False)
+    id = db.Column("fkpresmed", db.BigInteger, primary_key=True)
+    idOutlier = db.Column("idoutlier", db.BigInteger, nullable=False)
+    idPrescription = db.Column("fkprescricao", db.BigInteger, nullable=False)
+    idDrug = db.Column("fkmedicamento", db.BigInteger, nullable=False)
     idMeasureUnit = db.Column("fkunidademedida", db.String, nullable=False)
     idFrequency = db.Column("fkfrequencia", db.String, nullable=True)
-    idSegment = db.Column("idsegmento", db.Integer, nullable=False)
+    idSegment = db.Column("idsegmento", db.BigInteger, nullable=False)
 
     dose = db.Column("dose", db.Float, nullable=True)
     frequency = db.Column("frequenciadia", db.Float, nullable=True)
@@ -925,9 +927,9 @@ class PrescriptionDrug(db.Model):
     checked = db.Column("checado", db.Boolean, nullable=True)
     period = db.Column("periodo", db.Integer, nullable=True)
     update = db.Column("update_at", db.DateTime, nullable=True)
-    user = db.Column("update_by", db.Integer, nullable=True)
+    user = db.Column("update_by", db.BigInteger, nullable=True)
 
-    cpoe_group = db.Column("cpoe_grupo", db.Integer, nullable=True)
+    cpoe_group = db.Column("cpoe_grupo", db.BigInteger, nullable=True)
     form = db.Column("form", postgresql.JSON, nullable=True)
 
     def findByPrescription(
@@ -1070,33 +1072,35 @@ class PrescriptionDrug(db.Model):
 class PrescriptionDrugAudit(db.Model):
     __tablename__ = "presmed_audit"
 
-    id = db.Column("idpresmed_audit", db.Integer, nullable=False, primary_key=True)
+    id = db.Column("idpresmed_audit", db.BigInteger, nullable=False, primary_key=True)
     auditType = db.Column("tp_audit", db.Integer, nullable=False)
-    idPrescriptionDrug = db.Column("fkpresmed", db.Integer, nullable=False)
+    idPrescriptionDrug = db.Column("fkpresmed", db.BigInteger, nullable=False)
     extra = db.Column("extra", postgresql.JSON, nullable=True)
     createdAt = db.Column("created_at", db.DateTime, nullable=False)
-    createdBy = db.Column("created_by", db.Integer, nullable=False)
+    createdBy = db.Column("created_by", db.BigInteger, nullable=False)
 
 
 class Intervention(db.Model):
     __tablename__ = "intervencao"
 
-    idIntervention = db.Column("idintervencao", db.Integer, primary_key=True)
-    id = db.Column("fkpresmed", db.Integer, nullable=False)
-    idPrescription = db.Column("fkprescricao", db.Integer, nullable=False)
-    admissionNumber = db.Column("nratendimento", db.Integer, nullable=False)
+    idIntervention = db.Column("idintervencao", db.BigInteger, primary_key=True)
+    id = db.Column("fkpresmed", db.BigInteger, nullable=False)
+    idPrescription = db.Column("fkprescricao", db.BigInteger, nullable=False)
+    admissionNumber = db.Column("nratendimento", db.BigInteger, nullable=False)
     idInterventionReason = db.Column(
-        "idmotivointervencao", postgresql.ARRAY(db.Integer), nullable=False
+        "idmotivointervencao", postgresql.ARRAY(db.BigInteger), nullable=False
     )
-    idDepartment = db.Column("fksetor", db.Integer, nullable=False)
+    idDepartment = db.Column("fksetor", db.BigInteger, nullable=False)
     error = db.Column("erro", db.Boolean, nullable=True)
     cost = db.Column("custo", db.Boolean, nullable=True)
     notes = db.Column("observacao", db.String, nullable=True)
-    interactions = db.Column("interacoes", postgresql.ARRAY(db.Integer), nullable=True)
+    interactions = db.Column(
+        "interacoes", postgresql.ARRAY(db.BigInteger), nullable=True
+    )
     date = db.Column("dtintervencao", db.DateTime, nullable=True)
     status = db.Column("status", db.String(1), nullable=True)
     update = db.Column("update_at", db.DateTime, nullable=False)
-    user = db.Column("update_by", db.Integer, nullable=False)
+    user = db.Column("update_by", db.BigInteger, nullable=False)
     transcription = db.Column("transcricao", postgresql.JSON, nullable=True)
     economy_days = db.Column("dias_economia", db.Integer, nullable=True)
     expended_dose = db.Column("dose_despendida", db.Float, nullable=True)
@@ -1106,7 +1110,7 @@ class Intervention(db.Model):
         "vl_economia_dia_manual", db.Boolean, nullable=False
     )
     idPrescriptionDrugDestiny = db.Column(
-        "fkpresmed_destino", db.Integer, nullable=True
+        "fkpresmed_destino", db.BigInteger, nullable=True
     )
     date_base_economy = db.Column("dt_base_economia", db.DateTime, nullable=True)
     date_end_economy = db.Column("dt_fim_economia", db.DateTime, nullable=True)
