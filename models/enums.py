@@ -67,6 +67,8 @@ class PrescriptionAuditTypeEnum(Enum):
     UNCHECK = 2
     REVISION = 3
     UNDO_REVISION = 4
+    INTEGRATION_CLINICAL_NOTES = 5
+    INTEGRATION_PRESCRIPTION_RELEASE = 6
 
 
 class PrescriptionDrugAuditTypeEnum(Enum):
