@@ -458,3 +458,92 @@ def review_prescription(idPrescription, user, review_type, evaluation_time):
         "reviewedAt": datetime.today().isoformat(),
         "reviewedBy": db_user.name,
     }
+
+
+def recalculate_prescription(id_prescription: int, user: User):
+    p = Prescription.query.get(id_prescription)
+    if p is None:
+        raise ValidationError(
+            "Prescrição inexistente.",
+            "errors.invalidRegister",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    if p.agg:
+        if user.cpoe():
+            prescription_results = get_query_prescriptions_by_agg(
+                agg_prescription=p, is_cpoe=user.cpoe(), only_id=True
+            ).all()
+
+            prescription_ids = []
+            for item in prescription_results:
+                prescription_ids.append(item.id)
+
+            db.session.query(Prescription).filter(
+                Prescription.id.in_(prescription_ids)
+            ).filter(Prescription.idSegment == None).update(
+                {
+                    "idHospital": p.idHospital,
+                    "idDepartment": p.idDepartment,
+                    "idSegment": p.idSegment,
+                },
+                synchronize_session="fetch",
+            )
+
+            db.session.flush()
+
+            query = text(
+                f"""INSERT INTO {user.schema}.presmed
+                    SELECT
+                        pm.*
+                    FROM
+                        {user.schema}.presmed pm
+                    WHERE 
+                        fkprescricao = ANY(:prescriptionIds)
+                """
+            )
+
+            db.session.execute(query, {"prescriptionIds": prescription_ids})
+        else:
+            query = text(
+                "INSERT INTO "
+                + user.schema
+                + ".presmed \
+                    SELECT pm.*\
+                    FROM "
+                + user.schema
+                + ".presmed pm\
+                    WHERE fkprescricao IN (\
+                        SELECT fkprescricao\
+                        FROM "
+                + user.schema
+                + ".prescricao p\
+                        WHERE p.nratendimento = :admissionNumber"
+                + "\
+                        AND p.idsegmento IS NOT NULL \
+                        AND (\
+                            p.dtprescricao::date = "
+                + "date(:prescDate) OR\
+                            p.dtvigencia::date = "
+                + "date(:prescDate)\
+                        )\
+                    );"
+            )
+
+            db.session.execute(
+                query, {"admissionNumber": p.admissionNumber, "prescDate": p.date}
+            )
+    else:
+        query = text(
+            "INSERT INTO "
+            + user.schema
+            + ".presmed \
+                    SELECT *\
+                    FROM "
+            + user.schema
+            + ".presmed\
+                    WHERE fkprescricao = :idPrescription"
+            + ";"
+        )
+
+        db.session.execute(query, {"idPrescription": p.id})
