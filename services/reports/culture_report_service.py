@@ -79,7 +79,8 @@ def _group_culture_results(results):
     grouped_data = []
     for id in headers:
         headers[id]["cultures"] = sorted(
-            headers[id]["cultures"], key=lambda d: d["drug"]
+            headers[id]["cultures"],
+            key=lambda d: d["drug"] if d["drug"] != None else "",
         )
         if len(headers[id]["cultures"]) > 0:
             headers[id]["microorganism"] = headers[id]["cultures"][0]["microorganism"]
