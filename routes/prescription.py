@@ -818,84 +818,12 @@ def getPrescriptionUpdate(idPrescription):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
 
-    p = Prescription.query.get(idPrescription)
-    if p is None:
-        return {
-            "status": "error",
-            "message": "Prescrição Inexistente!",
-        }, status.HTTP_400_BAD_REQUEST
-
-    if p.agg:
-        if user.cpoe():
-            query = text(
-                "INSERT INTO "
-                + user.schema
-                + ".presmed \
-                        SELECT pm.*\
-                        FROM "
-                + user.schema
-                + ".presmed pm\
-                        WHERE fkprescricao IN (\
-                            SELECT fkprescricao\
-                            FROM "
-                + user.schema
-                + ".prescricao p\
-                            WHERE p.nratendimento = :admissionNumber"
-                + "\
-                            AND p.idsegmento IS NOT NULL \
-                            AND "
-                + "date(:prescDate)\
-                            BETWEEN p.dtprescricao::date AND COALESCE(p.dtvigencia::date, "
-                + "date(:prescDate))\
-                        );"
-            )
-
-            db.session.execute(
-                query, {"admissionNumber": p.admissionNumber, "prescDate": p.date}
-            )
-        else:
-            query = text(
-                "INSERT INTO "
-                + user.schema
-                + ".presmed \
-                    SELECT pm.*\
-                    FROM "
-                + user.schema
-                + ".presmed pm\
-                    WHERE fkprescricao IN (\
-                        SELECT fkprescricao\
-                        FROM "
-                + user.schema
-                + ".prescricao p\
-                        WHERE p.nratendimento = :admissionNumber"
-                + "\
-                        AND p.idsegmento IS NOT NULL \
-                        AND (\
-                            p.dtprescricao::date = "
-                + "date(:prescDate) OR\
-                            p.dtvigencia::date = "
-                + "date(:prescDate)\
-                        )\
-                    );"
-            )
-
-            db.session.execute(
-                query, {"admissionNumber": p.admissionNumber, "prescDate": p.date}
-            )
-    else:
-        query = text(
-            "INSERT INTO "
-            + user.schema
-            + ".presmed \
-                    SELECT *\
-                    FROM "
-            + user.schema
-            + ".presmed\
-                    WHERE fkprescricao = :idPrescription"
-            + ";"
+    try:
+        prescription_service.recalculate_prescription(
+            id_prescription=idPrescription, user=user
         )
-
-        db.session.execute(query, {"idPrescription": idPrescription})
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
     return tryCommit(db, escape_html(str(idPrescription)))
 

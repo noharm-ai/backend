@@ -1,5 +1,6 @@
-from models.main import db
+from sqlalchemy import literal
 
+from models.main import db
 from models.appendix import *
 from models.prescription import *
 from services import prescription_service
@@ -13,7 +14,7 @@ def getPrescriptionDrug(idPrescriptionDrug):
             Drug,
             MeasureUnit,
             Frequency,
-            "0",
+            literal("0"),
             func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4).label(
                 "score"
             ),
