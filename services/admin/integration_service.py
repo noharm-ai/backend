@@ -28,7 +28,7 @@ def get_table_count(schema, table):
 
 
 def can_refresh_agg(schema):
-    max_table_count = 500000
+    max_table_count = 300000
 
     return get_table_count(schema, "prescricaoagg") <= max_table_count
 
