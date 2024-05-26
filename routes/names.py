@@ -47,7 +47,7 @@ def proxy_name(idPatient):
     else:
         return {
             "status": "error",
-            "idPatient": idPatient,
+            "idPatient": int(idPatient),
             "name": f"Paciente {idPatient}",
         }, status.HTTP_400_BAD_REQUEST
 
@@ -92,8 +92,8 @@ def proxy_multiple():
             names.append(
                 {
                     "status": "error",
-                    "idPatient": id_patient,
-                    "name": "Paciente " + str(id_patient),
+                    "idPatient": int(id_patient),
+                    "name": "Paciente " + str(int(id_patient)),
                 }
             )
 
