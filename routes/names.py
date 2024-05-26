@@ -48,7 +48,7 @@ def proxy_name(idPatient):
         return {
             "status": "error",
             "idPatient": int(idPatient),
-            "name": f"Paciente {idPatient}",
+            "name": f"Paciente {str(int(idPatient))}",
         }, status.HTTP_400_BAD_REQUEST
 
 
