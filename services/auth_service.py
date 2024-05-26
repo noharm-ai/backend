@@ -197,7 +197,7 @@ def _auth_user(
         "nameUrl": nameUrl["value"] if "value" in nameUrl else None,
         "multipleNameUrl": nameUrl["multiple"] if "multiple" in nameUrl else None,
         "nameHeaders": nameUrl["headers"] if "headers" in nameUrl else {},
-        "proxy": True if "to" in nameUrl else False,
+        "proxy": nameUrl["proxy"] if "proxy" in nameUrl else False,
         "notify": notification,
         "access_token": access_token,
         "refresh_token": refresh_token,
