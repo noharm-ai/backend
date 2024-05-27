@@ -143,7 +143,14 @@ class Exams(db.Model):
                 else None
             )
 
-            if e.typeExam.lower() not in ["mdrd", "ckd", "ckd21", "cg", "swrtz2"]:
+            if e.typeExam.lower() not in [
+                "mdrd",
+                "ckd",
+                "ckd21",
+                "cg",
+                "swrtz2",
+                "swrtz1",
+            ]:
                 exams[e.typeExam.lower()] = formatExam(
                     e, e.typeExam.lower(), segExam, prevValue
                 )
@@ -201,6 +208,14 @@ class Exams(db.Model):
                 if "swrtz2" in exams:
                     exams["swrtz2"] = schwartz2_calc(
                         exams["cr"]["value"], patient.height
+                    )
+
+                if "swrtz1" in exams:
+                    exams["swrtz1"] = schwartz1_calc(
+                        exams["cr"]["value"],
+                        patient.birthdate,
+                        patient.gender,
+                        patient.height,
                     )
 
         return dict(exams, **examsExtra)

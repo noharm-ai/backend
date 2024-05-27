@@ -161,7 +161,7 @@ def getCodes():
         .all()
     )
 
-    results = ["mdrd", "ckd", "ckd21", "cg", "swrtz2"]
+    results = ["mdrd", "ckd", "ckd21", "cg", "swrtz2", "swrtz1"]
     for t in typesExam:
         results.append(t[0].lower())
 
