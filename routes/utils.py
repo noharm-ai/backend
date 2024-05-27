@@ -378,8 +378,6 @@ def schwartz1_calc(cr, birthdate, gender, height):
         return copy.deepcopy(swrtz1Empty)
 
     age = data2age(birthdate.isoformat())
-    if age == 0:
-        return copy.deepcopy(swrtz1Empty)
 
     k = 0
     if age <= 2:
