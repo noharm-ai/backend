@@ -161,7 +161,21 @@ class DrugList:
                                 + str(self.exams["swrtz2"]["value"])
                                 + " mL/min/1.73m²) está abaixo de "
                                 + str(pd[6].kidney)
-                                + " mL/min."
+                                + " mL/min. (Schwartz 2)"
+                            )
+                            self.alertStats["kidney"] += 1
+                        elif (
+                            "swrtz1" in self.exams
+                            and self.exams["swrtz1"]["value"]
+                            and pd[6].kidney > self.exams["swrtz1"]["value"]
+                            and self.exams["age"] <= 17
+                        ):
+                            alerts.append(
+                                "Medicamento deve sofrer ajuste de posologia ou contraindicado, já que a função renal do paciente ("
+                                + str(self.exams["swrtz1"]["value"])
+                                + " mL/min/1.73m²) está abaixo de "
+                                + str(pd[6].kidney)
+                                + " mL/min. (Schwartz 1)"
                             )
                             self.alertStats["kidney"] += 1
 

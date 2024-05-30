@@ -143,6 +143,7 @@ ckdEmpty = dict(
     examEmpty, **{"initials": "CKD", "name": "Chronic Kidney Disease Epidemiology"}
 )
 swrtz2Empty = dict(examEmpty, **{"initials": "Schwartz 2", "name": "Schwartz 2"})
+swrtz1Empty = dict(examEmpty, **{"initials": "Schwartz 1", "name": "Schwartz 1"})
 
 
 class refEmpty:
@@ -363,6 +364,41 @@ def schwartz2_calc(cr, height):
         "alert": (eGFR < 90),
         "name": "Schwartz 2",
         "initials": "Schwartz 2",
+        "min": 90,
+        "max": 120,
+    }
+
+
+def schwartz1_calc(cr, birthdate, gender, height):
+    if not is_float(cr):
+        return copy.deepcopy(swrtz1Empty)
+    if not is_float(height):
+        return copy.deepcopy(swrtz1Empty)
+    if birthdate is None:
+        return copy.deepcopy(swrtz1Empty)
+
+    age = data2age(birthdate.isoformat())
+
+    k = 0
+    if age <= 2:
+        k = 0.45
+    elif age > 2 and age <= 12:
+        k = 0.55
+    else:
+        if gender == "F":
+            k = 0.55
+        else:
+            k = 0.7
+
+    eGFR = (k * height) / cr if cr > 0 else 0
+
+    return {
+        "value": round(eGFR, 1),
+        "ref": "maior que 90 mL/min por 1.73 m²",
+        "unit": "mL/min/1.73m²",
+        "alert": (eGFR < 90),
+        "name": "Schwartz 1",
+        "initials": "Schwartz 1",
         "min": 90,
         "max": 120,
     }

@@ -1,5 +1,5 @@
 from models.main import db
-from sqlalchemy import case, and_
+from sqlalchemy import case, and_, func
 
 from models.appendix import *
 from models.prescription import *
@@ -856,11 +856,32 @@ def _outcome_calc(list, user: User, date_base_economy):
                 price_dose_convert.factor if price_dose_convert != None else None
             )
 
-        id_prescription_aggregate = gen_agg_id(
-            admission_number=prescription.admissionNumber,
-            id_segment=prescription.idSegment,
-            pdate=date_base_economy if date_base_economy != None else prescription.date,
+        base_date = (
+            date_base_economy if date_base_economy != None else prescription.date
         )
+        if prescription.idSegment:
+            id_prescription_aggregate = gen_agg_id(
+                admission_number=prescription.admissionNumber,
+                id_segment=prescription.idSegment,
+                pdate=base_date,
+            )
+        else:
+            agg_presc = (
+                db.session.query(Prescription)
+                .filter(Prescription.admissionNumber == prescription.admissionNumber)
+                .filter(Prescription.agg != None)
+                .filter(func.date(Prescription.date) == func.date(base_date))
+                .first()
+            )
+
+            if agg_presc != None:
+                id_prescription_aggregate = agg_presc.id
+            else:
+                raise ValidationError(
+                    "Não foi possível determinar o segmento desta intervenção. Tente recalcular a prescrição. Se não surtir efeito, contate o suporte.",
+                    "errors.businessRules",
+                    status.HTTP_400_BAD_REQUEST,
+                )
 
         results.append(
             {
