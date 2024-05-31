@@ -70,4 +70,5 @@ def list_available_reports(schema: str, report: str):
         if filename != "current":
             file_list.append(f["Key"].split("/")[-1].replace(".gz", ""))
 
+    file_list.sort(reverse=True)
     return file_list
