@@ -288,7 +288,8 @@ def set_intervention_outcome(
             )
 
     intervention.update = datetime.today()
-    intervention.user = user.id
+    # do not change responsible
+    # intervention.user = user.id
     intervention.status = outcome
 
     if intervention.economy_type != None:
