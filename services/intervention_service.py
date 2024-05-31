@@ -310,6 +310,11 @@ def set_intervention_outcome(
             intervention.origin = origin_data
             intervention.destiny = destiny_data
 
+            if not bool(intervention.origin):
+                # invalid origin
+                intervention.economy_day_value = 0
+                intervention.economy_day_value_manual = True
+
             if (
                 intervention.economy_type
                 == InterventionEconomyTypeEnum.SUBSTITUTION.value
