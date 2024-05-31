@@ -17,7 +17,9 @@ def get_report(report):
     user = User.find(get_jwt_identity())
 
     try:
-        report_data = general_report_service.get_report(user=user, report=report)
+        report_data = general_report_service.get_report(
+            user=user, report=report, filename=request.args.get("filename", "current")
+        )
     except ValidationError as e:
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 

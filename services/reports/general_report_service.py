@@ -24,5 +24,8 @@ def get_report(user, report, filename="current"):
 
     return {
         "cached": True,
-        "url": cache_service.generate_link(report, user.schema),
+        "availableReports": cache_service.list_available_reports(
+            schema=user.schema, report=report
+        ),
+        "url": cached_link,
     }

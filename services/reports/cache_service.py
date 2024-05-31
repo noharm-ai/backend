@@ -55,3 +55,19 @@ def get_cache_data(report, schema, filename="current"):
         }
     except ClientError:
         return {"exists": False, "updatedAt": None}
+
+
+def list_available_reports(schema: str, report: str):
+    client = _get_client()
+    files = client.list_objects_v2(
+        Bucket=Config.CACHE_BUCKET_NAME,
+        Prefix=f"reports/{schema}/{report}/",
+    )
+
+    file_list = []
+    for f in files["Contents"]:
+        filename = f["Key"].split("/")[-1].replace(".gz", "")
+        if filename != "current":
+            file_list.append(f["Key"].split("/")[-1].replace(".gz", ""))
+
+    return file_list
