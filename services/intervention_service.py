@@ -288,7 +288,8 @@ def set_intervention_outcome(
             )
 
     intervention.update = datetime.today()
-    intervention.user = user.id
+    # do not change responsible
+    # intervention.user = user.id
     intervention.status = outcome
 
     if intervention.economy_type != None:
@@ -308,6 +309,11 @@ def set_intervention_outcome(
 
             intervention.origin = origin_data
             intervention.destiny = destiny_data
+
+            if not bool(intervention.origin):
+                # invalid origin
+                intervention.economy_day_value = 0
+                intervention.economy_day_value_manual = True
 
             if (
                 intervention.economy_type
