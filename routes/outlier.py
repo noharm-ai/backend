@@ -309,6 +309,14 @@ def setDrugUnit(idSegment, idDrug):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
 
+    factor = data.get("factor", 1)
+
+    if factor == 0:
+        return {
+            "status": "error",
+            "message": "Fator de conversão deve ser maior que zero.",
+        }, status.HTTP_400_BAD_REQUEST
+
     idMeasureUnit = data.get("idMeasureUnit", 1)
     u = MeasureUnitConvert.query.get((idMeasureUnit, idDrug, idSegment))
     new = False
@@ -320,7 +328,7 @@ def setDrugUnit(idSegment, idDrug):
         u.idDrug = idDrug
         u.idSegment = idSegment
 
-    u.factor = data.get("factor", 1)
+    u.factor = factor
 
     if new:
         db.session.add(u)
