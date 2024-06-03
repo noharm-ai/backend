@@ -822,7 +822,11 @@ def _outcome_calc(list, user: User, date_base_economy):
         ):
             if drug_attr.idMeasureUnitPrice == drug_attr.idMeasureUnit:
                 origin_price = drug_attr.price
-            elif price_dose_convert != None and price_dose_convert.factor != None:
+            elif (
+                price_dose_convert != None
+                and price_dose_convert.factor != None
+                and price_dose_convert.factor != 0
+            ):
                 origin_price = drug_attr.price / price_dose_convert.factor
             else:
                 origin_price = drug_attr.price
@@ -859,7 +863,9 @@ def _outcome_calc(list, user: User, date_base_economy):
             price_factor = 1
         else:
             price_factor = (
-                price_dose_convert.factor if price_dose_convert != None else None
+                price_dose_convert.factor
+                if price_dose_convert != None and price_dose_convert.factor != 0
+                else None
             )
 
         base_date = (
