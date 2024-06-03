@@ -4,7 +4,8 @@ from models.main import db
 from models.appendix import *
 from models.notes import ClinicalNotes
 from models.prescription import *
-from services import memory_service, exams_service
+from models.enums import UserAuditTypeEnum
+from services import memory_service, exams_service, permission_service, user_service
 
 from exception.validation_error import ValidationError
 
@@ -70,3 +71,47 @@ def get_next_id(schema):
     )
 
     return ([row[0] for row in result])[0]
+
+
+def remove_annotation(id_clinical_notes: int, annotation_type: str, user: User):
+    if not permission_service.is_pharma(user):
+        raise ValidationError(
+            "Usuário não autorizado",
+            "errors.unauthorizedUser",
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
+    clinical_notes = (
+        db.session.query(ClinicalNotes)
+        .filter(ClinicalNotes.id == id_clinical_notes)
+        .first()
+    )
+    if clinical_notes == None:
+        raise ValidationError(
+            "Registro inválido", "errors.businessRules", status.HTTP_400_BAD_REQUEST
+        )
+
+    old_note = None
+    if annotation_type == "allergy":
+        old_note = clinical_notes.allergyText
+        clinical_notes.allergy = 0
+        clinical_notes.allergyText = None
+    elif annotation_type == "dialysis":
+        old_note = clinical_notes.dialysisText
+        clinical_notes.dialysis = 0
+        clinical_notes.dialysisText = None
+    else:
+        raise ValidationError(
+            "Tipo inválido", "errors.businessRules", status.HTTP_400_BAD_REQUEST
+        )
+
+    user_service.create_audit(
+        auditType=UserAuditTypeEnum.REMOVE_CLINICAL_NOTE_ANNOTATION,
+        id_user=user.id,
+        responsible=user,
+        extra={
+            "fkevolucao": id_clinical_notes,
+            "notes": old_note,
+            "type": annotation_type,
+        },
+    )

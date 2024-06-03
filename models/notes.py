@@ -174,7 +174,9 @@ class ClinicalNotes(db.Model):
 
         return (
             db.session.query(
-                ClinicalNotes.allergyText, func.max(ClinicalNotes.date).label("maxdate")
+                ClinicalNotes.allergyText,
+                func.max(ClinicalNotes.date).label("maxdate"),
+                func.max(ClinicalNotes.id),
             )
             .select_from(ClinicalNotes)
             .filter(ClinicalNotes.admissionNumber == admissionNumber)
@@ -198,6 +200,10 @@ class ClinicalNotes(db.Model):
                     order_by=desc(ClinicalNotes.date),
                 ),
                 func.date(ClinicalNotes.date).label("date"),
+                func.first_value(ClinicalNotes.id).over(
+                    partition_by=func.date(ClinicalNotes.date),
+                    order_by=desc(ClinicalNotes.date),
+                ),
             )
             .distinct(func.date(ClinicalNotes.date))
             .filter(ClinicalNotes.admissionNumber == admissionNumber)

@@ -141,10 +141,10 @@ def getPrescriptions():
             features["class"] = "blue"
 
         observation = None
-        if p[1]:
+        if p[1] and p[1].observation != None and p[1].observation != "":
             observation = (
                 p[1].observation[:300] + "..."
-                if p[1].observation != None and len(p[1].observation) > 300
+                if len(p[1].observation) > 300
                 else p[1].observation
             )
 
@@ -392,12 +392,12 @@ def getPrescription(
 
         for a in allergies:
             notesAllergies.append(
-                {"date": a[1].isoformat(), "text": a[0], "source": "care"}
+                {"date": a[1].isoformat(), "text": a[0], "source": "care", "id": a[2]}
             )
 
         notesDialysis = []
         for a in dialysis:
-            notesDialysis.append({"date": a[1].isoformat(), "text": a[0]})
+            notesDialysis.append({"date": a[1].isoformat(), "text": a[0], "id": a[3]})
 
     registeredAllergies = patient_service.get_patient_allergies(patient.idPatient)
     for a in registeredAllergies:
