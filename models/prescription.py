@@ -599,7 +599,12 @@ class Patient(db.Model):
         drugAttributes=[],
     ):
         q = (
-            db.session.query(Prescription, Patient, Department.name.label("department"))
+            db.session.query(
+                Prescription,
+                Patient,
+                Department.name.label("department"),
+                func.count().over(),
+            )
             .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)
             .outerjoin(
                 Department,

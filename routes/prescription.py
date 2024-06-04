@@ -178,6 +178,7 @@ def getPrescriptions():
                         p[0].features
                     ),
                     "observation": observation,
+                    "totalRecords": p[3],
                 }
             )
         )
