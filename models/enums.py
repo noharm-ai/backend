@@ -118,3 +118,4 @@ class UserAuditTypeEnum(Enum):
     UPDATE = 3
     FORGOT_PASSWORD = 4
     UPDATE_PASSWORD = 5
+    REMOVE_CLINICAL_NOTE_ANNOTATION = 6

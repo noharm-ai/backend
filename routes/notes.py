@@ -225,6 +225,26 @@ def create():
     try:
         id = clinical_notes_service.create_clinical_notes(data, user)
     except ValidationError as e:
-        return {"status": "error", "message": e.message, "code": e.code}, e.httpStatus
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
     return tryCommit(db, id, user.permission())
+
+
+@app_note.route("/notes/remove-annotation", methods=["POST"])
+@jwt_required()
+def remove_annotation():
+    data = request.get_json()
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+    os.environ["TZ"] = "America/Sao_Paulo"
+
+    try:
+        clinical_notes_service.remove_annotation(
+            id_clinical_notes=data.get("idClinicalNotes", None),
+            annotation_type=data.get("annotationType", None),
+            user=user,
+        )
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+
+    return tryCommit(db, True, user.permission())
