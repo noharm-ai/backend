@@ -177,6 +177,7 @@ def getPrescriptions():
                     "isBeingEvaluated": prescription_service.is_being_evaluated(
                         p[0].features
                     ),
+                    "reviewType": p[0].reviewType,
                     "observation": observation,
                     "totalRecords": p[3],
                 }
