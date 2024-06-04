@@ -3,7 +3,8 @@ from utils import status
 from models.main import *
 from models.appendix import *
 from models.segment import *
-from models.enums import RoleEnum
+from models.enums import RoleEnum, IntegrationStatusEnum
+from services.admin import integration_status_service
 
 from exception.validation_error import ValidationError
 
@@ -26,6 +27,16 @@ def upsert_segment(id_segment, description, active, user):
                 status.HTTP_400_BAD_REQUEST,
             )
     else:
+        if (
+            integration_status_service.get_integration_status(user.schema)
+            == IntegrationStatusEnum.PRODUCTION.value
+        ):
+            raise ValidationError(
+                "O processo de criação de segmentos foi desativado para integrações em Produção. Solicite criação manual.",
+                "errors.businessRules",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
         segment = Segment()
 
     segment.description = description
