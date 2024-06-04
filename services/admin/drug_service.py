@@ -367,6 +367,8 @@ def copy_drug_attributes(
         "dialisavel",
         "lactante",
         "gestante",
+        "fkunidademedidacusto",
+        "custo",
     ]
     set_attributes = []
     for a in attributes:
@@ -393,7 +395,9 @@ def copy_drug_attributes(
                 coalesce(ma.sonda, false) as sonda,
                 coalesce(ma.naopadronizado, false) as naopadronizado,
                 coalesce(ma.linhabranca, false) as linhabranca,
-                coalesce(ma.dialisavel, false) as dialisavel
+                coalesce(ma.dialisavel, false) as dialisavel,
+                ma.fkunidademedidacusto,
+                ma.custo
             from
                 {origin_schema}.medatributos ma
                 inner join {origin_schema}.medicamento m on (ma.fkmedicamento = m.fkmedicamento)
