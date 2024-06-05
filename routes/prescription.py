@@ -156,6 +156,7 @@ def getPrescriptions():
                     "idPatient": str(p[0].idPatient),
                     "name": patient.admissionNumber,
                     "admissionNumber": patient.admissionNumber,
+                    "idSegment": p[0].idSegment,
                     "birthdate": (
                         patient.birthdate.isoformat() if patient.birthdate else None
                     ),
@@ -177,7 +178,15 @@ def getPrescriptions():
                     "isBeingEvaluated": prescription_service.is_being_evaluated(
                         p[0].features
                     ),
+                    "reviewType": p[0].reviewType,
                     "observation": observation,
+                    "totalRecords": p[3],
+                    "agg": p[0].agg,
+                    "prescriptionAggId": gen_agg_id(
+                        admission_number=p[0].admissionNumber,
+                        id_segment=p[0].idSegment,
+                        pdate=p[0].date,
+                    ),
                 }
             )
         )
@@ -514,6 +523,11 @@ def getPrescription(
             "idHospital": prescription[0].idHospital,
             "name": prescription[0].admissionNumber,
             "agg": prescription[0].agg,
+            "prescriptionAggId": gen_agg_id(
+                admission_number=prescription[0].admissionNumber,
+                id_segment=prescription[0].idSegment,
+                pdate=prescription[0].date,
+            ),
             "concilia": prescription[0].concilia,
             "conciliaList": conciliaList,
             "admissionNumber": prescription[0].admissionNumber,

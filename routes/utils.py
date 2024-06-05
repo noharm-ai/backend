@@ -580,6 +580,9 @@ def get_period_filter(query, model, agg_date, is_pmc, is_cpoe):
 
 
 def gen_agg_id(admission_number, id_segment, pdate):
+    if admission_number == None or id_segment == None or pdate == None:
+        return None
+
     id = (pdate.year - 2000) * 100000000000000
     id += pdate.month * 1000000000000
     id += pdate.day * 10000000000
