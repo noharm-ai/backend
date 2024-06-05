@@ -39,6 +39,7 @@ class ClinicalNotes(db.Model):
     template = deferred(db.Column("template", postgresql.JSON, nullable=True))
 
     summary = deferred(db.Column("sumario", postgresql.JSONB, nullable=True))
+    annotations = deferred(db.Column("anotacoes", postgresql.JSONB, nullable=True))
 
     def exists():
         return True

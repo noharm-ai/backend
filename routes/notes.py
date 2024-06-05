@@ -7,7 +7,7 @@ from markupsafe import escape as escape_html
 from utils import status
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from .utils import tryCommit
-from sqlalchemy import desc, or_, func
+from sqlalchemy import desc, or_, func, Integer
 from sqlalchemy.orm import undefer
 from datetime import datetime
 from services import clinical_notes_service, memory_service
@@ -28,30 +28,56 @@ def get_notes_v2(admissionNumber):
     dates = None
     previous_admissions = []
 
+    tags = [
+        {"name": "dados", "column": "info"},
+        {"name": "acesso", "column": None},
+        {"name": "germes", "column": None},
+        {"name": "sinais", "column": "signs"},
+        {"name": "alergia", "column": "allergy"},
+        {"name": "conduta", "column": "conduct"},
+        {"name": "dialise", "column": "dialysis"},
+        {"name": "diliexc", "column": None},
+        {"name": "doencas", "column": "diseases"},
+        {"name": "resthid", "column": None},
+        {"name": "gestante", "column": None},
+        {"name": "sintomas", "column": "symptoms"},
+        {"name": "complicacoes", "column": "complication"},
+        {"name": "medicamentos", "column": "medications"},
+    ]
+
     if filter_date is None:
-        dates = (
+        dates_query = (
             db.session.query(
-                func.date(ClinicalNotes.date),
-                func.count(),
-                func.sum(ClinicalNotes.diseases),
-                func.sum(ClinicalNotes.complication),
-                func.sum(ClinicalNotes.symptoms),
-                func.sum(ClinicalNotes.conduct),
-                func.array_agg(func.distinct(ClinicalNotes.position)),
-                func.sum(ClinicalNotes.allergy),
-                func.sum(ClinicalNotes.info),
-                func.sum(ClinicalNotes.medications),
-                func.sum(ClinicalNotes.names),
-                func.sum(ClinicalNotes.signs),
-                func.sum(ClinicalNotes.dialysis),
+                func.date(ClinicalNotes.date).label("date"),
+                func.count().label("total"),
+                func.array_agg(func.distinct(ClinicalNotes.position)).label("roles"),
             )
             .select_from(ClinicalNotes)
             .filter(ClinicalNotes.admissionNumber == admissionNumber)
             .filter(or_(ClinicalNotes.isExam == None, ClinicalNotes.isExam == False))
             .group_by(func.date(ClinicalNotes.date))
             .order_by(desc(func.date(ClinicalNotes.date)))
-            .all()
         )
+
+        for tag in tags:
+            if tag["column"] != None:
+                dates_query = dates_query.add_columns(
+                    func.sum(getattr(ClinicalNotes, tag["column"])).label(tag["name"])
+                )
+            else:
+                column_name = tag["name"] + "_count"
+                dates_query = dates_query.add_columns(
+                    func.sum(
+                        func.cast(
+                            func.coalesce(
+                                ClinicalNotes.annotations[column_name].astext, "0"
+                            ),
+                            Integer,
+                        )
+                    ).label(tag["name"])
+                )
+
+        dates = dates_query.all()
 
         if len(dates) > 0:
             dates_list = []
@@ -96,28 +122,20 @@ def get_notes_v2(admissionNumber):
 
     noteResults = []
     for n in notes:
-        noteResults.append(convert_notes(n, has_primary_care))
+        noteResults.append(convert_notes(n, has_primary_care, tags))
 
     dateResults = []
     if dates is not None:
         for d in dates:
-            dateResults.append(
-                {
-                    "date": d[0].isoformat(),
-                    "count": d[1],
-                    "diseases": d[2],
-                    "complication": d[3],
-                    "symptoms": d[4],
-                    "conduct": d[5],
-                    "roles": d[6],
-                    "allergy": d[7],
-                    "info": d[8],
-                    "medications": d[9],
-                    "names": d[10],
-                    "signs": d[11],
-                    "dialysis": d[12],
-                }
-            )
+            d_dict = {"date": d.date.isoformat(), "count": d.total, "roles": d.roles}
+
+            for tag in tags:
+                if tag["column"] != None:
+                    d_dict[tag["column"]] = getattr(d, tag["name"])
+                else:
+                    d_dict[tag["name"]] = getattr(d, tag["name"])
+
+            dateResults.append(d_dict)
 
     return {
         "status": "success",
@@ -136,6 +154,8 @@ def get_notes_by_date(admissionNumber, dateList, has_primary_care):
         .filter(func.date(ClinicalNotes.date).in_(dateList))
     )
 
+    query = query.options(undefer(ClinicalNotes.annotations))
+
     if has_primary_care:
         query = query.options(
             undefer(ClinicalNotes.form), undefer(ClinicalNotes.template)
@@ -144,8 +164,8 @@ def get_notes_by_date(admissionNumber, dateList, has_primary_care):
     return query.order_by(desc(ClinicalNotes.date)).all()
 
 
-def convert_notes(notes, has_primary_care):
-    return {
+def convert_notes(notes, has_primary_care, tags):
+    obj = {
         "id": str(notes.id),
         "admissionNumber": notes.admissionNumber,
         "text": notes.text,
@@ -154,17 +174,19 @@ def convert_notes(notes, has_primary_care):
         "date": notes.date.isoformat(),
         "prescriber": notes.prescriber,
         "position": notes.position,
-        "medications": notes.medications,
-        "complication": notes.complication,
-        "symptoms": notes.symptoms,
-        "diseases": notes.diseases,
-        "info": notes.info,
-        "conduct": notes.conduct,
-        "signs": notes.signs,
-        "allergy": notes.allergy,
-        "names": notes.names,
-        "dialysis": notes.dialysis,
     }
+
+    for tag in tags:
+        if tag["column"] != None:
+            obj[tag["column"]] = getattr(notes, tag["column"])
+        else:
+            obj[tag["name"]] = (
+                notes.annotations[tag["name"] + "_count"]
+                if notes.annotations != None
+                else 0
+            )
+
+    return obj
 
 
 @app_note.route("/notes/<int:idNote>", methods=["POST"])
