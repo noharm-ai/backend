@@ -446,7 +446,10 @@ def save_intervention(
     if expended_dose != -1:
         i.expended_dose = expended_dose
 
-    if memory_service.has_feature(FeatureEnum.INTERVENTION_V2.value):
+    if (
+        memory_service.has_feature(FeatureEnum.INTERVENTION_V2.value)
+        and id_prescription == 0
+    ):
         economy_type = None
         reasons = (
             db.session.query(InterventionReason)
