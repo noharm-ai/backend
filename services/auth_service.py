@@ -148,14 +148,9 @@ def _auth_user(
 
     logout_url = None
     if features is not None and FeatureEnum.OAUTH.value in features.value:
-        oauth_config = (
-            db_session.query(Memory)
-            .filter(Memory.kind == MemoryEnum.OAUTH_CONFIG.value)
-            .first()
-        )
-        logout_url = (
-            oauth_config.value["logout_url"] if oauth_config is not None else None
-        )
+        oauth_config = get_oauth_config(schema=user_schema)
+
+        logout_url = oauth_config["logout_url"] if oauth_config is not None else None
 
     db_session.close()
 
@@ -330,7 +325,7 @@ def auth_provider(code, schema):
         requests_log.setLevel(logging.DEBUG)
         requests_log.propagate = True
 
-    oauth_config = memory_service.get_memory(MemoryEnum.OAUTH_CONFIG.value)
+    oauth_config = get_oauth_config(schema=schema)
 
     if oauth_config is None:
         raise ValidationError(
@@ -343,12 +338,12 @@ def auth_provider(code, schema):
     # params = {
     #     "grant_type": "authorization_code",
     #     "code": code,
-    #     "client_id": oauth_config.value["client_id"],
-    #     "client_secret": oauth_config.value["client_secret"],
-    #     "redirect_uri": oauth_config.value["redirect_uri"],
+    #     "client_id": oauth_config["client_id"],
+    #     "client_secret": oauth_config["client_secret"],
+    #     "redirect_uri": oauth_config["redirect_uri"],
     # }
 
-    # response = requests.post(url=oauth_config.value["login_url"], data=params)
+    # response = requests.post(url=oauth_config["login_url"], data=params)
 
     # if response.status_code != status.HTTP_200_OK:
     #     raise ValidationError(
@@ -359,7 +354,7 @@ def auth_provider(code, schema):
 
     # auth_data = response.json()
 
-    if oauth_config.value["verify_signature"]:
+    if oauth_config["verify_signature"]:
         oauth_keys = memory_service.get_memory(MemoryEnum.OAUTH_KEYS.value)
 
         if oauth_keys is None:
@@ -389,7 +384,7 @@ def auth_provider(code, schema):
                 code,
                 key=rsa_pem_key_bytes,
                 algorithms=[token_alg],
-                audience=[oauth_config.value["client_id"]],
+                audience=[oauth_config["client_id"]],
             )
         except Exception as error:
             raise ValidationError(
@@ -410,8 +405,8 @@ def auth_provider(code, schema):
                 status.HTTP_401_UNAUTHORIZED,
             )
 
-    email_attr = oauth_config.value["email_attr"]
-    name_attr = oauth_config.value["name_attr"]
+    email_attr = oauth_config["email_attr"]
+    name_attr = oauth_config["name_attr"]
 
     if email_attr not in jwt_user or jwt_user[email_attr] is None:
         raise ValidationError(
@@ -424,7 +419,7 @@ def auth_provider(code, schema):
         jwt_user[email_attr],
         jwt_user[name_attr] if name_attr in jwt_user else "Usuário",
         schema,
-        oauth_config.value,
+        oauth_config,
     )
 
     features = (
@@ -461,3 +456,14 @@ def _get_oauth_user(email, name, schema, oauth_config):
         )
 
     return db_user
+
+
+def get_oauth_config(schema: str):
+    schema_config = (
+        db.session.query(SchemaConfig).filter(SchemaConfig.schemaName == schema).first()
+    )
+
+    if schema_config.config != None:
+        return schema_config.config["oauth"]
+
+    return None
