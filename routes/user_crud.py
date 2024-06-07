@@ -4,11 +4,11 @@ from models.appendix import *
 from flask import Blueprint, request, render_template
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from .utils import tryCommit, sendEmail
-from sqlalchemy import func, or_
+from sqlalchemy import func
 from flask import render_template
 from config import Config
 
-from services import memory_service, user_service
+from services import memory_service, user_service, user_admin_service
 from models.enums import FeatureEnum, RoleEnum, UserAuditTypeEnum
 from exception.validation_error import ValidationError
 
@@ -25,12 +25,12 @@ def _has_special_role(roles):
     )
 
 
-@app_user_crud.route("/editUser", methods=["PUT"])
-@app_user_crud.route("/editUser/<int:idUser>", methods=["PUT"])
+@app_user_crud.route("/editUser", methods=["POST"])
 @jwt_required()
-def createUser(idUser=None):
+def createUser():
     data = request.get_json()
     user = User.find(get_jwt_identity())
+    idUser = data.get("id", None)
 
     if not user:
         return {
@@ -69,7 +69,7 @@ def createUser(idUser=None):
         newUser.email = userEmail
         newUser.name = userName
         newUser.external = data.get("external", None)
-        newUser.active = bool(data.get("active", True))
+        newUser.active = bool(data.get("active", False))
         newUser.schema = user.schema
         pwo = PasswordGenerator()
         pwo.minlen = 6
@@ -118,7 +118,9 @@ def createUser(idUser=None):
             extra=extra_audit,
         )
 
-        response, rstatus = tryCommit(db, newUser.id)
+        user_result = user_admin_service.get_user_data(newUser.id)
+
+        response, rstatus = tryCommit(db, user_result)
 
         if rstatus == status.HTTP_200_OK:
             sendEmail(
@@ -186,7 +188,9 @@ def createUser(idUser=None):
         db.session.add(updatedUser)
         db.session.flush()
 
-        return tryCommit(db, updatedUser.id)
+        user_result = user_admin_service.get_user_data(updatedUser.id)
+
+        return tryCommit(db, user_result)
 
 
 @app_user_crud.route("/users", methods=["GET"])
@@ -195,41 +199,12 @@ def getUsers():
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
 
-    roles = user.config["roles"] if user.config and "roles" in user.config else []
+    try:
+        result = user_admin_service.get_user_list(user=user)
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
-    if "userAdmin" not in roles:
-        return {
-            "status": "error",
-            "message": "Usuário não autorizado",
-            "code": "errors.unauthorizedUser",
-        }, status.HTTP_401_UNAUTHORIZED
-
-    users = (
-        User.query.filter(User.schema == user.schema)
-        .filter(
-            or_(
-                ~User.config["roles"].astext.contains("suporte"),
-                User.config["roles"] == None,
-            )
-        )
-        .order_by(desc(User.active), asc(User.name))
-        .all()
-    )
-
-    results = []
-    for u in users:
-        results.append(
-            {
-                "id": u.id,
-                "external": u.external,
-                "name": u.name,
-                "email": u.email,
-                "active": u.active,
-                "roles": u.config["roles"] if u.config and "roles" in u.config else [],
-            }
-        )
-
-    return {"status": "success", "data": results}, status.HTTP_200_OK
+    return {"status": "success", "data": result}, status.HTTP_200_OK
 
 
 @app_user_crud.route("/user/reset-token", methods=["POST"])

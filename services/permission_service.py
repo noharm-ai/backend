@@ -1,4 +1,5 @@
 from models.enums import RoleEnum
+from models.main import User
 
 
 def is_admin(user):
@@ -19,6 +20,10 @@ def is_pharma(user):
         RoleEnum.SUPPORT.value,
         RoleEnum.READONLY.value,
     )
+
+
+def is_user_admin(user: User):
+    return not has_any_role(user, RoleEnum.USER_ADMIN)
 
 
 def is_cpoe(user):
