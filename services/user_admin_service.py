@@ -20,7 +20,7 @@ def get_user_list(user: User):
     ).filter(User.id == UserAuthorization.idUser)
 
     users = (
-        db.session.query(User, segments_query.as_scalar())
+        db.session.query(User, segments_query.scalar_subquery())
         .filter(User.schema == user.schema)
         .filter(
             or_(
