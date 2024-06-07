@@ -126,6 +126,7 @@ def get_auth_provider(schema):
             "loginUrl": oauth_config["login_url"],
             "redirectUri": oauth_config["redirect_uri"],
             "clientId": oauth_config["client_id"],
+            "clientSecret": oauth_config["client_secret"],
             "company": oauth_config["company"],
             "flow": (oauth_config["flow"] if "flow" in oauth_config else "implicit"),
             "codeChallengeMethod": (
