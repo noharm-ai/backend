@@ -23,7 +23,7 @@ def is_pharma(user):
 
 
 def is_user_admin(user: User):
-    return has_any_role(user, RoleEnum.USER_ADMIN)
+    return has_any_role(user, RoleEnum.USER_ADMIN.value)
 
 
 def is_cpoe(user):
