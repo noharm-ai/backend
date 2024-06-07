@@ -43,7 +43,7 @@ def test_get_users(client):
 
 def test_get_users_permission(client):
     """Teste get /users/ - Deve retornar erro [401 UNAUTHORIZED] devido ao usuário utilizado"""
-    access_token = get_access(client, "demo", "demo")
+    access_token = get_access(client, roles=["staging"])
 
     response = client.get("/users", headers=make_headers(access_token))
 
