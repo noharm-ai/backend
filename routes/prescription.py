@@ -362,17 +362,17 @@ def getPrescription(
         admissionNumber=patient.admissionNumber
     )
 
-    relations = Prescription.findRelation(
-        prescription[0].id,
-        patient.admissionNumber,
-        patient.idPatient,
-        aggDate,
-        is_cpoe,
-        is_pmc,
-    )
-    # relations = alert_service.find_relations(
-    #     drug_list=drugs, is_cpoe=is_cpoe, id_patient=patient.idPatient
+    # relations = Prescription.findRelation(
+    #     prescription[0].id,
+    #     patient.admissionNumber,
+    #     patient.idPatient,
+    #     aggDate,
+    #     is_cpoe,
+    #     is_pmc,
     # )
+    relations = alert_service.find_relations(
+        drug_list=drugs, is_cpoe=is_cpoe, id_patient=patient.idPatient
+    )
     headers = (
         Prescription.getHeaders(admissionNumber, aggDate, idSegment, is_pmc, is_cpoe)
         if aggDate

@@ -984,6 +984,7 @@ class PrescriptionDrug(db.Model):
                 Prescription.expire,
                 Substance,
                 period_cpoe.label("period_cpoe"),
+                Prescription.date,
             )
             .outerjoin(Outlier, Outlier.id == PrescriptionDrug.idOutlier)
             .outerjoin(Drug, Drug.id == PrescriptionDrug.idDrug)
