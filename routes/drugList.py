@@ -54,6 +54,12 @@ class DrugList:
                 self.alertStats[_get_legacy_alert(k)] = v
                 self.alertStats["interactions"][k] = v
 
+        # keep legacy data
+        self.alertStats["dup"] = (
+            self.alertStats["interactions"]["dm"]
+            + self.alertStats["interactions"]["dt"]
+        )
+
         self.alertStats["exams"] = (
             self.alertStats["exams"]
             + self.alertStats["kidney"]
