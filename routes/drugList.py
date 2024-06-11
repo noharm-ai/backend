@@ -55,10 +55,14 @@ class DrugList:
                 self.alertStats["interactions"][k] = v
 
         # keep legacy data
-        self.alertStats["dup"] = (
-            self.alertStats["interactions"]["dm"]
-            + self.alertStats["interactions"]["dt"]
-        )
+        if (
+            "dm" in self.alertStats["interactions"]
+            and "dt" in self.alertStats["interactions"]
+        ):
+            self.alertStats["dup"] = (
+                self.alertStats["interactions"]["dm"]
+                + self.alertStats["interactions"]["dt"]
+            )
 
         self.alertStats["exams"] = (
             self.alertStats["exams"]
