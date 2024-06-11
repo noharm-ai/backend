@@ -55,6 +55,7 @@ def find_relations(drug_list, id_patient: int, is_cpoe: bool):
                         "group": _get_solution_group_key(
                             pd=prescription_drug, is_cpoe=is_cpoe
                         ),
+                        "expireDate": prescription_expire_date.isoformat(),
                         "rx": False,
                     },
                     "to": {
@@ -69,6 +70,7 @@ def find_relations(drug_list, id_patient: int, is_cpoe: bool):
                         "group": _get_solution_group_key(
                             pd=cp_prescription_drug, is_cpoe=is_cpoe
                         ),
+                        "expireDate": cp_prescription_expire_date.isoformat(),
                         "rx": False,
                     },
                 }
@@ -157,10 +159,20 @@ def find_relations(drug_list, id_patient: int, is_cpoe: bool):
                     continue
 
             if key in active_relations:
-                if not key in unique_relations and not invert_key in unique_relations:
+                if is_cpoe:
+                    uniq_key = key
+                    uniq_invert_key = invert_key
+                else:
+                    uniq_key = f"""{key}-{drug_from["expireDate"]}"""
+                    uniq_invert_key = f"""{invert_key}-{drug_from["expireDate"]}"""
+
+                if (
+                    not uniq_key in unique_relations
+                    and not uniq_invert_key in unique_relations
+                ):
                     stats[kind] += 1
-                    unique_relations[key] = 1
-                    unique_relations[invert_key] = 1
+                    unique_relations[uniq_key] = 1
+                    unique_relations[uniq_invert_key] = 1
 
                 alert = typeRelations[kind] + ": "
                 alert += (
@@ -216,10 +228,6 @@ def _filter_drug_list(drug_list):
 
         if drug == None or drug.sctid == None:
             continue
-
-        # TODO: VALiDATE
-        # if item[6] != None and bool(item[6].whiteList) == True:
-        #     continue
 
         filtered_list.append(item)
 
