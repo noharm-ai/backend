@@ -96,7 +96,7 @@ def find_relations(drug_list, id_patient: int, is_cpoe: bool):
             )
 
     if len(overlap_drugs) == 0:
-        return []
+        return {"alerts": {}, "list": {}, "stats": {}}
 
     query = db.session.query(Relation).filter(Relation.active == True)
 
