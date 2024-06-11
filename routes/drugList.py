@@ -49,9 +49,10 @@ class DrugList:
 
     def sumAlerts(self):
         # relations stats
-        for k, v in self.relations["stats"].items():
-            self.alertStats[_get_legacy_alert(k)] = v
-            self.alertStats["interactions"][k] = v
+        if self.relations["stats"]:
+            for k, v in self.relations["stats"].items():
+                self.alertStats[_get_legacy_alert(k)] = v
+                self.alertStats["interactions"][k] = v
 
         self.alertStats["exams"] = (
             self.alertStats["exams"]
@@ -130,7 +131,7 @@ class DrugList:
             tubeAlert = False
             alerts = []
 
-            if pd[0].id in self.relations["alerts"]:
+            if self.relations["alerts"] and pd[0].id in self.relations["alerts"]:
                 for a in self.relations["alerts"][pd[0].id]:
                     # self.alertStats[a[:3].lower()] += 1
                     alerts.append(a)
