@@ -122,55 +122,79 @@ def find_relations(drug_list, id_patient: int, is_cpoe: bool):
         }
 
     alerts = {}
+    relations = {}
+    stats = {}
+    unique_relations = {}
     kinds = ["it", "dt", "dm", "iy", "sl", "rx"]
+
+    for kind in kinds:
+        stats[kind] = 0
+
     for drug in overlap_drugs:
+        drug_from = drug["from"]
+        drug_to = drug["to"]
+
         for kind in kinds:
-            key = f"""{drug["from"]["sctid"]}-{drug["to"]["sctid"]}-{kind}"""
+            key = f"""{drug_from["sctid"]}-{drug_to["sctid"]}-{kind}"""
+            invert_key = f"""{drug_to["sctid"]}-{drug_from["sctid"]}-{kind}"""
 
             # iy must have intravenous route
             if kind == "iy" and (
-                not drug["from"]["intravenous"] or not drug["to"]["intravenous"]
+                not drug_from["intravenous"] or not drug_to["intravenous"]
             ):
                 continue
 
             # sl must be in the same group
-            if kind == "sl" and (drug["from"]["group"] != drug["to"]["group"]):
+            if kind == "sl" and (drug_from["group"] != drug_to["group"]):
                 continue
 
             # rx rules
             if kind == "rx":
-                if not drug["from"]["rx"]:
+                if not drug_from["rx"]:
                     continue
             else:
-                if drug["from"]["rx"]:
+                if drug_from["rx"]:
                     continue
 
             if key in active_relations:
+                if not key in unique_relations and not invert_key in unique_relations:
+                    stats[kind] += 1
+                    unique_relations[key] = 1
+                    unique_relations[invert_key] = 1
+
                 alert = typeRelations[kind] + ": "
                 alert += (
                     strNone(active_relations[key]["text"])
                     + " ("
-                    + strNone(drug["from"]["drug"])
+                    + strNone(drug_from["drug"])
                     + " e "
-                    + strNone(drug["to"]["drug"])
+                    + strNone(drug_to["drug"])
                     + ")"
                 )
 
+                relation = {
+                    "key": key,
+                    "kind": kind,
+                    "to": drug_to["id"],
+                }
+
                 if kind == "dm":
                     # one way
-                    ids = [drug["from"]["id"]]
+                    ids = [drug_from["id"]]
                 else:
                     # both ways
-                    ids = [drug["from"]["id"], drug["to"]["id"]]
+                    ids = [drug_from["id"], drug_to["id"]]
 
                 for id in ids:
                     if id in alerts:
+                        relations[id].append(relation)
                         if alert not in alerts[id]:
                             alerts[id].append(alert)
                     else:
                         alerts[id] = [alert]
+                        relations[id] = [relation]
 
-    return alerts
+    return {"alerts": alerts, "list": relations, "stats": stats}
 
 
 def _filter_drug_list(drug_list):

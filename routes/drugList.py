@@ -4,6 +4,19 @@ from .utils import *
 from models.appendix import *
 
 
+def _get_legacy_alert(kind):
+    config = {
+        "it": "int",
+        "dt": "dup",
+        "dm": "dup",
+        "iy": "inc",
+        "sl": "isl",
+        "rx": "rea",
+    }
+
+    return config[kind]
+
+
 class DrugList:
     def __init__(
         self, drugList, interventions, relations, exams, agg, dialysis, is_cpoe=False
@@ -30,10 +43,16 @@ class DrugList:
             "platelets": 0,
             "tube": 0,
             "exams": 0,  # kidney + liver + platelets
-            "allergy": 0,  # allergy + rea
+            "allergy": 0,  # allergy + rea,
+            "interactions": {},
         }
 
     def sumAlerts(self):
+        # relations stats
+        for k, v in self.relations["stats"].items():
+            self.alertStats[_get_legacy_alert(k)] = v
+            self.alertStats["interactions"][k] = v
+
         self.alertStats["exams"] = (
             self.alertStats["exams"]
             + self.alertStats["kidney"]
@@ -110,6 +129,12 @@ class DrugList:
 
             tubeAlert = False
             alerts = []
+
+            if pd[0].id in self.relations["alerts"]:
+                for a in self.relations["alerts"][pd[0].id]:
+                    # self.alertStats[a[:3].lower()] += 1
+                    alerts.append(a)
+
             if not bool(pd[0].suspendedDate):
                 self.maxDoseAgg[idDrugAgg]["value"] += pdDoseconv
                 self.maxDoseAgg[idDrugAgg]["count"] += 1
@@ -352,11 +377,6 @@ class DrugList:
                     )
                     self.alertStats["maxTime"] += 1
 
-                if pd[0].id in self.relations:
-                    for a in self.relations[pd[0].id]:
-                        self.alertStats[a[:3].lower()] += 1
-                        alerts.append(a)
-
                 if pd[1] and "vanco" in pd[1].name.lower():
                     maxdose = self.maxDoseAgg[idDrugAgg]["value"]
                     ckd = (
@@ -503,6 +523,11 @@ class DrugList:
                     "infusionKey": self.getInfusionKey(pd),
                     "formValues": pd[0].form,
                     "drugAttributes": self.getDrugAttributes(pd),
+                    "relations": (
+                        self.relations["list"][pd[0].id]
+                        if pd[0].id in self.relations["list"]
+                        else []
+                    ),
                 }
             )
 
