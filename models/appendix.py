@@ -164,6 +164,7 @@ class Culture(db.Model):
     id = db.Column("idcultura", db.Integer, primary_key=True)
     idExam = db.Column("fkexame", db.Integer, nullable=True)
     idExamItem = db.Column("fkitemexame", db.Integer, nullable=True)
+    idMicroorganism = db.Column("fkmicroorganismo", db.Integer, nullable=True)
     microorganism = db.Column("nomemicroorganismo", db.String, nullable=True)
     drug = db.Column("nomemedicamento", db.String, nullable=True)
     result = db.Column("resultado", db.String, nullable=True)
