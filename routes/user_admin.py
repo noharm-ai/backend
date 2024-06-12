@@ -8,10 +8,11 @@ from services import user_service, user_admin_service
 from exception.validation_error import ValidationError
 
 
-app_user_crud = Blueprint("app_user_crud", __name__)
+app_user_admin = Blueprint("app_user_admin", __name__)
 
 
-@app_user_crud.route("/editUser", methods=["POST"])
+@app_user_admin.route("/user-admin/upsert", methods=["POST"])
+@app_user_admin.route("/editUser", methods=["POST"])
 @jwt_required()
 def upsert_user():
     data = request.get_json()
@@ -26,7 +27,8 @@ def upsert_user():
     return tryCommit(db, result)
 
 
-@app_user_crud.route("/users", methods=["GET"])
+@app_user_admin.route("/user-admin/list", methods=["GET"])
+@app_user_admin.route("/users", methods=["GET"])
 @jwt_required()
 def getUsers():
     user = User.find(get_jwt_identity())
@@ -40,7 +42,8 @@ def getUsers():
     return {"status": "success", "data": result}, status.HTTP_200_OK
 
 
-@app_user_crud.route("/user/reset-token", methods=["POST"])
+@app_user_admin.route("/user-admin/reset-token", methods=["POST"])
+@app_user_admin.route("/user/reset-token", methods=["POST"])
 @jwt_required()
 def get_reset_token():
     data = request.get_json()

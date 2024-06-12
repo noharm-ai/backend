@@ -17,7 +17,7 @@ from routes.memory import app_mem
 from routes.patient import app_pat
 from routes.user import app_usr
 from routes.notes import app_note
-from routes.user_crud import app_user_crud
+from routes.user_admin import app_user_admin
 from routes.prescription_crud import app_pres_crud
 from routes.drugs import app_drugs
 from routes.names import app_names
@@ -88,7 +88,7 @@ app.register_blueprint(app_summary)
 app.register_blueprint(app_support)
 
 
-app.register_blueprint(app_user_crud)
+app.register_blueprint(app_user_admin)
 app.register_blueprint(app_pres_crud)
 
 app.register_blueprint(app_admin_freq)
