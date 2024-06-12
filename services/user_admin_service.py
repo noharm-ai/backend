@@ -1,4 +1,4 @@
-import logging
+from datetime import datetime
 from sqlalchemy import desc, func, or_, asc
 from password_generator import PasswordGenerator
 from flask import render_template
@@ -93,6 +93,7 @@ def upsert_user(data: dict, user: User):
         )
 
     idUser = data.get("id", None)
+    id_segment_list = data.get("segments", [])
     roles = user.config["roles"] if user.config and "roles" in user.config else []
 
     if not idUser:
@@ -154,14 +155,18 @@ def upsert_user(data: dict, user: User):
         db.session.add(newUser)
         db.session.flush()
 
-        extra_audit = {
-            "config": newUser.config,
-        }
+        # authorizations
+        _add_authorizations(
+            id_segment_list=id_segment_list,
+            user=newUser,
+            responsible=user,
+        )
+
         user_service.create_audit(
             auditType=UserAuditTypeEnum.CREATE,
             id_user=newUser.id,
             responsible=user,
-            extra=extra_audit,
+            extra={"config": newUser.config, "segments": id_segment_list},
         )
 
         sendEmail(
@@ -216,18 +221,22 @@ def upsert_user(data: dict, user: User):
                     status.HTTP_401_UNAUTHORIZED,
                 )
 
-        extra_audit = {
-            "config": updatedUser.config,
-        }
+        db.session.add(updatedUser)
+        db.session.flush()
+
+        # authorizations
+        _add_authorizations(
+            id_segment_list=id_segment_list,
+            user=updatedUser,
+            responsible=user,
+        )
+
         user_service.create_audit(
             auditType=UserAuditTypeEnum.UPDATE,
             id_user=updatedUser.id,
             responsible=user,
-            extra=extra_audit,
+            extra={"config": updatedUser.config, "segments": id_segment_list},
         )
-
-        db.session.add(updatedUser)
-        db.session.flush()
 
         return _get_user_data(updatedUser.id)
 
@@ -239,3 +248,41 @@ def _has_special_role(roles):
         or RoleEnum.TRAINING.value in roles
         or RoleEnum.MULTI_SCHEMA.value in roles
     )
+
+
+def _add_authorizations(id_segment_list, user: User, responsible: User):
+    # remove old authorizations
+    db.session.query(UserAuthorization).filter(
+        UserAuthorization.idUser == user.id
+    ).filter(UserAuthorization.idSegment != None).delete()
+
+    # responsible authorizations
+    responsible_auth_list = (
+        db.session.query(UserAuthorization)
+        .filter(UserAuthorization.idUser == responsible.id)
+        .all()
+    )
+    valid_id_segment_list = {}
+    for a in responsible_auth_list:
+        valid_id_segment_list[str(a.idSegment)] = True
+
+    for id_segment in id_segment_list:
+        if str(
+            id_segment
+        ) not in valid_id_segment_list and not permission_service.has_maintainer_permission(
+            responsible
+        ):
+            raise ValidationError(
+                f"Permissão inválida no segmento {id_segment}",
+                "errors.businessRules",
+                status.HTTP_401_UNAUTHORIZED,
+            )
+
+        authorization = UserAuthorization()
+        authorization.idUser = user.id
+        authorization.idSegment = id_segment
+        authorization.createdAt = datetime.today()
+        authorization.createdBy = responsible.id
+
+        db.session.add(authorization)
+        db.session.flush()
