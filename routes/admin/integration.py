@@ -9,7 +9,6 @@ from models.prescription import *
 from services.admin import (
     integration_service,
     integration_status_service,
-    integration_remote_service,
 )
 from exception.validation_error import ValidationError
 
@@ -76,22 +75,6 @@ def get_status():
     os.environ["TZ"] = "America/Sao_Paulo"
     try:
         result = integration_status_service.get_status(
-            user=user,
-        )
-    except ValidationError as e:
-        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
-
-    return tryCommit(db, result)
-
-
-@app_admin_integration.route("/admin/integration/template", methods=["GET"])
-@jwt_required()
-def get_template():
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
-    os.environ["TZ"] = "America/Sao_Paulo"
-    try:
-        result = integration_remote_service.get_template(
             user=user,
         )
     except ValidationError as e:

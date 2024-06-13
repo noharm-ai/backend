@@ -28,6 +28,7 @@ from routes.admin.intervention_reason import app_admin_interv
 from routes.admin.memory import app_admin_memory
 from routes.admin.drug import app_admin_drug
 from routes.admin.integration import app_admin_integration
+from routes.admin.integration_remote import app_admin_integration_remote
 from routes.admin.segment import app_admin_segment
 from routes.admin.exam import app_admin_exam
 from routes.admin.unit_conversion import app_admin_unit_conversion
@@ -87,7 +88,6 @@ app.register_blueprint(app_names)
 app.register_blueprint(app_summary)
 app.register_blueprint(app_support)
 
-
 app.register_blueprint(app_user_admin)
 app.register_blueprint(app_pres_crud)
 
@@ -96,6 +96,7 @@ app.register_blueprint(app_admin_interv)
 app.register_blueprint(app_admin_memory)
 app.register_blueprint(app_admin_drug)
 app.register_blueprint(app_admin_integration)
+app.register_blueprint(app_admin_integration_remote)
 app.register_blueprint(app_admin_segment)
 app.register_blueprint(app_admin_exam)
 app.register_blueprint(app_admin_unit_conversion)
