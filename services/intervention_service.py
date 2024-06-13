@@ -9,7 +9,7 @@ from models.enums import (
     FeatureEnum,
 )
 from routes.utils import validate, gen_agg_id
-from services import memory_service, permission_service
+from services import memory_service, permission_service, data_authorization_service
 
 from exception.validation_error import ValidationError
 
@@ -245,6 +245,12 @@ def set_intervention_outcome(
             status.HTTP_400_BAD_REQUEST,
         )
 
+    _validate_authorization(
+        id_prescription=intervention.idPrescription,
+        id_prescription_drug=intervention.id,
+        user=user,
+    )
+
     if outcome not in ["a", "n", "x", "j", "s"]:
         raise ValidationError(
             "Desfecho inválido",
@@ -403,7 +409,11 @@ def save_intervention(
     i = None
 
     if id_intervention:
-        i = Intervention.query.get(id_intervention)
+        i = (
+            db.session.query(Intervention)
+            .filter(Intervention.idIntervention == id_intervention)
+            .first()
+        )
         if not i:
             raise ValidationError(
                 "Registro inválido",
@@ -426,6 +436,10 @@ def save_intervention(
         i.date = datetime.today()
         i.update = datetime.today()
         i.user = user.id
+
+    _validate_authorization(
+        id_prescription=i.idPrescription, id_prescription_drug=i.id, user=user
+    )
 
     if admission_number:
         i.admissionNumber = admission_number
@@ -543,6 +557,40 @@ def save_intervention(
     return get_interventions(
         admissionNumber=i.admissionNumber, idIntervention=i.idIntervention
     )
+
+
+def _validate_authorization(id_prescription, id_prescription_drug, user: User):
+    id_segment = None
+    if id_prescription != 0:
+        p = (
+            db.session.query(Prescription)
+            .filter(Prescription.id == id_prescription)
+            .first()
+        )
+        if p == None:
+            raise ValidationError(
+                "Prescrição inexistente",
+                "errors.businessRules",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+        id_segment = p.idSegment
+    else:
+        p_drug = (
+            db.session.query(PrescriptionDrug)
+            .filter(PrescriptionDrug.id == id_prescription_drug)
+            .first()
+        )
+        id_segment = p_drug.idSegment
+
+    if not data_authorization_service.has_segment_authorization(
+        id_segment=id_segment, user=user
+    ):
+        raise ValidationError(
+            "Usuário não autorizado neste segmento",
+            "errors.businessRules",
+            status.HTTP_401_UNAUTHORIZED,
+        )
 
 
 def _get_outcome_data_query():

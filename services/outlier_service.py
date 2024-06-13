@@ -12,6 +12,7 @@ from models.enums import RoleEnum
 from routes.outlier_lib import add_score
 from exception.validation_error import ValidationError
 from services.admin import drug_service, integration_status_service
+from services import data_authorization_service, permission_service
 
 FOLD_SIZE = 15
 
@@ -28,6 +29,15 @@ def prepare(id_drug, id_segment, user):
                 "errors.invalidParams",
                 status.HTTP_400_BAD_REQUEST,
             )
+
+    if not data_authorization_service.has_segment_authorization(
+        id_segment=id_segment, user=user
+    ):
+        raise ValidationError(
+            "Usuário não autorizado neste segmento",
+            "errors.businessRules",
+            status.HTTP_401_UNAUTHORIZED,
+        )
 
     history_count = (
         db.session.query(PrescriptionAgg)
@@ -63,13 +73,21 @@ def generate(id_drug, id_segment, fold, user):
     # call prepare before generate score (only for wizard)
 
     if fold != None:
-        roles = user.config["roles"] if user.config and "roles" in user.config else []
-        if RoleEnum.ADMIN.value not in roles and RoleEnum.TRAINING.value not in roles:
+        if not permission_service.has_maintainer_permission(user):
             raise ValidationError(
                 "Usuário não autorizado",
                 "errors.unauthorizedUser",
                 status.HTTP_401_UNAUTHORIZED,
             )
+
+    if not data_authorization_service.has_segment_authorization(
+        id_segment=id_segment, user=user
+    ):
+        raise ValidationError(
+            "Usuário não autorizado neste segmento",
+            "errors.businessRules",
+            status.HTTP_401_UNAUTHORIZED,
+        )
 
     csv_buffer = _get_csv_buffer(
         id_segment=id_segment, schema=user.schema, id_drug=id_drug, fold=fold

@@ -4,7 +4,7 @@ from sqlalchemy import asc, distinct
 from models.appendix import *
 from models.prescription import *
 from models.enums import DrugAdminSegment
-from services import permission_service
+from services import permission_service, data_authorization_service
 from exception.validation_error import ValidationError
 
 
@@ -102,6 +102,15 @@ def drug_config_to_generate_score(
             status.HTTP_400_BAD_REQUEST,
         )
 
+    if not data_authorization_service.has_segment_authorization(
+        id_segment=id_segment, user=user
+    ):
+        raise ValidationError(
+            "Usuário não autorizado neste segmento",
+            "errors.businessRules",
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
     if measure_unit_list:
         for m in measure_unit_list:
             _setDrugUnit(id_drug, m["idMeasureUnit"], id_segment, m["fator"])
@@ -193,6 +202,15 @@ def save_attributes(id_segment, id_drug, data, user):
             "Parâmetro inválido",
             "errors.invalidParams",
             status.HTTP_400_BAD_REQUEST,
+        )
+
+    if not data_authorization_service.has_segment_authorization(
+        id_segment=id_segment, user=user
+    ):
+        raise ValidationError(
+            "Usuário não autorizado neste segmento",
+            "errors.businessRules",
+            status.HTTP_401_UNAUTHORIZED,
         )
 
     attr = DrugAttributes.query.get((id_drug, id_segment))

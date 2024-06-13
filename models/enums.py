@@ -51,6 +51,7 @@ class RoleEnum(Enum):
     SUMMARY = "summary"
     UNLOCK_CHECKED_PRESCRIPTION = "unlock-checked-prescription"
     CPOE = "cpoe"
+    PRESMED_FORM = "presmed-form"
 
 
 class FeatureEnum(Enum):
@@ -60,6 +61,7 @@ class FeatureEnum(Enum):
     DISABLE_SOLUTION_TAB = "DISABLE_SOLUTION_TAB"
     PATIENT_REVISION = "PATIENT_REVISION"
     INTERVENTION_V2 = "INTERVENTION_V2"
+    AUTHORIZATION_SEGMENT = "AUTHORIZATION_SEGMENT"
 
 
 class PrescriptionAuditTypeEnum(Enum):
