@@ -91,6 +91,7 @@ def find_relations(drug_list, id_patient: int, is_cpoe: bool):
                         "group": _get_solution_group_key(
                             pd=prescription_drug, is_cpoe=is_cpoe
                         ),
+                        "expireDate": prescription_expire_date.isoformat(),
                         "rx": True,
                     },
                     "to": a,
