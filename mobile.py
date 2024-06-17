@@ -17,7 +17,7 @@ from routes.memory import app_mem
 from routes.patient import app_pat
 from routes.user import app_usr
 from routes.notes import app_note
-from routes.user_crud import app_user_crud
+from routes.user_admin import app_user_admin
 from routes.prescription_crud import app_pres_crud
 from routes.drugs import app_drugs
 from routes.names import app_names
@@ -28,6 +28,7 @@ from routes.admin.intervention_reason import app_admin_interv
 from routes.admin.memory import app_admin_memory
 from routes.admin.drug import app_admin_drug
 from routes.admin.integration import app_admin_integration
+from routes.admin.integration_remote import app_admin_integration_remote
 from routes.admin.segment import app_admin_segment
 from routes.admin.exam import app_admin_exam
 from routes.admin.unit_conversion import app_admin_unit_conversion
@@ -87,8 +88,7 @@ app.register_blueprint(app_names)
 app.register_blueprint(app_summary)
 app.register_blueprint(app_support)
 
-
-app.register_blueprint(app_user_crud)
+app.register_blueprint(app_user_admin)
 app.register_blueprint(app_pres_crud)
 
 app.register_blueprint(app_admin_freq)
@@ -96,6 +96,7 @@ app.register_blueprint(app_admin_interv)
 app.register_blueprint(app_admin_memory)
 app.register_blueprint(app_admin_drug)
 app.register_blueprint(app_admin_integration)
+app.register_blueprint(app_admin_integration_remote)
 app.register_blueprint(app_admin_segment)
 app.register_blueprint(app_admin_exam)
 app.register_blueprint(app_admin_unit_conversion)
@@ -114,7 +115,7 @@ if Config.ENV != NoHarmENV.PRODUCTION.value:
 
 @app.route("/version", methods=["GET"])
 def getVersion():
-    return {"status": "success", "data": "v3.08-beta"}, status.HTTP_200_OK
+    return {"status": "success", "data": "v3.09-beta"}, status.HTTP_200_OK
 
 
 @app.route("/exc", methods=["GET"])

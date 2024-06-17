@@ -24,6 +24,7 @@ def get_cultures(idPatient: int, user: User):
             CultureHeader.gram,
             CultureHeader.extraInfo,
             CultureHeader.colony,
+            Culture.idMicroorganism,
             Culture.microorganism,
             Culture.drug,
             Culture.result,
@@ -31,7 +32,11 @@ def get_cultures(idPatient: int, user: User):
         )
         .outerjoin(Culture, CultureHeader.idExamItem == Culture.idExamItem)
         .where(CultureHeader.idPatient == idPatient)
-        .order_by(desc(CultureHeader.collectionDate), CultureHeader.idExamItem)
+        .order_by(
+            desc(CultureHeader.collectionDate),
+            CultureHeader.idExamItem,
+            Culture.idMicroorganism,
+        )
         .limit(2000)
     )
 
@@ -44,7 +49,7 @@ def _group_culture_results(results):
     headers = {}
 
     def culture(row):
-        if row.result != None:
+        if row.microorganism != None:
             return {
                 "microorganism": row.microorganism,
                 "drug": row.drug,
@@ -57,11 +62,16 @@ def _group_culture_results(results):
     for row in results:
         culture_data = culture(row)
 
-        if row.id in headers:
+        key = (
+            f"{row.id}-{row.idMicroorganism if row.idMicroorganism != None else 'None'}"
+        )
+
+        if key in headers:
             if culture_data != None:
-                headers[row.id]["cultures"].append(culture_data)
+                headers[key]["cultures"].append(culture_data)
         else:
-            headers[row.id] = {
+            headers[key] = {
+                "key": key,
                 "id": row.id,
                 "idExamItem": row.idExamItem,
                 "collectionDate": dateutils.to_iso(row.collectionDate),

@@ -73,6 +73,18 @@ class UserAudit(db.Model):
     createdBy = db.Column("created_by", db.BigInteger, nullable=False)
 
 
+class UserAuthorization(db.Model):
+    __tablename__ = "usuario_autorizacao"
+    __table_args__ = {"schema": "public"}
+
+    id = db.Column("idusuario_autorizacao", db.BigInteger, primary_key=True)
+    idUser = db.Column("idusuario", db.BigInteger, nullable=False)
+    idSegment = db.Column("idsegmento", db.BigInteger, nullable=True)
+    schemaName = db.Column("schema_name", db.String, nullable=True)
+    createdAt = db.Column("created_at", db.DateTime, nullable=False)
+    createdBy = db.Column("created_by", db.BigInteger, nullable=False)
+
+
 class Substance(db.Model):
     __tablename__ = "substancia"
     __table_args__ = {"schema": "public"}

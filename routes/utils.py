@@ -554,7 +554,8 @@ def sendEmail(subject, sender, emails, html):
         msg.html = html
         mail.send(msg)
     except:
-        print("Erro ao enviar email")
+        logger = logging.getLogger("noharm.backend")
+        logger.error("Could not send new user email")
 
 
 def get_period_filter(query, model, agg_date, is_pmc, is_cpoe):

@@ -13,7 +13,12 @@ from models.enums import (
     PrescriptionReviewTypeEnum,
 )
 from exception.validation_error import ValidationError
-from services import prescription_drug_service, memory_service, permission_service
+from services import (
+    prescription_drug_service,
+    memory_service,
+    permission_service,
+    data_authorization_service,
+)
 
 
 def search(search_key):
@@ -97,6 +102,15 @@ def check_prescription(idPrescription, p_status, user, evaluation_time):
             "Prescrição inexistente",
             "errors.invalidRegister",
             status.HTTP_400_BAD_REQUEST,
+        )
+
+    if not data_authorization_service.has_segment_authorization(
+        id_segment=p.idSegment, user=user
+    ):
+        raise ValidationError(
+            "Usuário não autorizado neste segmento",
+            "errors.businessRules",
+            status.HTTP_401_UNAUTHORIZED,
         )
 
     has_lock_feature = memory_service.has_feature(
@@ -386,6 +400,15 @@ def review_prescription(idPrescription, user, review_type, evaluation_time):
             "Prescrição inexistente",
             "errors.invalidRegister",
             status.HTTP_400_BAD_REQUEST,
+        )
+
+    if not data_authorization_service.has_segment_authorization(
+        id_segment=prescription.idSegment, user=user
+    ):
+        raise ValidationError(
+            "Usuário não autorizado neste segmento",
+            "errors.businessRules",
+            status.HTTP_401_UNAUTHORIZED,
         )
 
     if not prescription.agg:

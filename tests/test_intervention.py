@@ -42,7 +42,7 @@ def test_put_interventions(client):
 
     access_token = get_access(client, roles=["staging"])
 
-    idPrescriptionDrug = "99"
+    idPrescriptionDrug = "1"
     data = {
         "status": "s",
         "admissionNumber": 5,

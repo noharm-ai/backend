@@ -3,7 +3,12 @@ from sqlalchemy import literal
 from models.main import db
 from models.appendix import *
 from models.prescription import *
-from services import prescription_service
+from models.enums import RoleEnum
+from services import (
+    prescription_service,
+    permission_service,
+    data_authorization_service,
+)
 from exception.validation_error import ValidationError
 
 
@@ -97,8 +102,14 @@ def count_drugs_by_prescription(
 
 
 def update_pd_form(pd_list, user):
-    roles = user.config["roles"] if user.config and "roles" in user.config else []
-    if "presmed-form" not in roles:
+    if not permission_service.is_pharma(user):
+        raise ValidationError(
+            "Usuário não autorizado",
+            "errors.unauthorizedUser",
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
+    if not permission_service.has_role(user, RoleEnum.PRESMED_FORM.value):
         raise ValidationError(
             "Usuário não autorizado",
             "errors.unauthorizedUser",
@@ -106,12 +117,23 @@ def update_pd_form(pd_list, user):
         )
 
     for pd in pd_list:
-        drug = PrescriptionDrug.query.get(pd)
+        drug = drug = (
+            db.session.query(PrescriptionDrug).filter(PrescriptionDrug.id == pd).first()
+        )
         if drug is None:
             raise ValidationError(
                 "Prescrição inexistente",
                 "errors.invalidRegister",
                 status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not data_authorization_service.has_segment_authorization(
+            id_segment=drug.idSegment, user=user
+        ):
+            raise ValidationError(
+                "Usuário não autorizado neste segmento",
+                "errors.businessRules",
+                status.HTTP_401_UNAUTHORIZED,
             )
 
         drug.form = pd_list[pd]

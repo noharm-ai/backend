@@ -114,7 +114,7 @@ def auth_provider():
 def get_auth_provider(schema):
     dbSession.setSchema(schema)
 
-    oauth_config = memory_service.get_memory(MemoryEnum.OAUTH_CONFIG.value)
+    oauth_config = auth_service.get_oauth_config(schema=schema)
 
     if oauth_config is None:
         return {"status": "error"}, status.HTTP_404_NOT_FOUND
@@ -122,19 +122,16 @@ def get_auth_provider(schema):
     return {
         "status": "success",
         "data": {
-            "url": oauth_config.value["auth_url"],
-            "loginUrl": oauth_config.value["login_url"],
-            "redirectUri": oauth_config.value["redirect_uri"],
-            "clientId": oauth_config.value["client_id"],
-            "company": oauth_config.value["company"],
-            "flow": (
-                oauth_config.value["flow"]
-                if "flow" in oauth_config.value
-                else "implicit"
-            ),
+            "url": oauth_config["auth_url"],
+            "loginUrl": oauth_config["login_url"],
+            "redirectUri": oauth_config["redirect_uri"],
+            "clientId": oauth_config["client_id"],
+            "clientSecret": oauth_config["client_secret"],
+            "company": oauth_config["company"],
+            "flow": (oauth_config["flow"] if "flow" in oauth_config else "implicit"),
             "codeChallengeMethod": (
-                oauth_config.value["code_challenge_method"]
-                if "code_challenge_method" in oauth_config.value
+                oauth_config["code_challenge_method"]
+                if "code_challenge_method" in oauth_config
                 else None
             ),
         },

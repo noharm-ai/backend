@@ -1,8 +1,7 @@
 from sqlalchemy import or_
+
 from conftest import *
 from models.main import User
-
-from routes.utils import tryCommit
 
 
 def delete_user(email):
@@ -15,7 +14,7 @@ def delete_user(email):
 def create_user(client, data, access_token):
     delete_user(data["email"])
 
-    return client.put(
+    return client.post(
         "/editUser", data=json.dumps(data), headers=make_headers(access_token)
     )
 
@@ -44,7 +43,7 @@ def test_get_users(client):
 
 def test_get_users_permission(client):
     """Teste get /users/ - Deve retornar erro [401 UNAUTHORIZED] devido ao usuário utilizado"""
-    access_token = get_access(client, "demo", "demo")
+    access_token = get_access(client, roles=["staging"])
 
     response = client.get("/users", headers=make_headers(access_token))
 
@@ -56,7 +55,6 @@ def test_put_user(client):
     access_token = get_access(client, roles=["userAdmin", "staging"])
 
     data = {
-        "id": "",
         "email": "test@noharm.ai",
         "name": "test3",
         "external": "test",
@@ -65,7 +63,7 @@ def test_put_user(client):
 
     response = create_user(client, data, access_token)
     responseObject = json.loads(response.data)
-    userId = responseObject["data"]
+    userId = responseObject["data"]["id"]
     user = session.query(User).filter(User.id == userId).first()
 
     assert response.status_code == 200
@@ -78,7 +76,6 @@ def test_put_editUser(client):
 
     # first insert user
     create_data = {
-        "id": "",
         "email": "test@noharm.ai",
         "name": "test3",
         "external": "test",
@@ -99,8 +96,8 @@ def test_put_editUser(client):
         "active": False,
     }
 
-    response = client.put(
-        "/editUser/" + str(user.id),
+    response = client.post(
+        "/editUser",
         data=json.dumps(data),
         headers=make_headers(access_token),
     )
@@ -123,7 +120,6 @@ def test_create_user_invalid_role(client):
     delete_user(email)
 
     data = {
-        "id": "",
         "email": email,
         "name": "test3",
         "external": "test",
@@ -131,11 +127,11 @@ def test_create_user_invalid_role(client):
         "roles": ["admin"],
     }
 
-    response = client.put(
+    response = client.post(
         "/editUser", data=json.dumps(data), headers=make_headers(access_token)
     )
     responseObject = json.loads(response.data)
-    userId = responseObject["data"]
+    userId = responseObject["data"]["id"]
     user = session.query(User).filter(User.id == userId).first()
 
     assert response.status_code == 200
@@ -149,7 +145,6 @@ def test_update_user_invalid_role(client):
 
     # first insert user
     create_data = {
-        "id": "",
         "email": "test4@noharm.ai",
         "name": "test3",
         "external": "test",
@@ -171,8 +166,8 @@ def test_update_user_invalid_role(client):
         "roles": ["admin"],
     }
 
-    response = client.put(
-        "/editUser/" + str(user.id),
+    response = client.post(
+        "/editUser",
         data=json.dumps(data),
         headers=make_headers(access_token),
     )
@@ -196,7 +191,6 @@ def test_create_user_invalid_role_perimission(client):
     delete_user(email)
 
     data = {
-        "id": "",
         "email": email,
         "name": "test3",
         "external": "test",
@@ -205,13 +199,13 @@ def test_create_user_invalid_role_perimission(client):
     }
 
     access_token = get_access(client, roles=["userAdmin", "staging", "admin"])
-    response = client.put(
+    response = client.post(
         "/editUser", data=json.dumps(data), headers=make_headers(access_token)
     )
     assert response.status_code == 401
 
     access_token = get_access(client, roles=["userAdmin", "staging", "training"])
-    response = client.put(
+    response = client.post(
         "/editUser", data=json.dumps(data), headers=make_headers(access_token)
     )
     assert response.status_code == 401
@@ -223,7 +217,6 @@ def test_update_user_invalid_role_permission(client):
 
     # first insert user
     create_data = {
-        "id": "",
         "email": "test6@noharm.ai",
         "name": "test3",
         "external": "test",
@@ -246,17 +239,88 @@ def test_update_user_invalid_role_permission(client):
     }
 
     access_token = get_access(client, roles=["userAdmin", "staging", "admin"])
-    response = client.put(
-        "/editUser/" + str(user.id),
+    response = client.post(
+        "/editUser",
         data=json.dumps(data),
         headers=make_headers(access_token),
     )
     assert response.status_code == 401
 
     access_token = get_access(client, roles=["userAdmin", "staging", "training"])
-    response = client.put(
-        "/editUser/" + str(user.id),
+    response = client.post(
+        "/editUser",
         data=json.dumps(data),
         headers=make_headers(access_token),
     )
     assert response.status_code == 401
+
+
+def test_create_user_invalid_authorization(client):
+    """Teste put /editUser - Verifica autorizacao de segmento"""
+    access_token = get_access(client, roles=["userAdmin", "staging"])
+    email = "test3@noharm.ai"
+
+    delete_user(email)
+
+    data = {
+        "email": email,
+        "name": "test3",
+        "external": "test",
+        "active": "true",
+        "roles": [],
+        "segments": [2],
+    }
+
+    response = client.post(
+        "/editUser", data=json.dumps(data), headers=make_headers(access_token)
+    )
+
+    assert response.status_code == 401
+
+
+def test_update_user_authorization(client):
+    """Teste put /editUser/<int:idUser> - Testa permissao de ediçao de autorizacoes"""
+    access_token = get_access(client, roles=["userAdmin", "staging"])
+    email = "test7@noharm.ai"
+
+    delete_user(email)
+
+    # first insert user
+    create_data = {
+        "email": email,
+        "name": "test3",
+        "external": "test",
+        "active": "true",
+    }
+
+    response = create_user(client, create_data, access_token)
+    assert response.status_code == 200
+
+    user = session.query(User).filter(User.email == create_data["email"]).first()
+    assert user != None
+
+    data = {
+        "id": user.id,
+        "email": user.email,
+        "name": "updateTest",
+        "external": "updateTest",
+        "active": False,
+        "segments": [2],
+    }
+
+    # invalida authorization
+    response = client.post(
+        "/editUser",
+        data=json.dumps(data),
+        headers=make_headers(access_token),
+    )
+    assert response.status_code == 401
+
+    # valid authorization
+    data["segments"] = [1]
+    response = client.post(
+        "/editUser",
+        data=json.dumps(data),
+        headers=make_headers(access_token),
+    )
+    assert response.status_code == 200

@@ -25,6 +25,8 @@ from services import (
     prescription_drug_service,
     intervention_service,
     patient_service,
+    alert_service,
+    data_authorization_service,
 )
 from converter import prescription_converter
 from models.enums import (
@@ -360,13 +362,17 @@ def getPrescription(
     interventions = intervention_service.get_interventions(
         admissionNumber=patient.admissionNumber
     )
-    relations = Prescription.findRelation(
-        prescription[0].id,
-        patient.admissionNumber,
-        patient.idPatient,
-        aggDate,
-        is_cpoe,
-        is_pmc,
+
+    # relations = Prescription.findRelation(
+    #     prescription[0].id,
+    #     patient.admissionNumber,
+    #     patient.idPatient,
+    #     aggDate,
+    #     is_cpoe,
+    #     is_pmc,
+    # )
+    relations = alert_service.find_relations(
+        drug_list=drugs, is_cpoe=is_cpoe, id_patient=patient.idPatient
     )
     headers = (
         Prescription.getHeaders(admissionNumber, aggDate, idSegment, is_pmc, is_cpoe)
@@ -634,12 +640,20 @@ def setPrescriptionData(idPrescription):
     dbSession.setSchema(user.schema)
     os.environ["TZ"] = "America/Sao_Paulo"
 
-    p = Prescription.query.get(idPrescription)
+    p = db.session.query(Prescription).filter(Prescription.id == idPrescription).first()
     if p is None:
         return {
             "status": "error",
             "message": "Prescrição Inexistente!",
         }, status.HTTP_400_BAD_REQUEST
+
+    if not data_authorization_service.has_segment_authorization(
+        id_segment=p.idSegment, user=user
+    ):
+        return {
+            "status": "error",
+            "message": "Usuário não autorizado neste segmento",
+        }, status.HTTP_401_UNAUTHORIZED
 
     if "notes" in data.keys():
         p.notes = data.get("notes", None)
@@ -765,6 +779,7 @@ def getDrugPeriod(idPrescriptionDrug):
     return {"status": "success", "data": periodList}, status.HTTP_200_OK
 
 
+# TODO: REFACTOR
 @app_pres.route("/prescriptions/drug/<int:idPrescriptionDrug>", methods=["PUT"])
 @jwt_required()
 def setPrescriptionDrugNote(idPrescriptionDrug):
@@ -772,6 +787,25 @@ def setPrescriptionDrugNote(idPrescriptionDrug):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
     os.environ["TZ"] = "America/Sao_Paulo"
+
+    drug = (
+        db.session.query(PrescriptionDrug)
+        .filter(PrescriptionDrug.id == idPrescriptionDrug)
+        .first()
+    )
+    if drug is None:
+        return {
+            "status": "error",
+            "message": "Prescrição  Inexistente!",
+        }, status.HTTP_400_BAD_REQUEST
+
+    if not data_authorization_service.has_segment_authorization(
+        id_segment=drug.idSegment, user=user
+    ):
+        return {
+            "status": "error",
+            "message": "Usuário não autorizado neste segmento",
+        }, status.HTTP_401_UNAUTHORIZED
 
     if "notes" in data:
         notes = data.get("notes", None)
@@ -796,13 +830,6 @@ def setPrescriptionDrugNote(idPrescriptionDrug):
             db.session.add(note)
 
     if "form" in data:
-        drug = PrescriptionDrug.query.get(idPrescriptionDrug)
-        if drug is None:
-            return {
-                "status": "error",
-                "message": "Prescrição  Inexistente!",
-            }, status.HTTP_400_BAD_REQUEST
-
         drug.form = data.get("form", None)
         drug.update = datetime.today()
         drug.user = user.id

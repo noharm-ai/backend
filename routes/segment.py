@@ -1,7 +1,3 @@
-from utils import status
-from models.main import *
-from models.appendix import *
-from models.prescription import *
 from flask import Blueprint, request
 from markupsafe import escape as escape_html
 from flask_jwt_extended import (
@@ -10,7 +6,14 @@ from flask_jwt_extended import (
 )
 from sqlalchemy import asc, func
 from .utils import tryCommit
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
+
+from utils import status
+from models.main import *
+from models.appendix import *
+from models.prescription import *
+from services import exams_service
+from exception.validation_error import ValidationError
 
 app_seg = Blueprint("app_seg", __name__)
 
@@ -205,39 +208,15 @@ def setExams(idSegment):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
     data = request.get_json()
-    typeExam = data.get("type", None)
 
-    segExam = SegmentExam.query.get((idSegment, typeExam))
+    try:
+        result = exams_service.upsert_seg_exam(
+            data=data, id_segment=idSegment, user=user
+        )
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
-    newSegExam = False
-    if segExam is None:
-        newSegExam = True
-        segExam = SegmentExam()
-        segExam.idSegment = idSegment
-        segExam.typeExam = typeExam
-
-    if "initials" in data.keys():
-        segExam.initials = data.get("initials", None)
-    if "name" in data.keys():
-        segExam.name = data.get("name", None)
-    if "min" in data.keys():
-        segExam.min = data.get("min", None)
-    if "max" in data.keys():
-        segExam.max = data.get("max", None)
-    if "ref" in data.keys():
-        segExam.ref = data.get("ref", None)
-    if "order" in data.keys():
-        segExam.order = data.get("order", None)
-    if "active" in data.keys():
-        segExam.active = bool(data.get("active", False))
-
-    segExam.update = datetime.today()
-    segExam.user = user.id
-
-    if newSegExam:
-        db.session.add(segExam)
-
-    return tryCommit(db, escape_html(typeExam))
+    return tryCommit(db, escape_html(result.typeExam))
 
 
 @app_seg.route("/segments/<int:idSegment>/exams-order", methods=["PUT"])
@@ -247,23 +226,11 @@ def setExamsOrder(idSegment):
     dbSession.setSchema(user.schema)
     data = request.get_json()
 
-    examsOrder = data.get("exams", None)
-    if not examsOrder:
-        return {
-            "status": "error",
-            "message": "Sem exames para ordenar!",
-        }, status.HTTP_400_BAD_REQUEST
-
-    segExams = (
-        SegmentExam.query.filter(SegmentExam.idSegment == idSegment)
-        .order_by(asc(SegmentExam.order))
-        .all()
-    )
-
-    result = {}
-    for s in segExams:
-        if s.typeExam in examsOrder:
-            s.order = examsOrder.index(s.typeExam)
-        result[s.typeExam] = s.order
+    try:
+        result = exams_service.exams_reorder(
+            exams=data.get("exams", None), id_segment=idSegment, user=user
+        )
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
     return tryCommit(db, result)

@@ -125,7 +125,7 @@ def is_admin_memory(key):
     return key in [
         MemoryEnum.FEATURES.value,
         MemoryEnum.GETNAME.value,
-        MemoryEnum.OAUTH_CONFIG.value,
+        MemoryEnum.OAUTH_CONFIG.value,  # deprecated
         MemoryEnum.OAUTH_KEYS.value,
         MemoryEnum.PRESMED_FORM.value,
         MemoryEnum.REPORTS.value,
