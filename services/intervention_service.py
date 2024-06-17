@@ -828,7 +828,6 @@ def _get_price_kit(id_prescription, prescription_drug: PrescriptionDrug, user: U
                 PrescriptionDrug.cpoe_group == group,
             )
         )
-        .filter(PrescriptionDrug.suspendedDate == None)
         .all()
     )
 
