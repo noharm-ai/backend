@@ -101,15 +101,22 @@ def find_relations(drug_list, id_patient: int, is_cpoe: bool):
     if len(overlap_drugs) == 0:
         return {"alerts": {}, "list": {}, "stats": {}}
 
-    query = db.session.query(Relation).filter(Relation.active == True)
+    uniq_overlap_drugs = []
+    uniq_overlap_keys = []
+    for d in overlap_drugs:
+        key = f"""{d["from"]["sctid"]}-{d["to"]["sctid"]}"""
+        if key not in uniq_overlap_keys:
+            uniq_overlap_drugs.append(d)
+            uniq_overlap_keys.append(key)
 
+    query = db.session.query(Relation).filter(Relation.active == True)
     query = query.filter(
         or_(
             and_(
                 Relation.sctida == i["from"]["sctid"],
                 Relation.sctidb == i["to"]["sctid"],
             )
-            for i in overlap_drugs
+            for i in uniq_overlap_drugs
         )
     )
 
