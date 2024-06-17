@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import or_, and_
+from sqlalchemy import text
 
 from models.prescription import PrescriptionDrug, Allergy
 from models.main import db, Drug, Relation, Substance
@@ -101,28 +101,33 @@ def find_relations(drug_list, id_patient: int, is_cpoe: bool):
     if len(overlap_drugs) == 0:
         return {"alerts": {}, "list": {}, "stats": {}}
 
-    uniq_overlap_drugs = []
     uniq_overlap_keys = []
     for d in overlap_drugs:
-        key = f"""{d["from"]["sctid"]}-{d["to"]["sctid"]}"""
+        key = f"""({d["from"]["sctid"]},{d["to"]["sctid"]})"""
         if key not in uniq_overlap_keys:
-            uniq_overlap_drugs.append(d)
             uniq_overlap_keys.append(key)
 
-    query = db.session.query(Relation).filter(Relation.active == True)
-    query = query.filter(
-        or_(
-            and_(
-                Relation.sctida == i["from"]["sctid"],
-                Relation.sctidb == i["to"]["sctid"],
-            )
-            for i in uniq_overlap_drugs
+    query = text(
+        f"""
+        with cruzamento as (
+            select * from (values {",".join(uniq_overlap_keys)}) AS t (sctida, sctidb)
         )
+        select
+            r.sctida,
+            r.sctidb,
+            r.tprelacao as "kind",
+            r.texto as "text"
+        from 
+            public.relacao r 
+            inner join cruzamento c on (r.sctida = c.sctida and r.sctidb = c.sctidb)
+        where 
+	        r.ativo = true
+    """
     )
 
     active_relations = {}
 
-    for item in query.all():
+    for item in db.session.execute(query).all():
         key = f"{item.sctida}-{item.sctidb}-{item.kind}"
         active_relations[key] = {
             "sctida": item.sctida,
