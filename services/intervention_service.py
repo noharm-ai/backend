@@ -262,7 +262,7 @@ def set_intervention_outcome(
         economy_day_amount == None or economy_day_amount == 0
     ):
         raise ValidationError(
-            "Quantidade de Dias de Economia deve ser especificado",
+            "Quantidade de Dias de Economia deve ser especificado e maior que zero",
             "errors.businessRule",
             status.HTTP_400_BAD_REQUEST,
         )
