@@ -97,7 +97,7 @@ def push_queue_request(id_processor: str, action_type: str, data: dict, user: Us
         id_processor=id_processor, action_type=action_type, data=data
     )
     queue.extra = {
-        "type": action_type,
+        "type": escape(action_type),
         "entity": escape(data["entity"]),
         "componentType": escape(data["componentType"]),
         "idEntity": escape(data["idProcessor"]),
