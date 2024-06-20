@@ -1,8 +1,8 @@
 import jwt
 import json
 import logging
+import requests
 from flask import request
-from password_generator import PasswordGenerator
 from http.client import HTTPConnection
 from flask_jwt_extended import (
     create_access_token,
@@ -319,7 +319,10 @@ def auth_provider(code, schema):
     # this one works because it's the first db interaction
     dbSession.setSchema(schema)
 
-    if Config.ENV == NoHarmENV.STAGING.value:
+    if (
+        Config.ENV == NoHarmENV.DEVELOPMENT.value
+        or Config.ENV == NoHarmENV.STAGING.value
+    ):
         HTTPConnection.debuglevel = 1
         requests_log = logging.getLogger("requests.packages.urllib3")
         requests_log.setLevel(logging.DEBUG)
@@ -334,25 +337,29 @@ def auth_provider(code, schema):
             status.HTTP_401_UNAUTHORIZED,
         )
 
-    # authorization_code flow
-    # params = {
-    #     "grant_type": "authorization_code",
-    #     "code": code,
-    #     "client_id": oauth_config["client_id"],
-    #     "client_secret": oauth_config["client_secret"],
-    #     "redirect_uri": oauth_config["redirect_uri"],
-    # }
+    if "flow" in oauth_config and oauth_config["flow"] == "authentication_basic":
+        params = {
+            "grant_type": "authorization_code",
+            "code": code,
+            "client_id": oauth_config["client_id"],
+            "redirect_uri": oauth_config["redirect_uri"],
+        }
 
-    # response = requests.post(url=oauth_config["login_url"], data=params)
+        response = requests.post(
+            url=oauth_config["login_url"],
+            data=params,
+            auth=(oauth_config["client_id"], oauth_config["client_secret"]),
+        )
 
-    # if response.status_code != status.HTTP_200_OK:
-    #     raise ValidationError(
-    #         "OAUTH provider error",
-    #         "errors.unauthorizedUser",
-    #         status.HTTP_401_UNAUTHORIZED,
-    #     )
+        if response.status_code != status.HTTP_200_OK:
+            raise ValidationError(
+                "OAUTH provider error",
+                "errors.unauthorizedUser",
+                status.HTTP_401_UNAUTHORIZED,
+            )
 
-    # auth_data = response.json()
+        token_data = response.json()
+        code = token_data["id_token"]
 
     if oauth_config["verify_signature"]:
         oauth_keys = memory_service.get_memory(MemoryEnum.OAUTH_KEYS.value)
@@ -409,6 +416,16 @@ def auth_provider(code, schema):
     name_attr = oauth_config["name_attr"]
 
     if email_attr not in jwt_user or jwt_user[email_attr] is None:
+        if (
+            Config.ENV == NoHarmENV.DEVELOPMENT.value
+            or Config.ENV == NoHarmENV.STAGING.value
+        ):
+            raise ValidationError(
+                "OAUTH: email inválido: " + code,
+                "errors.unauthorizedUser",
+                status.HTTP_401_UNAUTHORIZED,
+            )
+
         raise ValidationError(
             "OAUTH: email inválido",
             "errors.unauthorizedUser",
