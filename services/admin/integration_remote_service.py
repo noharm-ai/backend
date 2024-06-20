@@ -98,9 +98,9 @@ def push_queue_request(id_processor: str, action_type: str, data: dict, user: Us
     )
     queue.extra = {
         "type": action_type,
-        "entity": data["entity"],
-        "componentType": data["componentType"],
-        "idEntity": data["idProcessor"],
+        "entity": escape(data["entity"]),
+        "componentType": escape(data["componentType"]),
+        "idEntity": escape(data["idProcessor"]),
     }
     queue.createdAt = datetime.today()
 
@@ -183,8 +183,12 @@ def get_queue_status(id_queue_list, user: User):
 
 
 def _validate_custom_endpoint(endpoint: str):
-    pattern1 = re.compile("^nifi-api\/flowfile-queues\/.*?\/flowfiles\/.*?\/content$")
-    pattern2 = re.compile("^nifi-api\/flowfile-queues\/.*?\/listing-requests\/.*?$")
+    pattern1 = re.compile(
+        "^nifi-api\/flowfile-queues\/[\w-]{36}\/flowfiles\/[\w-]{36}\/content$"
+    )
+    pattern2 = re.compile(
+        "^nifi-api\/flowfile-queues\/[\w-]{36}\/listing-requests\/[\w-]{36}$"
+    )
 
     if pattern1.match(endpoint):
         return True
