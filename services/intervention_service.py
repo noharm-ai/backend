@@ -970,7 +970,10 @@ def _outcome_calc(list, user: User, date_base_economy):
                         frequency.description if frequency != None else None
                     ),
                     "route": prescription_drug.route,
-                    "pricePerDose": str(none2zero(origin_price) * none2zero(dose)),
+                    "pricePerDose": str(
+                        none2zero(origin_price) * none2zero(dose)
+                        + none2zero(kit["price"])
+                    ),
                     "priceKit": kit["price"],
                     "beforeConversion": {
                         "price": (
