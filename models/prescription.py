@@ -698,6 +698,7 @@ class PrescriptionDrug(db.Model):
                 Substance,
                 period_cpoe.label("period_cpoe"),
                 Prescription.date,
+                MeasureUnitConvert.factor.label("measure_unit_convert_factor"),
             )
             .outerjoin(Outlier, Outlier.id == PrescriptionDrug.idOutlier)
             .outerjoin(Drug, Drug.id == PrescriptionDrug.idDrug)
@@ -708,6 +709,14 @@ class PrescriptionDrug(db.Model):
                 and_(
                     MeasureUnit.id == PrescriptionDrug.idMeasureUnit,
                     MeasureUnit.idHospital == Prescription.idHospital,
+                ),
+            )
+            .outerjoin(
+                MeasureUnitConvert,
+                and_(
+                    MeasureUnitConvert.idSegment == PrescriptionDrug.idSegment,
+                    MeasureUnitConvert.idDrug == PrescriptionDrug.idDrug,
+                    MeasureUnitConvert.idMeasureUnit == MeasureUnit.id,
                 ),
             )
             .outerjoin(
