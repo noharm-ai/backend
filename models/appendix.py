@@ -182,6 +182,7 @@ class NifiQueue(db.Model):
     url = db.Column("url", db.String, nullable=False)
     method = db.Column("method", db.String, nullable=False)
     body = db.Column("body", postgresql.JSONB, nullable=True)
+    extra = db.Column("extra", postgresql.JSONB, nullable=True)
     runStatus = db.Column("run_status", db.Boolean, nullable=False)
     responseCode = db.Column("response_code", db.Integer, nullable=True)
     response = db.Column("response", postgresql.JSONB, nullable=True)
