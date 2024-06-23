@@ -97,8 +97,7 @@ def refresh_prescriptions(user):
 
 
 def init_intervention_reason(user):
-    roles = user.config["roles"] if user.config and "roles" in user.config else []
-    if RoleEnum.ADMIN.value not in roles and RoleEnum.TRAINING.value not in roles:
+    if not permission_service.has_maintainer_permission(user):
         raise ValidationError(
             "Usuário não autorizado",
             "errors.unauthorizedUser",
@@ -117,8 +116,8 @@ def init_intervention_reason(user):
     insert = text(
         f"""
             insert into {schema}.motivointervencao
-            (fkhospital, idmotivointervencao,nome, idmotivomae, ativo, suspensao, substituicao, tp_relacao)
-            select fkhospital, idmotivointervencao,nome, idmotivomae, ativo, suspensao, substituicao, tp_relacao
+            (fkhospital, idmotivointervencao,nome, idmotivomae, ativo, suspensao, substituicao, tp_relacao, economia_customizada)
+            select fkhospital, idmotivointervencao,nome, idmotivomae, ativo, suspensao, substituicao, tp_relacao, economia_customizada
             from hsc_test.motivointervencao
         """
     )

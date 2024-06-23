@@ -51,6 +51,7 @@ class InterventionReason(db.Model):
     active = db.Column("ativo", db.Boolean, nullable=False)
     suspension = db.Column("suspensao", db.Boolean, nullable=False)
     substitution = db.Column("substituicao", db.Boolean, nullable=False)
+    customEconomy = db.Column("economia_customizada", db.Boolean, nullable=False)
     relation_type = db.Column("tp_relacao", db.BigInteger, nullable=False)
 
 

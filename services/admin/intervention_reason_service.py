@@ -5,6 +5,7 @@ from models.main import db
 from models.appendix import *
 from models.prescription import *
 from models.enums import RoleEnum
+from services import permission_service
 
 from exception.validation_error import ValidationError
 
@@ -40,8 +41,7 @@ def get_reasons(id=None, active_only=False):
 
 
 def upsert_reason(id, reason: InterventionReason, user):
-    roles = user.config["roles"] if user.config and "roles" in user.config else []
-    if RoleEnum.ADMIN.value not in roles and RoleEnum.TRAINING.value not in roles:
+    if not permission_service.has_maintainer_permission(user):
         raise ValidationError(
             "Usuário não autorizado",
             "errors.unauthorizedUser",
@@ -68,10 +68,21 @@ def upsert_reason(id, reason: InterventionReason, user):
         record.description = reason.description
         record.mamy = reason.mamy
 
+    tp_count = (
+        int(reason.substitution) + int(reason.suspension) + int(reason.customEconomy)
+    )
+    if tp_count > 1:
+        raise ValidationError(
+            "Você pode escolher somente um tipo de economia para este motivo de intervenção",
+            "errors.businessRoles",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
     record.idHospital = reason.idHospital
     record.active = reason.active
     record.suspension = reason.suspension
     record.substitution = reason.substitution
+    record.customEconomy = reason.customEconomy
     record.relation_type = reason.relation_type
 
     db.session.add(record)
@@ -94,6 +105,7 @@ def list_to_dto(reasons):
                 "suspension": r[0].suspension,
                 "substitution": r[0].substitution,
                 "relationType": r[0].relation_type,
+                "customEconomy": r[0].customEconomy,
                 "protected": r[3],
             }
         )

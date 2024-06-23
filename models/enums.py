@@ -107,6 +107,7 @@ class ReportEnum(Enum):
 class InterventionEconomyTypeEnum(Enum):
     SUSPENSION = 1
     SUBSTITUTION = 2
+    CUSTOM = 3
 
 
 class InterventionStatusEnum(Enum):
