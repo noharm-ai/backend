@@ -829,6 +829,8 @@ class Intervention(db.Model):
     status = db.Column("status", db.String(1), nullable=True)
     update = db.Column("update_at", db.DateTime, nullable=False)
     user = db.Column("update_by", db.BigInteger, nullable=False)
+    outcome_at = db.Column("outcome_at", db.DateTime, nullable=True)
+    outcome_by = db.Column("outcome_by", db.BigInteger, nullable=True)
     transcription = db.Column("transcricao", postgresql.JSON, nullable=True)
     economy_days = db.Column("dias_economia", db.Integer, nullable=True)
     expended_dose = db.Column("dose_despendida", db.Float, nullable=True)

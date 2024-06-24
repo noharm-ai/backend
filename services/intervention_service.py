@@ -302,9 +302,8 @@ def set_intervention_outcome(
                 status.HTTP_400_BAD_REQUEST,
             )
 
-    intervention.update = datetime.today()
-    # do not change responsible
-    # intervention.user = user.id
+    intervention.outcome_at = datetime.today()
+    intervention.outcome_by = user.id
     intervention.status = outcome
 
     if intervention.economy_type != None:
