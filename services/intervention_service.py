@@ -258,6 +258,15 @@ def set_intervention_outcome(
             status.HTTP_400_BAD_REQUEST,
         )
 
+    if intervention.economy_type == InterventionEconomyTypeEnum.CUSTOM.value and (
+        not economy_day_amount_manual or not economy_day_value_manual
+    ):
+        raise ValidationError(
+            "Para o tipo de economia customizada, é necessário especificar Economia/Dia e Qtd. de dias de economia manualmente.",
+            "errors.businessRule",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
     if economy_day_amount_manual and (
         economy_day_amount == None or economy_day_amount == 0
     ):
@@ -460,10 +469,7 @@ def save_intervention(
     if expended_dose != -1:
         i.expended_dose = expended_dose
 
-    if (
-        memory_service.has_feature(FeatureEnum.INTERVENTION_V2.value)
-        and id_prescription == 0
-    ):
+    if memory_service.has_feature(FeatureEnum.INTERVENTION_V2.value):
         economy_type = None
         reasons = (
             db.session.query(InterventionReason)
@@ -475,6 +481,15 @@ def save_intervention(
                 economy_type = InterventionEconomyTypeEnum.SUSPENSION.value
             elif r.substitution:
                 economy_type = InterventionEconomyTypeEnum.SUBSTITUTION.value
+            elif r.customEconomy:
+                economy_type = InterventionEconomyTypeEnum.CUSTOM.value
+
+        if (
+            id_prescription != 0
+            and economy_type != InterventionEconomyTypeEnum.CUSTOM.value
+        ):
+            # prescription intv can only have custom economy
+            economy_type = None
 
         i.economy_type = economy_type
 
@@ -499,23 +514,40 @@ def save_intervention(
 
                     i.date_base_economy = presc.date
             else:
-                presc = (
-                    db.session.query(PrescriptionDrug, Prescription)
-                    .join(
-                        Prescription, PrescriptionDrug.idPrescription == Prescription.id
-                    )
-                    .filter(PrescriptionDrug.id == id_prescription_drug)
-                    .first()
-                )
-
-                if presc == None:
-                    raise ValidationError(
-                        "Registro inválido: data base economia",
-                        "errors.invalidRecord",
-                        status.HTTP_400_BAD_REQUEST,
+                if id_prescription != 0:
+                    presc: Prescription = (
+                        db.session.query(Prescription)
+                        .filter(Prescription.id == id_prescription)
+                        .first()
                     )
 
-                i.date_base_economy = presc[1].date
+                    if presc == None:
+                        raise ValidationError(
+                            "Registro inválido id_prescription: data base economia",
+                            "errors.invalidRecord",
+                            status.HTTP_400_BAD_REQUEST,
+                        )
+
+                    i.date_base_economy = presc.date
+                else:
+                    presc = (
+                        db.session.query(PrescriptionDrug, Prescription)
+                        .join(
+                            Prescription,
+                            PrescriptionDrug.idPrescription == Prescription.id,
+                        )
+                        .filter(PrescriptionDrug.id == id_prescription_drug)
+                        .first()
+                    )
+
+                    if presc == None:
+                        raise ValidationError(
+                            "Registro inválido: data base economia",
+                            "errors.invalidRecord",
+                            status.HTTP_400_BAD_REQUEST,
+                        )
+
+                    i.date_base_economy = presc[1].date
 
     if i.admissionNumber != None and i.idDepartment == None:
         currentDepartment = (
@@ -649,8 +681,9 @@ def _get_outcome_data_query():
 
 def get_outcome_data(id_intervention, user: User, edit=False):
     record = (
-        db.session.query(Intervention, PrescriptionDrug)
+        db.session.query(Intervention, PrescriptionDrug, Drug)
         .outerjoin(PrescriptionDrug, PrescriptionDrug.id == Intervention.id)
+        .outerjoin(Drug, PrescriptionDrug.idDrug == Drug.id)
         .filter(Intervention.idIntervention == id_intervention)
         .first()
     )
@@ -667,13 +700,24 @@ def get_outcome_data(id_intervention, user: User, edit=False):
     readonly = intervention.status != InterventionStatusEnum.PENDING.value and not edit
     economy_type = intervention.economy_type
 
+    # custom economy gets a simpler response
+    if economy_type == InterventionEconomyTypeEnum.CUSTOM.value:
+        return _get_outcome_dict(
+            outcome_data=record,
+            readonly=readonly,
+            destiny_drug=None,
+            original=None,
+            origin=None,
+            destiny=None,
+        )
+
     # origin
     origin_query = _get_outcome_data_query().filter(
         PrescriptionDrug.id == intervention.id
     )
     origin_list = origin_query.all()
 
-    if prescription_drug == None or economy_type == None or len(origin_list) == 0:
+    if economy_type == None or len(origin_list) == 0:
         return {
             "idIntervention": id_intervention,
             "header": {
@@ -737,31 +781,41 @@ def get_outcome_data(id_intervention, user: User, edit=False):
         destiny = None
         destiny_drug = None
 
-    # calc
-    economy_day_value = (
-        intervention.economy_day_value
-        if readonly
-        else _calc_economy(
-            origin=origin[0],
-            destiny=destiny[0] if destiny != None and len(destiny) > 0 else None,
-        )
+    return _get_outcome_dict(
+        outcome_data=record,
+        readonly=readonly,
+        destiny_drug=destiny_drug,
+        original={"origin": base_origin[0], "destiny": base_destiny},
+        origin=origin,
+        destiny=destiny,
     )
 
-    return {
+
+def _get_outcome_dict(
+    outcome_data,
+    readonly: bool,
+    destiny_drug: Drug,
+    original: dict,
+    origin: dict,
+    destiny: dict,
+):
+    intervention: Intervention = outcome_data[0]
+    prescription_drug: PrescriptionDrug = outcome_data[1]
+    origin_drug: Drug = outcome_data[2]
+
+    data = {
         "idIntervention": intervention.idIntervention,
         "header": {
-            "patient": False,
-            "idSegment": prescription_drug.idSegment,
+            "patient": intervention.idPrescription != 0,
             "status": intervention.status,
             "readonly": readonly,
             "date": intervention.date.isoformat(),
-            "originDrug": origin[0]["item"]["name"],
+            "originDrug": origin_drug.name if origin_drug != None else None,
             "destinyDrug": destiny_drug.name if destiny_drug != None else None,
             "economyDayValueManual": intervention.economy_day_value_manual,
-            "economyDayValue": economy_day_value,
             "economyDayAmount": intervention.economy_days,
             "economyDayAmountManual": intervention.economy_days != None,
-            "economyType": economy_type,
+            "economyType": intervention.economy_type,
             "updatedAt": (
                 intervention.update.isoformat() if intervention.update != None else None
             ),
@@ -776,10 +830,57 @@ def get_outcome_data(id_intervention, user: User, edit=False):
                 else None
             ),
         },
-        "original": {"origin": base_origin[0], "destiny": base_destiny},
-        "origin": origin[0],
-        "destiny": destiny,
     }
+
+    if (
+        intervention.economy_type == InterventionEconomyTypeEnum.SUBSTITUTION.value
+        or intervention.economy_type == InterventionEconomyTypeEnum.SUSPENSION.value
+    ):
+        # calc
+        economy_day_value = (
+            intervention.economy_day_value
+            if readonly
+            else _calc_economy(
+                origin=origin[0],
+                destiny=destiny[0] if destiny != None and len(destiny) > 0 else None,
+            )
+        )
+
+        data["header"]["economyDayValue"] = economy_day_value
+        data["header"]["idSegment"] = prescription_drug.idSegment
+        data["original"] = original
+        data["origin"] = origin[0]
+        data["destiny"] = destiny
+
+    if intervention.economy_type == InterventionEconomyTypeEnum.CUSTOM.value:
+        id_prescription = (
+            intervention.idPrescription
+            if intervention.idPrescription != 0
+            else prescription_drug.idPrescription
+        )
+        prescription = (
+            db.session.query(Prescription)
+            .filter(Prescription.id == id_prescription)
+            .first()
+        )
+
+        data["header"]["economyDayValue"] = intervention.economy_day_value
+        data["header"]["economyDayValueManual"] = True
+        data["header"]["economyDayAmountManual"] = True
+        data["header"]["idSegment"] = prescription.idSegment
+        data["origin"] = {
+            "item": {
+                "idPrescription": str(prescription.id),
+                "idPrescriptionAgg": gen_agg_id(
+                    admission_number=prescription.admissionNumber,
+                    id_segment=prescription.idSegment,
+                    pdate=intervention.date_base_economy,
+                ),
+                "prescriptionDate": prescription.date.isoformat(),
+            }
+        }
+
+    return data
 
 
 def _calc_economy(origin, destiny):
