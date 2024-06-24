@@ -680,9 +680,10 @@ def _get_outcome_data_query():
 
 def get_outcome_data(id_intervention, user: User, edit=False):
     record = (
-        db.session.query(Intervention, PrescriptionDrug, Drug)
+        db.session.query(Intervention, PrescriptionDrug, Drug, User)
         .outerjoin(PrescriptionDrug, PrescriptionDrug.id == Intervention.id)
         .outerjoin(Drug, PrescriptionDrug.idDrug == Drug.id)
+        .outerjoin(User, Intervention.outcome_by == User.id)
         .filter(Intervention.idIntervention == id_intervention)
         .first()
     )
@@ -801,6 +802,7 @@ def _get_outcome_dict(
     intervention: Intervention = outcome_data[0]
     prescription_drug: PrescriptionDrug = outcome_data[1]
     origin_drug: Drug = outcome_data[2]
+    outcome_user: User = outcome_data[3]
 
     data = {
         "idIntervention": intervention.idIntervention,
@@ -818,6 +820,12 @@ def _get_outcome_dict(
             "updatedAt": (
                 intervention.update.isoformat() if intervention.update != None else None
             ),
+            "outcomeAt": (
+                intervention.outcome_at.isoformat()
+                if intervention.outcome_at != None
+                else None
+            ),
+            "outcomeUser": (outcome_user.name if outcome_user != None else None),
             "economyIniDate": (
                 intervention.date_base_economy.isoformat()
                 if intervention.date_base_economy != None
