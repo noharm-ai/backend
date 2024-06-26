@@ -96,4 +96,8 @@ def _group_culture_results(results):
             headers[id]["microorganism"] = headers[id]["cultures"][0]["microorganism"]
         grouped_data.append(headers[id])
 
-    return sorted(grouped_data, key=lambda d: d["collectionDate"], reverse=True)
+    return sorted(
+        grouped_data,
+        key=lambda d: d["collectionDate"] if d["collectionDate"] != None else "",
+        reverse=True,
+    )
