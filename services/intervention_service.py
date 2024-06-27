@@ -309,6 +309,13 @@ def set_intervention_outcome(
     if intervention.economy_type != None:
         # intervention v2
         if intervention.status != "s":
+            if economy_day_value == None:
+                raise ValidationError(
+                    "Economia/Dia inválido",
+                    "errors.businessRule",
+                    status.HTTP_400_BAD_REQUEST,
+                )
+
             intervention.idPrescriptionDrugDestiny = id_prescription_drug_destiny
 
             intervention.economy_day_value = economy_day_value
