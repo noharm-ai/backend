@@ -343,6 +343,7 @@ def auth_provider(code, schema):
             "code": code,
             "client_id": oauth_config["client_id"],
             "redirect_uri": oauth_config["redirect_uri"],
+            "scope": "openid+profile",
         }
 
         response = requests.post(
