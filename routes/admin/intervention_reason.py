@@ -52,6 +52,7 @@ def data_to_object(data) -> InterventionReason:
         active=data.get("active", False),
         suspension=data.get("suspension", False),
         substitution=data.get("substitution", False),
+        customEconomy=data.get("customEconomy", False),
         relation_type=data.get("relationType", 0),
         idHospital=data.get("idHospital", 1),
     )
