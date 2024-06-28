@@ -395,7 +395,7 @@ def auth_provider(code, schema):
             )
         except Exception as error:
             raise ValidationError(
-                "OAUTH provider error:" + str(error),
+                "OAUTH provider error: decode error",
                 "errors.unauthorizedUser",
                 status.HTTP_401_UNAUTHORIZED,
             )
@@ -407,7 +407,7 @@ def auth_provider(code, schema):
             )
         except Exception as error:
             raise ValidationError(
-                "OAUTH provider error:" + str(error),
+                "OAUTH provider error: decode error",
                 "errors.unauthorizedUser",
                 status.HTTP_401_UNAUTHORIZED,
             )
@@ -421,7 +421,7 @@ def auth_provider(code, schema):
             or Config.ENV == NoHarmENV.STAGING.value
         ):
             raise ValidationError(
-                "OAUTH: email inválido: " + code,
+                "OAUTH: email inválido",
                 "errors.unauthorizedUser",
                 status.HTTP_401_UNAUTHORIZED,
             )
