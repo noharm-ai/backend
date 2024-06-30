@@ -475,85 +475,85 @@ def save_intervention(
     if expended_dose != -1:
         i.expended_dose = expended_dose
 
-    if memory_service.has_feature(FeatureEnum.INTERVENTION_V2.value):
+    # define economy
+    economy_type = None
+    reasons = (
+        db.session.query(InterventionReason)
+        .filter(InterventionReason.id.in_(i.idInterventionReason))
+        .all()
+    )
+    for r in reasons:
+        if r.suspension:
+            economy_type = InterventionEconomyTypeEnum.SUSPENSION.value
+        elif r.substitution:
+            economy_type = InterventionEconomyTypeEnum.SUBSTITUTION.value
+        elif r.customEconomy:
+            economy_type = InterventionEconomyTypeEnum.CUSTOM.value
+
+    if (
+        id_prescription != 0
+        and economy_type != InterventionEconomyTypeEnum.CUSTOM.value
+    ):
+        # prescription intv can only have custom economy
         economy_type = None
-        reasons = (
-            db.session.query(InterventionReason)
-            .filter(InterventionReason.id.in_(i.idInterventionReason))
-            .all()
-        )
-        for r in reasons:
-            if r.suspension:
-                economy_type = InterventionEconomyTypeEnum.SUSPENSION.value
-            elif r.substitution:
-                economy_type = InterventionEconomyTypeEnum.SUBSTITUTION.value
-            elif r.customEconomy:
-                economy_type = InterventionEconomyTypeEnum.CUSTOM.value
 
-        if (
-            id_prescription != 0
-            and economy_type != InterventionEconomyTypeEnum.CUSTOM.value
-        ):
-            # prescription intv can only have custom economy
-            economy_type = None
+    i.economy_type = economy_type
 
-        i.economy_type = economy_type
-
-        # date base economy
-        if economy_type != None and i.date_base_economy == None:
-            if permission_service.is_cpoe(user):
-                if agg_id_prescription == None:
-                    i.date_base_economy = i.date
-                else:
-                    presc = (
-                        db.session.query(Prescription)
-                        .filter(Prescription.id == agg_id_prescription)
-                        .first()
-                    )
-
-                    if presc == None:
-                        raise ValidationError(
-                            "Registro inválido: data base economia",
-                            "errors.businessRule",
-                            status.HTTP_400_BAD_REQUEST,
-                        )
-
-                    i.date_base_economy = presc.date
+    # date base economy
+    if economy_type != None and i.date_base_economy == None:
+        if permission_service.is_cpoe(user):
+            if agg_id_prescription == None:
+                i.date_base_economy = i.date
             else:
-                if id_prescription != 0:
-                    presc: Prescription = (
-                        db.session.query(Prescription)
-                        .filter(Prescription.id == id_prescription)
-                        .first()
+                presc = (
+                    db.session.query(Prescription)
+                    .filter(Prescription.id == agg_id_prescription)
+                    .first()
+                )
+
+                if presc == None:
+                    raise ValidationError(
+                        "Registro inválido: data base economia",
+                        "errors.businessRule",
+                        status.HTTP_400_BAD_REQUEST,
                     )
 
-                    if presc == None:
-                        raise ValidationError(
-                            "Registro inválido id_prescription: data base economia",
-                            "errors.invalidRecord",
-                            status.HTTP_400_BAD_REQUEST,
-                        )
+                i.date_base_economy = presc.date
+        else:
+            if id_prescription != 0:
+                presc: Prescription = (
+                    db.session.query(Prescription)
+                    .filter(Prescription.id == id_prescription)
+                    .first()
+                )
 
-                    i.date_base_economy = presc.date
-                else:
-                    presc = (
-                        db.session.query(PrescriptionDrug, Prescription)
-                        .join(
-                            Prescription,
-                            PrescriptionDrug.idPrescription == Prescription.id,
-                        )
-                        .filter(PrescriptionDrug.id == id_prescription_drug)
-                        .first()
+                if presc == None:
+                    raise ValidationError(
+                        "Registro inválido id_prescription: data base economia",
+                        "errors.invalidRecord",
+                        status.HTTP_400_BAD_REQUEST,
                     )
 
-                    if presc == None:
-                        raise ValidationError(
-                            "Registro inválido: data base economia",
-                            "errors.invalidRecord",
-                            status.HTTP_400_BAD_REQUEST,
-                        )
+                i.date_base_economy = presc.date
+            else:
+                presc = (
+                    db.session.query(PrescriptionDrug, Prescription)
+                    .join(
+                        Prescription,
+                        PrescriptionDrug.idPrescription == Prescription.id,
+                    )
+                    .filter(PrescriptionDrug.id == id_prescription_drug)
+                    .first()
+                )
 
-                    i.date_base_economy = presc[1].date
+                if presc == None:
+                    raise ValidationError(
+                        "Registro inválido: data base economia",
+                        "errors.invalidRecord",
+                        status.HTTP_400_BAD_REQUEST,
+                    )
+
+                i.date_base_economy = presc[1].date
 
     if i.admissionNumber != None and i.idDepartment == None:
         currentDepartment = (
