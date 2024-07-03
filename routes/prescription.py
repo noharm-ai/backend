@@ -20,12 +20,13 @@ from sqlalchemy import func, between, text
 from datetime import date, datetime
 from .drugList import DrugList
 from services import (
+    alert_service,
+    alert_interaction_service,
     memory_service,
     prescription_service,
     prescription_drug_service,
     intervention_service,
     patient_service,
-    alert_service,
     data_authorization_service,
 )
 from converter import prescription_converter
@@ -362,15 +363,12 @@ def getPrescription(
     interventions = intervention_service.get_interventions(
         admissionNumber=patient.admissionNumber
     )
-
-    relations = alert_service.find_relations(
-        drug_list=drugs, is_cpoe=is_cpoe, id_patient=patient.idPatient
-    )
     headers = (
         Prescription.getHeaders(admissionNumber, aggDate, idSegment, is_pmc, is_cpoe)
         if aggDate
         else []
     )
+
     formTemplate = memory_service.get_memory(MemoryEnum.PRESMED_FORM.value)
     admission_reports = memory_service.get_memory(MemoryEnum.ADMISSION_REPORTS.value)
     admission_reports_internal = memory_service.get_memory(
@@ -427,6 +425,17 @@ def getPrescription(
         exams, **{"age": age, "weight": patientWeight, "height": patientHeight}
     )
 
+    relations = alert_interaction_service.find_relations(
+        drug_list=drugs, is_cpoe=is_cpoe, id_patient=patient.idPatient
+    )
+    alerts = alert_service.find_alerts(
+        drug_list=drugs,
+        exams=exams,
+        dialisys=patient.dialysis,
+        pregnant=patient.pregnant,
+        lactating=patient.lactating,
+    )
+
     drugList = DrugList(
         drugs,
         interventions,
@@ -434,6 +443,7 @@ def getPrescription(
         exams,
         aggDate is not None,
         patient.dialysis,
+        alerts,
         is_cpoe,
     )
 

@@ -398,7 +398,18 @@ class Patient(db.Model):
 
         if len(indicators) > 0:
             for i in indicators:
-                q = q.filter(Prescription.features["alertStats"][i].as_integer() > 0)
+                interactions = ["it", "dt", "dm", "iy", "sl", "rx"]
+                if i in interactions:
+                    q = q.filter(
+                        Prescription.features["alertStats"]["interactions"][
+                            i
+                        ].as_integer()
+                        > 0
+                    )
+                else:
+                    q = q.filter(
+                        Prescription.features["alertStats"][i].as_integer() > 0
+                    )
 
         if len(drugAttributes) > 0:
             for a in drugAttributes:

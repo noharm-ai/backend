@@ -1,225 +1,712 @@
-from datetime import datetime
-from sqlalchemy import text
+import re
 
-from models.prescription import PrescriptionDrug, Allergy
-from models.main import db, Drug, Relation, Substance
-from models.enums import DrugTypeEnum
-from routes.utils import typeRelations, strNone
+from routes.utils import none2zero, strNone, strFormatBR
+from models.enums import DrugTypeEnum, DrugAlertTypeEnum, DrugAlertLevelEnum
+from models.prescription import (
+    PrescriptionDrug,
+    Drug,
+    DrugAttributes,
+)
 
 
-def find_relations(drug_list, id_patient: int, is_cpoe: bool):
+# analyze alerts
+# drug_list (PrescriptionDrug.findByPrescription)
+def find_alerts(drug_list, exams: dict, dialisys: str, pregnant: bool, lactating: bool):
     filtered_list = _filter_drug_list(drug_list=drug_list)
-    allergies = _get_allergies(id_patient=id_patient)
-    overlap_drugs = []
+    dose_total = _get_dose_total(drug_list=filtered_list, exams=exams)
+    alerts = {}
+    stats = _get_empty_stats()
+
+    def add_alert(a):
+        if a != None:
+            key = a["idPrescriptionDrug"]
+            stats[a["type"]] += 1
+            a["text"] = re.sub(" {2,}", "", a["text"])
+            a["text"] = re.sub("\n", "", a["text"])
+
+            if key not in alerts:
+                alerts[key] = [a]
+            else:
+                alerts[key].append(a)
 
     for item in filtered_list:
         prescription_drug: PrescriptionDrug = item[0]
         drug: Drug = item[1]
-        prescription_date = item[13]
-        prescription_expire_date = item[10] if item[10] != None else datetime.today()
-
-        for compare_item in filtered_list:
-            cp_prescription_drug: PrescriptionDrug = compare_item[0]
-            cp_drug: Drug = compare_item[1]
-            cp_prescription_date = compare_item[13]
-            cp_prescription_expire_date = (
-                compare_item[10] if compare_item[10] != None else datetime.today()
-            )
-
-            if prescription_drug.id == cp_prescription_drug.id:
-                continue
-
-            if is_cpoe:
-                # period overlap
-                if not (
-                    (prescription_date.date() <= cp_prescription_expire_date.date())
-                    and (cp_prescription_date.date() <= prescription_expire_date.date())
-                ):
-                    continue
-            else:
-                # same expire date
-                if not (prescription_expire_date == cp_prescription_expire_date):
-                    continue
-
-            overlap_drugs.append(
-                {
-                    "from": {
-                        "id": prescription_drug.id,
-                        "drug": drug.name,
-                        "sctid": drug.sctid,
-                        "intravenous": (
-                            prescription_drug.intravenous
-                            if prescription_drug.intravenous != None
-                            else False
-                        ),
-                        "group": _get_solution_group_key(
-                            pd=prescription_drug, is_cpoe=is_cpoe
-                        ),
-                        "expireDate": prescription_expire_date.isoformat(),
-                        "rx": False,
-                    },
-                    "to": {
-                        "id": cp_prescription_drug.id,
-                        "drug": cp_drug.name,
-                        "sctid": cp_drug.sctid,
-                        "intravenous": (
-                            cp_prescription_drug.intravenous
-                            if cp_prescription_drug.intravenous != None
-                            else False
-                        ),
-                        "group": _get_solution_group_key(
-                            pd=cp_prescription_drug, is_cpoe=is_cpoe
-                        ),
-                        "expireDate": cp_prescription_expire_date.isoformat(),
-                        "rx": False,
-                    },
-                }
-            )
-
-        for a in allergies:
-            overlap_drugs.append(
-                {
-                    "from": {
-                        "id": prescription_drug.id,
-                        "drug": drug.name,
-                        "sctid": drug.sctid,
-                        "intravenous": (
-                            prescription_drug.intravenous
-                            if prescription_drug.intravenous != None
-                            else False
-                        ),
-                        "group": _get_solution_group_key(
-                            pd=prescription_drug, is_cpoe=is_cpoe
-                        ),
-                        "expireDate": prescription_expire_date.isoformat(),
-                        "rx": True,
-                    },
-                    "to": a,
-                }
-            )
-
-    if len(overlap_drugs) == 0:
-        return {"alerts": {}, "list": {}, "stats": {}}
-
-    uniq_overlap_keys = []
-    for d in overlap_drugs:
-        key = f"""({d["from"]["sctid"]},{d["to"]["sctid"]})"""
-        if key not in uniq_overlap_keys:
-            uniq_overlap_keys.append(key)
-
-    query = text(
-        f"""
-        with cruzamento as (
-            select * from (values {",".join(uniq_overlap_keys)}) AS t (sctida, sctidb)
+        measure_unit_convert_factor = (
+            item.measure_unit_convert_factor
+            if item.measure_unit_convert_factor != None
+            else 1
         )
-        select
-            r.sctida,
-            r.sctidb,
-            r.tprelacao as "kind",
-            r.texto as "text"
-        from 
-            public.relacao r 
-            inner join cruzamento c on (r.sctida = c.sctida and r.sctidb = c.sctidb)
-        where 
-	        r.ativo = true
-    """
+        drug_attributes: DrugAttributes = item[6]
+        prescription_expire_date = item[10]
+
+        # kidney alert
+        add_alert(
+            _alert_kidney(
+                prescription_drug=prescription_drug,
+                drug_attributes=drug_attributes,
+                exams=exams,
+                dialysis=dialisys,
+            )
+        )
+
+        # liver alert
+        add_alert(
+            _alert_liver(
+                prescription_drug=prescription_drug,
+                drug_attributes=drug_attributes,
+                exams=exams,
+            )
+        )
+
+        # platelets
+        add_alert(
+            _alert_platelets(
+                prescription_drug=prescription_drug,
+                drug_attributes=drug_attributes,
+                exams=exams,
+            )
+        )
+
+        # elderly
+        add_alert(
+            _alert_elderly(
+                prescription_drug=prescription_drug,
+                drug_attributes=drug_attributes,
+                exams=exams,
+            )
+        )
+
+        # tube
+        add_alert(
+            _alert_tube(
+                prescription_drug=prescription_drug, drug_attributes=drug_attributes
+            )
+        )
+
+        # allergy
+        add_alert(_alert_allergy(prescription_drug=prescription_drug))
+
+        # maximum treatment period
+        add_alert(
+            _alert_max_time(
+                prescription_drug=prescription_drug, drug_attributes=drug_attributes
+            )
+        )
+
+        # max dose
+        add_alert(
+            _alert_max_dose(
+                prescription_drug=prescription_drug,
+                drug_attributes=drug_attributes,
+                exams=exams,
+                measure_unit_convert_factor=measure_unit_convert_factor,
+            )
+        )
+
+        # max dose total
+        add_alert(
+            _alert_max_dose_total(
+                prescription_drug=prescription_drug,
+                drug_attributes=drug_attributes,
+                exams=exams,
+                prescription_expire_date=prescription_expire_date,
+                dose_total=dose_total,
+            )
+        )
+
+        # IRA
+        add_alert(
+            _alert_ira(
+                prescription_drug=prescription_drug,
+                drug=drug,
+                exams=exams,
+                prescription_expire_date=prescription_expire_date,
+                dose_total=dose_total,
+                dialysis=dialisys,
+            )
+        )
+
+        # pregnant
+        add_alert(
+            _alert_pregnant(
+                prescription_drug=prescription_drug,
+                drug_attributes=drug_attributes,
+                pregnant=pregnant,
+            )
+        )
+
+        # lactating
+        add_alert(
+            _alert_lactating(
+                prescription_drug=prescription_drug,
+                drug_attributes=drug_attributes,
+                lactating=lactating,
+            )
+        )
+
+    return {"alerts": alerts, "stats": stats}
+
+
+def _get_empty_stats():
+    stats = {}
+    for t in DrugAlertTypeEnum:
+        stats[t.value] = 0
+
+    return stats
+
+
+def _create_alert(
+    id_prescription_drug: str,
+    key: str,
+    alert_type: DrugAlertTypeEnum,
+    alert_level: DrugAlertLevelEnum,
+    text: str,
+):
+    return {
+        "idPrescriptionDrug": id_prescription_drug,
+        "key": key,
+        "type": alert_type.value,
+        "level": alert_level.value,
+        "text": text,
+    }
+
+
+def _get_dose_conv(
+    prescription_drug: PrescriptionDrug,
+    drug_attributes: DrugAttributes,
+    measure_unit_convert_factor: float,
+):
+    pd_frequency = (
+        1
+        if prescription_drug.frequency in [33, 44, 55, 66, 99]
+        else prescription_drug.frequency
     )
 
-    active_relations = {}
+    if drug_attributes != None and drug_attributes.division != None:
+        return (
+            none2zero(prescription_drug.dose)
+            * (
+                measure_unit_convert_factor
+                if measure_unit_convert_factor != None
+                else 1
+            )
+            * none2zero(pd_frequency)
+        )
 
-    for item in db.session.execute(query).all():
-        key = f"{item.sctida}-{item.sctidb}-{item.kind}"
-        active_relations[key] = {
-            "sctida": item.sctida,
-            "sctidb": item.sctidb,
-            "kind": item.kind,
-            "text": item.text,
-        }
+    return none2zero(prescription_drug.doseconv) * none2zero(pd_frequency)
 
-    alerts = {}
-    relations = {}
-    stats = {}
-    unique_relations = {}
-    kinds = ["it", "dt", "dm", "iy", "sl", "rx"]
 
-    for kind in kinds:
-        stats[kind] = 0
+def _get_dose_total(drug_list, exams: dict):
+    dose_total = {}
+    for item in drug_list:
+        prescription_drug: PrescriptionDrug = item[0]
+        drug_attributes: DrugAttributes = item[6]
+        prescription_expire_date = item[10]
+        expireDay = prescription_expire_date.day if prescription_expire_date else 0
+        measure_unit_convert_factor = (
+            item.measure_unit_convert_factor
+            if item.measure_unit_convert_factor != None
+            else 1
+        )
+        pd_dose_conv = _get_dose_conv(
+            prescription_drug=prescription_drug,
+            drug_attributes=drug_attributes,
+            measure_unit_convert_factor=measure_unit_convert_factor,
+        )
 
-    for drug in overlap_drugs:
-        drug_from = drug["from"]
-        drug_to = drug["to"]
+        idDrugAgg = str(prescription_drug.idDrug) + "_" + str(expireDay)
+        idDrugAggWeight = str(idDrugAgg) + "kg"
 
-        for kind in kinds:
-            key = f"""{drug_from["sctid"]}-{drug_to["sctid"]}-{kind}"""
-            invert_key = f"""{drug_to["sctid"]}-{drug_from["sctid"]}-{kind}"""
+        # dose
+        if idDrugAgg not in dose_total:
+            dose_total[idDrugAgg] = {"value": pd_dose_conv, "count": 1}
+        else:
+            dose_total[idDrugAgg]["value"] += pd_dose_conv
+            dose_total[idDrugAgg]["count"] += 1
 
-            # iy must have intravenous route
-            if kind == "iy" and (
-                not drug_from["intravenous"] or not drug_to["intravenous"]
-            ):
-                continue
+        # dose / kg
+        weight = none2zero(exams["weight"])
+        weight = weight if weight > 0 else 1
+        doseWeight = round(pd_dose_conv / float(weight), 2)
 
-            # sl must be in the same group
-            if kind == "sl" and (drug_from["group"] != drug_to["group"]):
-                continue
+        if idDrugAggWeight not in dose_total:
+            dose_total[idDrugAggWeight] = {"value": doseWeight, "count": 1}
+        else:
+            dose_total[idDrugAggWeight]["value"] += doseWeight
+            dose_total[idDrugAggWeight]["count"] += 1
 
-            # rx rules
-            if kind == "rx":
-                if not drug_from["rx"]:
-                    continue
-            else:
-                if drug_from["rx"]:
-                    continue
+    return dose_total
 
-            if key in active_relations:
-                if is_cpoe:
-                    uniq_key = key
-                    uniq_invert_key = invert_key
-                else:
-                    uniq_key = f"""{key}-{drug_from["expireDate"]}"""
-                    uniq_invert_key = f"""{invert_key}-{drug_from["expireDate"]}"""
 
-                if (
-                    not uniq_key in unique_relations
-                    and not uniq_invert_key in unique_relations
-                ):
-                    stats[kind] += 1
-                    unique_relations[uniq_key] = 1
-                    unique_relations[uniq_invert_key] = 1
+def _alert_ira(
+    prescription_drug: PrescriptionDrug,
+    drug: Drug,
+    exams: dict,
+    prescription_expire_date,
+    dose_total: dict,
+    dialysis: str,
+):
+    alert = _create_alert(
+        id_prescription_drug=str(prescription_drug.id),
+        key="",
+        alert_type=DrugAlertTypeEnum.IRA,
+        alert_level=DrugAlertLevelEnum.HIGH,
+        text="",
+    )
 
-                alert = typeRelations[kind] + ": "
-                alert += (
-                    strNone(active_relations[key]["text"])
-                    + " ("
-                    + strNone(drug_from["drug"])
-                    + " e "
-                    + strNone(drug_to["drug"])
-                    + ")"
-                )
+    if drug and "vanco" in drug.name.lower():
+        expireDay = prescription_expire_date.day if prescription_expire_date else 0
+        idDrugAgg = str(prescription_drug.idDrug) + "_" + str(expireDay)
+        maxdose = dose_total[idDrugAgg]["value"]
+        ckd = (
+            exams["ckd"]["value"] if "ckd" in exams and exams["ckd"]["value"] else None
+        )
+        weight = exams["weight"]
 
-                relation = {
-                    "key": key,
-                    "kind": kind,
-                    "to": drug_to["id"],
-                }
+        if (
+            maxdose != None
+            and ckd != None
+            and weight != None
+            and ckd > 0
+            and weight > 0
+        ):
+            ira = maxdose / ckd / weight
+            maxira = 0.6219
 
-                if kind == "dm":
-                    # one way
-                    ids = [drug_from["id"]]
-                else:
-                    # both ways
-                    ids = [drug_from["id"], drug_to["id"]]
+            if ira > maxira and dialysis is None:
+                alert[
+                    "text"
+                ] = f"""
+                    Risco de desenvolvimento de Insuficiência Renal Aguda (IRA), já que o resultado do cálculo 
+                    [dose diária de VANCOMICINA/TFG/peso] é superior a 0,6219. Caso o paciente esteja em diálise, 
+                    desconsiderar. <a href="https://revista.ghc.com.br/index.php/cadernosdeensinoepesquisa/issue/view/3" target="_blank">Referência: CaEPS</a>
+                """
 
-                for id in ids:
-                    if id in alerts:
-                        relations[id].append(relation)
-                        if alert not in alerts[id]:
-                            alerts[id].append(alert)
-                    else:
-                        alerts[id] = [alert]
-                        relations[id] = [relation]
+                return alert
 
-    return {"alerts": alerts, "list": relations, "stats": stats}
+    return None
+
+
+def _alert_max_dose(
+    prescription_drug: PrescriptionDrug,
+    drug_attributes: DrugAttributes,
+    exams: dict,
+    measure_unit_convert_factor: float,
+):
+    if not drug_attributes:
+        return None
+
+    pd_dose_conv = _get_dose_conv(
+        prescription_drug=prescription_drug,
+        drug_attributes=drug_attributes,
+        measure_unit_convert_factor=measure_unit_convert_factor,
+    )
+    alert = _create_alert(
+        id_prescription_drug=str(prescription_drug.id),
+        key="",
+        alert_type=DrugAlertTypeEnum.MAX_DOSE,
+        alert_level=DrugAlertLevelEnum.HIGH,
+        text="",
+    )
+
+    if drug_attributes.useWeight and prescription_drug.dose:
+        weight = none2zero(exams["weight"])
+        weight = weight if weight > 0 else 1
+        doseWeight = round(pd_dose_conv / float(weight), 2)
+
+        if drug_attributes.maxDose and drug_attributes.maxDose < doseWeight:
+            alert[
+                "text"
+            ] = f"""
+                Dose diária prescrita ({strFormatBR(doseWeight)} {str(drug_attributes.idMeasureUnit)}/Kg) 
+                maior que a dose de alerta 
+                ({strFormatBR(drug_attributes.maxDose)} {str(drug_attributes.idMeasureUnit)}/Kg) 
+                usualmente recomendada (considerada a dose diária independente da indicação).
+            """
+
+            return alert
+
+    else:
+        if drug_attributes.maxDose and drug_attributes.maxDose < pd_dose_conv:
+            alert[
+                "text"
+            ] = f"""
+                Dose diária prescrita ({str(pd_dose_conv)} {str(drug_attributes.idMeasureUnit)}) 
+                maior que a dose de alerta ({str(drug_attributes.maxDose)} {str(drug_attributes.idMeasureUnit)}) 
+                usualmente recomendada (considerada a dose diária independente da indicação).
+            """
+
+            return alert
+
+    return None
+
+
+def _alert_max_dose_total(
+    prescription_drug: PrescriptionDrug,
+    drug_attributes: DrugAttributes,
+    exams: dict,
+    prescription_expire_date,
+    dose_total,
+):
+    if not drug_attributes:
+        return None
+
+    alert = _create_alert(
+        id_prescription_drug=str(prescription_drug.id),
+        key="",
+        alert_type=DrugAlertTypeEnum.MAX_DOSE,
+        alert_level=DrugAlertLevelEnum.HIGH,
+        text="",
+    )
+
+    expireDay = prescription_expire_date.day if prescription_expire_date else 0
+    idDrugAgg = str(prescription_drug.idDrug) + "_" + str(expireDay)
+    idDrugAggWeight = str(idDrugAgg) + "kg"
+
+    if drug_attributes.useWeight and prescription_drug.dose:
+        weight = none2zero(exams["weight"])
+        weight = weight if weight > 0 else 1
+
+        if (
+            drug_attributes.maxDose
+            and idDrugAggWeight in dose_total
+            and dose_total[idDrugAggWeight]["count"] > 1
+            and drug_attributes.maxDose
+            < none2zero(dose_total[idDrugAggWeight]["value"])
+        ):
+            alert[
+                "text"
+            ] = f"""
+                Dose diária prescrita SOMADA (
+                {str(dose_total[idDrugAggWeight]["value"])} {str(drug_attributes.idMeasureUnit)}/Kg) maior 
+                que a dose de alerta (
+                {str(drug_attributes.maxDose)} {str(drug_attributes.idMeasureUnit)}/Kg) 
+                usualmente recomendada (considerada a dose diária independente da indicação)."
+            """
+
+            return alert
+
+    else:
+        if (
+            drug_attributes.maxDose
+            and idDrugAgg in dose_total
+            and dose_total[idDrugAgg]["count"] > 1
+            and drug_attributes.maxDose < none2zero(dose_total[idDrugAgg]["value"])
+        ):
+            alert[
+                "text"
+            ] = f"""
+                Dose diária prescrita SOMADA (
+                {str(dose_total[idDrugAgg]["value"])} {str(drug_attributes.idMeasureUnit)}) maior que a 
+                dose de alerta ({str(drug_attributes.maxDose)} {str(drug_attributes.idMeasureUnit)}) 
+                usualmente recomendada (considerada a dose diária independente da indicação).
+            """
+
+            return alert
+
+    return None
+
+
+def _alert_max_time(
+    prescription_drug: PrescriptionDrug, drug_attributes: DrugAttributes
+):
+    alert = _create_alert(
+        id_prescription_drug=str(prescription_drug.id),
+        key="",
+        alert_type=DrugAlertTypeEnum.MAX_TIME,
+        alert_level=DrugAlertLevelEnum.HIGH,
+        text="",
+    )
+
+    if (
+        drug_attributes
+        and drug_attributes.maxTime
+        and prescription_drug.period
+        and prescription_drug.period > drug_attributes.maxTime
+    ):
+        alert[
+            "text"
+        ] = f"""
+          Tempo de tratamento atual ({str(prescription_drug.period)} dias) maior que o tempo máximo de tratamento ( 
+          {str(drug_attributes.maxTime)} dias) usualmente recomendado.
+        """
+
+        return alert
+
+    return None
+
+
+def _alert_pregnant(
+    prescription_drug: PrescriptionDrug, drug_attributes: DrugAttributes, pregnant: bool
+):
+    alert = _create_alert(
+        id_prescription_drug=str(prescription_drug.id),
+        key="",
+        alert_type=DrugAlertTypeEnum.PREGNANT,
+        alert_level=DrugAlertLevelEnum.HIGH,
+        text="",
+    )
+
+    if pregnant and drug_attributes != None:
+        if drug_attributes.pregnant == "D" or drug_attributes.pregnant == "X":
+            alert["text"] = (
+                f"Paciente gestante com medicamento classificado como {drug_attributes.pregnant} prescrito. Avaliar manutenção deste medicamento com a equipe médica."
+            )
+
+            return alert
+
+    return None
+
+
+def _alert_lactating(
+    prescription_drug: PrescriptionDrug,
+    drug_attributes: DrugAttributes,
+    lactating: bool,
+):
+    alert = _create_alert(
+        id_prescription_drug=str(prescription_drug.id),
+        key="",
+        alert_type=DrugAlertTypeEnum.LACTATING,
+        alert_level=DrugAlertLevelEnum.MEDIUM,
+        text="",
+    )
+
+    if lactating and drug_attributes != None and drug_attributes.lactating == "3":
+        alert["text"] = (
+            f"""Paciente amamentando com medicamento classificado como Alto risco prescrito.
+            Avaliar manutenção deste medicamento com a equipe médica ou cessação da amamentação."""
+        )
+
+        return alert
+
+    return None
+
+
+def _alert_allergy(prescription_drug: PrescriptionDrug):
+    alert = _create_alert(
+        id_prescription_drug=str(prescription_drug.id),
+        key="",
+        alert_type=DrugAlertTypeEnum.ALLERGY,
+        alert_level=DrugAlertLevelEnum.HIGH,
+        text="",
+    )
+
+    if prescription_drug.allergy == "S":
+        alert["text"] = "Paciente alérgico a este medicamento."
+
+        return alert
+
+    return None
+
+
+def _alert_tube(prescription_drug: PrescriptionDrug, drug_attributes: DrugAttributes):
+    alert = _create_alert(
+        id_prescription_drug=str(prescription_drug.id),
+        key="",
+        alert_type=DrugAlertTypeEnum.TUBE,
+        alert_level=DrugAlertLevelEnum.HIGH,
+        text="",
+    )
+
+    if drug_attributes and drug_attributes.tube and prescription_drug.tube:
+        alert["text"] = (
+            f"""Medicamento contraindicado via sonda ({strNone(prescription_drug.route)})"""
+        )
+
+        return alert
+
+    return None
+
+
+def _alert_elderly(
+    prescription_drug: PrescriptionDrug, drug_attributes: DrugAttributes, exams: dict
+):
+    if not drug_attributes or not exams:
+        return None
+
+    alert = _create_alert(
+        id_prescription_drug=str(prescription_drug.id),
+        key="",
+        alert_type=DrugAlertTypeEnum.ELDERLY,
+        alert_level=DrugAlertLevelEnum.LOW,
+        text="",
+    )
+
+    if drug_attributes.elderly and exams["age"] > 60:
+        alert[
+            "text"
+        ] = f"""
+            Medicamento potencialmente inapropriado para idosos, independente das comorbidades do paciente.
+        """
+
+        return alert
+
+    return None
+
+
+def _alert_platelets(
+    prescription_drug: PrescriptionDrug, drug_attributes: DrugAttributes, exams: dict
+):
+    if not drug_attributes or not exams:
+        return None
+
+    if not drug_attributes.platelets:
+        return None
+
+    alert = _create_alert(
+        id_prescription_drug=str(prescription_drug.id),
+        key="",
+        alert_type=DrugAlertTypeEnum.LIVER,
+        alert_level=DrugAlertLevelEnum.HIGH,
+        text="",
+    )
+
+    if (
+        "plqt" in exams
+        and exams["plqt"]["value"]
+        and drug_attributes.platelets > exams["plqt"]["value"]
+    ):
+        alert[
+            "text"
+        ] = f"""
+            Medicamento contraindicado para paciente com plaquetas ({str(exams["plqt"]["value"])} plaquetas/µL)
+            abaixo de {str(drug_attributes.platelets)} plaquetas/µL.
+        """
+
+        return alert
+
+    return None
+
+
+def _alert_liver(
+    prescription_drug: PrescriptionDrug, drug_attributes: DrugAttributes, exams: dict
+):
+    if not drug_attributes or not exams:
+        return None
+
+    if not drug_attributes.liver:
+        return None
+
+    alert = _create_alert(
+        id_prescription_drug=str(prescription_drug.id),
+        key="",
+        alert_type=DrugAlertTypeEnum.LIVER,
+        alert_level=DrugAlertLevelEnum.MEDIUM,
+        text="",
+    )
+
+    if (
+        "tgp" in exams
+        and exams["tgp"]["value"]
+        and float(exams["tgp"]["value"]) > drug_attributes.liver
+    ) or (
+        "tgo" in exams
+        and exams["tgo"]["value"]
+        and float(exams["tgo"]["value"]) > drug_attributes.liver
+    ):
+        alert[
+            "text"
+        ] = f"""
+            Medicamento deve sofrer ajuste de posologia ou contraindicado, já que a função hepática do paciente 
+            está reduzida (acima de {str(drug_attributes.liver)} U/L).
+        """
+
+        return alert
+
+    return None
+
+
+def _alert_kidney(
+    prescription_drug: PrescriptionDrug,
+    drug_attributes: DrugAttributes,
+    exams: dict,
+    dialysis: str,
+):
+    if not drug_attributes or not exams:
+        return None
+
+    if not drug_attributes.kidney:
+        return None
+
+    alert = _create_alert(
+        id_prescription_drug=str(prescription_drug.id),
+        key="",
+        alert_type=DrugAlertTypeEnum.KIDNEY,
+        alert_level=DrugAlertLevelEnum.MEDIUM,
+        text="",
+    )
+
+    if dialysis == "c":
+        alert["text"] = (
+            "Medicamento é contraindicado ou deve sofrer ajuste de posologia, já que o paciente está em diálise contínua."
+        )
+
+        return alert
+
+    if dialysis == "x":
+        alert["text"] = (
+            "Medicamento é contraindicado ou deve sofrer ajuste de posologia, já que o paciente está em diálise estendida, também conhecida como SLED."
+        )
+        return alert
+
+    if dialysis == "v":
+        alert["text"] = (
+            "Medicamento é contraindicado ou deve sofrer ajuste de posologia, já que o paciente está em diálise intermitente."
+        )
+        return alert
+
+    if dialysis == "p":
+        alert["text"] = (
+            "Medicamento é contraindicado ou deve sofrer ajuste de posologia, já que o paciente está em diálise peritoneal."
+        )
+        return alert
+
+    if (
+        "ckd" in exams
+        and exams["ckd"]["value"]
+        and drug_attributes.kidney > exams["ckd"]["value"]
+        and exams["age"] > 17
+    ):
+        alert[
+            "text"
+        ] = f"""
+            Medicamento deve sofrer ajuste de posologia ou contraindicado, já que a função renal do paciente (
+            {str(exams["ckd"]["value"])} mL/min) está abaixo de {str(drug_attributes.kidney)} mL/min.
+        """
+        return alert
+
+    if (
+        "swrtz2" in exams
+        and exams["swrtz2"]["value"]
+        and drug_attributes[6].kidney > exams["swrtz2"]["value"]
+        and exams["age"] <= 17
+    ):
+        alert[
+            "text"
+        ] = f"""
+            Medicamento deve sofrer ajuste de posologia ou contraindicado, já que a função renal do paciente 
+            ({str(exams["swrtz2"]["value"])} mL/min/1.73m²) está abaixo de 
+            {str(drug_attributes[6].kidney)} mL/min. (Schwartz 2)
+        """
+        return alert
+
+    if (
+        "swrtz1" in exams
+        and exams["swrtz1"]["value"]
+        and drug_attributes[6].kidney > exams["swrtz1"]["value"]
+        and exams["age"] <= 17
+    ):
+        alert[
+            "text"
+        ] = f"""
+            Medicamento deve sofrer ajuste de posologia ou contraindicado, já que a função renal do paciente 
+            ({str(exams["swrtz1"]["value"])} mL/min/1.73m²) está abaixo de {str(drug_attributes[6].kidney)} 
+            mL/min. (Schwartz 1)
+        """
+        return alert
+
+    return None
 
 
 def _filter_drug_list(drug_list):
@@ -232,52 +719,13 @@ def _filter_drug_list(drug_list):
 
     for item in drug_list:
         prescription_drug: PrescriptionDrug = item[0]
-        drug: Drug = item[1]
+
         if prescription_drug.source not in valid_sources:
             continue
 
         if prescription_drug.suspendedDate != None:
             continue
 
-        if drug == None or drug.sctid == None:
-            continue
-
         filtered_list.append(item)
 
     return filtered_list
-
-
-def _get_solution_group_key(pd: PrescriptionDrug, is_cpoe: bool):
-    if is_cpoe:
-        return f"{pd.idPrescription}-{pd.cpoe_group}"
-    else:
-        return f"{pd.idPrescription}-{pd.solutionGroup}"
-
-
-def _get_allergies(id_patient: int):
-    allergies = (
-        db.session.query(Substance.id, Substance.name)
-        .select_from(Allergy)
-        .join(Drug, Allergy.idDrug == Drug.id)
-        .join(Substance, Substance.id == Drug.sctid)
-        .filter(Allergy.idPatient == id_patient)
-        .filter(Allergy.active == True)
-        .group_by(Substance.id, Substance.name)
-        .all()
-    )
-
-    results = []
-    for a in allergies:
-        if a.id != None:
-            results.append(
-                {
-                    "id": None,
-                    "drug": a.name,
-                    "sctid": a.id,
-                    "intravenous": False,
-                    "group": None,
-                    "rx": True,
-                }
-            )
-
-    return results

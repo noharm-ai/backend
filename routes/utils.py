@@ -465,7 +465,7 @@ def getFeatures(result):
     drugList.extend(result["data"]["solution"])
     drugList.extend(result["data"]["procedures"])
 
-    allergy = alerts = pScore = score1 = score2 = score3 = 0
+    allergy = alerts = alerts_prescription = pScore = score1 = score2 = score3 = 0
     am = av = control = np = tube = diff = 0
     drugIDs = []
     substanceIDs = []
@@ -492,7 +492,7 @@ def getFeatures(result):
             continue
 
         allergy += int(d["allergy"])
-        alerts += len(d["alerts"])
+        alerts_prescription += len(d["alerts"])
         pScore += int(d["score"])
         score1 += int(d["score"] == "1")
         score2 += int(d["score"] == "2")
@@ -513,6 +513,13 @@ def getFeatures(result):
 
     exams = result["data"]["alertExams"]
     complicationCount = result["data"]["complication"]
+
+    if "alertStats" in result["data"]:
+        # entire prescription (agg features)
+        alerts = result["data"]["alertStats"]["total"]
+    else:
+        # headers
+        alerts = alerts_prescription
 
     return {
         "alergy": allergy,
