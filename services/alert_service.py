@@ -215,6 +215,10 @@ def _get_dose_total(drug_list, exams: dict):
             measure_unit_convert_factor=measure_unit_convert_factor,
         )
 
+        if prescription_drug.frequency in [66]:
+            # do not sum some types of frequency
+            continue
+
         idDrugAgg = str(prescription_drug.idDrug) + "_" + str(expireDay)
         idDrugAggWeight = str(idDrugAgg) + "kg"
 
@@ -382,7 +386,7 @@ def _alert_max_dose_total(
                 {str(dose_total[idDrugAggWeight]["value"])} {str(drug_attributes.idMeasureUnit)}/Kg) maior 
                 que a dose de alerta (
                 {str(drug_attributes.maxDose)} {str(drug_attributes.idMeasureUnit)}/Kg) 
-                usualmente recomendada (considerada a dose diária independente da indicação)."
+                usualmente recomendada (Frequência "AGORA" não é considerada no cálculo)."
             """
 
             return alert
@@ -400,7 +404,7 @@ def _alert_max_dose_total(
                 Dose diária prescrita SOMADA (
                 {str(dose_total[idDrugAgg]["value"])} {str(drug_attributes.idMeasureUnit)}) maior que a 
                 dose de alerta ({str(drug_attributes.maxDose)} {str(drug_attributes.idMeasureUnit)}) 
-                usualmente recomendada (considerada a dose diária independente da indicação).
+                usualmente recomendada (Frequência "AGORA" não é considerada no cálculo).
             """
 
             return alert
