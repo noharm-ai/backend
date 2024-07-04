@@ -121,7 +121,8 @@ def find_relations(drug_list, id_patient: int, is_cpoe: bool):
             r.sctida,
             r.sctidb,
             r.tprelacao as "kind",
-            r.texto as "text"
+            r.texto as "text",
+            r.nivel as "level"
         from 
             public.relacao r 
             inner join cruzamento c on (r.sctida = c.sctida and r.sctidb = c.sctidb)
@@ -139,6 +140,7 @@ def find_relations(drug_list, id_patient: int, is_cpoe: bool):
             "sctidb": item.sctidb,
             "kind": item.kind,
             "text": item.text,
+            "level": item.level,
         }
 
     alerts = {}
@@ -215,7 +217,11 @@ def find_relations(drug_list, id_patient: int, is_cpoe: bool):
                         "idPrescriptionDrug": id,
                         "key": key,
                         "type": kind,
-                        "level": _get_alert_level(kind),
+                        "level": (
+                            active_relations[key]["level"]
+                            if active_relations[key]["level"] != None
+                            else DrugAlertLevelEnum.LOW
+                        ),
                         "relation": drug_to["id"],
                         "text": alert_text,
                     }
@@ -229,16 +235,6 @@ def find_relations(drug_list, id_patient: int, is_cpoe: bool):
                         alerts[id] = [alert_obj]
 
     return {"alerts": alerts, "stats": stats}
-
-
-def _get_alert_level(kind):
-    if kind in ["iy", "it", "rx"]:
-        return DrugAlertLevelEnum.LOW.value
-
-    if kind in ["dm", "dt"]:
-        return DrugAlertLevelEnum.MEDIUM.value
-
-    return DrugAlertLevelEnum.HIGH.value
 
 
 def _filter_drug_list(drug_list):

@@ -453,6 +453,11 @@ def _alert_pregnant(
             alert["text"] = (
                 f"Paciente gestante com medicamento classificado como {drug_attributes.pregnant} prescrito. Avaliar manutenção deste medicamento com a equipe médica."
             )
+            alert["level"] = (
+                DrugAlertLevelEnum.HIGH.value
+                if drug_attributes.pregnant == "X"
+                else DrugAlertLevelEnum.MEDIUM.value
+            )
 
             return alert
 
