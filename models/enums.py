@@ -71,6 +71,7 @@ class PrescriptionAuditTypeEnum(Enum):
     UNDO_REVISION = 4
     INTEGRATION_CLINICAL_NOTES = 5
     INTEGRATION_PRESCRIPTION_RELEASE = 6
+    UPSERT_CLINICAL_NOTES = 7
 
 
 class PrescriptionDrugAuditTypeEnum(Enum):
@@ -132,3 +133,23 @@ class NifiQueueActionTypeEnum(Enum):
     CLEAR_STATE = "CLEAR_STATE"
     TERMINATE_PROCESS = "TERMINATE_PROCESS"
     CUSTOM_CALLBACK = "CUSTOM_CALLBACK"
+
+
+class DrugAlertTypeEnum(Enum):
+    KIDNEY = "kidney"
+    LIVER = "liver"
+    PLATELETS = "platelets"
+    ELDERLY = "elderly"
+    TUBE = "tube"
+    ALLERGY = "allergy"
+    MAX_TIME = "maxTime"
+    MAX_DOSE = "maxDose"
+    IRA = "ira"
+    PREGNANT = "pregnant"
+    LACTATING = "lactating"
+
+
+class DrugAlertLevelEnum(Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"

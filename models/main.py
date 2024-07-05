@@ -113,6 +113,7 @@ class Relation(db.Model):
     sctidb = db.Column("sctidb", db.BigInteger, primary_key=True)
     kind = db.Column("tprelacao", db.String(2), primary_key=True)
     text = db.Column("texto", db.String, nullable=True)
+    level = db.Column("nivel", db.String, nullable=True)
     active = db.Column("ativo", db.Boolean, nullable=True)
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.BigInteger, nullable=True)
@@ -146,6 +147,7 @@ class Relation(db.Model):
                     "type": r[0].kind,
                     "text": r[0].text,
                     "active": r[0].active,
+                    "level": r[0].level,
                     "editable": bool(r[0].creator == user.id)
                     or (not User.permission(user)),
                 }

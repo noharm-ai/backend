@@ -178,6 +178,9 @@ def setRelation(sctidA, sctidB, kind):
     if "active" in data.keys():
         relation.active = bool(data.get("active", False))
 
+    if "level" in data.keys():
+        relation.level = data.get("level", None)
+
     relation.update = datetime.today()
     relation.user = user.id
 
