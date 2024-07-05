@@ -1,5 +1,6 @@
 import os
 import random
+import logging
 from utils import status
 from models.main import *
 from models.appendix import *
@@ -190,7 +191,7 @@ def getPrescriptions():
                         id_segment=p[0].idSegment,
                         pdate=p[0].date,
                     ),
-                }
+                },
             )
         )
 
@@ -307,6 +308,14 @@ def getExistIntervention(interventions, dtPrescription):
     return result
 
 
+def _log_perf(start_date, section):
+    end_date = datetime.now()
+    logging.basicConfig()
+    logger = logging.getLogger("noharm.backend")
+
+    logger.debug(f"PERF {section}: {(end_date-start_date).total_seconds()}")
+
+
 def getPrescription(
     idPrescription=None,
     admissionNumber=None,
@@ -316,6 +325,8 @@ def getPrescription(
     is_pmc=False,
     is_complete=False,
 ):
+    start_date = datetime.now()
+
     if idPrescription:
         prescription = Prescription.getPrescription(idPrescription)
     else:
@@ -357,6 +368,9 @@ def getPrescription(
         ref_date=aggDate if aggDate != None else prescription[0].date,
     )
 
+    _log_perf(start_date, "GET PRESCRIPTION")
+
+    start_date = datetime.now()
     drugs = PrescriptionDrug.findByPrescription(
         prescription[0].id, patient.admissionNumber, aggDate, idSegment, is_cpoe, is_pmc
     )
@@ -368,6 +382,7 @@ def getPrescription(
         if aggDate
         else []
     )
+    _log_perf(start_date, "GET DRUGS AND INTERVENTIONS")
 
     formTemplate = memory_service.get_memory(MemoryEnum.PRESMED_FORM.value)
     admission_reports = memory_service.get_memory(MemoryEnum.ADMISSION_REPORTS.value)
@@ -375,12 +390,14 @@ def getPrescription(
         MemoryEnum.ADMISSION_REPORTS_INTERNAL.value
     )
 
+    start_date = datetime.now()
     clinicalNotesCount = ClinicalNotes.getCountIfExists(
         prescription[0].admissionNumber, is_pmc
     )
     notesTotal = ClinicalNotes.getTotalIfExists(
         prescription[0].admissionNumber, admission_date=patient.admissionDate
     )
+
     notesSigns = None
     notesInfo = None
     notesAllergies = []
@@ -404,6 +421,9 @@ def getPrescription(
         for a in dialysis:
             notesDialysis.append({"date": a[1].isoformat(), "text": a[0], "id": a[3]})
 
+    _log_perf(start_date, "GET CLINICAL NOTES")
+
+    start_date = datetime.now()
     registeredAllergies = patient_service.get_patient_allergies(patient.idPatient)
     for a in registeredAllergies:
         notesAllergies.append({"date": a[0], "text": a[1], "source": "pep"})
@@ -424,7 +444,9 @@ def getPrescription(
     exams = dict(
         exams, **{"age": age, "weight": patientWeight, "height": patientHeight}
     )
+    _log_perf(start_date, "ALLERGIES AND EXAMS")
 
+    start_date = datetime.now()
     relations = alert_interaction_service.find_relations(
         drug_list=drugs, is_cpoe=is_cpoe, id_patient=patient.idPatient
     )
@@ -446,7 +468,9 @@ def getPrescription(
         alerts,
         is_cpoe,
     )
+    _log_perf(start_date, "ALERTS")
 
+    start_date = datetime.now()
     disable_solution_tab = memory_service.has_feature(
         FeatureEnum.DISABLE_SOLUTION_TAB.value
     )
@@ -520,6 +544,8 @@ def getPrescription(
         for i in interventions
         if int(i["id"]) == 0 and int(i["idPrescription"]) == prescription[0].id
     ]
+
+    _log_perf(start_date, "ADDITIONAL QUERIES")
 
     return {
         "status": "success",
@@ -660,6 +686,22 @@ def setPrescriptionData(idPrescription):
     if "notes" in data.keys():
         p.notes = data.get("notes", None)
         p.notes_at = datetime.today()
+
+        audit = PrescriptionAudit()
+        audit.auditType = PrescriptionAuditTypeEnum.UPSERT_CLINICAL_NOTES.value
+        audit.admissionNumber = p.admissionNumber
+        audit.idPrescription = p.id
+        audit.prescriptionDate = p.date
+        audit.idDepartment = p.idDepartment
+        audit.idSegment = p.idSegment
+        audit.totalItens = 0
+        audit.agg = p.agg
+        audit.concilia = p.concilia
+        audit.bed = p.bed
+        audit.extra = {"text": data.get("notes", None)}
+        audit.createdAt = datetime.today()
+        audit.createdBy = user.id
+        db.session.add(audit)
 
     if "concilia" in data.keys():
         concilia = data.get("concilia", "s")

@@ -71,6 +71,7 @@ class PrescriptionAuditTypeEnum(Enum):
     UNDO_REVISION = 4
     INTEGRATION_CLINICAL_NOTES = 5
     INTEGRATION_PRESCRIPTION_RELEASE = 6
+    UPSERT_CLINICAL_NOTES = 7
 
 
 class PrescriptionDrugAuditTypeEnum(Enum):
