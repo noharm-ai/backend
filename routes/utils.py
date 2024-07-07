@@ -472,6 +472,8 @@ def getFeatures(result):
     substanceClassIDs = []
     frequencies = []
     drug_attributes = {}
+    alert_levels = []
+    alert_level = "low"
 
     for attr in get_bool_drug_attributes_list():
         drug_attributes[attr] = 0
@@ -492,7 +494,7 @@ def getFeatures(result):
             continue
 
         allergy += int(d["allergy"])
-        alerts_prescription += len(d["alerts"])
+        alerts_prescription += len(d["alertsComplete"])
         pScore += int(d["score"])
         score1 += int(d["score"] == "1")
         score2 += int(d["score"] == "2")
@@ -507,6 +509,9 @@ def getFeatures(result):
         if d["frequency"]["value"] != "":
             frequencies.append(d["frequency"]["value"])
 
+        for a in d["alertsComplete"]:
+            alert_levels.append(a["level"])
+
     interventions = 0
     for i in result["data"]["interventions"]:
         interventions += int(i["status"] == "s")
@@ -517,14 +522,22 @@ def getFeatures(result):
     if "alertStats" in result["data"]:
         # entire prescription (agg features)
         alerts = result["data"]["alertStats"]["total"]
+        alert_level = result["data"]["alertStats"].get("level", "low")
     else:
         # headers
         alerts = alerts_prescription
+
+        if "medium" in alert_levels:
+            alert_level = "medium"
+
+        if "high" in alert_levels:
+            alert_level = "high"
 
     return {
         "alergy": allergy,
         "allergy": allergy,
         "alerts": alerts,
+        "alertLevel": alert_level,
         "prescriptionScore": pScore,
         "scoreOne": score1,
         "scoreTwo": score2,

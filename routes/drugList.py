@@ -55,6 +55,7 @@ class DrugList:
             "allergy": 0,  # allergy + rea,
             "interactions": {},
             "total": 0,
+            "level": "low",
         }
 
     def sumAlerts(self):
@@ -87,6 +88,23 @@ class DrugList:
             + self.alertStats["liver"]
             + self.alertStats["platelets"]
         )
+
+        levels = []
+        if self.relations["alerts"]:
+            for k, v in self.relations["alerts"].items():
+                for alert in v:
+                    levels.append(alert["level"])
+
+        if self.alerts["alerts"]:
+            for k, v in self.alerts["alerts"].items():
+                for alert in v:
+                    levels.append(alert["level"])
+
+        if "medium" in levels:
+            self.alertStats["level"] = "medium"
+
+        if "high" in levels:
+            self.alertStats["level"] = "high"
 
     @staticmethod
     def sortDrugs(d):
@@ -294,7 +312,7 @@ class DrugList:
                         pd[0].idDrug, pd[0].idPrescription
                     ),
                     # remove alerts attribute after migration to alertsComplete
-                    "alerts": alerts,
+                    # "alerts": alerts,
                     "alertsComplete": alerts_complete,
                     "tubeAlert": tubeAlert,
                     "notes": pd[7],
