@@ -727,6 +727,7 @@ def setPrescriptionStatus():
         else None
     )
     evaluation_time = data.get("evaluationTime", None)
+    alerts = data.get("alerts", [])
 
     try:
         result = prescription_service.check_prescription(
@@ -734,6 +735,7 @@ def setPrescriptionStatus():
             p_status=p_status,
             user=user,
             evaluation_time=evaluation_time,
+            alerts=alerts,
         )
     except ValidationError as e:
         return {
