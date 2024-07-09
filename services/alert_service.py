@@ -566,7 +566,7 @@ def _alert_platelets(
     alert = _create_alert(
         id_prescription_drug=str(prescription_drug.id),
         key="",
-        alert_type=DrugAlertTypeEnum.LIVER,
+        alert_type=DrugAlertTypeEnum.PLATELETS,
         alert_level=DrugAlertLevelEnum.HIGH,
         text="",
     )
