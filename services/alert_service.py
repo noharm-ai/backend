@@ -688,7 +688,7 @@ def _alert_kidney(
     if (
         "swrtz2" in exams
         and exams["swrtz2"]["value"]
-        and drug_attributes[6].kidney > exams["swrtz2"]["value"]
+        and drug_attributes.kidney > exams["swrtz2"]["value"]
         and exams["age"] <= 17
     ):
         alert[
@@ -696,21 +696,21 @@ def _alert_kidney(
         ] = f"""
             Medicamento deve sofrer ajuste de posologia ou contraindicado, já que a função renal do paciente 
             ({str(exams["swrtz2"]["value"])} mL/min/1.73m²) está abaixo de 
-            {str(drug_attributes[6].kidney)} mL/min. (Schwartz 2)
+            {str(drug_attributes.kidney)} mL/min. (Schwartz 2)
         """
         return alert
 
     if (
         "swrtz1" in exams
         and exams["swrtz1"]["value"]
-        and drug_attributes[6].kidney > exams["swrtz1"]["value"]
+        and drug_attributes.kidney > exams["swrtz1"]["value"]
         and exams["age"] <= 17
     ):
         alert[
             "text"
         ] = f"""
             Medicamento deve sofrer ajuste de posologia ou contraindicado, já que a função renal do paciente 
-            ({str(exams["swrtz1"]["value"])} mL/min/1.73m²) está abaixo de {str(drug_attributes[6].kidney)} 
+            ({str(exams["swrtz1"]["value"])} mL/min/1.73m²) está abaixo de {str(drug_attributes.kidney)} 
             mL/min. (Schwartz 1)
         """
         return alert
