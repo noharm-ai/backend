@@ -262,7 +262,7 @@ def _alert_ira(
     if drug and "vanco" in drug.name.lower():
         expireDay = prescription_expire_date.day if prescription_expire_date else 0
         idDrugAgg = str(prescription_drug.idDrug) + "_" + str(expireDay)
-        maxdose = dose_total[idDrugAgg]["value"]
+        maxdose = dose_total[idDrugAgg]["value"] if idDrugAgg in dose_total else None
         ckd = (
             exams["ckd"]["value"] if "ckd" in exams and exams["ckd"]["value"] else None
         )
