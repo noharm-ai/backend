@@ -19,11 +19,20 @@ def _get_legacy_alert(kind):
 
 class DrugList:
     def __init__(
-        self, drugList, interventions, relations, exams, agg, dialysis, is_cpoe=False
+        self,
+        drugList,
+        interventions,
+        relations,
+        exams,
+        agg,
+        dialysis,
+        alerts,
+        is_cpoe=False,
     ):
         self.drugList = drugList
         self.interventions = interventions
         self.relations = relations
+        self.alerts = alerts
         self.exams = exams
         self.agg = agg
         self.dialysis = dialysis
@@ -45,6 +54,8 @@ class DrugList:
             "exams": 0,  # kidney + liver + platelets
             "allergy": 0,  # allergy + rea,
             "interactions": {},
+            "total": 0,
+            "level": "low",
         }
 
     def sumAlerts(self):
@@ -53,6 +64,13 @@ class DrugList:
             for k, v in self.relations["stats"].items():
                 self.alertStats[_get_legacy_alert(k)] = v
                 self.alertStats["interactions"][k] = v
+                self.alertStats["total"] += v
+
+        # alerts stats
+        if self.alerts["stats"]:
+            for k, v in self.alerts["stats"].items():
+                self.alertStats[k] = v
+                self.alertStats["total"] += v
 
         # keep legacy data
         if (
@@ -70,7 +88,23 @@ class DrugList:
             + self.alertStats["liver"]
             + self.alertStats["platelets"]
         )
-        self.alertStats["allergy"] += self.alertStats["rea"]
+
+        levels = []
+        if self.relations["alerts"]:
+            for k, v in self.relations["alerts"].items():
+                for alert in v:
+                    levels.append(alert["level"])
+
+        if self.alerts["alerts"]:
+            for k, v in self.alerts["alerts"].items():
+                for alert in v:
+                    levels.append(alert["level"])
+
+        if "medium" in levels:
+            self.alertStats["level"] = "medium"
+
+        if "high" in levels:
+            self.alertStats["level"] = "high"
 
     @staticmethod
     def sortDrugs(d):
@@ -110,306 +144,65 @@ class DrugList:
             if pd[0].source not in source:
                 continue
 
-            pdFrequency = (
-                1 if pd[0].frequency in [33, 44, 55, 66, 99] else pd[0].frequency
-            )
-
-            if pd[2] != None and pd[6] != None and pd[6].division != None:
-                measureUnitFactor = 1
-
-                if pd.measure_unit_convert_factor != None:
-                    measureUnitFactor = pd.measure_unit_convert_factor
-
-                pdDoseconv = (
-                    none2zero(pd[0].dose) * measureUnitFactor * none2zero(pdFrequency)
-                )
-            else:
-                pdDoseconv = none2zero(pd[0].doseconv) * none2zero(pdFrequency)
-
             pdUnit = strNone(pd[2].id) if pd[2] else ""
             pdWhiteList = bool(pd[6].whiteList) if pd[6] is not None else False
             doseWeightStr = None
             doseBodySurfaceStr = None
-            expireDay = pd[10].day if pd[10] else 0
-
-            idDrugAgg = str(pd[0].idDrug) + "_" + str(expireDay)
-            if idDrugAgg not in self.maxDoseAgg:
-                self.maxDoseAgg[idDrugAgg] = {"value": 0, "count": 0}
 
             tubeAlert = False
             alerts = []
+            alerts_complete = []
 
-            if self.relations["alerts"] and pd[0].id in self.relations["alerts"]:
-                for a in self.relations["alerts"][pd[0].id]:
-                    # self.alertStats[a[:3].lower()] += 1
-                    alerts.append(a)
+            if self.relations["alerts"] and str(pd[0].id) in self.relations["alerts"]:
+                for a in self.relations["alerts"][str(pd[0].id)]:
+                    alerts.append(a["text"])
+                    alerts_complete.append(a)
 
-            if not bool(pd[0].suspendedDate):
-                self.maxDoseAgg[idDrugAgg]["value"] += pdDoseconv
-                self.maxDoseAgg[idDrugAgg]["count"] += 1
+            if self.alerts["alerts"] and str(pd[0].id) in self.alerts["alerts"]:
+                for a in self.alerts["alerts"][str(pd[0].id)]:
+                    alerts.append(a["text"])
+                    alerts_complete.append(a)
 
-                if self.exams and pd[6]:
-                    if pd[6].kidney:
-                        if self.dialysis == "c":
-                            alerts.append(
-                                "Medicamento é contraindicado ou deve sofrer ajuste de posologia, já que o paciente está diálise contínua."
-                            )
-                            self.alertStats["kidney"] += 1
-                        elif self.dialysis == "x":
-                            alerts.append(
-                                "Medicamento é contraindicado ou deve sofrer ajuste de posologia, já que o paciente está diálise estendida, também conhecida como SLED."
-                            )
-                            self.alertStats["kidney"] += 1
-                        elif self.dialysis == "v":
-                            alerts.append(
-                                "Medicamento é contraindicado ou deve sofrer ajuste de posologia, já que o paciente está em diálise intermitente."
-                            )
-                            self.alertStats["kidney"] += 1
-                        elif self.dialysis == "p":
-                            alerts.append(
-                                "Medicamento é contraindicado ou deve sofrer ajuste de posologia, já que o paciente está em diálise peritoneal."
-                            )
-                            self.alertStats["kidney"] += 1
-                        elif (
-                            "ckd" in self.exams
-                            and self.exams["ckd"]["value"]
-                            and pd[6].kidney > self.exams["ckd"]["value"]
-                            and self.exams["age"] > 17
-                        ):
-                            alerts.append(
-                                "Medicamento deve sofrer ajuste de posologia ou contraindicado, já que a função renal do paciente ("
-                                + str(self.exams["ckd"]["value"])
-                                + " mL/min) está abaixo de "
-                                + str(pd[6].kidney)
-                                + " mL/min."
-                            )
-                            self.alertStats["kidney"] += 1
-                        elif (
-                            "swrtz2" in self.exams
-                            and self.exams["swrtz2"]["value"]
-                            and pd[6].kidney > self.exams["swrtz2"]["value"]
-                            and self.exams["age"] <= 17
-                        ):
-                            alerts.append(
-                                "Medicamento deve sofrer ajuste de posologia ou contraindicado, já que a função renal do paciente ("
-                                + str(self.exams["swrtz2"]["value"])
-                                + " mL/min/1.73m²) está abaixo de "
-                                + str(pd[6].kidney)
-                                + " mL/min. (Schwartz 2)"
-                            )
-                            self.alertStats["kidney"] += 1
-                        elif (
-                            "swrtz1" in self.exams
-                            and self.exams["swrtz1"]["value"]
-                            and pd[6].kidney > self.exams["swrtz1"]["value"]
-                            and self.exams["age"] <= 17
-                        ):
-                            alerts.append(
-                                "Medicamento deve sofrer ajuste de posologia ou contraindicado, já que a função renal do paciente ("
-                                + str(self.exams["swrtz1"]["value"])
-                                + " mL/min/1.73m²) está abaixo de "
-                                + str(pd[6].kidney)
-                                + " mL/min. (Schwartz 1)"
-                            )
-                            self.alertStats["kidney"] += 1
+            if self.exams and pd[6]:
+                if pd[6].chemo and pd[0].dose:
+                    bs_weight = none2zero(self.exams["weight"])
+                    bs_height = none2zero(self.exams["height"])
 
-                    if pd[6].liver:
-                        if (
-                            "tgp" in self.exams
-                            and self.exams["tgp"]["value"]
-                            and float(self.exams["tgp"]["value"]) > pd[6].liver
-                        ) or (
-                            "tgo" in self.exams
-                            and self.exams["tgo"]["value"]
-                            and float(self.exams["tgo"]["value"]) > pd[6].liver
-                        ):
-                            alerts.append(
-                                "Medicamento deve sofrer ajuste de posologia ou contraindicado, já que a função hepática do paciente está reduzida (acima de "
-                                + str(pd[6].liver)
-                                + " U/L)."
-                            )
-                            self.alertStats["liver"] += 1
+                    if bs_weight != 0 and bs_height != 0:
+                        body_surface = math.sqrt((bs_weight * bs_height) / 3600)
+                        doseBodySurfaceStr = f"""{strFormatBR(round(pd[0].dose / body_surface, 2))} {pdUnit}/m²"""
+
+                if pd[6].useWeight and pd[0].dose:
+                    weight = none2zero(self.exams["weight"])
+                    weight = weight if weight > 0 else 1
+
+                    doseWeightStr = (
+                        strFormatBR(round(pd[0].dose / float(weight), 2))
+                        + " "
+                        + pdUnit
+                        + "/Kg"
+                    )
 
                     if (
-                        pd[6].platelets
-                        and "plqt" in self.exams
-                        and self.exams["plqt"]["value"]
-                        and pd[6].platelets > self.exams["plqt"]["value"]
+                        pd[6].idMeasureUnit != None
+                        and pd[6].idMeasureUnit != pdUnit
+                        and pd[0].doseconv != None
                     ):
-                        alerts.append(
-                            "Medicamento contraindicado para paciente com plaquetas ("
-                            + str(self.exams["plqt"]["value"])
-                            + " plaquetas/µL) abaixo de "
-                            + str(pd[6].platelets)
-                            + " plaquetas/µL."
-                        )
-                        self.alertStats["platelets"] += 1
-
-                    if pd[6].elderly and self.exams["age"] > 60:
-                        alerts.append(
-                            "Medicamento potencialmente inapropriado para idosos, independente das comorbidades do paciente."
-                        )
-                        self.alertStats["elderly"] += 1
-
-                    if pd[6].chemo and pd[0].dose:
-                        bs_weight = none2zero(self.exams["weight"])
-                        bs_height = none2zero(self.exams["height"])
-
-                        if bs_weight != 0 and bs_height != 0:
-                            body_surface = math.sqrt((bs_weight * bs_height) / 3600)
-                            doseBodySurfaceStr = f"""{strFormatBR(round(pd[0].dose / body_surface, 2))} {pdUnit}/m²"""
-
-                    if pd[6].useWeight and pd[0].dose:
-                        weight = none2zero(self.exams["weight"])
-                        weight = weight if weight > 0 else 1
-
-                        doseWeight = round(pdDoseconv / float(weight), 2)
-                        doseWeightStr = (
-                            strFormatBR(round(pd[0].dose / float(weight), 2))
+                        doseWeightStr += (
+                            " ou "
+                            + strFormatBR(pd[0].doseconv)
                             + " "
-                            + pdUnit
-                            + "/Kg"
+                            + str(pd[6].idMeasureUnit)
+                            + "/Kg (faixa arredondada)"
                         )
-
-                        if (
-                            pd[6].idMeasureUnit != None
-                            and pd[6].idMeasureUnit != pdUnit
-                            and pd[0].doseconv != None
-                        ):
-                            doseWeightStr += (
-                                " ou "
-                                + strFormatBR(pd[0].doseconv)
-                                + " "
-                                + str(pd[6].idMeasureUnit)
-                                + "/Kg (faixa arredondada)"
-                            )
-
-                        keyDrugKg = str(idDrugAgg) + "kg"
-                        if keyDrugKg not in self.maxDoseAgg:
-                            self.maxDoseAgg[keyDrugKg] = {"value": 0, "count": 0}
-
-                        self.maxDoseAgg[keyDrugKg]["value"] += doseWeight
-                        self.maxDoseAgg[keyDrugKg]["count"] += 1
-
-                        if pd[6].maxDose and pd[6].maxDose < doseWeight:
-                            alerts.append(
-                                "Dose diária prescrita ("
-                                + strFormatBR(doseWeight)
-                                + " "
-                                + str(pd[6].idMeasureUnit)
-                                + "/Kg) maior que a dose de alerta ("
-                                + strFormatBR(pd[6].maxDose)
-                                + " "
-                                + str(pd[6].idMeasureUnit)
-                                + "/Kg) usualmente recomendada (considerada a dose diária independente da indicação)."
-                            )
-                            self.alertStats["maxDose"] += 1
-
-                        if (
-                            pd[6].maxDose
-                            and self.maxDoseAgg[keyDrugKg]["count"] > 1
-                            and pd[6].maxDose
-                            < none2zero(self.maxDoseAgg[keyDrugKg]["value"])
-                        ):
-                            alerts.append(
-                                "Dose diária prescrita SOMADA ("
-                                + str(self.maxDoseAgg[keyDrugKg]["value"])
-                                + " "
-                                + str(pd[6].idMeasureUnit)
-                                + "/Kg) maior que a dose de alerta ("
-                                + str(pd[6].maxDose)
-                                + " "
-                                + str(pd[6].idMeasureUnit)
-                                + "/Kg) usualmente recomendada (considerada a dose diária independente da indicação)."
-                            )
-                            self.alertStats["maxDose"] += 1
-
-                    else:
-                        if pd[6].maxDose and pd[6].maxDose < pdDoseconv:
-                            alerts.append(
-                                "Dose diária prescrita ("
-                                + str(pdDoseconv)
-                                + " "
-                                + str(pd[6].idMeasureUnit)
-                                + ") maior que a dose de alerta ("
-                                + str(pd[6].maxDose)
-                                + " "
-                                + str(pd[6].idMeasureUnit)
-                                + ") usualmente recomendada (considerada a dose diária independente da indicação)."
-                            )
-                            self.alertStats["maxDose"] += 1
-
-                        if (
-                            pd[6].maxDose
-                            and self.maxDoseAgg[idDrugAgg]["count"] > 1
-                            and pd[6].maxDose
-                            < none2zero(self.maxDoseAgg[idDrugAgg]["value"])
-                        ):
-                            alerts.append(
-                                "Dose diária prescrita SOMADA ("
-                                + str(self.maxDoseAgg[idDrugAgg]["value"])
-                                + " "
-                                + str(pd[6].idMeasureUnit)
-                                + ") maior que a dose de alerta ("
-                                + str(pd[6].maxDose)
-                                + " "
-                                + str(pd[6].idMeasureUnit)
-                                + ") usualmente recomendada (considerada a dose diária independente da indicação)."
-                            )
-                            self.alertStats["maxDose"] += 1
-
-                if pd[6] and pd[6].tube and pd[0].tube:
-                    alerts.append(
-                        "Medicamento contraindicado via sonda ("
-                        + strNone(pd[0].route)
-                        + ")"
-                    )
-                    self.alertStats["tube"] += 1
-                    tubeAlert = True
-
-                if pd[0].allergy == "S":
-                    alerts.append("Paciente alérgico a este medicamento.")
-                    self.alertStats["allergy"] += 1
 
                 if (
-                    pd[6]
-                    and pd[6].maxTime
-                    and pd[0].period
-                    and pd[0].period > pd[6].maxTime
+                    not bool(pd[0].suspendedDate)
+                    and pd[6]
+                    and pd[6].tube
+                    and pd[0].tube
                 ):
-                    alerts.append(
-                        "Tempo de tratamento atual ("
-                        + str(pd[0].period)
-                        + " dias) maior que o tempo máximo de tratamento ("
-                        + str(pd[6].maxTime)
-                        + " dias) usualmente recomendado."
-                    )
-                    self.alertStats["maxTime"] += 1
-
-                if pd[1] and "vanco" in pd[1].name.lower():
-                    maxdose = self.maxDoseAgg[idDrugAgg]["value"]
-                    ckd = (
-                        self.exams["ckd"]["value"]
-                        if "ckd" in self.exams and self.exams["ckd"]["value"]
-                        else None
-                    )
-                    weight = self.exams["weight"]
-
-                    if (
-                        maxdose != None
-                        and ckd != None
-                        and weight != None
-                        and ckd > 0
-                        and weight > 0
-                    ):
-                        ira = maxdose / ckd / weight
-                        maxira = 0.6219
-
-                        if ira > maxira and self.dialysis is None:
-                            self.alertStats["exams"] += 1
-                            alerts.append(
-                                'Risco de desenvolvimento de Insuficiência Renal Aguda (IRA), já que o resultado do cálculo [dose diária de VANCOMICINA/TFG/peso] é superior a 0,6219. Caso o paciente esteja em diálise, desconsiderar. <a href="https://revista.ghc.com.br/index.php/cadernosdeensinoepesquisa/issue/view/3" target="_blank">Referência: CaEPS</a>'
-                            )
+                    tubeAlert = True
 
             total_period = 0
             if self.is_cpoe:
@@ -518,9 +311,9 @@ class DrugList:
                     "existIntervention": self.getExistIntervention(
                         pd[0].idDrug, pd[0].idPrescription
                     ),
-                    # remove intervention attribute after transition (new attribute = interventionList)
-                    "intervention": self.getIntervention(pd[0].id),
-                    "alerts": alerts,
+                    # remove alerts attribute after migration to alertsComplete
+                    # "alerts": alerts,
+                    "alertsComplete": alerts_complete,
                     "tubeAlert": tubeAlert,
                     "notes": pd[7],
                     "prevNotes": prevNotes,
@@ -532,11 +325,6 @@ class DrugList:
                     "infusionKey": self.getInfusionKey(pd),
                     "formValues": pd[0].form,
                     "drugAttributes": self.getDrugAttributes(pd),
-                    "relations": (
-                        self.relations["list"][pd[0].id]
-                        if pd[0].id in self.relations["list"]
-                        else []
-                    ),
                 }
             )
 
