@@ -220,7 +220,7 @@ def find_relations(drug_list, id_patient: int, is_cpoe: bool):
                         "level": (
                             active_relations[key]["level"]
                             if active_relations[key]["level"] != None
-                            else DrugAlertLevelEnum.LOW
+                            else DrugAlertLevelEnum.LOW.value
                         ),
                         "relation": drug_to["id"],
                         "text": alert_text,
