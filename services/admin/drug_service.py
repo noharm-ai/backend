@@ -7,7 +7,7 @@ from models.appendix import *
 from models.segment import *
 from models.enums import RoleEnum, DrugAdminSegment
 from services.admin import ai_service
-from services import drug_service as main_drug_service
+from services import drug_service as main_drug_service, permission_service
 
 from exception.validation_error import ValidationError
 
@@ -485,6 +485,46 @@ def predict_substance(id_drugs: List[int], user: User):
         )
 
     return ia_results
+
+
+def add_new_drugs_to_outlier(user: User):
+    if not permission_service.has_maintainer_permission(user):
+        raise ValidationError(
+            "Usuário não autorizado",
+            "errors.unauthorizedUser",
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
+    query = text(
+        f"""
+            insert into {user.schema}.outlier 
+                (fkmedicamento, idsegmento, contagem, doseconv, frequenciadia, escore, update_at, update_by)
+            select 
+                pm.fkmedicamento, p.idsegmento, 0, 0, 0, 4, :updateAt, :updateBy 
+            from 
+	            {user.schema}.presmed pm
+	            inner join {user.schema}.prescricao p on (pm.fkprescricao = p.fkprescricao)
+            where
+                p.update_at > now() - interval '5 days'
+                and pm.idoutlier is null
+                and p.idsegmento is not null
+                and not exists (
+                    select 1
+                    from {user.schema}.outlier o 
+                    where o.fkmedicamento = pm.fkmedicamento and o.idsegmento = p.idsegmento
+                )
+            group by 
+	            pm.fkmedicamento, p.idsegmento
+        """
+    )
+
+    return db.session.execute(
+        query,
+        {
+            "updateAt": datetime.today(),
+            "updateBy": user.id,
+        },
+    )
 
 
 def get_drugs_missing_substance():
