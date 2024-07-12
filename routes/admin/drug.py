@@ -156,3 +156,20 @@ def get_drugs_missing_substance():
         "count": len(result),
         "data": result,
     }, status.HTTP_200_OK
+
+
+@app_admin_drug.route("/admin/drug/add-new-outlier", methods=["POST"])
+@jwt_required()
+def add_new_outlier():
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+    os.environ["TZ"] = "America/Sao_Paulo"
+
+    try:
+        result = drug_service.add_new_drugs_to_outlier(
+            user=user,
+        )
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+
+    return tryCommit(db, result.rowcount)

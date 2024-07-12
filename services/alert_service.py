@@ -320,14 +320,19 @@ def _alert_max_dose(
         doseWeight = round(pd_dose_conv / float(weight), 2)
 
         if drug_attributes.maxDose and drug_attributes.maxDose < doseWeight:
-            alert[
-                "text"
-            ] = f"""
-                Dose diária prescrita ({strFormatBR(doseWeight)} {str(drug_attributes.idMeasureUnit)}/Kg) 
-                maior que a dose de alerta 
-                ({strFormatBR(drug_attributes.maxDose)} {str(drug_attributes.idMeasureUnit)}/Kg) 
-                usualmente recomendada (considerada a dose diária independente da indicação).
-            """
+            if none2zero(exams["weight"]) == 0:
+                alert["text"] = (
+                    "A dose máxima registrada é por kg, mas o peso do paciente não está disponível. Favor preencher manualmente o peso para que o cálculo de dose máxima fique correto."
+                )
+            else:
+                alert[
+                    "text"
+                ] = f"""
+                    Dose diária prescrita ({strFormatBR(doseWeight)} {str(drug_attributes.idMeasureUnit)}/Kg) 
+                    maior que a dose de alerta 
+                    ({strFormatBR(drug_attributes.maxDose)} {str(drug_attributes.idMeasureUnit)}/Kg) 
+                    usualmente recomendada (considerada a dose diária independente da indicação).
+                """
 
             return alert
 
@@ -379,15 +384,20 @@ def _alert_max_dose_total(
             and drug_attributes.maxDose
             < none2zero(dose_total[idDrugAggWeight]["value"])
         ):
-            alert[
-                "text"
-            ] = f"""
-                Dose diária prescrita SOMADA (
-                {str(dose_total[idDrugAggWeight]["value"])} {str(drug_attributes.idMeasureUnit)}/Kg) maior 
-                que a dose de alerta (
-                {str(drug_attributes.maxDose)} {str(drug_attributes.idMeasureUnit)}/Kg) 
-                usualmente recomendada (Frequência "AGORA" não é considerada no cálculo)."
-            """
+            if none2zero(exams["weight"]) == 0:
+                alert["text"] = (
+                    "A dose máxima registrada é por kg, mas o peso do paciente não está disponível. Favor preencher manualmente o peso."
+                )
+            else:
+                alert[
+                    "text"
+                ] = f"""
+                    Dose diária prescrita SOMADA (
+                    {str(dose_total[idDrugAggWeight]["value"])} {str(drug_attributes.idMeasureUnit)}/Kg) maior 
+                    que a dose de alerta (
+                    {str(drug_attributes.maxDose)} {str(drug_attributes.idMeasureUnit)}/Kg) 
+                    usualmente recomendada (Frequência "AGORA" não é considerada no cálculo)."
+                """
 
             return alert
 
