@@ -119,14 +119,8 @@ def getPrescriptions():
             for f in featuresNames:
                 features[f] = p[0].features[f] if f in p[0].features else 0
 
-            features["globalScore"] = (
-                features["prescriptionScore"]
-                + features["av"]
-                + features["am"]
-                + features["alertExams"]
-                + features["alerts"]
-                + features["diff"]
-            )
+            features["globalScore"] = p.globalScore
+
             if features["globalScore"] > 90:
                 features["class"] = "red"
             elif features["globalScore"] > 60:

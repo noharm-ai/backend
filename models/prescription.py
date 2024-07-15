@@ -4,7 +4,7 @@ from .segment import *
 from routes.utils import *
 from datetime import datetime
 from sqlalchemy.orm import deferred, undefer
-from sqlalchemy import case, BigInteger, cast, between, outerjoin, literal
+from sqlalchemy import case, BigInteger, cast, between, outerjoin, literal, Integer
 from sqlalchemy.sql.expression import literal_column, case
 from functools import partial
 from sqlalchemy.dialects.postgresql import TSRANGE
@@ -317,6 +317,14 @@ class Patient(db.Model):
                 Patient,
                 Department.name.label("department"),
                 func.count().over(),
+                (
+                    Prescription.features["prescriptionScore"].astext.cast(Integer)
+                    + Prescription.features["av"].astext.cast(Integer)
+                    + Prescription.features["am"].astext.cast(Integer)
+                    + Prescription.features["alertExams"].astext.cast(Integer)
+                    + Prescription.features["alerts"].astext.cast(Integer)
+                    + Prescription.features["diff"].astext.cast(Integer)
+                ).label("globalScore"),
             )
             .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)
             .outerjoin(
@@ -468,7 +476,10 @@ class Patient(db.Model):
             Prescription.date <= (validate(endDate) + timedelta(hours=23, minutes=59))
         )
 
-        q = q.order_by(desc(Prescription.date))
+        if agg:
+            q = q.order_by(desc("globalScore"))
+        else:
+            q = q.order_by(desc(Prescription.date))
 
         q = q.options(undefer(Patient.observation))
 
