@@ -143,7 +143,7 @@ def test_getSegmentsID(client):
 def test_getDepartments(client):
     """Teste get /departments - Valida o status_code 200."""
 
-    url = "/departments"
+    url = "/segments/departments"
 
     access_token = get_access(client)
 
