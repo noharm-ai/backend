@@ -49,6 +49,7 @@ def getPrescriptions():
     dbSession.setSchema(user.schema)
 
     idSegment = request.args.get("idSegment", None)
+    idSegmentList = request.args.getlist("idSegment[]")
     idDept = request.args.getlist("idDept[]")
     idDrug = request.args.getlist("idDrug[]")
     allDrugs = request.args.get("allDrugs", 0)
@@ -69,6 +70,7 @@ def getPrescriptions():
 
     patients = Patient.getPatients(
         idSegment=idSegment,
+        idSegmentList=idSegmentList,
         idDept=idDept,
         idDrug=idDrug,
         startDate=startDate,

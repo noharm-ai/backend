@@ -209,20 +209,16 @@ class Drug(db.Model):
 
     def getBySegment(idSegment, qDrug=None, idDrug=None):
         segDrubs = (
-            db.session.query(PrescriptionAgg.idDrug.label("idDrug"))
-            .filter(PrescriptionAgg.idSegment == idSegment)
-            .group_by(PrescriptionAgg.idDrug)
-            .subquery()
-        )  # too costly
-
-        segDrubs = (
             db.session.query(Outlier.idDrug.label("idDrug"))
             .filter(Outlier.idSegment == idSegment)
             .group_by(Outlier.idDrug)
             .subquery()
         )
 
-        drugs = Drug.query.filter(Drug.id.in_(segDrubs))
+        if idSegment != None:
+            drugs = Drug.query.filter(Drug.id.in_(segDrubs))
+        else:
+            drugs = db.session.query(Drug)
 
         if qDrug:
             drugs = drugs.filter(Drug.name.ilike("%" + str(qDrug) + "%"))

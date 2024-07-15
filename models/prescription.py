@@ -292,6 +292,7 @@ class Patient(db.Model):
 
     def getPatients(
         idSegment=None,
+        idSegmentList=[],
         idDept=[],
         idDrug=[],
         startDate=date.today(),
@@ -340,8 +341,11 @@ class Patient(db.Model):
             len(idDept) > 0
         )
 
-        if (not (idSegment is None)) and (not currentDepartment):
+        if idSegment != None:
             q = q.filter(Prescription.idSegment == idSegment)
+
+        if len(idSegmentList) > 0:
+            q = q.filter(Prescription.idSegment.in_(idSegmentList))
 
         if len(idDept) > 0:
             idDept = list(map(int, idDept))

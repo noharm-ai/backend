@@ -322,7 +322,7 @@ def _alert_max_dose(
         if drug_attributes.maxDose and drug_attributes.maxDose < doseWeight:
             if none2zero(exams["weight"]) == 0:
                 alert["text"] = (
-                    "A dose máxima registrada é por kg, mas o peso do paciente não está disponível. Favor preencher manualmente o peso para que o cálculo de dose máxima fique correto."
+                    "A dose máxima registrada é por kg, mas o peso do paciente não está disponível. Favor preencher manualmente o peso."
                 )
             else:
                 alert[
