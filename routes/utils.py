@@ -533,6 +533,15 @@ def getFeatures(result):
         if "high" in alert_levels:
             alert_level = "high"
 
+    p_dates = []
+    if "headers" in result["data"]:
+        for p_id in result["data"]["headers"]:
+            header = result["data"]["headers"][p_id]
+            if "date" in header:
+                p_dates.append(header["date"])
+
+        p_dates.sort()
+
     return {
         "alergy": allergy,
         "allergy": allergy,
@@ -561,6 +570,7 @@ def getFeatures(result):
         "processedDate": datetime.today().isoformat(),
         "totalItens": len(drugList),
         "drugAttributes": drug_attributes,
+        "lastPrescriptionDate": p_dates[-1] if len(p_dates) > 0 else None,
     }
 
 
