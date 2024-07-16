@@ -121,7 +121,7 @@ def getPrescriptions():
             for f in featuresNames:
                 features[f] = p[0].features[f] if f in p[0].features else 0
 
-            features["globalScore"] = p.globalScore
+            features["globalScore"] = none2zero(p.globalScore)
 
             if features["globalScore"] > 90:
                 features["class"] = "red"
