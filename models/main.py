@@ -256,6 +256,7 @@ class DrugAttributesBase:
     dialyzable = db.Column("dialisavel", db.Boolean, nullable=True)
     pregnant = db.Column("gestante", db.String, nullable=True)
     lactating = db.Column("lactante", db.String, nullable=True)
+    fasting = db.Column("jejum", db.Boolean, nullable=True)
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.BigInteger, nullable=True)
 

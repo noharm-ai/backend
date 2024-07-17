@@ -39,8 +39,11 @@ def update_frequency():
     os.environ["TZ"] = "America/Sao_Paulo"
 
     try:
-        freq = frequency_service.update_daily_frequency(
-            data.get("id", None), data.get("dailyFrequency", None), user
+        freq = frequency_service.update_frequency(
+            id=data.get("id", None),
+            daily_frequency=data.get("dailyFrequency", None),
+            fasting=data.get("fasting", None),
+            user=user,
         )
     except ValidationError as e:
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus

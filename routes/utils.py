@@ -457,6 +457,7 @@ def get_bool_drug_attributes_list():
         "whiteList",
         "chemo",
         "dialyzable",
+        "fasting",
     ]
 
 

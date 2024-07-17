@@ -183,6 +183,7 @@ def get_drug_list(
             ["risco_queda", DrugAttributes.fallRisk],
             ["lactante", DrugAttributes.lactating],
             ["gestante", DrugAttributes.pregnant],
+            ["jejum", DrugAttributes.fasting],
         ]
 
         for a in bool_attributes:
