@@ -2,11 +2,7 @@ import re
 
 from routes.utils import none2zero, strNone, strFormatBR
 from models.enums import DrugTypeEnum, DrugAlertTypeEnum, DrugAlertLevelEnum
-from models.prescription import (
-    PrescriptionDrug,
-    Drug,
-    DrugAttributes,
-)
+from models.prescription import PrescriptionDrug, Drug, DrugAttributes, Frequency
 
 
 # analyze alerts
@@ -39,6 +35,7 @@ def find_alerts(drug_list, exams: dict, dialisys: str, pregnant: bool, lactating
         )
         drug_attributes: DrugAttributes = item[6]
         prescription_expire_date = item[10]
+        frequency = item[3]
 
         # kidney alert
         add_alert(
@@ -142,6 +139,15 @@ def find_alerts(drug_list, exams: dict, dialisys: str, pregnant: bool, lactating
                 prescription_drug=prescription_drug,
                 drug_attributes=drug_attributes,
                 lactating=lactating,
+            )
+        )
+
+        # fasting
+        add_alert(
+            _alert_fasting(
+                prescription_drug=prescription_drug,
+                drug_attributes=drug_attributes,
+                frequency=frequency,
             )
         )
 
@@ -557,6 +563,34 @@ def _alert_elderly(
             "text"
         ] = f"""
             Medicamento potencialmente inapropriado para idosos, independente das comorbidades do paciente.
+        """
+
+        return alert
+
+    return None
+
+
+def _alert_fasting(
+    prescription_drug: PrescriptionDrug,
+    drug_attributes: DrugAttributes,
+    frequency: Frequency,
+):
+    if not drug_attributes or not frequency:
+        return None
+
+    alert = _create_alert(
+        id_prescription_drug=str(prescription_drug.id),
+        key="",
+        alert_type=DrugAlertTypeEnum.FASTING,
+        alert_level=DrugAlertLevelEnum.MEDIUM,
+        text="",
+    )
+
+    if drug_attributes.fasting and not frequency.fasting:
+        alert[
+            "text"
+        ] = f"""
+            O medicamento deve ser administrado em jejum, verificar horários de administração.
         """
 
         return alert
