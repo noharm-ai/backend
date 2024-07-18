@@ -193,6 +193,7 @@ def get_attributes(id_segment, id_drug, user):
         "dialyzable": attr.dialyzable,
         "pregnant": attr.pregnant,
         "lactating": attr.lactating,
+        "fasting": attr.fasting,
     }
 
 
@@ -281,6 +282,8 @@ def save_attributes(id_segment, id_drug, data, user):
         attr.pregnant = data.get("pregnant", None)
     if "lactating" in data.keys():
         attr.lactating = data.get("lactating", None)
+    if "fasting" in data.keys():
+        attr.fasting = data.get("fasting", None)
 
     attr.update = datetime.today()
     attr.user = user.id
@@ -347,6 +350,7 @@ def copy_substance_default_attributes(id_drug, sctid, user: User, overwrite=True
             da.elderly = reference.elderly
             da.whiteList = reference.whiteList
             da.dialyzable = reference.dialyzable
+            da.fasting = reference.fasting
 
             da.kidney = reference.kidney
             da.liver = reference.liver
@@ -402,6 +406,7 @@ def create_attributes_from_reference(id_drug, id_segment, user):
             da.elderly = reference.elderly
             da.whiteList = reference.whiteList
             da.dialyzable = reference.dialyzable
+            da.fasting = reference.fasting
 
             da.kidney = reference.kidney
             da.liver = reference.liver

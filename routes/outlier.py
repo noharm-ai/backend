@@ -227,7 +227,7 @@ def setManualOutlier(idOutlier):
 @app_out.route("/drugs", methods=["GET"])
 @app_out.route("/drugs/<int:idSegment>", methods=["GET"])
 @jwt_required()
-def getDrugs(idSegment=1):
+def getDrugs(idSegment=None):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
 

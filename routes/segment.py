@@ -12,7 +12,7 @@ from utils import status
 from models.main import *
 from models.appendix import *
 from models.prescription import *
-from services import exams_service
+from services import exams_service, segment_service
 from exception.validation_error import ValidationError
 
 app_seg = Blueprint("app_seg", __name__)
@@ -30,6 +30,20 @@ def getSegments():
         iList.append({"id": i.id, "description": i.description, "status": i.status})
 
     return {"status": "success", "data": iList}, status.HTTP_200_OK
+
+
+@app_seg.route("/segments/departments", methods=["GET"])
+@jwt_required()
+def get_segment_departments():
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+
+    try:
+        results = segment_service.get_segment_departments()
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+
+    return {"status": "success", "data": results}, status.HTTP_200_OK
 
 
 @app_seg.route("/segments/<int:idSegment>", methods=["GET"])
@@ -127,27 +141,6 @@ def getSegmentsId(idSegment, idHospital=None):
             "exams": exams,
         },
     }, status.HTTP_200_OK
-
-
-@app_seg.route("/departments", methods=["GET"])
-@jwt_required()
-def getDepartments():
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
-
-    departs = Department.getAll()
-
-    results = []
-    for d in departs:
-        results.append(
-            {
-                "idDepartment": d.id,
-                "idHospital": d.idHospital,
-                "name": d.name,
-            }
-        )
-
-    return {"status": "success", "data": results}, status.HTTP_200_OK
 
 
 @app_seg.route("/segments/exams/types", methods=["GET"])

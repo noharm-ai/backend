@@ -49,6 +49,7 @@ def getPrescriptions():
     dbSession.setSchema(user.schema)
 
     idSegment = request.args.get("idSegment", None)
+    idSegmentList = request.args.getlist("idSegment[]")
     idDept = request.args.getlist("idDept[]")
     idDrug = request.args.getlist("idDrug[]")
     allDrugs = request.args.get("allDrugs", 0)
@@ -69,6 +70,7 @@ def getPrescriptions():
 
     patients = Patient.getPatients(
         idSegment=idSegment,
+        idSegmentList=idSegmentList,
         idDept=idDept,
         idDrug=idDrug,
         startDate=startDate,
@@ -119,14 +121,8 @@ def getPrescriptions():
             for f in featuresNames:
                 features[f] = p[0].features[f] if f in p[0].features else 0
 
-            features["globalScore"] = (
-                features["prescriptionScore"]
-                + features["av"]
-                + features["am"]
-                + features["alertExams"]
-                + features["alerts"]
-                + features["diff"]
-            )
+            features["globalScore"] = none2zero(p.globalScore)
+
             if features["globalScore"] > 90:
                 features["class"] = "red"
             elif features["globalScore"] > 60:

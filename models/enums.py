@@ -147,6 +147,7 @@ class DrugAlertTypeEnum(Enum):
     IRA = "ira"
     PREGNANT = "pregnant"
     LACTATING = "lactating"
+    FASTING = "fasting"
 
 
 class DrugAlertLevelEnum(Enum):

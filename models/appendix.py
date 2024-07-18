@@ -62,6 +62,7 @@ class Frequency(db.Model):
     idHospital = db.Column("fkhospital", db.BigInteger, nullable=False)
     description = db.Column("nome", db.String, nullable=False)
     dailyFrequency = db.Column("frequenciadia", db.Float, nullable=True)
+    fasting = db.Column("jejum", db.Boolean, nullable=True)
 
 
 class Notes(db.Model):
