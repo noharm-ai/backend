@@ -345,7 +345,14 @@ class Patient(db.Model):
             q = q.filter(Prescription.idSegment == idSegment)
 
         if len(idSegmentList) > 0:
-            q = q.filter(Prescription.idSegment.in_(idSegmentList))
+            # refactor
+            segments = []
+            for s in idSegmentList:
+                if s != None and s != "null":
+                    segments.append(s)
+
+            if len(segments) > 0:
+                q = q.filter(Prescription.idSegment.in_(idSegmentList))
 
         if len(idDept) > 0:
             idDept = list(map(int, idDept))
