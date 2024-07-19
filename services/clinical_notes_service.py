@@ -137,7 +137,24 @@ def get_tags():
     ]
 
 
-def get_notes(admission_number: int, filter_date: str):
+def get_single_note(id_clinical_notes: int):
+    cn = (
+        db.session.query(ClinicalNotes)
+        .filter(ClinicalNotes.id == id_clinical_notes)
+        .first()
+    )
+
+    if not cn:
+        raise ValidationError(
+            "Registro inexistente",
+            "errors.invalidRecord",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    return convert_notes(notes=cn, has_primary_care=False, tags=[])
+
+
+def get_notes(admission_number: int, filter_date: str | None):
     has_primary_care = memory_service.has_feature("PRIMARYCARE")
     dates = None
     previous_admissions = []
