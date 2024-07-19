@@ -154,7 +154,7 @@ def get_single_note(id_clinical_notes: int):
     return convert_notes(notes=cn, has_primary_care=False, tags=[])
 
 
-def get_notes(admission_number: int, filter_date: str | None):
+def get_notes(admission_number: int, filter_date: str):
     has_primary_care = memory_service.has_feature("PRIMARYCARE")
     dates = None
     previous_admissions = []
