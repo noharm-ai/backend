@@ -581,8 +581,8 @@ def _alert_elderly(
 
 def _alert_fasting(
     prescription_drug: PrescriptionDrug,
-    drug_attributes: DrugAttributes | None,
-    frequency: Frequency | None,
+    drug_attributes: DrugAttributes,
+    frequency: Frequency,
     schedules_fasting: List[str],
 ):
     if not drug_attributes or not frequency:
