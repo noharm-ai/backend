@@ -1,6 +1,7 @@
+from datetime import datetime, timedelta
 from markupsafe import escape as escape_html
 from utils import status
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 
 from models.main import db
 from models.appendix import *
@@ -51,7 +52,33 @@ def get_memory_itens(kinds):
 
     for k in kinds:
         if k not in foundKinds:
-            itens.append({"key": None, "kind": escape_html(k), "value": []})
+            if k == "map-schedules":
+                schedules = []
+                results = (
+                    db.session.query(
+                        func.distinct(PrescriptionDrug.interval).label("interval")
+                    )
+                    .join(
+                        Prescription, PrescriptionDrug.idPrescription == Prescription.id
+                    )
+                    .filter(Prescription.date > datetime.now() - timedelta(days=2))
+                    .order_by(PrescriptionDrug.interval)
+                    .limit(500)
+                    .all()
+                )
+                for s in results:
+                    if s.interval != None and s.interval != "":
+                        schedules.append(
+                            {
+                                "id": s.interval,
+                                "value": s.interval,
+                            }
+                        )
+
+                itens.append({"key": None, "kind": escape_html(k), "value": schedules})
+
+            else:
+                itens.append({"key": None, "kind": escape_html(k), "value": []})
 
     return itens
 

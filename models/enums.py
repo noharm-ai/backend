@@ -20,6 +20,8 @@ class MemoryEnum(Enum):
     MAP_ORIGIN_PROCEDURE = "map-origin-procedure"
     MAP_ORIGIN_DIET = "map-origin-diet"
     MAP_ORIGIN_CUSTOM = "map-origin-custom"
+    MAP_SCHEDULES_FASTING = "map-schedules-fasting"
+    MAP_SCHEDULES = "map-schedules"
     CUSTOM_FORMS = "custom-forms"
 
 
