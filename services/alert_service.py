@@ -1,4 +1,5 @@
 import re
+from typing import List
 
 from routes.utils import none2zero, strNone, strFormatBR
 from models.enums import DrugTypeEnum, DrugAlertTypeEnum, DrugAlertLevelEnum
@@ -7,7 +8,14 @@ from models.prescription import PrescriptionDrug, Drug, DrugAttributes, Frequenc
 
 # analyze alerts
 # drug_list (PrescriptionDrug.findByPrescription)
-def find_alerts(drug_list, exams: dict, dialisys: str, pregnant: bool, lactating: bool):
+def find_alerts(
+    drug_list,
+    exams: dict,
+    dialisys: str,
+    pregnant: bool,
+    lactating: bool,
+    schedules_fasting: List[str],
+):
     filtered_list = _filter_drug_list(drug_list=drug_list)
     dose_total = _get_dose_total(drug_list=filtered_list, exams=exams)
     alerts = {}
@@ -148,6 +156,7 @@ def find_alerts(drug_list, exams: dict, dialisys: str, pregnant: bool, lactating
                 prescription_drug=prescription_drug,
                 drug_attributes=drug_attributes,
                 frequency=frequency,
+                schedules_fasting=schedules_fasting,
             )
         )
 
@@ -572,8 +581,9 @@ def _alert_elderly(
 
 def _alert_fasting(
     prescription_drug: PrescriptionDrug,
-    drug_attributes: DrugAttributes,
-    frequency: Frequency,
+    drug_attributes: DrugAttributes | None,
+    frequency: Frequency | None,
+    schedules_fasting: List[str],
 ):
     if not drug_attributes or not frequency:
         return None
@@ -586,7 +596,18 @@ def _alert_fasting(
         text="",
     )
 
-    if drug_attributes.fasting and not frequency.fasting:
+    if drug_attributes.fasting:
+        # check frequency
+        if frequency.fasting:
+            return None
+
+        # check schedules
+        if (
+            prescription_drug.interval != None
+            and prescription_drug.interval in schedules_fasting
+        ):
+            return None
+
         alert[
             "text"
         ] = f"""
