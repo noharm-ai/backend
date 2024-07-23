@@ -429,7 +429,10 @@ def tryCommit(db, recId, allow=True):
         logger = logging.getLogger("noharm.backend")
         logger.error(str(e))
 
-        return {"status": "error", "message": str(e)}, status.HTTP_400_BAD_REQUEST
+        return {
+            "status": "error",
+            "message": "Ocorreu um erro inesperado.",
+        }, status.HTTP_400_BAD_REQUEST
     except Exception as e:
         db.session.rollback()
         db.session.close()
