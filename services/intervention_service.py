@@ -22,6 +22,7 @@ def get_interventions(
     idPrescription=None,
     idPrescriptionDrug=None,
     idIntervention=None,
+    idInterventionList=[],
     idDrug=None,
 ):
     mReasion = db.aliased(InterventionReason)
@@ -152,7 +153,12 @@ def get_interventions(
             Intervention.idIntervention == idIntervention
         )
 
-    if not idIntervention:
+    if len(idInterventionList) > 0:
+        interventions = interventions.filter(
+            Intervention.idIntervention.in_(idInterventionList)
+        )
+
+    if not idIntervention and len(idInterventionList) == 0:
         interventions = interventions.filter(
             Intervention.status.in_(["s", "a", "n", "x", "j"])
         )
@@ -371,6 +377,113 @@ def set_intervention_outcome(
             intervention.date_end_economy = None
 
 
+def add_multiple_interventions(
+    id_prescription_drug_list,
+    user=None,
+    admission_number=None,
+    id_intervention_reason=None,
+    error=None,
+    cost=None,
+    observation=None,
+    agg_id_prescription=None,
+):
+    id_intervention_list = []
+
+    if not user:
+        raise ValidationError(
+            "Parâmetros inválidos",
+            "errors.invalidParameter",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    if not permission_service.is_pharma(user):
+        raise ValidationError(
+            "Permissão inválida",
+            "errors.invalidPermission",
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
+    # define economy
+    economy_type = None
+    reasons = (
+        db.session.query(InterventionReason)
+        .filter(InterventionReason.id.in_(id_intervention_reason))
+        .all()
+    )
+    for r in reasons:
+        if r.suspension:
+            economy_type = InterventionEconomyTypeEnum.SUSPENSION.value
+        elif r.substitution:
+            economy_type = InterventionEconomyTypeEnum.SUBSTITUTION.value
+        elif r.customEconomy:
+            economy_type = InterventionEconomyTypeEnum.CUSTOM.value
+
+    currentDepartment = (
+        db.session.query(Prescription.idDepartment)
+        .filter(Prescription.admissionNumber == admission_number)
+        .order_by(desc(Prescription.date))
+        .first()
+    )
+
+    # insert
+    for id_prescription_drug in id_prescription_drug_list:
+        i = Intervention()
+        i.id = id_prescription_drug
+        i.idPrescription = 0
+        i.date = datetime.today()
+        i.update = datetime.today()
+        i.user = user.id
+        i.interactions = None
+        i.transcription = None
+        i.economy_days = None
+        i.expended_dose = None
+        i.economy_type = economy_type
+        i.date = datetime.today()
+        i.status = "s"
+        i.economy_day_value_manual = False
+
+        _validate_authorization(
+            id_prescription=i.idPrescription, id_prescription_drug=i.id, user=user
+        )
+
+        if admission_number:
+            i.admissionNumber = admission_number
+        if id_intervention_reason:
+            i.idInterventionReason = id_intervention_reason
+        if error is not None:
+            i.error = error
+        if cost is not None:
+            i.cost = cost
+        if observation:
+            i.notes = observation
+
+        # date base economy
+        i.date_base_economy = _get_date_base_economy(
+            economy_type=economy_type,
+            i=i,
+            id_prescription=0,
+            id_prescription_drug=id_prescription_drug,
+            agg_id_prescription=agg_id_prescription,
+            user=user,
+        )
+
+        # current department
+        if currentDepartment != None:
+            i.idDepartment = currentDepartment[0]
+
+        db.session.add(i)
+        db.session.flush()
+
+        id_intervention_list.append(i.idIntervention)
+
+    if len(id_intervention_list) > 0:
+        return get_interventions(
+            admissionNumber=admission_number, idInterventionList=id_intervention_list
+        )
+
+    return []
+
+
 def save_intervention(
     id_intervention=None,
     id_prescription=0,
@@ -500,60 +613,14 @@ def save_intervention(
     i.economy_type = economy_type
 
     # date base economy
-    if economy_type != None and i.date_base_economy == None:
-        if permission_service.is_cpoe(user):
-            if agg_id_prescription == None:
-                i.date_base_economy = i.date
-            else:
-                presc = (
-                    db.session.query(Prescription)
-                    .filter(Prescription.id == agg_id_prescription)
-                    .first()
-                )
-
-                if presc == None:
-                    raise ValidationError(
-                        "Registro inválido: data base economia",
-                        "errors.businessRule",
-                        status.HTTP_400_BAD_REQUEST,
-                    )
-
-                i.date_base_economy = presc.date
-        else:
-            if id_prescription != 0:
-                presc: Prescription = (
-                    db.session.query(Prescription)
-                    .filter(Prescription.id == id_prescription)
-                    .first()
-                )
-
-                if presc == None:
-                    raise ValidationError(
-                        "Registro inválido id_prescription: data base economia",
-                        "errors.invalidRecord",
-                        status.HTTP_400_BAD_REQUEST,
-                    )
-
-                i.date_base_economy = presc.date
-            else:
-                presc = (
-                    db.session.query(PrescriptionDrug, Prescription)
-                    .join(
-                        Prescription,
-                        PrescriptionDrug.idPrescription == Prescription.id,
-                    )
-                    .filter(PrescriptionDrug.id == id_prescription_drug)
-                    .first()
-                )
-
-                if presc == None:
-                    raise ValidationError(
-                        "Registro inválido: data base economia",
-                        "errors.invalidRecord",
-                        status.HTTP_400_BAD_REQUEST,
-                    )
-
-                i.date_base_economy = presc[1].date
+    i.date_base_economy = _get_date_base_economy(
+        economy_type=economy_type,
+        i=i,
+        id_prescription=id_prescription,
+        id_prescription_drug=id_prescription_drug,
+        agg_id_prescription=agg_id_prescription,
+        user=user,
+    )
 
     if i.admissionNumber != None and i.idDepartment == None:
         currentDepartment = (
@@ -595,6 +662,73 @@ def save_intervention(
     return get_interventions(
         admissionNumber=i.admissionNumber, idIntervention=i.idIntervention
     )
+
+
+def _get_date_base_economy(
+    economy_type,
+    i: Intervention,
+    id_prescription,
+    id_prescription_drug,
+    agg_id_prescription,
+    user: User,
+):
+    # date base economy
+    if economy_type != None and i.date_base_economy == None:
+        if permission_service.is_cpoe(user):
+            if agg_id_prescription == None:
+                return i.date
+            else:
+                presc = (
+                    db.session.query(Prescription)
+                    .filter(Prescription.id == agg_id_prescription)
+                    .first()
+                )
+
+                if presc == None:
+                    raise ValidationError(
+                        "Registro inválido: data base economia",
+                        "errors.businessRule",
+                        status.HTTP_400_BAD_REQUEST,
+                    )
+
+                return presc.date
+        else:
+            if id_prescription != 0:
+                presc: Prescription = (
+                    db.session.query(Prescription)
+                    .filter(Prescription.id == id_prescription)
+                    .first()
+                )
+
+                if presc == None:
+                    raise ValidationError(
+                        "Registro inválido id_prescription: data base economia",
+                        "errors.invalidRecord",
+                        status.HTTP_400_BAD_REQUEST,
+                    )
+
+                return presc.date
+            else:
+                presc = (
+                    db.session.query(PrescriptionDrug, Prescription)
+                    .join(
+                        Prescription,
+                        PrescriptionDrug.idPrescription == Prescription.id,
+                    )
+                    .filter(PrescriptionDrug.id == id_prescription_drug)
+                    .first()
+                )
+
+                if presc == None:
+                    raise ValidationError(
+                        "Registro inválido: data base economia",
+                        "errors.invalidRecord",
+                        status.HTTP_400_BAD_REQUEST,
+                    )
+
+                return presc[1].date
+
+    return None
 
 
 def _validate_authorization(id_prescription, id_prescription_drug, user: User):

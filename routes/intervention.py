@@ -39,29 +39,45 @@ def save_intervention():
     data = request.get_json()
 
     try:
-        intervention = intervention_service.save_intervention(
-            id_intervention=data.get("idIntervention", None),
-            id_prescription=data.get("idPrescription", "0"),
-            id_prescription_drug=data.get("idPrescriptionDrug", "0"),
-            new_status=data.get("status", "s"),
-            user=user,
-            admission_number=data.get("admissionNumber", None),
-            id_intervention_reason=data.get("idInterventionReason", None),
-            error=data.get("error", None),
-            cost=data.get("cost", None),
-            observation=data.get("observation", None),
-            interactions=data.get("interactions", None),
-            transcription=data.get("transcription", None),
-            economy_days=data.get("economyDays", None) if "economyDays" in data else -1,
-            expended_dose=(
-                data.get("expendedDose", None) if "expendedDose" in data else -1
-            ),
-            agg_id_prescription=data.get("aggIdPrescription", None),
-        )
+        id_prescription_drug_list = data.get("idPrescriptionDrugList", [])
+
+        if len(id_prescription_drug_list) > 0:
+            result = intervention_service.add_multiple_interventions(
+                id_prescription_drug_list=id_prescription_drug_list,
+                user=user,
+                admission_number=data.get("admissionNumber", None),
+                id_intervention_reason=data.get("idInterventionReason", None),
+                error=data.get("error", None),
+                cost=data.get("cost", None),
+                observation=data.get("observation", None),
+                agg_id_prescription=data.get("aggIdPrescription", None),
+            )
+        else:
+            result = intervention_service.save_intervention(
+                id_intervention=data.get("idIntervention", None),
+                id_prescription=data.get("idPrescription", "0"),
+                id_prescription_drug=data.get("idPrescriptionDrug", "0"),
+                new_status=data.get("status", "s"),
+                user=user,
+                admission_number=data.get("admissionNumber", None),
+                id_intervention_reason=data.get("idInterventionReason", None),
+                error=data.get("error", None),
+                cost=data.get("cost", None),
+                observation=data.get("observation", None),
+                interactions=data.get("interactions", None),
+                transcription=data.get("transcription", None),
+                economy_days=(
+                    data.get("economyDays", None) if "economyDays" in data else -1
+                ),
+                expended_dose=(
+                    data.get("expendedDose", None) if "expendedDose" in data else -1
+                ),
+                agg_id_prescription=data.get("aggIdPrescription", None),
+            )
     except ValidationError as e:
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
-    return tryCommit(db, intervention, user.permission())
+    return tryCommit(db, result, user.permission())
 
 
 def sortReasons(e):
