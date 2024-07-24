@@ -12,6 +12,28 @@ from models.enums import NifiQueueActionTypeEnum
 from exception.validation_error import ValidationError
 
 
+def get_template_date(user: User):
+    if not permission_service.is_admin(user):
+        raise ValidationError(
+            "Usuário não autorizado",
+            "errors.unauthorizedUser",
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
+    result = (
+        db.session.query(NifiStatus.updatedAt)
+        .filter(NifiStatus.nifi_diagnostics != None)
+        .filter(NifiStatus.nifi_template != None)
+        .filter(NifiStatus.nifi_status != None)
+        .first()
+    )
+
+    if result != None:
+        return {"updatedAt": result.updatedAt.isoformat()}
+
+    return {"updatedAt": None}
+
+
 def get_template(user: User):
     if not permission_service.is_admin(user):
         raise ValidationError(
@@ -72,9 +94,9 @@ def push_queue_request(id_processor: str, action_type: str, data: dict, user: Us
             status.HTTP_401_UNAUTHORIZED,
         )
 
-    if (
-        id_processor == None
-        and action_type != NifiQueueActionTypeEnum.CUSTOM_CALLBACK.value
+    if id_processor == None and (
+        action_type != NifiQueueActionTypeEnum.CUSTOM_CALLBACK.value
+        and action_type != NifiQueueActionTypeEnum.REFRESH_TEMPLATE.value
     ):
         raise ValidationError(
             "Entidade inválida",
@@ -98,9 +120,21 @@ def push_queue_request(id_processor: str, action_type: str, data: dict, user: Us
     )
     queue.extra = {
         "type": escape(action_type),
-        "entity": escape(data["entity"]),
-        "componentType": escape(data["componentType"]),
-        "idEntity": escape(data["idProcessor"]),
+        "entity": (
+            escape(data.get("entity", None))
+            if data.get("entity", None) != None
+            else None
+        ),
+        "componentType": (
+            escape(data.get("componentType", None))
+            if data.get("componentType", None) != None
+            else None
+        ),
+        "idEntity": (
+            escape(data.get("idProcessor", None))
+            if data.get("idProcessor", None) != None
+            else None
+        ),
     }
     queue.createdAt = datetime.today()
 
@@ -146,8 +180,10 @@ def _get_new_queue(id_processor: str, action_type: str, data: dict):
     elif NifiQueueActionTypeEnum.CUSTOM_CALLBACK.value == action_type:
         queue.url = data["endpoint"]
         queue.method = data["method"]
-
         _validate_custom_endpoint(data["endpoint"])
+    elif NifiQueueActionTypeEnum.REFRESH_TEMPLATE.value == action_type:
+        queue.url = f"nifi-api/system-diagnostics"
+        queue.method = "GET"
 
     return queue
 

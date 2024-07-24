@@ -33,6 +33,24 @@ def get_template():
 
 
 @app_admin_integration_remote.route(
+    "/admin/integration-remote/template-date", methods=["GET"]
+)
+@jwt_required()
+def get_template_date():
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+    os.environ["TZ"] = "America/Sao_Paulo"
+    try:
+        result = integration_remote_service.get_template_date(
+            user=user,
+        )
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+
+    return tryCommit(db, result)
+
+
+@app_admin_integration_remote.route(
     "/admin/integration-remote/set-state", methods=["POST"]
 )
 @jwt_required()
