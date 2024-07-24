@@ -1,4 +1,5 @@
 import requests
+import logging
 from flask import Blueprint, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
@@ -27,29 +28,28 @@ def proxy_name(idPatient):
         params=params,
     )
 
-    if response.status_code != status.HTTP_200_OK:
-        raise ValidationError(
-            "Erro ao buscar nome",
-            "errors.invalid",
-            response.status_code,
-        )
+    if response.status_code == status.HTTP_200_OK:
+        data = response.json()
 
-    data = response.json()
+        if len(data["data"]) > 0:
+            patient = data["data"][0]
 
-    if len(data["data"]) > 0:
-        patient = data["data"][0]
+            return {
+                "status": "success",
+                "idPatient": patient["idPatient"],
+                "name": patient["name"],
+            }, status.HTTP_200_OK
 
-        return {
-            "status": "success",
-            "idPatient": patient["idPatient"],
-            "name": patient["name"],
-        }, status.HTTP_200_OK
-    else:
-        return {
-            "status": "error",
-            "idPatient": int(idPatient),
-            "name": f"Paciente {str(int(idPatient))}",
-        }, status.HTTP_400_BAD_REQUEST
+    logging.basicConfig()
+    logger = logging.getLogger("noharm.backend")
+    logger.error(f"Service names error {response.status_code}")
+    logger.error(response.json())
+
+    return {
+        "status": "error",
+        "idPatient": int(idPatient),
+        "name": f"Paciente {str(int(idPatient))}",
+    }, status.HTTP_400_BAD_REQUEST
 
 
 @app_names.route("/names", methods=["POST"])
@@ -70,22 +70,21 @@ def proxy_multiple():
     )
     response = requests.get(url, headers={"Authorization": token}, params=params)
 
-    if response.status_code != status.HTTP_200_OK:
-        raise ValidationError(
-            "Erro ao buscar nome",
-            "errors.invalid",
-            response.status_code,
-        )
-
-    data = response.json()
     found = []
     names = []
+    if response.status_code == status.HTTP_200_OK:
+        data = response.json()
 
-    for p in data["data"]:
-        found.append(str(p["idPatient"]))
-        names.append(
-            {"status": "success", "idPatient": p["idPatient"], "name": p["name"]}
-        )
+        for p in data["data"]:
+            found.append(str(p["idPatient"]))
+            names.append(
+                {"status": "success", "idPatient": p["idPatient"], "name": p["name"]}
+            )
+    else:
+        logging.basicConfig()
+        logger = logging.getLogger("noharm.backend")
+        logger.error(f"Service names error {response.status_code}")
+        logger.error(response.json())
 
     for id_patient in ids_list:
         if str(id_patient) not in found:
