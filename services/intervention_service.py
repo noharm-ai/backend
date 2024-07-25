@@ -1130,7 +1130,11 @@ def _outcome_calc(list, user: User, date_base_economy):
             else:
                 origin_price = drug_attr.price
 
-        if dose_convert != None and dose_convert.factor != None:
+        if (
+            dose_convert != None
+            and dose_convert.factor != None
+            and prescription_drug.dose != None
+        ):
             dose = prescription_drug.dose * dose_convert.factor
         else:
             dose = prescription_drug.dose
