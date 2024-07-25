@@ -613,14 +613,15 @@ def save_intervention(
     i.economy_type = economy_type
 
     # date base economy
-    i.date_base_economy = _get_date_base_economy(
-        economy_type=economy_type,
-        i=i,
-        id_prescription=id_prescription,
-        id_prescription_drug=id_prescription_drug,
-        agg_id_prescription=agg_id_prescription,
-        user=user,
-    )
+    if i.date_base_economy == None:
+        i.date_base_economy = _get_date_base_economy(
+            economy_type=economy_type,
+            i=i,
+            id_prescription=id_prescription,
+            id_prescription_drug=id_prescription_drug,
+            agg_id_prescription=agg_id_prescription,
+            user=user,
+        )
 
     if i.admissionNumber != None and i.idDepartment == None:
         currentDepartment = (
