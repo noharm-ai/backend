@@ -46,6 +46,16 @@ def get_memory(key):
     return db.session.query(Memory).filter(Memory.kind == key).first()
 
 
+def get_by_kind(kinds) -> dict:
+    memory_itens = {}
+    records = db.session.query(Memory).filter(Memory.kind.in_(kinds)).all()
+
+    for r in records:
+        memory_itens[r.kind] = r.value
+
+    return memory_itens
+
+
 def save_memory(id, kind, value, user):
     newMem = False
     if id:

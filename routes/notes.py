@@ -30,6 +30,22 @@ def get_notes_v2(admissionNumber):
     return {"status": "success", "data": result}, status.HTTP_200_OK
 
 
+@app_note.route("/notes/single/<int:id_clinical_notes>", methods=["GET"])
+@jwt_required()
+def get_single_note(id_clinical_notes):
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+
+    try:
+        result = clinical_notes_service.get_single_note(
+            id_clinical_notes=id_clinical_notes
+        )
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+
+    return {"status": "success", "data": result}, status.HTTP_200_OK
+
+
 @app_note.route("/notes/<int:idNote>", methods=["POST"])
 @jwt_required()
 def changeNote(idNote):

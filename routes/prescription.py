@@ -380,11 +380,24 @@ def getPrescription(
     )
     _log_perf(start_date, "GET DRUGS AND INTERVENTIONS")
 
-    formTemplate = memory_service.get_memory(MemoryEnum.PRESMED_FORM.value)
-    admission_reports = memory_service.get_memory(MemoryEnum.ADMISSION_REPORTS.value)
-    admission_reports_internal = memory_service.get_memory(
-        MemoryEnum.ADMISSION_REPORTS_INTERNAL.value
+    # get memory configurations
+    start_date = datetime.now()
+    memory_itens = memory_service.get_by_kind(
+        [
+            MemoryEnum.PRESMED_FORM.value,
+            MemoryEnum.ADMISSION_REPORTS.value,
+            MemoryEnum.ADMISSION_REPORTS_INTERNAL.value,
+            MemoryEnum.MAP_SCHEDULES_FASTING.value,
+        ]
     )
+
+    formTemplate = memory_itens.get(MemoryEnum.PRESMED_FORM.value, None)
+    admission_reports = memory_itens.get(MemoryEnum.ADMISSION_REPORTS.value, None)
+    admission_reports_internal = memory_itens.get(
+        MemoryEnum.ADMISSION_REPORTS_INTERNAL.value, []
+    )
+    schedules_fasting = memory_itens.get(MemoryEnum.MAP_SCHEDULES_FASTING.value, [])
+    _log_perf(start_date, "GET MEMORY CONFIG")
 
     start_date = datetime.now()
     clinicalNotesCount = ClinicalNotes.getCountIfExists(
@@ -452,6 +465,7 @@ def getPrescription(
         dialisys=patient.dialysis,
         pregnant=patient.pregnant,
         lactating=patient.lactating,
+        schedules_fasting=schedules_fasting,
     )
 
     drugList = DrugList(
@@ -642,11 +656,9 @@ def getPrescription(
             "user": prescription[10],
             "userId": prescription[0].user,
             "insurance": prescription[11],
-            "formTemplate": formTemplate.value if formTemplate else None,
-            "admissionReports": admission_reports.value if admission_reports else None,
-            "admissionReportsInternal": (
-                admission_reports_internal.value if admission_reports_internal else []
-            ),
+            "formTemplate": formTemplate,
+            "admissionReports": admission_reports,
+            "admissionReportsInternal": admission_reports_internal,
             "review": {
                 "reviewed": reviewed,
                 "reviewedAt": reviewed_at,
