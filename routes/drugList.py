@@ -82,6 +82,10 @@ class DrugList:
                 + self.alertStats["interactions"]["dt"]
             )
 
+        self.alertStats["maxDose"] = self.alerts["stats"].get(
+            "maxDose", 0
+        ) + self.alerts["stats"].get("maxDosePlus", 0)
+
         self.alertStats["exams"] = (
             self.alertStats["exams"]
             + self.alertStats["kidney"]
