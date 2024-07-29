@@ -43,6 +43,17 @@ def test_get_prescriptions_by_idPrescription(client):
     assert data["bed"] == prescription.bed
     assert data["status"] == prescription.status
     assert len(data["prescription"]) > 0
+    
+    idPrescription = "199"
+    response = client.get(
+        "/prescriptions/" + idPrescription, headers=make_headers(access_token)
+    )
+    data = json.loads(response.data)["data"]
+    
+    assert len(data['prescription']) == 6
+    assert len(data['solution']) == 0
+    assert len(data['procedures']) == 0
+    assert data['birthdate'] == '1941-02-05'
 
 
 def test_get_prescriptions_drug_by_idPrescription_and_period(client):
