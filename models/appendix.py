@@ -165,6 +165,9 @@ class Culture(db.Model):
     drug = db.Column("nomemedicamento", db.String, nullable=True)
     result = db.Column("resultado", db.String, nullable=True)
     microorganismAmount = db.Column("qtmicroorganismo", db.String, nullable=True)
+    predict_proba = db.Column("predict_proba", db.Float, nullable=True)
+    drug_proba = db.Column("medicamento_proba", db.Float, nullable=True)
+    prediction = db.Column("predict", db.String, nullable=True)
 
 
 class NifiStatus(db.Model):

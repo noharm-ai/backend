@@ -29,6 +29,9 @@ def get_cultures(idPatient: int, user: User):
             Culture.drug,
             Culture.result,
             Culture.microorganismAmount,
+            Culture.drug_proba,
+            Culture.predict_proba,
+            Culture.prediction,
         )
         .outerjoin(Culture, CultureHeader.idExamItem == Culture.idExamItem)
         .where(CultureHeader.idPatient == idPatient)
@@ -59,8 +62,23 @@ def _group_culture_results(results):
 
         return None
 
+    def prediction(row):
+        if (
+            row.prediction != None
+            and row.predict_proba > 0.7
+            and row.drug_proba > 0.025
+        ):
+            return {
+                "drug": row.drug,
+                "prediction": row.prediction,
+                "probability": row.predict_proba,
+            }
+
+        return None
+
     for row in results:
         culture_data = culture(row)
+        prediction_data = prediction(row)
 
         key = (
             f"{row.id}-{row.idMicroorganism if row.idMicroorganism != None else 'None'}"
@@ -69,6 +87,9 @@ def _group_culture_results(results):
         if key in headers:
             if culture_data != None:
                 headers[key]["cultures"].append(culture_data)
+
+            if prediction_data != None:
+                headers[key]["predictions"].append(prediction_data)
         else:
             headers[key] = {
                 "key": key,
@@ -84,6 +105,7 @@ def _group_culture_results(results):
                 "colony": row.colony,
                 "microorganism": None,
                 "cultures": [culture_data] if culture_data != None else [],
+                "predictions": [prediction_data] if prediction_data != None else [],
             }
 
     grouped_data = []
@@ -94,6 +116,13 @@ def _group_culture_results(results):
         )
         if len(headers[id]["cultures"]) > 0:
             headers[id]["microorganism"] = headers[id]["cultures"][0]["microorganism"]
+
+        if len(headers[id]["predictions"]) > 0:
+            headers[id]["predictions"] = sorted(
+                headers[id]["predictions"],
+                key=lambda d: d["drug"] if d["drug"] != None else "",
+            )
+
         grouped_data.append(headers[id])
 
     return sorted(
