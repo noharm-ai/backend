@@ -4,6 +4,7 @@ from models.main import db, desc, User
 from models.appendix import CultureHeader, Culture
 from exception.validation_error import ValidationError
 from utils import dateutils, status
+from routes.utils import none2zero
 
 
 def get_cultures(idPatient: int, user: User):
@@ -65,8 +66,8 @@ def _group_culture_results(results):
     def prediction(row):
         if (
             row.prediction != None
-            and row.predict_proba > 0.7
-            and row.drug_proba > 0.025
+            and none2zero(row.predict_proba) > 0.7
+            and none2zero(row.drug_proba) > 0.025
         ):
             return {
                 "drug": row.drug,
