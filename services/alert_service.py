@@ -379,7 +379,7 @@ def _alert_max_dose_total(
     alert = _create_alert(
         id_prescription_drug=str(prescription_drug.id),
         key="",
-        alert_type=DrugAlertTypeEnum.MAX_DOSE,
+        alert_type=DrugAlertTypeEnum.MAX_DOSE_PLUS,
         alert_level=DrugAlertLevelEnum.HIGH,
         text="",
     )

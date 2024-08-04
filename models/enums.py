@@ -147,6 +147,7 @@ class DrugAlertTypeEnum(Enum):
     ALLERGY = "allergy"
     MAX_TIME = "maxTime"
     MAX_DOSE = "maxDose"
+    MAX_DOSE_PLUS = "maxDosePlus"
     IRA = "ira"
     PREGNANT = "pregnant"
     LACTATING = "lactating"
