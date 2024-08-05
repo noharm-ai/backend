@@ -122,7 +122,7 @@ def getVersion():
 @app.route("/tmpdir", methods=["GET"])
 def getTmpdir():
     results = []
-    a = os.listdir("/tmp")
+    a = os.listdir("/tmp/noharm-mobile")
     for x in a:
         results.append(x)
 
