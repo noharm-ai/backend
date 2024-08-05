@@ -92,7 +92,7 @@ def _get_model(model_name):
     client = _get_client()
     model = None
 
-    with tempfile.TemporaryFile() as f:
+    with tempfile.NamedTemporaryFile() as f:
         client.download_fileobj(Config.CACHE_BUCKET_NAME, model_name, f)
         f.seek(0)
 
