@@ -119,6 +119,16 @@ def getVersion():
     return {"status": "success", "data": "v3.17-beta"}, status.HTTP_200_OK
 
 
+@app.route("/tmpdir", methods=["GET"])
+def getTmpdir():
+    results = []
+    a = os.listdir("/tmp")
+    for x in a:
+        results.append(x)
+
+    return {"status": "success", "data": results}, status.HTTP_200_OK
+
+
 @app.route("/exc", methods=["GET"])
 def get_exception():
     results = []
