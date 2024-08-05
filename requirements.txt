@@ -23,4 +23,3 @@ pyjwt[crypto]
 cryptography==3.4.8
 boto3
 openai==1.12.0
-maritalk

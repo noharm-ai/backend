@@ -1,4 +1,3 @@
-import maritalk
 from openai import AzureOpenAI
 
 from config import Config
@@ -52,14 +51,8 @@ def _prompt_openai(messages):
 
 
 def _prompt_maritaca(messages, options={}):
-    client = maritalk.MariTalk(key=Config.MARITACA_API_KEY)
-
-    answer = client.generate(
-        messages,
-        do_sample=options.get("do_sample", True),
-        max_tokens=1000,
-        temperature=options.get("temperature", 0.7),
-        top_p=options.get("top_p", 0.95),
+    raise ValidationError(
+        "Maritaca not implemented",
+        "errors.invalidModule",
+        status.HTTP_400_BAD_REQUEST,
     )
-
-    return answer
