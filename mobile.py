@@ -126,6 +126,10 @@ def getTmpdir():
     for x in a:
         results.append(x)
 
+    a = os.listdir("/tmp/noharm-mobile")
+    for x in a:
+        results.append(x)
+
     return {"status": "success", "data": results}, status.HTTP_200_OK
 
 
