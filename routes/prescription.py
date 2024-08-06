@@ -52,6 +52,7 @@ def getPrescriptions():
     idSegmentList = request.args.getlist("idSegment[]")
     idDept = request.args.getlist("idDept[]")
     idDrug = request.args.getlist("idDrug[]")
+    idPatient = request.args.getlist("idPatient[]")
     allDrugs = request.args.get("allDrugs", 0)
     startDate = request.args.get("startDate", str(date.today()))
     endDate = request.args.get("endDate", None)
@@ -89,6 +90,7 @@ def getPrescriptions():
         substanceClasses=substanceClasses,
         patientReviewType=patientReviewType,
         drugAttributes=drugAttributes,
+        idPatient=idPatient,
     )
 
     results = []

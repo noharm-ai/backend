@@ -311,6 +311,7 @@ class Patient(db.Model):
         substanceClasses=[],
         patientReviewType=None,
         drugAttributes=[],
+        idPatient=[],
     ):
         q = (
             db.session.query(
@@ -478,6 +479,9 @@ class Patient(db.Model):
                     substanceClasses
                 )
             )
+
+        if len(idPatient) > 0:
+            q = q.filter(Prescription.idPatient.in_(idPatient))
 
         if endDate is None:
             endDate = startDate
