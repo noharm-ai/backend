@@ -21,10 +21,11 @@ def computePrescription(schema, id_prescription):
     is_cpoe = request.args.get("cpoe", False)
     is_pmc = request.args.get("pmc", False)
     out_patient = request.args.get("outpatient", None)
+    force = request.args.get("force", False)
 
     try:
         prescription_agg_service.create_agg_prescription_by_prescription(
-            schema, id_prescription, is_cpoe, out_patient, is_pmc=is_pmc
+            schema, id_prescription, is_cpoe, out_patient, is_pmc=is_pmc, force=force
         )
     except ValidationError as e:
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
