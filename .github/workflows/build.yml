@@ -35,8 +35,6 @@ jobs:
         run: |
           python mobile.py &
           sleep 10
-      - name: Run Python Tests
-        run: python -m pytest -v
       - name: Run Coverage Report
         run: python -m pytest --cov-report xml --cov=.
       - name: Submit Coverage Report
