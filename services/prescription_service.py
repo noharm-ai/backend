@@ -106,6 +106,13 @@ def check_prescription(
             status.HTTP_400_BAD_REQUEST,
         )
 
+    if p.status == p_status:
+        raise ValidationError(
+            "Não houve alteração de situação",
+            "errors.invalidRegister",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
     if not data_authorization_service.has_segment_authorization(
         id_segment=p.idSegment, user=user
     ):
