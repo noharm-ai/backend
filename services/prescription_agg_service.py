@@ -1,5 +1,5 @@
 from utils import status
-from sqlalchemy import desc, text
+from sqlalchemy import desc, text, select, func, and_
 from flask_sqlalchemy.session import Session
 from datetime import date, timedelta
 
@@ -15,7 +15,7 @@ from exception.validation_error import ValidationError
 
 
 def create_agg_prescription_by_prescription(
-    schema, id_prescription, is_cpoe, out_patient, is_pmc=False
+    schema, id_prescription, is_cpoe, out_patient, is_pmc=False, force=False
 ):
     set_schema(schema)
 
@@ -28,6 +28,9 @@ def create_agg_prescription_by_prescription(
         )
 
     if p.idSegment is None:
+        return
+
+    if not force and not _has_new_itens(id_prescription):
         return
 
     resultPresc, stat = getPrescription(idPrescription=id_prescription)
@@ -265,3 +268,28 @@ def get_date_range(p):
     )
     end_date = end_date if end_date < max_date else max_date
     return [start_date + timedelta(days=x) for x in range((end_date - start_date).days)]
+
+
+def _has_new_itens(id_prescription: int):
+    query = (
+        select(PrescriptionDrug.id, func.count(PrescriptionDrugAudit.id))
+        .select_from(PrescriptionDrug)
+        .outerjoin(
+            PrescriptionDrugAudit,
+            and_(
+                PrescriptionDrug.id == PrescriptionDrugAudit.idPrescriptionDrug,
+                PrescriptionDrugAudit.auditType
+                == PrescriptionDrugAuditTypeEnum.PROCESSED.value,
+            ),
+        )
+        .where(PrescriptionDrug.idPrescription == id_prescription)
+        .group_by(PrescriptionDrug.id)
+        .having(func.count(PrescriptionDrugAudit.id) == 0)
+    )
+
+    results = db.session.execute(query).all()
+
+    if len(results) > 0:
+        return True
+
+    return False
