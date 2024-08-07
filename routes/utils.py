@@ -1,4 +1,4 @@
-from utils import status
+from utils import status, dateutils
 from datetime import date, datetime, timedelta
 import unicodedata, copy, re
 import logging
@@ -464,7 +464,7 @@ def get_bool_drug_attributes_list():
     ]
 
 
-def getFeatures(result):
+def getFeatures(result, agg_date: datetime = None, intervals_for_agg_date=False):
     drugList = result["data"]["prescription"]
     drugList.extend(result["data"]["solution"])
     drugList.extend(result["data"]["procedures"])
@@ -475,6 +475,7 @@ def getFeatures(result):
     substanceIDs = []
     substanceClassIDs = []
     frequencies = []
+    intervals = []
     drug_attributes = {}
     alert_levels = []
     alert_level = "low"
@@ -509,6 +510,27 @@ def getFeatures(result):
         control += int(d["c"]) if not d["c"] is None else 0
         diff += int(not d["checked"])
         tube += int(d["tubeAlert"])
+
+        if (
+            intervals_for_agg_date
+            and agg_date != None
+            and d["prescriptionDate"] != None
+            and dateutils.to_iso(agg_date).split("T")[0]
+            == d["prescriptionDate"].split("T")[0]
+        ):
+            # add interval for agg_date
+            if d.get("interval", None) != None:
+                times = split_interval(d.get("interval"))
+                for t in times:
+                    if not t in intervals:
+                        intervals.append(t)
+        else:
+            # add all intervals
+            if d.get("interval", None) != None:
+                times = split_interval(d.get("interval"))
+                for t in times:
+                    if not t in intervals:
+                        intervals.append(t)
 
         if d["frequency"]["value"] != "":
             frequencies.append(d["frequency"]["value"])
@@ -575,6 +597,7 @@ def getFeatures(result):
         "totalItens": len(drugList),
         "drugAttributes": drug_attributes,
         "lastPrescriptionDate": p_dates[-1] if len(p_dates) > 0 else None,
+        "intervals": intervals,
     }
 
 
@@ -625,3 +648,10 @@ def gen_agg_id(admission_number, id_segment, pdate):
     id += admission_number
 
     return id
+
+
+def split_interval(interval):
+    if interval != None:
+        return interval.split(" ")
+
+    return []
