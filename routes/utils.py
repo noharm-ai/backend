@@ -519,6 +519,7 @@ def getFeatures(result, agg_date: datetime = None, intervals_for_agg_date=False)
             == d["prescriptionDate"].split("T")[0]
         ):
             # add interval for agg_date
+            # must be the same prescription date (individual and agg)
             if d.get("interval", None) != None:
                 times = split_interval(d.get("interval"))
                 for t in times:
@@ -531,6 +532,8 @@ def getFeatures(result, agg_date: datetime = None, intervals_for_agg_date=False)
                 for t in times:
                     if not t in intervals:
                         intervals.append(t)
+
+        intervals.sort()
 
         if d["frequency"]["value"] != "":
             frequencies.append(d["frequency"]["value"])
@@ -652,6 +655,16 @@ def gen_agg_id(admission_number, id_segment, pdate):
 
 def split_interval(interval):
     if interval != None:
-        return interval.split(" ")
+        results = []
+        int_array = interval.split(" ")
+
+        for t in int_array:
+            if len(t.split(":")) > 1:
+                results.append(t.split(":")[0])
+            else:
+                if t != "":
+                    results.append(t)
+
+        return results
 
     return []
