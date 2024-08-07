@@ -812,7 +812,7 @@ def static_prescription_status():
             "code": e.code,
         }, e.httpStatus
 
-    return tryCommit(db, result, user.permission())
+    return tryCommit(db, result, origin_user.permission())
 
 
 @app_pres.route("/prescriptions/review", methods=["POST"])
