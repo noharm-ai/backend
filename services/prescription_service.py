@@ -87,7 +87,9 @@ def search(search_key):
     )
 
 
-def check_prescription(idPrescription, p_status, user, evaluation_time, alerts):
+def check_prescription(
+    idPrescription, p_status, user, evaluation_time, alerts, service_user=False
+):
     roles = user.config["roles"] if user.config and "roles" in user.config else []
     if not permission_service.is_pharma(user):
         raise ValidationError(
@@ -137,6 +139,7 @@ def check_prescription(idPrescription, p_status, user, evaluation_time, alerts):
         ),
         "evaluationTime": evaluation_time or 0,
         "alerts": alerts,
+        "serviceUser": service_user,
     }
 
     results = []

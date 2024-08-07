@@ -54,6 +54,7 @@ class RoleEnum(Enum):
     UNLOCK_CHECKED_PRESCRIPTION = "unlock-checked-prescription"
     CPOE = "cpoe"
     PRESMED_FORM = "presmed-form"
+    SERVICE_USER = "service-user"
 
 
 class FeatureEnum(Enum):
