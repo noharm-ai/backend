@@ -2,6 +2,7 @@ import re
 
 from .utils import *
 from models.appendix import *
+from utils.dateutils import to_iso
 
 
 def _get_legacy_alert(kind):
@@ -315,8 +316,6 @@ class DrugList:
                     "existIntervention": self.getExistIntervention(
                         pd[0].idDrug, pd[0].idPrescription
                     ),
-                    # remove alerts attribute after migration to alertsComplete
-                    # "alerts": alerts,
                     "alertsComplete": alerts_complete,
                     "tubeAlert": tubeAlert,
                     "notes": pd[7],
@@ -329,6 +328,7 @@ class DrugList:
                     "infusionKey": self.getInfusionKey(pd),
                     "formValues": pd[0].form,
                     "drugAttributes": self.getDrugAttributes(pd),
+                    "prescriptionDate": to_iso(pd.prescription_date),
                 }
             )
 

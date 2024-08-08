@@ -22,6 +22,10 @@ def is_pharma(user: User):
     )
 
 
+def is_service_user(user: User):
+    return has_role(user, RoleEnum.SERVICE_USER.value)
+
+
 def is_user_admin(user: User):
     return has_any_role(user, RoleEnum.USER_ADMIN.value)
 

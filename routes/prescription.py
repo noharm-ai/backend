@@ -29,6 +29,7 @@ from services import (
     intervention_service,
     patient_service,
     data_authorization_service,
+    permission_service,
 )
 from converter import prescription_converter
 from models.enums import (
@@ -53,6 +54,7 @@ def getPrescriptions():
     idDept = request.args.getlist("idDept[]")
     idDrug = request.args.getlist("idDrug[]")
     idPatient = request.args.getlist("idPatient[]")
+    intervals = request.args.getlist("intervals[]")
     allDrugs = request.args.get("allDrugs", 0)
     startDate = request.args.get("startDate", str(date.today()))
     endDate = request.args.get("endDate", None)
@@ -91,6 +93,7 @@ def getPrescriptions():
         patientReviewType=patientReviewType,
         drugAttributes=drugAttributes,
         idPatient=idPatient,
+        intervals=intervals,
     )
 
     results = []
@@ -755,6 +758,63 @@ def setPrescriptionStatus():
         }, e.httpStatus
 
     return tryCommit(db, result, user.permission())
+
+
+@app_pres.route("/static/prescriptions/status", methods=["POST"])
+@jwt_required()
+def static_prescription_status():
+    data = request.get_json()
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+    os.environ["TZ"] = "America/Sao_Paulo"
+
+    id_prescription = data.get("idPrescription", None)
+    p_status = (
+        escape_html(data.get("status", None))
+        if data.get("status", None) != None
+        else None
+    )
+    id_origin_user = data.get("idOriginUser", None)
+
+    if not permission_service.is_service_user(user):
+        return {
+            "status": "error",
+            "message": "usuário serviço inválido",
+            "code": "invalid",
+        }, status.HTTP_401_UNAUTHORIZED
+
+    origin_user = (
+        db.session.query(User)
+        .filter(User.schema == user.schema)
+        .filter(User.external == id_origin_user)
+        .filter(User.active == True)
+        .first()
+    )
+
+    if not origin_user:
+        return {
+            "status": "error",
+            "message": "usuário origem inválido",
+            "code": "invalid",
+        }, status.HTTP_400_BAD_REQUEST
+
+    try:
+        result = prescription_service.check_prescription(
+            idPrescription=id_prescription,
+            p_status=p_status,
+            user=origin_user,
+            evaluation_time=0,
+            alerts=[],
+            service_user=True,
+        )
+    except ValidationError as e:
+        return {
+            "status": "error",
+            "message": str(e),
+            "code": e.code,
+        }, e.httpStatus
+
+    return tryCommit(db, result, origin_user.permission())
 
 
 @app_pres.route("/prescriptions/review", methods=["POST"])
