@@ -103,7 +103,9 @@ def create_agg_prescription_by_prescription(
                 )
 
         if "data" in resultAgg:
-            pAgg.features = getFeatures(resultAgg)
+            pAgg.features = getFeatures(
+                resultAgg, agg_date=pAgg.date, intervals_for_agg_date=True
+            )
             pAgg.aggDrugs = pAgg.features["drugIDs"]
             pAgg.aggDeps = list(
                 set(

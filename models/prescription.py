@@ -742,7 +742,7 @@ class PrescriptionDrug(db.Model):
                 Prescription.expire,
                 Substance,
                 period_cpoe.label("period_cpoe"),
-                Prescription.date,
+                Prescription.date.label("prescription_date"),
                 MeasureUnitConvert.factor.label("measure_unit_convert_factor"),
             )
             .outerjoin(Outlier, Outlier.id == PrescriptionDrug.idOutlier)
