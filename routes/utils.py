@@ -511,20 +511,20 @@ def getFeatures(result, agg_date: datetime = None, intervals_for_agg_date=False)
         diff += int(not d["checked"])
         tube += int(d["tubeAlert"])
 
-        if (
-            intervals_for_agg_date
-            and agg_date != None
-            and d["prescriptionDate"] != None
-            and dateutils.to_iso(agg_date).split("T")[0]
-            == d["prescriptionDate"].split("T")[0]
-        ):
+        if intervals_for_agg_date:
             # add interval for agg_date
-            # must be the same prescription date (individual and agg)
-            if d.get("interval", None) != None:
-                times = split_interval(d.get("interval"))
-                for t in times:
-                    if not t in intervals:
-                        intervals.append(t)
+            if (
+                agg_date != None
+                and d["prescriptionDate"] != None
+                and dateutils.to_iso(agg_date).split("T")[0]
+                == d["prescriptionDate"].split("T")[0]
+            ):
+                # must be the same prescription date (individual and agg)
+                if d.get("interval", None) != None:
+                    times = split_interval(d.get("interval"))
+                    for t in times:
+                        if not t in intervals:
+                            intervals.append(t)
         else:
             # add all intervals
             if d.get("interval", None) != None:
