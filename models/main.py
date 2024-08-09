@@ -270,6 +270,20 @@ class DrugAttributesReference(db.Model, DrugAttributesBase):
     __table_args__ = {"schema": "hsc_test"}
 
 
+class DrugAttributesAudit(db.Model):
+    __tablename__ = "medatributos_audit"
+
+    id = db.Column(
+        "idmedatributos_audit", db.BigInteger, nullable=False, primary_key=True
+    )
+    auditType = db.Column("tp_audit", db.Integer, nullable=False)
+    idDrug = db.Column("fkmedicamento", db.BigInteger, nullable=False)
+    idSegment = db.Column("idsegmento", db.BigInteger, nullable=True)
+    extra = db.Column("extra", postgresql.JSON, nullable=True)
+    createdAt = db.Column("created_at", db.DateTime, nullable=False)
+    createdBy = db.Column("created_by", db.BigInteger, nullable=False)
+
+
 class Allergy(db.Model):
     __tablename__ = "alergia"
 
