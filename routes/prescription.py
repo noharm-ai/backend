@@ -428,12 +428,19 @@ def getPrescription(
 
         for a in allergies:
             notesAllergies.append(
-                {"date": a[1].isoformat(), "text": a[0], "source": "care", "id": a[2]}
+                {
+                    "date": a[1].isoformat(),
+                    "text": a[0],
+                    "source": "care",
+                    "id": str(a[2]),
+                }
             )
 
         notesDialysis = []
         for a in dialysis:
-            notesDialysis.append({"date": a[1].isoformat(), "text": a[0], "id": a[3]})
+            notesDialysis.append(
+                {"date": a[1].isoformat(), "text": a[0], "id": str(a[3])}
+            )
 
     _log_perf(start_date, "GET CLINICAL NOTES")
 
