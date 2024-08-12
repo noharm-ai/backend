@@ -129,21 +129,6 @@ class ClinicalNotes(db.Model):
         else:
             return None
 
-    def getExamsIfExists(admissionNumber):
-        if ClinicalNotes.exists():
-            return (
-                ClinicalNotes.query.filter(
-                    ClinicalNotes.admissionNumber == admissionNumber
-                )
-                .filter(ClinicalNotes.isExam == True)
-                .filter(ClinicalNotes.text != None)
-                .filter(ClinicalNotes.date > (datetime.today() - timedelta(days=90)))
-                .order_by(desc(ClinicalNotes.date))
-                .all()
-            )
-        else:
-            return []
-
     def getSigns(admissionNumber):
         return (
             db.session.query(ClinicalNotes.signsText, ClinicalNotes.date)

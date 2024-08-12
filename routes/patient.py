@@ -11,9 +11,8 @@ from models.main import *
 from models.appendix import *
 from models.segment import *
 from models.prescription import *
-from models.notes import ClinicalNotes
 from .utils import *
-from services import patient_service
+from services import patient_service, exams_service
 from converter import patient_converter
 from exception.validation_error import ValidationError
 
@@ -176,7 +175,7 @@ def getExamsbyAdmission(admissionNumber):
         else:
             del results[e]
 
-    examsText = ClinicalNotes.getExamsIfExists(admissionNumber)
+    examsText = exams_service.get_textual_exams(id_patient=patient.idPatient)
     resultsText = {}
     for e in examsText:
         slugExam = slugify(e.prescriber)
