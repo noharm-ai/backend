@@ -653,6 +653,17 @@ def getPrevNotes(admissionNumber):
     )
 
 
+class PatientAudit(db.Model):
+    __tablename__ = "pessoa_audit"
+
+    id = db.Column("idpessoa_audit", db.BigInteger, nullable=False, primary_key=True)
+    auditType = db.Column("tp_audit", db.Integer, nullable=False)
+    admissionNumber = db.Column("nratendimento", db.BigInteger, nullable=False)
+    extra = db.Column("extra", postgresql.JSON, nullable=True)
+    createdAt = db.Column("created_at", db.DateTime, nullable=False)
+    createdBy = db.Column("created_by", db.BigInteger, nullable=False)
+
+
 class PrescriptionDrug(db.Model):
     __tablename__ = "presmed"
 
