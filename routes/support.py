@@ -19,6 +19,7 @@ def create_ticket():
             user=user,
             from_url=request.form.get("fromUrl", None),
             category=request.form.get("category", None),
+            title=request.form.get("title", None),
             description=request.form.get("description", None),
             filelist=request.files.getlist("fileList[]"),
         )
