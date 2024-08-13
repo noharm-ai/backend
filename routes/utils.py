@@ -491,7 +491,7 @@ def getFeatures(result, agg_date: datetime = None, intervals_for_agg_date=False)
         if d["idSubstanceClass"] != None:
             substanceClassIDs.append(d["idSubstanceClass"])
 
-        if "drugAttributes" in d:
+        if "drugAttributes" in d and d["drugAttributes"] != None:
             for attr in d["drugAttributes"]:
                 if attr in drug_attributes:
                     drug_attributes[attr] += int(none2zero(d["drugAttributes"][attr]))
