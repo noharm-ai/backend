@@ -5,7 +5,7 @@ from typing import List
 from models.main import *
 from models.appendix import *
 from models.segment import *
-from models.enums import RoleEnum, DrugAdminSegment
+from models.enums import RoleEnum, DrugAdminSegment, DrugAttributesAuditTypeEnum
 from services.admin import ai_service
 from services import drug_service as main_drug_service, permission_service
 
@@ -370,14 +370,14 @@ def copy_drug_attributes(
         "gestante",
         "fkunidademedidacusto",
         "custo",
+        "jejum",
     ]
     set_attributes = []
     for a in attributes:
         if a in base_attributes:
             set_attributes.append(f"{a} = destino.{a},")
 
-    query = text(
-        f"""
+    query = f"""
         with modelo as (
             select
                 m.sctid,
@@ -397,6 +397,7 @@ def copy_drug_attributes(
                 coalesce(ma.naopadronizado, false) as naopadronizado,
                 coalesce(ma.linhabranca, false) as linhabranca,
                 coalesce(ma.dialisavel, false) as dialisavel,
+                coalesce(ma.jejum, false) as jejum,
                 ma.fkunidademedidacusto,
                 ma.custo
             from
@@ -419,6 +420,35 @@ def copy_drug_attributes(
                 ma.idsegmento = :idSegmentDestiny
                 {only_support_filter if not overwrite_all else ''}
         )
+    """
+
+    audit_stmt = text(
+        f"""
+        {query}
+        insert into 
+            {schema}.medatributos_audit 
+            (tp_audit, fkmedicamento, idsegmento, extra, created_at, created_by)
+        select 
+            {DrugAttributesAuditTypeEnum.COPY_FROM_REFERENCE.value}, d.fkmedicamento, d.idsegmento, :extra, now(), :idUser
+        from
+	        destino d
+    """
+    )
+
+    db.session.execute(
+        audit_stmt,
+        {
+            "idSegmentOrigin": id_segment_origin,
+            "idSegmentDestiny": id_segment_destiny,
+            "supportRole": f"%{RoleEnum.SUPPORT.value}%",
+            "idUser": user.id,
+            "extra": '{"attributes": "' + ",".join(attributes) + '"}',
+        },
+    )
+
+    update_stmt = text(
+        f"""
+        {query}
         update 
             {schema}.medatributos origem
         set 
@@ -434,7 +464,7 @@ def copy_drug_attributes(
     )
 
     return db.session.execute(
-        query,
+        update_stmt,
         {
             "idSegmentOrigin": id_segment_origin,
             "idSegmentDestiny": id_segment_destiny,

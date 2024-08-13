@@ -3,7 +3,7 @@ from sqlalchemy import asc, distinct
 
 from models.appendix import *
 from models.prescription import *
-from models.enums import DrugAdminSegment
+from models.enums import DrugAdminSegment, DrugAttributesAuditTypeEnum
 from services import permission_service, data_authorization_service
 from exception.validation_error import ValidationError
 
@@ -128,6 +128,12 @@ def drug_config_to_generate_score(
     drugAttr.update = datetime.today()
     drugAttr.user = user.id
 
+    _audit(
+        drug_attributes=drugAttr,
+        audit_type=DrugAttributesAuditTypeEnum.UPSERT_BEFORE_GEN_SCORE,
+        user=user,
+    )
+
     db.session.flush()
 
 
@@ -166,35 +172,11 @@ def get_attributes(id_segment, id_drug, user):
     if attr == None:
         return {"drugRef": drug_ref}
 
-    return {
-        "antimicro": attr.antimicro,
-        "mav": attr.mav,
-        "controlled": attr.controlled,
-        "notdefault": attr.notdefault,
-        "maxDose": attr.maxDose,
-        "kidney": attr.kidney,
-        "liver": attr.liver,
-        "platelets": attr.platelets,
-        "elderly": attr.elderly,
-        "tube": attr.tube,
-        "division": attr.division,
-        "useWeight": attr.useWeight,
-        "idMeasureUnit": attr.idMeasureUnit,
-        "idMeasureUnitPrice": attr.idMeasureUnitPrice,
-        "amount": attr.amount,
-        "amountUnit": attr.amountUnit,
-        "price": attr.price,
-        "maxTime": attr.maxTime,
-        "fallRisk": attr.fallRisk,
-        "whiteList": attr.whiteList,
-        "chemo": attr.chemo,
-        "sctid": str(drug.sctid),
-        "drugRef": drug_ref,
-        "dialyzable": attr.dialyzable,
-        "pregnant": attr.pregnant,
-        "lactating": attr.lactating,
-        "fasting": attr.fasting,
-    }
+    result = _to_dict(attr)
+    result["sctid"] = str(drug.sctid)
+    result["drugRef"] = drug_ref
+
+    return result
 
 
 def save_attributes(id_segment, id_drug, data, user):
@@ -291,6 +273,10 @@ def save_attributes(id_segment, id_drug, data, user):
     if add:
         db.session.add(attr)
 
+    _audit(
+        drug_attributes=attr, audit_type=DrugAttributesAuditTypeEnum.UPSERT, user=user
+    )
+
     db.session.flush()
 
 
@@ -368,6 +354,12 @@ def copy_substance_default_attributes(id_drug, sctid, user: User, overwrite=True
             else:
                 db.session.flush()
 
+            _audit(
+                drug_attributes=da,
+                audit_type=DrugAttributesAuditTypeEnum.UPSERT_UPDATE_SUBSTANCE,
+                user=user,
+            )
+
 
 def create_attributes_from_reference(id_drug, id_segment, user):
     da = (
@@ -422,6 +414,56 @@ def create_attributes_from_reference(id_drug, id_segment, user):
         db.session.add(da)
         db.session.flush()
 
+        _audit(
+            drug_attributes=da,
+            audit_type=DrugAttributesAuditTypeEnum.INSERT_FROM_REFERENCE,
+            user=user,
+        )
+
         return da
 
     return None
+
+
+def _to_dict(attr: DrugAttributes):
+    return {
+        "antimicro": attr.antimicro,
+        "mav": attr.mav,
+        "controlled": attr.controlled,
+        "notdefault": attr.notdefault,
+        "maxDose": attr.maxDose,
+        "kidney": attr.kidney,
+        "liver": attr.liver,
+        "platelets": attr.platelets,
+        "elderly": attr.elderly,
+        "tube": attr.tube,
+        "division": attr.division,
+        "useWeight": attr.useWeight,
+        "idMeasureUnit": attr.idMeasureUnit,
+        "idMeasureUnitPrice": attr.idMeasureUnitPrice,
+        "amount": attr.amount,
+        "amountUnit": attr.amountUnit,
+        "price": attr.price,
+        "maxTime": attr.maxTime,
+        "fallRisk": attr.fallRisk,
+        "whiteList": attr.whiteList,
+        "chemo": attr.chemo,
+        "dialyzable": attr.dialyzable,
+        "pregnant": attr.pregnant,
+        "lactating": attr.lactating,
+        "fasting": attr.fasting,
+    }
+
+
+def _audit(
+    drug_attributes: DrugAttributes, audit_type: DrugAttributesAuditTypeEnum, user: User
+):
+    audit = DrugAttributesAudit()
+    audit.idDrug = drug_attributes.idDrug
+    audit.idSegment = drug_attributes.idSegment
+    audit.auditType = audit_type.value
+    audit.extra = _to_dict(drug_attributes)
+    audit.createdAt = datetime.today()
+    audit.createdBy = user.id
+
+    db.session.add(audit)

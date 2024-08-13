@@ -1,8 +1,9 @@
-from sqlalchemy import text
+from sqlalchemy import text, desc
 
 from models.main import db
 from models.appendix import *
 from models.prescription import *
+from models.notes import ClinicalNotes
 from services import memory_service, data_authorization_service
 
 from exception.validation_error import ValidationError
@@ -128,3 +129,35 @@ def exams_reorder(exams, id_segment, user: User):
         result[s.typeExam] = s.order
 
     return result
+
+
+def get_textual_exams(admission_number: int = None, id_patient: int = None):
+    admission_number_array = []
+
+    if admission_number != None:
+        admission_number_array.append(admission_number)
+    else:
+        admissions = (
+            db.session.query(Patient)
+            .filter(Patient.idPatient == id_patient)
+            .order_by(desc(Patient.admissionDate))
+            .limit(5)
+            .all()
+        )
+
+        for a in admissions:
+            admission_number_array.append(a.admissionNumber)
+
+    if len(admission_number_array) == 0:
+        return []
+
+    return (
+        ClinicalNotes.query.filter(
+            ClinicalNotes.admissionNumber.in_(admission_number_array)
+        )
+        .filter(ClinicalNotes.isExam == True)
+        .filter(ClinicalNotes.text != None)
+        .filter(ClinicalNotes.date > (datetime.today() - timedelta(days=90)))
+        .order_by(desc(ClinicalNotes.date))
+        .all()
+    )

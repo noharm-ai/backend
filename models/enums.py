@@ -159,3 +159,15 @@ class DrugAlertLevelEnum(Enum):
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
+
+
+class DrugAttributesAuditTypeEnum(Enum):
+    UPSERT = 1
+    UPSERT_BEFORE_GEN_SCORE = 2
+    UPSERT_UPDATE_SUBSTANCE = 3
+    INSERT_FROM_REFERENCE = 4
+    COPY_FROM_REFERENCE = 5
+
+
+class PatientAuditTypeEnum(Enum):
+    UPSERT = 1

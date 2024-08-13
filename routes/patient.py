@@ -1,24 +1,20 @@
 import os, copy
+from flask import Blueprint, request
+from markupsafe import escape as escape_html
+from flask_jwt_extended import (
+    jwt_required,
+    get_jwt_identity,
+)
+
 from utils import status
-from sqlalchemy import text
 from models.main import *
 from models.appendix import *
 from models.segment import *
 from models.prescription import *
-from models.notes import ClinicalNotes
-from flask import Blueprint, request
-from markupsafe import escape as escape_html
-from flask_jwt_extended import (
-    create_access_token,
-    create_refresh_token,
-    jwt_required,
-    get_jwt_identity,
-)
 from .utils import *
-from datetime import datetime
-from services import patient_service
+from services import patient_service, exams_service
 from converter import patient_converter
-from models.enums import RoleEnum
+from exception.validation_error import ValidationError
 
 app_pat = Blueprint("app_pat", __name__)
 
@@ -179,7 +175,7 @@ def getExamsbyAdmission(admissionNumber):
         else:
             del results[e]
 
-    examsText = ClinicalNotes.getExamsIfExists(admissionNumber)
+    examsText = exams_service.get_textual_exams(id_patient=patient.idPatient)
     resultsText = {}
     for e in examsText:
         slugExam = slugify(e.prescriber)
@@ -209,102 +205,16 @@ def getExamsbyAdmission(admissionNumber):
 def setPatientData(admissionNumber):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
-    data = request.get_json()
     os.environ["TZ"] = "America/Sao_Paulo"
-    roles = user.config["roles"] if user.config and "roles" in user.config else []
 
-    p = Patient.findByAdmission(admissionNumber)
-    if p is None:
-        first_prescription = (
-            db.session.query(Prescription)
-            .filter(Prescription.admissionNumber == admissionNumber)
-            .filter(Prescription.agg == None)
-            .filter(Prescription.concilia == None)
-            .filter(Prescription.idSegment != None)
-            .order_by(asc(Prescription.date))
-            .first()
+    try:
+        result = patient_service.save_patient(
+            request_data=request.get_json(), admission_number=admissionNumber, user=user
         )
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
-        if first_prescription == None:
-            return {
-                "status": "error",
-                "message": "Paciente Inexistente!",
-            }, status.HTTP_400_BAD_REQUEST
-
-        p = Patient()
-        p.admissionNumber = admissionNumber
-        p.admissionDate = first_prescription.date
-        p.idHospital = first_prescription.idHospital
-        p.idPatient = first_prescription.idPatient
-        db.session.add(p)
-
-    updateWeight = False
-
-    if RoleEnum.READONLY.value in roles and not (
-        RoleEnum.ADMIN.value in roles or RoleEnum.TRAINING.value in roles
-    ):
-        return {
-            "status": "error",
-            "message": "Permissão inválida",
-        }, status.HTTP_401_UNAUTHORIZED
-
-    if RoleEnum.SUPPORT.value not in roles and RoleEnum.READONLY.value not in roles:
-        if "weight" in data.keys():
-            weight = data.get("weight", None)
-
-            if weight != p.weight:
-                p.weightDate = datetime.today()
-                p.weight = weight
-                updateWeight = True
-
-        alertExpire = data.get("alertExpire", None)
-        if alertExpire and alertExpire != p.alertExpire:
-            p.alert = data.get("alert", None)
-            p.alertExpire = alertExpire
-            p.alertDate = datetime.today()
-            p.alertBy = user.id
-
-        if "height" in data.keys():
-            p.height = data.get("height", None)
-        if "dialysis" in data.keys():
-            p.dialysis = data.get("dialysis", None)
-        if "lactating" in data.keys():
-            p.lactating = data.get("lactating", None)
-        if "pregnant" in data.keys():
-            p.pregnant = data.get("pregnant", None)
-        if "observation" in data.keys():
-            p.observation = data.get("observation", None)
-        if "skinColor" in data.keys():
-            p.skinColor = data.get("skinColor", None)
-        if "gender" in data.keys():
-            p.gender = data.get("gender", None)
-        if "birthdate" in data.keys():
-            p.birthdate = data.get("birthdate", None)
-
-    if RoleEnum.ADMIN.value in roles or RoleEnum.TRAINING.value in roles:
-        if "dischargeDate" in data.keys():
-            p.dischargeDate = data.get("dischargeDate", None)
-
-    p.update = datetime.today()
-    p.user = user.id
-
-    if "idPrescription" in data.keys() and updateWeight:
-        idPrescription = data.get("idPrescription")
-
-        query = text(
-            "INSERT INTO "
-            + user.schema
-            + ".presmed \
-                    SELECT *\
-                    FROM "
-            + user.schema
-            + ".presmed\
-                    WHERE fkprescricao = :idPrescription ;"
-        )
-
-        db.session.execute(query, {"idPrescription": idPrescription})
-
-    return tryCommit(db, escape_html(admissionNumber))
+    return tryCommit(db, escape_html(result.admissionNumber))
 
 
 @app_pat.route("/patient", methods=["GET"])

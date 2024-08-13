@@ -26,13 +26,13 @@ def _get_client():
     return execute
 
 
-def create_ticket(user, from_url, filelist, category, description):
+def create_ticket(user, from_url, filelist, category, description, title):
     db_user = db.session.query(User).filter(User.id == user.id).first()
 
     client = _get_client()
 
     ticket = {
-        "name": f"[{category or 'Geral'}] {db_user.name}",
+        "name": f"[{category or 'Geral'}] {title or db_user.name}",
         "partner_name": db_user.name,
         "partner_email": db_user.email,
         "description": description,
