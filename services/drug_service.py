@@ -172,7 +172,7 @@ def get_attributes(id_segment, id_drug, user):
     if attr == None:
         return {"drugRef": drug_ref}
 
-    result = _to_dict(attr)
+    result = to_dict(attr)
     result["sctid"] = str(drug.sctid)
     result["drugRef"] = drug_ref
 
@@ -425,7 +425,10 @@ def create_attributes_from_reference(id_drug, id_segment, user):
     return None
 
 
-def _to_dict(attr: DrugAttributes):
+def to_dict(attr: DrugAttributes):
+    if attr == None:
+        return None
+
     return {
         "antimicro": attr.antimicro,
         "mav": attr.mav,
@@ -462,7 +465,7 @@ def _audit(
     audit.idDrug = drug_attributes.idDrug
     audit.idSegment = drug_attributes.idSegment
     audit.auditType = audit_type.value
-    audit.extra = _to_dict(drug_attributes)
+    audit.extra = to_dict(drug_attributes)
     audit.createdAt = datetime.today()
     audit.createdBy = user.id
 
