@@ -46,6 +46,7 @@ def get_segment_departments():
     return {"status": "success", "data": results}, status.HTTP_200_OK
 
 
+# deprecated
 @app_seg.route("/segments/<int:idSegment>", methods=["GET"])
 @app_seg.route("/segments/<int:idSegment>/<int:idHospital>", methods=["GET"])
 @jwt_required()
@@ -143,6 +144,7 @@ def getSegmentsId(idSegment, idHospital=None):
     }, status.HTTP_200_OK
 
 
+# deprecated
 @app_seg.route("/segments/exams/types", methods=["GET"])
 @jwt_required()
 def getCodes():
@@ -195,23 +197,21 @@ def getRefs():
     return {"status": "success", "data": results}, status.HTTP_200_OK
 
 
+# deprecated
 @app_seg.route("/segments/<int:idSegment>/exams", methods=["PUT"])
 @jwt_required()
 def setExams(idSegment):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
-    data = request.get_json()
 
-    try:
-        result = exams_service.upsert_seg_exam(
-            data=data, id_segment=idSegment, user=user
-        )
-    except ValidationError as e:
-        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
-
-    return tryCommit(db, escape_html(result.typeExam))
+    return {
+        "status": "error",
+        "message": "Atualize a NoHarm e tente novamente",
+        "code": "error",
+    }, status.HTTP_400_BAD_REQUEST
 
 
+# deprecated
 @app_seg.route("/segments/<int:idSegment>/exams-order", methods=["PUT"])
 @jwt_required()
 def setExamsOrder(idSegment):
