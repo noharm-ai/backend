@@ -5,14 +5,12 @@ from flask_jwt_extended import (
     get_jwt_identity,
 )
 from sqlalchemy import asc, func
-from .utils import tryCommit
-from datetime import date, timedelta
 
 from utils import status
 from models.main import *
 from models.appendix import *
 from models.prescription import *
-from services import exams_service, segment_service
+from services import segment_service
 from exception.validation_error import ValidationError
 
 app_seg = Blueprint("app_seg", __name__)
@@ -46,7 +44,6 @@ def get_segment_departments():
     return {"status": "success", "data": results}, status.HTTP_200_OK
 
 
-# deprecated
 @app_seg.route("/segments/<int:idSegment>", methods=["GET"])
 @app_seg.route("/segments/<int:idSegment>/<int:idHospital>", methods=["GET"])
 @jwt_required()
@@ -144,28 +141,6 @@ def getSegmentsId(idSegment, idHospital=None):
     }, status.HTTP_200_OK
 
 
-# deprecated
-@app_seg.route("/segments/exams/types", methods=["GET"])
-@jwt_required()
-def getCodes():
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
-
-    typesExam = (
-        db.session.query(Exams.typeExam)
-        .filter(Exams.date > (date.today() - timedelta(days=30)))
-        .group_by(Exams.typeExam)
-        .order_by(asc(Exams.typeExam))
-        .all()
-    )
-
-    results = ["mdrd", "ckd", "ckd21", "cg", "swrtz2", "swrtz1"]
-    for t in typesExam:
-        results.append(t[0].lower())
-
-    return {"status": "success", "data": {"types": results}}, status.HTTP_200_OK
-
-
 @app_seg.route("/segments/exams/refs", methods=["GET"])
 @jwt_required()
 def getRefs():
@@ -195,35 +170,3 @@ def getRefs():
         )
 
     return {"status": "success", "data": results}, status.HTTP_200_OK
-
-
-# deprecated
-@app_seg.route("/segments/<int:idSegment>/exams", methods=["PUT"])
-@jwt_required()
-def setExams(idSegment):
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
-
-    return {
-        "status": "error",
-        "message": "Atualize a NoHarm e tente novamente",
-        "code": "error",
-    }, status.HTTP_400_BAD_REQUEST
-
-
-# deprecated
-@app_seg.route("/segments/<int:idSegment>/exams-order", methods=["PUT"])
-@jwt_required()
-def setExamsOrder(idSegment):
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
-    data = request.get_json()
-
-    try:
-        result = exams_service.exams_reorder(
-            exams=data.get("exams", None), id_segment=idSegment, user=user
-        )
-    except ValidationError as e:
-        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
-
-    return tryCommit(db, result)

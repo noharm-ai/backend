@@ -41,40 +41,6 @@ def get_next_id(schema):
     return ([row[0] for row in result])[0]
 
 
-def exams_reorder(exams, id_segment, user: User):
-    if not exams:
-        raise ValidationError(
-            "Parametros inválidos",
-            "errors.businessRules",
-            status.HTTP_400_BAD_REQUEST,
-        )
-
-    if not data_authorization_service.has_segment_authorization(
-        id_segment=id_segment, user=user
-    ):
-        raise ValidationError(
-            "Usuário não autorizado neste segmento",
-            "errors.businessRules",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-
-    segExams = (
-        SegmentExam.query.filter(SegmentExam.idSegment == id_segment)
-        .order_by(asc(SegmentExam.order))
-        .all()
-    )
-
-    result = {}
-    for s in segExams:
-        if s.typeExam in exams:
-            s.order = exams.index(s.typeExam)
-            db.session.flush()
-
-        result[s.typeExam] = s.order
-
-    return result
-
-
 def get_textual_exams(admission_number: int = None, id_patient: int = None):
     admission_number_array = []
 
