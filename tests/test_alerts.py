@@ -14,9 +14,9 @@ MockRow = namedtuple(
 def _get_mock_row(
     id_prescription_drug: int, dose: float, frequency: float, max_dose: float = None
 ):
-    d = Drug
+    d = Drug()
     d.id = 1
-    d.name = "Test"
+    d.name = "Test2"
 
     pd = PrescriptionDrug()
     pd.id = id_prescription_drug
