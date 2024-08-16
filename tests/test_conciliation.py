@@ -1,16 +1,11 @@
-from flask.json import jsonify
 from conftest import *
-from models.appendix import Department
-from models.segment import Segment
-
-# from models.prescription import Prescription
 
 from models.prescription import Prescription
 
 
 def test_get_prescriptions_by_idPrescription_additional2(client):
     """Teste get /prescriptions/idPrescription - Compara response data com dados do banco e valida status_code 200
-       Additional2 idPrescription data validation"""
+    Additional2 idPrescription data validation"""
 
     access_token = get_access(client)
     idPrescription = "9199"
@@ -20,13 +15,12 @@ def test_get_prescriptions_by_idPrescription_additional2(client):
     )
     data = json.loads(response.data)["data"]
 
-    assert data['concilia'] == 's'
-    assert len(data['prescription']) == 1
-    assert data['prescription'][0]['drug'] == 'Medicamento do paciente'
-    assert len(data['solution']) == 0
-    assert len(data['procedures']) == 0
-    assert data['birthdate']   ==  "1941-02-05"
-
+    assert data["concilia"] == "s"
+    assert len(data["prescription"]) == 1
+    assert data["prescription"][0]["drug"] == "Medicamento do paciente"
+    assert len(data["solution"]) == 0
+    assert len(data["procedures"]) == 0
+    assert data["birthdate"] == "1941-02-05"
 
 
 def test_putPrescriprionsCheck(client):
@@ -40,7 +34,7 @@ def test_putPrescriprionsCheck(client):
     response = client.post(
         url, data=json.dumps(data), headers=make_headers(access_token)
     )
-    
+
     prescription = (
         session.query(Prescription)
         .filter(Prescription.id == PRESCRIPTION_ID)
@@ -56,5 +50,3 @@ def test_putPrescriprionsCheck(client):
     assert response.status_code == 200
     assert prescription
     assert prescriptionaudit
- 
- 
