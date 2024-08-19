@@ -70,6 +70,7 @@ def getPrescriptions():
     substanceClasses = request.args.getlist("substanceClasses[]")
     patientStatus = request.args.get("patientStatus", None)
     patientReviewType = request.args.get("patientReviewType", None)
+    prescriber = request.args.get("prescriber", None)
 
     patients = Patient.getPatients(
         idSegment=idSegment,
@@ -94,6 +95,7 @@ def getPrescriptions():
         drugAttributes=drugAttributes,
         idPatient=idPatient,
         intervals=intervals,
+        prescriber=prescriber,
     )
 
     results = []

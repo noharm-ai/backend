@@ -152,10 +152,10 @@ def test_getDepartments(client):
     assert response.status_code == 200
 
 
-def test_getSegmentsExams(client):
+def test_get_exam_types(client):
     """Teste get /segments/exams/types - Valida o status_code 200."""
 
-    url = "/segments/exams/types"
+    url = "/admin/exam/types"
 
     access_token = get_access(client)
 

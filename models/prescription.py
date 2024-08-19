@@ -313,6 +313,7 @@ class Patient(db.Model):
         drugAttributes=[],
         idPatient=[],
         intervals=[],
+        prescriber=None,
     ):
         q = (
             db.session.query(
@@ -490,6 +491,9 @@ class Patient(db.Model):
                     "|".join(map(re.escape, intervals))
                 )
             )
+
+        if prescriber != None:
+            q = q.filter(Prescription.prescriber.ilike(f"%{prescriber}%"))
 
         if endDate is None:
             endDate = startDate

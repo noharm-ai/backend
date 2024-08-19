@@ -5,6 +5,7 @@ from unittest.mock import patch
 from flask_jwt_extended import create_access_token
 from models.appendix import Memory
 from models.prescription import Prescription, PrescriptionAudit
+import logging
 
 import sys
 
@@ -18,6 +19,9 @@ engine = sqlalchemy.create_engine(Config.POTGRESQL_CONNECTION_STRING)
 DBSession = sessionmaker(bind=engine)
 session = DBSession()
 session.connection(execution_options={"schema_translate_map": {None: "demo"}})
+
+logging.basicConfig()
+logging.getLogger("sqlalchemy.engine").setLevel(logging.ERROR)
 
 with app.test_request_context():
     access_token = create_access_token("1")

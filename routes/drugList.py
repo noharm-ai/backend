@@ -3,6 +3,7 @@ import re
 from .utils import *
 from models.appendix import *
 from utils.dateutils import to_iso
+from services import drug_service
 
 
 def _get_legacy_alert(kind):
@@ -327,7 +328,7 @@ class DrugList:
                     "cpoe_group": pd[0].cpoe_group,
                     "infusionKey": self.getInfusionKey(pd),
                     "formValues": pd[0].form,
-                    "drugAttributes": self.getDrugAttributes(pd),
+                    "drugAttributes": drug_service.to_dict(pd[6]),
                     "prescriptionDate": to_iso(pd.prescription_date),
                 }
             )
@@ -339,15 +340,6 @@ class DrugList:
             return pd[0].cpoe_group if pd[0].cpoe_group else pd[0].solutionGroup
 
         return str(pd[0].idPrescription) + str(pd[0].solutionGroup)
-
-    def getDrugAttributes(self, pd):
-        attr_list = get_bool_drug_attributes_list()
-        attributes = {}
-
-        for a in attr_list:
-            attributes[a] = 1 if pd[6] and getattr(pd[6], a) else 0
-
-        return attributes
 
     def getInfusionList(self):
         result = {}

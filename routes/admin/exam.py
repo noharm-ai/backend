@@ -49,6 +49,43 @@ def get_most_frequent():
     }, status.HTTP_200_OK
 
 
+@app_admin_exam.route("/admin/exam/list", methods=["POST"])
+@jwt_required()
+def list_exams():
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+    data = request.get_json()
+
+    try:
+        list = exam_service.get_segment_exams(
+            user=user, id_segment=data.get("idSegment", None)
+        )
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+
+    return {
+        "status": "success",
+        "data": list,
+    }, status.HTTP_200_OK
+
+
+@app_admin_exam.route("/admin/exam/types", methods=["GET"])
+@jwt_required()
+def list_exam_types():
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+
+    try:
+        list = exam_service.get_exam_types()
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+
+    return {
+        "status": "success",
+        "data": list,
+    }, status.HTTP_200_OK
+
+
 @app_admin_exam.route("/admin/exam/most-frequent/add", methods=["POST"])
 @jwt_required()
 def add_most_frequent():
@@ -67,3 +104,37 @@ def add_most_frequent():
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
     return tryCommit(db, True)
+
+
+@app_admin_exam.route("/admin/exam/upsert", methods=["POST"])
+@jwt_required()
+def upsert_seg_exam():
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+    data = request.get_json()
+
+    try:
+        result = exam_service.upsert_seg_exam(data=data, user=user)
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+
+    return tryCommit(db, result)
+
+
+@app_admin_exam.route("/admin/exam/order", methods=["POST"])
+@jwt_required()
+def set_exams_order():
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+    data = request.get_json()
+
+    try:
+        result = exam_service.set_exams_order(
+            exams=data.get("exams", None),
+            id_segment=data.get("idSegment", None),
+            user=user,
+        )
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+
+    return tryCommit(db, result)
