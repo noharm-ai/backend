@@ -419,7 +419,7 @@ def getPrescription(
     notesAllergies = []
     notesDialysis = None
 
-    if notesTotal > 0:
+    if notesTotal > 0 and is_complete:
         notesSigns = ClinicalNotes.getSigns(prescription[0].admissionNumber)
         notesInfo = ClinicalNotes.getInfo(prescription[0].admissionNumber)
 
