@@ -59,61 +59,54 @@ class ClinicalNotes(db.Model):
             None,
         ]
 
-        if ClinicalNotes.exists():
-            qNotes = (
-                db.session.query(
-                    ClinicalNotes.admissionNumber,
-                    func.sum(ClinicalNotes.medications),
-                    func.sum(ClinicalNotes.complication),
-                    func.sum(ClinicalNotes.symptoms),
-                    func.sum(ClinicalNotes.diseases),
-                    func.sum(ClinicalNotes.info),
-                    func.sum(ClinicalNotes.conduct),
-                    func.sum(ClinicalNotes.signs),
-                    func.sum(ClinicalNotes.allergy),
-                    func.count().label("total"),
-                    func.sum(ClinicalNotes.dialysis),
-                )
-                .select_from(ClinicalNotes)
-                .filter(ClinicalNotes.admissionNumber == admissionNumber)
-                .filter(ClinicalNotes.isExam == None)
+        qNotes = (
+            db.session.query(
+                ClinicalNotes.admissionNumber,
+                func.sum(ClinicalNotes.medications),
+                func.sum(ClinicalNotes.complication),
+                func.sum(ClinicalNotes.symptoms),
+                func.sum(ClinicalNotes.diseases),
+                func.sum(ClinicalNotes.info),
+                func.sum(ClinicalNotes.conduct),
+                func.sum(ClinicalNotes.signs),
+                func.sum(ClinicalNotes.allergy),
+                func.count().label("total"),
+                func.sum(ClinicalNotes.dialysis),
+            )
+            .select_from(ClinicalNotes)
+            .filter(ClinicalNotes.admissionNumber == admissionNumber)
+            .filter(ClinicalNotes.isExam == None)
+        )
+
+        if not pmc:
+            qNotes = qNotes.filter(
+                ClinicalNotes.date > (datetime.today() - timedelta(days=6))
             )
 
-            if not pmc:
-                qNotes = qNotes.filter(
-                    ClinicalNotes.date > (datetime.today() - timedelta(days=6))
-                )
+        stats_return = qNotes.group_by(ClinicalNotes.admissionNumber).first()
 
-            stats_return = qNotes.group_by(ClinicalNotes.admissionNumber).first()
-
-            return stats_return if stats_return else empty_return
-
-        else:
-            return empty_return
+        return stats_return if stats_return else empty_return
 
     def getTotalIfExists(admissionNumber, admission_date=None):
-        if ClinicalNotes.exists():
-            cutoff_date = (
-                datetime.today() - timedelta(days=120)
-                if admission_date == None
-                else admission_date
-            ) - timedelta(days=1)
+        cutoff_date = (
+            datetime.today() - timedelta(days=120)
+            if admission_date == None
+            else admission_date
+        ) - timedelta(days=1)
 
-            qNotes = (
-                db.session.query(
-                    func.count().label("total"),
-                )
-                .select_from(ClinicalNotes)
-                .filter(ClinicalNotes.admissionNumber == admissionNumber)
-                .filter(ClinicalNotes.isExam == None)
-                .filter(ClinicalNotes.date >= cutoff_date)
+        qNotes = (
+            db.session.query(
+                func.count().label("total"),
             )
+            .select_from(ClinicalNotes)
+            .filter(ClinicalNotes.admissionNumber == admissionNumber)
+            .filter(ClinicalNotes.isExam == None)
+            .filter(ClinicalNotes.date >= cutoff_date)
+        )
 
-            total = qNotes.scalar()
+        total = qNotes.scalar()
 
-            return total
-        else:
-            return 0
+        return total
 
     def getComplicationCountIfExists(admissionNumber):
         if ClinicalNotes.exists():

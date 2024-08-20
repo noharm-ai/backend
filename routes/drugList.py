@@ -330,6 +330,7 @@ class DrugList:
                     "formValues": pd[0].form,
                     "drugAttributes": drug_service.to_dict(pd[6]),
                     "prescriptionDate": to_iso(pd.prescription_date),
+                    "prescriptionExpire": to_iso(pd.prescription_expire),
                 }
             )
 

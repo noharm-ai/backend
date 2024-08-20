@@ -754,7 +754,7 @@ class PrescriptionDrug(db.Model):
                 Notes.notes,
                 prevNotes.label("prevNotes"),
                 Prescription.status,
-                Prescription.expire,
+                Prescription.expire.label("prescription_expire"),
                 Substance,
                 period_cpoe.label("period_cpoe"),
                 Prescription.date.label("prescription_date"),
