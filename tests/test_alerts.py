@@ -358,8 +358,36 @@ def test_allergy():
 
     assert stats.get("allergy", 0) == 2    
     
-  
-    ## _alert_ira    ---- NAO FIZ , DIFICIL -- dose_total[idDrugAgg]
+
+def test_ira():
+    """Fasting alerts:  Test for the presence of an alert type equal to 'ira' - Insuficiência Renal Aguda"""
+
+    drugs =[]
+    drugs.append(
+       _get_mock_row(id_prescription_drug=61,dose=10, frequency=10,drug_name = "xxx vancoyyy")
+    )
+
+    exams = {'ckd' : {'value' : 1.}, 'weight': 80 }
+
+    alerts = alert_service.find_alerts(
+        drug_list=drugs,
+        exams=exams,
+        dialisys= None,
+        pregnant=None,
+        lactating=None,
+        schedules_fasting= None,
+    )
+
+    stats = alerts.get("stats")
+    alert1 = alerts.get("alerts").get("61", [])
+    
+    assert len(alert1) == 1
+   
+    assert alert1[0].get("type", None) == "ira"
+    assert alert1[0].get("level", None) == "high"
+    
+    assert stats.get("ira", 0) == 1   
+    
     
 def test_pregnant():
     """Pregnant alerts:  Test for the presence of an alert type equal to 'pregnant' """
