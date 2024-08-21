@@ -360,7 +360,7 @@ def test_allergy():
     
 
 def test_ira():
-    """Fasting alerts:  Test for the presence of an alert type equal to 'ira' - Insuficiência Renal Aguda"""
+    """IRA alerts:  Test for the presence of an alert type equal to 'ira' - Insuficiência Renal Aguda"""
 
     drugs =[]
     drugs.append(
