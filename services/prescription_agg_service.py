@@ -81,7 +81,7 @@ def create_agg_prescription_by_prescription(
         pAgg.agg = True
         pAgg.update = datetime.today()
 
-        if p.concilia is None and pAgg.status == "s":
+        if p.concilia is None and (pAgg.status == "s" or p.status == "s"):
             prescalc_user = User()
             prescalc_user.id = 0
 
@@ -96,11 +96,21 @@ def create_agg_prescription_by_prescription(
             )
 
             if drug_count > 0:
-                pAgg.status = 0
+                if pAgg.status == "s":
+                    pAgg.status = 0
 
-                prescription_service.audit_check(
-                    prescription=pAgg, user=prescalc_user, extra={"prescalc": True}
-                )
+                    prescription_service.audit_check(
+                        prescription=pAgg, user=prescalc_user, extra={"prescalc": True}
+                    )
+
+                if p.status == "s":
+                    p.update = datetime.today()
+                    p.user = None
+                    p.status = 0
+
+                    prescription_service.audit_check(
+                        prescription=p, user=prescalc_user, extra={"prescalc": True}
+                    )
 
         if "data" in resultAgg:
             pAgg.features = getFeatures(
