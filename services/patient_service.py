@@ -6,8 +6,9 @@ from models.main import db
 from models.appendix import *
 from models.notes import ClinicalNotes
 from models.prescription import *
-from models.enums import RoleEnum, PatientAuditTypeEnum
+from models.enums import RoleEnum, PatientAuditTypeEnum, FeatureEnum
 from utils.dateutils import to_iso
+from services import memory_service
 
 from exception.validation_error import ValidationError
 
@@ -21,6 +22,13 @@ def get_patients(
     attended_by_list,
     appointment=None,
 ):
+    if not memory_service.has_feature(FeatureEnum.PRIMARY_CARE.value):
+        raise ValidationError(
+            "Funcionalidade não está habilitada",
+            "errors.invalidRequest",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
     Pmax = db.aliased(Prescription)
 
     sq_appointment = (

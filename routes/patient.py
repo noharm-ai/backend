@@ -231,15 +231,18 @@ def list_patients():
     scheduled_by_list = request.args.getlist("scheduledBy[]", None)
     attended_by_list = request.args.getlist("attendedBy[]", None)
 
-    patients = patient_service.get_patients(
-        id_segment=id_segment,
-        id_department_list=id_department_list,
-        next_appointment_start_date=next_appointment_start_date,
-        next_appointment_end_date=next_appointment_end_date,
-        scheduled_by_list=scheduled_by_list,
-        attended_by_list=attended_by_list,
-        appointment=appointment,
-    )
+    try:
+        patients = patient_service.get_patients(
+            id_segment=id_segment,
+            id_department_list=id_department_list,
+            next_appointment_start_date=next_appointment_start_date,
+            next_appointment_end_date=next_appointment_end_date,
+            scheduled_by_list=scheduled_by_list,
+            attended_by_list=attended_by_list,
+            appointment=appointment,
+        )
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
     return {
         "status": "success",
