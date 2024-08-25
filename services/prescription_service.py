@@ -1,5 +1,5 @@
 from sqlalchemy import desc, nullsfirst
-from datetime import date
+from datetime import date, datetime, timedelta
 from utils import status
 
 from models.main import db
@@ -296,9 +296,65 @@ def _check_single_prescription(
         extra=extra,
     )
 
+    _add_checkedindex(prescription=prescription, user=user)
+
     db.session.flush()
 
     return {"idPrescription": str(prescription.id), "status": p_status}
+
+
+def _add_checkedindex(prescription: Prescription, user: User):
+    if prescription.status != "s" or prescription.agg or prescription.concilia != None:
+        return
+
+    query = text(
+        f"""
+        INSERT INTO {user.schema}.checkedindex
+        (
+            nratendimento, fkmedicamento, doseconv, frequenciadia, sletapas, slhorafase,
+            sltempoaplicacao, sldosagem, dtprescricao, via, horario, dose, complemento, fkprescricao, 
+            created_at, created_by
+        )
+        SELECT 
+            p.nratendimento,
+            pm.fkmedicamento, 
+            pm.doseconv, 
+            pm.frequenciadia, 
+            COALESCE(pm.sletapas, 0), 
+            COALESCE(pm.slhorafase, 0), 
+            COALESCE(pm.sltempoaplicacao, 0), 
+            COALESCE(pm.sldosagem, 0),
+            p.dtprescricao, 
+            COALESCE(pm.via, ''), 
+            COALESCE(left(pm.horario ,50), ''),
+            pm.dose, 
+            MD5(pm.complemento),
+            p.fkprescricao,
+            :createdAt,
+            :idUser
+        FROM 
+            {user.schema}.prescricao p
+            INNER JOIN {user.schema}.presmed pm ON pm.fkprescricao = p.fkprescricao 
+        WHERE 
+            p.fkprescricao = :idPrescription
+            AND pm.dtsuspensao is null
+    """
+    )
+
+    db.session.execute(
+        query,
+        {
+            "createdAt": datetime.today(),
+            "idUser": user.id,
+            "idPrescription": prescription.id,
+        },
+    )
+
+    # delete old records to force revalidation
+    db.session.execute(
+        text(f"""DELETE FROM {user.schema}.checkedindex WHERE created_at < :maxDate"""),
+        {"maxDate": (datetime.today() - timedelta(days=15))},
+    )
 
 
 def audit_check(prescription: Prescription, user: User, parent_agg_date=None, extra={}):
