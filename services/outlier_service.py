@@ -14,7 +14,7 @@ from exception.validation_error import ValidationError
 from services.admin import drug_service, integration_status_service
 from services import data_authorization_service, permission_service
 
-FOLD_SIZE = 15
+FOLD_SIZE = 10
 
 
 def prepare(id_drug, id_segment, user):
