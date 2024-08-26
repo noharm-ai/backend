@@ -71,6 +71,7 @@ def prepare(id_drug, id_segment, user):
 
 def generate(id_drug, id_segment, fold, user: User):
     # call prepare before generate score (only for wizard)
+    start_date = datetime.now()
 
     if fold != None:
         if not permission_service.has_maintainer_permission(user):
@@ -92,6 +93,9 @@ def generate(id_drug, id_segment, fold, user: User):
     csv_buffer = _get_csv_buffer(
         id_segment=id_segment, schema=user.schema, id_drug=id_drug, fold=fold
     )
+    _log_perf(start_date, "GENERATE CSV BUFFER")
+
+    start_date = datetime.now()
 
     manager = Manager()
     drugs = pandas.read_csv(csv_buffer)
@@ -101,6 +105,10 @@ def generate(id_drug, id_segment, fold, user: User):
         .filter(Outlier.idDrug.in_(drugs_list))
         .all()
     )
+
+    _log_perf(start_date, "GET OUTLIERS LIST")
+
+    start_date = datetime.now()
 
     with Manager() as manager:
         poolDict = manager.dict()
@@ -129,6 +137,10 @@ def generate(id_drug, id_segment, fold, user: User):
 
         for drug in poolDict:
             new_os = new_os.append(poolDict[drug])
+
+    _log_perf(start_date, "PROCESS SCORES")
+
+    start_date = datetime.now()
 
     updates = []
     for o in outliers:
@@ -167,6 +179,8 @@ def generate(id_drug, id_segment, fold, user: User):
         """
 
         db.session.execute(text(update_stmt))
+
+        _log_perf(start_date, "UPDATE SCORES")
 
 
 def _to_update_row(update: dict, user: User):
@@ -251,6 +265,14 @@ def _get_csv_buffer(id_segment, schema, id_drug=None, fold=None):
     csv_buffer.seek(0)
 
     return csv_buffer
+
+
+def _log_perf(start_date, section):
+    end_date = datetime.now()
+    logging.basicConfig()
+    logger = logging.getLogger("noharm.backend")
+
+    logger.debug(f"PERF {section}: {(end_date-start_date).total_seconds()}")
 
 
 def _compute_outlier(idDrug, drugsItem, poolDict, fold):
