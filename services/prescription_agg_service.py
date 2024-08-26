@@ -30,7 +30,9 @@ def create_agg_prescription_by_prescription(
     if p.idSegment is None:
         return
 
-    if not force and not _has_new_itens(id_prescription):
+    processed_status = _get_processed_status(id_prescription=id_prescription)
+
+    if not force and processed_status == "PROCESSED":
         return
 
     resultPresc, stat = getPrescription(idPrescription=id_prescription)
@@ -103,7 +105,8 @@ def create_agg_prescription_by_prescription(
                         prescription=pAgg, user=prescalc_user, extra={"prescalc": True}
                     )
 
-                if p.status == "s":
+                # if it was checked before this process, keep it
+                if p.status == "s" and processed_status == "NEW_ITENS":
                     p.update = datetime.today()
                     p.user = None
                     p.status = 0
@@ -282,9 +285,11 @@ def get_date_range(p):
     return [start_date + timedelta(days=x) for x in range((end_date - start_date).days)]
 
 
-def _has_new_itens(id_prescription: int):
+def _get_processed_status(id_prescription: int):
     query = (
-        select(PrescriptionDrug.id, func.count(PrescriptionDrugAudit.id))
+        select(
+            PrescriptionDrug.id, func.count(PrescriptionDrugAudit.id).label("p_count")
+        )
         .select_from(PrescriptionDrug)
         .outerjoin(
             PrescriptionDrugAudit,
@@ -296,12 +301,19 @@ def _has_new_itens(id_prescription: int):
         )
         .where(PrescriptionDrug.idPrescription == id_prescription)
         .group_by(PrescriptionDrug.id)
-        .having(func.count(PrescriptionDrugAudit.id) == 0)
     )
 
     results = db.session.execute(query).all()
 
-    if len(results) > 0:
-        return True
+    not_processed_count = 0
+    for r in results:
+        if r.p_count == 0:
+            not_processed_count += 1
 
-    return False
+    if not_processed_count == len(results):
+        return "NEW_PRESCRIPTION"
+
+    if not_processed_count > 0:
+        return "NEW_ITENS"
+
+    return "PROCESSED"
