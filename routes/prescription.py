@@ -121,6 +121,7 @@ def getPrescriptions():
             "alertExams",
             "interventions",
             "complication",
+            "alertLevel",
         ]
 
         features = {"processed": True}
