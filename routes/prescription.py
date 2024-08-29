@@ -71,6 +71,10 @@ def getPrescriptions():
     patientStatus = request.args.get("patientStatus", None)
     patientReviewType = request.args.get("patientReviewType", None)
     prescriber = request.args.get("prescriber", None)
+    diff = request.args.get("diff", None)
+    pending_interventions = request.args.get("pendingInterventions", None)
+    global_score_min = request.args.get("globalScoreMin", None)
+    global_score_max = request.args.get("globalScoreMax", None)
 
     patients = Patient.getPatients(
         idSegment=idSegment,
@@ -96,6 +100,10 @@ def getPrescriptions():
         idPatient=idPatient,
         intervals=intervals,
         prescriber=prescriber,
+        diff=diff,
+        global_score_min=global_score_min,
+        global_score_max=global_score_max,
+        pending_interventions=pending_interventions,
     )
 
     results = []
