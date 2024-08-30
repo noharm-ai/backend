@@ -48,9 +48,11 @@ def create_ticket(user, from_url, filelist, category, description, title):
         options={"specification": {}},
     )
 
+    attachments = []
+
     if filelist:
         for f in filelist:
-            client(
+            att = client(
                 model="ir.attachment",
                 action="create",
                 payload=[
@@ -65,6 +67,8 @@ def create_ticket(user, from_url, filelist, category, description, title):
                 options={},
             )
 
+            attachments.append(att)
+
     ticket = client(
         model="helpdesk.ticket",
         action="search_read",
@@ -74,10 +78,32 @@ def create_ticket(user, from_url, filelist, category, description, title):
                 "id",
                 "access_token",
                 "ticket_ref",
+                "partner_id",
             ],
             "limit": 50,
         },
     )
+
+    print("/// ticket", ticket)
+    print("/// partner_id", ticket[0]["partner_id"][0])
+    if len(ticket) > 0 and ticket[0].get("partner_id", None) != None:
+        # add message
+        client(
+            model="mail.message",
+            action="create",
+            payload=[
+                {
+                    "message_type": "email",
+                    "author_id": ticket[0]["partner_id"][0],
+                    "body": description,
+                    "model": "helpdesk.ticket",
+                    "res_id": result[0]["id"],
+                    "subtype_id": 1,
+                    "attachment_ids": attachments,
+                }
+            ],
+            options={},
+        )
 
     return ticket
 
