@@ -84,8 +84,6 @@ def create_ticket(user, from_url, filelist, category, description, title):
         },
     )
 
-    print("/// ticket", ticket)
-    print("/// partner_id", ticket[0]["partner_id"][0])
     if len(ticket) > 0 and ticket[0].get("partner_id", None) != None:
         # add message
         client(
