@@ -432,6 +432,50 @@ def test_kidney_swrtz1():
     assert stats.get("kidney", 0) == 1
 
 
+@pytest.mark.parametrize(
+    "kidney_threshold, ckd_value, age, dialysis, expected_alert",
+    [
+        (60, 50, 18, None, True),  # Adult, CKD below threshold
+        (60, 70, 18, None, False),  # Adult, CKD above threshold
+        (60, 70, 18, "c", True),  # Continuous dialysis
+        (60, 70, 18, "x", True),  # Extended dialysis
+        (60, 70, 18, "v", True),  # Intermittent dialysis
+        (60, 70, 18, "p", True),  # Peritoneal dialysis
+    ],
+)
+def test_kidney_alert_multiple(
+    kidney_threshold, ckd_value, age, dialysis, expected_alert
+):
+
+    drugs = [
+        _get_mock_row(id_prescription_drug=1, dose=ckd_value, kidney=kidney_threshold)
+    ]
+    exams = {
+        "age": age,
+        "weight": 80,
+        "ckd": {"value": ckd_value} if ckd_value is not None else None,
+    }
+    alerts = alert_service.find_alerts(
+        drug_list=drugs,
+        exams=exams,
+        dialisys=dialysis,
+        pregnant=None,
+        lactating=None,
+        schedules_fasting=None,
+    )
+    kidney_alerts = alerts.get("alerts", {}).get("1", [])
+    kidney_alert_count = alerts.get("stats", {}).get(DrugAlertTypeEnum.KIDNEY.value, 0)
+
+    if expected_alert:
+        assert len(kidney_alerts) == 1
+        assert kidney_alerts[0].get("type") == DrugAlertTypeEnum.KIDNEY.value
+        assert kidney_alerts[0].get("level") == DrugAlertLevelEnum.MEDIUM.value
+        assert kidney_alert_count == 1
+    else:
+        assert len(kidney_alerts) == 0
+        assert kidney_alert_count == 0
+
+
 def test_liver():
     """Liver alerts:  Test for the presence of an alert type equal to 'liver'"""
 
