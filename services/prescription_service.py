@@ -88,7 +88,13 @@ def search(search_key):
 
 
 def check_prescription(
-    idPrescription, p_status, user, evaluation_time, alerts, service_user=False
+    idPrescription,
+    p_status,
+    user,
+    evaluation_time,
+    alerts,
+    service_user=False,
+    fast_check=False,
 ):
     roles = user.config["roles"] if user.config and "roles" in user.config else []
     if not permission_service.is_pharma(user):
@@ -102,14 +108,18 @@ def check_prescription(
     if p is None:
         raise ValidationError(
             "Prescrição inexistente",
-            "errors.invalidRegister",
+            "errors.businessRules",
             status.HTTP_400_BAD_REQUEST,
         )
 
     if p.status == p_status:
         raise ValidationError(
-            "Não houve alteração de situação",
-            "errors.invalidRegister",
+            (
+                "Não houve alteração da situação: Prescrição já está checada"
+                if p_status == "s"
+                else "Não houve alteração da situação: A checagem já foi desfeita"
+            ),
+            "errors.businessRules",
             status.HTTP_400_BAD_REQUEST,
         )
 
@@ -147,6 +157,7 @@ def check_prescription(
         "evaluationTime": evaluation_time or 0,
         "alerts": alerts,
         "serviceUser": service_user,
+        "fastCheck": fast_check,
     }
 
     results = []

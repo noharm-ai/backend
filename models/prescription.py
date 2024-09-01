@@ -314,6 +314,10 @@ class Patient(db.Model):
         idPatient=[],
         intervals=[],
         prescriber=None,
+        diff=None,
+        global_score_min=None,
+        global_score_max=None,
+        pending_interventions=None,
     ):
         q = (
             db.session.query(
@@ -490,6 +494,48 @@ class Patient(db.Model):
                 cast(Prescription.features["intervals"], db.String).op("~*")(
                     "|".join(map(re.escape, intervals))
                 )
+            )
+
+        if diff != None:
+            if bool(int(diff)):
+                q = q.filter(Prescription.features["diff"].astext.cast(Integer) > 0)
+            else:
+                q = q.filter(Prescription.features["diff"].astext.cast(Integer) == 0)
+
+        if pending_interventions != None:
+            if bool(int(pending_interventions)):
+                q = q.filter(
+                    Prescription.features["interventions"].astext.cast(Integer) > 0
+                )
+            else:
+                q = q.filter(
+                    Prescription.features["interventions"].astext.cast(Integer) == 0
+                )
+
+        if global_score_min != None:
+            q = q.filter(
+                (
+                    Prescription.features["prescriptionScore"].astext.cast(Integer)
+                    + Prescription.features["av"].astext.cast(Integer)
+                    + Prescription.features["am"].astext.cast(Integer)
+                    + Prescription.features["alertExams"].astext.cast(Integer)
+                    + Prescription.features["alerts"].astext.cast(Integer)
+                    + Prescription.features["diff"].astext.cast(Integer)
+                )
+                >= global_score_min
+            )
+
+        if global_score_max != None:
+            q = q.filter(
+                (
+                    Prescription.features["prescriptionScore"].astext.cast(Integer)
+                    + Prescription.features["av"].astext.cast(Integer)
+                    + Prescription.features["am"].astext.cast(Integer)
+                    + Prescription.features["alertExams"].astext.cast(Integer)
+                    + Prescription.features["alerts"].astext.cast(Integer)
+                    + Prescription.features["diff"].astext.cast(Integer)
+                )
+                <= global_score_max
             )
 
         if prescriber != None:
