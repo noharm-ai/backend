@@ -1,3 +1,4 @@
+from datetime import datetime
 from sqlalchemy import text, Integer, func, desc
 from sqlalchemy.orm import undefer
 
@@ -106,6 +107,7 @@ def remove_annotation(id_clinical_notes: int, annotation_type: str, user: User):
             "Tipo inválido", "errors.businessRules", status.HTTP_400_BAD_REQUEST
         )
 
+    # TODO: move to ClinicalNotesAudit
     user_service.create_audit(
         auditType=UserAuditTypeEnum.REMOVE_CLINICAL_NOTE_ANNOTATION,
         id_user=user.id,
@@ -120,20 +122,20 @@ def remove_annotation(id_clinical_notes: int, annotation_type: str, user: User):
 
 def get_tags():
     return [
-        {"name": "dados", "column": "info"},
-        {"name": "acesso", "column": None},
-        {"name": "germes", "column": None},
-        {"name": "sinais", "column": "signs"},
-        {"name": "alergia", "column": "allergy"},
-        {"name": "conduta", "column": "conduct"},
-        {"name": "dialise", "column": "dialysis"},
-        {"name": "diliexc", "column": None},
-        {"name": "doencas", "column": "diseases"},
-        {"name": "resthid", "column": None},
-        {"name": "gestante", "column": None},
-        {"name": "sintomas", "column": "symptoms"},
-        {"name": "complicacoes", "column": "complication"},
-        {"name": "medicamentos", "column": "medications"},
+        {"name": "dados", "column": "info", "key": "info"},
+        {"name": "acesso", "column": None, "key": "access"},
+        {"name": "germes", "column": None, "key": "germs"},
+        {"name": "sinais", "column": "signs", "key": "signs"},
+        {"name": "alergia", "column": "allergy", "key": "allergy"},
+        {"name": "conduta", "column": "conduct", "key": "conduct"},
+        {"name": "dialise", "column": "dialysis", "key": "dialysis"},
+        {"name": "diliexc", "column": None, "key": "diliexc"},
+        {"name": "doencas", "column": "diseases", "key": "diseases"},
+        {"name": "resthid", "column": None, "key": "resthid"},
+        {"name": "gestante", "column": None, "key": "pregnant"},
+        {"name": "sintomas", "column": "symptoms", "key": "symptoms"},
+        {"name": "complicacoes", "column": "complication", "key": "complication"},
+        {"name": "medicamentos", "column": "medications", "key": "medications"},
     ]
 
 
@@ -300,3 +302,74 @@ def convert_notes(notes, has_primary_care, tags):
             )
 
     return obj
+
+
+def get_user_last_clinical_notes(admission_number: int):
+    last_notes = (
+        db.session.query(Prescription.notes, Prescription.date)
+        .filter(Prescription.admissionNumber == admission_number)
+        .filter(Prescription.notes != None)
+        .order_by(desc(Prescription.date))
+        .first()
+    )
+
+    if last_notes:
+        return {"text": last_notes.notes, "date": last_notes.date.isoformat()}
+
+    return None
+
+
+def get_admission_stats(admission_number: int):
+    tags = get_tags()
+    stats = {}
+    q_stats = db.session.query().select_from(ClinicalNotes)
+
+    for tag in tags:
+        stats[tag["key"]] = 0
+
+        q_stats = q_stats.add_columns(
+            func.sum(
+                func.cast(
+                    func.coalesce(
+                        ClinicalNotes.annotations[tag["name"] + "_count"].astext, "0"
+                    ),
+                    Integer,
+                )
+            ).label(tag["key"])
+        )
+
+    q_stats = (
+        q_stats.filter(ClinicalNotes.admissionNumber == admission_number)
+        .filter(ClinicalNotes.isExam == None)
+        .filter(ClinicalNotes.date > (datetime.today() - timedelta(days=6)))
+    )
+
+    stats_result = q_stats.first()
+
+    if stats_result:
+        for tag in tags:
+            stats[tag["key"]] = getattr(stats_result, tag["key"])
+
+    return stats
+
+
+def get_count(admission_number: int, admission_date: datetime) -> int:
+    cutoff_date = (
+        datetime.today() - timedelta(days=120)
+        if admission_date == None
+        else admission_date - timedelta(days=1)
+    )
+
+    qNotes = (
+        db.session.query(
+            func.count().label("total"),
+        )
+        .select_from(ClinicalNotes)
+        .filter(ClinicalNotes.admissionNumber == admission_number)
+        .filter(ClinicalNotes.isExam == None)
+        .filter(ClinicalNotes.date >= cutoff_date)
+    )
+
+    total = qNotes.scalar()
+
+    return total

@@ -127,3 +127,19 @@ def remove_annotation():
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
     return tryCommit(db, True, user.permission())
+
+
+@app_note.route("/notes/get-user-last", methods=["GET"])
+@jwt_required()
+def get_user_last():
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+
+    try:
+        result = clinical_notes_service.get_user_last_clinical_notes(
+            admission_number=request.args.get("admissionNumber", None)
+        )
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+
+    return {"status": "success", "data": result}, status.HTTP_200_OK

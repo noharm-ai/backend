@@ -30,6 +30,7 @@ from services import (
     patient_service,
     data_authorization_service,
     permission_service,
+    clinical_notes_service,
 )
 from converter import prescription_converter
 from models.enums import (
@@ -416,20 +417,45 @@ def getPrescription(
     _log_perf(start_date, "GET MEMORY CONFIG")
 
     start_date = datetime.now()
-    clinicalNotesCount = ClinicalNotes.getCountIfExists(
-        prescription[0].admissionNumber, is_pmc
+
+    p_cache: Prescription = (
+        db.session.query(Prescription)
+        .filter(
+            Prescription.id
+            == gen_agg_id(
+                admission_number=prescription[0].admissionNumber,
+                id_segment=prescription[0].idSegment,
+                pdate=datetime.today(),
+            )
+        )
+        .first()
     )
-    notesTotal = ClinicalNotes.getTotalIfExists(
-        prescription[0].admissionNumber, admission_date=patient.admissionDate
-    )
+
+    if p_cache != None and p_cache.features.get("clinicalNotesStats", None) != None:
+        cn_stats = p_cache.features.get("clinicalNotesStats")
+    else:
+        cn_stats = clinical_notes_service.get_admission_stats(
+            admission_number=prescription[0].admissionNumber,
+        )
+
+    if p_cache != None and p_cache.features.get("clinicalNotes", 0) != 0:
+        cn_count = p_cache.features.get("clinicalNotes", 0)
+    else:
+        cn_count = clinical_notes_service.get_count(
+            admission_number=prescription[0].admissionNumber,
+            admission_date=patient.admissionDate,
+        )
 
     notesSigns = None
     notesInfo = None
     notesAllergies = []
     notesDialysis = None
 
-    if notesTotal > 0 and is_complete:
-        notesSigns = ClinicalNotes.getSigns(prescription[0].admissionNumber)
+    if cn_count > 0 and is_complete:
+        # TODO: add cache
+        if cn_stats.get("signs", 0) != 0:
+            notesSigns = ClinicalNotes.getSigns(prescription[0].admissionNumber)
+
         notesInfo = ClinicalNotes.getInfo(prescription[0].admissionNumber)
 
         allergies = ClinicalNotes.getAllergies(
@@ -649,8 +675,8 @@ def getPrescription(
             "existIntervention": getExistIntervention(
                 interventions, prescription[0].date
             ),
-            "clinicalNotes": notesTotal,
-            "complication": clinicalNotesCount[2],
+            "clinicalNotes": cn_count,
+            "complication": cn_stats.get("complication", 0),
             "notesSigns": strNone(notesSigns[0]) if notesSigns else "",
             "notesSignsDate": notesSigns[1].isoformat() if notesSigns else None,
             "notesInfo": strNone(notesInfo[0]) if notesInfo else "",
@@ -659,18 +685,7 @@ def getPrescription(
             "notesAllergiesDate": notesAllergies[0]["date"] if notesAllergies else None,
             "notesDialysis": notesDialysis,
             "notesDialysisDate": notesDialysis[0]["date"] if notesDialysis else None,
-            "clinicalNotesStats": {
-                "medications": clinicalNotesCount[1],
-                "complication": clinicalNotesCount[2],
-                "symptoms": clinicalNotesCount[3],
-                "diseases": clinicalNotesCount[4],
-                "info": clinicalNotesCount[5],
-                "conduct": clinicalNotesCount[6],
-                "signs": clinicalNotesCount[7],
-                "allergy": clinicalNotesCount[8],
-                "total": clinicalNotesCount[9],
-                "dialysis": clinicalNotesCount[10],
-            },
+            "clinicalNotesStats": cn_stats,
             "alertStats": drugList.alertStats,
             "features": prescription[0].features,
             "isBeingEvaluated": prescription_service.is_being_evaluated(
