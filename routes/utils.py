@@ -596,6 +596,8 @@ def getFeatures(result, agg_date: datetime = None, intervals_for_agg_date=False)
         "alertStats": (
             result["data"]["alertStats"] if "alertStats" in result["data"] else None
         ),
+        "clinicalNotesStats": result["data"].get("clinicalNotesStats", None),
+        "clinicalNotes": result["data"].get("clinicalNotes", None),
         "frequencies": list(set(frequencies)),
         "processedDate": datetime.today().isoformat(),
         "totalItens": len(drugList),
