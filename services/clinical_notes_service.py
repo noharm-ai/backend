@@ -107,6 +107,7 @@ def remove_annotation(id_clinical_notes: int, annotation_type: str, user: User):
             "Tipo inválido", "errors.businessRules", status.HTTP_400_BAD_REQUEST
         )
 
+    # TODO: move to ClinicalNotesAudit
     user_service.create_audit(
         auditType=UserAuditTypeEnum.REMOVE_CLINICAL_NOTE_ANNOTATION,
         id_user=user.id,
@@ -301,6 +302,21 @@ def convert_notes(notes, has_primary_care, tags):
             )
 
     return obj
+
+
+def get_user_last_clinical_notes(admission_number: int):
+    last_notes = (
+        db.session.query(Prescription.notes, Prescription.date)
+        .filter(Prescription.admissionNumber == admission_number)
+        .filter(Prescription.notes != None)
+        .order_by(desc(Prescription.date))
+        .first()
+    )
+
+    if last_notes:
+        return {"text": last_notes.notes, "date": last_notes.date.isoformat()}
+
+    return None
 
 
 def get_admission_stats(admission_number: int):
