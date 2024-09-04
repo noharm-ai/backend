@@ -315,9 +315,6 @@ def _alert_max_dose(
 ):
     if not drug_attributes:
         return None
-    print("prescription_drug", prescription_drug.idDrug)
-    print("drug_attributes", drug_attributes.idDrug)
-    print("exams", exams)
     pd_dose_conv = _get_dose_conv(
         prescription_drug=prescription_drug,
         drug_attributes=drug_attributes,
@@ -389,9 +386,6 @@ def _alert_max_dose_total(
     expireDay = prescription_expire_date.day if prescription_expire_date else 0
     idDrugAgg = str(prescription_drug.idDrug) + "_" + str(expireDay)
     idDrugAggWeight = str(idDrugAgg) + "kg"
-    print("idDrugAggWeight", idDrugAggWeight)
-    print("prescription_drug", prescription_drug.idDrug)
-    print("drug_attributes.useWeight", drug_attributes.useWeight)
     if drug_attributes.useWeight and prescription_drug.dose:
         weight = none2zero(exams["weight"])
         weight = weight if weight > 0 else 1
@@ -421,9 +415,6 @@ def _alert_max_dose_total(
             return alert
 
     else:
-        print("drug_attributes.maxDose", drug_attributes.maxDose)
-        print("idDrugAgg", idDrugAgg)
-        print('dose_total[idDrugAgg]["count"]', dose_total[idDrugAgg]["count"])
         if (
             drug_attributes.maxDose
             and idDrugAgg in dose_total
