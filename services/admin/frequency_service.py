@@ -52,7 +52,7 @@ def list_to_dto(frequencies):
                 "id": p.id,
                 "name": p.description,
                 "dailyFrequency": p.dailyFrequency,
-                "fasting": p.fasting,
+                "fasting": True if p.fasting else False,
             }
         )
 

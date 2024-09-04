@@ -1,6 +1,7 @@
 from utils import status
 from sqlalchemy import desc
 from datetime import datetime
+from markupsafe import escape as escape_html
 
 from models.main import *
 from models.appendix import *
@@ -229,18 +230,18 @@ def upsert_seg_exam(data: dict, user: User):
         segExam.idSegment = id_segment
         segExam.typeExam = typeExam
 
-    if "initials" in data.keys():
-        segExam.initials = data.get("initials", None)
-    if "name" in data.keys():
-        segExam.name = data.get("name", None)
-    if "min" in data.keys():
-        segExam.min = data.get("min", None)
-    if "max" in data.keys():
-        segExam.max = data.get("max", None)
-    if "ref" in data.keys():
-        segExam.ref = data.get("ref", None)
+    if data.get("initials", None) != None:
+        segExam.initials = escape_html(data.get("initials", None))
+    if data.get("name", None) != None:
+        segExam.name = escape_html(data.get("name", None))
+    if data.get("min", None) != None:
+        segExam.min = escape_html(data.get("min", None))
+    if data.get("max", None) != None:
+        segExam.max = escape_html(data.get("max", None))
+    if data.get("ref", None) != None:
+        segExam.ref = escape_html(data.get("ref", None))
     if "order" in data.keys():
-        segExam.order = data.get("order", None)
+        segExam.order = int(data.get("order", 99))
     if "active" in data.keys():
         segExam.active = bool(data.get("active", False))
 
