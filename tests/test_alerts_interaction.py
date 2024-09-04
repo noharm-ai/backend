@@ -1,109 +1,72 @@
-import sys
-import pytest
-from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-
-
-from config import Config
 from services.alert_interaction_service import find_relations
-from models.prescription import PrescriptionDrug, DrugAttributes, Drug, Frequency
-from models.main import db, Drug, Substance
 
-from conftest import _get_mock_row
-
-# Create a Flask app
-app = Flask(__name__)
-
-app.config["SQLALCHEMY_DATABASE_URI"] = Config.POTGRESQL_CONNECTION_STRING
-app.config["SQLALCHEMY_BINDS"] = {"report": Config.REPORT_CONNECTION_STRING}
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-    "pool_recycle": 250,
-    "pool_pre_ping": True,
-    "pool_size": 20,
-    "max_overflow": 30,
-}
-
-# Initialize SQLAlchemy with the app
-db.init_app(app)
-
-# Create the engine and session
-engine = create_engine(app.config["SQLALCHEMY_DATABASE_URI"])
-Session = sessionmaker(bind=engine)
+from conftest import get_mock_row
 
 
-@pytest.fixture
-def app_context():
-    with app.app_context():
-        yield
+def _mock_get_allergies(*args, **kwargs):
+    # Simulate an allergy to Drug A
+
+    return []
+
+    """
+    return [
+        type(
+            "obj",
+            (object,),
+            {
+                "idDrug": "1",
+                "idPatient": "1",
+                "drugName": "Drug A Substance",
+                "active": True,
+                "createdAt": datetime.now(),
+            },
+        )
+    ]
+    """
 
 
-@pytest.mark.usefixtures("app_context")
-def test_find_relations_drug_interaction(monkeypatch):
-    drug_list = [
-        _get_mock_row(id_prescription_drug=1, dose=10, drug_name="Drug A"),
-        _get_mock_row(id_prescription_drug=2, dose=20, drug_name="Drug B"),
+def _mock_get_active_relations(*args, **kwargs):
+    # Simulate the response from the database
+    active_relations = {}
+    # Example mock data that mimics the database response
+    mock_data = [
+        {
+            "sctida": "211111",
+            "sctidb": "111111",
+            "kind": "it",
+            "text": "Drug A interacts with Drug B",
+            "level": 1,
+        },
     ]
 
-    def mock_get_allergies(*args, **kwargs):
-        # Simulate an allergy to Drug A
+    for item in mock_data:
+        key = f"{item['sctida']}-{item['sctidb']}-{item['kind']}"
+        active_relations[key] = {
+            "sctida": item["sctida"],
+            "sctidb": item["sctidb"],
+            "kind": item["kind"],
+            "text": item["text"],
+            "level": item["level"],
+        }
 
-        return []
+    return active_relations
 
-        """
-        return [
-            type(
-                "obj",
-                (object,),
-                {
-                    "idDrug": "1",
-                    "idPatient": "1",
-                    "drugName": "Drug A Substance",
-                    "active": True,
-                    "createdAt": datetime.now(),
-                },
-            )
-        ]
-        """
 
-    def mock_get_active_relations(*args, **kwargs):
-        # Simulate the response from the database
-        active_relations = {}
-        # Example mock data that mimics the database response
-        mock_data = [
-            {
-                "sctida": "211111",
-                "sctidb": "111111",
-                "kind": "it",
-                "text": "Drug A interacts with Drug B",
-                "level": 1,
-            },
-        ]
+def test_find_relations_drug_interaction(monkeypatch):
+    """Alertas interação: Testa interação medicamentosa"""
 
-        for item in mock_data:
-            key = f"{item['sctida']}-{item['sctidb']}-{item['kind']}"
-            active_relations[key] = {
-                "sctida": item["sctida"],
-                "sctidb": item["sctidb"],
-                "kind": item["kind"],
-                "text": item["text"],
-                "level": item["level"],
-            }
-
-        return active_relations
+    drug_list = [
+        get_mock_row(id_prescription_drug=1, dose=10, drug_name="Drug A"),
+        get_mock_row(id_prescription_drug=2, dose=20, drug_name="Drug B"),
+        get_mock_row(id_prescription_drug=3, dose=20, drug_name="Drug C"),
+    ]
 
     monkeypatch.setattr(
-        "services.alert_interaction_service.db.session.scalar",
-        lambda *args, **kwargs: None,
-    )
-    monkeypatch.setattr(
-        "services.alert_interaction_service._get_allergies", mock_get_allergies
+        "services.alert_interaction_service._get_allergies", _mock_get_allergies
     )
     monkeypatch.setattr(
         "services.alert_interaction_service._get_active_relations",
-        mock_get_active_relations,
+        _mock_get_active_relations,
     )
 
     results = find_relations(drug_list, id_patient=1, is_cpoe=False)

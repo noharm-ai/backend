@@ -1,14 +1,8 @@
-import sys
-
-sys.path.append("..")
-sys.path.insert(0, "..")
-
 import pytest, json
 from mobile import app
 from models.main import User
 from unittest.mock import patch
 from flask_jwt_extended import create_access_token
-from models.appendix import Memory
 
 from models.prescription import (
     Prescription,
@@ -16,6 +10,7 @@ from models.prescription import (
     DrugAttributes,
     Drug,
     Frequency,
+    PrescriptionAudit,
 )
 
 from collections import namedtuple
@@ -123,7 +118,7 @@ MockRow = namedtuple(
 )
 
 
-def _get_mock_row(
+def get_mock_row(
     id_prescription_drug: int,
     dose: float,
     frequency: float = None,
