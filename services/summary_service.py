@@ -6,7 +6,7 @@ from models.main import db
 from models.appendix import *
 from models.prescription import *
 from models.notes import *
-from models.enums import RoleEnum, MemoryEnum, GlobalMemoryEnum
+from models.enums import RoleEnum, GlobalMemoryEnum
 from services import memory_service, prescription_agg_service
 from exception.validation_error import ValidationError
 
@@ -35,20 +35,38 @@ def get_structured_info(admission_number, user, mock=False):
 
     draft = memory_service.get_memory(f"draft_summary_{admission_number}")
 
-    return {
-        "patient": _get_patient_data(patient),
-        "exams": _get_exams(patient.idPatient, user.schema),
-        "allergies": _get_allergies(patient.idPatient, user.schema),
-        "drugsUsed": _get_all_drugs_used(
-            admission_number=admission_number, schema=user.schema
-        ),
-        "drugsSuspended": _get_all_drugs_suspended(
-            admission_number=admission_number, schema=user.schema
-        ),
-        "receipt": _get_receipt(admission_number=admission_number, schema=user.schema),
-        "summaryConfig": _get_summary_config(admission_number, mock),
-        "draft": draft.value if draft else None,
-    }
+    engine = db.engines["report"]
+    with engine.connect() as report_connection:
+        data = {
+            "patient": _get_patient_data(patient),
+            "exams": _get_exams(
+                id_patient=patient.idPatient,
+                schema=user.schema,
+                report_connection=report_connection,
+            ),
+            "allergies": _get_allergies(
+                patient.idPatient, user.schema, report_connection
+            ),
+            "drugsUsed": _get_all_drugs_used(
+                admission_number=admission_number,
+                schema=user.schema,
+                report_connection=report_connection,
+            ),
+            "drugsSuspended": _get_all_drugs_suspended(
+                admission_number=admission_number,
+                schema=user.schema,
+                report_connection=report_connection,
+            ),
+            "receipt": _get_receipt(
+                admission_number=admission_number,
+                schema=user.schema,
+                report_connection=report_connection,
+            ),
+            "summaryConfig": _get_summary_config(admission_number, mock),
+            "draft": draft.value if draft else None,
+        }
+
+    return data
 
 
 def _get_patient_data(patient: Patient):
@@ -280,7 +298,7 @@ def _get_annotation(admission_number, field, add, interval, compare_date):
     }
 
 
-def _get_exams(id_patient, schema):
+def _get_exams(id_patient, schema, report_connection):
     query = text(
         f"""
     select * from (
@@ -316,7 +334,7 @@ def _get_exams(id_patient, schema):
     """
     )
 
-    exams = db.session.execute(query, {"id_patient": id_patient})
+    exams = report_connection.execute(query, {"id_patient": id_patient})
 
     exams_list = []
     for e in exams:
@@ -332,7 +350,7 @@ def _get_exams(id_patient, schema):
     return exams_list
 
 
-def _get_allergies(id_patient, schema):
+def _get_allergies(id_patient, schema, report_connection):
     query = text(
         f"""
     select
@@ -350,7 +368,7 @@ def _get_allergies(id_patient, schema):
     """
     )
 
-    items = db.session.execute(query, {"id_patient": id_patient})
+    items = report_connection.execute(query, {"id_patient": id_patient})
 
     list = []
     for i in items:
@@ -363,7 +381,7 @@ def _get_allergies(id_patient, schema):
     return list
 
 
-def _get_all_drugs_used(admission_number, schema):
+def _get_all_drugs_used(admission_number, schema, report_connection):
     query = text(
         f"""
     select
@@ -419,7 +437,7 @@ def _get_all_drugs_used(admission_number, schema):
     """
     )
 
-    result = db.session.execute(query, {"admission_number": admission_number})
+    result = report_connection.execute(query, {"admission_number": admission_number})
 
     list = []
     for i in result:
@@ -428,7 +446,7 @@ def _get_all_drugs_used(admission_number, schema):
     return list
 
 
-def _get_all_drugs_suspended(admission_number, schema):
+def _get_all_drugs_suspended(admission_number, schema, report_connection):
     query = text(
         f"""
     select 
@@ -457,7 +475,7 @@ def _get_all_drugs_suspended(admission_number, schema):
     """
     )
 
-    result = db.session.execute(query, {"admission_number": admission_number})
+    result = report_connection.execute(query, {"admission_number": admission_number})
 
     list = []
     for i in result:
@@ -470,7 +488,7 @@ def _get_all_drugs_suspended(admission_number, schema):
     return list
 
 
-def _get_receipt(admission_number, schema):
+def _get_receipt(admission_number, schema, report_connection):
     last_agg = prescription_agg_service.get_last_agg_prescription(admission_number)
 
     if last_agg == None:
@@ -497,7 +515,7 @@ def _get_receipt(admission_number, schema):
     """
     )
 
-    result = db.session.execute(
+    result = report_connection.execute(
         query, {"admission_number": admission_number, "date": last_agg.date}
     )
 
