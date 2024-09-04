@@ -431,14 +431,22 @@ def getPrescription(
         .first()
     )
 
-    if p_cache != None and p_cache.features.get("clinicalNotesStats", None) != None:
+    if (
+        p_cache != None
+        and p_cache.features != None
+        and p_cache.features.get("clinicalNotesStats", None) != None
+    ):
         cn_stats = p_cache.features.get("clinicalNotesStats")
     else:
         cn_stats = clinical_notes_service.get_admission_stats(
             admission_number=prescription[0].admissionNumber,
         )
 
-    if p_cache != None and p_cache.features.get("clinicalNotes", 0) != 0:
+    if (
+        p_cache != None
+        and p_cache.features != None
+        and p_cache.features.get("clinicalNotes", 0) != 0
+    ):
         cn_count = p_cache.features.get("clinicalNotes", 0)
     else:
         cn_count = clinical_notes_service.get_count(
