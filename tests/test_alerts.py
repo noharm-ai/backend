@@ -5,77 +5,12 @@ from conftest import *
 from models.prescription import PrescriptionDrug, DrugAttributes, Drug, Frequency
 from models.enums import DrugAlertTypeEnum, DrugAlertLevelEnum
 from services import alert_service
+from conftest import _get_mock_row
 
 MockRow = namedtuple(
     "Mockrow",
     "prescription_drug drug measure_unit frequency not_used score drug_attributes notes prevnotes status expire substance period_cpoe prescription_date measure_unit_convert_factor",
 )
-
-
-def _get_mock_row(
-    id_prescription_drug: int,
-    dose: float,
-    frequency: float = None,
-    max_dose: float = None,
-    kidney: float = None,
-    liver: float = None,
-    platelets: float = None,
-    elderly: bool = None,
-    tube: bool = None,
-    allergy: str = None,
-    drug_name: str = "Test2",
-    pregnant: str = None,
-    lactating: str = None,
-    interval: str = None,
-    freq_obj: Frequency = None,
-    use_weight: bool = False,
-    expire_date: datetime = None,
-):
-    d = Drug()
-    d.id = 1
-    d.name = drug_name
-
-    pd = PrescriptionDrug()
-    pd.id = id_prescription_drug
-    pd.source = "Medicamentos"
-    pd.idDrug = 1
-    pd.frequency = frequency
-    pd.doseconv = dose
-    pd.tube = tube
-    pd.allergy = allergy
-    pd.interval = interval
-
-    da = DrugAttributes()
-    da.idDrug = 1
-    da.idSegment = 1
-    da.maxDose = max_dose
-    da.kidney = kidney
-    da.liver = liver
-    da.platelets = platelets
-    da.elderly = elderly
-    da.tube = tube
-    da.pregnant = pregnant
-    da.lactating = lactating
-    da.fasting = True
-    da.useWeight = use_weight
-
-    return MockRow(
-        pd,
-        d,
-        None,
-        freq_obj,
-        None,
-        None,
-        da,
-        None,
-        None,
-        None,
-        datetime.today(),
-        None,
-        0,
-        datetime.today(),
-        1,
-    )
 
 
 def test_dosemaxplus():

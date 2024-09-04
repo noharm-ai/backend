@@ -315,7 +315,6 @@ def _alert_max_dose(
 ):
     if not drug_attributes:
         return None
-
     pd_dose_conv = _get_dose_conv(
         prescription_drug=prescription_drug,
         drug_attributes=drug_attributes,
@@ -387,7 +386,6 @@ def _alert_max_dose_total(
     expireDay = prescription_expire_date.day if prescription_expire_date else 0
     idDrugAgg = str(prescription_drug.idDrug) + "_" + str(expireDay)
     idDrugAggWeight = str(idDrugAgg) + "kg"
-
     if drug_attributes.useWeight and prescription_drug.dose:
         weight = none2zero(exams["weight"])
         weight = weight if weight > 0 else 1
