@@ -275,7 +275,7 @@ def _get_annotation(admission_number, field, add, interval, compare_date):
         uniqueList.add(i[0])
 
     return {
-        "value": ". ".join(uniqueList)[:1500].replace('"', '\\"'),
+        "value": ". ".join(uniqueList)[:2000].replace('"', '\\"'),
         "list": list(uniqueList),
     }
 
