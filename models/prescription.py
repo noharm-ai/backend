@@ -423,25 +423,31 @@ class Patient(db.Model):
             q = q.filter(Prescription.insurance.ilike("%" + str(insurance) + "%"))
 
         if len(indicators) > 0:
+            ind_filters = []
             for i in indicators:
                 interactions = ["it", "dt", "dm", "iy", "sl", "rx"]
                 if i in interactions:
-                    q = q.filter(
+                    ind_filters.append(
                         Prescription.features["alertStats"]["interactions"][
                             i
                         ].as_integer()
                         > 0
                     )
                 else:
-                    q = q.filter(
+                    ind_filters.append(
                         Prescription.features["alertStats"][i].as_integer() > 0
                     )
 
+            q = q.filter(or_(*ind_filters))
+
         if len(drugAttributes) > 0:
+            attr_filters = []
             for a in drugAttributes:
-                q = q.filter(
+                attr_filters.append(
                     Prescription.features["drugAttributes"][a].as_integer() > 0
                 )
+
+            q = q.filter(or_(*attr_filters))
 
         if len(frequencies) > 0:
             q = q.filter(
