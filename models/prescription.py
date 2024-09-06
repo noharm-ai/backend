@@ -791,6 +791,12 @@ class PrescriptionDrug(db.Model):
         else:
             period_cpoe = literal_column("0")
 
+        substance_handling = (
+            db.session.query(("*"))
+            .select_from(func.jsonb_object_keys(Substance.handling))
+            .as_scalar()
+        )
+
         q = (
             db.session.query(
                 PrescriptionDrug,
@@ -811,6 +817,7 @@ class PrescriptionDrug(db.Model):
                 period_cpoe.label("period_cpoe"),
                 Prescription.date.label("prescription_date"),
                 MeasureUnitConvert.factor.label("measure_unit_convert_factor"),
+                func.array(substance_handling).label("substance_handling_types"),
             )
             .outerjoin(Outlier, Outlier.id == PrescriptionDrug.idOutlier)
             .outerjoin(Drug, Drug.id == PrescriptionDrug.idDrug)

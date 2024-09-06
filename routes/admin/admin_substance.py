@@ -1,0 +1,39 @@
+import os
+from flask import Blueprint, request
+from flask_jwt_extended import jwt_required, get_jwt_identity
+
+from utils import status
+from models.main import User, dbSession, tryCommit, db
+from services.admin import admin_substance_service
+from exception.validation_error import ValidationError
+
+app_admin_subs = Blueprint("app_admin_subs", __name__)
+
+
+@app_admin_subs.route("/admin/substance/list", methods=["POST"])
+@jwt_required()
+def get_substances():
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+
+    list = admin_substance_service.get_substances()
+
+    return {"status": "success", "data": list}, status.HTTP_200_OK
+
+
+@app_admin_subs.route("/admin/substance", methods=["PUT"])
+@jwt_required()
+def update_substance():
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+    os.environ["TZ"] = "America/Sao_Paulo"
+
+    try:
+        subs = admin_substance_service.upsert_substance(
+            data=request.get_json(),
+            user=user,
+        )
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+
+    return tryCommit(db, subs)

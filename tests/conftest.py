@@ -114,7 +114,7 @@ def prepareTestAggregate(id, admissionNumber, prescriptionid1, prescriptionid2):
 
 MockRow = namedtuple(
     "Mockrow",
-    "prescription_drug drug measure_unit frequency not_used score drug_attributes notes prevnotes status expire substance period_cpoe prescription_date measure_unit_convert_factor",
+    "prescription_drug drug measure_unit frequency not_used score drug_attributes notes prevnotes status expire substance period_cpoe prescription_date measure_unit_convert_factor substance_handling_types",
 )
 
 
@@ -183,4 +183,5 @@ def get_mock_row(
         0,
         datetime.now(),
         1,
+        [],
     )

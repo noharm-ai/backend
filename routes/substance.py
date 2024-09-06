@@ -54,6 +54,26 @@ def get_substance_single(idSubstance):
     }, status.HTTP_200_OK
 
 
+@app_sub.route("/substance/handling", methods=["GET"])
+@jwt_required()
+def get_substance_handling():
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+
+    try:
+        result = substance_service.get_substance_handling(
+            sctid=request.args.get("sctid", None),
+            alert_type=request.args.get("alertType"),
+        )
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+
+    return {
+        "status": "success",
+        "data": result,
+    }, status.HTTP_200_OK
+
+
 @app_sub.route("/substance/find", methods=["GET"])
 @jwt_required()
 def find_substance():
