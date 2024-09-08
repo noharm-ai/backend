@@ -87,5 +87,6 @@ def _to_dto(s: Substance):
         "name": s.name,
         "idClass": s.idclass,
         "active": s.active,
+        "link": s.link,
         "handling": s.handling,
     }
