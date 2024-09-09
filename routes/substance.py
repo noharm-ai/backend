@@ -35,25 +35,6 @@ def getSubstance():
     return {"status": "success", "data": results}, status.HTTP_200_OK
 
 
-@app_sub.route("/substance/single/<int:idSubstance>", methods=["GET"])
-@jwt_required()
-def get_substance_single(idSubstance):
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
-
-    subs = Substance.query.get(idSubstance)
-
-    return {
-        "status": "success",
-        "data": {
-            "sctid": subs.id,
-            "name": subs.name.upper(),
-            "idclass": subs.idclass,
-            "active": subs.active,
-        },
-    }, status.HTTP_200_OK
-
-
 @app_sub.route("/substance/handling", methods=["GET"])
 @jwt_required()
 def get_substance_handling():
@@ -108,39 +89,6 @@ def find_substance_class():
         "status": "success",
         "data": results,
     }, status.HTTP_200_OK
-
-
-@app_sub.route("/substance/<int:idSubstance>", methods=["PUT"])
-@jwt_required()
-def setSubstance(idSubstance):
-    data = request.get_json()
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
-
-    roles = user.config["roles"] if user.config and "roles" in user.config else []
-    if "admin" not in roles:
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-
-    subs = Substance.query.get(idSubstance)
-
-    newSubs = False
-    if subs is None:
-        newSubs = True
-        subs = Substance()
-        subs.id = idSubstance
-
-    subs.name = data.get("name", None)
-    subs.idclass = data.get("idclass", None)
-    subs.active = data.get("active", None)
-
-    if newSubs:
-        db.session.add(subs)
-
-    return tryCommit(db, escape_html(idSubstance))
 
 
 @app_sub.route("/substance/<int:idSubstance>/relation", methods=["GET"])

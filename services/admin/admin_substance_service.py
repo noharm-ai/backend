@@ -1,6 +1,5 @@
 from sqlalchemy import func
 from sqlalchemy.orm import undefer
-from typing import List
 
 from models.main import db, Substance, User, SubstanceClass
 from services import permission_service
@@ -13,6 +12,8 @@ def get_substances(
     name=None,
     idClassList=[],
     has_handling=None,
+    has_class=None,
+    class_name=None,
     limit=50,
     offset=0,
 ):
@@ -30,6 +31,9 @@ def get_substances(
     if name != None:
         q = q.filter(Substance.name.ilike(name))
 
+    if class_name != None:
+        q = q.filter(SubstanceClass.id.ilike(class_name))
+
     if len(idClassList) > 0:
         q = q.filter(Substance.idclass.in_(idClassList))
 
@@ -38,6 +42,12 @@ def get_substances(
             q = q.filter(Substance.handling != None)
         else:
             q = q.filter(Substance.handling == None)
+
+    if has_class != None:
+        if has_class:
+            q = q.filter(Substance.idclass != None)
+        else:
+            q = q.filter(Substance.idclass == None)
 
     q = (
         q.options(undefer(Substance.handling))
