@@ -22,12 +22,14 @@ def get_substances():
         limit=data.get("limit", 50),
         offset=data.get("offset", 0),
         name=data.get("name", None),
+        idClassList=data.get("idClassList", []),
+        has_handling=data.get("hasHandling", None),
     )
 
     return {"status": "success", "data": list}, status.HTTP_200_OK
 
 
-@app_admin_subs.route("/admin/substance", methods=["PUT"])
+@app_admin_subs.route("/admin/substance", methods=["POST"])
 @jwt_required()
 def update_substance():
     user = User.find(get_jwt_identity())

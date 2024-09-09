@@ -11,6 +11,8 @@ from utils import status
 def get_substances(
     user: User,
     name=None,
+    idClassList=[],
+    has_handling=None,
     limit=50,
     offset=0,
 ):
@@ -27,6 +29,15 @@ def get_substances(
 
     if name != None:
         q = q.filter(Substance.name.ilike(name))
+
+    if len(idClassList) > 0:
+        q = q.filter(Substance.idclass.in_(idClassList))
+
+    if has_handling != None:
+        if has_handling:
+            q = q.filter(Substance.handling != None)
+        else:
+            q = q.filter(Substance.handling == None)
 
     q = (
         q.options(undefer(Substance.handling))
@@ -69,21 +80,29 @@ def upsert_substance(data: dict, user):
         db.session.add(subs)
 
     subs.name = data.get("name", None)
-    subs.idclass = data.get("idclass", None)
+    subs.idclass = data.get("idClass", None)
     subs.active = data.get("active", None)
+    subs.link = data.get("link", None)
     subs.handling = data.get("handling")
 
     db.session.flush()
 
-    db_substance = db.session.query(Substance).filter(Substance.id == subs.id).first()
+    db_substance = (
+        db.session.query(Substance, SubstanceClass)
+        .outerjoin(SubstanceClass, SubstanceClass.id == Substance.idclass)
+        .filter(Substance.id == subs.id)
+        .first()
+    )
 
-    # todo
-    # return list_to_dto([db_substance])
+    return dict(
+        _to_dto(db_substance[0]),
+        **{"className": db_substance[1].name if db_substance[1] != None else None}
+    )
 
 
 def _to_dto(s: Substance):
     return {
-        "id": s.id,
+        "id": str(s.id),
         "name": s.name,
         "idClass": s.idclass,
         "active": s.active,
