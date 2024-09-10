@@ -38,6 +38,7 @@ def create_ticket(user, from_url, filelist, category, description, title):
         "description": description,
         "x_studio_schema_1": db_user.schema,
         "x_studio_fromurl": from_url,
+        "x_studio_tipo_de_chamado": category,
         "team_id": 1,
     }
 
