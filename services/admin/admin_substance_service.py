@@ -1,4 +1,4 @@
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import undefer
 
 from models.main import db, Substance, User, SubstanceClass
@@ -11,9 +11,10 @@ def get_substances(
     user: User,
     name=None,
     idClassList=[],
-    has_handling=None,
     has_class=None,
     class_name=None,
+    handling_option="filled",
+    handling_type_list=[],
     limit=50,
     offset=0,
 ):
@@ -37,11 +38,15 @@ def get_substances(
     if len(idClassList) > 0:
         q = q.filter(Substance.idclass.in_(idClassList))
 
-    if has_handling != None:
-        if has_handling:
-            q = q.filter(Substance.handling != None)
-        else:
-            q = q.filter(Substance.handling == None)
+    if len(handling_type_list) > 0:
+        handlings = []
+        for h in handling_type_list:
+            if handling_option == "filled":
+                handlings.append(Substance.handling[h].astext != None)
+            else:
+                handlings.append(Substance.handling[h].astext == None)
+
+        q = q.filter(or_(*handlings))
 
     if has_class != None:
         if has_class:

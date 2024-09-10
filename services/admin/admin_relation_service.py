@@ -51,7 +51,7 @@ def get_relations(
         else:
             q = q.filter(Relation.active == False)
 
-    q = q.order_by(SubstA.name).limit(limit).offset(offset)
+    q = q.order_by(SubstA.name, SubstB.name).limit(limit).offset(offset)
 
     results = q.all()
 

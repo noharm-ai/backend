@@ -24,7 +24,8 @@ def get_substances():
         name=data.get("name", None),
         class_name=data.get("className", None),
         idClassList=data.get("idClassList", []),
-        has_handling=data.get("hasHandling", None),
+        handling_option=data.get("handlingOption", "filled"),
+        handling_type_list=data.get("handlingTypeList", []),
         has_class=data.get("hasClass", None),
     )
 
