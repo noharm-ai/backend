@@ -24,6 +24,8 @@ def get_relations():
         id_origin_list=data.get("idOriginList", []),
         id_destination_list=data.get("idDestinationList", []),
         kind_list=data.get("kindList", []),
+        level=data.get("level", None),
+        relation_status=data.get("status", None),
     )
 
     return {"status": "success", "data": list}, status.HTTP_200_OK

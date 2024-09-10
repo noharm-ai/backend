@@ -12,6 +12,8 @@ def get_relations(
     id_origin_list=[],
     id_destination_list=[],
     kind_list=[],
+    level=None,
+    relation_status=None,
     limit=50,
     offset=0,
 ):
@@ -39,6 +41,15 @@ def get_relations(
 
     if len(kind_list) > 0:
         q = q.filter(Relation.kind.in_(kind_list))
+
+    if level != None:
+        q = q.filter(Relation.level == level)
+
+    if relation_status != None:
+        if relation_status == 1:
+            q = q.filter(Relation.active == True)
+        else:
+            q = q.filter(Relation.active == False)
 
     q = q.order_by(SubstA.name).limit(limit).offset(offset)
 

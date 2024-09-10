@@ -120,39 +120,3 @@ def get_substance_class():
         )
 
     return {"status": "success", "data": results}, status.HTTP_200_OK
-
-
-@app_sub.route("/relation/<int:sctidA>/<int:sctidB>/<string:kind>", methods=["PUT"])
-@jwt_required()
-def setRelation(sctidA, sctidB, kind):
-    data = request.get_json()
-    user = User.find(get_jwt_identity())
-
-    relation = Relation.query.get((sctidA, sctidB, kind))
-    if relation is None:
-        relation = Relation.query.get((sctidB, sctidA, kind))
-
-    newRelation = False
-    if relation is None:
-        newRelation = True
-        relation = Relation()
-        relation.sctida = sctidA
-        relation.sctidb = sctidB
-        relation.kind = kind
-        relation.creator = user.id
-
-    if "text" in data.keys():
-        relation.text = data.get("text", None)
-    if "active" in data.keys():
-        relation.active = bool(data.get("active", False))
-
-    if "level" in data.keys():
-        relation.level = data.get("level", None)
-
-    relation.update = datetime.today()
-    relation.user = user.id
-
-    if newRelation:
-        db.session.add(relation)
-
-    return tryCommit(db, escape_html(sctidA))
