@@ -1,5 +1,6 @@
 from datetime import datetime
 from sqlalchemy import text
+from typing import List
 
 from models.prescription import PrescriptionDrug, Allergy
 from models.main import db, Drug, Substance
@@ -112,36 +113,7 @@ def find_relations(drug_list, id_patient: int, is_cpoe: bool):
         if key not in uniq_overlap_keys:
             uniq_overlap_keys.append(key)
 
-    query = text(
-        f"""
-        with cruzamento as (
-            select * from (values {",".join(uniq_overlap_keys)}) AS t (sctida, sctidb)
-        )
-        select
-            r.sctida,
-            r.sctidb,
-            r.tprelacao as "kind",
-            r.texto as "text",
-            r.nivel as "level"
-        from 
-            public.relacao r 
-            inner join cruzamento c on (r.sctida = c.sctida and r.sctidb = c.sctidb)
-        where 
-	        r.ativo = true
-    """
-    )
-
-    active_relations = {}
-
-    for item in db.session.execute(query).all():
-        key = f"{item.sctida}-{item.sctidb}-{item.kind}"
-        active_relations[key] = {
-            "sctida": item.sctida,
-            "sctidb": item.sctidb,
-            "kind": item.kind,
-            "text": item.text,
-            "level": item.level,
-        }
+    active_relations = _get_active_relations(uniq_overlap_keys)
 
     alerts = {}
     stats = {}
@@ -300,3 +272,37 @@ def _get_allergies(id_patient: int):
             )
 
     return results
+
+
+def _get_active_relations(uniq_overlap_keys: List[str]):
+    query = text(
+        f"""
+        with cruzamento as (
+            select * from (values {",".join(uniq_overlap_keys)}) AS t (sctida, sctidb)
+        )
+        select
+            r.sctida,
+            r.sctidb,
+            r.tprelacao as "kind",
+            r.texto as "text",
+            r.nivel as "level"
+        from 
+            public.relacao r 
+            inner join cruzamento c on (r.sctida = c.sctida and r.sctidb = c.sctidb)
+        where 
+	        r.ativo = true
+    """
+    )
+    active_relations = {}
+
+    for item in db.session.execute(query).all():
+        key = f"{item.sctida}-{item.sctidb}-{item.kind}"
+        active_relations[key] = {
+            "sctida": item.sctida,
+            "sctidb": item.sctidb,
+            "kind": item.kind,
+            "text": item.text,
+            "level": item.level,
+        }
+
+    return active_relations

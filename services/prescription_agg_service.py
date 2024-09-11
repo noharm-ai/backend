@@ -1,7 +1,7 @@
 from utils import status
 from sqlalchemy import desc, text, select, func, and_
 from flask_sqlalchemy.session import Session
-from datetime import date, timedelta
+from datetime import date
 
 from models.main import db
 from models.appendix import *
@@ -18,6 +18,13 @@ def create_agg_prescription_by_prescription(
     schema, id_prescription, is_cpoe, out_patient, is_pmc=False, force=False
 ):
     set_schema(schema)
+
+    if is_cpoe:
+        raise ValidationError(
+            "CPOE deve acionar o fluxo por atendimento",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
 
     p = Prescription.query.get(id_prescription)
     if p is None:
@@ -40,96 +47,98 @@ def create_agg_prescription_by_prescription(
     p.aggDrugs = p.features["drugIDs"]
     p.aggDeps = [p.idDepartment]
 
-    if is_cpoe:
-        prescription_dates = get_date_range(p)
+    pdate = p.date
+
+    if processed_status == "NEW_ITENS":
+        days_between = (datetime.today().date() - p.date.date()).days
+        if days_between <= 1:
+            # updates on last day prescriptions should affect current agg prescription
+            pdate = datetime.today().date()
+
+    if out_patient:
+        PrescAggID = p.admissionNumber
     else:
-        prescription_dates = [p.date]
+        PrescAggID = gen_agg_id(p.admissionNumber, p.idSegment, pdate)
 
-    for pdate in prescription_dates:
-        if out_patient:
-            PrescAggID = p.admissionNumber
-        else:
-            PrescAggID = gen_agg_id(p.admissionNumber, p.idSegment, pdate)
+    newPrescAgg = False
+    pAgg = Prescription.query.get(PrescAggID)
+    if pAgg is None:
+        pAgg = Prescription()
+        pAgg.id = PrescAggID
+        pAgg.idPatient = p.idPatient
+        pAgg.admissionNumber = p.admissionNumber
+        pAgg.date = pdate
+        pAgg.status = 0
+        newPrescAgg = True
 
-        newPrescAgg = False
-        pAgg = Prescription.query.get(PrescAggID)
-        if pAgg is None:
-            pAgg = Prescription()
-            pAgg.id = PrescAggID
-            pAgg.idPatient = p.idPatient
-            pAgg.admissionNumber = p.admissionNumber
-            pAgg.date = pdate
-            pAgg.status = 0
-            newPrescAgg = True
+    if out_patient:
+        pAgg.date = date(pdate.year, pdate.month, pdate.day)
 
-        if out_patient:
-            pAgg.date = date(pdate.year, pdate.month, pdate.day)
+    resultAgg, stat = getPrescription(
+        admissionNumber=p.admissionNumber,
+        aggDate=pAgg.date,
+        idSegment=p.idSegment,
+        is_cpoe=is_cpoe,
+        is_pmc=is_pmc,
+    )
 
-        resultAgg, stat = getPrescription(
-            admissionNumber=p.admissionNumber,
-            aggDate=pAgg.date,
-            idSegment=p.idSegment,
-            is_cpoe=is_cpoe,
-            is_pmc=is_pmc,
+    pAgg.idHospital = p.idHospital
+    pAgg.idDepartment = p.idDepartment
+    pAgg.idSegment = p.idSegment
+    pAgg.bed = p.bed
+    pAgg.record = p.record
+    pAgg.prescriber = "Prescrição Agregada"
+    pAgg.insurance = p.insurance
+    pAgg.agg = True
+    pAgg.update = datetime.today()
+
+    if p.concilia is None and (pAgg.status == "s" or p.status == "s"):
+        prescalc_user = User()
+        prescalc_user.id = 0
+
+        drug_count = prescription_drug_service.count_drugs_by_prescription(
+            prescription=p,
+            drug_types=[
+                DrugTypeEnum.DRUG.value,
+                DrugTypeEnum.PROCEDURE.value,
+                DrugTypeEnum.SOLUTION.value,
+            ],
+            user=prescalc_user,
         )
 
-        pAgg.idHospital = p.idHospital
-        pAgg.idDepartment = p.idDepartment
-        pAgg.idSegment = p.idSegment
-        pAgg.bed = p.bed
-        pAgg.record = p.record
-        pAgg.prescriber = "Prescrição Agregada"
-        pAgg.insurance = p.insurance
-        pAgg.agg = True
-        pAgg.update = datetime.today()
+        if drug_count > 0:
+            if pAgg.status == "s":
+                pAgg.status = 0
 
-        if p.concilia is None and (pAgg.status == "s" or p.status == "s"):
-            prescalc_user = User()
-            prescalc_user.id = 0
-
-            drug_count = prescription_drug_service.count_drugs_by_prescription(
-                prescription=p,
-                drug_types=[
-                    DrugTypeEnum.DRUG.value,
-                    DrugTypeEnum.PROCEDURE.value,
-                    DrugTypeEnum.SOLUTION.value,
-                ],
-                user=prescalc_user,
-            )
-
-            if drug_count > 0:
-                if pAgg.status == "s":
-                    pAgg.status = 0
-
-                    prescription_service.audit_check(
-                        prescription=pAgg, user=prescalc_user, extra={"prescalc": True}
-                    )
-
-                # if it was checked before this process, keep it
-                if p.status == "s" and processed_status == "NEW_ITENS":
-                    p.update = datetime.today()
-                    p.user = None
-                    p.status = 0
-
-                    prescription_service.audit_check(
-                        prescription=p, user=prescalc_user, extra={"prescalc": True}
-                    )
-
-        if "data" in resultAgg:
-            pAgg.features = getFeatures(
-                resultAgg, agg_date=pAgg.date, intervals_for_agg_date=True
-            )
-            pAgg.aggDrugs = pAgg.features["drugIDs"]
-            pAgg.aggDeps = list(
-                set(
-                    [
-                        resultAgg["data"]["headers"][h]["idDepartment"]
-                        for h in resultAgg["data"]["headers"]
-                    ]
+                prescription_service.audit_check(
+                    prescription=pAgg, user=prescalc_user, extra={"prescalc": True}
                 )
+
+            # if it was checked before this process, keep it
+            if p.status == "s" and processed_status == "NEW_ITENS":
+                p.update = datetime.today()
+                p.user = None
+                p.status = 0
+
+                prescription_service.audit_check(
+                    prescription=p, user=prescalc_user, extra={"prescalc": True}
+                )
+
+    if "data" in resultAgg:
+        pAgg.features = getFeatures(
+            resultAgg, agg_date=pAgg.date, intervals_for_agg_date=True
+        )
+        pAgg.aggDrugs = pAgg.features["drugIDs"]
+        pAgg.aggDeps = list(
+            set(
+                [
+                    resultAgg["data"]["headers"][h]["idDepartment"]
+                    for h in resultAgg["data"]["headers"]
+                ]
             )
-            if newPrescAgg:
-                db.session.add(pAgg)
+        )
+        if newPrescAgg:
+            db.session.add(pAgg)
 
     _log_processed_date(id_prescription_array=[id_prescription], schema=schema)
 
@@ -273,16 +282,6 @@ def get_last_agg_prescription(admission_number) -> Prescription:
         .order_by(desc(Prescription.date))
         .first()
     )
-
-
-def get_date_range(p):
-    max_date = date.today() + timedelta(days=3)
-    start_date = p.date.date() if p.date.date() >= date.today() else date.today()
-    end_date = (p.expire.date() if p.expire != None else p.date.date()) + timedelta(
-        days=1
-    )
-    end_date = end_date if end_date < max_date else max_date
-    return [start_date + timedelta(days=x) for x in range((end_date - start_date).days)]
 
 
 def _get_processed_status(id_prescription: int):

@@ -67,3 +67,18 @@ def find_substance_class(term):
         results.append({"id": i[0].id, "name": i[0].name, "parent": i[1]})
 
     return results
+
+
+def get_substance_handling(sctid: int, alert_type: str):
+    subst = (
+        db.session.query(
+            Substance.id, Substance.handling[alert_type].label("handling_text")
+        )
+        .filter(Substance.id == sctid)
+        .first()
+    )
+
+    if subst and subst.handling_text != None:
+        return subst.handling_text
+
+    return None

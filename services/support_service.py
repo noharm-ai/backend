@@ -38,6 +38,7 @@ def create_ticket(user, from_url, filelist, category, description, title):
         "description": description,
         "x_studio_schema_1": db_user.schema,
         "x_studio_fromurl": from_url,
+        "x_studio_tipo_de_chamado": category,
         "team_id": 1,
     }
 
@@ -96,7 +97,7 @@ def create_ticket(user, from_url, filelist, category, description, title):
                     "body": description,
                     "model": "helpdesk.ticket",
                     "res_id": result[0]["id"],
-                    "subtype_id": 1,
+                    "subtype_id": 32,
                     "attachment_ids": attachments,
                 }
             ],

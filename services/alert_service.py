@@ -21,12 +21,14 @@ def find_alerts(
     alerts = {}
     stats = _get_empty_stats()
 
-    def add_alert(a):
+    def add_alert(a, handling_types=[]):
         if a != None:
             key = a["idPrescriptionDrug"]
             stats[a["type"]] += 1
             a["text"] = re.sub(" {2,}", "", a["text"])
             a["text"] = re.sub("\n", "", a["text"])
+
+            a["handling"] = a["type"] in handling_types
 
             if key not in alerts:
                 alerts[key] = [a]
@@ -44,6 +46,7 @@ def find_alerts(
         drug_attributes: DrugAttributes = item[6]
         prescription_expire_date = item[10]
         frequency = item[3]
+        handling_types = item.substance_handling_types
 
         # kidney alert
         add_alert(
@@ -52,7 +55,8 @@ def find_alerts(
                 drug_attributes=drug_attributes,
                 exams=exams,
                 dialysis=dialisys,
-            )
+            ),
+            handling_types=handling_types,
         )
 
         # liver alert
@@ -61,7 +65,8 @@ def find_alerts(
                 prescription_drug=prescription_drug,
                 drug_attributes=drug_attributes,
                 exams=exams,
-            )
+            ),
+            handling_types=handling_types,
         )
 
         # platelets
@@ -70,7 +75,8 @@ def find_alerts(
                 prescription_drug=prescription_drug,
                 drug_attributes=drug_attributes,
                 exams=exams,
-            )
+            ),
+            handling_types=handling_types,
         )
 
         # elderly
@@ -79,24 +85,30 @@ def find_alerts(
                 prescription_drug=prescription_drug,
                 drug_attributes=drug_attributes,
                 exams=exams,
-            )
+            ),
+            handling_types=handling_types,
         )
 
         # tube
         add_alert(
             _alert_tube(
                 prescription_drug=prescription_drug, drug_attributes=drug_attributes
-            )
+            ),
+            handling_types=handling_types,
         )
 
         # allergy
-        add_alert(_alert_allergy(prescription_drug=prescription_drug))
+        add_alert(
+            _alert_allergy(prescription_drug=prescription_drug),
+            handling_types=handling_types,
+        )
 
         # maximum treatment period
         add_alert(
             _alert_max_time(
                 prescription_drug=prescription_drug, drug_attributes=drug_attributes
-            )
+            ),
+            handling_types=handling_types,
         )
 
         # max dose
@@ -106,7 +118,8 @@ def find_alerts(
                 drug_attributes=drug_attributes,
                 exams=exams,
                 measure_unit_convert_factor=measure_unit_convert_factor,
-            )
+            ),
+            handling_types=handling_types,
         )
 
         # max dose total
@@ -117,7 +130,8 @@ def find_alerts(
                 exams=exams,
                 prescription_expire_date=prescription_expire_date,
                 dose_total=dose_total,
-            )
+            ),
+            handling_types=handling_types,
         )
 
         # IRA
@@ -129,7 +143,8 @@ def find_alerts(
                 prescription_expire_date=prescription_expire_date,
                 dose_total=dose_total,
                 dialysis=dialisys,
-            )
+            ),
+            handling_types=handling_types,
         )
 
         # pregnant
@@ -138,7 +153,8 @@ def find_alerts(
                 prescription_drug=prescription_drug,
                 drug_attributes=drug_attributes,
                 pregnant=pregnant,
-            )
+            ),
+            handling_types=handling_types,
         )
 
         # lactating
@@ -147,7 +163,8 @@ def find_alerts(
                 prescription_drug=prescription_drug,
                 drug_attributes=drug_attributes,
                 lactating=lactating,
-            )
+            ),
+            handling_types=handling_types,
         )
 
         # fasting
@@ -157,7 +174,8 @@ def find_alerts(
                 drug_attributes=drug_attributes,
                 frequency=frequency,
                 schedules_fasting=schedules_fasting,
-            )
+            ),
+            handling_types=handling_types,
         )
 
     return {"alerts": alerts, "stats": stats}
@@ -315,7 +333,6 @@ def _alert_max_dose(
 ):
     if not drug_attributes:
         return None
-
     pd_dose_conv = _get_dose_conv(
         prescription_drug=prescription_drug,
         drug_attributes=drug_attributes,
@@ -387,7 +404,6 @@ def _alert_max_dose_total(
     expireDay = prescription_expire_date.day if prescription_expire_date else 0
     idDrugAgg = str(prescription_drug.idDrug) + "_" + str(expireDay)
     idDrugAggWeight = str(idDrugAgg) + "kg"
-
     if drug_attributes.useWeight and prescription_drug.dose:
         weight = none2zero(exams["weight"])
         weight = weight if weight > 0 else 1

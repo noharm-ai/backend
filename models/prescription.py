@@ -423,25 +423,31 @@ class Patient(db.Model):
             q = q.filter(Prescription.insurance.ilike("%" + str(insurance) + "%"))
 
         if len(indicators) > 0:
+            ind_filters = []
             for i in indicators:
                 interactions = ["it", "dt", "dm", "iy", "sl", "rx"]
                 if i in interactions:
-                    q = q.filter(
+                    ind_filters.append(
                         Prescription.features["alertStats"]["interactions"][
                             i
                         ].as_integer()
                         > 0
                     )
                 else:
-                    q = q.filter(
+                    ind_filters.append(
                         Prescription.features["alertStats"][i].as_integer() > 0
                     )
 
+            q = q.filter(or_(*ind_filters))
+
         if len(drugAttributes) > 0:
+            attr_filters = []
             for a in drugAttributes:
-                q = q.filter(
+                attr_filters.append(
                     Prescription.features["drugAttributes"][a].as_integer() > 0
                 )
+
+            q = q.filter(or_(*attr_filters))
 
         if len(frequencies) > 0:
             q = q.filter(
@@ -785,6 +791,12 @@ class PrescriptionDrug(db.Model):
         else:
             period_cpoe = literal_column("0")
 
+        substance_handling = (
+            db.session.query(("*"))
+            .select_from(func.jsonb_object_keys(Substance.handling))
+            .as_scalar()
+        )
+
         q = (
             db.session.query(
                 PrescriptionDrug,
@@ -805,6 +817,7 @@ class PrescriptionDrug(db.Model):
                 period_cpoe.label("period_cpoe"),
                 Prescription.date.label("prescription_date"),
                 MeasureUnitConvert.factor.label("measure_unit_convert_factor"),
+                func.array(substance_handling).label("substance_handling_types"),
             )
             .outerjoin(Outlier, Outlier.id == PrescriptionDrug.idOutlier)
             .outerjoin(Drug, Drug.id == PrescriptionDrug.idDrug)

@@ -32,6 +32,8 @@ from routes.admin.integration_remote import app_admin_integration_remote
 from routes.admin.segment import app_admin_segment
 from routes.admin.exam import app_admin_exam
 from routes.admin.unit_conversion import app_admin_unit_conversion
+from routes.admin.admin_substance import app_admin_subs
+from routes.admin.admin_relation import app_admin_relation
 from routes.reports.general import app_rpt_general
 from routes.reports.config_rpt import app_rpt_config
 from routes.reports.culture import app_rpt_culture
@@ -100,6 +102,8 @@ app.register_blueprint(app_admin_integration_remote)
 app.register_blueprint(app_admin_segment)
 app.register_blueprint(app_admin_exam)
 app.register_blueprint(app_admin_unit_conversion)
+app.register_blueprint(app_admin_subs)
+app.register_blueprint(app_admin_relation)
 
 app.register_blueprint(app_rpt_general)
 app.register_blueprint(app_rpt_culture)
@@ -116,7 +120,7 @@ if Config.ENV != NoHarmENV.PRODUCTION.value:
 
 @app.route("/version", methods=["GET"])
 def getVersion():
-    return {"status": "success", "data": "v3.29-beta"}, status.HTTP_200_OK
+    return {"status": "success", "data": "v3.30-beta"}, status.HTTP_200_OK
 
 
 if __name__ == "__main__":
