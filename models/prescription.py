@@ -794,6 +794,8 @@ class PrescriptionDrug(db.Model):
         substance_handling = (
             db.session.query(("*"))
             .select_from(func.jsonb_object_keys(Substance.handling))
+            .filter(Substance.handling != None)
+            .filter(Substance.handling != "null")
             .as_scalar()
         )
 

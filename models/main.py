@@ -94,7 +94,9 @@ class Substance(db.Model):
     link = db.Column("link", db.String(255), nullable=False)
     idclass = db.Column("idclasse", db.String(255), nullable=False)
     active = db.Column("ativo", db.Boolean, nullable=False)
-    handling = deferred(db.Column("manejo", postgresql.JSONB, nullable=True))
+    handling = deferred(
+        db.Column("manejo", postgresql.JSONB(none_as_null=True), nullable=True)
+    )
 
 
 class SubstanceClass(db.Model):

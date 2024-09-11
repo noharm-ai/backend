@@ -98,7 +98,10 @@ def upsert_substance(data: dict, user):
     subs.idclass = data.get("idClass", None)
     subs.active = data.get("active", None)
     subs.link = data.get("link", None)
-    subs.handling = data.get("handling")
+    subs.handling = data.get("handling", None)
+
+    if not subs.handling:
+        subs.handling = None
 
     db.session.flush()
 
