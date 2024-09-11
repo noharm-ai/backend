@@ -27,6 +27,7 @@ def get_drug_list(
     id_segment_list=None,
     has_ai_substance=None,
     ai_accuracy_range=None,
+    has_max_dose=None,
 ):
     SegmentOutlier = db.aliased(Segment)
     ConversionsAgg = db.aliased(MeasureUnitConvert)
@@ -80,6 +81,9 @@ def get_drug_list(
             Substance.name,
             SegmentOutlier.description,
             Drug.ai_accuracy,
+            DrugAttributes.maxDose,
+            DrugAttributes.useWeight,
+            MeasureUnit.description.label("measure_unit_default_name"),
         )
         .select_from(presc_query)
         .join(Drug, presc_query.c.idDrug == Drug.id)
@@ -90,6 +94,7 @@ def get_drug_list(
                 DrugAttributes.idSegment == presc_query.c.idSegment,
             ),
         )
+        .outerjoin(MeasureUnit, MeasureUnit.id == DrugAttributes.idMeasureUnit)
         .outerjoin(Segment, Segment.id == DrugAttributes.idSegment)
         .outerjoin(
             MeasureUnitConvert,
@@ -164,6 +169,12 @@ def get_drug_list(
                 )
         else:
             q = q.filter(Drug.ai_accuracy == None)
+
+    if has_max_dose != None:
+        if has_max_dose:
+            q = q.filter(DrugAttributes.maxDose != None)
+        else:
+            q = q.filter(DrugAttributes.maxDose == None)
 
     if len(attribute_list) > 0:
         bool_attributes = [
