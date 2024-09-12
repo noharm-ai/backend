@@ -298,6 +298,7 @@ def convert_notes(notes, has_primary_care, tags):
             obj[tag["name"]] = (
                 notes.annotations[tag["name"] + "_count"]
                 if notes.annotations != None
+                and (tag["name"] + "_count") in notes.annotations
                 else 0
             )
 

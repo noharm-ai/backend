@@ -34,6 +34,7 @@ def get_drug_list():
         term=request_data.get("term", None),
         substance=request_data.get("substance", None),
         id_segment_list=request_data.get("idSegmentList", None),
+        has_max_dose=request_data.get("hasMaxDose", None),
         limit=request_data.get("limit", 10),
         offset=request_data.get("offset", 0),
     )
@@ -54,6 +55,9 @@ def get_drug_list():
                 "substance": i[10],
                 "segmentOutlier": i[11],
                 "substanceAccuracy": i[12],
+                "maxDose": i.maxDose,
+                "useWeight": i.useWeight,
+                "measureUnitDefaultName": i.measure_unit_default_name,
             }
         )
 
