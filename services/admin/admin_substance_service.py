@@ -12,6 +12,7 @@ def get_substances(
     name=None,
     idClassList=[],
     has_class=None,
+    has_admin_text=None,
     class_name=None,
     handling_option="filled",
     handling_type_list=[],
@@ -54,8 +55,14 @@ def get_substances(
         else:
             q = q.filter(Substance.idclass == None)
 
+    if has_admin_text != None:
+        if has_admin_text:
+            q = q.filter(Substance.admin_text != None)
+        else:
+            q = q.filter(Substance.admin_text == None)
+
     q = (
-        q.options(undefer(Substance.handling))
+        q.options(undefer(Substance.handling), undefer(Substance.admin_text))
         .order_by(Substance.name)
         .limit(limit)
         .offset(offset)
@@ -99,6 +106,7 @@ def upsert_substance(data: dict, user):
     subs.active = data.get("active", None)
     subs.link = data.get("link", None)
     subs.handling = data.get("handling", None)
+    subs.admin_text = data.get("adminText", None)
 
     if not subs.handling:
         subs.handling = None
@@ -126,4 +134,5 @@ def _to_dto(s: Substance):
         "active": s.active,
         "link": s.link,
         "handling": s.handling,
+        "adminText": s.admin_text,
     }

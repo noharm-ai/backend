@@ -97,6 +97,7 @@ class Substance(db.Model):
     handling = deferred(
         db.Column("manejo", postgresql.JSONB(none_as_null=True), nullable=True)
     )
+    admin_text = deferred(db.Column("curadoria", db.String, nullable=True))
 
 
 class SubstanceClass(db.Model):

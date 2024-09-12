@@ -79,16 +79,6 @@ class Notes(db.Model):
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.BigInteger, nullable=True)
 
-    def getDefaultNote(sctid):
-        defaultSchema = "hsc_test"
-
-        db_session = Session(db)
-        db_session.connection(
-            execution_options={"schema_translate_map": {None: defaultSchema}}
-        )
-        note = db_session.query(Notes).filter_by(idDrug=sctid, idSegment=5).first()
-        return note.notes if note else None
-
 
 class Memory(db.Model):
     __tablename__ = "memoria"
