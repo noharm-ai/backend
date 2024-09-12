@@ -1,5 +1,6 @@
 from utils import status
 from sqlalchemy import and_, or_, func, text
+from sqlalchemy.orm import undefer
 from typing import List
 
 from models.main import *
@@ -214,6 +215,31 @@ def get_drug_list(
         q = q.filter(DrugAttributes.idSegment.in_(id_segment_list))
 
     return q.order_by(Drug.name, Segment.description).limit(limit).offset(offset).all()
+
+
+def get_drug_ref(sctid: int, user: User):
+    if not permission_service.has_maintainer_permission(user):
+        raise ValidationError(
+            "Usuário não autorizado",
+            "errors.unauthorizedUser",
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
+    subst = (
+        db.session.query(Substance)
+        .filter(Substance.id == sctid)
+        .options(undefer(Substance.admin_text))
+        .first()
+    )
+
+    if subst == None:
+        raise ValidationError(
+            "Substância inválido",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    return {"name": subst.name, "ref": subst.admin_text}
 
 
 def update_price_factor(id_drug, id_segment, factor, user):

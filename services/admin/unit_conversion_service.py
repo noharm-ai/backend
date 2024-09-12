@@ -67,6 +67,7 @@ def get_conversion_list(id_segment, user, show_prediction=False):
             units.c.idMeasureUnit,
             MeasureUnitConvert.factor,
             MeasureUnit.description,
+            Drug.sctid,
         )
         .join(active_drugs, Drug.id == active_drugs.c.idDrug)
         .join(units, Drug.id == units.c.idDrug)
@@ -79,6 +80,7 @@ def get_conversion_list(id_segment, user, show_prediction=False):
             ),
         )
         .outerjoin(MeasureUnit, MeasureUnit.id == units.c.idMeasureUnit)
+        .outerjoin(Substance, Drug.sctid == Substance.id)
         .order_by(Drug.name, MeasureUnitConvert.factor)
         .all()
     )
@@ -93,6 +95,7 @@ def get_conversion_list(id_segment, user, show_prediction=False):
                 "factor": i[4],
                 "idSegment": escape_html(id_segment),
                 "measureUnit": i[5],
+                "sctid": i.sctid,
             }
         )
 
