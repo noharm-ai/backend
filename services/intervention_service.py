@@ -871,6 +871,7 @@ def get_outcome_data(id_intervention, user: User, edit=False):
     prescription_drug: PrescriptionDrug = record[1]
     readonly = intervention.status != InterventionStatusEnum.PENDING.value and not edit
     economy_type = intervention.economy_type
+    outcome_user: User = record[3]
 
     # custom economy gets a simpler response
     if economy_type == InterventionEconomyTypeEnum.CUSTOM.value:
@@ -898,6 +899,12 @@ def get_outcome_data(id_intervention, user: User, edit=False):
                 "readonly": readonly,
                 "date": intervention.date.isoformat(),
                 "interventionReason": record.reason,
+                "outcomeAt": (
+                    intervention.outcome_at.isoformat()
+                    if intervention.outcome_at != None
+                    else None
+                ),
+                "outcomeUser": (outcome_user.name if outcome_user != None else None),
             },
         }
 
