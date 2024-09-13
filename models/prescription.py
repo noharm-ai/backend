@@ -493,7 +493,10 @@ class Patient(db.Model):
             )
 
         if len(idPatient) > 0:
-            q = q.filter(Prescription.idPatient.in_(idPatient))
+            try:
+                q = q.filter(Prescription.idPatient.in_([int(i) for i in idPatient]))
+            except ValueError:
+                q = q.filter(Prescription.idPatient == None)
 
         if len(intervals) > 0:
             q = q.filter(

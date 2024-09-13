@@ -1,5 +1,6 @@
 from models.main import db
 from sqlalchemy import asc, distinct
+from sqlalchemy.orm import undefer
 
 from models.appendix import *
 from models.prescription import *
@@ -167,7 +168,15 @@ def get_attributes(id_segment, id_drug, user):
     attr = DrugAttributes.query.get((id_drug, id_segment))
     drug_ref = None
     if drug.sctid != None and permission_service.has_maintainer_permission(user):
-        drug_ref = Notes.getDefaultNote(drug.sctid)
+        subst = (
+            db.session.query(Substance)
+            .filter(Substance.id == drug.sctid)
+            .options(undefer(Substance.admin_text))
+            .first()
+        )
+
+        if subst != None:
+            drug_ref = subst.admin_text
 
     if attr == None:
         return {"drugRef": drug_ref}

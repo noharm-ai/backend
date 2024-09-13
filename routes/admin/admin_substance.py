@@ -27,6 +27,7 @@ def get_substances():
         handling_option=data.get("handlingOption", "filled"),
         handling_type_list=data.get("handlingTypeList", []),
         has_class=data.get("hasClass", None),
+        has_admin_text=data.get("hasAdminText", None),
     )
 
     return {"status": "success", "data": list}, status.HTTP_200_OK

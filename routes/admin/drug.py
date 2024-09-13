@@ -104,6 +104,29 @@ def update_price_factor():
     )
 
 
+@app_admin_drug.route("/admin/drug/ref", methods=["GET"])
+@jwt_required()
+def get_drug_ref():
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+    os.environ["TZ"] = "America/Sao_Paulo"
+
+    sctid = request.args.get("sctid", None)
+
+    try:
+        ref = drug_service.get_drug_ref(
+            sctid=sctid,
+            user=user,
+        )
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+
+    return {
+        "status": "success",
+        "data": ref,
+    }, status.HTTP_200_OK
+
+
 @app_admin_drug.route("/admin/drug/copy-attributes", methods=["POST"])
 @jwt_required()
 def copy_attributes():
