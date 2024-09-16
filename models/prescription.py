@@ -360,6 +360,8 @@ class Patient(db.Model):
 
             if len(segments) > 0:
                 q = q.filter(Prescription.idSegment.in_(idSegmentList))
+        else:
+            q = q.filter(Prescription.idSegment != None)
 
         if len(idDept) > 0:
             idDept = list(map(int, idDept))

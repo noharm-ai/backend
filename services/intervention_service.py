@@ -821,8 +821,38 @@ def _get_outcome_data_query():
 
 
 def get_outcome_data(id_intervention, user: User, edit=False):
+    InterventionReasonParent = db.aliased(InterventionReason)
+    reason_column = case(
+        (
+            InterventionReasonParent.description != None,
+            func.concat(
+                InterventionReasonParent.description,
+                " - ",
+                InterventionReason.description,
+            ),
+        ),
+        else_=InterventionReason.description,
+    )
+
+    reason = (
+        db.session.query(reason_column)
+        .select_from(InterventionReason)
+        .outerjoin(
+            InterventionReasonParent,
+            InterventionReasonParent.id == InterventionReason.mamy,
+        )
+        .filter(InterventionReason.id == func.any(Intervention.idInterventionReason))
+        .as_scalar()
+    )
+
     record = (
-        db.session.query(Intervention, PrescriptionDrug, Drug, User)
+        db.session.query(
+            Intervention,
+            PrescriptionDrug,
+            Drug,
+            User,
+            func.array(reason).label("reason"),
+        )
         .outerjoin(PrescriptionDrug, PrescriptionDrug.id == Intervention.id)
         .outerjoin(Drug, PrescriptionDrug.idDrug == Drug.id)
         .outerjoin(User, Intervention.outcome_by == User.id)
@@ -841,6 +871,7 @@ def get_outcome_data(id_intervention, user: User, edit=False):
     prescription_drug: PrescriptionDrug = record[1]
     readonly = intervention.status != InterventionStatusEnum.PENDING.value and not edit
     economy_type = intervention.economy_type
+    outcome_user: User = record[3]
 
     # custom economy gets a simpler response
     if economy_type == InterventionEconomyTypeEnum.CUSTOM.value:
@@ -867,6 +898,13 @@ def get_outcome_data(id_intervention, user: User, edit=False):
                 "status": intervention.status,
                 "readonly": readonly,
                 "date": intervention.date.isoformat(),
+                "interventionReason": record.reason,
+                "outcomeAt": (
+                    intervention.outcome_at.isoformat()
+                    if intervention.outcome_at != None
+                    else None
+                ),
+                "outcomeUser": (outcome_user.name if outcome_user != None else None),
             },
         }
 
@@ -978,6 +1016,7 @@ def _get_outcome_dict(
                 if intervention.date_end_economy != None
                 else None
             ),
+            "interventionReason": outcome_data.reason,
         },
     }
 
