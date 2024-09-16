@@ -1,4 +1,4 @@
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from datetime import datetime
 
 from models.main import db, Substance, User, Relation
@@ -34,7 +34,11 @@ def get_relations(
     )
 
     if len(id_origin_list) > 0:
-        q = q.filter(Relation.sctida.in_(id_origin_list))
+        q = q.filter(
+            or_(
+                Relation.sctida.in_(id_origin_list), Relation.sctidb.in_(id_origin_list)
+            )
+        )
 
     if len(id_destination_list) > 0:
         q = q.filter(Relation.sctidb.in_(id_destination_list))
