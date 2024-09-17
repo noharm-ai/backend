@@ -648,8 +648,6 @@ def save_intervention(
                 status.HTTP_400_BAD_REQUEST,
             )
     else:
-        i.user = user.id
-
         if memory_service.has_feature("PRIMARYCARE"):
             i.date = datetime.today()
 
