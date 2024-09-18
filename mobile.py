@@ -23,6 +23,7 @@ from routes.drugs import app_drugs
 from routes.names import app_names
 from routes.summary import app_summary
 from routes.support import app_support
+from routes.conciliation import app_conciliation
 from routes.admin.frequency import app_admin_freq
 from routes.admin.intervention_reason import app_admin_interv
 from routes.admin.memory import app_admin_memory
@@ -89,6 +90,7 @@ app.register_blueprint(app_drugs)
 app.register_blueprint(app_names)
 app.register_blueprint(app_summary)
 app.register_blueprint(app_support)
+app.register_blueprint(app_conciliation)
 
 app.register_blueprint(app_user_admin)
 app.register_blueprint(app_pres_crud)
