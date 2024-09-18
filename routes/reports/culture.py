@@ -2,7 +2,7 @@ from flask import Blueprint, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from models.main import dbSession, User
-from services.reports import culture_report_service
+from services.reports import reports_culture_service
 from exception.validation_error import ValidationError
 from utils import status
 
@@ -16,7 +16,7 @@ def get_headers():
     dbSession.setSchema(user.schema)
 
     try:
-        result = culture_report_service.get_cultures(
+        result = reports_culture_service.get_cultures(
             idPatient=request.args.get("idPatient"), user=user
         )
     except ValidationError as e:

@@ -5,7 +5,7 @@ from models.main import *
 from models.appendix import *
 from models.segment import *
 from models.prescription import *
-from services.reports import general_report_service
+from services.reports import reports_general_service
 from exception.validation_error import ValidationError
 
 app_rpt_general = Blueprint("app_rpt_general", __name__)
@@ -17,7 +17,7 @@ def get_report(report):
     user = User.find(get_jwt_identity())
 
     try:
-        report_data = general_report_service.get_report(
+        report_data = reports_general_service.get_report(
             user=user, report=report, filename=request.args.get("filename", "current")
         )
     except ValidationError as e:

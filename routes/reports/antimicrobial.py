@@ -2,7 +2,7 @@ from flask import Blueprint, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from models.main import dbSession, User
-from services.reports import antimicrobial_report_service
+from services.reports import reports_antimicrobial_service
 from exception.validation_error import ValidationError
 from utils import status
 
@@ -16,7 +16,7 @@ def get_headers():
     dbSession.setSchema(user.schema)
 
     try:
-        result = antimicrobial_report_service.get_history(
+        result = reports_antimicrobial_service.get_history(
             admission_number=request.args.get("admissionNumber"), user=user
         )
     except ValidationError as e:
