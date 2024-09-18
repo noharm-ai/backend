@@ -26,7 +26,7 @@ def create_conciliation():
     except ValidationError as e:
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
-    return tryCommit(db, id, user.permission())
+    return tryCommit(db, str(id), user.permission())
 
 
 @app_conciliation.route("/conciliation/list-available", methods=["GET"])
