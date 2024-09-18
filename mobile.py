@@ -35,10 +35,10 @@ from routes.admin.admin_exam import app_admin_exam
 from routes.admin.admin_unit_conversion import app_admin_unit_conversion
 from routes.admin.admin_substance import app_admin_subs
 from routes.admin.admin_relation import app_admin_relation
-from routes.reports.general import app_rpt_general
-from routes.reports.config_rpt import app_rpt_config
-from routes.reports.culture import app_rpt_culture
-from routes.reports.antimicrobial import app_rpt_antimicrobial
+from routes.reports.reports_general import app_rpt_general
+from routes.reports.reports_config_rpt import app_rpt_config
+from routes.reports.reports_culture import app_rpt_culture
+from routes.reports.reports_antimicrobial import app_rpt_antimicrobial
 import os
 import logging
 from models.enums import NoHarmENV
