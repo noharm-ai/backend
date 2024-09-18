@@ -24,7 +24,7 @@ from models.enums import (
     UserAuditTypeEnum,
 )
 from services import memory_service, permission_service, user_service
-from services.admin import integration_status_service
+from services.admin import admin_integration_status_service
 from config import Config
 from exception.validation_error import ValidationError
 
@@ -154,7 +154,9 @@ def _auth_user(
 
     db_session.close()
 
-    integration_status = integration_status_service.get_integration_status(user_schema)
+    integration_status = admin_integration_status_service.get_integration_status(
+        user_schema
+    )
     if (
         integration_status == IntegrationStatusEnum.CANCELED.value
         and not permission_service.has_maintainer_permission(user)

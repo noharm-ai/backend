@@ -7,7 +7,7 @@ from models.main import *
 from models.appendix import *
 from models.segment import *
 from models.prescription import *
-from services.admin import intervention_reason_service
+from services.admin import admin_intervention_reason_service
 from exception.validation_error import ValidationError
 
 app_admin_interv = Blueprint("app_admin_interv", __name__)
@@ -19,11 +19,11 @@ def get_records():
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
 
-    list = intervention_reason_service.get_reasons()
+    list = admin_intervention_reason_service.get_reasons()
 
     return {
         "status": "success",
-        "data": intervention_reason_service.list_to_dto(list),
+        "data": admin_intervention_reason_service.list_to_dto(list),
     }, status.HTTP_200_OK
 
 
@@ -36,13 +36,13 @@ def upsert_record():
     os.environ["TZ"] = "America/Sao_Paulo"
 
     try:
-        reason = intervention_reason_service.upsert_reason(
+        reason = admin_intervention_reason_service.upsert_reason(
             data.get("id", None), data_to_object(data), user
         )
     except ValidationError as e:
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
-    return tryCommit(db, intervention_reason_service.list_to_dto(reason))
+    return tryCommit(db, admin_intervention_reason_service.list_to_dto(reason))
 
 
 def data_to_object(data) -> InterventionReason:

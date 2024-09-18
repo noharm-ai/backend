@@ -7,7 +7,7 @@ from models.main import *
 from models.appendix import *
 from models.segment import *
 from models.enums import RoleEnum
-from services.admin import integration_service
+from services.admin import admin_integration_service
 from services import data_authorization_service
 
 from exception.validation_error import ValidationError
@@ -112,7 +112,7 @@ def get_most_frequent(user):
             status.HTTP_401_UNAUTHORIZED,
         )
 
-    if integration_service.get_table_count(user.schema, "exame") > 1000000:
+    if admin_integration_service.get_table_count(user.schema, "exame") > 1000000:
         raise ValidationError(
             "A tabela é grande demais para ser consultada",
             "errors.invalidParams",

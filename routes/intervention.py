@@ -7,7 +7,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from markupsafe import escape as escape_html
 from datetime import datetime
 from .utils import tryCommit
-from services.admin import intervention_reason_service
+from services.admin import admin_intervention_reason_service
 from services import intervention_service, memory_service
 from exception.validation_error import ValidationError
 
@@ -90,11 +90,11 @@ def getInterventionReasons():
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
 
-    list = intervention_reason_service.get_reasons(active_only=True)
+    list = admin_intervention_reason_service.get_reasons(active_only=True)
 
     return {
         "status": "success",
-        "data": intervention_reason_service.list_to_dto(list),
+        "data": admin_intervention_reason_service.list_to_dto(list),
     }, status.HTTP_200_OK
 
 

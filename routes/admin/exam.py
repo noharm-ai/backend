@@ -6,7 +6,7 @@ from models.main import *
 from models.appendix import *
 from models.segment import *
 from models.prescription import *
-from services.admin import exam_service
+from services.admin import admin_exam_service
 from exception.validation_error import ValidationError
 
 app_admin_exam = Blueprint("app_admin_exam", __name__)
@@ -21,7 +21,7 @@ def copy_exams():
     data = request.get_json()
 
     try:
-        result = exam_service.copy_exams(
+        result = admin_exam_service.copy_exams(
             id_segment_origin=data.get("idSegmentOrigin", None),
             id_segment_destiny=data.get("idSegmentDestiny", None),
             user=user,
@@ -39,7 +39,7 @@ def get_most_frequent():
     dbSession.setSchema(user.schema)
 
     try:
-        list = exam_service.get_most_frequent(user=user)
+        list = admin_exam_service.get_most_frequent(user=user)
     except ValidationError as e:
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
@@ -57,7 +57,7 @@ def list_exams():
     data = request.get_json()
 
     try:
-        list = exam_service.get_segment_exams(
+        list = admin_exam_service.get_segment_exams(
             user=user, id_segment=data.get("idSegment", None)
         )
     except ValidationError as e:
@@ -76,7 +76,7 @@ def list_exam_types():
     dbSession.setSchema(user.schema)
 
     try:
-        list = exam_service.get_exam_types()
+        list = admin_exam_service.get_exam_types()
     except ValidationError as e:
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
@@ -95,7 +95,7 @@ def add_most_frequent():
     data = request.get_json()
 
     try:
-        exam_service.add_most_frequent(
+        admin_exam_service.add_most_frequent(
             id_segment=data.get("idSegment", None),
             exam_types=data.get("examTypes", None),
             user=user,
@@ -114,7 +114,7 @@ def upsert_seg_exam():
     data = request.get_json()
 
     try:
-        result = exam_service.upsert_seg_exam(data=data, user=user)
+        result = admin_exam_service.upsert_seg_exam(data=data, user=user)
     except ValidationError as e:
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
@@ -129,7 +129,7 @@ def set_exams_order():
     data = request.get_json()
 
     try:
-        result = exam_service.set_exams_order(
+        result = admin_exam_service.set_exams_order(
             exams=data.get("exams", None),
             id_segment=data.get("idSegment", None),
             user=user,

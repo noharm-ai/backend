@@ -7,7 +7,7 @@ from models.main import *
 from models.appendix import *
 from models.segment import *
 from models.prescription import *
-from services.admin import frequency_service
+from services.admin import admin_frequency_service
 from exception.validation_error import ValidationError
 
 app_admin_freq = Blueprint("app_admin_freq", __name__)
@@ -20,13 +20,13 @@ def get_frequencies():
     dbSession.setSchema(user.schema)
     request_data = request.get_json()
 
-    list = frequency_service.get_frequencies(
+    list = admin_frequency_service.get_frequencies(
         has_daily_frequency=request_data.get("hasDailyFrequency", None),
     )
 
     return {
         "status": "success",
-        "data": frequency_service.list_to_dto(list),
+        "data": admin_frequency_service.list_to_dto(list),
     }, status.HTTP_200_OK
 
 
@@ -39,7 +39,7 @@ def update_frequency():
     os.environ["TZ"] = "America/Sao_Paulo"
 
     try:
-        freq = frequency_service.update_frequency(
+        freq = admin_frequency_service.update_frequency(
             id=data.get("id", None),
             daily_frequency=data.get("dailyFrequency", None),
             fasting=data.get("fasting", None),
@@ -48,4 +48,4 @@ def update_frequency():
     except ValidationError as e:
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
-    return tryCommit(db, frequency_service.list_to_dto([freq]))
+    return tryCommit(db, admin_frequency_service.list_to_dto([freq]))

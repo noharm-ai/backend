@@ -8,7 +8,7 @@ from models.main import *
 from models.appendix import *
 from models.segment import *
 from models.prescription import *
-from services.admin import drug_service
+from services.admin import admin_drug_service
 from exception.validation_error import ValidationError
 
 app_admin_drug = Blueprint("app_admin_drug", __name__)
@@ -21,7 +21,7 @@ def get_drug_list():
     dbSession.setSchema(user.schema)
     request_data = request.get_json()
 
-    list = drug_service.get_drug_list(
+    list = admin_drug_service.get_drug_list(
         has_price_conversion=request_data.get("hasPriceConversion", None),
         has_substance=request_data.get("hasSubstance", None),
         has_default_unit=request_data.get("hasDefaultUnit", None),
@@ -85,7 +85,7 @@ def update_price_factor():
     factor = data.get("factor", None)
 
     try:
-        drug_service.update_price_factor(
+        admin_drug_service.update_price_factor(
             id_drug=id_drug,
             id_segment=id_segment,
             factor=factor,
@@ -114,7 +114,7 @@ def get_drug_ref():
     sctid = request.args.get("sctid", None)
 
     try:
-        ref = drug_service.get_drug_ref(
+        ref = admin_drug_service.get_drug_ref(
             sctid=sctid,
             user=user,
         )
@@ -136,7 +136,7 @@ def copy_attributes():
     os.environ["TZ"] = "America/Sao_Paulo"
 
     try:
-        result = drug_service.copy_drug_attributes(
+        result = admin_drug_service.copy_drug_attributes(
             user=user,
             id_segment_origin=data.get("idSegmentOrigin", None),
             id_segment_destiny=data.get("idSegmentDestiny", None),
@@ -159,7 +159,7 @@ def predict_substance():
     os.environ["TZ"] = "America/Sao_Paulo"
 
     try:
-        result = drug_service.predict_substance(data.get("idDrugs", []), user)
+        result = admin_drug_service.predict_substance(data.get("idDrugs", []), user)
     except ValidationError as e:
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
@@ -174,7 +174,7 @@ def get_drugs_missing_substance():
     os.environ["TZ"] = "America/Sao_Paulo"
 
     try:
-        result = drug_service.get_drugs_missing_substance()
+        result = admin_drug_service.get_drugs_missing_substance()
     except ValidationError as e:
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
@@ -193,7 +193,7 @@ def add_new_outlier():
     os.environ["TZ"] = "America/Sao_Paulo"
 
     try:
-        result = drug_service.add_new_drugs_to_outlier(
+        result = admin_drug_service.add_new_drugs_to_outlier(
             user=user,
         )
     except ValidationError as e:

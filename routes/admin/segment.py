@@ -8,7 +8,7 @@ from models.main import *
 from models.appendix import *
 from models.segment import *
 from models.prescription import *
-from services.admin import segment_service
+from services.admin import admin_segment_service
 from services import outlier_service
 from exception.validation_error import ValidationError
 
@@ -24,7 +24,7 @@ def upsert_segment():
     os.environ["TZ"] = "America/Sao_Paulo"
 
     try:
-        segment_service.upsert_segment(
+        admin_segment_service.upsert_segment(
             id_segment=data.get("idSegment", None),
             description=data.get("description", None),
             active=data.get("active", None),
@@ -44,7 +44,7 @@ def get_departments(id_segment):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
 
-    list = segment_service.get_departments(id_segment)
+    list = admin_segment_service.get_departments(id_segment)
 
     return {"status": "success", "data": list}, status.HTTP_200_OK
 
@@ -58,7 +58,7 @@ def upsert_department():
     os.environ["TZ"] = "America/Sao_Paulo"
 
     try:
-        segment_service.update_segment_departments(
+        admin_segment_service.update_segment_departments(
             id_segment=data.get("idSegment", None),
             department_list=data.get("departmentList", None),
             user=user,

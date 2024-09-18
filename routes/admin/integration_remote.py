@@ -7,7 +7,7 @@ from models.appendix import *
 from models.segment import *
 from models.prescription import *
 from services.admin import (
-    integration_remote_service,
+    admin_integration_remote_service,
 )
 from exception.validation_error import ValidationError
 
@@ -23,7 +23,7 @@ def get_template():
     dbSession.setSchema(user.schema)
     os.environ["TZ"] = "America/Sao_Paulo"
     try:
-        result = integration_remote_service.get_template(
+        result = admin_integration_remote_service.get_template(
             user=user,
         )
     except ValidationError as e:
@@ -41,7 +41,7 @@ def get_template_date():
     dbSession.setSchema(user.schema)
     os.environ["TZ"] = "America/Sao_Paulo"
     try:
-        result = integration_remote_service.get_template_date(
+        result = admin_integration_remote_service.get_template_date(
             user=user,
         )
     except ValidationError as e:
@@ -61,7 +61,7 @@ def set_state():
     request_data = request.get_json()
 
     try:
-        result = integration_remote_service.set_state(
+        result = admin_integration_remote_service.set_state(
             id_processor=request_data.get("idProcessor", None),
             state=request_data.get("state", None),
             user=user,
@@ -82,7 +82,7 @@ def queue_status():
     os.environ["TZ"] = "America/Sao_Paulo"
 
     try:
-        result = integration_remote_service.get_queue_status(
+        result = admin_integration_remote_service.get_queue_status(
             id_queue_list=request.args.getlist("idQueueList[]"),
             user=user,
         )
@@ -103,7 +103,7 @@ def push_queue_request():
     request_data = request.get_json()
 
     try:
-        result = integration_remote_service.push_queue_request(
+        result = admin_integration_remote_service.push_queue_request(
             id_processor=request_data.get("idProcessor", None),
             action_type=request_data.get("actionType", None),
             data=request_data,

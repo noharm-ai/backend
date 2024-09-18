@@ -5,7 +5,7 @@ from models.appendix import *
 from models.segment import *
 from models.enums import MemoryEnum
 from services import permission_service
-from services.admin import memory_service as admin_memory_service
+from services.admin import admin_memory_service
 from exception.validation_error import ValidationError
 
 

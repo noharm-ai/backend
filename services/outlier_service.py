@@ -11,7 +11,7 @@ from models.prescription import *
 from models.enums import RoleEnum
 from routes.outlier_lib import add_score
 from exception.validation_error import ValidationError
-from services.admin import drug_service, integration_status_service
+from services.admin import admin_drug_service, admin_integration_status_service
 from services import data_authorization_service, permission_service
 
 FOLD_SIZE = 10
@@ -374,7 +374,7 @@ def get_outliers_process_list(id_segment, user):
             status.HTTP_401_UNAUTHORIZED,
         )
 
-    pending_frequencies = integration_status_service._get_pending_frequencies()
+    pending_frequencies = admin_integration_status_service._get_pending_frequencies()
     if pending_frequencies > 0:
         raise ValidationError(
             "Existem frequências pendentes de conversão. Configure todas as frequências antes de gerar os escores.",
@@ -388,7 +388,7 @@ def get_outliers_process_list(id_segment, user):
     print("RowCount", result.rowcount)
 
     # fix inconsistencies after outlier insert
-    drug_service.fix_inconsistency(user)
+    admin_drug_service.fix_inconsistency(user)
 
     totalCount = (
         db.session.query(func.count(distinct(Outlier.idDrug)))
