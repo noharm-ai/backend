@@ -11,13 +11,19 @@ from services import permission_service
 from exception.validation_error import ValidationError
 
 
-class ApiEndpointType(Enum):
+class ApiEndpointUserGroup(Enum):
     ADMIN = "admin"
     MAINTAINER = "mantainer"
-    USER = "user"
+    PHARMA = "pharma"
+    ALL = "all"
 
 
-def api_endpoint(api_endpoint_type: ApiEndpointType):
+class ApiEndpointAction(Enum):
+    READ = "read"
+    WRITE = "write"
+
+
+def api_endpoint(user_group: ApiEndpointUserGroup, action: ApiEndpointAction):
 
     def wrapper(f):
         @wraps(f)
@@ -31,25 +37,9 @@ def api_endpoint(api_endpoint_type: ApiEndpointType):
                 dbSession.setSchema(user_context.schema)
                 os.environ["TZ"] = "America/Sao_Paulo"
 
-                has_permission = False
-
-                if (
-                    api_endpoint_type == ApiEndpointType.USER
-                    and permission_service.is_pharma(user_context)
+                if not _has_permission(
+                    user_group=user_group, action=action, user_context=user_context
                 ):
-                    has_permission = True
-                elif (
-                    api_endpoint_type == ApiEndpointType.MAINTAINER
-                    and permission_service.has_maintainer_permission(user_context)
-                ):
-                    has_permission = True
-                elif (
-                    api_endpoint_type == ApiEndpointType.ADMIN
-                    and permission_service.is_admin(user_context)
-                ):
-                    has_permission = True
-
-                if not has_permission or permission_service.is_readonly(user_context):
                     db.session.rollback()
                     db.session.close()
                     db.session.remove()
@@ -95,3 +85,37 @@ def api_endpoint(api_endpoint_type: ApiEndpointType):
         return decorator_f
 
     return wrapper
+
+
+def _has_permission(
+    user_group: ApiEndpointUserGroup, action: ApiEndpointAction, user_context: User
+):
+    # check params
+    if not isinstance(user_group, ApiEndpointUserGroup):
+        return False
+
+    if not isinstance(action, ApiEndpointAction):
+        return False
+
+    # check permissions
+    if action == ApiEndpointAction.WRITE:
+        if permission_service.is_readonly(user_context):
+            return False
+
+    if user_group == ApiEndpointUserGroup.PHARMA and not permission_service.is_pharma(
+        user_context
+    ):
+        return False
+
+    if (
+        user_group == ApiEndpointUserGroup.MAINTAINER
+        and not permission_service.has_maintainer_permission(user_context)
+    ):
+        return False
+
+    if user_group == ApiEndpointUserGroup.ADMIN and not permission_service.is_admin(
+        user_context
+    ):
+        return False
+
+    return True

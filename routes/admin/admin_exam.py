@@ -1,140 +1,85 @@
-import os
 from flask import Blueprint, request
-from flask_jwt_extended import jwt_required, get_jwt_identity
 
-from models.main import *
-from models.appendix import *
-from models.segment import *
-from models.prescription import *
+from decorators.api_endpoint_decorator import (
+    api_endpoint,
+    ApiEndpointUserGroup,
+    ApiEndpointAction,
+)
+from models.main import User
 from services.admin import admin_exam_service
-from exception.validation_error import ValidationError
 
 app_admin_exam = Blueprint("app_admin_exam", __name__)
 
 
 @app_admin_exam.route("/admin/exam/copy", methods=["POST"])
-@jwt_required()
-def copy_exams():
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
-    os.environ["TZ"] = "America/Sao_Paulo"
+@api_endpoint(
+    user_group=ApiEndpointUserGroup.MAINTAINER, action=ApiEndpointAction.WRITE
+)
+def copy_exams(user_context: User):
     data = request.get_json()
 
-    try:
-        result = admin_exam_service.copy_exams(
-            id_segment_origin=data.get("idSegmentOrigin", None),
-            id_segment_destiny=data.get("idSegmentDestiny", None),
-            user=user,
-        )
-    except ValidationError as e:
-        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+    result = admin_exam_service.copy_exams(
+        id_segment_origin=data.get("idSegmentOrigin", None),
+        id_segment_destiny=data.get("idSegmentDestiny", None),
+        user=user_context,
+    )
 
-    return tryCommit(db, result.rowcount)
+    return result.rowcount
 
 
 @app_admin_exam.route("/admin/exam/most-frequent", methods=["GET"])
-@jwt_required()
-def get_most_frequent():
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
-
-    try:
-        list = admin_exam_service.get_most_frequent(user=user)
-    except ValidationError as e:
-        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
-
-    return {
-        "status": "success",
-        "data": list,
-    }, status.HTTP_200_OK
+@api_endpoint(user_group=ApiEndpointUserGroup.MAINTAINER, action=ApiEndpointAction.READ)
+def get_most_frequent(user_context: User):
+    return admin_exam_service.get_most_frequent(user=user_context)
 
 
 @app_admin_exam.route("/admin/exam/list", methods=["POST"])
-@jwt_required()
-def list_exams():
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
+@api_endpoint(user_group=ApiEndpointUserGroup.ALL, action=ApiEndpointAction.READ)
+def list_exams(user_context: User):
     data = request.get_json()
 
-    try:
-        list = admin_exam_service.get_segment_exams(
-            user=user, id_segment=data.get("idSegment", None)
-        )
-    except ValidationError as e:
-        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
-
-    return {
-        "status": "success",
-        "data": list,
-    }, status.HTTP_200_OK
+    return admin_exam_service.get_segment_exams(
+        user=user_context, id_segment=data.get("idSegment", None)
+    )
 
 
 @app_admin_exam.route("/admin/exam/types", methods=["GET"])
-@jwt_required()
+@api_endpoint(user_group=ApiEndpointUserGroup.ALL, action=ApiEndpointAction.READ)
 def list_exam_types():
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
-
-    try:
-        list = admin_exam_service.get_exam_types()
-    except ValidationError as e:
-        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
-
-    return {
-        "status": "success",
-        "data": list,
-    }, status.HTTP_200_OK
+    return admin_exam_service.get_exam_types()
 
 
 @app_admin_exam.route("/admin/exam/most-frequent/add", methods=["POST"])
-@jwt_required()
-def add_most_frequent():
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
-    os.environ["TZ"] = "America/Sao_Paulo"
+@api_endpoint(
+    user_group=ApiEndpointUserGroup.MAINTAINER, action=ApiEndpointAction.WRITE
+)
+def add_most_frequent(user_context: User):
     data = request.get_json()
 
-    try:
-        admin_exam_service.add_most_frequent(
-            id_segment=data.get("idSegment", None),
-            exam_types=data.get("examTypes", None),
-            user=user,
-        )
-    except ValidationError as e:
-        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+    admin_exam_service.add_most_frequent(
+        id_segment=data.get("idSegment", None),
+        exam_types=data.get("examTypes", None),
+        user=user_context,
+    )
 
-    return tryCommit(db, True)
+    return True
 
 
 @app_admin_exam.route("/admin/exam/upsert", methods=["POST"])
-@jwt_required()
-def upsert_seg_exam():
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
+@api_endpoint(user_group=ApiEndpointUserGroup.ALL, action=ApiEndpointAction.WRITE)
+def upsert_seg_exam(user_context: User):
     data = request.get_json()
 
-    try:
-        result = admin_exam_service.upsert_seg_exam(data=data, user=user)
-    except ValidationError as e:
-        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
-
-    return tryCommit(db, result)
+    return admin_exam_service.upsert_seg_exam(data=data, user=user_context)
 
 
 @app_admin_exam.route("/admin/exam/order", methods=["POST"])
-@jwt_required()
-def set_exams_order():
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
+@api_endpoint(user_group=ApiEndpointUserGroup.ALL, action=ApiEndpointAction.WRITE)
+def set_exams_order(user_context: User):
     data = request.get_json()
 
-    try:
-        result = admin_exam_service.set_exams_order(
-            exams=data.get("exams", None),
-            id_segment=data.get("idSegment", None),
-            user=user,
-        )
-    except ValidationError as e:
-        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
-
-    return tryCommit(db, result)
+    return admin_exam_service.set_exams_order(
+        exams=data.get("exams", None),
+        id_segment=data.get("idSegment", None),
+        user=user_context,
+    )
