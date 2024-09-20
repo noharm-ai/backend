@@ -1,5 +1,6 @@
 import os
 import logging
+import inspect
 from enum import Enum
 from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
 from functools import wraps
@@ -32,7 +33,8 @@ def api_endpoint(user_group: ApiEndpointUserGroup, action: ApiEndpointAction):
                 verify_jwt_in_request()
 
                 user_context = User.find(get_jwt_identity())
-                kwargs["user_context"] = user_context
+                if "user_context" in inspect.signature(f).parameters:
+                    kwargs["user_context"] = user_context
 
                 dbSession.setSchema(user_context.schema)
                 os.environ["TZ"] = "America/Sao_Paulo"
