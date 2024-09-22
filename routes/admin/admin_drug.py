@@ -1,24 +1,20 @@
-import os
 from flask import Blueprint, request
 from markupsafe import escape as escape_html
-from flask_jwt_extended import jwt_required, get_jwt_identity
 
-from utils import status
-from models.main import *
-from models.appendix import *
-from models.segment import *
-from models.prescription import *
+from decorators.api_endpoint_decorator import (
+    api_endpoint,
+    ApiEndpointUserGroup,
+    ApiEndpointAction,
+)
+from models.main import User
 from services.admin import admin_drug_service
-from exception.validation_error import ValidationError
 
 app_admin_drug = Blueprint("app_admin_drug", __name__)
 
 
 @app_admin_drug.route("/admin/drug/attributes-list", methods=["POST"])
-@jwt_required()
+@api_endpoint(user_group=ApiEndpointUserGroup.MAINTAINER, action=ApiEndpointAction.READ)
 def get_drug_list():
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
     request_data = request.get_json()
 
     list = admin_drug_service.get_drug_list(
@@ -65,138 +61,89 @@ def get_drug_list():
     if len(list) > 0:
         count = list[0][9]
 
-    return {
-        "status": "success",
-        "count": count,
-        "data": result,
-    }, status.HTTP_200_OK
+    return {"list": result, "count": count}
 
 
 @app_admin_drug.route("/admin/drug/price-factor", methods=["POST"])
-@jwt_required()
-def update_price_factor():
+@api_endpoint(
+    user_group=ApiEndpointUserGroup.MAINTAINER, action=ApiEndpointAction.WRITE
+)
+def update_price_factor(user_context: User):
     data = request.get_json()
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
-    os.environ["TZ"] = "America/Sao_Paulo"
 
     id_drug = data.get("idDrug", None)
     id_segment = data.get("idSegment", None)
     factor = data.get("factor", None)
 
-    try:
-        admin_drug_service.update_price_factor(
-            id_drug=id_drug,
-            id_segment=id_segment,
-            factor=factor,
-            user=user,
-        )
-    except ValidationError as e:
-        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
-
-    return tryCommit(
-        db,
-        {
-            "idSegment": escape_html(id_segment),
-            "idDrug": escape_html(id_drug),
-            "factor": float(factor),
-        },
+    admin_drug_service.update_price_factor(
+        id_drug=id_drug,
+        id_segment=id_segment,
+        factor=factor,
+        user=user_context,
     )
+
+    return {
+        "idSegment": escape_html(id_segment),
+        "idDrug": escape_html(id_drug),
+        "factor": float(factor),
+    }
 
 
 @app_admin_drug.route("/admin/drug/ref", methods=["GET"])
-@jwt_required()
-def get_drug_ref():
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
-    os.environ["TZ"] = "America/Sao_Paulo"
-
+@api_endpoint(user_group=ApiEndpointUserGroup.MAINTAINER, action=ApiEndpointAction.READ)
+def get_drug_ref(user_context: User):
     sctid = request.args.get("sctid", None)
 
-    try:
-        ref = admin_drug_service.get_drug_ref(
-            sctid=sctid,
-            user=user,
-        )
-    except ValidationError as e:
-        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
-
-    return {
-        "status": "success",
-        "data": ref,
-    }, status.HTTP_200_OK
+    return admin_drug_service.get_drug_ref(
+        sctid=sctid,
+        user=user_context,
+    )
 
 
 @app_admin_drug.route("/admin/drug/copy-attributes", methods=["POST"])
-@jwt_required()
-def copy_attributes():
+@api_endpoint(
+    user_group=ApiEndpointUserGroup.MAINTAINER, action=ApiEndpointAction.WRITE
+)
+def copy_attributes(user_context: User):
     data = request.get_json()
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
-    os.environ["TZ"] = "America/Sao_Paulo"
 
-    try:
-        result = admin_drug_service.copy_drug_attributes(
-            user=user,
-            id_segment_origin=data.get("idSegmentOrigin", None),
-            id_segment_destiny=data.get("idSegmentDestiny", None),
-            attributes=data.get("attributes", None),
-            from_admin_schema=data.get("fromAdminSchema", True),
-            overwrite_all=data.get("overwriteAll", False),
-        )
-    except ValidationError as e:
-        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+    result = admin_drug_service.copy_drug_attributes(
+        user=user_context,
+        id_segment_origin=data.get("idSegmentOrigin", None),
+        id_segment_destiny=data.get("idSegmentDestiny", None),
+        attributes=data.get("attributes", None),
+        from_admin_schema=data.get("fromAdminSchema", True),
+        overwrite_all=data.get("overwriteAll", False),
+    )
 
-    return tryCommit(db, result.rowcount)
+    return result.rowcount
 
 
 @app_admin_drug.route("/admin/drug/predict-substance", methods=["POST"])
-@jwt_required()
-def predict_substance():
+@api_endpoint(
+    user_group=ApiEndpointUserGroup.MAINTAINER, action=ApiEndpointAction.WRITE
+)
+def predict_substance(user_context: User):
     data = request.get_json()
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
-    os.environ["TZ"] = "America/Sao_Paulo"
 
-    try:
-        result = admin_drug_service.predict_substance(data.get("idDrugs", []), user)
-    except ValidationError as e:
-        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
-
-    return tryCommit(db, result)
+    return admin_drug_service.predict_substance(
+        id_drugs=data.get("idDrugs", []), user=user_context
+    )
 
 
 @app_admin_drug.route("/admin/drug/get-missing-substance", methods=["GET"])
-@jwt_required()
+@api_endpoint(user_group=ApiEndpointUserGroup.MAINTAINER, action=ApiEndpointAction.READ)
 def get_drugs_missing_substance():
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
-    os.environ["TZ"] = "America/Sao_Paulo"
+    result = admin_drug_service.get_drugs_missing_substance()
 
-    try:
-        result = admin_drug_service.get_drugs_missing_substance()
-    except ValidationError as e:
-        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
-
-    return {
-        "status": "success",
-        "count": len(result),
-        "data": result,
-    }, status.HTTP_200_OK
+    return result
 
 
 @app_admin_drug.route("/admin/drug/add-new-outlier", methods=["POST"])
-@jwt_required()
-def add_new_outlier():
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
-    os.environ["TZ"] = "America/Sao_Paulo"
+@api_endpoint(user_group=ApiEndpointUserGroup.MAINTAINER, action=ApiEndpointAction.READ)
+def add_new_outlier(user_context: User):
+    result = admin_drug_service.add_new_drugs_to_outlier(
+        user=user_context,
+    )
 
-    try:
-        result = admin_drug_service.add_new_drugs_to_outlier(
-            user=user,
-        )
-    except ValidationError as e:
-        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
-
-    return tryCommit(db, result.rowcount)
+    return result.rowcount
