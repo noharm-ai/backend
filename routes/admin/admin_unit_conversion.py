@@ -5,7 +5,7 @@ from utils import status
 
 
 from models.main import *
-from services.admin import unit_conversion_service
+from services.admin import admin_unit_conversion_service
 from exception.validation_error import ValidationError
 
 app_admin_unit_conversion = Blueprint("app_admin_unit_conversion", __name__)
@@ -19,7 +19,7 @@ def get_unit_conversion_list():
     os.environ["TZ"] = "America/Sao_Paulo"
     request_data = request.get_json()
 
-    list = unit_conversion_service.get_conversion_list(
+    list = admin_unit_conversion_service.get_conversion_list(
         id_segment=request_data.get("idSegment"),
         user=user,
         show_prediction=request_data.get("showPrediction", False),
@@ -40,7 +40,7 @@ def save_conversions():
     os.environ["TZ"] = "America/Sao_Paulo"
 
     try:
-        result = unit_conversion_service.save_conversions(
+        result = admin_unit_conversion_service.save_conversions(
             id_drug=data.get("idDrug", None),
             id_segment=data.get("idSegment", None),
             id_measure_unit_default=data.get("idMeasureUnitDefault", None),
@@ -63,7 +63,7 @@ def add_default_units():
     os.environ["TZ"] = "America/Sao_Paulo"
 
     try:
-        result = unit_conversion_service.add_default_units(user=user)
+        result = admin_unit_conversion_service.add_default_units(user=user)
     except ValidationError as e:
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
@@ -81,7 +81,7 @@ def copy_unit_conversion():
     os.environ["TZ"] = "America/Sao_Paulo"
 
     try:
-        result = unit_conversion_service.copy_unit_conversion(
+        result = admin_unit_conversion_service.copy_unit_conversion(
             user=user,
             id_segment_origin=data.get("idSegmentOrigin", None),
             id_segment_destiny=data.get("idSegmentDestiny", None),

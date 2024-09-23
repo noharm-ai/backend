@@ -34,6 +34,10 @@ def is_cpoe(user: User):
     return has_any_role(user, RoleEnum.CPOE.value)
 
 
+def is_readonly(user: User):
+    return has_role(user, RoleEnum.READONLY.value)
+
+
 def has_any_role(user: User, *roles):
     user_roles = set(_get_roles(user))
 

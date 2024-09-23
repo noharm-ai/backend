@@ -8,7 +8,7 @@ from models.main import *
 from models.appendix import *
 from models.segment import *
 from models.prescription import *
-from services.admin import memory_service
+from services.admin import admin_memory_service
 from exception.validation_error import ValidationError
 
 app_admin_memory = Blueprint("app_admin_memory", __name__)
@@ -21,7 +21,7 @@ def get_admin_memory_itens():
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
 
-    list = memory_service.get_admin_entries(user, kinds=data.get("kinds", []))
+    list = admin_memory_service.get_admin_entries(user, kinds=data.get("kinds", []))
 
     return {"status": "success", "data": list}, status.HTTP_200_OK
 
@@ -35,7 +35,7 @@ def update_memory_item():
     os.environ["TZ"] = "America/Sao_Paulo"
 
     try:
-        key = memory_service.update_memory(
+        key = admin_memory_service.update_memory(
             key=data.get("key", None),
             kind=data.get("kind", None),
             value=data.get("value", None),

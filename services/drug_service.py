@@ -34,13 +34,8 @@ def getPreviouslyPrescribedUnits(idDrug, idSegment):
     )
 
 
-def getUnits(idHospital):
-    return (
-        db.session.query(MeasureUnit)
-        .filter(MeasureUnit.idHospital == idHospital)
-        .order_by(asc(MeasureUnit.description))
-        .all()
-    )
+def getUnits():
+    return db.session.query(MeasureUnit).order_by(asc(MeasureUnit.description)).all()
 
 
 # FREQUENCY
@@ -68,13 +63,8 @@ def getPreviouslyPrescribedFrequencies(idDrug, idSegment):
     )
 
 
-def getFrequencies(idHospital):
-    return (
-        db.session.query(Frequency)
-        .filter(Frequency.idHospital == idHospital)
-        .order_by(asc(Frequency.description))
-        .all()
-    )
+def getFrequencies():
+    return db.session.query(Frequency).order_by(asc(Frequency.description)).all()
 
 
 def get_all_frequencies():

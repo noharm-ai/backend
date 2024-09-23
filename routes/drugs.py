@@ -15,15 +15,16 @@ app_drugs = Blueprint("app_drugs", __name__)
 @app_drugs.route(
     "/drugs/resources/<int:idDrug>/<int:idSegment>/<int:idHospital>", methods=["GET"]
 )
+@app_drugs.route("/drugs/resources/<int:idDrug>/<int:idSegment>", methods=["GET"])
 @jwt_required()
-def getDrugSummary(idDrug, idSegment, idHospital):
+def getDrugSummary(idDrug, idSegment, idHospital=None):
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
 
     drug = Drug.query.get(idDrug)
 
     prescribedUnits = drug_service.getPreviouslyPrescribedUnits(idDrug, idSegment)
-    allUnits = drug_service.getUnits(idHospital)
+    allUnits = drug_service.getUnits()
 
     unitResults = []
     for u in prescribedUnits:
@@ -36,7 +37,7 @@ def getDrugSummary(idDrug, idSegment, idHospital):
     prescribedFrequencies = drug_service.getPreviouslyPrescribedFrequencies(
         idDrug, idSegment
     )
-    allFrequencies = drug_service.getFrequencies(idHospital)
+    allFrequencies = drug_service.getFrequencies()
 
     frequencyResults = []
     for f in prescribedFrequencies:

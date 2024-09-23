@@ -19,7 +19,7 @@ from flask_jwt_extended import (
 
 from models.enums import MemoryEnum, IntegrationStatusEnum
 from services import auth_service, memory_service, permission_service
-from services.admin import integration_status_service
+from services.admin import admin_integration_status_service
 from exception.validation_error import ValidationError
 
 app_auth = Blueprint("app_auth", __name__)
@@ -165,7 +165,7 @@ def refreshToken():
             "message": "Usuário inativo",
         }, status.HTTP_401_UNAUTHORIZED
 
-    integration_status = integration_status_service.get_integration_status(
+    integration_status = admin_integration_status_service.get_integration_status(
         current_claims["schema"]
     )
     if (

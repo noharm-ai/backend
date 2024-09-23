@@ -8,9 +8,9 @@ from models.segment import *
 from models.enums import IntegrationStatusEnum
 from services import permission_service, drug_service as main_drug_service
 from services.admin import (
-    drug_service as admin_drug_service,
-    integration_status_service,
-    ai_service,
+    admin_ai_service,
+    admin_drug_service,
+    admin_integration_status_service,
 )
 from exception.validation_error import ValidationError
 
@@ -100,7 +100,7 @@ def get_conversion_list(id_segment, user, show_prediction=False):
         )
 
     if show_prediction:
-        return ai_service.get_factors(result)
+        return admin_ai_service.get_factors(result)
 
     return result
 
@@ -117,7 +117,7 @@ def save_conversions(
 
     overwrite = False
     if (
-        integration_status_service.get_integration_status(user.schema)
+        admin_integration_status_service.get_integration_status(user.schema)
         != IntegrationStatusEnum.PRODUCTION.value
     ):
         overwrite = True

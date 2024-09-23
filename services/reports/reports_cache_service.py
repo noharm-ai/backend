@@ -1,6 +1,6 @@
 import boto3
 import dateutil
-from datetime import timedelta, datetime
+from datetime import timedelta
 from botocore.exceptions import ClientError
 
 from config import Config

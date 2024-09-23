@@ -108,11 +108,18 @@ def create_agg_prescription_by_prescription(
 
         if drug_count > 0:
             if pAgg.status == "s":
-                pAgg.status = 0
+                remove_agg_check = True
 
-                prescription_service.audit_check(
-                    prescription=pAgg, user=prescalc_user, extra={"prescalc": True}
-                )
+                # if it was checked before this process, keep it
+                if p.status == "s" and processed_status == "NEW_PRESCRIPTION":
+                    remove_agg_check = False
+
+                if remove_agg_check:
+                    pAgg.status = 0
+
+                    prescription_service.audit_check(
+                        prescription=pAgg, user=prescalc_user, extra={"prescalc": True}
+                    )
 
             # if it was checked before this process, keep it
             if p.status == "s" and processed_status == "NEW_ITENS":

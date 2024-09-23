@@ -2,22 +2,22 @@ from flask import Blueprint, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from models.main import dbSession, User
-from services.reports import antimicrobial_report_service
+from services.reports import reports_culture_service
 from exception.validation_error import ValidationError
 from utils import status
 
-app_rpt_antimicrobial = Blueprint("app_rpt_antimicrobial", __name__)
+app_rpt_culture = Blueprint("app_rpt_culture", __name__)
 
 
-@app_rpt_antimicrobial.route("/reports/antimicrobial/history", methods=["GET"])
+@app_rpt_culture.route("/reports/culture", methods=["GET"])
 @jwt_required()
 def get_headers():
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
 
     try:
-        result = antimicrobial_report_service.get_history(
-            admission_number=request.args.get("admissionNumber"), user=user
+        result = reports_culture_service.get_cultures(
+            idPatient=request.args.get("idPatient"), user=user
         )
     except ValidationError as e:
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus

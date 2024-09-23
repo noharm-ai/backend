@@ -1,24 +1,23 @@
-import os
 from flask import Blueprint, request
-from flask_jwt_extended import jwt_required, get_jwt_identity
 
-from utils import status
-from models.main import User, dbSession, tryCommit, db
+from models.main import User
 from services.admin import admin_substance_service
-from exception.validation_error import ValidationError
+from decorators.api_endpoint_decorator import (
+    api_endpoint,
+    ApiEndpointUserGroup,
+    ApiEndpointAction,
+)
 
 app_admin_subs = Blueprint("app_admin_subs", __name__)
 
 
 @app_admin_subs.route("/admin/substance/list", methods=["POST"])
-@jwt_required()
-def get_substances():
+@api_endpoint(user_group=ApiEndpointUserGroup.MAINTAINER, action=ApiEndpointAction.READ)
+def get_substances(user_context: User):
     data = request.get_json()
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
 
     list = admin_substance_service.get_substances(
-        user=user,
+        user=user_context,
         limit=data.get("limit", 50),
         offset=data.get("offset", 0),
         name=data.get("name", None),
@@ -30,22 +29,17 @@ def get_substances():
         has_admin_text=data.get("hasAdminText", None),
     )
 
-    return {"status": "success", "data": list}, status.HTTP_200_OK
+    return list
 
 
 @app_admin_subs.route("/admin/substance", methods=["POST"])
-@jwt_required()
-def update_substance():
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
-    os.environ["TZ"] = "America/Sao_Paulo"
+@api_endpoint(
+    user_group=ApiEndpointUserGroup.MAINTAINER, action=ApiEndpointAction.WRITE
+)
+def update_substance(user_context: User):
+    subs = admin_substance_service.upsert_substance(
+        data=request.get_json(),
+        user=user_context,
+    )
 
-    try:
-        subs = admin_substance_service.upsert_substance(
-            data=request.get_json(),
-            user=user,
-        )
-    except ValidationError as e:
-        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
-
-    return tryCommit(db, subs)
+    return subs

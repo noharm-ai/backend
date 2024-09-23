@@ -7,7 +7,7 @@ from models.main import *
 from models.appendix import *
 from models.segment import *
 from models.enums import RoleEnum, DrugAdminSegment, DrugAttributesAuditTypeEnum
-from services.admin import ai_service
+from services.admin import admin_ai_service
 from services import drug_service as main_drug_service, permission_service
 
 from exception.validation_error import ValidationError
@@ -535,7 +535,7 @@ def predict_substance(id_drugs: List[int], user: User):
         .all()
     )
 
-    ia_results = ai_service.get_substance(drugs)
+    ia_results = admin_ai_service.get_substance(drugs)
 
     for i in ia_results:
         db.session.query(Drug).filter(Drug.id == i["idDrug"]).update(

@@ -4,7 +4,8 @@ from sqlalchemy import distinct, text
 from models.main import db
 from models.appendix import *
 from models.prescription import *
-
+from models.enums import FeatureEnum
+from services import permission_service, memory_service
 from exception.validation_error import ValidationError
 
 
@@ -28,17 +29,27 @@ def getNextId(idPrescription, schema):
 
 
 def createPrescriptionDrug(data, user):
-    roles = user.config["roles"] if user.config and "roles" in user.config else []
-    if "prescriptionEdit" not in roles:
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
+    prescription = (
+        db.session.query(Prescription)
+        .filter(Prescription.id == data.get("idPrescription", None))
+        .first()
+    )
+
+    _validate_permission(prescription=prescription, user=user)
+
+    if prescription.concilia == None:
+        next_id = getNextId(prescription.id, user.schema)
+    else:
+        count = (
+            db.session.query(PrescriptionDrug)
+            .filter(PrescriptionDrug.idPrescription == prescription.id)
+            .count()
         )
+        next_id = str(prescription.id - 90000000000000000) + str(count).zfill(2)
 
     pdCreate = PrescriptionDrug()
 
-    pdCreate.id = getNextId(data.get("idPrescription", None), user.schema)
+    pdCreate.id = next_id
     pdCreate.idPrescription = data.get("idPrescription", None)
     pdCreate.source = data.get("source", None)
 
@@ -48,6 +59,7 @@ def createPrescriptionDrug(data, user):
     pdCreate.idFrequency = data.get("frequency", None)
     pdCreate.interval = data.get("interval", None)
     pdCreate.route = data.get("route", None)
+    pdCreate.notes = data.get("recommendation", None)
 
     pdCreate.update = datetime.today()
     pdCreate.user = user.id
@@ -59,14 +71,6 @@ def createPrescriptionDrug(data, user):
 
 
 def updatePrescriptionDrug(idPrescriptionDrug, data, user):
-    roles = user.config["roles"] if user.config and "roles" in user.config else []
-    if "prescriptionEdit" not in roles:
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-
     pdUpdate = PrescriptionDrug.query.get(idPrescriptionDrug)
     if pdUpdate is None:
         raise ValidationError(
@@ -74,6 +78,14 @@ def updatePrescriptionDrug(idPrescriptionDrug, data, user):
             "errors.invalidRegister",
             status.HTTP_400_BAD_REQUEST,
         )
+
+    prescription = (
+        db.session.query(Prescription)
+        .filter(Prescription.id == pdUpdate.idPrescription)
+        .first()
+    )
+
+    _validate_permission(prescription=prescription, user=user)
 
     pdUpdate.update = datetime.today()
     pdUpdate.user = user.id
@@ -116,14 +128,6 @@ def updatePrescriptionDrug(idPrescriptionDrug, data, user):
 
 
 def togglePrescriptionDrugSuspension(idPrescriptionDrug, user, suspend):
-    roles = user.config["roles"] if user.config and "roles" in user.config else []
-    if "prescriptionEdit" not in roles:
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-
     pdUpdate = PrescriptionDrug.query.get(idPrescriptionDrug)
     if pdUpdate is None:
         raise ValidationError(
@@ -131,6 +135,14 @@ def togglePrescriptionDrugSuspension(idPrescriptionDrug, user, suspend):
             "errors.invalidRegister",
             status.HTTP_400_BAD_REQUEST,
         )
+
+    prescription = (
+        db.session.query(Prescription)
+        .filter(Prescription.id == pdUpdate.idPrescription)
+        .first()
+    )
+
+    _validate_permission(prescription=prescription, user=user)
 
     if suspend == True:
         pdUpdate.suspendedDate = datetime.today()
@@ -240,3 +252,30 @@ def get_missing_drugs(idPrescription, user):
         .order_by(Drug.name)
         .all()
     )
+
+
+def _validate_permission(prescription: Prescription, user: User):
+    if prescription == None:
+        raise ValidationError(
+            "Prescrição inexistente",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    if prescription.concilia == None:
+        roles = user.config["roles"] if user.config and "roles" in user.config else []
+        if "prescriptionEdit" not in roles:
+            raise ValidationError(
+                "Usuário não autorizado",
+                "errors.unauthorizedUser",
+                status.HTTP_401_UNAUTHORIZED,
+            )
+    else:
+        if not memory_service.has_feature(
+            FeatureEnum.CONCILIATION_EDIT.value
+        ) or not permission_service.is_pharma(user):
+            raise ValidationError(
+                "Usuário não autorizado",
+                "errors.unauthorizedUser",
+                status.HTTP_401_UNAUTHORIZED,
+            )

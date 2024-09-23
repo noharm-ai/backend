@@ -7,8 +7,8 @@ from models.appendix import *
 from models.segment import *
 from models.prescription import *
 from services.admin import (
-    integration_service,
-    integration_status_service,
+    admin_integration_service,
+    admin_integration_status_service,
 )
 from exception.validation_error import ValidationError
 
@@ -22,7 +22,7 @@ def refresh_agg():
     dbSession.setSchema(user.schema)
     os.environ["TZ"] = "America/Sao_Paulo"
     try:
-        result = integration_service.refresh_agg(
+        result = admin_integration_service.refresh_agg(
             user=user,
         )
     except ValidationError as e:
@@ -40,7 +40,7 @@ def refresh_prescriptions():
     dbSession.setSchema(user.schema)
     os.environ["TZ"] = "America/Sao_Paulo"
     try:
-        result = integration_service.refresh_prescriptions(
+        result = admin_integration_service.refresh_prescriptions(
             user=user,
         )
     except ValidationError as e:
@@ -58,7 +58,7 @@ def init_intervention_reason():
     dbSession.setSchema(user.schema)
     os.environ["TZ"] = "America/Sao_Paulo"
     try:
-        result = integration_service.init_intervention_reason(
+        result = admin_integration_service.init_intervention_reason(
             user=user,
         )
     except ValidationError as e:
@@ -74,7 +74,7 @@ def get_status():
     dbSession.setSchema(user.schema)
     os.environ["TZ"] = "America/Sao_Paulo"
     try:
-        result = integration_status_service.get_status(
+        result = admin_integration_status_service.get_status(
             user=user,
         )
     except ValidationError as e:
@@ -92,7 +92,7 @@ def update_config():
     request_data = request.get_json()
 
     try:
-        result = integration_service.update_integration_config(
+        result = admin_integration_service.update_integration_config(
             schema=request_data.get("schema", None),
             status=request_data.get("status", None),
             nh_care=request_data.get("nhCare", None),
@@ -117,7 +117,7 @@ def list_integrations():
     os.environ["TZ"] = "America/Sao_Paulo"
 
     try:
-        results = integration_service.list_integrations(
+        results = admin_integration_service.list_integrations(
             user=user,
         )
     except ValidationError as e:

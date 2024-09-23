@@ -7,7 +7,7 @@ from models.enums import MemoryEnum
 from exception.validation_error import ValidationError
 
 
-def has_feature(feature):
+def has_feature(feature: str):
     try:
         user = User.find(get_jwt_identity())
         user_features = (

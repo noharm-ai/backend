@@ -7,7 +7,7 @@ from models.main import *
 from models.prescription import *
 from .utils import tryCommit
 from services import prescription_agg_service
-from services.admin import drug_service
+from services.admin import admin_drug_service
 
 from exception.validation_error import ValidationError
 
@@ -62,7 +62,7 @@ def update_substances():
     dbSession.setSchema(user.schema)
 
     try:
-        result = drug_service.static_update_substances(user)
+        result = admin_drug_service.static_update_substances(user)
     except ValidationError as e:
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 

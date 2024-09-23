@@ -1,10 +1,14 @@
-from flask import request, url_for, jsonify, Flask
-from flask_sqlalchemy import SQLAlchemy
+import os
+import logging
+from flask import Flask
 from flask_jwt_extended import JWTManager
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_cors import CORS
+
 from models.main import db, mail
 from config import Config
-from flask_cors import CORS
+from models.enums import NoHarmENV
+from utils import status
+
 from routes.authentication import app_auth
 from routes.outlier import app_out
 from routes.prescription import app_pres
@@ -23,25 +27,22 @@ from routes.drugs import app_drugs
 from routes.names import app_names
 from routes.summary import app_summary
 from routes.support import app_support
-from routes.admin.frequency import app_admin_freq
-from routes.admin.intervention_reason import app_admin_interv
-from routes.admin.memory import app_admin_memory
-from routes.admin.drug import app_admin_drug
-from routes.admin.integration import app_admin_integration
-from routes.admin.integration_remote import app_admin_integration_remote
-from routes.admin.segment import app_admin_segment
-from routes.admin.exam import app_admin_exam
-from routes.admin.unit_conversion import app_admin_unit_conversion
+from routes.conciliation import app_conciliation
+from routes.admin.admin_frequency import app_admin_freq
+from routes.admin.admin_intervention_reason import app_admin_interv
+from routes.admin.admin_memory import app_admin_memory
+from routes.admin.admin_drug import app_admin_drug
+from routes.admin.admin_integration import app_admin_integration
+from routes.admin.admin_integration_remote import app_admin_integration_remote
+from routes.admin.admin_segment import app_admin_segment
+from routes.admin.admin_exam import app_admin_exam
+from routes.admin.admin_unit_conversion import app_admin_unit_conversion
 from routes.admin.admin_substance import app_admin_subs
 from routes.admin.admin_relation import app_admin_relation
-from routes.reports.general import app_rpt_general
-from routes.reports.config_rpt import app_rpt_config
-from routes.reports.culture import app_rpt_culture
-from routes.reports.antimicrobial import app_rpt_antimicrobial
-import os
-import logging
-from models.enums import NoHarmENV
-from utils import status
+from routes.reports.reports_general import app_rpt_general
+from routes.reports.reports_config_rpt import app_rpt_config
+from routes.reports.reports_culture import app_rpt_culture
+from routes.reports.reports_antimicrobial import app_rpt_antimicrobial
 
 os.environ["TZ"] = "America/Sao_Paulo"
 
@@ -89,6 +90,7 @@ app.register_blueprint(app_drugs)
 app.register_blueprint(app_names)
 app.register_blueprint(app_summary)
 app.register_blueprint(app_support)
+app.register_blueprint(app_conciliation)
 
 app.register_blueprint(app_user_admin)
 app.register_blueprint(app_pres_crud)
@@ -120,7 +122,7 @@ if Config.ENV != NoHarmENV.PRODUCTION.value:
 
 @app.route("/version", methods=["GET"])
 def getVersion():
-    return {"status": "success", "data": "v3.32-beta"}, status.HTTP_200_OK
+    return {"status": "success", "data": "v3.33-beta"}, status.HTTP_200_OK
 
 
 if __name__ == "__main__":
