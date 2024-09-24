@@ -4,6 +4,7 @@ from datetime import timedelta
 from botocore.exceptions import ClientError
 
 from config import Config
+from utils.dateutils import to_iso
 
 
 def _get_client():
@@ -68,7 +69,19 @@ def list_available_reports(schema: str, report: str):
     for f in files["Contents"]:
         filename = f["Key"].split("/")[-1].replace(".gz", "")
         if filename != "current":
-            file_list.append(f["Key"].split("/")[-1].replace(".gz", ""))
+            file_list.append(
+                {
+                    "name": f["Key"].split("/")[-1].replace(".gz", ""),
+                    "updateAt": to_iso(f["LastModified"]),
+                }
+            )
 
-    file_list.sort(reverse=True)
-    return file_list
+    reports = sorted(
+        file_list,
+        key=lambda d: d["updateAt"] if d["updateAt"] != None else "",
+        reverse=True,
+    )
+    # remove first
+    reports.pop(0)
+
+    return reports
