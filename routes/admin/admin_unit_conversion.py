@@ -1,92 +1,69 @@
-import os
 from flask import Blueprint, request
-from flask_jwt_extended import jwt_required, get_jwt_identity
-from utils import status
 
-
+from decorators.api_endpoint_decorator import (
+    api_endpoint,
+    ApiEndpointUserGroup,
+    ApiEndpointAction,
+)
 from models.main import *
 from services.admin import admin_unit_conversion_service
-from exception.validation_error import ValidationError
 
 app_admin_unit_conversion = Blueprint("app_admin_unit_conversion", __name__)
 
 
 @app_admin_unit_conversion.route("/admin/unit-conversion/list", methods=["POST"])
-@jwt_required()
-def get_unit_conversion_list():
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
-    os.environ["TZ"] = "America/Sao_Paulo"
+@api_endpoint(user_group=ApiEndpointUserGroup.MAINTAINER, action=ApiEndpointAction.READ)
+def get_unit_conversion_list(user_context: User):
     request_data = request.get_json()
 
-    list = admin_unit_conversion_service.get_conversion_list(
+    return admin_unit_conversion_service.get_conversion_list(
         id_segment=request_data.get("idSegment"),
-        user=user,
+        user=user_context,
         show_prediction=request_data.get("showPrediction", False),
     )
 
-    return {
-        "status": "success",
-        "data": list,
-    }, status.HTTP_200_OK
-
 
 @app_admin_unit_conversion.route("/admin/unit-conversion/save", methods=["POST"])
-@jwt_required()
-def save_conversions():
+@api_endpoint(
+    user_group=ApiEndpointUserGroup.MAINTAINER, action=ApiEndpointAction.WRITE
+)
+def save_conversions(user_context: User):
     data = request.get_json()
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
-    os.environ["TZ"] = "America/Sao_Paulo"
 
-    try:
-        result = admin_unit_conversion_service.save_conversions(
-            id_drug=data.get("idDrug", None),
-            id_segment=data.get("idSegment", None),
-            id_measure_unit_default=data.get("idMeasureUnitDefault", None),
-            conversion_list=data.get("conversionList", []),
-            user=user,
-        )
-    except ValidationError as e:
-        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
-
-    return tryCommit(db, result)
+    return admin_unit_conversion_service.save_conversions(
+        id_drug=data.get("idDrug", None),
+        id_segment=data.get("idSegment", None),
+        id_measure_unit_default=data.get("idMeasureUnitDefault", None),
+        conversion_list=data.get("conversionList", []),
+        user=user_context,
+    )
 
 
 @app_admin_unit_conversion.route(
     "/admin/unit-conversion/add-default-units", methods=["POST"]
 )
-@jwt_required()
-def add_default_units():
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
-    os.environ["TZ"] = "America/Sao_Paulo"
+@api_endpoint(
+    user_group=ApiEndpointUserGroup.MAINTAINER, action=ApiEndpointAction.WRITE
+)
+def add_default_units(user_context: User):
+    result = admin_unit_conversion_service.add_default_units(user=user_context)
 
-    try:
-        result = admin_unit_conversion_service.add_default_units(user=user)
-    except ValidationError as e:
-        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
-
-    return tryCommit(db, result.rowcount)
+    return result.rowcount
 
 
 @app_admin_unit_conversion.route(
     "/admin/unit-conversion/copy-unit-conversion", methods=["POST"]
 )
-@jwt_required()
-def copy_unit_conversion():
+@api_endpoint(
+    user_group=ApiEndpointUserGroup.MAINTAINER, action=ApiEndpointAction.WRITE
+)
+def copy_unit_conversion(user_context: User):
     data = request.get_json()
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
-    os.environ["TZ"] = "America/Sao_Paulo"
 
-    try:
-        result = admin_unit_conversion_service.copy_unit_conversion(
-            user=user,
-            id_segment_origin=data.get("idSegmentOrigin", None),
-            id_segment_destiny=data.get("idSegmentDestiny", None),
-        )
-    except ValidationError as e:
-        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+    result = admin_unit_conversion_service.copy_unit_conversion(
+        user=user_context,
+        id_segment_origin=data.get("idSegmentOrigin", None),
+        id_segment_destiny=data.get("idSegmentDestiny", None),
+    )
 
-    return tryCommit(db, result.rowcount)
+    return result.rowcount

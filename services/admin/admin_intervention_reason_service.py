@@ -4,7 +4,6 @@ from sqlalchemy import asc, func
 from models.main import db
 from models.appendix import *
 from models.prescription import *
-from models.enums import RoleEnum
 from services import permission_service
 
 from exception.validation_error import ValidationError
@@ -111,3 +110,16 @@ def list_to_dto(reasons):
         )
 
     return list
+
+
+def data_to_object(data) -> InterventionReason:
+    return InterventionReason(
+        description=data.get("name", None),
+        mamy=data.get("parentId", None),
+        active=data.get("active", False),
+        suspension=data.get("suspension", False),
+        substitution=data.get("substitution", False),
+        customEconomy=data.get("customEconomy", False),
+        relation_type=data.get("relationType", 0),
+        idHospital=data.get("idHospital", 1),
+    )

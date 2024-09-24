@@ -1,28 +1,16 @@
 from flask import Blueprint
-from flask_jwt_extended import jwt_required, get_jwt_identity
 
-from models.main import *
-from models.appendix import *
-from models.segment import *
-from models.prescription import *
+from decorators.api_endpoint_decorator import (
+    api_endpoint,
+    ApiEndpointUserGroup,
+    ApiEndpointAction,
+)
 from services import memory_service
-from exception.validation_error import ValidationError
 
 app_rpt_config = Blueprint("app_rpt_config", __name__)
 
 
 @app_rpt_config.route("/reports/config", methods=["GET"])
-@jwt_required()
+@api_endpoint(user_group=ApiEndpointUserGroup.ALL, action=ApiEndpointAction.READ)
 def get_config():
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
-
-    try:
-        reports = memory_service.get_reports()
-    except ValidationError as e:
-        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
-
-    return {
-        "status": "success",
-        "data": reports,
-    }, status.HTTP_200_OK
+    return memory_service.get_reports()

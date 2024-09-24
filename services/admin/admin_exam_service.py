@@ -242,8 +242,6 @@ def upsert_seg_exam(data: dict, user: User):
         segExam.max = escape_html(data.get("max", None))
     if data.get("ref", None) != None:
         segExam.ref = escape_html(data.get("ref", None))
-    if "order" in data.keys():
-        segExam.order = int(data.get("order", 99))
     if "active" in data.keys():
         segExam.active = bool(data.get("active", False))
 

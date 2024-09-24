@@ -81,7 +81,7 @@ def api_endpoint(user_group: ApiEndpointUserGroup, action: ApiEndpointAction):
 
                 return {
                     "status": "error",
-                    "message": str(e),
+                    "message": "Ocorreu um erro inesperado",
                 }, status.HTTP_500_INTERNAL_SERVER_ERROR
 
         return decorator_f

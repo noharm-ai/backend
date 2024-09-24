@@ -1,24 +1,23 @@
-import os
 from flask import Blueprint, request
-from flask_jwt_extended import jwt_required, get_jwt_identity
 
-from utils import status
-from models.main import User, dbSession, tryCommit, db
+from decorators.api_endpoint_decorator import (
+    api_endpoint,
+    ApiEndpointUserGroup,
+    ApiEndpointAction,
+)
+from models.main import User
 from services.admin import admin_relation_service
-from exception.validation_error import ValidationError
 
 app_admin_relation = Blueprint("app_admin_relation", __name__)
 
 
 @app_admin_relation.route("/admin/relation/list", methods=["POST"])
-@jwt_required()
-def get_relations():
+@api_endpoint(user_group=ApiEndpointUserGroup.MAINTAINER, action=ApiEndpointAction.READ)
+def get_relations(user_context: User):
     data = request.get_json()
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
 
-    list = admin_relation_service.get_relations(
-        user=user,
+    return admin_relation_service.get_relations(
+        user=user_context,
         limit=data.get("limit", 50),
         offset=data.get("offset", 0),
         id_origin_list=data.get("idOriginList", []),
@@ -28,22 +27,13 @@ def get_relations():
         relation_status=data.get("status", None),
     )
 
-    return {"status": "success", "data": list}, status.HTTP_200_OK
-
 
 @app_admin_relation.route("/admin/relation", methods=["POST"])
-@jwt_required()
-def upsert_relation():
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
-    os.environ["TZ"] = "America/Sao_Paulo"
-
-    try:
-        rel = admin_relation_service.upsert_relation(
-            data=request.get_json(),
-            user=user,
-        )
-    except ValidationError as e:
-        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
-
-    return tryCommit(db, rel)
+@api_endpoint(
+    user_group=ApiEndpointUserGroup.MAINTAINER, action=ApiEndpointAction.WRITE
+)
+def upsert_relation(user_context: User):
+    return admin_relation_service.upsert_relation(
+        data=request.get_json(),
+        user=user_context,
+    )
