@@ -486,3 +486,50 @@ def get_oauth_config(schema: str):
         return schema_config.config["oauth"]
 
     return None
+
+
+def refresh_token(current_user, current_claims):
+    if "schema" in current_claims:
+        claims = {
+            "schema": current_claims["schema"],
+            "config": current_claims["config"],
+        }
+    else:
+        raise ValidationError(
+            "Request inválido",
+            "errors.unauthorizedUser",
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
+    user = db.session.query(User).filter(User.id == current_user).first()
+    if user == None:
+        raise ValidationError(
+            "Usuário inválido",
+            "errors.unauthorizedUser",
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
+    if user.active == False:
+        raise ValidationError(
+            "Usuário inativo",
+            "errors.businessRules",
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
+    integration_status = admin_integration_status_service.get_integration_status(
+        current_claims["schema"]
+    )
+
+    if (
+        integration_status == IntegrationStatusEnum.CANCELED.value
+        and not permission_service.has_maintainer_permission(user)
+    ):
+        raise ValidationError(
+            "Usuário inválido",
+            "errors.businessRules",
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
+    access_token = create_access_token(identity=current_user, additional_claims=claims)
+
+    return {"access_token": access_token}

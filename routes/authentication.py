@@ -1,25 +1,19 @@
 from flask import (
     Blueprint,
     request,
-    url_for,
-    jsonify,
     after_this_request,
 )
 from utils import status
-from models.main import *
-from models.appendix import *
-from models.prescription import *
 from flask_jwt_extended import (
-    create_access_token,
     jwt_required,
     get_jwt_identity,
     get_jwt,
     set_refresh_cookies,
 )
 
-from models.enums import MemoryEnum, IntegrationStatusEnum
-from services import auth_service, memory_service, permission_service
-from services.admin import admin_integration_status_service
+from models.main import db, dbSession
+from services import auth_service
+from .utils import tryCommit
 from exception.validation_error import ValidationError
 
 app_auth = Blueprint("app_auth", __name__)
@@ -144,39 +138,11 @@ def refreshToken():
     current_user = get_jwt_identity()
     current_claims = get_jwt()
 
-    if "schema" in current_claims:
-        claims = {
-            "schema": current_claims["schema"],
-            "config": current_claims["config"],
-        }
-    else:
-        return {"status": "error"}, status.HTTP_401_UNAUTHORIZED
+    try:
+        result = auth_service.refresh_token(
+            current_user=current_user, current_claims=current_claims
+        )
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
-    user = db.session.query(User).filter(User.id == get_jwt_identity()).first()
-    if user == None:
-        return {
-            "status": "error",
-            "message": "Usuário inválido",
-        }, status.HTTP_401_UNAUTHORIZED
-
-    if user.active == False:
-        return {
-            "status": "error",
-            "message": "Usuário inativo",
-        }, status.HTTP_401_UNAUTHORIZED
-
-    integration_status = admin_integration_status_service.get_integration_status(
-        current_claims["schema"]
-    )
-    if (
-        integration_status == IntegrationStatusEnum.CANCELED.value
-        and not permission_service.has_maintainer_permission(user)
-    ):
-        return {
-            "status": "error",
-            "message": "Cliente desativado",
-        }, status.HTTP_401_UNAUTHORIZED
-
-    access_token = create_access_token(identity=current_user, additional_claims=claims)
-
-    return {"access_token": access_token}
+    return result, status.HTTP_200_OK
