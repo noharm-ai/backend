@@ -13,7 +13,6 @@ from models.segment import *
 from models.prescription import *
 from .utils import *
 from services import patient_service, exams_service
-from converter import patient_converter
 from exception.validation_error import ValidationError
 
 app_pat = Blueprint("app_pat", __name__)
@@ -244,7 +243,24 @@ def list_patients():
     except ValidationError as e:
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
+    list = []
+
+    for p in patients:
+        list.append(
+            {
+                "idPatient": p[0].idPatient,
+                "admissionNumber": p[0].admissionNumber,
+                "admissionDate": (
+                    p[0].admissionDate.isoformat() if p[0].admissionDate else None
+                ),
+                "birthdate": p[0].birthdate.isoformat() if p[0].birthdate else None,
+                "idPrescription": p[1].id,
+                "observation": p[0].observation,
+                "refDate": p[2].isoformat() if p[2] else None,
+            }
+        )
+
     return {
         "status": "success",
-        "data": patient_converter.list_to_dto(patients),
+        "data": list,
     }, status.HTTP_200_OK
