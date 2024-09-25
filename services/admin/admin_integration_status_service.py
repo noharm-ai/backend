@@ -4,9 +4,9 @@ from models.main import *
 from models.appendix import *
 from models.segment import *
 from models.enums import MemoryEnum
-from services import permission_service
 from services.admin import admin_memory_service
 from exception.validation_error import ValidationError
+from decorators.has_permission_decorator import has_permission, Permission
 
 
 def get_integration_status(schema):
@@ -24,16 +24,10 @@ def get_integration_status(schema):
     return config.status
 
 
-def get_status(user):
-    if not permission_service.has_maintainer_permission(user):
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-
+@has_permission(Permission.INTEGRATION_STATUS)
+def get_status(user_context: User):
     return {
-        "status": get_integration_status(user.schema),
+        "status": get_integration_status(user_context.schema),
         "memory": _get_memory_status(),
         "segments": _get_segments(),
         "pendingFrequencies": _get_pending_frequencies(),
@@ -41,10 +35,10 @@ def get_status(user):
         "pendingSubstances": _get_pending_substances(),
         "maxDose": _get_max_dose_count(),
         "interventionReason": _get_intervention_reasons_count(),
-        "users": _get_users(user.schema),
+        "users": _get_users(user_context.schema),
         "exams": _get_exams_status(),
         "conversions": _get_conversion_status(),
-        "tables": _get_table_stats(user.schema),
+        "tables": _get_table_stats(user_context.schema),
     }
 
 

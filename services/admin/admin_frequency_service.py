@@ -3,11 +3,12 @@ from sqlalchemy import asc
 
 from models.main import db
 from models.appendix import *
-from services import permission_service
+from decorators.has_permission_decorator import has_permission, Permission
 
 from exception.validation_error import ValidationError
 
 
+@has_permission(Permission.ADMIN_FREQUENCIES)
 def get_frequencies(has_daily_frequency=None):
     q = db.session.query(Frequency)
 
@@ -20,18 +21,12 @@ def get_frequencies(has_daily_frequency=None):
     return q.order_by(asc(Frequency.description)).all()
 
 
-def update_frequency(id, daily_frequency, fasting, user):
-    if not permission_service.has_maintainer_permission(user):
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-
+@has_permission(Permission.ADMIN_FREQUENCIES)
+def update_frequency(id, daily_frequency, fasting):
     freq = Frequency.query.get(id)
     if freq is None:
         raise ValidationError(
-            "Registro inexistente", "errors.invalidRecord", status.HTTP_401_UNAUTHORIZED
+            "Registro inexistente", "errors.invalidRecord", status.HTTP_400_BAD_REQUEST
         )
 
     freq.dailyFrequency = float(daily_frequency)

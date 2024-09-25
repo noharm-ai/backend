@@ -15,16 +15,52 @@ class Role(Enum):
         self.id = id
         self.permissions = permissions
 
-    ADMIN = "ADMIN", [Permission.ADMIN_DRUGS, Permission.ADMIN_EXAMS]
+    ADMIN = "ADMIN", [
+        Permission.ADMIN_DRUGS,
+        Permission.ADMIN_DRUGS__OVERWRITE_ATTRIBUTES,
+        Permission.ADMIN_EXAMS,
+        Permission.ADMIN_EXAMS__COPY,
+        Permission.ADMIN_EXAMS__MOST_FREQUENT,
+        Permission.ADMIN_FREQUENCIES,
+        Permission.ADMIN_INTEGRATION_REMOTE,
+        Permission.SCORE_SEGMENT,
+        Permission.INTEGRATION_UTILS,
+        Permission.ADMIN_INTERVENTION_REASON,
+        Permission.INTEGRATION_STATUS,
+        Permission.ADMIN_ROUTES,
+        Permission.ADMIN_SUBSTANCE_RELATIONS,
+        Permission.ADMIN_SUBSTANCES,
+        Permission.ADMIN_UNIT_CONVERSION,
+        Permission.ADMIN_SEGMENTS,
+        Permission.VIEW_REPORTS,
+    ]
 
-    CURATOR = "CURATOR", [Permission.ADMIN_DRUGS, Permission.ADMIN_EXAMS]
+    CURATOR = "CURATOR", [
+        Permission.ADMIN_DRUGS,
+        Permission.ADMIN_EXAMS,
+        Permission.ADMIN_EXAMS__COPY,
+        Permission.ADMIN_EXAMS__MOST_FREQUENT,
+        Permission.ADMIN_FREQUENCIES,
+        Permission.SCORE_SEGMENT,
+        Permission.ADMIN_INTERVENTION_REASON,
+        Permission.INTEGRATION_STATUS,
+        Permission.ADMIN_ROUTES,
+        Permission.ADMIN_SUBSTANCE_RELATIONS,
+        Permission.ADMIN_SUBSTANCES,
+        Permission.ADMIN_UNIT_CONVERSION,
+        Permission.ADMIN_SEGMENTS,
+        Permission.VIEW_REPORTS,
+    ]
 
-    PHARMA = "PHARMA", [Permission.CHECK_PRESCRIPTION]
+    PRESCRIPTION_ANALIST = "PRESCRIPTION_ANALIST", [
+        Permission.CHECK_PRESCRIPTION,
+        Permission.VIEW_REPORTS,
+    ]
 
-    ADMIN_USERS = "ADMIN_USERS", [Permission.ADMIN_USERS]
+    USER_MANAGER = "USER_MANAGER", [Permission.ADMIN_USERS]
 
-    ADMIN_CONFIG = "ADMIN_CONFIG", [Permission.ADMIN_EXAMS]
+    CONFIG_MANAGER = "CONFIG_MANAGER", [Permission.ADMIN_EXAMS]
 
-    RESEARCHER = "RESEARCHER", []
+    VIEWER = "VIEWER", [Permission.VIEW_REPORTS]
 
-    DOCTOR = "DOCTOR", []
+    DISCHARGE_MANAGER = "DISCHARGE_MANAGER", []

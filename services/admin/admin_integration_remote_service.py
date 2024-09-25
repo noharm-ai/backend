@@ -4,22 +4,16 @@ from markupsafe import escape
 from datetime import datetime
 from sqlalchemy import desc
 
-from models.main import User, db
+from models.main import db
 from models.appendix import NifiStatus, NifiQueue
 from utils.dateutils import to_iso
-from services import permission_service
 from models.enums import NifiQueueActionTypeEnum
 from exception.validation_error import ValidationError
+from decorators.has_permission_decorator import has_permission, Permission
 
 
-def get_template_date(user: User):
-    if not permission_service.is_admin(user):
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-
+@has_permission(Permission.ADMIN_INTEGRATION_REMOTE)
+def get_template_date():
     result = (
         db.session.query(NifiStatus.updatedAt)
         .filter(NifiStatus.nifi_diagnostics != None)
@@ -34,14 +28,8 @@ def get_template_date(user: User):
     return {"updatedAt": None}
 
 
-def get_template(user: User):
-    if not permission_service.is_admin(user):
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-
+@has_permission(Permission.ADMIN_INTEGRATION_REMOTE)
+def get_template():
     config: NifiStatus = db.session.query(NifiStatus).first()
 
     if config == None:
@@ -86,14 +74,8 @@ def get_template(user: User):
     }
 
 
-def push_queue_request(id_processor: str, action_type: str, data: dict, user: User):
-    if not permission_service.is_admin(user):
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-
+@has_permission(Permission.ADMIN_INTEGRATION_REMOTE)
+def push_queue_request(id_processor: str, action_type: str, data: dict):
     if id_processor == None and (
         action_type != NifiQueueActionTypeEnum.CUSTOM_CALLBACK.value
         and action_type != NifiQueueActionTypeEnum.REFRESH_TEMPLATE.value
@@ -188,14 +170,8 @@ def _get_new_queue(id_processor: str, action_type: str, data: dict):
     return queue
 
 
-def get_queue_status(id_queue_list, user: User):
-    if not permission_service.is_admin(user):
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-
+@has_permission(Permission.ADMIN_INTEGRATION_REMOTE)
+def get_queue_status(id_queue_list):
     queue_list = (
         db.session.query(NifiQueue).filter(NifiQueue.id.in_(id_queue_list)).all()
     )

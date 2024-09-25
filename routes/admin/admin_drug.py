@@ -1,20 +1,14 @@
 from flask import Blueprint, request
 from markupsafe import escape as escape_html
 
-from decorators.api_endpoint_decorator import (
-    api_endpoint,
-    api_endpoint_new,
-    ApiEndpointUserGroup,
-    ApiEndpointAction,
-)
-from models.main import User
+from decorators.api_endpoint_decorator import api_endpoint
 from services.admin import admin_drug_service
 
 app_admin_drug = Blueprint("app_admin_drug", __name__)
 
 
 @app_admin_drug.route("/admin/drug/attributes-list", methods=["POST"])
-@api_endpoint_new()
+@api_endpoint()
 def get_drug_list():
     request_data = request.get_json()
 
@@ -66,10 +60,8 @@ def get_drug_list():
 
 
 @app_admin_drug.route("/admin/drug/price-factor", methods=["POST"])
-@api_endpoint(
-    user_group=ApiEndpointUserGroup.MAINTAINER, action=ApiEndpointAction.WRITE
-)
-def update_price_factor(user_context: User):
+@api_endpoint()
+def update_price_factor():
     data = request.get_json()
 
     id_drug = data.get("idDrug", None)
@@ -80,7 +72,6 @@ def update_price_factor(user_context: User):
         id_drug=id_drug,
         id_segment=id_segment,
         factor=factor,
-        user=user_context,
     )
 
     return {
@@ -91,25 +82,19 @@ def update_price_factor(user_context: User):
 
 
 @app_admin_drug.route("/admin/drug/ref", methods=["GET"])
-@api_endpoint(user_group=ApiEndpointUserGroup.MAINTAINER, action=ApiEndpointAction.READ)
-def get_drug_ref(user_context: User):
+@api_endpoint()
+def get_drug_ref():
     sctid = request.args.get("sctid", None)
 
-    return admin_drug_service.get_drug_ref(
-        sctid=sctid,
-        user=user_context,
-    )
+    return admin_drug_service.get_drug_ref(sctid=sctid)
 
 
 @app_admin_drug.route("/admin/drug/copy-attributes", methods=["POST"])
-@api_endpoint(
-    user_group=ApiEndpointUserGroup.MAINTAINER, action=ApiEndpointAction.WRITE
-)
-def copy_attributes(user_context: User):
+@api_endpoint()
+def copy_attributes():
     data = request.get_json()
 
     result = admin_drug_service.copy_drug_attributes(
-        user=user_context,
         id_segment_origin=data.get("idSegmentOrigin", None),
         id_segment_destiny=data.get("idSegmentDestiny", None),
         attributes=data.get("attributes", None),
@@ -121,19 +106,15 @@ def copy_attributes(user_context: User):
 
 
 @app_admin_drug.route("/admin/drug/predict-substance", methods=["POST"])
-@api_endpoint(
-    user_group=ApiEndpointUserGroup.MAINTAINER, action=ApiEndpointAction.WRITE
-)
-def predict_substance(user_context: User):
+@api_endpoint()
+def predict_substance():
     data = request.get_json()
 
-    return admin_drug_service.predict_substance(
-        id_drugs=data.get("idDrugs", []), user=user_context
-    )
+    return admin_drug_service.predict_substance(id_drugs=data.get("idDrugs", []))
 
 
 @app_admin_drug.route("/admin/drug/get-missing-substance", methods=["GET"])
-@api_endpoint(user_group=ApiEndpointUserGroup.MAINTAINER, action=ApiEndpointAction.READ)
+@api_endpoint()
 def get_drugs_missing_substance():
     result = admin_drug_service.get_drugs_missing_substance()
 
@@ -141,10 +122,8 @@ def get_drugs_missing_substance():
 
 
 @app_admin_drug.route("/admin/drug/add-new-outlier", methods=["POST"])
-@api_endpoint(user_group=ApiEndpointUserGroup.MAINTAINER, action=ApiEndpointAction.READ)
-def add_new_outlier(user_context: User):
-    result = admin_drug_service.add_new_drugs_to_outlier(
-        user=user_context,
-    )
+@api_endpoint()
+def add_new_outlier():
+    result = admin_drug_service.add_new_drugs_to_outlier()
 
     return result.rowcount

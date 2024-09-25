@@ -297,6 +297,7 @@ def update_substance(id_drug, sctid, user):
     copy_substance_default_attributes(drug.id, drug.sctid, user)
 
 
+# TODO: check where is called
 def copy_substance_default_attributes(id_drug, sctid, user: User, overwrite=True):
     reference = (
         db.session.query(DrugAttributesReference)
@@ -360,6 +361,7 @@ def copy_substance_default_attributes(id_drug, sctid, user: User, overwrite=True
             )
 
 
+# TODO: called from other services
 def create_attributes_from_reference(id_drug, id_segment, user):
     da = (
         db.session.query(DrugAttributes)

@@ -1,4 +1,5 @@
 import inspect
+from typing import List
 from functools import wraps
 from flask_jwt_extended import get_jwt_identity
 
@@ -8,14 +9,12 @@ from security.role import Role
 from exception.authorization_error import AuthorizationError
 
 
-def has_permission(permission: Permission):
+def has_permission(*permissions: List[Permission]):
 
     def wrapper(f):
         @wraps(f)
         def decorator_f(*args, **kwargs):
             user_context = User.find(get_jwt_identity())
-            if "user_context" in inspect.signature(f).parameters:
-                kwargs["user_context"] = user_context
 
             roles = (
                 user_context.config["roles"]
@@ -26,15 +25,18 @@ def has_permission(permission: Permission):
             for r in roles:
                 try:
                     role = Role(str(r).upper())
-                    print("role", role)
                     user_permissions = user_permissions + role.permissions
                 except:
                     pass
 
-            print("permisisons", user_permissions)
-
-            if permission not in user_permissions:
+            if len(set.intersection(set(permissions), set(user_permissions))) == 0:
                 raise AuthorizationError()
+
+            # inject params
+            if "user_context" in inspect.signature(f).parameters:
+                kwargs["user_context"] = user_context
+            if "user_permissions" in inspect.signature(f).parameters:
+                kwargs["user_permissions"] = user_permissions
 
             return f(*args, **kwargs)
 

@@ -1,13 +1,14 @@
 from datetime import datetime, timedelta
 from markupsafe import escape as escape_html
 from utils import status
-from sqlalchemy import or_, func
+from sqlalchemy import func
+from typing import List
 
 from models.main import db
 from models.appendix import *
 from models.prescription import *
-from models.enums import MemoryEnum, RoleEnum
-
+from models.enums import MemoryEnum
+from decorators.has_permission_decorator import has_permission, Permission
 from exception.validation_error import ValidationError
 
 KIND_ADMIN = [
@@ -29,15 +30,8 @@ KIND_ROUTES = [
 ]
 
 
-def get_admin_entries(user, kinds=[]):
-    roles = user.config["roles"] if user.config and "roles" in user.config else []
-    if RoleEnum.ADMIN.value not in roles and RoleEnum.TRAINING.value not in roles:
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-
+@has_permission(Permission.INTEGRATION_UTILS, Permission.ADMIN_ROUTES)
+def get_admin_entries(kinds=[]):
     return get_memory_itens(kinds)
 
 
@@ -83,12 +77,17 @@ def get_memory_itens(kinds):
     return itens
 
 
-def update_memory(key, kind, value, user, unique=False):
-    roles = user.config["roles"] if user.config and "roles" in user.config else []
+@has_permission(Permission.INTEGRATION_UTILS, Permission.ADMIN_ROUTES)
+def update_memory(
+    key,
+    kind,
+    value,
+    user_context: User,
+    user_permissions: List[Permission],
+    unique=False,
+):
     authorized = True
-    if kind in KIND_ADMIN and RoleEnum.ADMIN.value not in roles:
-        authorized = False
-    elif RoleEnum.ADMIN.value not in roles and RoleEnum.TRAINING.value not in roles:
+    if kind in KIND_ADMIN and Permission.INTEGRATION_UTILS not in user_permissions:
         authorized = False
 
     if not authorized:
@@ -123,7 +122,7 @@ def update_memory(key, kind, value, user, unique=False):
     # update
     memory_item.value = value
     memory_item.update = datetime.today()
-    memory_item.user = user.id
+    memory_item.user = user_context.id
 
     db.session.add(memory_item)
     db.session.flush()

@@ -13,6 +13,7 @@ from routes.outlier_lib import add_score
 from exception.validation_error import ValidationError
 from services.admin import admin_drug_service, admin_integration_status_service
 from services import data_authorization_service, permission_service
+from decorators.has_permission_decorator import has_permission, Permission
 
 FOLD_SIZE = 10
 
@@ -365,15 +366,8 @@ def _refresh_agg(id_drug, id_segment, schema):
     return db.session.execute(query, {"idSegment": id_segment, "idDrug": id_drug})
 
 
-def get_outliers_process_list(id_segment, user):
-    roles = user.config["roles"] if user.config and "roles" in user.config else []
-    if RoleEnum.ADMIN.value not in roles and RoleEnum.TRAINING.value not in roles:
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-
+@has_permission(Permission.SCORE_SEGMENT)
+def get_outliers_process_list(id_segment, user_context: User):
     pending_frequencies = admin_integration_status_service._get_pending_frequencies()
     if pending_frequencies > 0:
         raise ValidationError(
@@ -382,13 +376,13 @@ def get_outliers_process_list(id_segment, user):
             status.HTTP_400_BAD_REQUEST,
         )
 
-    print("Init Schema:", user.schema, "Segment:", id_segment)
+    print("Init Schema:", user_context.schema, "Segment:", id_segment)
 
-    result = refresh_outliers(id_segment=id_segment, user=user)
+    result = refresh_outliers(id_segment=id_segment, user=user_context)
     print("RowCount", result.rowcount)
 
     # fix inconsistencies after outlier insert
-    admin_drug_service.fix_inconsistency(user)
+    admin_drug_service.fix_inconsistency()
 
     totalCount = (
         db.session.query(func.count(distinct(Outlier.idDrug)))

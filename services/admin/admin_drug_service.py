@@ -9,8 +9,7 @@ from models.segment import *
 from models.enums import RoleEnum, DrugAdminSegment, DrugAttributesAuditTypeEnum
 from services.admin import admin_ai_service
 from services import drug_service as main_drug_service, permission_service
-from decorators.has_permission_decorator import has_permission
-from security.permission import Permission
+from decorators.has_permission_decorator import has_permission, Permission
 
 from exception.validation_error import ValidationError
 
@@ -220,14 +219,8 @@ def get_drug_list(
     return q.order_by(Drug.name, Segment.description).limit(limit).offset(offset).all()
 
 
-def get_drug_ref(sctid: int, user: User):
-    if not permission_service.has_maintainer_permission(user):
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-
+@has_permission(Permission.ADMIN_DRUGS)
+def get_drug_ref(sctid: int):
     subst = (
         db.session.query(Substance)
         .filter(Substance.id == sctid)
@@ -245,15 +238,8 @@ def get_drug_ref(sctid: int, user: User):
     return {"name": subst.name, "ref": subst.admin_text}
 
 
-def update_price_factor(id_drug, id_segment, factor, user):
-    roles = user.config["roles"] if user.config and "roles" in user.config else []
-    if RoleEnum.ADMIN.value not in roles and RoleEnum.TRAINING.value not in roles:
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-
+@has_permission(Permission.ADMIN_DRUGS)
+def update_price_factor(id_drug, id_segment, factor):
     attributes = (
         db.session.query(DrugAttributes)
         .filter(DrugAttributes.idDrug == id_drug)
@@ -291,15 +277,9 @@ def update_price_factor(id_drug, id_segment, factor, user):
         db.session.flush()
 
 
-def fix_inconsistency(user):
-    roles = user.config["roles"] if user.config and "roles" in user.config else []
-    if RoleEnum.ADMIN.value not in roles and RoleEnum.TRAINING.value not in roles:
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-    schema = user.schema
+@has_permission(Permission.ADMIN_DRUGS, Permission.SCORE_SEGMENT)
+def fix_inconsistency(user_context: User):
+    schema = user_context.schema
 
     # normalize medatributos
     query_normalize = text(
@@ -333,28 +313,22 @@ def fix_inconsistency(user):
 
     for d in inconsistent_drugs:
         main_drug_service.copy_substance_default_attributes(
-            id_drug=d[0], sctid=d[1], user=user, overwrite=False
+            id_drug=d[0], sctid=d[1], user=user_context, overwrite=False
         )
 
     return len(inconsistent_drugs)
 
 
+@has_permission(Permission.ADMIN_DRUGS)
 def copy_drug_attributes(
     id_segment_origin,
     id_segment_destiny,
-    user,
+    user_context: User,
+    user_permissions: List[Permission],
     attributes,
     from_admin_schema=True,
     overwrite_all=False,
 ):
-    roles = user.config["roles"] if user.config and "roles" in user.config else []
-    if RoleEnum.ADMIN.value not in roles and RoleEnum.TRAINING.value not in roles:
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-
     if (
         from_admin_schema
         and id_segment_origin != DrugAdminSegment.ADULT.value
@@ -373,15 +347,18 @@ def copy_drug_attributes(
             status.HTTP_400_BAD_REQUEST,
         )
 
-    if overwrite_all and RoleEnum.ADMIN.value not in roles:
+    if (
+        overwrite_all
+        and Permission.ADMIN_DRUGS__OVERWRITE_ATTRIBUTES in user_permissions
+    ):
         raise ValidationError(
             "Usuário não autorizado",
             "errors.unauthorizedUser",
             status.HTTP_401_UNAUTHORIZED,
         )
 
-    origin_schema = "hsc_test" if from_admin_schema else user.schema
-    schema = user.schema
+    origin_schema = "hsc_test" if from_admin_schema else user_context.schema
+    schema = user_context.schema
 
     only_support_filter = """
         and (
@@ -481,7 +458,7 @@ def copy_drug_attributes(
             "idSegmentOrigin": id_segment_origin,
             "idSegmentDestiny": id_segment_destiny,
             "supportRole": f"%{RoleEnum.SUPPORT.value}%",
-            "idUser": user.id,
+            "idUser": user_context.id,
             "extra": '{"attributes": "' + ",".join(attributes) + '"}',
         },
     )
@@ -509,13 +486,18 @@ def copy_drug_attributes(
             "idSegmentOrigin": id_segment_origin,
             "idSegmentDestiny": id_segment_destiny,
             "supportRole": f"%{RoleEnum.SUPPORT.value}%",
-            "idUser": user.id,
+            "idUser": user_context.id,
         },
     )
 
 
-def predict_substance(id_drugs: List[int], user: User):
-    roles = user.config["roles"] if user.config and "roles" in user.config else []
+@has_permission(Permission.ADMIN_DRUGS)
+def predict_substance(id_drugs: List[int], user_context: User):
+    roles = (
+        user_context.config["roles"]
+        if user_context.config and "roles" in user_context.config
+        else []
+    )
     if RoleEnum.ADMIN.value not in roles and RoleEnum.TRAINING.value not in roles:
         raise ValidationError(
             "Usuário não autorizado",
@@ -546,42 +528,36 @@ def predict_substance(id_drugs: List[int], user: User):
                 "sctid": i["sctid"],
                 "ai_accuracy": i["accuracy"],
                 "updated_at": datetime.today(),
-                "updated_by": user.id,
+                "updated_by": user_context.id,
             },
             synchronize_session="fetch",
         )
 
         main_drug_service.copy_substance_default_attributes(
-            i["idDrug"], i["sctid"], user
+            i["idDrug"], i["sctid"], user_context
         )
 
     return ia_results
 
 
-def add_new_drugs_to_outlier(user: User):
-    if not permission_service.has_maintainer_permission(user):
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-
+@has_permission(Permission.ADMIN_DRUGS)
+def add_new_drugs_to_outlier(user_context: User):
     query = text(
         f"""
-            insert into {user.schema}.outlier 
+            insert into {user_context.schema}.outlier 
                 (fkmedicamento, idsegmento, contagem, doseconv, frequenciadia, escore, update_at, update_by)
             select 
                 pm.fkmedicamento, p.idsegmento, 0, 0, 0, 4, :updateAt, :updateBy 
             from 
-	            {user.schema}.presmed pm
-	            inner join {user.schema}.prescricao p on (pm.fkprescricao = p.fkprescricao)
+	            {user_context.schema}.presmed pm
+	            inner join {user_context.schema}.prescricao p on (pm.fkprescricao = p.fkprescricao)
             where
                 p.update_at > now() - interval '5 days'
                 and pm.idoutlier is null
                 and p.idsegmento is not null
                 and not exists (
                     select 1
-                    from {user.schema}.outlier o 
+                    from {user_context.schema}.outlier o 
                     where o.fkmedicamento = pm.fkmedicamento and o.idsegmento = p.idsegmento
                 )
             group by 
@@ -593,11 +569,12 @@ def add_new_drugs_to_outlier(user: User):
         query,
         {
             "updateAt": datetime.today(),
-            "updateBy": user.id,
+            "updateBy": user_context.id,
         },
     )
 
 
+@has_permission(Permission.ADMIN_DRUGS)
 def get_drugs_missing_substance():
     drugs = (
         db.session.query(func.distinct(Drug.id))

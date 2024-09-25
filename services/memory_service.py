@@ -5,6 +5,7 @@ from models.appendix import *
 from models.prescription import *
 from models.enums import MemoryEnum
 from exception.validation_error import ValidationError
+from decorators.has_permission_decorator import has_permission, Permission
 
 
 def has_feature(feature: str):
@@ -163,6 +164,7 @@ def is_private(key):
     return False
 
 
+@has_permission(Permission.VIEW_REPORTS)
 def get_reports():
     external = get_memory(MemoryEnum.REPORTS.value)
     internal = get_memory(MemoryEnum.REPORTS_INTERNAL.value)

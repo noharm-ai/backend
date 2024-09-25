@@ -1,13 +1,15 @@
 from sqlalchemy import select
 
-from models.main import db, desc, User
+from models.main import db, desc
 from models.appendix import CultureHeader, Culture
 from exception.validation_error import ValidationError
 from utils import dateutils, status
 from routes.utils import none2zero
+from decorators.has_permission_decorator import has_permission, Permission
 
 
-def get_cultures(idPatient: int, user: User):
+@has_permission(Permission.VIEW_REPORTS)
+def get_cultures(idPatient: int):
     if idPatient == None:
         raise ValidationError(
             "idPatient inválido", "errors.invalidParams", status.HTTP_400_BAD_REQUEST

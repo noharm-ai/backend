@@ -6,23 +6,18 @@ from models.main import *
 from models.appendix import *
 from models.segment import *
 from models.enums import IntegrationStatusEnum
-from services import permission_service, drug_service as main_drug_service
+from services import drug_service as main_drug_service
 from services.admin import (
     admin_ai_service,
     admin_drug_service,
     admin_integration_status_service,
 )
+from decorators.has_permission_decorator import has_permission, Permission
 from exception.validation_error import ValidationError
 
 
-def get_conversion_list(id_segment, user, show_prediction=False):
-    if not permission_service.has_maintainer_permission(user):
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-
+@has_permission(Permission.ADMIN_UNIT_CONVERSION)
+def get_conversion_list(id_segment, show_prediction=False):
     active_drugs = db.session.query(distinct(Outlier.idDrug).label("idDrug")).cte(
         "active_drugs"
     )
@@ -105,19 +100,14 @@ def get_conversion_list(id_segment, user, show_prediction=False):
     return result
 
 
+@has_permission(Permission.ADMIN_UNIT_CONVERSION)
 def save_conversions(
-    id_drug, id_segment, id_measure_unit_default, conversion_list, user
+    id_drug, id_segment, id_measure_unit_default, conversion_list, user_context: User
 ):
-    if not permission_service.has_maintainer_permission(user):
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
 
     overwrite = False
     if (
-        admin_integration_status_service.get_integration_status(user.schema)
+        admin_integration_status_service.get_integration_status(user_context.schema)
         != IntegrationStatusEnum.PRODUCTION.value
     ):
         overwrite = True
@@ -151,7 +141,7 @@ def save_conversions(
     )
     if da == None:
         da = main_drug_service.create_attributes_from_reference(
-            id_drug=id_drug, id_segment=id_segment, user=user
+            id_drug=id_drug, id_segment=id_segment, user=user_context
         )
     else:
         if not overwrite and da.idMeasureUnit != id_measure_unit_default:
@@ -163,7 +153,7 @@ def save_conversions(
 
     da.idMeasureUnit = id_measure_unit_default
     da.update = datetime.today()
-    da.user = user.id
+    da.user = user_context.id
 
     db.session.flush()
 
@@ -172,7 +162,7 @@ def save_conversions(
         conversion_list=conversion_list,
         id_drug=id_drug,
         id_segment=id_segment,
-        user=user,
+        user=user_context,
     )
 
     # update other segments
@@ -206,18 +196,21 @@ def save_conversions(
 
         if da == None:
             da = main_drug_service.create_attributes_from_reference(
-                id_drug=id_drug, id_segment=s.id, user=user
+                id_drug=id_drug, id_segment=s.id, user=user_context
             )
 
         da.idMeasureUnit = id_measure_unit_default
         da.update = datetime.today()
-        da.user = user.id
+        da.user = user_context.id
 
         db.session.flush()
 
         # update conversions
         _update_conversion_list(
-            conversion_list=conversion_list, id_drug=id_drug, id_segment=s.id, user=user
+            conversion_list=conversion_list,
+            id_drug=id_drug,
+            id_segment=s.id,
+            user=user_context,
         )
 
     return {"updated": updated_segments, "rejected": rejected_segments}
@@ -247,16 +240,11 @@ def _update_conversion_list(conversion_list, id_drug, id_segment, user):
         )
 
 
-def add_default_units(user):
-    if not permission_service.has_maintainer_permission(user):
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-    schema = user.schema
+@has_permission(Permission.ADMIN_UNIT_CONVERSION)
+def add_default_units(user_context: User):
+    schema = user_context.schema
 
-    admin_drug_service.fix_inconsistency(user)
+    admin_drug_service.fix_inconsistency()
 
     query = text(
         f"""
@@ -316,14 +304,9 @@ def add_default_units(user):
     return result
 
 
-def copy_unit_conversion(id_segment_origin, id_segment_destiny, user):
-    if not permission_service.has_maintainer_permission(user):
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-    schema = user.schema
+@has_permission(Permission.ADMIN_UNIT_CONVERSION)
+def copy_unit_conversion(id_segment_origin, id_segment_destiny, user_context: User):
+    schema = user_context.schema
 
     if id_segment_origin == None or id_segment_destiny == None:
         raise ValidationError(

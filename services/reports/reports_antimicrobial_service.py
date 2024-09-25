@@ -1,6 +1,6 @@
 from sqlalchemy import select, and_
 
-from models.main import db, desc, User
+from models.main import db, desc
 from models.prescription import (
     Patient,
     Prescription,
@@ -13,9 +13,11 @@ from models.prescription import (
 )
 from exception.validation_error import ValidationError
 from utils import dateutils, status
+from decorators.has_permission_decorator import has_permission, Permission
 
 
-def get_history(admission_number: int, user: User):
+@has_permission(Permission.VIEW_REPORTS)
+def get_history(admission_number: int):
     if admission_number == None:
         raise ValidationError(
             "admissionNUmber inválido",
