@@ -76,12 +76,15 @@ def list_available_reports(schema: str, report: str):
                 }
             )
 
-    reports = sorted(
-        file_list,
-        key=lambda d: d["updateAt"] if d["updateAt"] != None else "",
-        reverse=True,
-    )
-    # remove first
-    reports.pop(0)
+    if len(file_list) > 0:
+        reports = sorted(
+            file_list,
+            key=lambda d: d["updateAt"] if d["updateAt"] != None else "",
+            reverse=True,
+        )
+        # remove first
+        reports.pop(0)
 
-    return reports
+        return reports
+
+    return []
