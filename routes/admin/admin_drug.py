@@ -3,6 +3,7 @@ from markupsafe import escape as escape_html
 
 from decorators.api_endpoint_decorator import (
     api_endpoint,
+    api_endpoint_new,
     ApiEndpointUserGroup,
     ApiEndpointAction,
 )
@@ -13,7 +14,7 @@ app_admin_drug = Blueprint("app_admin_drug", __name__)
 
 
 @app_admin_drug.route("/admin/drug/attributes-list", methods=["POST"])
-@api_endpoint(user_group=ApiEndpointUserGroup.MAINTAINER, action=ApiEndpointAction.READ)
+@api_endpoint_new()
 def get_drug_list():
     request_data = request.get_json()
 

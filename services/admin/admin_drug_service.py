@@ -9,10 +9,13 @@ from models.segment import *
 from models.enums import RoleEnum, DrugAdminSegment, DrugAttributesAuditTypeEnum
 from services.admin import admin_ai_service
 from services import drug_service as main_drug_service, permission_service
+from decorators.has_permission_decorator import has_permission
+from security.permission import Permission
 
 from exception.validation_error import ValidationError
 
 
+@has_permission(Permission.ADMIN_DRUGS)
 def get_drug_list(
     has_substance=None,
     has_price_conversion=None,

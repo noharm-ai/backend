@@ -10,6 +10,7 @@ from utils import status
 from services import permission_service
 
 from exception.validation_error import ValidationError
+from exception.authorization_error import AuthorizationError
 
 
 class ApiEndpointUserGroup(Enum):
@@ -121,3 +122,67 @@ def _has_permission(
         return False
 
     return True
+
+
+def api_endpoint_new():
+
+    def wrapper(f):
+        @wraps(f)
+        def decorator_f(*args, **kwargs):
+            try:
+                verify_jwt_in_request()
+
+                user_context = User.find(get_jwt_identity())
+                if "user_context" in inspect.signature(f).parameters:
+                    kwargs["user_context"] = user_context
+
+                dbSession.setSchema(user_context.schema)
+                os.environ["TZ"] = "America/Sao_Paulo"
+
+                result = f(*args, **kwargs)
+
+                db.session.commit()
+                db.session.close()
+                db.session.remove()
+
+                return {"status": "success", "data": result}, status.HTTP_200_OK
+
+            except AuthorizationError as e:
+                db.session.rollback()
+                db.session.close()
+                db.session.remove()
+
+                return {
+                    "status": "error",
+                    "message": "Usuário não autorizado",
+                    "code": "error.authorizationError",
+                }, status.HTTP_401_UNAUTHORIZED
+
+            except ValidationError as e:
+                db.session.rollback()
+                db.session.close()
+                db.session.remove()
+
+                return {
+                    "status": "error",
+                    "message": str(e),
+                    "code": e.code,
+                }, e.httpStatus
+
+            except Exception as e:
+                db.session.rollback()
+                db.session.close()
+                db.session.remove()
+
+                logging.basicConfig()
+                logger = logging.getLogger("noharm.backend")
+                logger.error(str(e))
+
+                return {
+                    "status": "error",
+                    "message": "Ocorreu um erro inesperado",
+                }, status.HTTP_500_INTERNAL_SERVER_ERROR
+
+        return decorator_f
+
+    return wrapper
