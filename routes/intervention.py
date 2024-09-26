@@ -73,6 +73,7 @@ def save_intervention():
                     data.get("expendedDose", None) if "expendedDose" in data else -1
                 ),
                 agg_id_prescription=data.get("aggIdPrescription", None),
+                update_responsible=data.get("updateResponsible", False),
             )
     except ValidationError as e:
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus

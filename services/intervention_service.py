@@ -531,6 +531,7 @@ def save_intervention(
     expended_dose=None,
     new_status="s",
     agg_id_prescription=None,
+    update_responsible=False,
 ):
     if id_intervention == None and id_intervention_reason == None:
         # transition between versions
@@ -684,6 +685,9 @@ def save_intervention(
 
     i.update = datetime.today()
     i.economy_day_value_manual = False
+
+    if update_responsible:
+        i.user = user.id
 
     if new_intv:
         db.session.add(i)
