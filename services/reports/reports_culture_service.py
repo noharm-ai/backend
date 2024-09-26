@@ -8,7 +8,7 @@ from routes.utils import none2zero
 from decorators.has_permission_decorator import has_permission, Permission
 
 
-@has_permission(Permission.VIEW_REPORTS)
+@has_permission(Permission.READ_REPORTS)
 def get_cultures(idPatient: int):
     if idPatient == None:
         raise ValidationError(

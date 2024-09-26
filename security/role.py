@@ -23,7 +23,7 @@ class Role(Enum):
         Permission.ADMIN_EXAMS__MOST_FREQUENT,
         Permission.ADMIN_FREQUENCIES,
         Permission.ADMIN_INTEGRATION_REMOTE,
-        Permission.SCORE_SEGMENT,
+        Permission.WRITE_SEGMENT_SCORE,
         Permission.INTEGRATION_UTILS,
         Permission.ADMIN_INTERVENTION_REASON,
         Permission.INTEGRATION_STATUS,
@@ -32,7 +32,12 @@ class Role(Enum):
         Permission.ADMIN_SUBSTANCES,
         Permission.ADMIN_UNIT_CONVERSION,
         Permission.ADMIN_SEGMENTS,
-        Permission.VIEW_REPORTS,
+        Permission.READ_REPORTS,
+        Permission.READ_PRESCRIPTION,
+        Permission.WRITE_DRUG_ATTRIBUTES,
+        Permission.WRITE_BASIC_FEATURES,
+        Permission.READ_BASIC_FEATURES,
+        Permission.WRITE_DRUG_SCORE,
     ]
 
     CURATOR = "CURATOR", [
@@ -41,7 +46,7 @@ class Role(Enum):
         Permission.ADMIN_EXAMS__COPY,
         Permission.ADMIN_EXAMS__MOST_FREQUENT,
         Permission.ADMIN_FREQUENCIES,
-        Permission.SCORE_SEGMENT,
+        Permission.WRITE_SEGMENT_SCORE,
         Permission.ADMIN_INTERVENTION_REASON,
         Permission.INTEGRATION_STATUS,
         Permission.ADMIN_ROUTES,
@@ -49,18 +54,43 @@ class Role(Enum):
         Permission.ADMIN_SUBSTANCES,
         Permission.ADMIN_UNIT_CONVERSION,
         Permission.ADMIN_SEGMENTS,
-        Permission.VIEW_REPORTS,
+        Permission.READ_REPORTS,
+        Permission.READ_PRESCRIPTION,
+        Permission.WRITE_DRUG_ATTRIBUTES,
+        Permission.WRITE_BASIC_FEATURES,
+        Permission.READ_BASIC_FEATURES,
+        Permission.WRITE_DRUG_SCORE,
     ]
 
     PRESCRIPTION_ANALIST = "PRESCRIPTION_ANALIST", [
-        Permission.CHECK_PRESCRIPTION,
-        Permission.VIEW_REPORTS,
+        Permission.READ_PRESCRIPTION,
+        Permission.WRITE_PRESCRIPTION,
+        Permission.READ_REPORTS,
+        Permission.WRITE_BASIC_FEATURES,
+        Permission.READ_BASIC_FEATURES,
     ]
 
-    USER_MANAGER = "USER_MANAGER", [Permission.ADMIN_USERS]
+    USER_MANAGER = "USER_MANAGER", [
+        Permission.ADMIN_USERS,
+        Permission.WRITE_BASIC_FEATURES,
+        Permission.READ_BASIC_FEATURES,
+    ]
 
-    CONFIG_MANAGER = "CONFIG_MANAGER", [Permission.ADMIN_EXAMS]
+    CONFIG_MANAGER = "CONFIG_MANAGER", [
+        Permission.ADMIN_EXAMS,
+        Permission.WRITE_DRUG_ATTRIBUTES,
+        Permission.WRITE_BASIC_FEATURES,
+        Permission.READ_BASIC_FEATURES,
+        Permission.WRITE_DRUG_SCORE,
+    ]
 
-    VIEWER = "VIEWER", [Permission.VIEW_REPORTS]
+    VIEWER = "VIEWER", [
+        Permission.READ_REPORTS,
+        Permission.READ_PRESCRIPTION,
+        Permission.READ_BASIC_FEATURES,
+    ]
 
-    DISCHARGE_MANAGER = "DISCHARGE_MANAGER", []
+    DISCHARGE_MANAGER = "DISCHARGE_MANAGER", [
+        Permission.WRITE_BASIC_FEATURES,
+        Permission.READ_BASIC_FEATURES,
+    ]

@@ -19,7 +19,7 @@ from flask_jwt_extended import (
 from .utils import *
 from sqlalchemy import func, between, text
 from datetime import date, datetime
-from .drugList import DrugList
+from utils.drug_list import DrugList
 from services import (
     alert_service,
     alert_interaction_service,

@@ -1,6 +1,6 @@
 import re
 
-from .utils import *
+from routes.utils import *
 from models.appendix import *
 from utils.dateutils import to_iso
 from services import drug_service

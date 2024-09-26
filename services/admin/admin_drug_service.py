@@ -277,7 +277,7 @@ def update_price_factor(id_drug, id_segment, factor):
         db.session.flush()
 
 
-@has_permission(Permission.ADMIN_DRUGS, Permission.SCORE_SEGMENT)
+@has_permission(Permission.ADMIN_DRUGS, Permission.WRITE_SEGMENT_SCORE)
 def fix_inconsistency(user_context: User):
     schema = user_context.schema
 

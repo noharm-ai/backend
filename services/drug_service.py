@@ -1,15 +1,62 @@
-from models.main import db
-from sqlalchemy import asc, distinct
+from sqlalchemy import asc, distinct, func, and_
 from sqlalchemy.orm import undefer
+from typing import List
+from datetime import datetime
 
-from models.appendix import *
-from models.prescription import *
+from models.main import db, User
+from models.prescription import (
+    Drug,
+    MeasureUnit,
+    PrescriptionAgg,
+    Frequency,
+    DrugAttributes,
+    MeasureUnitConvert,
+    Substance,
+    DrugAttributesReference,
+    Segment,
+    DrugAttributesAudit,
+)
 from models.enums import DrugAdminSegment, DrugAttributesAuditTypeEnum
-from services import permission_service, data_authorization_service
+from services import data_authorization_service
 from exception.validation_error import ValidationError
+from decorators.has_permission_decorator import has_permission, Permission
+from utils import status
 
 
-# MEASURE UNIT
+@has_permission(Permission.READ_PRESCRIPTION)
+def get_drug_summary(id_drug: int, id_segment: int):
+    drug = Drug.query.get(id_drug)
+
+    prescribedUnits = getPreviouslyPrescribedUnits(id_drug, id_segment)
+    allUnits = getUnits()
+
+    unitResults = []
+    for u in prescribedUnits:
+        unitResults.append(
+            {"id": u.id, "description": u.description, "amount": u.count}
+        )
+    for u in allUnits:
+        unitResults.append({"id": u.id, "description": u.description, "amount": 0})
+
+    prescribedFrequencies = getPreviouslyPrescribedFrequencies(id_drug, id_segment)
+    allFrequencies = getFrequencies()
+
+    frequencyResults = []
+    for f in prescribedFrequencies:
+        frequencyResults.append(
+            {"id": f.id, "description": f.description, "amount": f.count}
+        )
+    for f in allFrequencies:
+        frequencyResults.append({"id": f.id, "description": f.description, "amount": 0})
+
+    return {
+        "drug": {"id": int(id_drug), "name": drug.name if drug else ""},
+        "units": unitResults,
+        "frequencies": frequencyResults,
+    }
+
+
+@has_permission(Permission.READ_PRESCRIPTION)
 def getPreviouslyPrescribedUnits(idDrug, idSegment):
     u = db.aliased(MeasureUnit)
     agg = db.aliased(PrescriptionAgg)
@@ -34,11 +81,12 @@ def getPreviouslyPrescribedUnits(idDrug, idSegment):
     )
 
 
+@has_permission(Permission.READ_PRESCRIPTION)
 def getUnits():
     return db.session.query(MeasureUnit).order_by(asc(MeasureUnit.description)).all()
 
 
-# FREQUENCY
+@has_permission(Permission.READ_PRESCRIPTION)
 def getPreviouslyPrescribedFrequencies(idDrug, idSegment):
     agg = db.aliased(PrescriptionAgg)
     f = db.aliased(Frequency)
@@ -63,10 +111,12 @@ def getPreviouslyPrescribedFrequencies(idDrug, idSegment):
     )
 
 
+@has_permission(Permission.READ_PRESCRIPTION)
 def getFrequencies():
     return db.session.query(Frequency).order_by(asc(Frequency.description)).all()
 
 
+@has_permission(Permission.READ_PRESCRIPTION)
 def get_all_frequencies():
     return (
         db.session.query(distinct(Frequency.id), Frequency.description)
@@ -76,8 +126,15 @@ def get_all_frequencies():
     )
 
 
+@has_permission(Permission.WRITE_DRUG_ATTRIBUTES)
 def drug_config_to_generate_score(
-    id_drug, id_segment, id_measure_unit, division, use_weight, measure_unit_list, user
+    id_drug,
+    id_segment,
+    id_measure_unit,
+    division,
+    use_weight,
+    measure_unit_list,
+    user_context: User,
 ):
     if id_measure_unit == None or id_measure_unit == "":
         raise ValidationError(
@@ -94,7 +151,7 @@ def drug_config_to_generate_score(
         )
 
     if not data_authorization_service.has_segment_authorization(
-        id_segment=id_segment, user=user
+        id_segment=id_segment, user=user_context
     ):
         raise ValidationError(
             "Usuário não autorizado neste segmento",
@@ -110,19 +167,19 @@ def drug_config_to_generate_score(
 
     if drugAttr is None:
         drugAttr = create_attributes_from_reference(
-            id_drug=id_drug, id_segment=id_segment, user=user
+            id_drug=id_drug, id_segment=id_segment, user=user_context
         )
 
     drugAttr.idMeasureUnit = id_measure_unit
     drugAttr.division = division if division != 0 else None
     drugAttr.useWeight = use_weight
     drugAttr.update = datetime.today()
-    drugAttr.user = user.id
+    drugAttr.user = user_context.id
 
     _audit(
         drug_attributes=drugAttr,
         audit_type=DrugAttributesAuditTypeEnum.UPSERT_BEFORE_GEN_SCORE,
-        user=user,
+        user=user_context,
     )
 
     db.session.flush()
@@ -145,7 +202,8 @@ def _setDrugUnit(idDrug, idMeasureUnit, idSegment, factor):
         db.session.add(u)
 
 
-def get_attributes(id_segment, id_drug, user):
+@has_permission(Permission.READ_PRESCRIPTION)
+def get_attributes(id_segment, id_drug, user_permissions: List[Permission]):
     drug = Drug.query.get(id_drug)
 
     if drug == None:
@@ -157,7 +215,7 @@ def get_attributes(id_segment, id_drug, user):
 
     attr = DrugAttributes.query.get((id_drug, id_segment))
     drug_ref = None
-    if drug.sctid != None and permission_service.has_maintainer_permission(user):
+    if drug.sctid != None and Permission.ADMIN_DRUGS in user_permissions:
         subst = (
             db.session.query(Substance)
             .filter(Substance.id == drug.sctid)
@@ -178,7 +236,8 @@ def get_attributes(id_segment, id_drug, user):
     return result
 
 
-def save_attributes(id_segment, id_drug, data, user):
+@has_permission(Permission.WRITE_DRUG_ATTRIBUTES)
+def save_attributes(id_segment, id_drug, data, user_context: User):
     if id_drug == None or id_segment == None:
         raise ValidationError(
             "Parâmetro inválido",
@@ -187,7 +246,7 @@ def save_attributes(id_segment, id_drug, data, user):
         )
 
     if not data_authorization_service.has_segment_authorization(
-        id_segment=id_segment, user=user
+        id_segment=id_segment, user=user_context
     ):
         raise ValidationError(
             "Usuário não autorizado neste segmento",
@@ -267,19 +326,22 @@ def save_attributes(id_segment, id_drug, data, user):
         attr.fasting = data.get("fasting", None)
 
     attr.update = datetime.today()
-    attr.user = user.id
+    attr.user = user_context.id
 
     if add:
         db.session.add(attr)
 
     _audit(
-        drug_attributes=attr, audit_type=DrugAttributesAuditTypeEnum.UPSERT, user=user
+        drug_attributes=attr,
+        audit_type=DrugAttributesAuditTypeEnum.UPSERT,
+        user=user_context,
     )
 
     db.session.flush()
 
 
-def update_substance(id_drug, sctid, user):
+@has_permission(Permission.WRITE_DRUG_ATTRIBUTES)
+def update_substance(id_drug, sctid, user_context: User):
     drug = Drug.query.get(id_drug)
 
     if drug == None:
@@ -290,11 +352,11 @@ def update_substance(id_drug, sctid, user):
     drug.sctid = sctid
     drug.ai_accuracy = None
     drug.updated_at = datetime.today()
-    drug.updated_by = user.id
+    drug.updated_by = user_context.id
 
     db.session.flush()
 
-    copy_substance_default_attributes(drug.id, drug.sctid, user)
+    copy_substance_default_attributes(drug.id, drug.sctid, user=user_context)
 
 
 # TODO: check where is called

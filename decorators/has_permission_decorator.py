@@ -16,6 +16,9 @@ def has_permission(*permissions: List[Permission]):
         def decorator_f(*args, **kwargs):
             user_context = User.find(get_jwt_identity())
 
+            if user_context == None:
+                raise AuthorizationError()
+
             roles = (
                 user_context.config["roles"]
                 if user_context.config and "roles" in user_context.config

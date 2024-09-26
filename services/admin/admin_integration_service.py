@@ -34,7 +34,7 @@ def can_refresh_agg(schema):
     return get_table_count(schema, "prescricaoagg") <= max_table_count
 
 
-@has_permission(Permission.SCORE_SEGMENT)
+@has_permission(Permission.WRITE_SEGMENT_SCORE)
 def refresh_agg(user_context: User):
     schema = user_context.schema
 

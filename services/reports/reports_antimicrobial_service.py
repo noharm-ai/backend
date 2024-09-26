@@ -16,7 +16,7 @@ from utils import dateutils, status
 from decorators.has_permission_decorator import has_permission, Permission
 
 
-@has_permission(Permission.VIEW_REPORTS)
+@has_permission(Permission.READ_REPORTS)
 def get_history(admission_number: int):
     if admission_number == None:
         raise ValidationError(

@@ -6,7 +6,7 @@ from exception.validation_error import ValidationError
 from decorators.has_permission_decorator import has_permission, Permission
 
 
-@has_permission(Permission.VIEW_REPORTS)
+@has_permission(Permission.READ_REPORTS)
 def get_report(report, user_context: User, filename="current"):
     available_reports = list(map(lambda c: c.value, ReportEnum))
     if report not in available_reports:

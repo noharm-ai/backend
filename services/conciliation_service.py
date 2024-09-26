@@ -5,17 +5,17 @@ from models.main import db
 from models.prescription import Prescription, User
 from models.enums import FeatureEnum
 from utils import status
-from services import memory_service, prescription_agg_service, permission_service
+from services import memory_service, prescription_agg_service
 from exception.validation_error import ValidationError
+from decorators.has_permission_decorator import has_permission, Permission
 
 
-def create_conciliation(admission_number: int, user: User):
-    if not memory_service.has_feature(
-        FeatureEnum.CONCILIATION_EDIT.value
-    ) or not permission_service.is_pharma(user):
+@has_permission(Permission.WRITE_PRESCRIPTION)
+def create_conciliation(admission_number: int, user_context: User):
+    if not memory_service.has_feature(FeatureEnum.CONCILIATION_EDIT.value):
         raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
+            "Feature desabilitada",
+            "errors.unauthorizedFeature",
             status.HTTP_401_UNAUTHORIZED,
         )
 
@@ -54,11 +54,11 @@ def create_conciliation(admission_number: int, user: User):
     prescription.idHospital = ref.idHospital
     prescription.admissionNumber = ref.admissionNumber
     prescription.idPatient = ref.idPatient
-    prescription.prescriber = user.name
+    prescription.prescriber = user_context.name
     prescription.concilia = "s"
     prescription.agg = None
     prescription.update = datetime.today()
-    prescription.user = user.id
+    prescription.user = user_context.id
 
     db.session.add(prescription)
     db.session.flush()
@@ -66,11 +66,12 @@ def create_conciliation(admission_number: int, user: User):
     return prescription.id
 
 
-def list_available(admission_number: int, user: User):
+@has_permission(Permission.READ_PRESCRIPTION)
+def list_available(admission_number: int):
     if not memory_service.has_feature(FeatureEnum.CONCILIATION.value):
         raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
+            "Feature desabilitada",
+            "errors.unauthorizedFeature",
             status.HTTP_401_UNAUTHORIZED,
         )
 

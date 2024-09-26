@@ -8,7 +8,7 @@ from decorators.has_permission_decorator import has_permission, Permission
 from exception.validation_error import ValidationError
 
 
-@has_permission(Permission.ADMIN_INTERVENTION_REASON)
+@has_permission(Permission.ADMIN_INTERVENTION_REASON, Permission.READ_PRESCRIPTION)
 def get_reasons(id=None, active_only=False):
     parent = db.aliased(InterventionReason)
     query_editable = (

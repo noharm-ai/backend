@@ -22,11 +22,19 @@ class Permission(Enum):
 
     ADMIN_INTERVENTION_REASON = "admin intervention reason recordss"
 
-    CHECK_PRESCRIPTION = "check prescriptions"
-
-    SCORE_SEGMENT = "grant permission to generate score to the entire segment"
+    WRITE_SEGMENT_SCORE = "grant permission to generate score to the entire segment"
 
     INTEGRATION_UTILS = "grants permission to actions to help integration process"
     INTEGRATION_STATUS = "grants access to view current integration status"
 
-    VIEW_REPORTS = "grants permission to view reports"
+    READ_REPORTS = "grants permission to view reports"
+
+    # prescription
+    READ_PRESCRIPTION = "view prescription"
+    WRITE_PRESCRIPTION = "write prescription"
+
+    WRITE_DRUG_ATTRIBUTES = "write permission on drug drug attributes"
+    WRITE_DRUG_SCORE = "write permission to generate/edit score"
+
+    READ_BASIC_FEATURES = "grants use of basic features"
+    WRITE_BASIC_FEATURES = "grants use of basic features"

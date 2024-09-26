@@ -1,19 +1,33 @@
-from models.main import db
-from sqlalchemy import case, and_, func
+from sqlalchemy import case, and_, func, or_, desc
+from sqlalchemy.dialects import postgresql
+from datetime import timedelta, datetime
 
-from models.appendix import *
-from models.prescription import *
+from models.main import db
+from models.appendix import User
+from models.prescription import (
+    Intervention,
+    InterventionReason,
+    Prescription,
+    Department,
+    PrescriptionDrug,
+    Drug,
+    MeasureUnit,
+    Frequency,
+    MeasureUnitConvert,
+    DrugAttributes,
+)
 from models.enums import (
     InterventionEconomyTypeEnum,
     InterventionStatusEnum,
-    FeatureEnum,
 )
-from routes.utils import validate, gen_agg_id
+from routes.utils import validate, gen_agg_id, timeValue, interactionsList, none2zero
 from services import memory_service, permission_service, data_authorization_service
-
+from decorators.has_permission_decorator import has_permission, Permission
 from exception.validation_error import ValidationError
+from utils import status
 
 
+@has_permission(Permission.READ_PRESCRIPTION)
 def get_interventions(
     admissionNumber=None,
     startDate=None,
@@ -255,8 +269,9 @@ def get_interventions(
     return result
 
 
+@has_permission(Permission.WRITE_PRESCRIPTION)
 def set_intervention_outcome(
-    user,
+    user_context: User,
     id_intervention,
     outcome,
     economy_day_value,
@@ -267,13 +282,6 @@ def set_intervention_outcome(
     destiny_data,
     id_prescription_drug_destiny,
 ):
-    if not permission_service.is_pharma(user):
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-
     intervention: Intervention = Intervention.query.get(id_intervention)
     if not intervention:
         raise ValidationError(
@@ -285,7 +293,7 @@ def set_intervention_outcome(
     _validate_authorization(
         id_prescription=intervention.idPrescription,
         id_prescription_drug=intervention.id,
-        user=user,
+        user=user_context,
     )
 
     if outcome not in ["a", "n", "x", "j", "s"]:
@@ -340,7 +348,7 @@ def set_intervention_outcome(
             )
 
     intervention.outcome_at = datetime.today()
-    intervention.outcome_by = user.id
+    intervention.outcome_by = user_context.id
     intervention.status = outcome
 
     if intervention.economy_type != None:
@@ -408,9 +416,10 @@ def set_intervention_outcome(
             intervention.date_end_economy = None
 
 
+@has_permission(Permission.WRITE_PRESCRIPTION)
 def add_multiple_interventions(
     id_prescription_drug_list,
-    user=None,
+    user_context: User = None,
     admission_number=None,
     id_intervention_reason=None,
     error=None,
@@ -419,20 +428,6 @@ def add_multiple_interventions(
     agg_id_prescription=None,
 ):
     id_intervention_list = []
-
-    if not user:
-        raise ValidationError(
-            "Parâmetros inválidos",
-            "errors.invalidParameter",
-            status.HTTP_400_BAD_REQUEST,
-        )
-
-    if not permission_service.is_pharma(user):
-        raise ValidationError(
-            "Permissão inválida",
-            "errors.invalidPermission",
-            status.HTTP_401_UNAUTHORIZED,
-        )
 
     # define economy
     economy_type = None
@@ -463,7 +458,7 @@ def add_multiple_interventions(
         i.idPrescription = 0
         i.date = datetime.today()
         i.update = datetime.today()
-        i.user = user.id
+        i.user = user_context.id
         i.interactions = None
         i.transcription = None
         i.economy_days = None
@@ -474,7 +469,9 @@ def add_multiple_interventions(
         i.economy_day_value_manual = False
 
         _validate_authorization(
-            id_prescription=i.idPrescription, id_prescription_drug=i.id, user=user
+            id_prescription=i.idPrescription,
+            id_prescription_drug=i.id,
+            user=user_context,
         )
 
         if admission_number:
@@ -495,7 +492,7 @@ def add_multiple_interventions(
             id_prescription=0,
             id_prescription_drug=id_prescription_drug,
             agg_id_prescription=agg_id_prescription,
-            user=user,
+            user=user_context,
         )
 
         # current department
@@ -515,11 +512,12 @@ def add_multiple_interventions(
     return []
 
 
+@has_permission(Permission.WRITE_PRESCRIPTION)
 def save_intervention(
     id_intervention=None,
     id_prescription=0,
     id_prescription_drug=0,
-    user=None,
+    user_context: User = None,
     admission_number=None,
     id_intervention_reason=None,
     error=None,
@@ -539,20 +537,6 @@ def save_intervention(
             "Parâmetros inválidos",
             "errors.invalidParameter",
             status.HTTP_400_BAD_REQUEST,
-        )
-
-    if not user:
-        raise ValidationError(
-            "Parâmetros inválidos",
-            "errors.invalidParameter",
-            status.HTTP_400_BAD_REQUEST,
-        )
-
-    if not permission_service.is_pharma(user):
-        raise ValidationError(
-            "Permissão inválida",
-            "errors.invalidPermission",
-            status.HTTP_401_UNAUTHORIZED,
         )
 
     if id_prescription_drug != "0":
@@ -595,10 +579,10 @@ def save_intervention(
         i.idPrescription = id_prescription
         i.date = datetime.today()
         i.update = datetime.today()
-        i.user = user.id
+        i.user = user_context.id
 
     _validate_authorization(
-        id_prescription=i.idPrescription, id_prescription_drug=i.id, user=user
+        id_prescription=i.idPrescription, id_prescription_drug=i.id, user=user_context
     )
 
     if admission_number:
@@ -652,7 +636,7 @@ def save_intervention(
             id_prescription=id_prescription,
             id_prescription_drug=id_prescription_drug,
             agg_id_prescription=agg_id_prescription,
-            user=user,
+            user=user_context,
         )
 
     if i.admissionNumber != None and i.idDepartment == None:
@@ -669,7 +653,7 @@ def save_intervention(
     if new_status != i.status:
         if i.status == "0":
             i.date = datetime.today()
-            i.user = user.id
+            i.user = user_context.id
 
         i.status = new_status
 
@@ -687,7 +671,7 @@ def save_intervention(
     i.economy_day_value_manual = False
 
     if update_responsible:
-        i.user = user.id
+        i.user = user_context.id
 
     if new_intv:
         db.session.add(i)
@@ -853,7 +837,8 @@ def _get_outcome_data_query():
     )
 
 
-def get_outcome_data(id_intervention, user: User, edit=False):
+@has_permission(Permission.READ_PRESCRIPTION)
+def get_outcome_data(id_intervention, user_context: User, edit=False):
     InterventionReasonParent = db.aliased(InterventionReason)
     reason_column = case(
         (
@@ -943,7 +928,7 @@ def get_outcome_data(id_intervention, user: User, edit=False):
 
     base_origin = _outcome_calc(
         list=origin_query.all(),
-        user=user,
+        user=user_context,
         date_base_economy=(
             intervention.date_base_economy
             if intervention.date_base_economy != None
@@ -981,7 +966,7 @@ def get_outcome_data(id_intervention, user: User, edit=False):
 
         base_destiny = _outcome_calc(
             list=destiny_query.all(),
-            user=user,
+            user=user_context,
             date_base_economy=None,
         )
 

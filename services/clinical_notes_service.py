@@ -1,18 +1,19 @@
-from datetime import datetime
-from sqlalchemy import text, Integer, func, desc
+from datetime import datetime, timedelta
+from sqlalchemy import text, Integer, func, desc, or_
 from sqlalchemy.orm import undefer
 
-from models.main import db
-from models.appendix import *
+from models.main import db, User
 from models.notes import ClinicalNotes
-from models.prescription import *
+from models.prescription import Prescription
 from models.enums import UserAuditTypeEnum
-from services import memory_service, exams_service, permission_service, user_service
-
+from services import memory_service, exams_service, user_service
+from decorators.has_permission_decorator import has_permission, Permission
 from exception.validation_error import ValidationError
+from utils import status
 
 
-def create_clinical_notes(data, user):
+@has_permission(Permission.WRITE_PRESCRIPTION)
+def create_clinical_notes(data, user_context: User):
     if not memory_service.has_feature("PRIMARYCARE"):
         raise ValidationError(
             "Usuário não autorizado",
@@ -21,16 +22,16 @@ def create_clinical_notes(data, user):
         )
 
     date = data.get("date", None)
-    user_complete = db.session.query(User).get(user.id)
+    user_complete = db.session.query(User).get(user_context.id)
     cn = ClinicalNotes()
 
-    cn.id = get_next_id(user.schema)
+    cn.id = get_next_id(user_context.schema)
     cn.admissionNumber = data.get("admissionNumber", None)
     cn.date = datetime.today() if date == None else date
     cn.text = data.get("notes", None)
     cn.prescriber = user_complete.name
     cn.update = datetime.today()
-    cn.user = user.id
+    cn.user = user_context.id
     cn.position = (
         "Agendamento"
         if data.get("action", None) == "schedule"
@@ -61,7 +62,7 @@ def create_clinical_notes(data, user):
                             type_exam=q["id"],
                             value=cn.form[q["id"]],
                             unit=q["integration"]["unit"],
-                            user=user,
+                            user=user_context,
                         )
 
     return cn.id
@@ -75,14 +76,8 @@ def get_next_id(schema):
     return ([row[0] for row in result])[0]
 
 
-def remove_annotation(id_clinical_notes: int, annotation_type: str, user: User):
-    if not permission_service.is_pharma(user):
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-
+@has_permission(Permission.WRITE_PRESCRIPTION)
+def remove_annotation(id_clinical_notes: int, annotation_type: str, user_context: User):
     clinical_notes = (
         db.session.query(ClinicalNotes)
         .filter(ClinicalNotes.id == id_clinical_notes)
@@ -110,8 +105,8 @@ def remove_annotation(id_clinical_notes: int, annotation_type: str, user: User):
     # TODO: move to ClinicalNotesAudit
     user_service.create_audit(
         auditType=UserAuditTypeEnum.REMOVE_CLINICAL_NOTE_ANNOTATION,
-        id_user=user.id,
-        responsible=user,
+        id_user=user_context.id,
+        responsible=user_context,
         extra={
             "fkevolucao": id_clinical_notes,
             "notes": old_note,
@@ -139,6 +134,7 @@ def get_tags():
     ]
 
 
+@has_permission(Permission.READ_PRESCRIPTION)
 def get_single_note(id_clinical_notes: int):
     cn = (
         db.session.query(ClinicalNotes)
@@ -156,6 +152,7 @@ def get_single_note(id_clinical_notes: int):
     return convert_notes(notes=cn, has_primary_care=False, tags=[])
 
 
+@has_permission(Permission.READ_PRESCRIPTION)
 def get_notes(admission_number: int, filter_date: str):
     has_primary_care = memory_service.has_feature("PRIMARYCARE")
     dates = None
@@ -305,6 +302,7 @@ def convert_notes(notes, has_primary_care, tags):
     return obj
 
 
+@has_permission(Permission.READ_PRESCRIPTION)
 def get_user_last_clinical_notes(admission_number: int):
     last_notes = (
         db.session.query(Prescription.notes, Prescription.date)
@@ -374,3 +372,41 @@ def get_count(admission_number: int, admission_date: datetime) -> int:
     total = qNotes.scalar()
 
     return total
+
+
+@has_permission(Permission.WRITE_PRESCRIPTION)
+def update_note_text(id: int, data: dict, user_context: User):
+    has_primary_care = memory_service.has_feature("PRIMARYCARE")
+
+    n = db.session.query(ClinicalNotes).filter(ClinicalNotes.id == id).first()
+
+    if n is None:
+        raise ValidationError(
+            "Registro inexistente",
+            "errors.invalidRecord",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    n.update = datetime.today()
+    n.user = user_context.id
+
+    if "text" in data.keys():
+        n.text = data.get("text", None)
+        n.medications = n.text.count("annotation-medicamentos")
+        n.complication = n.text.count("annotation-complicacoes")
+        n.symptoms = n.text.count("annotation-sintomas")
+        n.diseases = n.text.count("annotation-doencas")
+        n.info = n.text.count("annotation-dados")
+        n.conduct = n.text.count("annotation-conduta")
+        n.signs = n.text.count("annotation-sinais")
+        n.allergy = n.text.count("annotation-alergia")
+        n.names = n.text.count("annotation-nomes")
+
+    if has_primary_care:
+        if "date" in data.keys() and data.get("date", None) != None:
+            n.date = data.get("date")
+
+        if "form" in data.keys() and data.get("form", None) != None:
+            n.form = data.get("form")
+
+    return n

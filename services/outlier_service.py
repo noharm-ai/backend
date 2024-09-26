@@ -1,27 +1,29 @@
 import io
 import pandas
+import logging
 from multiprocessing import Process, Manager
 from datetime import datetime
 from math import ceil
-from sqlalchemy import text
+from sqlalchemy import text, func, distinct
+from typing import List
 
-from models.main import db
-from models.appendix import *
-from models.prescription import *
-from models.enums import RoleEnum
-from routes.outlier_lib import add_score
+from models.main import db, User
+from models.prescription import PrescriptionAgg, Outlier
+from utils.outlier_lib import add_score
 from exception.validation_error import ValidationError
 from services.admin import admin_drug_service, admin_integration_status_service
-from services import data_authorization_service, permission_service
+from services import data_authorization_service
 from decorators.has_permission_decorator import has_permission, Permission
+from utils import status
 
 FOLD_SIZE = 10
 
 
-def prepare(id_drug, id_segment, user):
+@has_permission(Permission.WRITE_DRUG_SCORE)
+def prepare(id_drug, id_segment, user_context: User):
     def add_history_and_validate():
         history_count = add_prescription_history(
-            id_drug=id_drug, id_segment=id_segment, schema=user.schema
+            id_drug=id_drug, id_segment=id_segment, schema=user_context.schema
         )
 
         if history_count == 0:
@@ -32,7 +34,7 @@ def prepare(id_drug, id_segment, user):
             )
 
     if not data_authorization_service.has_segment_authorization(
-        id_segment=id_segment, user=user
+        id_segment=id_segment, user=user_context
     ):
         raise ValidationError(
             "Usuário não autorizado neste segmento",
@@ -64,18 +66,21 @@ def prepare(id_drug, id_segment, user):
 
     else:
         # refresh history to update frequency and dose
-        _refresh_agg(id_drug=id_drug, id_segment=id_segment, schema=user.schema)
+        _refresh_agg(id_drug=id_drug, id_segment=id_segment, schema=user_context.schema)
 
     # refresh outliers
-    return refresh_outliers(id_drug=id_drug, id_segment=id_segment, user=user)
+    return refresh_outliers(id_drug=id_drug, id_segment=id_segment, user=user_context)
 
 
-def generate(id_drug, id_segment, fold, user: User):
+@has_permission(Permission.WRITE_DRUG_SCORE, Permission.WRITE_SEGMENT_SCORE)
+def generate(
+    id_drug, id_segment, fold, user_context: User, user_permissions: List[Permission]
+):
     # call prepare before generate score (only for wizard)
     start_date = datetime.now()
 
     if fold != None:
-        if not permission_service.has_maintainer_permission(user):
+        if not Permission.WRITE_SEGMENT_SCORE not in user_permissions:
             raise ValidationError(
                 "Usuário não autorizado",
                 "errors.unauthorizedUser",
@@ -83,7 +88,7 @@ def generate(id_drug, id_segment, fold, user: User):
             )
 
     if not data_authorization_service.has_segment_authorization(
-        id_segment=id_segment, user=user
+        id_segment=id_segment, user=user_context
     ):
         raise ValidationError(
             "Usuário não autorizado neste segmento",
@@ -92,7 +97,7 @@ def generate(id_drug, id_segment, fold, user: User):
         )
 
     csv_buffer = _get_csv_buffer(
-        id_segment=id_segment, schema=user.schema, id_drug=id_drug, fold=fold
+        id_segment=id_segment, schema=user_context.schema, id_drug=id_drug, fold=fold
     )
     _log_perf(start_date, "GENERATE CSV BUFFER")
 
@@ -158,7 +163,7 @@ def generate(id_drug, id_segment, fold, user: User):
                         "score": no["score"].values[0],
                         "countNum": int(no["count"].values[0]),
                     },
-                    user,
+                    user_context,
                 )
             )
 
@@ -167,7 +172,7 @@ def generate(id_drug, id_segment, fold, user: User):
             with scores as (
                 select * from (values {",".join(updates)}) AS t (idoutlier, score, countnum, update_at, update_by)
             )
-            update {user.schema}.outlier o
+            update {user_context.schema}.outlier o
             set 
                 contagem = s.countnum,
                 escore = s.score,
@@ -291,9 +296,12 @@ def _clean_outliers(id_drug, id_segment):
     q.delete()
 
 
+@has_permission(Permission.WRITE_DRUG_SCORE)
 def add_prescription_history(
-    id_drug, id_segment, schema, clean=False, rollback_when_empty=False
+    id_drug, id_segment, user_context: User, clean=False, rollback_when_empty=False
 ):
+    schema = user_context.schema
+
     if clean:
         db.session.query(PrescriptionAgg).filter(
             PrescriptionAgg.idDrug == id_drug
@@ -366,7 +374,7 @@ def _refresh_agg(id_drug, id_segment, schema):
     return db.session.execute(query, {"idSegment": id_segment, "idDrug": id_drug})
 
 
-@has_permission(Permission.SCORE_SEGMENT)
+@has_permission(Permission.WRITE_SEGMENT_SCORE)
 def get_outliers_process_list(id_segment, user_context: User):
     pending_frequencies = admin_integration_status_service._get_pending_frequencies()
     if pending_frequencies > 0:
@@ -407,15 +415,8 @@ def get_outliers_process_list(id_segment, user_context: User):
     return processesUrl
 
 
-def remove_outlier(id_drug, id_segment, user):
-    roles = user.config["roles"] if user.config and "roles" in user.config else []
-    if RoleEnum.ADMIN.value not in roles:
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-
+@has_permission(Permission.WRITE_SEGMENT_SCORE)
+def remove_outlier(id_drug, id_segment):
     count = (
         db.session.query(PrescriptionAgg)
         .filter(PrescriptionAgg.idDrug == id_drug)
