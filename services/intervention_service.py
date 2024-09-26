@@ -24,6 +24,11 @@ def get_interventions(
     idIntervention=None,
     idInterventionList=[],
     idDrug=None,
+    id_intervention_reason_list=[],
+    has_economy=None,
+    status_list=[],
+    responsible_name=None,
+    prescriber_name=None,
 ):
     mReasion = db.aliased(InterventionReason)
     descript = case(
@@ -156,6 +161,32 @@ def get_interventions(
     if len(idInterventionList) > 0:
         interventions = interventions.filter(
             Intervention.idIntervention.in_(idInterventionList)
+        )
+
+    if len(id_intervention_reason_list) > 0:
+        interventions = interventions.filter(
+            postgresql.array(id_intervention_reason_list).overlap(
+                Intervention.idInterventionReason
+            )
+        )
+
+    if has_economy != None and has_economy != "":
+        if has_economy:
+            interventions = interventions.filter(Intervention.economy_type != None)
+        else:
+            interventions = interventions.filter(Intervention.economy_type == None)
+
+    if len(status_list) > 0:
+        interventions = interventions.filter(Intervention.status.in_(status_list))
+
+    if responsible_name != None:
+        interventions = interventions.filter(
+            User.name.ilike("%" + str(responsible_name) + "%")
+        )
+
+    if prescriber_name != None:
+        interventions = interventions.filter(
+            PrescriptionB.prescriber.ilike("%" + str(prescriber_name) + "%")
         )
 
     if not idIntervention and len(idInterventionList) == 0:
@@ -500,6 +531,7 @@ def save_intervention(
     expended_dose=None,
     new_status="s",
     agg_id_prescription=None,
+    update_responsible=False,
 ):
     if id_intervention == None and id_intervention_reason == None:
         # transition between versions
@@ -653,6 +685,9 @@ def save_intervention(
 
     i.update = datetime.today()
     i.economy_day_value_manual = False
+
+    if update_responsible:
+        i.user = user.id
 
     if new_intv:
         db.session.add(i)
