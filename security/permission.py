@@ -16,6 +16,8 @@ class Permission(Enum):
     ADMIN_SEGMENTS = "admin segments"
     ADMIN_UNIT_CONVERSION = "admin unit conversions"
 
+    ADMIN_PATIENT = "admin extra patient configs"
+
     ADMIN_USERS = "admin users"
 
     ADMIN_INTEGRATION_REMOTE = "grants integration remote access"

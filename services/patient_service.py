@@ -1,18 +1,28 @@
 from datetime import datetime
-from sqlalchemy import desc, func
+from sqlalchemy import desc, func, text, asc
 from sqlalchemy.orm import undefer
+from sqlalchemy.dialects.postgresql import INTERVAL
+from typing import List
 
-from models.main import db
-from models.appendix import *
+from models.main import db, User
+from models.prescription import (
+    Prescription,
+    Patient,
+    Allergy,
+    Substance,
+    Drug,
+    PatientAudit,
+)
 from models.notes import ClinicalNotes
-from models.prescription import *
-from models.enums import RoleEnum, PatientAuditTypeEnum, FeatureEnum
+from models.enums import PatientAuditTypeEnum, FeatureEnum
 from utils.dateutils import to_iso
 from services import memory_service
-
+from decorators.has_permission_decorator import has_permission, Permission
 from exception.validation_error import ValidationError
+from utils import status
 
 
+@has_permission(Permission.READ_PRESCRIPTION)
 def get_patients(
     id_segment,
     id_department_list,
@@ -126,9 +136,14 @@ def get_patient_weight(id_patient):
     )
 
 
-def save_patient(request_data: dict, admission_number: int, user: User):
-    roles = user.config["roles"] if user.config and "roles" in user.config else []
-
+@has_permission(Permission.WRITE_PRESCRIPTION, Permission.ADMIN_PATIENT_DATA)
+def save_patient(
+    request_data: dict,
+    admission_number: int,
+    user_context: User,
+    user_permissions: List[Permission],
+):
+    # TODO: refactor
     p = Patient.findByAdmission(admission_number)
     if p is None:
         first_prescription = (
@@ -157,14 +172,7 @@ def save_patient(request_data: dict, admission_number: int, user: User):
 
     updateWeight = False
 
-    if RoleEnum.READONLY.value in roles and not (
-        RoleEnum.ADMIN.value in roles or RoleEnum.TRAINING.value in roles
-    ):
-        raise ValidationError(
-            "Permissão inválida", "errors.invalidParams", status.HTTP_401_UNAUTHORIZED
-        )
-
-    if RoleEnum.SUPPORT.value not in roles and RoleEnum.READONLY.value not in roles:
+    if Permission.WRITE_PRESCRIPTION in user_permissions:
         if "weight" in request_data.keys():
             weight = request_data.get("weight", None)
 
@@ -178,7 +186,7 @@ def save_patient(request_data: dict, admission_number: int, user: User):
             p.alert = request_data.get("alert", None)
             p.alertExpire = alertExpire
             p.alertDate = datetime.today()
-            p.alertBy = user.id
+            p.alertBy = user_context.id
 
         if "height" in request_data.keys():
             p.height = request_data.get("height", None)
@@ -197,30 +205,30 @@ def save_patient(request_data: dict, admission_number: int, user: User):
         if "birthdate" in request_data.keys():
             p.birthdate = request_data.get("birthdate", None)
 
-    if RoleEnum.ADMIN.value in roles or RoleEnum.TRAINING.value in roles:
+    if Permission.ADMIN_PATIENT in user_permissions:
         if "dischargeDate" in request_data.keys():
             p.dischargeDate = request_data.get("dischargeDate", None)
 
     p.update = datetime.today()
-    p.user = user.id
+    p.user = user_context.id
 
     if "idPrescription" in request_data.keys() and updateWeight:
         idPrescription = request_data.get("idPrescription")
 
         query = text(
             "INSERT INTO "
-            + user.schema
+            + user_context.schema
             + ".presmed \
                     SELECT *\
                     FROM "
-            + user.schema
+            + user_context.schema
             + ".presmed\
                     WHERE fkprescricao = :idPrescription ;"
         )
 
         db.session.execute(query, {"idPrescription": idPrescription})
 
-    _audit(patient=p, audit_type=PatientAuditTypeEnum.UPSERT, user=user)
+    _audit(patient=p, audit_type=PatientAuditTypeEnum.UPSERT, user=user_context)
 
     return p
 
