@@ -113,6 +113,11 @@ def search_interventions():
         idPrescription=data.get("idPrescription", None),
         idPrescriptionDrug=data.get("idPrescriptionDrug", None),
         idDrug=data.get("idDrug", None),
+        id_intervention_reason_list=data.get("idInterventionReasonList", []),
+        has_economy=data.get("hasEconomy", None),
+        status_list=data.get("statusList", []),
+        responsible_name=data.get("responsibleName", None),
+        prescriber_name=data.get("prescriberName", None),
     )
 
     return {"status": "success", "data": results}, status.HTTP_200_OK
