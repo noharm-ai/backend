@@ -1,16 +1,24 @@
-from utils import status
-from sqlalchemy import and_, or_, func, text
+from sqlalchemy import and_, or_, func, text, distinct
 from sqlalchemy.orm import undefer
 from typing import List
+from datetime import datetime
 
-from models.main import *
-from models.appendix import *
-from models.segment import *
+from models.main import db, User
+from models.prescription import (
+    Segment,
+    MeasureUnit,
+    MeasureUnitConvert,
+    Outlier,
+    PrescriptionAgg,
+    Drug,
+    DrugAttributes,
+    Substance,
+)
 from models.enums import RoleEnum, DrugAdminSegment, DrugAttributesAuditTypeEnum
 from services.admin import admin_ai_service
-from services import drug_service as main_drug_service, permission_service
+from services import drug_service as main_drug_service
 from decorators.has_permission_decorator import has_permission, Permission
-
+from utils import status
 from exception.validation_error import ValidationError
 
 
@@ -590,23 +598,3 @@ def get_drugs_missing_substance():
         id_drugs.append(d[0])
 
     return id_drugs
-
-
-def static_update_substances(user):
-    limit = 100
-
-    drugs = (
-        db.session.query(func.distinct(Drug.id))
-        .select_from(Outlier)
-        .join(Drug, Drug.id == Outlier.idDrug)
-        .filter(Drug.sctid == None)
-        .order_by(Drug.id)
-        .limit(limit)
-        .all()
-    )
-
-    id_drugs = []
-    for d in drugs:
-        id_drugs.append(d[0])
-
-    return predict_substance(id_drugs=id_drugs, user=user)

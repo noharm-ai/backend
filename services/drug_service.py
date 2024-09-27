@@ -7,7 +7,9 @@ from models.main import db, User
 from models.prescription import (
     Drug,
     MeasureUnit,
+    Prescription,
     PrescriptionAgg,
+    PrescriptionDrug,
     Frequency,
     DrugAttributes,
     MeasureUnitConvert,
@@ -21,10 +23,11 @@ from services import data_authorization_service
 from exception.validation_error import ValidationError
 from decorators.has_permission_decorator import has_permission, Permission
 from utils import status
+from routes.utils import timeValue
 
 
 @has_permission(Permission.READ_PRESCRIPTION)
-def get_drug_summary(id_drug: int, id_segment: int):
+def get_drug_summary(id_drug: int, id_segment: int, complete=False):
     drug = Drug.query.get(id_drug)
 
     prescribedUnits = getPreviouslyPrescribedUnits(id_drug, id_segment)
@@ -49,10 +52,62 @@ def get_drug_summary(id_drug: int, id_segment: int):
     for f in allFrequencies:
         frequencyResults.append({"id": f.id, "description": f.description, "amount": 0})
 
+    routeResults = []
+    intervalResults = []
+
+    if complete:
+        max_days = 90
+        routes = (
+            db.session.query(PrescriptionDrug.route)
+            .select_from(PrescriptionDrug)
+            .join(Prescription, Prescription.id == PrescriptionDrug.idPrescription)
+            .filter(
+                and_(
+                    PrescriptionDrug.idDrug == id_drug,
+                    PrescriptionDrug.idSegment == id_segment,
+                    Prescription.date > func.current_date() - max_days,
+                )
+            )
+            .group_by(PrescriptionDrug.route)
+            .all()
+        )
+
+        routeResults = []
+        for r in routes:
+            routeResults.append({"id": r.route, "description": r.route})
+
+        intervals = (
+            db.session.query(PrescriptionDrug.interval, PrescriptionDrug.idFrequency)
+            .select_from(PrescriptionDrug)
+            .join(Prescription, Prescription.id == PrescriptionDrug.idPrescription)
+            .filter(
+                and_(
+                    PrescriptionDrug.idDrug == id_drug,
+                    PrescriptionDrug.idSegment == id_segment,
+                    Prescription.date > func.current_date() - max_days,
+                    PrescriptionDrug.interval != None,
+                )
+            )
+            .group_by(PrescriptionDrug.interval, PrescriptionDrug.idFrequency)
+            .all()
+        )
+
+        intervalResults = []
+        for i in intervals:
+            intervalResults.append(
+                {
+                    "id": i.interval,
+                    "idFrequency": i.idFrequency,
+                    "description": timeValue(i.interval),
+                }
+            )
+
     return {
         "drug": {"id": int(id_drug), "name": drug.name if drug else ""},
         "units": unitResults,
         "frequencies": frequencyResults,
+        "routes": routeResults,
+        "intervals": intervalResults,
     }
 
 
@@ -533,3 +588,38 @@ def _audit(
     audit.createdBy = user.id
 
     db.session.add(audit)
+
+
+@has_permission(Permission.WRITE_DRUG_ATTRIBUTES)
+def update_convert_factor(
+    id_measure_unit: str, id_drug: int, id_segment: int, factor: float
+):
+    if factor == 0:
+        raise ValidationError(
+            "Fator de conversão deve ser maior que zero.",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    u = (
+        db.session.query(MeasureUnitConvert)
+        .filter(
+            MeasureUnitConvert.idMeasureUnit == id_measure_unit,
+            MeasureUnitConvert.idDrug == id_drug,
+            MeasureUnitConvert.idSegment == id_segment,
+        )
+        .first()
+    )
+    new = False
+
+    if u is None:
+        new = True
+        u = MeasureUnitConvert()
+        u.idMeasureUnit = id_measure_unit
+        u.idDrug = id_drug
+        u.idSegment = id_segment
+
+    u.factor = factor
+
+    if new:
+        db.session.add(u)

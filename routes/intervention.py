@@ -50,10 +50,6 @@ def save_intervention():
     return result
 
 
-def sortReasons(e):
-    return e["description"]
-
-
 @app_itrv.route("/intervention/reasons", methods=["GET"])
 @api_endpoint()
 def getInterventionReasons():

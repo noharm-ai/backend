@@ -7,6 +7,8 @@ from flask_mail import Message, Mail
 from sqlalchemy.dialects.postgresql import INTERVAL
 from sqlalchemy import between, func
 
+# TODO: refactor
+
 
 def data2age(birthdate):
     if birthdate is None:

@@ -8,6 +8,7 @@ from models.appendix import SchemaConfig
 from exception.validation_error import ValidationError
 from utils import status
 
+# TODO: refactor
 app_names = Blueprint("app_names", __name__)
 
 

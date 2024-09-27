@@ -31,7 +31,6 @@ class Permission(Enum):
 
     READ_REPORTS = "grants permission to view reports"
 
-    # prescription
     READ_PRESCRIPTION = "view prescription"
     WRITE_PRESCRIPTION = "write prescription"
 
