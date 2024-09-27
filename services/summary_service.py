@@ -1,25 +1,20 @@
 import json
 from utils import status
 from sqlalchemy import asc, desc, func, between, text
+from sqlalchemy.dialects.postgresql import INTERVAL
 
-from models.main import db
-from models.appendix import *
-from models.prescription import *
-from models.notes import *
-from models.enums import RoleEnum, GlobalMemoryEnum
+from models.main import db, User
+from models.prescription import Patient
+from models.appendix import GlobalMemory
+from models.notes import ClinicalNotes
+from models.enums import GlobalMemoryEnum
 from services import memory_service, prescription_agg_service
 from exception.validation_error import ValidationError
+from decorators.has_permission_decorator import has_permission, Permission
 
 
-def get_structured_info(admission_number, user, mock=False):
-    roles = user.config["roles"] if user.config and "roles" in user.config else []
-    if RoleEnum.SUMMARY.value not in roles and RoleEnum.DOCTOR.value not in roles:
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-
+@has_permission(Permission.READ_DISCHARGE_SUMMARY)
+def get_structured_info(admission_number, user_context: User, mock=False):
     patient = (
         db.session.query(Patient)
         .filter(Patient.admissionNumber == admission_number)
@@ -41,25 +36,25 @@ def get_structured_info(admission_number, user, mock=False):
             "patient": _get_patient_data(patient),
             "exams": _get_exams(
                 id_patient=patient.idPatient,
-                schema=user.schema,
+                schema=user_context.schema,
                 report_connection=report_connection,
             ),
             "allergies": _get_allergies(
-                patient.idPatient, user.schema, report_connection
+                patient.idPatient, user_context.schema, report_connection
             ),
             "drugsUsed": _get_all_drugs_used(
                 admission_number=admission_number,
-                schema=user.schema,
+                schema=user_context.schema,
                 report_connection=report_connection,
             ),
             "drugsSuspended": _get_all_drugs_suspended(
                 admission_number=admission_number,
-                schema=user.schema,
+                schema=user_context.schema,
                 report_connection=report_connection,
             ),
             "receipt": _get_receipt(
                 admission_number=admission_number,
-                schema=user.schema,
+                schema=user_context.schema,
                 report_connection=report_connection,
             ),
             "summaryConfig": _get_summary_config(admission_number, mock),

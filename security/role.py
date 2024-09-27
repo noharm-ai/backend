@@ -39,6 +39,12 @@ class Role(Enum):
         Permission.WRITE_BASIC_FEATURES,
         Permission.READ_BASIC_FEATURES,
         Permission.WRITE_DRUG_SCORE,
+        Permission.READ_DISCHARGE_SUMMARY,
+        Permission.READ_SUPPORT,
+        Permission.WRITE_SUPPORT,
+        Permission.ADMIN_USERS,
+        Permission.READ_USERS,
+        Permission.WRITE_USERS,
     ]
 
     CURATOR = "CURATOR", [
@@ -62,6 +68,11 @@ class Role(Enum):
         Permission.WRITE_BASIC_FEATURES,
         Permission.READ_BASIC_FEATURES,
         Permission.WRITE_DRUG_SCORE,
+        Permission.READ_DISCHARGE_SUMMARY,
+        Permission.READ_SUPPORT,
+        Permission.WRITE_SUPPORT,
+        Permission.READ_USERS,
+        Permission.WRITE_USERS,
     ]
 
     PRESCRIPTION_ANALIST = "PRESCRIPTION_ANALIST", [
@@ -70,12 +81,17 @@ class Role(Enum):
         Permission.READ_REPORTS,
         Permission.WRITE_BASIC_FEATURES,
         Permission.READ_BASIC_FEATURES,
+        Permission.READ_SUPPORT,
+        Permission.WRITE_SUPPORT,
     ]
 
     USER_MANAGER = "USER_MANAGER", [
-        Permission.ADMIN_USERS,
         Permission.WRITE_BASIC_FEATURES,
         Permission.READ_BASIC_FEATURES,
+        Permission.READ_SUPPORT,
+        Permission.WRITE_SUPPORT,
+        Permission.READ_USERS,
+        Permission.WRITE_USERS,
     ]
 
     CONFIG_MANAGER = "CONFIG_MANAGER", [
@@ -84,15 +100,24 @@ class Role(Enum):
         Permission.WRITE_BASIC_FEATURES,
         Permission.READ_BASIC_FEATURES,
         Permission.WRITE_DRUG_SCORE,
+        Permission.READ_SUPPORT,
+        Permission.WRITE_SUPPORT,
     ]
 
     VIEWER = "VIEWER", [
         Permission.READ_REPORTS,
         Permission.READ_PRESCRIPTION,
         Permission.READ_BASIC_FEATURES,
+        Permission.READ_DISCHARGE_SUMMARY,
+        Permission.READ_SUPPORT,
+        Permission.WRITE_SUPPORT,
     ]
 
     DISCHARGE_MANAGER = "DISCHARGE_MANAGER", [
         Permission.WRITE_BASIC_FEATURES,
         Permission.READ_BASIC_FEATURES,
+        Permission.READ_DISCHARGE_SUMMARY,
+        Permission.WRITE_DISCHARGE_SUMMARY,
+        Permission.READ_SUPPORT,
+        Permission.WRITE_SUPPORT,
     ]

@@ -2,8 +2,7 @@ from sqlalchemy import case, and_, func, or_, desc
 from sqlalchemy.dialects import postgresql
 from datetime import timedelta, datetime
 
-from models.main import db
-from models.appendix import User
+from models.main import db, User
 from models.prescription import (
     Intervention,
     InterventionReason,

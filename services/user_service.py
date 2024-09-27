@@ -1,18 +1,17 @@
 import re
-
-from datetime import datetime, timedelta
-from utils import status
 from flask import request, render_template
 from flask_jwt_extended import decode_token, create_access_token, get_jwt_identity
 from flask_mail import Message
-from sqlalchemy import desc, func
+from sqlalchemy import desc, func, or_, asc
+from datetime import datetime, timedelta
 
 from models.main import User, UserAudit, db, mail
 from models.enums import UserAuditTypeEnum
 from services import permission_service
 from config import Config
-
+from decorators.has_permission_decorator import has_permission, Permission
 from exception.validation_error import ValidationError
+from utils import status
 
 
 def create_audit(
@@ -209,8 +208,9 @@ def get_reset_token(email: str, send_email=True, responsible: User = None):
     return reset_token
 
 
-def update_password(password, newpassword):
-    user = db.session.query(User).filter(User.id == get_jwt_identity()).first()
+@has_permission(Permission.WRITE_BASIC_FEATURES)
+def update_password(password, newpassword, user_context: User):
+    user = db.session.query(User).filter(User.id == user_context.id).first()
 
     if not user:
         raise ValidationError(
@@ -219,6 +219,7 @@ def update_password(password, newpassword):
             status.HTTP_400_BAD_REQUEST,
         )
 
+    # TODO: refactor
     auth_user = User.authenticate(user.email, password)
 
     if not auth_user or not newpassword:
@@ -245,3 +246,25 @@ def update_password(password, newpassword):
         id_user=user.id,
         responsible=user,
     )
+
+
+@has_permission(Permission.READ_BASIC_FEATURES)
+def search_users(user_context: User, term: str):
+    users = (
+        User.query.filter(User.schema == user_context.schema)
+        .filter(
+            or_(
+                ~User.config["roles"].astext.contains("suporte"),
+                User.config["roles"] == None,
+            )
+        )
+        .filter(User.name.ilike("%" + str(term) + "%"))
+        .order_by(desc(User.active), asc(User.name))
+        .all()
+    )
+
+    results = []
+    for u in users:
+        results.append({"id": u.id, "name": u.name})
+
+    return results

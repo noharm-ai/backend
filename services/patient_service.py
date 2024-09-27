@@ -136,7 +136,7 @@ def get_patient_weight(id_patient):
     )
 
 
-@has_permission(Permission.WRITE_PRESCRIPTION, Permission.ADMIN_PATIENT_DATA)
+@has_permission(Permission.WRITE_PRESCRIPTION, Permission.ADMIN_PATIENT)
 def save_patient(
     request_data: dict,
     admission_number: int,

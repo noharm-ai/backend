@@ -1,8 +1,17 @@
-from sqlalchemy import literal
+from sqlalchemy import literal, and_, func, or_
+from datetime import datetime
 
-from models.main import db
-from models.appendix import *
-from models.prescription import *
+from models.main import db, User
+from models.prescription import (
+    Prescription,
+    PrescriptionDrug,
+    Drug,
+    MeasureUnit,
+    Frequency,
+    Outlier,
+    DrugAttributes,
+)
+from models.appendix import Notes
 from models.enums import RoleEnum
 from services import (
     prescription_service,
@@ -10,8 +19,12 @@ from services import (
     data_authorization_service,
 )
 from exception.validation_error import ValidationError
+from decorators.has_permission_decorator import has_permission, Permission
+from utils import status
+from routes.utils import timeValue
 
 
+@has_permission(Permission.READ_PRESCRIPTION)
 def getPrescriptionDrug(idPrescriptionDrug):
     return (
         db.session.query(
@@ -143,6 +156,7 @@ def update_pd_form(pd_list, user):
         db.session.flush()
 
 
+@has_permission(Permission.READ_PRESCRIPTION)
 def prescriptionDrugToDTO(pd):
     pdWhiteList = bool(pd[6].whiteList) if pd[6] is not None else False
 

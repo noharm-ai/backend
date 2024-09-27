@@ -40,3 +40,12 @@ class Permission(Enum):
 
     READ_BASIC_FEATURES = "grants use of basic features"
     WRITE_BASIC_FEATURES = "grants use of basic features"
+
+    READ_DISCHARGE_SUMMARY = "grants access to discharge summary"
+    WRITE_DISCHARGE_SUMMARY = "grants access to discharge summary"
+
+    READ_SUPPORT = "permission to view support tickets"
+    WRITE_SUPPORT = "permission to create support tickets"
+
+    READ_USERS = "permission to view users list"
+    WRITE_USERS = "permission to create and edit users"

@@ -1,9 +1,16 @@
 from sqlalchemy import asc, func
 
 from models.main import db
-from models.prescription import SegmentDepartment, Department
+from models.prescription import SegmentDepartment, Department, Segment
+from decorators.has_permission_decorator import has_permission, Permission
 
 
+@has_permission(Permission.READ_BASIC_FEATURES)
+def get_segments():
+    return db.session.query(Segment).order_by(asc(Segment.description)).all()
+
+
+@has_permission(Permission.READ_BASIC_FEATURES)
 def get_segment_departments():
     results = (
         db.session.query(

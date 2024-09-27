@@ -1,12 +1,15 @@
 from openai import AzureOpenAI
 
 from config import Config
-from models.main import *
+from models.main import db
 from models.appendix import GlobalMemory
 from models.enums import GlobalMemoryEnum
 from exception.validation_error import ValidationError
+from decorators.has_permission_decorator import has_permission, Permission
+from utils import status
 
 
+@has_permission(Permission.READ_DISCHARGE_SUMMARY)
 def prompt(messages, options={}):
     if messages == None or len(messages) == 0:
         return ""

@@ -1,12 +1,13 @@
-from utils import status
 from sqlalchemy import distinct, text
+from datetime import datetime
 
-from models.main import db
-from models.appendix import *
-from models.prescription import *
+from models.main import db, User
+from models.prescription import Prescription, PrescriptionDrug, Drug
 from models.enums import FeatureEnum
-from services import permission_service, memory_service
+from services import memory_service
 from exception.validation_error import ValidationError
+from decorators.has_permission_decorator import has_permission, Permission
+from utils import status
 
 
 def getNextId(idPrescription, schema):
@@ -28,17 +29,18 @@ def getNextId(idPrescription, schema):
     return ([row[0] for row in result])[0]
 
 
-def createPrescriptionDrug(data, user):
+@has_permission(Permission.WRITE_PRESCRIPTION)
+def createPrescriptionDrug(data, user_context: User):
     prescription = (
         db.session.query(Prescription)
         .filter(Prescription.id == data.get("idPrescription", None))
         .first()
     )
 
-    _validate_permission(prescription=prescription, user=user)
+    _validate_permission(prescription=prescription)
 
     if prescription.concilia == None:
-        next_id = getNextId(prescription.id, user.schema)
+        next_id = getNextId(prescription.id, user_context.schema)
     else:
         count = (
             db.session.query(PrescriptionDrug)
@@ -62,7 +64,7 @@ def createPrescriptionDrug(data, user):
     pdCreate.notes = data.get("recommendation", None)
 
     pdCreate.update = datetime.today()
-    pdCreate.user = user.id
+    pdCreate.user = user_context.id
 
     db.session.add(pdCreate)
     db.session.flush()
@@ -70,7 +72,8 @@ def createPrescriptionDrug(data, user):
     return pdCreate.id
 
 
-def updatePrescriptionDrug(idPrescriptionDrug, data, user):
+@has_permission(Permission.WRITE_PRESCRIPTION)
+def updatePrescriptionDrug(idPrescriptionDrug, data, user_context: User):
     pdUpdate = PrescriptionDrug.query.get(idPrescriptionDrug)
     if pdUpdate is None:
         raise ValidationError(
@@ -85,10 +88,10 @@ def updatePrescriptionDrug(idPrescriptionDrug, data, user):
         .first()
     )
 
-    _validate_permission(prescription=prescription, user=user)
+    _validate_permission(prescription=prescription)
 
     pdUpdate.update = datetime.today()
-    pdUpdate.user = user.id
+    pdUpdate.user = user_context.id
 
     if "dose" in data.keys():
         pdUpdate.dose = data.get("dose", None)
@@ -115,11 +118,11 @@ def updatePrescriptionDrug(idPrescriptionDrug, data, user):
     query = text(
         "\
       INSERT INTO "
-        + user.schema
+        + user_context.schema
         + ".presmed \
         SELECT *\
         FROM "
-        + user.schema
+        + user_context.schema
         + ".presmed\
         WHERE fkpresmed = :id"
     )
@@ -127,7 +130,8 @@ def updatePrescriptionDrug(idPrescriptionDrug, data, user):
     db.session.execute(query, {"id": idPrescriptionDrug})
 
 
-def togglePrescriptionDrugSuspension(idPrescriptionDrug, user, suspend):
+@has_permission(Permission.WRITE_PRESCRIPTION)
+def togglePrescriptionDrugSuspension(idPrescriptionDrug, user_context: User, suspend):
     pdUpdate = PrescriptionDrug.query.get(idPrescriptionDrug)
     if pdUpdate is None:
         raise ValidationError(
@@ -142,7 +146,7 @@ def togglePrescriptionDrugSuspension(idPrescriptionDrug, user, suspend):
         .first()
     )
 
-    _validate_permission(prescription=prescription, user=user)
+    _validate_permission(prescription=prescription)
 
     if suspend == True:
         pdUpdate.suspendedDate = datetime.today()
@@ -150,7 +154,7 @@ def togglePrescriptionDrugSuspension(idPrescriptionDrug, user, suspend):
         pdUpdate.suspendedDate = None
 
     pdUpdate.update = datetime.today()
-    pdUpdate.user = user.id
+    pdUpdate.user = user_context.id
 
     db.session.add(pdUpdate)
     db.session.flush()
@@ -158,15 +162,8 @@ def togglePrescriptionDrugSuspension(idPrescriptionDrug, user, suspend):
     return pdUpdate
 
 
-def copy_missing_drugs(idPrescription, user, idDrugs):
-    roles = user.config["roles"] if user.config and "roles" in user.config else []
-    if "prescriptionEdit" not in roles:
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-
+@has_permission(Permission.WRITE_PRESCRIPTION)
+def copy_missing_drugs(idPrescription, user_context: User, idDrugs):
     if idDrugs == None or len(idDrugs) == 0:
         raise ValidationError(
             "Nenhum medicamento selecionado",
@@ -196,7 +193,7 @@ def copy_missing_drugs(idPrescription, user, idDrugs):
 
     for d in drugs:
         pdCreate = PrescriptionDrug()
-        new_id = getNextId(idPrescription, user.schema)
+        new_id = getNextId(idPrescription, user_context.schema)
         ids_list.append(new_id)
 
         pdCreate.id = new_id
@@ -211,29 +208,22 @@ def copy_missing_drugs(idPrescription, user, idDrugs):
         pdCreate.route = d.route
 
         pdCreate.update = datetime.today()
-        pdCreate.user = user.id
+        pdCreate.user = user_context.id
         db.session.add(pdCreate)
         db.session.flush()
 
     return ids_list
 
 
-def get_missing_drugs(idPrescription, user):
-    roles = user.config["roles"] if user.config and "roles" in user.config else []
-    if "prescriptionEdit" not in roles:
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-
+@has_permission(Permission.WRITE_PRESCRIPTION)
+def get_missing_drugs(idPrescription):
     prescription = Prescription.query.get(idPrescription)
     if prescription is None:
-        return {
-            "status": "error",
-            "message": "Registro Inexistente!",
-            "code": "errors.invalidRegister",
-        }, status.HTTP_400_BAD_REQUEST
+        raise ValidationError(
+            "Registro Inexistente!",
+            "errors.invalidRegister",
+            status.HTTP_400_BAD_REQUEST,
+        )
 
     pd_drugs = db.aliased(PrescriptionDrug)
     q_drugs = (
@@ -254,7 +244,7 @@ def get_missing_drugs(idPrescription, user):
     )
 
 
-def _validate_permission(prescription: Prescription, user: User):
+def _validate_permission(prescription: Prescription):
     if prescription == None:
         raise ValidationError(
             "Prescrição inexistente",
@@ -262,20 +252,10 @@ def _validate_permission(prescription: Prescription, user: User):
             status.HTTP_400_BAD_REQUEST,
         )
 
-    if prescription.concilia == None:
-        roles = user.config["roles"] if user.config and "roles" in user.config else []
-        if "prescriptionEdit" not in roles:
+    if prescription.concilia != None:
+        if not memory_service.has_feature(FeatureEnum.CONCILIATION_EDIT.value):
             raise ValidationError(
-                "Usuário não autorizado",
-                "errors.unauthorizedUser",
-                status.HTTP_401_UNAUTHORIZED,
-            )
-    else:
-        if not memory_service.has_feature(
-            FeatureEnum.CONCILIATION_EDIT.value
-        ) or not permission_service.is_pharma(user):
-            raise ValidationError(
-                "Usuário não autorizado",
-                "errors.unauthorizedUser",
+                "Feature desabilitada",
+                "errors.unauthorizedFeature",
                 status.HTTP_401_UNAUTHORIZED,
             )
