@@ -75,6 +75,10 @@ class Role(Enum):
         Permission.WRITE_USERS,
     ]
 
+    SERVICE_INTEGRATOR = "SERVICE_INTEGRATOR", [
+        Permission.RUN_AS,
+    ]
+
     PRESCRIPTION_ANALIST = "PRESCRIPTION_ANALIST", [
         Permission.READ_PRESCRIPTION,
         Permission.WRITE_PRESCRIPTION,

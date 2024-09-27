@@ -48,3 +48,5 @@ class Permission(Enum):
 
     READ_USERS = "permission to view users list"
     WRITE_USERS = "permission to create and edit users"
+
+    RUN_AS = "permission to service users"

@@ -14,7 +14,16 @@ def has_permission(*permissions: List[Permission]):
     def wrapper(f):
         @wraps(f)
         def decorator_f(*args, **kwargs):
-            user_context = User.find(get_jwt_identity())
+            user_context = None
+
+            if "user_context" in inspect.signature(f).parameters:
+                if "user_context" in kwargs and kwargs["user_context"] != None:
+                    user_context = kwargs["user_context"]
+                else:
+                    user_context = User.find(get_jwt_identity())
+                    kwargs["user_context"] = user_context
+            else:
+                user_context = User.find(get_jwt_identity())
 
             if user_context == None:
                 raise AuthorizationError()
@@ -35,9 +44,7 @@ def has_permission(*permissions: List[Permission]):
             if len(set.intersection(set(permissions), set(user_permissions))) == 0:
                 raise AuthorizationError()
 
-            # inject params
-            if "user_context" in inspect.signature(f).parameters:
-                kwargs["user_context"] = user_context
+            # inject extra params
             if "user_permissions" in inspect.signature(f).parameters:
                 kwargs["user_permissions"] = user_permissions
 

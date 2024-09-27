@@ -7,9 +7,14 @@ from models.main import db
 from models.appendix import *
 from models.prescription import *
 from models.enums import PrescriptionDrugAuditTypeEnum, DrugTypeEnum
-from routes.prescription import getPrescription
+
+# from routes.prescription import getPrescription
 from routes.utils import getFeatures, gen_agg_id
-from services import prescription_service, prescription_drug_service
+from services import (
+    prescription_service,
+    prescription_drug_service,
+    prescription_check_service,
+)
 
 from exception.validation_error import ValidationError
 
@@ -117,7 +122,7 @@ def create_agg_prescription_by_prescription(
                 if remove_agg_check:
                     pAgg.status = 0
 
-                    prescription_service.audit_check(
+                    prescription_check_service.audit_check(
                         prescription=pAgg, user=prescalc_user, extra={"prescalc": True}
                     )
 
@@ -127,7 +132,7 @@ def create_agg_prescription_by_prescription(
                 p.user = None
                 p.status = 0
 
-                prescription_service.audit_check(
+                prescription_check_service.audit_check(
                     prescription=p, user=prescalc_user, extra={"prescalc": True}
                 )
 

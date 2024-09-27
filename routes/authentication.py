@@ -3,7 +3,6 @@ from flask import (
     request,
     after_this_request,
 )
-from utils import status
 from flask_jwt_extended import (
     jwt_required,
     get_jwt_identity,
@@ -15,6 +14,7 @@ from models.main import db, dbSession
 from services import auth_service
 from .utils import tryCommit
 from exception.validation_error import ValidationError
+from utils import status
 
 app_auth = Blueprint("app_auth", __name__)
 
