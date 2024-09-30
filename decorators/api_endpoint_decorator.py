@@ -1,6 +1,7 @@
 import os
 import logging
 import inspect
+from flask import g
 from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
 from functools import wraps
 
@@ -27,6 +28,11 @@ def api_endpoint():
                 os.environ["TZ"] = "America/Sao_Paulo"
 
                 result = f(*args, **kwargs)
+
+                # should check for permission at least once
+                if g.get("permission_test_count", 0) == 0:
+                    print("sshould check for permission at least once")
+                    raise AuthorizationError()
 
                 db.session.commit()
                 db.session.close()

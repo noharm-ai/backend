@@ -50,3 +50,5 @@ class Permission(Enum):
     WRITE_USERS = "permission to create and edit users"
 
     RUN_AS = "permission to service users"
+
+    READ_STATIC = "read static permission"

@@ -125,3 +125,5 @@ class Role(Enum):
         Permission.READ_SUPPORT,
         Permission.WRITE_SUPPORT,
     ]
+
+    STATIC_USER = "STATIC_USER", [Permission.READ_STATIC]

@@ -6,6 +6,7 @@ import math
 from flask_mail import Message, Mail
 from sqlalchemy.dialects.postgresql import INTERVAL
 from sqlalchemy import between, func
+from exception.authorization_error import AuthorizationError
 
 # TODO: refactor
 
@@ -422,6 +423,15 @@ def tryCommit(db, recId, allow=True):
         db.session.remove()
 
         return {"status": "success", "data": recId}, status.HTTP_200_OK
+    except AuthorizationError as e:
+        db.session.rollback()
+        db.session.close()
+        db.session.remove()
+
+        return {
+            "status": "error",
+            "message": "Usuário não autorizado.",
+        }, status.HTTP_401_UNAUTHORIZED
     except AssertionError as e:
         db.session.rollback()
         db.session.close()
@@ -468,9 +478,9 @@ def get_numeric_drug_attributes_list():
 
 
 def getFeatures(result, agg_date: datetime = None, intervals_for_agg_date=False):
-    drugList = result["data"]["prescription"]
-    drugList.extend(result["data"]["solution"])
-    drugList.extend(result["data"]["procedures"])
+    drugList = result["prescription"]
+    drugList.extend(result["solution"])
+    drugList.extend(result["procedures"])
 
     allergy = alerts = alerts_prescription = pScore = score1 = score2 = score3 = 0
     am = av = control = np = tube = diff = 0
@@ -545,16 +555,16 @@ def getFeatures(result, agg_date: datetime = None, intervals_for_agg_date=False)
             alert_levels.append(a["level"])
 
     interventions = 0
-    for i in result["data"]["interventions"]:
+    for i in result["interventions"]:
         interventions += int(i["status"] == "s")
 
-    exams = result["data"]["alertExams"]
-    complicationCount = result["data"]["complication"]
+    exams = result["alertExams"]
+    complicationCount = result["complication"]
 
-    if "alertStats" in result["data"]:
+    if "alertStats" in result:
         # entire prescription (agg features)
-        alerts = result["data"]["alertStats"]["total"]
-        alert_level = result["data"]["alertStats"].get("level", "low")
+        alerts = result["alertStats"]["total"]
+        alert_level = result["alertStats"].get("level", "low")
     else:
         # headers
         alerts = alerts_prescription
@@ -566,9 +576,9 @@ def getFeatures(result, agg_date: datetime = None, intervals_for_agg_date=False)
             alert_level = "high"
 
     p_dates = []
-    if "headers" in result["data"]:
-        for p_id in result["data"]["headers"]:
-            header = result["data"]["headers"][p_id]
+    if "headers" in result:
+        for p_id in result["headers"]:
+            header = result["headers"][p_id]
             if "date" in header:
                 p_dates.append(header["date"])
 
@@ -595,11 +605,9 @@ def getFeatures(result, agg_date: datetime = None, intervals_for_agg_date=False)
         "drugIDs": list(set(drugIDs)),
         "substanceIDs": list(set(substanceIDs)),
         "substanceClassIDs": list(set(substanceClassIDs)),
-        "alertStats": (
-            result["data"]["alertStats"] if "alertStats" in result["data"] else None
-        ),
-        "clinicalNotesStats": result["data"].get("clinicalNotesStats", None),
-        "clinicalNotes": result["data"].get("clinicalNotes", None),
+        "alertStats": (result["alertStats"] if "alertStats" in result else None),
+        "clinicalNotesStats": result.get("clinicalNotesStats", None),
+        "clinicalNotes": result.get("clinicalNotes", None),
         "frequencies": list(set(frequencies)),
         "processedDate": datetime.today().isoformat(),
         "totalItens": len(drugList),

@@ -65,6 +65,27 @@ def route_get_prescription(id_prescription, user_context: User):
         )
 
 
+@has_permission(Permission.READ_PRESCRIPTION)
+def static_get_prescription(
+    idPrescription=None,
+    admissionNumber=None,
+    aggDate=None,
+    idSegment=None,
+    is_cpoe=False,
+    is_pmc=False,
+    is_complete=False,
+):
+    return internal_get_prescription(
+        idPrescription=idPrescription,
+        admissionNumber=admissionNumber,
+        aggDate=aggDate,
+        idSegment=idSegment,
+        is_cpoe=is_cpoe,
+        is_pmc=is_pmc,
+        is_complete=is_complete,
+    )
+
+
 def internal_get_prescription(
     idPrescription=None,
     admissionNumber=None,
@@ -84,10 +105,11 @@ def internal_get_prescription(
         )
 
     if prescription is None:
-        return {
-            "status": "error",
-            "message": "Prescrição Inexistente!",
-        }, status.HTTP_400_BAD_REQUEST
+        raise ValidationError(
+            "Prescrição inexistente",
+            "errors.invalidRecord",
+            status.HTTP_400_BAD_REQUEST,
+        )
 
     patient = prescription[1]
     patientWeight = None
@@ -485,38 +507,32 @@ def _build_headers(headers, pDrugs, pSolution, pProcedures):
 
         headers[pid]["drugs"] = getFeatures(
             {
-                "data": {
-                    "prescription": drugs,
-                    "solution": [],
-                    "procedures": [],
-                    "interventions": drugsInterv,
-                    "alertExams": [],
-                    "complication": 0,
-                }
+                "prescription": drugs,
+                "solution": [],
+                "procedures": [],
+                "interventions": drugsInterv,
+                "alertExams": [],
+                "complication": 0,
             }
         )
         headers[pid]["solutions"] = getFeatures(
             {
-                "data": {
-                    "prescription": [],
-                    "solution": solutions,
-                    "procedures": [],
-                    "interventions": solutionsInterv,
-                    "alertExams": [],
-                    "complication": 0,
-                }
+                "prescription": [],
+                "solution": solutions,
+                "procedures": [],
+                "interventions": solutionsInterv,
+                "alertExams": [],
+                "complication": 0,
             }
         )
         headers[pid]["procedures"] = getFeatures(
             {
-                "data": {
-                    "prescription": [],
-                    "solution": [],
-                    "procedures": procedures,
-                    "interventions": proceduresInterv,
-                    "alertExams": [],
-                    "complication": 0,
-                }
+                "prescription": [],
+                "solution": [],
+                "procedures": procedures,
+                "interventions": proceduresInterv,
+                "alertExams": [],
+                "complication": 0,
             }
         )
 

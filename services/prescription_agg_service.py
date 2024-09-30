@@ -11,14 +11,16 @@ from models.enums import PrescriptionDrugAuditTypeEnum, DrugTypeEnum
 # from routes.prescription import getPrescription
 from routes.utils import getFeatures, gen_agg_id
 from services import (
-    prescription_service,
     prescription_drug_service,
     prescription_check_service,
+    prescription_view_service,
 )
 
 from exception.validation_error import ValidationError
+from decorators.has_permission_decorator import has_permission, Permission
 
 
+@has_permission(Permission.READ_STATIC)
 def create_agg_prescription_by_prescription(
     schema, id_prescription, is_cpoe, out_patient, is_pmc=False, force=False
 ):
@@ -47,7 +49,9 @@ def create_agg_prescription_by_prescription(
     if not force and processed_status == "PROCESSED":
         return
 
-    resultPresc, stat = getPrescription(idPrescription=id_prescription)
+    resultPresc = prescription_view_service.static_get_prescription(
+        idPrescription=id_prescription
+    )
     p.features = getFeatures(resultPresc)
     p.aggDrugs = p.features["drugIDs"]
     p.aggDeps = [p.idDepartment]
@@ -79,7 +83,7 @@ def create_agg_prescription_by_prescription(
     if out_patient:
         pAgg.date = date(pdate.year, pdate.month, pdate.day)
 
-    resultAgg, stat = getPrescription(
+    resultAgg = prescription_view_service.static_get_prescription(
         admissionNumber=p.admissionNumber,
         aggDate=pAgg.date,
         idSegment=p.idSegment,
@@ -155,6 +159,7 @@ def create_agg_prescription_by_prescription(
     _log_processed_date(id_prescription_array=[id_prescription], schema=schema)
 
 
+@has_permission(Permission.READ_STATIC)
 def create_agg_prescription_by_date(schema, admission_number, p_date, is_cpoe):
     create_new = False
     set_schema(schema)
@@ -191,7 +196,7 @@ def create_agg_prescription_by_date(schema, admission_number, p_date, is_cpoe):
         agg_p.agg = True
         agg_p.update = datetime.today()
 
-    resultAgg, stat = getPrescription(
+    resultAgg = prescription_view_service.static_get_prescription(
         admissionNumber=admission_number,
         aggDate=agg_p.date,
         idSegment=agg_p.idSegment,
