@@ -399,7 +399,7 @@ def test_find_relations_drug_interaction_kind_sl(monkeypatch):
             dose=10,
             drug_name="Drug A",
             group="1",
-            solutionGroup=True,
+            solutionGroup="99",
             idPrescription="111",
         ),
         get_mock_row(
@@ -407,7 +407,7 @@ def test_find_relations_drug_interaction_kind_sl(monkeypatch):
             dose=20,
             drug_name="Drug B",
             group="1",
-            solutionGroup=True,
+            solutionGroup="99",
             idPrescription="111",
         ),
         get_mock_row(
@@ -415,7 +415,7 @@ def test_find_relations_drug_interaction_kind_sl(monkeypatch):
             dose=20,
             drug_name="Drug C",
             group="1",
-            solutionGroup=True,
+            solutionGroup="99",
             idPrescription="222",
         ),
     ]
