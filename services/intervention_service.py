@@ -358,21 +358,6 @@ def set_intervention_outcome(
             intervention.economy_day_value = economy_day_value
             intervention.economy_day_value_manual = economy_day_value_manual
 
-            if economy_day_amount_manual:
-                intervention.economy_days = economy_day_amount
-                intervention.date_end_economy = (
-                    intervention.date_base_economy
-                    + timedelta(days=economy_day_amount - 1)
-                )
-
-            intervention.origin = origin_data
-            intervention.destiny = destiny_data
-
-            if not bool(intervention.origin):
-                # invalid origin
-                intervention.economy_day_value = 0
-                intervention.economy_day_value_manual = True
-
             if (
                 intervention.economy_type
                 == InterventionEconomyTypeEnum.SUBSTITUTION.value
@@ -397,6 +382,21 @@ def set_intervention_outcome(
                     )
 
                 intervention.date_base_economy = presc_destiny.date.date()
+
+            if economy_day_amount_manual:
+                intervention.economy_days = economy_day_amount
+                intervention.date_end_economy = (
+                    intervention.date_base_economy
+                    + timedelta(days=economy_day_amount - 1)
+                )
+
+            intervention.origin = origin_data
+            intervention.destiny = destiny_data
+
+            if not bool(intervention.origin):
+                # invalid origin
+                intervention.economy_day_value = 0
+                intervention.economy_day_value_manual = True
         else:
             # cleanup
             intervention.idPrescriptionDrugDestiny = None
@@ -725,7 +725,7 @@ def _get_date_base_economy(
                         status.HTTP_400_BAD_REQUEST,
                     )
 
-                return presc.date
+                return presc.date.date()
         else:
             if id_prescription != 0:
                 presc: Prescription = (
@@ -741,7 +741,7 @@ def _get_date_base_economy(
                         status.HTTP_400_BAD_REQUEST,
                     )
 
-                return presc.date
+                return presc.date.date()
             else:
                 presc = (
                     db.session.query(PrescriptionDrug, Prescription)
@@ -760,7 +760,7 @@ def _get_date_base_economy(
                         status.HTTP_400_BAD_REQUEST,
                     )
 
-                return presc[1].date
+                return presc[1].date.date()
 
     return None
 
