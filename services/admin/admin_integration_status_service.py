@@ -1,18 +1,20 @@
 from sqlalchemy import func, text, distinct, and_
 
-from models.main import db, User
+from models.main import db, User, PrescriptionAgg
 from models.prescription import (
     Segment,
-    SegmentDepartment,
-    SegmentExam,
     Outlier,
     Drug,
     DrugAttributes,
-    InterventionReason,
-    PrescriptionAgg,
     MeasureUnitConvert,
 )
-from models.appendix import SchemaConfig, Frequency
+from models.appendix import (
+    SchemaConfig,
+    Frequency,
+    SegmentDepartment,
+    InterventionReason,
+)
+from models.segment import SegmentExam
 from models.enums import MemoryEnum
 from services.admin import admin_memory_service
 from exception.validation_error import ValidationError

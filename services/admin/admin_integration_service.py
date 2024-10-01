@@ -3,8 +3,7 @@ from sqlalchemy import case, text
 from datetime import datetime
 
 from models.main import db, User
-from models.prescription import InterventionReason
-from models.appendix import SchemaConfig
+from models.appendix import SchemaConfig, InterventionReason
 from decorators.has_permission_decorator import has_permission, Permission
 
 from exception.validation_error import ValidationError

@@ -3,13 +3,12 @@ from sqlalchemy.orm import undefer
 from typing import List
 from datetime import datetime
 
-from models.main import db, User
+from models.main import db, User, PrescriptionAgg
 from models.prescription import (
     Segment,
     MeasureUnit,
     MeasureUnitConvert,
     Outlier,
-    PrescriptionAgg,
     Drug,
     DrugAttributes,
     Substance,

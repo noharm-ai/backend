@@ -1,6 +1,6 @@
-from sqlalchemy import select
+from sqlalchemy import select, desc
 
-from models.main import db, desc
+from models.main import db
 from models.appendix import CultureHeader, Culture
 from exception.validation_error import ValidationError
 from utils import dateutils, status

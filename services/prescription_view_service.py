@@ -10,9 +10,9 @@ from models.prescription import (
     Prescription,
     Patient,
     PrescriptionDrug,
-    Exams,
     PrescriptionAudit,
 )
+from models.segment import Exams
 from models.notes import ClinicalNotes
 from models.enums import (
     MemoryEnum,

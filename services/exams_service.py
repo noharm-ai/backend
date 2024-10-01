@@ -3,7 +3,8 @@ from sqlalchemy import text, desc
 from datetime import datetime, timedelta
 
 from models.main import db
-from models.prescription import Patient, Exams, SegmentExam
+from models.prescription import Patient
+from models.segment import Exams, SegmentExam
 from models.notes import ClinicalNotes
 from services import memory_service
 from decorators.has_permission_decorator import has_permission, Permission

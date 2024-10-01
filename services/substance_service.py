@@ -1,7 +1,6 @@
 from sqlalchemy import or_, asc, func
 
-from models.main import db
-from models.prescription import Substance, SubstanceClass, Relation
+from models.main import db, Substance, SubstanceClass, Relation
 from decorators.has_permission_decorator import has_permission, Permission
 from exception.validation_error import ValidationError
 from utils import status

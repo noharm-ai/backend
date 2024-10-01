@@ -12,9 +12,6 @@ class Department(db.Model):
     idHospital = db.Column("fkhospital", db.BigInteger, primary_key=True)
     name = db.Column("nome", db.String, nullable=False)
 
-    def getAll():
-        return Department.query.all()
-
 
 class SegmentDepartment(db.Model):
     __tablename__ = "segmentosetor"

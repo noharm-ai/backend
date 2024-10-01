@@ -3,10 +3,9 @@ from sqlalchemy import func, and_, text
 from markupsafe import escape as escape_html
 from datetime import datetime
 
-from models.main import db, User
+from models.main import db, User, PrescriptionAgg
 from models.prescription import (
     Outlier,
-    PrescriptionAgg,
     MeasureUnitConvert,
     DrugAttributes,
     Drug,

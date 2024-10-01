@@ -8,9 +8,8 @@ from sqlalchemy import text, func, distinct, and_, or_, asc
 from typing import List
 from decimal import Decimal, ROUND_HALF_UP
 
-from models.main import db, User
+from models.main import db, User, PrescriptionAgg
 from models.prescription import (
-    PrescriptionAgg,
     Outlier,
     Notes,
     Drug,

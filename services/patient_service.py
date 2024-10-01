@@ -4,11 +4,10 @@ from sqlalchemy.orm import undefer
 from sqlalchemy.dialects.postgresql import INTERVAL
 from typing import List
 
-from models.main import db, User
+from models.main import db, User, Allergy
 from models.prescription import (
     Prescription,
     Patient,
-    Allergy,
     Substance,
     Drug,
     PatientAudit,

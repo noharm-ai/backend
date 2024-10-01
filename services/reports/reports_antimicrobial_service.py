@@ -1,6 +1,6 @@
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, desc
 
-from models.main import db, desc
+from models.main import db
 from models.prescription import (
     Patient,
     Prescription,
