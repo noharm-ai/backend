@@ -2,9 +2,8 @@ from utils import status
 from sqlalchemy import asc
 
 from models.main import db
-from models.appendix import *
+from models.appendix import Frequency
 from decorators.has_permission_decorator import has_permission, Permission
-
 from exception.validation_error import ValidationError
 
 

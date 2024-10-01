@@ -4,7 +4,7 @@ from password_generator import PasswordGenerator
 from flask import render_template
 
 from models.main import User, db, UserAuthorization
-from models.enums import RoleEnum, FeatureEnum, UserAuditTypeEnum
+from models.enums import FeatureEnum, UserAuditTypeEnum
 from services import permission_service, memory_service, user_service
 from utils import status
 from config import Config
@@ -83,11 +83,6 @@ def _get_user_data(id_user: int):
 def upsert_user(data: dict, user_context: User):
     idUser = data.get("id", None)
     id_segment_list = data.get("segments", [])
-    roles = (
-        user_context.config["roles"]
-        if user_context.config and "roles" in user_context.config
-        else []
-    )
 
     if not idUser:
         userEmail = data.get("email", None)

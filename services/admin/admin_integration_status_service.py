@@ -1,12 +1,23 @@
-from sqlalchemy import func, text
+from sqlalchemy import func, text, distinct, and_
 
-from models.main import *
-from models.appendix import *
-from models.segment import *
+from models.main import db, User
+from models.prescription import (
+    Segment,
+    SegmentDepartment,
+    SegmentExam,
+    Outlier,
+    Drug,
+    DrugAttributes,
+    InterventionReason,
+    PrescriptionAgg,
+    MeasureUnitConvert,
+)
+from models.appendix import SchemaConfig, Frequency
 from models.enums import MemoryEnum
 from services.admin import admin_memory_service
 from exception.validation_error import ValidationError
 from decorators.has_permission_decorator import has_permission, Permission
+from utils import status
 
 
 def get_integration_status(schema):

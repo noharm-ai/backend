@@ -2,8 +2,7 @@ from utils import status
 from sqlalchemy import asc, func
 
 from models.main import db
-from models.appendix import *
-from models.prescription import *
+from models.prescription import Intervention, InterventionReason
 from decorators.has_permission_decorator import has_permission, Permission
 from exception.validation_error import ValidationError
 

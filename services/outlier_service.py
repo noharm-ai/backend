@@ -492,7 +492,7 @@ def get_outliers_list(
     units = get_drug_outlier_units(id_drug=id_drug, id_segment=id_segment)
     defaultUnit = "unlikely big name for a measure unit"
     bUnit = False
-    for unit in units[0]["data"]:
+    for unit in units:
         if unit["fator"] == 1 and len(unit["idMeasureUnit"]) < len(defaultUnit):
             defaultUnit = unit["idMeasureUnit"]
             bUnit = True
@@ -704,4 +704,15 @@ def get_outlier_drugs(id_segment: int, term: str = None, id_drug: List[int] = []
     if len(id_drug) > 0:
         drugs = drugs.filter(Drug.id.in_(id_drug))
 
-    return drugs.order_by(asc(Drug.name)).all()
+    results = drugs.order_by(asc(Drug.name)).all()
+
+    items = []
+    for d in results:
+        items.append(
+            {
+                "idDrug": str(d.id),
+                "name": d.name,
+            }
+        )
+
+    return items

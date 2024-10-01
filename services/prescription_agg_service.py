@@ -1,21 +1,17 @@
 from utils import status
 from sqlalchemy import desc, text, select, func, and_
 from flask_sqlalchemy.session import Session
-from datetime import date
+from datetime import date, datetime
 
-from models.main import db
-from models.appendix import *
-from models.prescription import *
+from models.main import db, User, dbSession
+from models.prescription import Prescription, PrescriptionDrug, PrescriptionDrugAudit
 from models.enums import PrescriptionDrugAuditTypeEnum, DrugTypeEnum
-
-# from routes.prescription import getPrescription
 from routes.utils import getFeatures, gen_agg_id
 from services import (
     prescription_drug_service,
     prescription_check_service,
     prescription_view_service,
 )
-
 from exception.validation_error import ValidationError
 from decorators.has_permission_decorator import has_permission, Permission
 

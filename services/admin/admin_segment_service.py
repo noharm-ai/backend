@@ -1,12 +1,12 @@
-from utils import status
+from sqlalchemy import func, and_, asc
 
-from models.main import *
-from models.appendix import *
-from models.segment import *
+from models.main import db, User
+from models.prescription import Segment, SegmentDepartment, Department, Hospital
 from models.enums import IntegrationStatusEnum
 from services.admin import admin_integration_status_service
 from decorators.has_permission_decorator import has_permission, Permission
 from exception.validation_error import ValidationError
+from utils import status
 
 
 @has_permission(Permission.ADMIN_SEGMENTS)

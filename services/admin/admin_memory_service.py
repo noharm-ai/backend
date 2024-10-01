@@ -4,9 +4,9 @@ from utils import status
 from sqlalchemy import func
 from typing import List
 
-from models.main import db
-from models.appendix import *
-from models.prescription import *
+from models.main import db, User
+from models.appendix import Memory
+from models.prescription import Prescription, PrescriptionDrug
 from models.enums import MemoryEnum
 from decorators.has_permission_decorator import has_permission, Permission
 from exception.validation_error import ValidationError

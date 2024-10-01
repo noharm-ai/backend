@@ -1,15 +1,13 @@
-from utils import status
-from sqlalchemy import desc
-from datetime import datetime
+from sqlalchemy import desc, asc, text, func
+from datetime import datetime, date, timedelta
 from markupsafe import escape as escape_html
 
-from models.main import *
-from models.appendix import *
-from models.segment import *
+from models.main import db, User
+from models.prescription import Segment, SegmentExam, Exams
 from services.admin import admin_integration_service
 from services import data_authorization_service
 from decorators.has_permission_decorator import has_permission, Permission
-
+from utils import status
 from exception.validation_error import ValidationError
 
 
