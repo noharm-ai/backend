@@ -1,4 +1,3 @@
-from datetime import datetime, timedelta
 from sqlalchemy.orm import deferred
 from sqlalchemy import case, cast, between, literal, and_, func, desc, asc, or_
 from sqlalchemy.sql.expression import literal_column, case
@@ -122,28 +121,6 @@ class Prescription(db.Model):
             .filter(Prescription.concilia == None)
             .order_by(asc(Prescription.date))
             .first()
-        )
-
-    def shouldUpdate(idPrescription):
-        return (
-            db.session.query(DrugAttributes.update)
-            .select_from(PrescriptionDrug)
-            .join(
-                DrugAttributes,
-                and_(
-                    DrugAttributes.idDrug == PrescriptionDrug.idDrug,
-                    DrugAttributes.idSegment == PrescriptionDrug.idSegment,
-                ),
-            )
-            .join(Outlier, Outlier.id == PrescriptionDrug.idOutlier)
-            .filter(PrescriptionDrug.idPrescription == idPrescription)
-            .filter(
-                or_(
-                    DrugAttributes.update > (datetime.today() - timedelta(minutes=3)),
-                    Outlier.update > (datetime.today() - timedelta(minutes=3)),
-                )
-            )
-            .all()
         )
 
     def getHeaders(admissionNumber, aggDate, idSegment, is_pmc=False, is_cpoe=False):

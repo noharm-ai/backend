@@ -1,7 +1,17 @@
+from datetime import date, timedelta
+
 from .main import db
-from sqlalchemy import func, text, and_, or_, desc, asc, distinct, cast
-from sqlalchemy.dialects.postgresql import INTERVAL
-from routes.utils import *
+from sqlalchemy import and_, desc, asc
+from routes.utils import (
+    data2age,
+    formatExam,
+    mdrd_calc,
+    cg_calc,
+    ckd_calc,
+    ckd_calc_21,
+    schwartz1_calc,
+    schwartz2_calc,
+)
 
 
 class Segment(db.Model):
@@ -10,9 +20,6 @@ class Segment(db.Model):
     id = db.Column("idsegmento", db.BigInteger, primary_key=True)
     description = db.Column("nome", db.String, nullable=False)
     status = db.Column("status", db.Integer, nullable=False)
-
-    def findAll():
-        return db.session.query(Segment).order_by(asc(Segment.description)).all()
 
 
 class SegmentExam(db.Model):
