@@ -12,10 +12,7 @@ from models.prescription import (
     DrugAttributes,
 )
 from models.appendix import Notes
-from services import (
-    prescription_service,
-    data_authorization_service,
-)
+from services import prescription_service, data_authorization_service, feature_service
 from exception.validation_error import ValidationError
 from decorators.has_permission_decorator import has_permission, Permission
 from utils import status
@@ -74,7 +71,9 @@ def count_drugs_by_prescription(
 ):
     if prescription.agg:
         prescription_query = prescription_service.get_query_prescriptions_by_agg(
-            agg_prescription=prescription, is_cpoe=user.cpoe(), only_id=True
+            agg_prescription=prescription,
+            is_cpoe=feature_service.is_cpoe(),
+            only_id=True,
         )
 
         q = (
@@ -83,7 +82,7 @@ def count_drugs_by_prescription(
             .filter(PrescriptionDrug.source.in_(drug_types))
         )
 
-        if user.cpoe():
+        if feature_service.is_cpoe():
             q = q.filter(
                 or_(
                     PrescriptionDrug.suspendedDate == None,
@@ -100,7 +99,7 @@ def count_drugs_by_prescription(
             .filter(PrescriptionDrug.source.in_(drug_types))
         )
 
-        if user.cpoe():
+        if feature_service.is_cpoe():
             q = q.filter(
                 or_(
                     PrescriptionDrug.suspendedDate == None,
@@ -238,7 +237,7 @@ def get_drug_period(id_prescription_drug: int, future: bool, user_context: User)
 
     if id_prescription_drug != 0:
         results, admissionHistory = _drug_period_query(
-            id_prescription_drug, future, is_cpoe=user_context.cpoe()
+            id_prescription_drug, future, is_cpoe=feature_service.is_cpoe()
         )
     else:
         results[0][1].append("Intervenção no paciente não tem medicamento associado.")
@@ -249,7 +248,7 @@ def get_drug_period(id_prescription_drug: int, future: bool, user_context: User)
         else:
             results[0][1].append("Não há prescrição posterior para esse Paciente")
 
-    if user_context.cpoe() and not future:
+    if feature_service.is_cpoe() and not future:
         periodList = []
 
         for i, p in enumerate(results):

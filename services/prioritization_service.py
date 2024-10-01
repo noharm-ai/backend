@@ -4,18 +4,17 @@ from sqlalchemy import func, Integer, and_, cast, BigInteger, or_, desc
 from sqlalchemy.orm import undefer
 from sqlalchemy.dialects import postgresql
 
-from models.main import db, User
+from models.main import db
 from models.enums import PrescriptionReviewTypeEnum
 from models.prescription import Prescription, Patient, Department
 from decorators.has_permission_decorator import has_permission, Permission
 from routes.utils import none2zero, lenghStay, gen_agg_id
 from utils import dateutils
-from services import prescription_service
+from services import prescription_service, feature_service
 
 
 @has_permission(Permission.READ_PRESCRIPTION)
 def get_prioritization_list(
-    user_context: User,
     idSegment=None,
     idSegmentList=[],
     idDept=[],
@@ -43,7 +42,7 @@ def get_prioritization_list(
     global_score_max=None,
     pending_interventions=None,
 ):
-    is_cpoe = user_context.cpoe()
+    is_cpoe = feature_service.is_cpoe()
 
     q = (
         db.session.query(

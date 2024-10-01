@@ -20,7 +20,11 @@ from models.enums import (
     InterventionStatusEnum,
 )
 from routes.utils import validate, gen_agg_id, timeValue, interactionsList, none2zero
-from services import memory_service, permission_service, data_authorization_service
+from services import (
+    memory_service,
+    data_authorization_service,
+    feature_service,
+)
 from decorators.has_permission_decorator import has_permission, Permission
 from exception.validation_error import ValidationError
 from utils import status
@@ -691,7 +695,7 @@ def _get_date_base_economy(
 ):
     # date base economy
     if economy_type != None and i.date_base_economy == None:
-        if permission_service.is_cpoe(user):
+        if feature_service.is_cpoe():
             if agg_id_prescription == None:
                 return i.date
             else:
@@ -1108,7 +1112,7 @@ def _calc_economy(origin, destiny):
 
 def _get_price_kit(id_prescription, prescription_drug: PrescriptionDrug, user: User):
     group = None
-    if permission_service.is_cpoe(user):
+    if feature_service.is_cpoe():
         group = prescription_drug.cpoe_group
     else:
         group = prescription_drug.solutionGroup

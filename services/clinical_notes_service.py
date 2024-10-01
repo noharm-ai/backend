@@ -4,7 +4,7 @@ from sqlalchemy.orm import undefer
 
 from models.main import db, User
 from models.notes import ClinicalNotes
-from models.prescription import Prescription
+from models.prescription import Prescription, Patient
 from models.enums import UserAuditTypeEnum
 from services import memory_service, exams_service, user_service
 from decorators.has_permission_decorator import has_permission, Permission

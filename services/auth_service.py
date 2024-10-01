@@ -23,7 +23,7 @@ from models.enums import (
     IntegrationStatusEnum,
     UserAuditTypeEnum,
 )
-from services import memory_service, permission_service, user_service
+from services import memory_service, user_service
 from services.admin import admin_integration_status_service
 from config import Config
 from exception.validation_error import ValidationError
@@ -47,6 +47,7 @@ def _auth_user(
     extra_features=[],
 ):
     permissions = Role.get_permissions_from_user(user=user)
+    roles = user.config["roles"] if user.config and "roles" in user.config else []
     user_features = (
         user.config["features"] if user.config and "features" in user.config else []
     )
@@ -72,7 +73,26 @@ def _auth_user(
             },
         )
 
-    claims = {"schema": user_schema, "config": user_config}
+    schema_config = (
+        db.session.query(SchemaConfig)
+        .filter(SchemaConfig.schemaName == user_schema)
+        .first()
+    )
+    if FeatureEnum.DISABLE_CPOE.value in user_features:
+        is_cpoe = False
+    else:
+        is_cpoe = schema_config.cpoe
+
+    # keep compatibility (remove after transition)
+    if is_cpoe:
+        user_config = dict(
+            user.config,
+            **{
+                "roles": roles + ["cpoe"],
+            },
+        )
+
+    claims = {"schema": user_schema, "config": user_config, "cpoe": is_cpoe}
     access_token = create_access_token(identity=user.id, additional_claims=claims)
     refresh_token = create_refresh_token(identity=user.id, additional_claims=claims)
 
@@ -464,9 +484,11 @@ def refresh_token(current_user, current_claims):
         current_claims["schema"]
     )
 
+    permissions = Role.get_permissions_from_user(user=user)
+
     if (
         integration_status == IntegrationStatusEnum.CANCELED.value
-        and not permission_service.has_maintainer_permission(user)
+        and Permission.MAINTAINER not in permissions
     ):
         raise ValidationError(
             "Usuário inválido",

@@ -30,6 +30,7 @@ from services import (
     clinical_notes_service,
     alert_interaction_service,
     alert_service,
+    feature_service,
 )
 from routes.utils import gen_agg_id, data2age, getFeatures, strNone
 
@@ -55,7 +56,7 @@ def route_get_prescription(id_prescription, user_context: User):
             admissionNumber=p.admissionNumber,
             aggDate=p.date,
             idSegment=p.idSegment,
-            is_cpoe=user_context.cpoe(),
+            is_cpoe=feature_service.is_cpoe(),
             is_pmc=memory_service.has_feature("PRIMARYCARE"),
             is_complete=True,
         )

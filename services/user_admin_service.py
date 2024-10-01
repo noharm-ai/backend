@@ -5,7 +5,7 @@ from flask import render_template
 
 from models.main import User, db, UserAuthorization
 from models.enums import FeatureEnum, UserAuditTypeEnum
-from services import permission_service, memory_service, user_service
+from services import memory_service, user_service
 from utils import status
 from config import Config
 from routes.utils import sendEmail
@@ -240,11 +240,12 @@ def _add_authorizations(id_segment_list, user: User, responsible: User):
     for a in responsible_auth_list:
         valid_id_segment_list[str(a.idSegment)] = True
 
+    permissions = Role.get_permissions_from_user(user=responsible)
+
     for id_segment in id_segment_list:
-        if str(
-            id_segment
-        ) not in valid_id_segment_list and not permission_service.has_maintainer_permission(
-            responsible
+        if (
+            str(id_segment) not in valid_id_segment_list
+            and Permission.MAINTAINER not in permissions
         ):
             raise ValidationError(
                 f"Permissão inválida no segmento {id_segment}",

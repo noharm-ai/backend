@@ -14,6 +14,7 @@ from models.enums import FeatureEnum, PrescriptionAuditTypeEnum
 from exception.validation_error import ValidationError
 from services import (
     memory_service,
+    feature_service,
     data_authorization_service,
 )
 from decorators.has_permission_decorator import has_permission, Permission
@@ -181,9 +182,9 @@ def recalculate_prescription(id_prescription: int, user_context: User):
         )
 
     if p.agg:
-        if user_context.cpoe():
+        if feature_service.is_cpoe():
             prescription_results = get_query_prescriptions_by_agg(
-                agg_prescription=p, is_cpoe=user_context.cpoe(), only_id=True
+                agg_prescription=p, is_cpoe=feature_service.is_cpoe(), only_id=True
             ).all()
 
             prescription_ids = []

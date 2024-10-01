@@ -2,12 +2,13 @@ import os
 import logging
 import inspect
 from flask import g
-from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
+from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request, get_jwt
+from flask_jwt_extended.exceptions import NoAuthorizationError
 from functools import wraps
 
 from models.main import db, dbSession, User
+from models.enums import RoleEnum
 from utils import status
-
 from exception.validation_error import ValidationError
 from exception.authorization_error import AuthorizationError
 
@@ -27,6 +28,8 @@ def api_endpoint():
                 dbSession.setSchema(user_context.schema)
                 os.environ["TZ"] = "America/Sao_Paulo"
 
+                g.is_cpoe = _is_cpoe()
+
                 result = f(*args, **kwargs)
 
                 # should check for permission at least once
@@ -39,6 +42,17 @@ def api_endpoint():
                 db.session.remove()
 
                 return {"status": "success", "data": result}, status.HTTP_200_OK
+
+            except NoAuthorizationError:
+                db.session.rollback()
+                db.session.close()
+                db.session.remove()
+
+                return {
+                    "status": "error",
+                    "message": "Login expirado",
+                    "code": "error.authorizationError",
+                }, status.HTTP_401_UNAUTHORIZED
 
             except AuthorizationError as e:
                 db.session.rollback()
@@ -79,3 +93,19 @@ def api_endpoint():
         return decorator_f
 
     return wrapper
+
+
+def _is_cpoe():
+    claims = get_jwt()
+    is_cpoe = claims.get("cpoe", None)
+
+    if is_cpoe != None:
+        return is_cpoe
+
+    # keep compatibility (remove after transition)
+    config = claims.get("config", None)
+    roles = []
+    if config != None:
+        roles = config.get("roles", [])
+
+    return RoleEnum.CPOE.value in roles

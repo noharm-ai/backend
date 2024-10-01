@@ -21,6 +21,7 @@ from services import (
     memory_service,
     prescription_service,
     prescription_drug_service,
+    feature_service,
 )
 
 
@@ -132,7 +133,7 @@ def check_prescription(
 
 def _update_agg_status(prescription: Prescription, user: User, extra={}):
     unchecked_prescriptions = prescription_service.get_query_prescriptions_by_agg(
-        agg_prescription=prescription, is_cpoe=user.cpoe()
+        agg_prescription=prescription, is_cpoe=feature_service.is_cpoe()
     )
     unchecked_prescriptions = unchecked_prescriptions.filter(Prescription.status != "s")
 
@@ -157,7 +158,7 @@ def _check_agg_internal_prescriptions(
     prescription, p_status, user, has_lock_feature=False, extra={}
 ):
     q_internal_prescription = prescription_service.get_query_prescriptions_by_agg(
-        agg_prescription=prescription, is_cpoe=user.cpoe()
+        agg_prescription=prescription, is_cpoe=feature_service.is_cpoe()
     )
     q_internal_prescription = q_internal_prescription.filter(
         Prescription.status != p_status
