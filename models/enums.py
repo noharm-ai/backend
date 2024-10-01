@@ -68,6 +68,8 @@ class FeatureEnum(Enum):
     CONCILIATION = "CONCILIATION"
     CONCILIATION_EDIT = "CONCILIATION_EDIT"
 
+    STAGING_ACCESS = "STAGING_ACCESS"
+
 
 class PrescriptionAuditTypeEnum(Enum):
     CHECK = 1

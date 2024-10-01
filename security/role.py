@@ -2,6 +2,7 @@ from enum import Enum
 from typing import List
 
 from security.permission import Permission
+from models.main import User
 
 
 class Role(Enum):
@@ -45,6 +46,8 @@ class Role(Enum):
         Permission.ADMIN_USERS,
         Permission.READ_USERS,
         Permission.WRITE_USERS,
+        Permission.MULTI_SCHEMA,
+        Permission.MAINTAINER,
     ]
 
     CURATOR = "CURATOR", [
@@ -73,6 +76,8 @@ class Role(Enum):
         Permission.WRITE_SUPPORT,
         Permission.READ_USERS,
         Permission.WRITE_USERS,
+        Permission.MULTI_SCHEMA,
+        Permission.MAINTAINER,
     ]
 
     SERVICE_INTEGRATOR = "SERVICE_INTEGRATOR", [
@@ -127,3 +132,16 @@ class Role(Enum):
     ]
 
     STATIC_USER = "STATIC_USER", [Permission.READ_STATIC]
+
+    @staticmethod
+    def get_permissions_from_user(user: User) -> List[Permission]:
+        roles = user.config["roles"] if user.config and "roles" in user.config else []
+        user_permissions = []
+        for r in roles:
+            try:
+                role = Role(str(r).upper())
+                user_permissions = user_permissions + role.permissions
+            except:
+                pass
+
+        return user_permissions

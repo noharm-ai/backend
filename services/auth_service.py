@@ -11,15 +11,15 @@ from flask_jwt_extended import (
 from cryptography.hazmat.primitives import serialization
 from flask_sqlalchemy.session import Session
 from markupsafe import escape as escape_html
+from sqlalchemy import asc
 
-from models.main import *
-from models.appendix import *
-from models.prescription import *
+from models.main import db, dbSession, Notify, User
+from models.appendix import Memory, SchemaConfig
+from models.segment import Hospital, Segment
 from models.enums import (
     NoHarmENV,
     MemoryEnum,
     FeatureEnum,
-    RoleEnum,
     IntegrationStatusEnum,
     UserAuditTypeEnum,
 )
@@ -27,35 +27,32 @@ from services import memory_service, permission_service, user_service
 from services.admin import admin_integration_status_service
 from config import Config
 from exception.validation_error import ValidationError
+from utils import status
+from security.role import Role
+from security.permission import Permission
 
 
-def _has_force_schema_permission(roles, schema):
-    if schema != "hsc_test":
+def _has_force_schema_permission(user: User):
+    if user.schema != "hsc_test":
         return False
 
-    return (
-        RoleEnum.ADMIN.value in roles or RoleEnum.TRAINING.value in roles
-    ) and RoleEnum.MULTI_SCHEMA.value in roles
+    permissions = Role.get_permissions_from_user(user=user)
+
+    return Permission.MULTI_SCHEMA in permissions
 
 
 def _auth_user(
     user,
     force_schema=None,
-    default_roles=[],
-    run_as_basic_user=False,
     extra_features=[],
 ):
-    roles = user.config["roles"] if user.config and "roles" in user.config else []
+    permissions = Role.get_permissions_from_user(user=user)
     user_features = (
         user.config["features"] if user.config and "features" in user.config else []
     )
 
     if Config.ENV == NoHarmENV.STAGING.value:
-        if (
-            RoleEnum.SUPPORT.value not in roles
-            and RoleEnum.ADMIN.value not in roles
-            and RoleEnum.STAGING.value not in roles
-        ):
+        if FeatureEnum.STAGING_ACCESS.value not in user_features:
             raise ValidationError(
                 "Este é o ambiente de homologação da NoHarm. Acesse {} para utilizar a NoHarm.".format(
                     Config.APP_URL
@@ -66,39 +63,14 @@ def _auth_user(
 
     user_schema = user.schema
     user_config = user.config
-    if force_schema and _has_force_schema_permission(roles, user.schema):
+    if force_schema and _has_force_schema_permission(user):
         user_schema = force_schema
         user_config = dict(
             user.config,
             **{
-                "roles": roles + default_roles,
                 "features": user_features + extra_features,
             },
         )
-
-        if (
-            RoleEnum.ADMIN.value in default_roles
-            or RoleEnum.TRAINING.value in default_roles
-        ):
-            raise ValidationError(
-                "Permissão extra inválida",
-                "errors.unauthorizedUser",
-                status.HTTP_401_UNAUTHORIZED,
-            )
-
-        if run_as_basic_user:
-            basic_user_roles = roles + default_roles
-            if RoleEnum.ADMIN.value in basic_user_roles:
-                basic_user_roles.remove(RoleEnum.ADMIN.value)
-            if RoleEnum.TRAINING.value in basic_user_roles:
-                basic_user_roles.remove(RoleEnum.TRAINING.value)
-            if RoleEnum.SUPPORT.value in basic_user_roles:
-                basic_user_roles.remove(RoleEnum.SUPPORT.value)
-
-            if RoleEnum.READONLY.value not in basic_user_roles:
-                basic_user_roles.append(RoleEnum.READONLY.value)
-
-            user_config = dict(user.config, **{"roles": basic_user_roles})
 
     claims = {"schema": user_schema, "config": user_config}
     access_token = create_access_token(identity=user.id, additional_claims=claims)
@@ -159,7 +131,7 @@ def _auth_user(
     )
     if (
         integration_status == IntegrationStatusEnum.CANCELED.value
-        and not permission_service.has_maintainer_permission(user)
+        and Permission.MAINTAINER not in permissions
     ):
         raise ValidationError(
             "Integração Cancelada",
@@ -203,6 +175,7 @@ def _auth_user(
         "hospitals": hospitalList,
         "logoutUrl": logout_url,
         "integrationStatus": integration_status,
+        "permissions": [p.name for p in permissions],
     }
 
 
@@ -216,9 +189,7 @@ def pre_auth(email, password):
             status.HTTP_400_BAD_REQUEST,
         )
 
-    roles = user.config["roles"] if user.config and "roles" in user.config else []
-
-    if _has_force_schema_permission(roles, user.schema):
+    if _has_force_schema_permission(user):
         schema_results = db.session.query(SchemaConfig).order_by(
             SchemaConfig.schemaName
         )
@@ -250,8 +221,6 @@ def auth_local(
     email,
     password,
     force_schema=None,
-    default_roles=[],
-    run_as_basic_user=False,
     extra_features=[],
 ):
     preCheckUser = User.query.filter_by(email=email.lower()).first()
@@ -278,19 +247,13 @@ def auth_local(
     db_session.close()
 
     if features is not None and FeatureEnum.OAUTH.value in features.value:
-        roles = (
-            preCheckUser.config["roles"]
-            if preCheckUser.config and "roles" in preCheckUser.config
-            else []
+        raise ValidationError(
+            "Utilize o endereço {}/login/{} para fazer login na NoHarm".format(
+                Config.APP_URL, preCheckUser.schema
+            ),
+            "{}/login/{}".format(Config.APP_URL, preCheckUser.schema),
+            status.HTTP_401_UNAUTHORIZED,
         )
-        if RoleEnum.SUPPORT.value not in roles and "oauth-test" not in roles:
-            raise ValidationError(
-                "Utilize o endereço {}/login/{} para fazer login na NoHarm".format(
-                    Config.APP_URL, preCheckUser.schema
-                ),
-                "{}/login/{}".format(Config.APP_URL, preCheckUser.schema),
-                status.HTTP_401_UNAUTHORIZED,
-            )
 
     user = User.authenticate(email, password)
 
@@ -304,8 +267,6 @@ def auth_local(
     return _auth_user(
         user,
         force_schema=force_schema,
-        default_roles=default_roles,
-        run_as_basic_user=run_as_basic_user,
         extra_features=extra_features,
     )
 
@@ -418,16 +379,6 @@ def auth_provider(code, schema):
     name_attr = oauth_config["name_attr"]
 
     if email_attr not in jwt_user or jwt_user[email_attr] is None:
-        if (
-            Config.ENV == NoHarmENV.DEVELOPMENT.value
-            or Config.ENV == NoHarmENV.STAGING.value
-        ):
-            raise ValidationError(
-                "OAUTH: email inválido",
-                "errors.unauthorizedUser",
-                status.HTTP_401_UNAUTHORIZED,
-            )
-
         raise ValidationError(
             "OAUTH: email inválido",
             "errors.unauthorizedUser",
@@ -448,18 +399,11 @@ def auth_provider(code, schema):
     )
 
     if features is None or FeatureEnum.OAUTH.value not in features.value:
-        roles = (
-            nh_user.config["roles"]
-            if nh_user.config and "roles" in nh_user.config
-            else []
+        raise ValidationError(
+            "OAUTH bloqueado",
+            "errors.unauthorizedUser",
+            status.HTTP_401_UNAUTHORIZED,
         )
-
-        if "oauth-test" not in roles:
-            raise ValidationError(
-                "OAUTH bloqueado",
-                "errors.unauthorizedUser",
-                status.HTTP_401_UNAUTHORIZED,
-            )
 
     return _auth_user(nh_user)
 

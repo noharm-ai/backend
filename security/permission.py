@@ -52,3 +52,6 @@ class Permission(Enum):
     RUN_AS = "permission to service users"
 
     READ_STATIC = "read static permission"
+
+    MULTI_SCHEMA = "grants multi schema access"
+    MAINTAINER = "grants access to closed contracts"

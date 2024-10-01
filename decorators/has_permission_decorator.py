@@ -40,18 +40,7 @@ def has_permission(*permissions: List[Permission]):
             if user_context == None:
                 raise AuthorizationError()
 
-            roles = (
-                user_context.config["roles"]
-                if user_context.config and "roles" in user_context.config
-                else []
-            )
-            user_permissions = []
-            for r in roles:
-                try:
-                    role = Role(str(r).upper())
-                    user_permissions = user_permissions + role.permissions
-                except:
-                    pass
+            user_permissions = Role.get_permissions_from_user(user=user_context)
 
             # inject extra params
             if "user_permissions" in inspect.signature(f).parameters:

@@ -41,9 +41,7 @@ def auth():
     email = data.get("email", None)
     password = data.get("password", None)
     schema = data.get("schema", None) if data.get("schema", None) != None else None
-    default_roles = data.get("defaultRoles", [])
     extra_features = data.get("extraFeatures", [])
-    run_as_basic_user = data.get("runAsBasicUser", False)
     refresh_token = None
 
     try:
@@ -51,8 +49,6 @@ def auth():
             email,
             password,
             force_schema=schema,
-            default_roles=default_roles,
-            run_as_basic_user=run_as_basic_user,
             extra_features=extra_features,
         )
 
