@@ -77,7 +77,7 @@ def get_by_kind(kinds) -> dict:
 
 
 @has_permission(Permission.WRITE_BASIC_FEATURES)
-def save_memory(id, kind, value, user):
+def save_memory(id, kind, value, user_context: User):
     newMem = False
     if id:
         mem = Memory.query.get(id)
@@ -88,7 +88,7 @@ def save_memory(id, kind, value, user):
                 status.HTTP_400_BAD_REQUEST,
             )
 
-        if is_private(key=kind) and user.id != mem.user:
+        if is_private(key=kind) and user_context.id != mem.user:
             raise ValidationError(
                 "Usuário não possui permissão para alterar este registro",
                 "errors.unauthorizedUser",
@@ -102,7 +102,7 @@ def save_memory(id, kind, value, user):
     mem.kind = kind
     mem.value = value
     mem.update = datetime.today()
-    mem.user = user.id
+    mem.user = user_context.id
 
     if is_admin_memory(mem.kind):
         raise ValidationError(
@@ -119,7 +119,7 @@ def save_memory(id, kind, value, user):
 
 
 @has_permission(Permission.WRITE_BASIC_FEATURES)
-def save_unique_memory(kind, value, user):
+def save_unique_memory(kind, value, user_context: User):
     if is_admin_memory(kind):
         raise ValidationError(
             "Usuário não possui permissão para alterar este registro",
@@ -134,7 +134,7 @@ def save_unique_memory(kind, value, user):
         newMem = True
         mem = Memory()
     else:
-        if is_private(key=kind) and user.id != mem.user:
+        if is_private(key=kind) and user_context.id != mem.user:
             raise ValidationError(
                 "Usuário não possui permissão para alterar este registro",
                 "errors.unauthorizedUser",
@@ -144,7 +144,7 @@ def save_unique_memory(kind, value, user):
     mem.kind = kind
     mem.value = value
     mem.update = datetime.today()
-    mem.user = user.id
+    mem.user = user_context.id
 
     if newMem:
         db.session.add(mem)

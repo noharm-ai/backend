@@ -1,11 +1,10 @@
 from utils import status
 from sqlalchemy import case, text
+from datetime import datetime
 
-from models.main import *
-from models.appendix import *
-from models.segment import *
-from models.enums import RoleEnum
-from services import permission_service
+from models.main import db, User
+from models.prescription import InterventionReason
+from models.appendix import SchemaConfig
 from decorators.has_permission_decorator import has_permission, Permission
 
 from exception.validation_error import ValidationError

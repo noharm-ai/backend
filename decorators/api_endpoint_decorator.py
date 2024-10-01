@@ -69,7 +69,7 @@ def api_endpoint():
 
                 logging.basicConfig()
                 logger = logging.getLogger("noharm.backend")
-                logger.error(str(e))
+                logger.exception(str(e))
 
                 return {
                     "status": "error",

@@ -79,7 +79,7 @@ class Role(Enum):
         Permission.RUN_AS,
     ]
 
-    PRESCRIPTION_ANALIST = "PRESCRIPTION_ANALIST", [
+    PRESCRIPTION_ANALYST = "PRESCRIPTION_ANALYST", [
         Permission.READ_PRESCRIPTION,
         Permission.WRITE_PRESCRIPTION,
         Permission.READ_REPORTS,

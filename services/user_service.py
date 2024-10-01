@@ -1,13 +1,12 @@
 import re
 from flask import request, render_template
-from flask_jwt_extended import decode_token, create_access_token, get_jwt_identity
+from flask_jwt_extended import decode_token, create_access_token
 from flask_mail import Message
 from sqlalchemy import desc, func, or_, asc
 from datetime import datetime, timedelta
 
 from models.main import User, UserAudit, db, mail
 from models.enums import UserAuditTypeEnum
-from services import permission_service
 from config import Config
 from decorators.has_permission_decorator import has_permission, Permission
 from exception.validation_error import ValidationError
@@ -123,23 +122,8 @@ def is_valid_password(password):
     return re.fullmatch(r"^(?=.*[A-Z])(?=.*[0-9])(?=.*[a-z]).{8,}$", password)
 
 
-def admin_get_reset_token(id_user: int):
-    user = User.find(get_jwt_identity())
-
-    if not user:
-        raise ValidationError(
-            "Usuário inexistente.",
-            "errors.businessRules",
-            status.HTTP_400_BAD_REQUEST,
-        )
-
-    if not permission_service.is_admin(user):
-        raise ValidationError(
-            "Usuário inválido.",
-            "errors.businessRules",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-
+@has_permission(Permission.ADMIN_USERS)
+def admin_get_reset_token(id_user: int, user_context: User):
     reset_user = db.session.query(User).filter(User.id == id_user).first()
     if not reset_user:
         raise ValidationError(
@@ -148,7 +132,9 @@ def admin_get_reset_token(id_user: int):
             status.HTTP_400_BAD_REQUEST,
         )
 
-    return get_reset_token(email=reset_user.email, send_email=False, responsible=user)
+    return get_reset_token(
+        email=reset_user.email, send_email=False, responsible=user_context
+    )
 
 
 def get_reset_token(email: str, send_email=True, responsible: User = None):

@@ -1,12 +1,24 @@
+import copy
 from sqlalchemy import text, desc
+from datetime import datetime, timedelta
 
 from models.main import db
-from models.appendix import *
-from models.prescription import *
+from models.prescription import Patient, Exams, SegmentExam
 from models.notes import ClinicalNotes
 from services import memory_service
 from decorators.has_permission_decorator import has_permission, Permission
 from exception.validation_error import ValidationError
+from utils import status
+from routes.utils import (
+    formatExam,
+    mdrd_calc,
+    cg_calc,
+    ckd_calc,
+    ckd_calc_21,
+    schwartz1_calc,
+    schwartz2_calc,
+    slugify,
+)
 
 
 def create_exam(
@@ -246,4 +258,47 @@ def _history_calc(typeExam, examsList, patient):
 
         item["date"] = e["date"]
         results.append(item)
+    return results
+
+
+@has_permission(Permission.ADMIN_EXAMS)
+def get_exams_default_refs():
+    query = text(
+        """
+        select 
+            s.nome as segment,
+            se.tpexame as type_exam,
+            se.nome as name,
+            se.abrev as initials,
+            se.referencia as ref,
+            se.min,
+            se.max,
+            se.posicao as order
+        from 
+            hsc_test.segmentoexame se
+            inner join hsc_test.segmento s on (se.idsegmento = s.idsegmento)
+        where 
+            se.idsegmento in (1, 3)
+        order by 
+            s.idsegmento, se.nome 
+    """
+    )
+
+    refs = db.session.execute(query).all()
+
+    results = []
+    for r in refs:
+        results.append(
+            {
+                "segment": r.segment,
+                "type": r.type_exam,
+                "name": r.name,
+                "initials": r.initials,
+                "ref": r.ref,
+                "min": r.min,
+                "max": r.max,
+                "order": r.order,
+            }
+        )
+
     return results
