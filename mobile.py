@@ -116,13 +116,13 @@ CORS(app, origins=[Config.MAIL_HOST], supports_credentials=True)
 
 if Config.ENV != NoHarmENV.PRODUCTION.value:
     logging.basicConfig()
-    # logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)
+    logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)
     logging.getLogger("noharm.backend").setLevel(logging.DEBUG)
 
 
 @app.route("/version", methods=["GET"])
 def getVersion():
-    return {"status": "success", "data": "v3.35-beta"}, status.HTTP_200_OK
+    return {"status": "success", "data": "v4.00-beta"}, status.HTTP_200_OK
 
 
 if __name__ == "__main__":

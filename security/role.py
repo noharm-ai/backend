@@ -129,6 +129,15 @@ class Role(Enum):
         Permission.WRITE_SUPPORT,
     ]
 
+    RESEARCHER = "RESEARCHER", [
+        Permission.READ_REPORTS,
+        Permission.READ_PRESCRIPTION,
+        Permission.READ_BASIC_FEATURES,
+        Permission.READ_DISCHARGE_SUMMARY,
+        Permission.READ_SUPPORT,
+        Permission.WRITE_SUPPORT,
+    ]
+
     DISCHARGE_MANAGER = "DISCHARGE_MANAGER", [
         Permission.WRITE_BASIC_FEATURES,
         Permission.READ_BASIC_FEATURES,

@@ -25,10 +25,11 @@ def get_user_list(user_context: User):
         db.session.query(User, segments_query.scalar_subquery())
         .filter(User.schema == user_context.schema)
         .filter(
-            or_(
-                ~User.config["roles"].astext.contains("suporte"),
-                User.config["roles"] == None,
-            )
+            ~User.config["roles"].astext.contains(Role.ADMIN.value),
+            ~User.config["roles"].astext.contains(Role.CURATOR.value),
+            ~User.config["roles"].astext.contains(Role.RESEARCHER.value),
+            ~User.config["roles"].astext.contains(Role.SERVICE_INTEGRATOR.value),
+            ~User.config["roles"].astext.contains(Role.STATIC_USER.value),
         )
         .order_by(desc(User.active), asc(User.name))
         .all()
