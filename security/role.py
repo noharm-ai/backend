@@ -48,6 +48,7 @@ class Role(Enum):
         Permission.WRITE_USERS,
         Permission.MULTI_SCHEMA,
         Permission.MAINTAINER,
+        Permission.READ_DISPENSATION,
     ]
 
     CURATOR = "CURATOR", [
@@ -78,6 +79,7 @@ class Role(Enum):
         Permission.WRITE_USERS,
         Permission.MULTI_SCHEMA,
         Permission.MAINTAINER,
+        Permission.READ_DISPENSATION,
     ]
 
     SERVICE_INTEGRATOR = "SERVICE_INTEGRATOR", [
@@ -92,6 +94,11 @@ class Role(Enum):
         Permission.READ_BASIC_FEATURES,
         Permission.READ_SUPPORT,
         Permission.WRITE_SUPPORT,
+    ]
+
+    DISPENSING_MANAGER = "DISPENSING_MANAGER", [
+        Permission.READ_DISPENSATION,
+        Permission.WRITE_DISPENSATION,
     ]
 
     USER_MANAGER = "USER_MANAGER", [

@@ -215,6 +215,7 @@ def _has_valid_roles(roles):
         Role.DISCHARGE_MANAGER.value,
         Role.USER_MANAGER.value,
         Role.VIEWER.value,
+        Role.DISPENSING_MANAGER.value,
     ]
 
     for r in roles:

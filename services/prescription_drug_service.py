@@ -111,7 +111,7 @@ def count_drugs_by_prescription(
         return q.count()
 
 
-@has_permission(Permission.WRITE_PRESCRIPTION)
+@has_permission(Permission.WRITE_DISPENSATION)
 def update_pd_form(pd_list, user_context: User):
     for pd in pd_list:
         drug = drug = (

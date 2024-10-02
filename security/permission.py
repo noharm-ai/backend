@@ -49,6 +49,9 @@ class Permission(Enum):
     READ_USERS = "permission to view users list"
     WRITE_USERS = "permission to create and edit users"
 
+    READ_DISPENSATION = "permission to view dispensation info"
+    WRITE_DISPENSATION = "permission to change dispensation info"
+
     RUN_AS = "permission to service users"
 
     READ_STATIC = "read static permission"
