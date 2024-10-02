@@ -78,7 +78,10 @@ def _auth_user(
         .filter(SchemaConfig.schemaName == user_schema)
         .first()
     )
-    if FeatureEnum.DISABLE_CPOE.value in user_features:
+    if (
+        FeatureEnum.DISABLE_CPOE.value in user_features
+        or FeatureEnum.DISABLE_CPOE.value in extra_features
+    ):
         is_cpoe = False
     else:
         is_cpoe = schema_config.cpoe
@@ -86,7 +89,7 @@ def _auth_user(
     # keep compatibility (remove after transition)
     if is_cpoe:
         user_config = dict(
-            user.config,
+            user_config,
             **{
                 "roles": roles + ["cpoe"],
             },
