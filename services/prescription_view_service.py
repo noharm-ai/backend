@@ -99,7 +99,7 @@ def internal_get_prescription(
     drugs = PrescriptionDrug.findByPrescription(
         prescription[0].id,
         patient.admissionNumber,
-        prescription[0].date,
+        prescription[0].date if prescription[0].agg else None,
         prescription[0].idSegment,
         is_cpoe,
         is_pmc,

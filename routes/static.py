@@ -24,7 +24,7 @@ def create_aggregated_by_prescription(schema, id_prescription):
     user_context = User()
     user_context.config = {"roles": ["STATIC_USER"]}
     g.user_context = user_context
-    g.is_cpoe = is_cpoe
+    g.is_cpoe = bool(is_cpoe)
 
     try:
         prescription_agg_service.create_agg_prescription_by_prescription(
