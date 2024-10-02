@@ -16,9 +16,8 @@ app_stc = Blueprint("app_stc", __name__)
 @app_stc.route(
     "/static/<string:schema>/prescription/<int:id_prescription>", methods=["GET"]
 )
-def computePrescription(schema, id_prescription):
+def create_aggregated_by_prescription(schema, id_prescription):
     is_cpoe = request.args.get("cpoe", False)
-    is_pmc = request.args.get("pmc", False)
     out_patient = request.args.get("outpatient", None)
     force = request.args.get("force", False)
 
@@ -29,7 +28,10 @@ def computePrescription(schema, id_prescription):
 
     try:
         prescription_agg_service.create_agg_prescription_by_prescription(
-            schema, id_prescription, is_cpoe, out_patient, is_pmc=is_pmc, force=force
+            schema=schema,
+            id_prescription=id_prescription,
+            out_patient=out_patient,
+            force=force,
         )
     except ValidationError as e:
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
@@ -62,7 +64,7 @@ def create_aggregated_prescription_by_date(schema, admission_number):
 
     try:
         prescription_agg_service.create_agg_prescription_by_date(
-            schema, admission_number, p_date, is_cpoe
+            schema, admission_number, p_date
         )
     except ValidationError as e:
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus

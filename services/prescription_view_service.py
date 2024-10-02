@@ -36,81 +36,34 @@ from routes.utils import gen_agg_id, data2age, getFeatures, strNone
 
 
 @has_permission(Permission.READ_PRESCRIPTION)
-def route_get_prescription(id_prescription, user_context: User):
-    p = (
-        db.session.query(Prescription)
-        .filter(Prescription.id == id_prescription)
-        .first()
-    )
-
-    if p is None:
-        raise ValidationError(
-            "Prescrição inexistente",
-            "errors.invalidRecord",
-            status.HTTP_400_BAD_REQUEST,
-        )
-
-    if p.agg:
-        return internal_get_prescription(
-            idPrescription=id_prescription,
-            admissionNumber=p.admissionNumber,
-            aggDate=p.date,
-            idSegment=p.idSegment,
-            is_cpoe=feature_service.is_cpoe(),
-            is_pmc=memory_service.has_feature("PRIMARYCARE"),
-            is_complete=True,
-        )
-    else:
-        return internal_get_prescription(
-            idPrescription=id_prescription, is_complete=True
-        )
+def route_get_prescription(id_prescription):
+    return internal_get_prescription(idPrescription=id_prescription, is_complete=True)
 
 
-@has_permission(Permission.READ_PRESCRIPTION)
-def static_get_prescription(
-    idPrescription=None,
-    admissionNumber=None,
-    aggDate=None,
-    idSegment=None,
-    is_cpoe=False,
-    is_pmc=False,
-    is_complete=False,
-):
+@has_permission(Permission.READ_STATIC)
+def static_get_prescription(idPrescription=None):
     return internal_get_prescription(
         idPrescription=idPrescription,
-        admissionNumber=admissionNumber,
-        aggDate=aggDate,
-        idSegment=idSegment,
-        is_cpoe=is_cpoe,
-        is_pmc=is_pmc,
-        is_complete=is_complete,
+        is_complete=False,
     )
 
 
 def internal_get_prescription(
     idPrescription=None,
-    admissionNumber=None,
-    aggDate=None,
-    idSegment=None,
-    is_cpoe=False,
-    is_pmc=False,
     is_complete=False,
 ):
     start_date = datetime.now()
 
-    if idPrescription:
-        prescription = Prescription.getPrescription(idPrescription)
-    else:
-        prescription = Prescription.getPrescriptionAgg(
-            admissionNumber, aggDate, idSegment
-        )
-
+    prescription = Prescription.getPrescription(idPrescription)
     if prescription is None:
         raise ValidationError(
             "Prescrição inexistente",
             "errors.invalidRecord",
             status.HTTP_400_BAD_REQUEST,
         )
+
+    is_cpoe = feature_service.is_cpoe()
+    is_pmc = memory_service.has_feature("PRIMARYCARE")
 
     patient = prescription[1]
     patientWeight = None
@@ -137,21 +90,32 @@ def internal_get_prescription(
     lastDept = Prescription.lastDeptbyAdmission(
         prescription[0].id,
         patient.admissionNumber,
-        ref_date=aggDate if aggDate != None else prescription[0].date,
+        ref_date=prescription[0].date,
     )
 
     _log_perf(start_date, "GET PRESCRIPTION")
 
     start_date = datetime.now()
     drugs = PrescriptionDrug.findByPrescription(
-        prescription[0].id, patient.admissionNumber, aggDate, idSegment, is_cpoe, is_pmc
+        prescription[0].id,
+        patient.admissionNumber,
+        prescription[0].date,
+        prescription[0].idSegment,
+        is_cpoe,
+        is_pmc,
     )
     interventions = intervention_service.get_interventions(
         admissionNumber=patient.admissionNumber
     )
     headers = (
-        Prescription.getHeaders(admissionNumber, aggDate, idSegment, is_pmc, is_cpoe)
-        if aggDate
+        Prescription.getHeaders(
+            patient.admissionNumber,
+            prescription[0].date,
+            prescription[0].idSegment,
+            is_pmc,
+            is_cpoe,
+        )
+        if prescription[0].agg
         else []
     )
     _log_perf(start_date, "GET DRUGS AND INTERVENTIONS")
@@ -289,7 +253,7 @@ def internal_get_prescription(
         interventions,
         relations,
         exams,
-        aggDate is not None,
+        prescription[0].agg,
         patient.dialysis,
         alerts,
         is_cpoe,
@@ -356,7 +320,7 @@ def internal_get_prescription(
 
     drugList.sumAlerts()
 
-    if aggDate:
+    if prescription[0].agg:
         headers = _build_headers(headers, pDrugs, pSolution, pProcedures)
 
         if is_cpoe:
