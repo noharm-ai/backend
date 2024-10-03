@@ -130,12 +130,11 @@ def upsert_user(data: dict, user_context: User):
         db.session.flush()
 
         # authorizations
-        if memory_service.has_feature(FeatureEnum.AUTHORIZATION_SEGMENT.value):
-            _add_authorizations(
-                id_segment_list=id_segment_list,
-                user=newUser,
-                responsible=user_context,
-            )
+        _add_authorizations(
+            id_segment_list=id_segment_list,
+            user=newUser,
+            responsible=user_context,
+        )
 
         user_service.create_audit(
             auditType=UserAuditTypeEnum.CREATE,
@@ -192,12 +191,11 @@ def upsert_user(data: dict, user_context: User):
         db.session.flush()
 
         # authorizations
-        if memory_service.has_feature(FeatureEnum.OAUTH.value):
-            _add_authorizations(
-                id_segment_list=id_segment_list,
-                user=updatedUser,
-                responsible=user_context,
-            )
+        _add_authorizations(
+            id_segment_list=id_segment_list,
+            user=updatedUser,
+            responsible=user_context,
+        )
 
         user_service.create_audit(
             auditType=UserAuditTypeEnum.UPDATE,

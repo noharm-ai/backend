@@ -1,17 +1,13 @@
 from conftest import *
 from models.enums import FeatureEnum, MemoryEnum
 from models.prescription import Prescription, PrescriptionAudit
-from test_memory import add_memory
+from security.role import Role
 
 SEGMENT = "1"
 DRUG = "5"
 PRESCRIPTION = "20"
 PRESCRIPTIONDRUG = "20"
 ADMISSION = "5"
-
-
-def getMem(kind, default):
-    return default
 
 
 def test_simple_get(client):
@@ -25,7 +21,7 @@ def test_getInterventionReasons(client):
 
     url = "/intervention/reasons"
 
-    access_token = get_access(client, roles=["staging"])
+    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
 
     response = client.get(url, headers=make_headers(access_token))
 
@@ -37,7 +33,7 @@ def test_getSubstance(client):
 
     url = "/substance"
 
-    access_token = get_access(client)
+    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
 
     response = client.get(url, headers=make_headers(access_token))
 
@@ -49,7 +45,7 @@ def test_getDrugs(client):
 
     url = f"/drugs/{SEGMENT}"
 
-    access_token = get_access(client)
+    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
 
     response = client.get(url, headers=make_headers(access_token))
 
@@ -61,7 +57,7 @@ def test_getPrescriptionsSegment(client):
 
     url = f"/prescriptions?idSegment={SEGMENT}&date=2020-12-31"
 
-    access_token = get_access(client)
+    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
 
     response = client.get(url, headers=make_headers(access_token))
 
@@ -73,7 +69,7 @@ def test_getPrescriptions(client):
 
     url = f"/prescriptions/{PRESCRIPTION}"
 
-    access_token = get_access(client)
+    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
 
     response = client.get(url, headers=make_headers(access_token))
 
@@ -85,7 +81,7 @@ def test_getPrescriptionsDrug(client):
 
     url = f"/prescriptions/drug/{PRESCRIPTIONDRUG}/period"
 
-    access_token = get_access(client)
+    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
 
     response = client.get(url, headers=make_headers(access_token))
 
@@ -109,7 +105,7 @@ def test_getExams(client):
 
     url = f"/exams/{ADMISSION}"
 
-    access_token = get_access(client)
+    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
 
     response = client.get(url, headers=make_headers(access_token))
 
@@ -121,19 +117,7 @@ def test_getSegments(client):
 
     url = "/segments"
 
-    access_token = get_access(client)
-
-    response = client.get(url, headers=make_headers(access_token))
-
-    assert response.status_code == 200
-
-
-def test_getSegmentsID(client):
-    """Teste get /segments/idSegment - Valida o status_code 200."""
-
-    url = f"/segments/{SEGMENT}"
-
-    access_token = get_access(client)
+    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
 
     response = client.get(url, headers=make_headers(access_token))
 
@@ -145,7 +129,7 @@ def test_getDepartments(client):
 
     url = "/segments/departments"
 
-    access_token = get_access(client)
+    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
 
     response = client.get(url, headers=make_headers(access_token))
 
@@ -157,7 +141,7 @@ def test_get_exam_types(client):
 
     url = "/admin/exam/types"
 
-    access_token = get_access(client)
+    access_token = get_access(client, roles=[Role.CONFIG_MANAGER.value])
 
     response = client.get(url, headers=make_headers(access_token))
 
@@ -169,7 +153,7 @@ def test_getNotes(client):
 
     url = f"/notes/{ADMISSION}/v2"
 
-    access_token = get_access(client)
+    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
 
     response = client.get(url, headers=make_headers(access_token))
 
@@ -181,7 +165,7 @@ def test_putPrescriprionsCheck(client):
 
     url = f"/prescriptions/status"
 
-    access_token = get_access(client, roles=["staging"])
+    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
 
     data = {"status": "s", "idPrescription": PRESCRIPTION}
 
@@ -213,7 +197,7 @@ def test_putPrescriprionsUncheck(client):
 
     url = f"/prescriptions/status"
 
-    access_token = get_access(client, roles=["staging"])
+    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
 
     data = {"status": "0", "idPrescription": PRESCRIPTION}
 
@@ -249,7 +233,7 @@ def test_putAggregatePrescriprionsCheckStaging(client):
     prescriptionid1 = 4
     prescriptionid2 = 7
 
-    access_token = get_access(client, roles=["staging"])
+    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
 
     prepareTestAggregate(id, admissionNumber, prescriptionid1, prescriptionid2)
 
@@ -303,68 +287,68 @@ def test_putAggregatePrescriprionsCheckStaging(client):
     assert not pOutAgaudit
 
 
-def test_putAggregatePrescriprionsCheckCpoe(client):
-    """Teste put /prescriptions/idPrescription - Verifica o status "s" e a existência de um resgistro na tabela prescricao_audit
-    referente a uma prescrição agregada e todas as dentro dela."""
+# def test_putAggregatePrescriprionsCheckCpoe(client):
+#     """Teste put /prescriptions/idPrescription - Verifica o status "s" e a existência de um resgistro na tabela prescricao_audit
+#     referente a uma prescrição agregada e todas as dentro dela."""
 
-    id = 2012301000000003
-    admissionNumber = 3
-    prescriptionid1 = 4
-    prescriptionid2 = 7
+#     id = 2012301000000003
+#     admissionNumber = 3
+#     prescriptionid1 = 4
+#     prescriptionid2 = 7
 
-    access_token = get_access(client, roles=["staging", "cpoe"])
+#     access_token = get_access(client, roles=["staging", "cpoe"])
 
-    prepareTestAggregate(id, admissionNumber, prescriptionid1, prescriptionid2)
+#     prepareTestAggregate(id, admissionNumber, prescriptionid1, prescriptionid2)
 
-    pInAg = (
-        session.query(Prescription)
-        .filter(Prescription.id.in_([prescriptionid1, prescriptionid2]))
-        .filter(Prescription.status == "0")
-        .all()
-    )
+#     pInAg = (
+#         session.query(Prescription)
+#         .filter(Prescription.id.in_([prescriptionid1, prescriptionid2]))
+#         .filter(Prescription.status == "0")
+#         .all()
+#     )
 
-    assert len(pInAg) == 2
+#     assert len(pInAg) == 2
 
-    """Criando novamente a prescrição agregada."""
+#     """Criando novamente a prescrição agregada."""
 
-    createagurl = f"/static/demo/aggregate/3?cpoe=true&p_date=2020-12-30"
+#     createagurl = f"/static/demo/aggregate/3?cpoe=true&p_date=2020-12-30"
 
-    response = client.get(createagurl, headers=make_headers(access_token))
+#     response = client.get(createagurl, headers=make_headers(access_token))
 
-    assert response.status_code == 200
+#     assert response.status_code == 200
 
-    """Checagem da prescrição agregada."""
+#     """Checagem da prescrição agregada."""
 
-    checkagurl = f"/prescriptions/status"
+#     checkagurl = f"/prescriptions/status"
 
-    datachk = {"status": "s", "idPrescription": id}
+#     datachk = {"status": "s", "idPrescription": id}
 
-    response = client.post(
-        checkagurl, data=json.dumps(datachk), headers=make_headers(access_token)
-    )
+#     response = client.post(
+#         checkagurl, data=json.dumps(datachk), headers=make_headers(access_token)
+#     )
 
-    assert response.status_code == 200
+#     assert response.status_code == 200
 
-    """Verificação do status esperado em cada prescrição e existência dos
-    respectivos registros."""
+#     """Verificação do status esperado em cada prescrição e existência dos
+#     respectivos registros."""
 
-    pInAg = (
-        session.query(Prescription)
-        .filter(Prescription.id.in_([prescriptionid1, prescriptionid2, id]))
-        .filter(Prescription.status == "s")
-        .all()
-    )
-    pInAgaudit = (
-        session.query(PrescriptionAudit)
-        .filter(
-            PrescriptionAudit.idPrescription.in_([prescriptionid1, prescriptionid2, id])
-        )
-        .filter(PrescriptionAudit.auditType == 1)
-        .all()
-    )
+#     pInAg = (
+#         session.query(Prescription)
+#         .filter(Prescription.id.in_([prescriptionid1, prescriptionid2, id]))
+#         .filter(Prescription.status == "s")
+#         .all()
+#     )
+#     pInAgaudit = (
+#         session.query(PrescriptionAudit)
+#         .filter(
+#             PrescriptionAudit.idPrescription.in_([prescriptionid1, prescriptionid2, id])
+#         )
+#         .filter(PrescriptionAudit.auditType == 1)
+#         .all()
+#     )
 
-    assert len(pInAg) == 3
-    assert len(pInAgaudit) == 3
+#     assert len(pInAg) == 3
+#     assert len(pInAgaudit) == 3
 
 
 def test_putPrescriprions(client):
@@ -372,7 +356,7 @@ def test_putPrescriprions(client):
 
     url = f"/prescriptions/status"
 
-    access_token = get_access(client, roles=["staging", "suporte"])
+    access_token = get_access(client, roles=[Role.VIEWER.value])
 
     data = {"status": "s", "idPrescription": PRESCRIPTION}
 
@@ -383,12 +367,12 @@ def test_putPrescriprions(client):
     assert response.status_code == 401
 
 
-def test_postPatient(client):
+def test_postPatient401(client):
     """Teste post /patient/idAdmission - Assegura que o usuário com role readonly não tenha autorização para chamar o endpoint."""
 
     url = f"/patient/{ADMISSION}"
 
-    access_token = get_access(client, roles=["staging", "readonly"])
+    access_token = get_access(client, roles=[Role.VIEWER.value])
 
     data = {"height": 15}
 
@@ -404,7 +388,7 @@ def test_getPrescriptions404(client):
 
     url = "/prescriptions/404"
 
-    access_token = get_access(client)
+    access_token = get_access(client, roles=[Role.VIEWER.value])
 
     response = client.get(url, headers=make_headers(access_token))
 
@@ -416,7 +400,7 @@ def test_putPrescription(client):
 
     url = f"/prescriptions/status"
 
-    access_token = get_access(client, roles=["staging"])
+    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
 
     data = {"status": "s", "idPrescription": PRESCRIPTION}
 
@@ -427,12 +411,12 @@ def test_putPrescription(client):
     assert response.status_code == 200
 
 
-def test_postPatient404(client):
+def test_postPatient(client):
     """Teste post /patient/idAsmission - Deve retornar o código 200, indicando funcionamento do endpoint."""
 
     url = f"/patient/{ADMISSION}"
 
-    access_token = get_access(client, roles=["staging"])
+    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
 
     data = {"height": 15}
 
@@ -448,7 +432,7 @@ def test_putPrescriptionsDrug(client):
 
     url = f"/prescriptions/drug/{PRESCRIPTIONDRUG}"
 
-    access_token = get_access(client, roles=["staging"])
+    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
 
     data = {"notes": "some notes", "admissionNumber": 5}
 

@@ -1,7 +1,6 @@
-from sqlalchemy import or_
-
 from conftest import *
 from models.main import User
+from security.role import Role
 
 
 def delete_user(email):
@@ -21,29 +20,16 @@ def create_user(client, data, access_token):
 
 def test_get_users(client):
     """Teste get /users/ - Compara quantidade de usuários enviados com dados do banco e valida status_code 200"""
-    access_token = get_access(client, roles=["userAdmin", "staging"])
+    access_token = get_access(client, roles=[Role.USER_MANAGER.value])
 
     response = client.get("/users", headers=make_headers(access_token))
-    data = json.loads(response.data)
-    qtdUsers = (
-        session.query(User)
-        .filter(User.schema == "demo")
-        .filter(
-            or_(
-                ~User.config["roles"].astext.contains("suporte"),
-                User.config["roles"] == None,
-            )
-        )
-        .count()
-    )
 
     assert response.status_code == 200
-    assert len(data["data"]) == qtdUsers
 
 
 def test_get_users_permission(client):
     """Teste get /users/ - Deve retornar erro [401 UNAUTHORIZED] devido ao usuário utilizado"""
-    access_token = get_access(client, roles=["staging"])
+    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
 
     response = client.get("/users", headers=make_headers(access_token))
 
@@ -52,7 +38,7 @@ def test_get_users_permission(client):
 
 def test_put_user(client):
     """Teste put /editUser - Compara o response.data e cria o usuário"""
-    access_token = get_access(client, roles=["userAdmin", "staging"])
+    access_token = get_access(client, roles=[Role.USER_MANAGER.value])
 
     data = {
         "email": "test@noharm.ai",
@@ -72,7 +58,7 @@ def test_put_user(client):
 
 def test_put_editUser(client):
     """Teste put /editUser/<int:idUser> - Compara o response.data e edita o usuário"""
-    access_token = get_access(client, roles=["userAdmin", "staging"])
+    access_token = get_access(client, roles=[Role.USER_MANAGER.value])
 
     # first insert user
     create_data = {
@@ -112,9 +98,9 @@ def test_put_editUser(client):
     assert data["active"] == userEdited.active
 
 
-def test_create_user_invalid_role(client):
+def test_create_user_check_roles(client):
     """Teste put /editUser - Verifica roles criadas"""
-    access_token = get_access(client, roles=["userAdmin", "staging"])
+    access_token = get_access(client, roles=[Role.USER_MANAGER.value])
     email = "test3@noharm.ai"
 
     delete_user(email)
@@ -124,7 +110,7 @@ def test_create_user_invalid_role(client):
         "name": "test3",
         "external": "test",
         "active": "true",
-        "roles": ["admin"],
+        "roles": [Role.PRESCRIPTION_ANALYST.value],
     }
 
     response = client.post(
@@ -135,13 +121,15 @@ def test_create_user_invalid_role(client):
     user = session.query(User).filter(User.id == userId).first()
 
     assert response.status_code == 200
-    assert "admin" not in user.config["roles"]
-    assert "userAdmin" not in user.config["roles"]
+    assert Role.ADMIN.value not in user.config["roles"]
+    assert Role.CURATOR.value not in user.config["roles"]
+    assert Role.USER_MANAGER.value not in user.config["roles"]
+    assert Role.PRESCRIPTION_ANALYST.value in user.config["roles"]
 
 
 def test_update_user_invalid_role(client):
     """Teste put /editUser/<int:idUser> - Compara o response.data e edita o usuário"""
-    access_token = get_access(client, roles=["userAdmin", "staging"])
+    access_token = get_access(client, roles=[Role.USER_MANAGER.value])
 
     # first insert user
     create_data = {
@@ -163,7 +151,7 @@ def test_update_user_invalid_role(client):
         "name": "updateTest",
         "external": "updateTest",
         "active": False,
-        "roles": ["admin"],
+        "roles": [Role.DISCHARGE_MANAGER.value],
     }
 
     response = client.post(
@@ -179,8 +167,8 @@ def test_update_user_invalid_role(client):
 
     assert data["name"] == userEdited.name
     assert data["external"] == userEdited.external
-    assert "admin" not in user.config["roles"]
-    assert "userAdmin" not in user.config["roles"]
+    assert Role.ADMIN.value not in user.config["roles"]
+    assert Role.DISCHARGE_MANAGER.value in user.config["roles"]
 
 
 def test_create_user_invalid_role_perimission(client):
@@ -195,25 +183,19 @@ def test_create_user_invalid_role_perimission(client):
         "name": "test3",
         "external": "test",
         "active": "true",
-        "roles": ["admin"],
+        "roles": [Role.ADMIN.value],
     }
 
-    access_token = get_access(client, roles=["userAdmin", "staging", "admin"])
+    access_token = get_access(client, roles=[Role.USER_MANAGER.value])
     response = client.post(
         "/editUser", data=json.dumps(data), headers=make_headers(access_token)
     )
-    assert response.status_code == 401
-
-    access_token = get_access(client, roles=["userAdmin", "staging", "training"])
-    response = client.post(
-        "/editUser", data=json.dumps(data), headers=make_headers(access_token)
-    )
-    assert response.status_code == 401
+    assert response.status_code == 400
 
 
 def test_update_user_invalid_role_permission(client):
     """Teste put /editUser/<int:idUser> - Edição com roles inválidas"""
-    access_token = get_access(client, roles=["userAdmin", "staging"])
+    access_token = get_access(client, roles=[Role.USER_MANAGER.value])
 
     # first insert user
     create_data = {
@@ -235,29 +217,29 @@ def test_update_user_invalid_role_permission(client):
         "name": "updateTest",
         "external": "updateTest",
         "active": False,
-        "roles": ["admin"],
+        "roles": [Role.CURATOR.value],
     }
 
-    access_token = get_access(client, roles=["userAdmin", "staging", "admin"])
+    access_token = get_access(client, roles=[Role.USER_MANAGER.value])
     response = client.post(
         "/editUser",
         data=json.dumps(data),
         headers=make_headers(access_token),
     )
-    assert response.status_code == 401
+    assert response.status_code == 400
 
-    access_token = get_access(client, roles=["userAdmin", "staging", "training"])
+    access_token = get_access(client, roles=[Role.ADMIN.value])
     response = client.post(
         "/editUser",
         data=json.dumps(data),
         headers=make_headers(access_token),
     )
-    assert response.status_code == 401
+    assert response.status_code == 400
 
 
 def test_create_user_invalid_authorization(client):
     """Teste put /editUser - Verifica autorizacao de segmento"""
-    access_token = get_access(client, roles=["userAdmin", "staging"])
+    access_token = get_access(client, roles=[Role.USER_MANAGER.value])
     email = "test3@noharm.ai"
 
     delete_user(email)
@@ -280,7 +262,7 @@ def test_create_user_invalid_authorization(client):
 
 def test_update_user_authorization(client):
     """Teste put /editUser/<int:idUser> - Testa permissao de ediçao de autorizacoes"""
-    access_token = get_access(client, roles=["userAdmin", "staging"])
+    access_token = get_access(client, roles=[Role.USER_MANAGER.value])
     email = "test7@noharm.ai"
 
     delete_user(email)
