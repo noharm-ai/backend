@@ -93,10 +93,12 @@ def remove_annotation(id_clinical_notes: int, annotation_type: str, user_context
         old_note = clinical_notes.allergyText
         clinical_notes.allergy = 0
         clinical_notes.allergyText = None
+        db.session.flush()
     elif annotation_type == "dialysis":
         old_note = clinical_notes.dialysisText
         clinical_notes.dialysis = 0
         clinical_notes.dialysisText = None
+        db.session.flush()
     else:
         raise ValidationError(
             "Tipo inválido", "errors.businessRules", status.HTTP_400_BAD_REQUEST
