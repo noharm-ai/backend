@@ -90,7 +90,7 @@ def generate(
     start_date = datetime.now()
 
     if fold != None:
-        if not Permission.WRITE_SEGMENT_SCORE not in user_permissions:
+        if Permission.WRITE_SEGMENT_SCORE not in user_permissions:
             raise ValidationError(
                 "Usuário não autorizado",
                 "errors.unauthorizedUser",
