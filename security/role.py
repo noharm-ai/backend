@@ -124,7 +124,6 @@ class Role(Enum):
         Permission.READ_REPORTS,
         Permission.READ_PRESCRIPTION,
         Permission.READ_BASIC_FEATURES,
-        Permission.READ_DISCHARGE_SUMMARY,
         Permission.READ_SUPPORT,
         Permission.WRITE_SUPPORT,
     ]

@@ -45,6 +45,7 @@ def test_put_user(client):
         "name": "test3",
         "external": "test",
         "active": "true",
+        "roles": [Role.PRESCRIPTION_ANALYST.value],
     }
 
     response = create_user(client, data, access_token)
@@ -66,6 +67,7 @@ def test_put_editUser(client):
         "name": "test3",
         "external": "test",
         "active": "true",
+        "roles": [Role.PRESCRIPTION_ANALYST.value],
     }
 
     response = create_user(client, create_data, access_token)
@@ -80,6 +82,7 @@ def test_put_editUser(client):
         "name": "updateTest",
         "external": "updateTest",
         "active": False,
+        "roles": [Role.PRESCRIPTION_ANALYST.value],
     }
 
     response = client.post(
@@ -137,6 +140,7 @@ def test_update_user_invalid_role(client):
         "name": "test3",
         "external": "test",
         "active": "true",
+        "roles": [Role.PRESCRIPTION_ANALYST.value],
     }
 
     response = create_user(client, create_data, access_token)
@@ -203,6 +207,7 @@ def test_update_user_invalid_role_permission(client):
         "name": "test3",
         "external": "test",
         "active": "true",
+        "roles": [Role.PRESCRIPTION_ANALYST.value],
     }
 
     response = create_user(client, create_data, access_token)
@@ -249,7 +254,7 @@ def test_create_user_invalid_authorization(client):
         "name": "test3",
         "external": "test",
         "active": "true",
-        "roles": [],
+        "roles": [Role.PRESCRIPTION_ANALYST.value],
         "segments": [2],
     }
 
@@ -273,6 +278,7 @@ def test_update_user_authorization(client):
         "name": "test3",
         "external": "test",
         "active": "true",
+        "roles": [Role.PRESCRIPTION_ANALYST.value],
     }
 
     response = create_user(client, create_data, access_token)
@@ -287,6 +293,7 @@ def test_update_user_authorization(client):
         "name": "updateTest",
         "external": "updateTest",
         "active": False,
+        "roles": [Role.PRESCRIPTION_ANALYST.value],
         "segments": [2],
     }
 

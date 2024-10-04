@@ -126,6 +126,13 @@ def upsert_user(data: dict, user_context: User):
                 status.HTTP_400_BAD_REQUEST,
             )
 
+        if len(newUser.config["roles"]) == 0:
+            raise ValidationError(
+                "O usuário deve ter ao menos um Papel definido",
+                "errors.businessRules",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
         db.session.add(newUser)
         db.session.flush()
 
@@ -179,10 +186,26 @@ def upsert_user(data: dict, user_context: User):
         updatedUser.external = data.get("external", None)
         updatedUser.active = bool(data.get("active", True))
 
+        if not _has_valid_roles(
+            updatedUser.config.get("roles", []) if updatedUser.config != None else []
+        ):
+            raise ValidationError(
+                "Este usuário não pode ser editado.",
+                "errors.businessRules",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
         updatedUser.config = {"roles": data.get("roles", [])}
         if not _has_valid_roles(updatedUser.config["roles"]):
             raise ValidationError(
                 "Papel inválido",
+                "errors.businessRules",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+        if len(updatedUser.config["roles"]) == 0:
+            raise ValidationError(
+                "O usuário deve ter ao menos um Papel definido",
                 "errors.businessRules",
                 status.HTTP_400_BAD_REQUEST,
             )

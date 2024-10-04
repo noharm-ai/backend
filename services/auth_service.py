@@ -199,6 +199,7 @@ def _auth_user(
         "logoutUrl": logout_url,
         "integrationStatus": integration_status,
         "permissions": [p.name for p in permissions],
+        "isCpoe": is_cpoe,
     }
 
 
