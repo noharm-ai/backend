@@ -211,7 +211,7 @@ def get_exams_by_admission(admission_number: int, id_segment: int):
         resultsText[slugExam]["history"].append(item)
         resultsText[slugExam]["date"] = e.date.isoformat()
 
-    return (dict(results, **resultsText),)
+    return dict(results, **resultsText)
 
 
 def _history_exam(typeExam, examsList, segExam):
