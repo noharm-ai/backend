@@ -1,6 +1,5 @@
 from sqlalchemy import desc, nullsfirst, func, and_, or_, text
 from datetime import date, datetime
-from utils import status
 
 from models.main import db, User
 from models.prescription import (
@@ -18,7 +17,7 @@ from services import (
     data_authorization_service,
 )
 from decorators.has_permission_decorator import has_permission, Permission
-from routes.utils import get_period_filter
+from utils import status, prescriptionutils
 
 
 @has_permission(Permission.READ_PRESCRIPTION, Permission.READ_DISCHARGE_SUMMARY)
@@ -273,7 +272,9 @@ def get_query_prescriptions_by_agg(
         .filter(Prescription.agg == None)
     )
 
-    q = get_period_filter(q, Prescription, agg_prescription.date, is_pmc, is_cpoe)
+    q = prescriptionutils.get_period_filter(
+        q, Prescription, agg_prescription.date, is_pmc, is_cpoe
+    )
 
     if not is_cpoe:
         q = q.filter(Prescription.idSegment == agg_prescription.idSegment)

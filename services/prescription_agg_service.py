@@ -1,4 +1,3 @@
-from utils import status
 from sqlalchemy import desc, text, select, func, and_
 from flask_sqlalchemy.session import Session
 from datetime import date, datetime
@@ -6,7 +5,6 @@ from datetime import date, datetime
 from models.main import db, User, dbSession
 from models.prescription import Prescription, PrescriptionDrug, PrescriptionDrugAudit
 from models.enums import PrescriptionDrugAuditTypeEnum, DrugTypeEnum
-from routes.utils import getFeatures, gen_agg_id
 from services import (
     prescription_drug_service,
     prescription_check_service,
@@ -15,6 +13,7 @@ from services import (
 )
 from exception.validation_error import ValidationError
 from decorators.has_permission_decorator import has_permission, Permission
+from utils import status, prescriptionutils
 
 
 @has_permission(Permission.READ_STATIC)
@@ -49,7 +48,7 @@ def create_agg_prescription_by_prescription(
     resultPresc = prescription_view_service.static_get_prescription(
         idPrescription=id_prescription
     )
-    p.features = getFeatures(resultPresc)
+    p.features = prescriptionutils.getFeatures(resultPresc)
     p.aggDrugs = p.features["drugIDs"]
     p.aggDeps = [p.idDepartment]
 
@@ -64,7 +63,7 @@ def create_agg_prescription_by_prescription(
     if out_patient:
         PrescAggID = p.admissionNumber
     else:
-        PrescAggID = gen_agg_id(p.admissionNumber, p.idSegment, pdate)
+        PrescAggID = prescriptionutils.gen_agg_id(p.admissionNumber, p.idSegment, pdate)
 
     pAgg = Prescription.query.get(PrescAggID)
     if pAgg is None:
@@ -134,7 +133,7 @@ def create_agg_prescription_by_prescription(
                 )
 
     if "idPrescription" in resultAgg:
-        pAgg.features = getFeatures(
+        pAgg.features = prescriptionutils.getFeatures(
             resultAgg, agg_date=pAgg.date, intervals_for_agg_date=True
         )
         pAgg.aggDrugs = pAgg.features["drugIDs"]
@@ -158,7 +157,9 @@ def create_agg_prescription_by_date(schema, admission_number, p_date):
             status.HTTP_400_BAD_REQUEST,
         )
 
-    p_id = gen_agg_id(admission_number, last_prescription.idSegment, p_date)
+    p_id = prescriptionutils.gen_agg_id(
+        admission_number, last_prescription.idSegment, p_date
+    )
 
     agg_p = db.session.query(Prescription).get(p_id)
 
@@ -186,7 +187,7 @@ def create_agg_prescription_by_date(schema, admission_number, p_date):
 
     if "idPrescription" in resultAgg:
         agg_p.update = datetime.today()
-        agg_p.features = getFeatures(resultAgg)
+        agg_p.features = prescriptionutils.getFeatures(resultAgg)
         agg_p.aggDrugs = agg_p.features["drugIDs"]
         agg_p.aggDeps = list(
             set([resultAgg["headers"][h]["idDepartment"] for h in resultAgg["headers"]])

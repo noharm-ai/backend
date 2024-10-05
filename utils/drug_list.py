@@ -1,9 +1,9 @@
 import re
+import math
 
-from routes.utils import *
-from models.appendix import *
 from utils.dateutils import to_iso
 from services import drug_service
+from utils import stringutils, numberutils, prescriptionutils
 
 
 def _get_legacy_alert(kind):
@@ -114,7 +114,7 @@ class DrugList:
 
     @staticmethod
     def sortDrugs(d):
-        return remove_accents(d["drug"]).lower()
+        return stringutils.remove_accents(d["drug"]).lower()
 
     def getPrevIntervention(self, idDrug, idPrescription):
         result = {}
@@ -150,7 +150,7 @@ class DrugList:
             if pd[0].source not in source:
                 continue
 
-            pdUnit = strNone(pd[2].id) if pd[2] else ""
+            pdUnit = stringutils.strNone(pd[2].id) if pd[2] else ""
             pdWhiteList = bool(pd[6].whiteList) if pd[6] is not None else False
             doseWeightStr = None
             doseBodySurfaceStr = None
@@ -171,19 +171,19 @@ class DrugList:
 
             if self.exams and pd[6]:
                 if pd[6].chemo and pd[0].dose:
-                    bs_weight = none2zero(self.exams["weight"])
-                    bs_height = none2zero(self.exams["height"])
+                    bs_weight = numberutils.none2zero(self.exams["weight"])
+                    bs_height = numberutils.none2zero(self.exams["height"])
 
                     if bs_weight != 0 and bs_height != 0:
                         body_surface = math.sqrt((bs_weight * bs_height) / 3600)
-                        doseBodySurfaceStr = f"""{strFormatBR(round(pd[0].dose / body_surface, 2))} {pdUnit}/m²"""
+                        doseBodySurfaceStr = f"""{stringutils.strFormatBR(round(pd[0].dose / body_surface, 2))} {pdUnit}/m²"""
 
                 if pd[6].useWeight and pd[0].dose:
-                    weight = none2zero(self.exams["weight"])
+                    weight = numberutils.none2zero(self.exams["weight"])
                     weight = weight if weight > 0 else 1
 
                     doseWeightStr = (
-                        strFormatBR(round(pd[0].dose / float(weight), 2))
+                        stringutils.strFormatBR(round(pd[0].dose / float(weight), 2))
                         + " "
                         + pdUnit
                         + "/Kg"
@@ -196,7 +196,7 @@ class DrugList:
                     ):
                         doseWeightStr += (
                             " ou "
-                            + strFormatBR(pd[0].doseconv)
+                            + stringutils.strFormatBR(pd[0].doseconv)
                             + " "
                             + str(pd[6].idMeasureUnit)
                             + "/Kg (faixa arredondada)"
@@ -213,10 +213,12 @@ class DrugList:
             total_period = 0
             if self.is_cpoe:
                 period = str(round(pd[12])) + "D" if pd[12] else ""
-                total_period = none2zero(pd[12]) + none2zero(pd[0].period)
+                total_period = numberutils.none2zero(pd[12]) + numberutils.none2zero(
+                    pd[0].period
+                )
             else:
                 period = (str(pd[0].period) + "D" if pd[0].period else "",)
-                total_period = none2zero(pd[0].period)
+                total_period = numberutils.none2zero(pd[0].period)
 
             prevNotes = None
             prevNotesUser = None
@@ -260,21 +262,21 @@ class DrugList:
                         {"value": pd[2].id, "label": pd[2].description}
                         if pd[2]
                         else {
-                            "value": strNone(pd[0].idMeasureUnit),
-                            "label": strNone(pd[0].idMeasureUnit),
+                            "value": stringutils.strNone(pd[0].idMeasureUnit),
+                            "label": stringutils.strNone(pd[0].idMeasureUnit),
                         }
                     ),
                     "frequency": (
                         {"value": pd[3].id, "label": pd[3].description}
                         if pd[3]
                         else {
-                            "value": strNone(pd[0].idFrequency),
-                            "label": strNone(pd[0].idFrequency),
+                            "value": stringutils.strNone(pd[0].idFrequency),
+                            "label": stringutils.strNone(pd[0].idFrequency),
                         }
                     ),
                     "dayFrequency": pd[0].frequency,
                     "doseconv": pd[0].doseconv,
-                    "time": timeValue(pd[0].interval),
+                    "time": prescriptionutils.timeValue(pd[0].interval),
                     "interval": pd[0].interval,
                     "recommendation": (
                         pd[0].notes
@@ -292,16 +294,16 @@ class DrugList:
                     "stage": (
                         "ACM"
                         if pd[0].solutionACM == "S"
-                        else strNone(pd[0].solutionPhase)
+                        else stringutils.strNone(pd[0].solutionPhase)
                         + " x "
-                        + strNone(pd[0].solutionTime)
+                        + stringutils.strNone(pd[0].solutionTime)
                         + " ("
-                        + strNone(pd[0].solutionTotalTime)
+                        + stringutils.strNone(pd[0].solutionTotalTime)
                         + ")"
                     ),
-                    "infusion": strNone(pd[0].solutionDose)
+                    "infusion": stringutils.strNone(pd[0].solutionDose)
                     + " "
-                    + strNone(pd[0].solutionUnit),
+                    + stringutils.strNone(pd[0].solutionUnit),
                     "score": (
                         str(pd[5]) if not pdWhiteList and source != "Dietas" else "0"
                     ),
@@ -429,7 +431,7 @@ class DrugList:
                             if pd[3]
                             else ""
                         ),
-                        "time": timeValue(pd[0].interval),
+                        "time": prescriptionutils.timeValue(pd[0].interval),
                         "recommendation": pd[0].notes,
                     }
                 )

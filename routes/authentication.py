@@ -12,9 +12,8 @@ from flask_jwt_extended import (
 
 from models.main import db, dbSession
 from services import auth_service
-from .utils import tryCommit
 from exception.validation_error import ValidationError
-from utils import status
+from utils import status, sessionutils
 
 app_auth = Blueprint("app_auth", __name__)
 
@@ -97,7 +96,7 @@ def auth_provider():
         set_refresh_cookies(response, refresh_token)
         return response
 
-    return tryCommit(db, auth_data)
+    return sessionutils.tryCommit(db, auth_data)
 
 
 @app_auth.route("/auth-provider/<schema>", methods=["GET"])

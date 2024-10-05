@@ -8,7 +8,7 @@ from models.enums import FeatureEnum, UserAuditTypeEnum
 from services import memory_service, user_service
 from utils import status
 from config import Config
-from routes.utils import sendEmail
+from utils import emailutils
 from decorators.has_permission_decorator import has_permission, Permission
 from exception.validation_error import ValidationError
 from security.role import Role
@@ -150,7 +150,7 @@ def upsert_user(data: dict, user_context: User):
             extra={"config": newUser.config, "segments": id_segment_list},
         )
 
-        sendEmail(
+        emailutils.sendEmail(
             "Boas-vindas NoHarm: Credenciais",
             Config.MAIL_SENDER,
             [userEmail],

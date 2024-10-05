@@ -4,7 +4,7 @@ from sqlalchemy import desc
 from models.main import db
 from models.prescription import Prescription, User
 from models.enums import FeatureEnum
-from utils import status
+from utils import status, prescriptionutils
 from services import memory_service, prescription_agg_service
 from exception.validation_error import ValidationError
 from decorators.has_permission_decorator import has_permission, Permission
@@ -28,7 +28,7 @@ def create_conciliation(admission_number: int, user_context: User):
             "Atendimento inválido", "errors.businessRules", status.HTTP_400_BAD_REQUEST
         )
 
-    new_id = 90000000000000000 + prescription_agg_service.gen_agg_id(
+    new_id = 90000000000000000 + prescriptionutils.gen_agg_id(
         admission_number=admission_number,
         id_segment=ref.idSegment,
         pdate=datetime.today().date(),

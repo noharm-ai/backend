@@ -5,7 +5,7 @@ from typing import List
 from models.prescription import PrescriptionDrug
 from models.main import db, Drug, Substance, Allergy
 from models.enums import DrugTypeEnum, DrugAlertLevelEnum
-from routes.utils import typeRelations, strNone
+from utils import examutils, stringutils
 
 
 # analyze interactions between drugs.
@@ -167,13 +167,13 @@ def find_relations(drug_list, id_patient: int, is_cpoe: bool):
                     unique_relations[uniq_key] = 1
                     unique_relations[uniq_invert_key] = 1
 
-                alert_text = typeRelations[kind] + ": "
+                alert_text = examutils.typeRelations[kind] + ": "
                 alert_text += (
-                    strNone(active_relations[key]["text"])
+                    stringutils.strNone(active_relations[key]["text"])
                     + " ("
-                    + strNone(drug_from["drug"])
+                    + stringutils.strNone(drug_from["drug"])
                     + " e "
-                    + strNone(drug_to["drug"])
+                    + stringutils.strNone(drug_to["drug"])
                     + ")"
                 )
 

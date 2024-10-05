@@ -9,17 +9,7 @@ from models.notes import ClinicalNotes
 from services import memory_service
 from decorators.has_permission_decorator import has_permission, Permission
 from exception.validation_error import ValidationError
-from utils import status
-from routes.utils import (
-    formatExam,
-    mdrd_calc,
-    cg_calc,
-    ckd_calc,
-    ckd_calc_21,
-    schwartz1_calc,
-    schwartz2_calc,
-    slugify,
-)
+from utils import status, examutils, stringutils
 
 
 def create_exam(
@@ -119,7 +109,7 @@ def get_exams_by_admission(admission_number: int, id_segment: int):
     for e in examsList:
         if not e.typeExam.lower() in typeExams and e.typeExam.lower() in segExam:
             key = e.typeExam.lower()
-            item = formatExam(e, key, segExam)
+            item = examutils.formatExam(e, key, segExam)
             item["name"] = segExam[key].name
             item["perc"] = None
             item["history"] = _history_exam(e.typeExam, examsList, segExam)
@@ -133,21 +123,21 @@ def get_exams_by_admission(admission_number: int, id_segment: int):
                 for keyCalc in ["mdrd", "ckd", "ckd21", "cg", "swrtz2", "swrtz1"]:
                     if keyCalc in segExam and patient:
                         if keyCalc == "mdrd":
-                            itemCalc = mdrd_calc(
+                            itemCalc = examutils.mdrd_calc(
                                 e.value,
                                 patient.birthdate,
                                 patient.gender,
                                 patient.skinColor,
                             )
                         elif keyCalc == "cg":
-                            itemCalc = cg_calc(
+                            itemCalc = examutils.cg_calc(
                                 e.value,
                                 patient.birthdate,
                                 patient.gender,
                                 patient.weight,
                             )
                         elif keyCalc == "ckd":
-                            itemCalc = ckd_calc(
+                            itemCalc = examutils.ckd_calc(
                                 e.value,
                                 patient.birthdate,
                                 patient.gender,
@@ -156,13 +146,13 @@ def get_exams_by_admission(admission_number: int, id_segment: int):
                                 patient.weight,
                             )
                         elif keyCalc == "ckd21":
-                            itemCalc = ckd_calc_21(
+                            itemCalc = examutils.ckd_calc_21(
                                 e.value, patient.birthdate, patient.gender
                             )
                         elif keyCalc == "swrtz2":
-                            itemCalc = schwartz2_calc(e.value, patient.height)
+                            itemCalc = examutils.schwartz2_calc(e.value, patient.height)
                         elif keyCalc == "swrtz1":
-                            itemCalc = schwartz1_calc(
+                            itemCalc = examutils.schwartz1_calc(
                                 e.value,
                                 patient.birthdate,
                                 patient.gender,
@@ -195,7 +185,7 @@ def get_exams_by_admission(admission_number: int, id_segment: int):
     examsText = _get_textual_exams(id_patient=patient.idPatient)
     resultsText = {}
     for e in examsText:
-        slugExam = slugify(e.prescriber)
+        slugExam = stringutils.slugify(e.prescriber)
         if not slugExam in resultsText.keys():
             resultsText[slugExam] = {
                 "name": e.prescriber,
@@ -218,7 +208,7 @@ def _history_exam(typeExam, examsList, segExam):
     results = []
     for e in examsList:
         if e.typeExam == typeExam:
-            item = formatExam(e, e.typeExam.lower(), segExam)
+            item = examutils.formatExam(e, e.typeExam.lower(), segExam)
             del item["ref"]
             results.append(item)
     return results
@@ -229,15 +219,15 @@ def _history_calc(typeExam, examsList, patient):
     for e in examsList:
         item = {}
         if typeExam == "mdrd":
-            item = mdrd_calc(
+            item = examutils.mdrd_calc(
                 e["value"], patient.birthdate, patient.gender, patient.skinColor
             )
         elif typeExam == "cg":
-            item = cg_calc(
+            item = examutils.cg_calc(
                 e["value"], patient.birthdate, patient.gender, patient.weight
             )
         elif typeExam == "ckd":
-            item = ckd_calc(
+            item = examutils.ckd_calc(
                 e["value"],
                 patient.birthdate,
                 patient.gender,
@@ -246,11 +236,11 @@ def _history_calc(typeExam, examsList, patient):
                 patient.weight,
             )
         elif typeExam == "ckd21":
-            item = ckd_calc_21(e["value"], patient.birthdate, patient.gender)
+            item = examutils.ckd_calc_21(e["value"], patient.birthdate, patient.gender)
         elif typeExam == "swrtz2":
-            item = schwartz2_calc(e["value"], patient.height)
+            item = examutils.schwartz2_calc(e["value"], patient.height)
         elif typeExam == "swrtz1":
-            item = schwartz1_calc(
+            item = examutils.schwartz1_calc(
                 e["value"],
                 patient.birthdate,
                 patient.gender,

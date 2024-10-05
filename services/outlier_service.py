@@ -23,8 +23,7 @@ from exception.validation_error import ValidationError
 from services.admin import admin_drug_service, admin_integration_status_service
 from services import data_authorization_service, substance_service
 from decorators.has_permission_decorator import has_permission, Permission
-from utils import status
-from routes.utils import freqValue, is_float, strNone, typeRelations
+from utils import prescriptionutils, numberutils, stringutils, examutils, status
 
 FOLD_SIZE = 10
 
@@ -506,8 +505,8 @@ def get_outliers_list(
         if (
             dose is not None
             and frequency is not None
-            and is_float(dose)
-            and is_float(frequency)
+            and numberutils.is_float(dose)
+            and numberutils.is_float(frequency)
         ):
             if float(dose) == o[0].dose and float(frequency) == o[0].frequency:
                 newOutlier = False
@@ -520,7 +519,7 @@ def get_outliers_list(
                 "countNum": o[0].countNum,
                 "dose": o[0].dose,
                 "unit": defaultUnit,
-                "frequency": freqValue(o[0].frequency),
+                "frequency": prescriptionutils.freqValue(o[0].frequency),
                 "score": o[0].score,
                 "manualScore": o[0].manualScore,
                 "obs": o[1].notes if o[1] != None else "",
@@ -533,8 +532,8 @@ def get_outliers_list(
         dose is not None
         and frequency is not None
         and newOutlier
-        and is_float(dose)
-        and is_float(frequency)
+        and numberutils.is_float(dose)
+        and numberutils.is_float(frequency)
     ):
         o = Outlier()
         o.idDrug = id_drug
@@ -557,7 +556,7 @@ def get_outliers_list(
                 "countNum": 1,
                 "dose": float(dose),
                 "unit": defaultUnit,
-                "frequency": freqValue(float(frequency)),
+                "frequency": prescriptionutils.freqValue(float(frequency)),
                 "score": 4,
                 "manualScore": None,
                 "obs": "",
@@ -589,9 +588,12 @@ def get_outliers_list(
         "whiteList": drugAttr.whiteList,
         "chemo": drugAttr.chemo,
         "sctidA": str(d[0].sctid) if d else "",
-        "sctNameA": strNone(d[1]).upper() if d else "",
+        "sctNameA": stringutils.strNone(d[1]).upper() if d else "",
         "relations": relations,
-        "relationTypes": [{"key": t, "value": typeRelations[t]} for t in typeRelations],
+        "relationTypes": [
+            {"key": t, "value": examutils.typeRelations[t]}
+            for t in examutils.typeRelations
+        ],
         "defaultNote": defaultNote,
     }
 

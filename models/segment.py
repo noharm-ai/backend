@@ -1,17 +1,8 @@
 from datetime import date, timedelta
+from sqlalchemy import and_, desc, asc
 
 from .main import db
-from sqlalchemy import and_, desc, asc
-from routes.utils import (
-    data2age,
-    formatExam,
-    mdrd_calc,
-    cg_calc,
-    ckd_calc,
-    ckd_calc_21,
-    schwartz1_calc,
-    schwartz2_calc,
-)
+from utils import examutils, dateutils
 
 
 class Segment(db.Model):
@@ -111,7 +102,7 @@ class Exams(db.Model):
         )
 
         segExam = SegmentExam.refDict(idSegment)
-        age = data2age(
+        age = dateutils.data2age(
             patient.birthdate.isoformat()
             if patient.birthdate
             else date.today().isoformat()
@@ -158,7 +149,7 @@ class Exams(db.Model):
                 "swrtz2",
                 "swrtz1",
             ]:
-                exams[e.typeExam.lower()] = formatExam(
+                exams[e.typeExam.lower()] = examutils.formatExam(
                     e, e.typeExam.lower(), segExam, prevValue
                 )
 
@@ -168,38 +159,40 @@ class Exams(db.Model):
                     and "cr" in exams
                     and exams["cr"]["value"] == None
                 ):
-                    exams["cr"] = formatExam(e, e.typeExam.lower(), segExam, prevValue)
+                    exams["cr"] = examutils.formatExam(
+                        e, e.typeExam.lower(), segExam, prevValue
+                    )
                 if segExam[e.typeExam.lower()].initials.lower().strip() == "tgo":
-                    examsExtra["tgo"] = formatExam(
+                    examsExtra["tgo"] = examutils.formatExam(
                         e, e.typeExam.lower(), segExam, prevValue
                     )
                 if segExam[e.typeExam.lower()].initials.lower().strip() == "tgp":
-                    examsExtra["tgp"] = formatExam(
+                    examsExtra["tgp"] = examutils.formatExam(
                         e, e.typeExam.lower(), segExam, prevValue
                     )
                 if segExam[e.typeExam.lower()].initials.lower().strip() == "plaquetas":
-                    examsExtra["plqt"] = formatExam(
+                    examsExtra["plqt"] = examutils.formatExam(
                         e, e.typeExam.lower(), segExam, prevValue
                     )
 
         if "cr" in exams:
             if age > 17:
                 if "mdrd" in exams:
-                    exams["mdrd"] = mdrd_calc(
+                    exams["mdrd"] = examutils.mdrd_calc(
                         exams["cr"]["value"],
                         patient.birthdate,
                         patient.gender,
                         patient.skinColor,
                     )
                 if "cg" in exams:
-                    exams["cg"] = cg_calc(
+                    exams["cg"] = examutils.cg_calc(
                         exams["cr"]["value"],
                         patient.birthdate,
                         patient.gender,
                         patient.weight,
                     )
                 if "ckd" in exams:
-                    exams["ckd"] = ckd_calc(
+                    exams["ckd"] = examutils.ckd_calc(
                         exams["cr"]["value"],
                         patient.birthdate,
                         patient.gender,
@@ -208,17 +201,17 @@ class Exams(db.Model):
                         patient.weight,
                     )
                 if "ckd21" in exams:
-                    exams["ckd21"] = ckd_calc_21(
+                    exams["ckd21"] = examutils.ckd_calc_21(
                         exams["cr"]["value"], patient.birthdate, patient.gender
                     )
             else:
                 if "swrtz2" in exams:
-                    exams["swrtz2"] = schwartz2_calc(
+                    exams["swrtz2"] = examutils.schwartz2_calc(
                         exams["cr"]["value"], patient.height
                     )
 
                 if "swrtz1" in exams:
-                    exams["swrtz1"] = schwartz1_calc(
+                    exams["swrtz1"] = examutils.schwartz1_calc(
                         exams["cr"]["value"],
                         patient.birthdate,
                         patient.gender,

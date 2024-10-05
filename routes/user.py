@@ -2,9 +2,9 @@ from flask import Blueprint, request
 
 from models.main import db
 from services import user_service
-from .utils import tryCommit
 from exception.validation_error import ValidationError
 from decorators.api_endpoint_decorator import api_endpoint
+from utils import sessionutils
 
 app_usr = Blueprint("app_usr", __name__)
 
@@ -39,7 +39,7 @@ def forgot_password():
     except ValidationError as e:
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
-    return tryCommit(db, True)
+    return sessionutils.tryCommit(db, True)
 
 
 @app_usr.route("/user/reset", methods=["POST"])
@@ -54,4 +54,4 @@ def reset_password():
     except ValidationError as e:
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
-    return tryCommit(db, True)
+    return sessionutils.tryCommit(db, True)

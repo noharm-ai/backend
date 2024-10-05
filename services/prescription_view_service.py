@@ -20,7 +20,6 @@ from models.enums import (
     PrescriptionReviewTypeEnum,
     PrescriptionAuditTypeEnum,
 )
-from utils import status
 from utils.drug_list import DrugList
 from services import (
     prescription_service,
@@ -32,7 +31,7 @@ from services import (
     alert_service,
     feature_service,
 )
-from routes.utils import gen_agg_id, data2age, getFeatures, strNone
+from utils import prescriptionutils, dateutils, stringutils, status
 
 
 @has_permission(Permission.READ_PRESCRIPTION)
@@ -145,7 +144,7 @@ def internal_get_prescription(
         db.session.query(Prescription)
         .filter(
             Prescription.id
-            == gen_agg_id(
+            == prescriptionutils.gen_agg_id(
                 admission_number=prescription[0].admissionNumber,
                 id_segment=prescription[0].idSegment,
                 pdate=datetime.today(),
@@ -220,7 +219,7 @@ def internal_get_prescription(
     exams = Exams.findLatestByAdmission(
         patient, prescription[0].idSegment, prevEx=is_complete
     )
-    age = data2age(
+    age = dateutils.data2age(
         patient.birthdate.isoformat() if patient.birthdate else date.today().isoformat()
     )
 
@@ -345,7 +344,7 @@ def internal_get_prescription(
         "idHospital": prescription[0].idHospital,
         "name": prescription[0].admissionNumber,
         "agg": prescription[0].agg,
-        "prescriptionAggId": gen_agg_id(
+        "prescriptionAggId": prescriptionutils.gen_agg_id(
             admission_number=prescription[0].admissionNumber,
             id_segment=prescription[0].idSegment,
             pdate=prescription[0].date,
@@ -404,9 +403,9 @@ def internal_get_prescription(
         ),
         "clinicalNotes": cn_count,
         "complication": cn_stats.get("complication", 0),
-        "notesSigns": strNone(notesSigns[0]) if notesSigns else "",
+        "notesSigns": stringutils.strNone(notesSigns[0]) if notesSigns else "",
         "notesSignsDate": notesSigns[1].isoformat() if notesSigns else None,
-        "notesInfo": strNone(notesInfo[0]) if notesInfo else "",
+        "notesInfo": stringutils.strNone(notesInfo[0]) if notesInfo else "",
         "notesInfoDate": notesInfo[1].isoformat() if notesInfo else None,
         "notesAllergies": notesAllergies,
         "notesAllergiesDate": notesAllergies[0]["date"] if notesAllergies else None,
@@ -470,7 +469,7 @@ def _build_headers(headers, pDrugs, pSolution, pProcedures):
             p["prevIntervention"] for p in procedures if p["prevIntervention"] != {}
         ]
 
-        headers[pid]["drugs"] = getFeatures(
+        headers[pid]["drugs"] = prescriptionutils.getFeatures(
             {
                 "prescription": drugs,
                 "solution": [],
@@ -480,7 +479,7 @@ def _build_headers(headers, pDrugs, pSolution, pProcedures):
                 "complication": 0,
             }
         )
-        headers[pid]["solutions"] = getFeatures(
+        headers[pid]["solutions"] = prescriptionutils.getFeatures(
             {
                 "prescription": [],
                 "solution": solutions,
@@ -490,7 +489,7 @@ def _build_headers(headers, pDrugs, pSolution, pProcedures):
                 "complication": 0,
             }
         )
-        headers[pid]["procedures"] = getFeatures(
+        headers[pid]["procedures"] = prescriptionutils.getFeatures(
             {
                 "prescription": [],
                 "solution": [],

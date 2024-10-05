@@ -1,9 +1,9 @@
 import re
 from typing import List
 
-from routes.utils import none2zero, strNone, strFormatBR
 from models.enums import DrugTypeEnum, DrugAlertTypeEnum, DrugAlertLevelEnum
 from models.prescription import PrescriptionDrug, Drug, DrugAttributes, Frequency
+from utils import numberutils, stringutils
 
 
 # analyze alerts
@@ -218,16 +218,18 @@ def _get_dose_conv(
 
     if drug_attributes != None and drug_attributes.division != None:
         return (
-            none2zero(prescription_drug.dose)
+            numberutils.none2zero(prescription_drug.dose)
             * (
                 measure_unit_convert_factor
                 if measure_unit_convert_factor != None
                 else 1
             )
-            * none2zero(pd_frequency)
+            * numberutils.none2zero(pd_frequency)
         )
 
-    return none2zero(prescription_drug.doseconv) * none2zero(pd_frequency)
+    return numberutils.none2zero(prescription_drug.doseconv) * numberutils.none2zero(
+        pd_frequency
+    )
 
 
 def _get_dose_total(drug_list, exams: dict):
@@ -263,7 +265,7 @@ def _get_dose_total(drug_list, exams: dict):
             dose_total[idDrugAgg]["count"] += 1
 
         # dose / kg
-        weight = none2zero(exams["weight"])
+        weight = numberutils.none2zero(exams["weight"])
         weight = weight if weight > 0 else 1
         doseWeight = round(pd_dose_conv / float(weight), 2)
 
@@ -347,12 +349,12 @@ def _alert_max_dose(
     )
 
     if drug_attributes.useWeight and prescription_drug.dose:
-        weight = none2zero(exams["weight"])
+        weight = numberutils.none2zero(exams["weight"])
         weight = weight if weight > 0 else 1
         doseWeight = round(pd_dose_conv / float(weight), 2)
 
         if drug_attributes.maxDose and drug_attributes.maxDose < doseWeight:
-            if none2zero(exams["weight"]) == 0:
+            if numberutils.none2zero(exams["weight"]) == 0:
                 alert["text"] = (
                     "A dose máxima registrada é por kg, mas o peso do paciente não está disponível. Favor preencher manualmente o peso."
                 )
@@ -360,9 +362,9 @@ def _alert_max_dose(
                 alert[
                     "text"
                 ] = f"""
-                    Dose diária prescrita ({strFormatBR(doseWeight)} {str(drug_attributes.idMeasureUnit)}/Kg) 
+                    Dose diária prescrita ({stringutils.strFormatBR(doseWeight)} {str(drug_attributes.idMeasureUnit)}/Kg) 
                     maior que a dose de alerta 
-                    ({strFormatBR(drug_attributes.maxDose)} {str(drug_attributes.idMeasureUnit)}/Kg) 
+                    ({stringutils.strFormatBR(drug_attributes.maxDose)} {str(drug_attributes.idMeasureUnit)}/Kg) 
                     usualmente recomendada (considerada a dose diária independente da indicação).
                 """
 
@@ -405,7 +407,7 @@ def _alert_max_dose_total(
     idDrugAgg = str(prescription_drug.idDrug) + "_" + str(expireDay)
     idDrugAggWeight = str(idDrugAgg) + "kg"
     if drug_attributes.useWeight and prescription_drug.dose:
-        weight = none2zero(exams["weight"])
+        weight = numberutils.none2zero(exams["weight"])
         weight = weight if weight > 0 else 1
 
         if (
@@ -413,9 +415,9 @@ def _alert_max_dose_total(
             and idDrugAggWeight in dose_total
             and dose_total[idDrugAggWeight]["count"] > 1
             and drug_attributes.maxDose
-            < none2zero(dose_total[idDrugAggWeight]["value"])
+            < numberutils.none2zero(dose_total[idDrugAggWeight]["value"])
         ):
-            if none2zero(exams["weight"]) == 0:
+            if numberutils.none2zero(exams["weight"]) == 0:
                 alert["text"] = (
                     "A dose máxima registrada é por kg, mas o peso do paciente não está disponível. Favor preencher manualmente o peso."
                 )
@@ -437,7 +439,8 @@ def _alert_max_dose_total(
             drug_attributes.maxDose
             and idDrugAgg in dose_total
             and dose_total[idDrugAgg]["count"] > 1
-            and drug_attributes.maxDose < none2zero(dose_total[idDrugAgg]["value"])
+            and drug_attributes.maxDose
+            < numberutils.none2zero(dose_total[idDrugAgg]["value"])
         ):
             alert[
                 "text"
@@ -561,7 +564,7 @@ def _alert_tube(prescription_drug: PrescriptionDrug, drug_attributes: DrugAttrib
 
     if drug_attributes and drug_attributes.tube and prescription_drug.tube:
         alert["text"] = (
-            f"""Medicamento contraindicado via sonda ({strNone(prescription_drug.route)})"""
+            f"""Medicamento contraindicado via sonda ({stringutils.strNone(prescription_drug.route)})"""
         )
 
         return alert

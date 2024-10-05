@@ -3,8 +3,7 @@ from sqlalchemy import or_, asc, func
 from models.main import db, Substance, SubstanceClass, Relation
 from decorators.has_permission_decorator import has_permission, Permission
 from exception.validation_error import ValidationError
-from utils import status
-from routes.utils import strNone, sortRelations
+from utils import status, stringutils, prescriptionutils
 
 
 @has_permission(Permission.READ_BASIC_FEATURES)
@@ -130,7 +129,7 @@ def get_substance_relations(sctid: int):
         results.append(
             {
                 "sctidB": sctidB,
-                "nameB": strNone(nameB).upper(),
+                "nameB": stringutils.strNone(nameB).upper(),
                 "type": r[0].kind,
                 "text": r[0].text,
                 "active": r[0].active,
@@ -139,7 +138,7 @@ def get_substance_relations(sctid: int):
             }
         )
 
-    results.sort(key=sortRelations)
+    results.sort(key=prescriptionutils.sortRelations)
 
     return results
 

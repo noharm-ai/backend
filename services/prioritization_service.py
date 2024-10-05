@@ -8,8 +8,7 @@ from models.main import db
 from models.enums import PrescriptionReviewTypeEnum
 from models.prescription import Prescription, Patient, Department
 from decorators.has_permission_decorator import has_permission, Permission
-from routes.utils import none2zero, lenghStay, gen_agg_id
-from utils import dateutils
+from utils import dateutils, numberutils, prescriptionutils
 from services import prescription_service, feature_service
 
 
@@ -69,7 +68,9 @@ def get_prioritization_list(
         )
     )
 
-    currentDepartment = bool(int(none2zero(currentDepartment))) and (len(idDept) > 0)
+    currentDepartment = bool(int(numberutils.none2zero(currentDepartment))) and (
+        len(idDept) > 0
+    )
 
     if idSegment != None:
         q = q.filter(Prescription.idSegment == idSegment)
@@ -88,14 +89,14 @@ def get_prioritization_list(
 
     if len(idDept) > 0:
         idDept = list(map(int, idDept))
-        if currentDepartment or bool(int(none2zero(concilia))) == True:
+        if currentDepartment or bool(int(numberutils.none2zero(concilia))) == True:
             q = q.filter(Prescription.idDepartment.in_(idDept))
         else:
             q = q.filter(postgresql.array(idDept).overlap(Prescription.aggDeps))
 
     if len(idDrug) > 0:
         idDrug = list(map(int, idDrug))
-        if bool(int(none2zero(allDrugs))):
+        if bool(int(numberutils.none2zero(allDrugs))):
             q = q.filter(
                 cast(idDrug, postgresql.ARRAY(BigInteger)).contained_by(
                     Prescription.aggDrugs
@@ -108,7 +109,7 @@ def get_prioritization_list(
                 )
             )
 
-    if bool(int(none2zero(pending))):
+    if bool(int(numberutils.none2zero(pending))):
         q = q.filter(Prescription.status == "0")
 
     if patientStatus == "DISCHARGED":
@@ -117,7 +118,7 @@ def get_prioritization_list(
     if patientStatus == "ACTIVE":
         q = q.filter(Patient.dischargeDate == None)
 
-    if bool(int(none2zero(agg))) and patientReviewType != None:
+    if bool(int(numberutils.none2zero(agg))) and patientReviewType != None:
         if int(patientReviewType) == PrescriptionReviewTypeEnum.PENDING.value:
             q = q.filter(
                 Prescription.reviewType == PrescriptionReviewTypeEnum.PENDING.value
@@ -128,7 +129,7 @@ def get_prioritization_list(
                 Prescription.reviewType == PrescriptionReviewTypeEnum.REVIEWED.value
             )
 
-    if bool(int(none2zero(agg))):
+    if bool(int(numberutils.none2zero(agg))):
         q = q.filter(Prescription.agg == True)
 
         if is_cpoe:
@@ -139,7 +140,7 @@ def get_prioritization_list(
     else:
         q = q.filter(Prescription.agg == None)
 
-    if bool(int(none2zero(concilia))):
+    if bool(int(numberutils.none2zero(concilia))):
         q = q.filter(Prescription.concilia != None)
     else:
         q = q.filter(Prescription.concilia == None)
@@ -322,7 +323,7 @@ def get_prioritization_list(
             for f in featuresNames:
                 features[f] = p[0].features[f] if f in p[0].features else 0
 
-            features["globalScore"] = none2zero(p.globalScore)
+            features["globalScore"] = numberutils.none2zero(p.globalScore)
 
             if features["globalScore"] > 90:
                 features["class"] = "red"
@@ -364,7 +365,7 @@ def get_prioritization_list(
                     "gender": patient.gender,
                     "weight": patient.weight,
                     "skinColor": patient.skinColor,
-                    "lengthStay": lenghStay(patient.admissionDate),
+                    "lengthStay": prescriptionutils.lenghStay(patient.admissionDate),
                     "dischargeDate": (
                         patient.dischargeDate.isoformat()
                         if patient.dischargeDate
@@ -383,7 +384,7 @@ def get_prioritization_list(
                     "observation": observation,
                     "totalRecords": p[3],
                     "agg": p[0].agg,
-                    "prescriptionAggId": gen_agg_id(
+                    "prescriptionAggId": prescriptionutils.gen_agg_id(
                         admission_number=p[0].admissionNumber,
                         id_segment=p[0].idSegment,
                         pdate=p[0].date,

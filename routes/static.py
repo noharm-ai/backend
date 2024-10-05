@@ -3,12 +3,10 @@ from markupsafe import escape as escape_html
 from datetime import datetime
 
 from models.main import db, User
-from .utils import tryCommit
 from services import prescription_agg_service, prescription_check_service
-
 from exception.validation_error import ValidationError
 from exception.authorization_error import AuthorizationError
-from utils import status
+from utils import status, sessionutils
 from decorators.api_endpoint_decorator import api_endpoint
 
 app_stc = Blueprint("app_stc", __name__)
@@ -43,7 +41,7 @@ def create_aggregated_by_prescription(schema, id_prescription):
             "code": "errors.unauthorized",
         }, status.HTTP_401_UNAUTHORIZED
 
-    return tryCommit(db, escape_html(str(id_prescription)))
+    return sessionutils.tryCommit(db, escape_html(str(id_prescription)))
 
 
 @app_stc.route(
@@ -76,7 +74,7 @@ def create_aggregated_prescription_by_date(schema, admission_number):
             "code": "errors.unauthorized",
         }, status.HTTP_401_UNAUTHORIZED
 
-    return tryCommit(db, escape_html(str(admission_number)))
+    return sessionutils.tryCommit(db, escape_html(str(admission_number)))
 
 
 @app_stc.route("/static/prescriptions/status", methods=["POST"])

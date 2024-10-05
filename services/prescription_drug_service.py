@@ -15,8 +15,7 @@ from models.appendix import Notes
 from services import prescription_service, data_authorization_service, feature_service
 from exception.validation_error import ValidationError
 from decorators.has_permission_decorator import has_permission, Permission
-from utils import status
-from routes.utils import timeValue
+from utils import status, prescriptionutils
 
 
 @has_permission(Permission.READ_PRESCRIPTION)
@@ -154,7 +153,7 @@ def prescriptionDrugToDTO(pd):
         "frequency": {"value": pd[3].id, "label": pd[3].description} if pd[3] else "",
         "dayFrequency": pd[0].frequency,
         "doseconv": pd[0].doseconv,
-        "time": timeValue(pd[0].interval),
+        "time": prescriptionutils.timeValue(pd[0].interval),
         "interval": pd[0].interval,
         "route": pd[0].route,
         "score": str(pd[5]) if not pdWhiteList and pd[0].source != "Dietas" else "0",

@@ -19,7 +19,6 @@ from models.enums import (
     InterventionEconomyTypeEnum,
     InterventionStatusEnum,
 )
-from routes.utils import validate, gen_agg_id, timeValue, interactionsList, none2zero
 from services import (
     memory_service,
     data_authorization_service,
@@ -27,7 +26,7 @@ from services import (
 )
 from decorators.has_permission_decorator import has_permission, Permission
 from exception.validation_error import ValidationError
-from utils import status
+from utils import status, prescriptionutils, numberutils, dateutils
 
 
 @has_permission(Permission.READ_PRESCRIPTION)
@@ -144,11 +143,16 @@ def get_interventions(
         )
 
     if startDate is not None:
-        interventions = interventions.filter(Intervention.date >= validate(startDate))
+        interventions = interventions.filter(
+            Intervention.date >= dateutils.parse_date_or_today(startDate)
+        )
 
     if endDate is not None:
         interventions = interventions.filter(
-            Intervention.date <= (validate(endDate) + timedelta(hours=23, minutes=59))
+            Intervention.date
+            <= (
+                dateutils.parse_date_or_today(endDate) + timedelta(hours=23, minutes=59)
+            )
         )
 
     if idSegment is not None:
@@ -244,7 +248,7 @@ def get_interventions(
                 "frequency": (
                     {"value": i[6].id, "label": i[6].description} if i[6] else ""
                 ),
-                "time": timeValue(i[1].interval) if i[1] else None,
+                "time": prescriptionutils.timeValue(i[1].interval) if i[1] else None,
                 "route": i[1].route if i[1] else "None",
                 "admissionNumber": i[0].admissionNumber,
                 "observation": i[0].notes,
@@ -253,7 +257,7 @@ def get_interventions(
                 "interactionsDescription": (", ").join(
                     [d.split(splitStr)[0] for d in i[4]]
                 ),
-                "interactionsList": interactionsList(i[4], splitStr),
+                "interactionsList": prescriptionutils.interactionsList(i[4], splitStr),
                 "interactions": i[0].interactions,
                 "date": i[0].date.isoformat(),
                 "user": i[8],
@@ -1080,7 +1084,7 @@ def _get_outcome_dict(
         data["origin"] = {
             "item": {
                 "idPrescription": str(prescription.id),
-                "idPrescriptionAgg": gen_agg_id(
+                "idPrescriptionAgg": prescriptionutils.gen_agg_id(
                     admission_number=prescription.admissionNumber,
                     id_segment=prescription.idSegment,
                     pdate=intervention.date_base_economy,
@@ -1097,15 +1101,19 @@ def _calc_economy(origin, destiny):
         return 0
 
     if destiny != None:
-        economy = none2zero(origin["item"]["pricePerDose"]) * none2zero(
+        economy = numberutils.none2zero(
+            origin["item"]["pricePerDose"]
+        ) * numberutils.none2zero(
             origin["item"]["frequencyDay"]
-        ) - none2zero(destiny["item"]["pricePerDose"]) * none2zero(
+        ) - numberutils.none2zero(
+            destiny["item"]["pricePerDose"]
+        ) * numberutils.none2zero(
             destiny["item"]["frequencyDay"]
         )
     else:
-        economy = none2zero(origin["item"]["pricePerDose"]) * none2zero(
-            origin["item"]["frequencyDay"]
-        )
+        economy = numberutils.none2zero(
+            origin["item"]["pricePerDose"]
+        ) * numberutils.none2zero(origin["item"]["frequencyDay"])
 
     return economy
 
@@ -1236,7 +1244,7 @@ def _outcome_calc(list, user: User, date_base_economy):
             date_base_economy if date_base_economy != None else prescription.date
         )
         if prescription.idSegment:
-            id_prescription_aggregate = gen_agg_id(
+            id_prescription_aggregate = prescriptionutils.gen_agg_id(
                 admission_number=prescription.admissionNumber,
                 id_segment=prescription.idSegment,
                 pdate=base_date,
@@ -1285,8 +1293,9 @@ def _outcome_calc(list, user: User, date_base_economy):
                     ),
                     "route": prescription_drug.route,
                     "pricePerDose": str(
-                        none2zero(origin_price) * none2zero(dose)
-                        + none2zero(kit["price"])
+                        numberutils.none2zero(origin_price)
+                        * numberutils.none2zero(dose)
+                        + numberutils.none2zero(kit["price"])
                     ),
                     "priceKit": kit["price"],
                     "beforeConversion": {

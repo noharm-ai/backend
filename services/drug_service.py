@@ -25,8 +25,7 @@ from models.enums import DrugAdminSegment, DrugAttributesAuditTypeEnum
 from services import data_authorization_service
 from exception.validation_error import ValidationError
 from decorators.has_permission_decorator import has_permission, Permission
-from utils import status
-from routes.utils import timeValue
+from utils import status, prescriptionutils
 
 
 @has_permission(Permission.READ_PRESCRIPTION)
@@ -101,7 +100,7 @@ def get_drug_summary(id_drug: int, id_segment: int, complete=False):
                 {
                     "id": i.interval,
                     "idFrequency": i.idFrequency,
-                    "description": timeValue(i.interval),
+                    "description": prescriptionutils.timeValue(i.interval),
                 }
             )
 

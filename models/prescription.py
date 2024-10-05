@@ -7,7 +7,7 @@ from sqlalchemy.dialects.postgresql import INTERVAL
 from .main import db, User, DrugAttributes, Outlier, Substance, Drug
 from .appendix import Department, Notes, MeasureUnit, Frequency, MeasureUnitConvert
 from .segment import Segment
-from routes.utils import get_period_filter
+from utils import prescriptionutils
 
 
 class Prescription(db.Model):
@@ -139,7 +139,9 @@ class Prescription(db.Model):
             .filter(Prescription.concilia == None)
         )
 
-        q = get_period_filter(q, Prescription, aggDate, is_pmc, is_cpoe)
+        q = prescriptionutils.get_period_filter(
+            q, Prescription, aggDate, is_pmc, is_cpoe
+        )
 
         if not is_cpoe:
             q = q.filter(Prescription.idSegment == idSegment)
@@ -426,7 +428,9 @@ class PrescriptionDrug(db.Model):
                 .filter(Prescription.concilia == None)
             )
 
-            q = get_period_filter(q, Prescription, aggDate, is_pmc, is_cpoe)
+            q = prescriptionutils.get_period_filter(
+                q, Prescription, aggDate, is_pmc, is_cpoe
+            )
 
             if is_cpoe:
                 q = q.filter(
