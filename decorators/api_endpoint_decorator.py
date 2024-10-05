@@ -8,7 +8,6 @@ from jwt.exceptions import PyJWTError
 from functools import wraps
 
 from models.main import db, dbSession, User
-from models.enums import RoleEnum
 from utils import status
 from exception.validation_error import ValidationError
 from exception.authorization_error import AuthorizationError
@@ -109,4 +108,4 @@ def _is_cpoe():
     if config != None:
         roles = config.get("roles", [])
 
-    return RoleEnum.CPOE.value in roles
+    return "cpoe" in roles

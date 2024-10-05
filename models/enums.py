@@ -41,22 +41,6 @@ class IntegrationStatusEnum(Enum):
     CANCELED = 2
 
 
-class RoleEnum(Enum):
-    ADMIN = "admin"
-    SUPPORT = "suporte"
-    STAGING = "staging"
-    TRAINING = "training"
-    DOCTOR = "doctor"
-    READONLY = "readonly"
-    MULTI_SCHEMA = "multi-schema"
-    USER_ADMIN = "userAdmin"
-    SUMMARY = "summary"
-    UNLOCK_CHECKED_PRESCRIPTION = "unlock-checked-prescription"
-    CPOE = "cpoe"
-    PRESMED_FORM = "presmed-form"
-    SERVICE_USER = "service-user"
-
-
 class FeatureEnum(Enum):
     PRIMARY_CARE = "PRIMARYCARE"
     OAUTH = "OAUTH"

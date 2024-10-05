@@ -13,7 +13,7 @@ from models.prescription import (
     DrugAttributes,
     Substance,
 )
-from models.enums import RoleEnum, DrugAdminSegment, DrugAttributesAuditTypeEnum
+from models.enums import DrugAdminSegment, DrugAttributesAuditTypeEnum
 from services.admin import admin_ai_service
 from services import drug_service as main_drug_service
 from decorators.has_permission_decorator import has_permission, Permission
@@ -371,7 +371,8 @@ def copy_drug_attributes(
         and (
             ma.update_by = 0
             or ma.update_by is null
-            or u.config::text like :supportRole
+            or u.config::text like '%ADMIN%'
+            or u.config::text like '%CURATOR%'
         )
     """
 
@@ -464,7 +465,6 @@ def copy_drug_attributes(
         {
             "idSegmentOrigin": id_segment_origin,
             "idSegmentDestiny": id_segment_destiny,
-            "supportRole": f"%{RoleEnum.SUPPORT.value}%",
             "idUser": user_context.id,
             "extra": '{"attributes": "' + ",".join(attributes) + '"}',
         },
@@ -492,7 +492,6 @@ def copy_drug_attributes(
         {
             "idSegmentOrigin": id_segment_origin,
             "idSegmentDestiny": id_segment_destiny,
-            "supportRole": f"%{RoleEnum.SUPPORT.value}%",
             "idUser": user_context.id,
         },
     )
@@ -500,18 +499,6 @@ def copy_drug_attributes(
 
 @has_permission(Permission.ADMIN_DRUGS)
 def predict_substance(id_drugs: List[int], user_context: User):
-    roles = (
-        user_context.config["roles"]
-        if user_context.config and "roles" in user_context.config
-        else []
-    )
-    if RoleEnum.ADMIN.value not in roles and RoleEnum.TRAINING.value not in roles:
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-
     if len(id_drugs) == 0 or len(id_drugs) > 200:
         raise ValidationError(
             "Parâmetro inválido (min=1; max=200)",
