@@ -9,7 +9,6 @@ from models.prescription import (
 )
 from models.enums import (
     FeatureEnum,
-    RoleEnum,
     PrescriptionAuditTypeEnum,
     DrugTypeEnum,
     PrescriptionReviewTypeEnum,
@@ -23,6 +22,7 @@ from services import (
     prescription_drug_service,
     feature_service,
 )
+from security.role import Role
 
 
 @has_permission(Permission.WRITE_PRESCRIPTION)
@@ -187,10 +187,8 @@ def _check_agg_internal_prescriptions(
 def _check_single_prescription(
     prescription, p_status, user, parent_agg_date=None, has_lock_feature=False, extra={}
 ):
-    roles = user.config["roles"] if user.config and "roles" in user.config else []
-
     if p_status == "0" and prescription.user != user.id:
-        if has_lock_feature and RoleEnum.UNLOCK_CHECKED_PRESCRIPTION.value not in roles:
+        if has_lock_feature:
             # skip this one
             return None
 
@@ -415,6 +413,15 @@ def static_check(
         raise ValidationError(
             "Usuário origem inválido",
             "errors.invalidRegister",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    permissions = Role.get_permissions_from_user(origin_user)
+
+    if Permission.WRITE_PRESCRIPTION not in permissions:
+        raise ValidationError(
+            "Usuário origem não possui permissão para checagem",
+            "errors.invalidPermission",
             status.HTTP_400_BAD_REQUEST,
         )
 

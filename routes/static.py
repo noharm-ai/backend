@@ -4,11 +4,12 @@ from datetime import datetime
 
 from models.main import db, User
 from .utils import tryCommit
-from services import prescription_agg_service
+from services import prescription_agg_service, prescription_check_service
 
 from exception.validation_error import ValidationError
 from exception.authorization_error import AuthorizationError
 from utils import status
+from decorators.api_endpoint_decorator import api_endpoint
 
 app_stc = Blueprint("app_stc", __name__)
 
@@ -76,3 +77,23 @@ def create_aggregated_prescription_by_date(schema, admission_number):
         }, status.HTTP_401_UNAUTHORIZED
 
     return tryCommit(db, escape_html(str(admission_number)))
+
+
+@app_stc.route("/static/prescriptions/status", methods=["POST"])
+@api_endpoint()
+def static_prescription_status():
+    data = request.get_json()
+
+    id_prescription = data.get("idPrescription", None)
+    p_status = (
+        escape_html(data.get("status", None))
+        if data.get("status", None) != None
+        else None
+    )
+    id_origin_user = data.get("idOriginUser", None)
+
+    return prescription_check_service.static_check(
+        id_prescription=id_prescription,
+        p_status=p_status,
+        id_origin_user=id_origin_user,
+    )

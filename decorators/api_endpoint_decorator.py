@@ -3,7 +3,8 @@ import logging
 import inspect
 from flask import g
 from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request, get_jwt
-from flask_jwt_extended.exceptions import NoAuthorizationError
+from flask_jwt_extended.exceptions import JWTExtendedException
+from jwt.exceptions import PyJWTError
 from functools import wraps
 
 from models.main import db, dbSession, User
@@ -43,7 +44,7 @@ def api_endpoint():
 
                 return {"status": "success", "data": result}, status.HTTP_200_OK
 
-            except NoAuthorizationError:
+            except (JWTExtendedException, PyJWTError):
                 db.session.rollback()
                 db.session.close()
                 db.session.remove()

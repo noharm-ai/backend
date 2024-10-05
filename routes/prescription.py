@@ -118,26 +118,6 @@ def setPrescriptionStatus():
     )
 
 
-@app_pres.route("/static/prescriptions/status", methods=["POST"])
-@api_endpoint()
-def static_prescription_status():
-    data = request.get_json()
-
-    id_prescription = data.get("idPrescription", None)
-    p_status = (
-        escape_html(data.get("status", None))
-        if data.get("status", None) != None
-        else None
-    )
-    id_origin_user = data.get("idOriginUser", None)
-
-    return prescription_check_service.static_check(
-        id_prescription=id_prescription,
-        p_status=p_status,
-        id_origin_user=id_origin_user,
-    )
-
-
 @app_pres.route("/prescriptions/review", methods=["POST"])
 @api_endpoint()
 def review_prescription():
