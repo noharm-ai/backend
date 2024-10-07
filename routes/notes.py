@@ -24,7 +24,7 @@ def get_single_note(id_clinical_notes):
 @app_note.route("/notes/<int:idNote>", methods=["POST"])
 @api_endpoint()
 def changeNote(idNote):
-    clinical_notes_service.update_note_text(id=idNote, data=request.json())
+    clinical_notes_service.update_note_text(id=idNote, data=request.get_json())
 
     return escape_html(idNote)
 
