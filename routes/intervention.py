@@ -1,7 +1,7 @@
 from flask import Blueprint, request
 
 from services.admin import admin_intervention_reason_service
-from services import intervention_service
+from services import intervention_service, intervention_outcome_service
 from decorators.api_endpoint_decorator import api_endpoint
 
 app_itrv = Blueprint("app_itrv", __name__)
@@ -82,7 +82,7 @@ def search_interventions():
 @app_itrv.route("/intervention/outcome-data", methods=["GET"])
 @api_endpoint()
 def outcome_data():
-    return intervention_service.get_outcome_data(
+    return intervention_outcome_service.get_outcome_data(
         id_intervention=request.args.get("idIntervention", None),
         edit=request.args.get("edit", False),
     )
@@ -93,7 +93,7 @@ def outcome_data():
 def set_outcome():
     data = request.get_json()
 
-    intervention_service.set_intervention_outcome(
+    intervention_outcome_service.set_intervention_outcome(
         id_intervention=data.get("idIntervention", None),
         outcome=data.get("outcome", None),
         economy_day_amount=data.get("economyDayAmount", None),
