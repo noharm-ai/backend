@@ -1,112 +1,69 @@
-from utils import status
-from models.main import *
-from models.appendix import *
-from models.prescription import *
 from flask import Blueprint, request
-from flask_jwt_extended import jwt_required, get_jwt_identity
-from markupsafe import escape as escape_html
-from datetime import datetime
-from .utils import tryCommit
+
 from services.admin import admin_intervention_reason_service
-from services import intervention_service, memory_service
-from exception.validation_error import ValidationError
+from services import intervention_service
+from decorators.api_endpoint_decorator import api_endpoint
 
 app_itrv = Blueprint("app_itrv", __name__)
 
 
-@app_itrv.route(
-    "/prescriptions/drug/<int:idPrescriptionDrug>/<int:drugStatus>", methods=["PUT"]
-)
-@jwt_required()
-def setDrugStatus(idPrescriptionDrug, drugStatus):
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
-
-    pd = PrescriptionDrug.query.get(idPrescriptionDrug)
-    if pd is not None:
-        pd.status = drugStatus
-        pd.update = datetime.today()
-        pd.user = user.id
-
-    return tryCommit(db, escape_html(str(idPrescriptionDrug)), user.permission())
-
-
 @app_itrv.route("/intervention", methods=["PUT"])
-@jwt_required()
+@api_endpoint()
 def save_intervention():
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
     data = request.get_json()
 
-    try:
-        id_prescription_drug_list = data.get("idPrescriptionDrugList", [])
+    id_prescription_drug_list = data.get("idPrescriptionDrugList", [])
 
-        if len(id_prescription_drug_list) > 0:
-            result = intervention_service.add_multiple_interventions(
-                id_prescription_drug_list=id_prescription_drug_list,
-                user=user,
-                admission_number=data.get("admissionNumber", None),
-                id_intervention_reason=data.get("idInterventionReason", None),
-                error=data.get("error", None),
-                cost=data.get("cost", None),
-                observation=data.get("observation", None),
-                agg_id_prescription=data.get("aggIdPrescription", None),
-            )
-        else:
-            result = intervention_service.save_intervention(
-                id_intervention=data.get("idIntervention", None),
-                id_prescription=data.get("idPrescription", "0"),
-                id_prescription_drug=data.get("idPrescriptionDrug", "0"),
-                new_status=data.get("status", "s"),
-                user=user,
-                admission_number=data.get("admissionNumber", None),
-                id_intervention_reason=data.get("idInterventionReason", None),
-                error=data.get("error", None),
-                cost=data.get("cost", None),
-                observation=data.get("observation", None),
-                interactions=data.get("interactions", None),
-                transcription=data.get("transcription", None),
-                economy_days=(
-                    data.get("economyDays", None) if "economyDays" in data else -1
-                ),
-                expended_dose=(
-                    data.get("expendedDose", None) if "expendedDose" in data else -1
-                ),
-                agg_id_prescription=data.get("aggIdPrescription", None),
-                update_responsible=data.get("updateResponsible", False),
-            )
-    except ValidationError as e:
-        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+    if len(id_prescription_drug_list) > 0:
+        result = intervention_service.add_multiple_interventions(
+            id_prescription_drug_list=id_prescription_drug_list,
+            admission_number=data.get("admissionNumber", None),
+            id_intervention_reason=data.get("idInterventionReason", None),
+            error=data.get("error", None),
+            cost=data.get("cost", None),
+            observation=data.get("observation", None),
+            agg_id_prescription=data.get("aggIdPrescription", None),
+        )
+    else:
+        result = intervention_service.save_intervention(
+            id_intervention=data.get("idIntervention", None),
+            id_prescription=data.get("idPrescription", "0"),
+            id_prescription_drug=data.get("idPrescriptionDrug", "0"),
+            new_status=data.get("status", "s"),
+            admission_number=data.get("admissionNumber", None),
+            id_intervention_reason=data.get("idInterventionReason", None),
+            error=data.get("error", None),
+            cost=data.get("cost", None),
+            observation=data.get("observation", None),
+            interactions=data.get("interactions", None),
+            transcription=data.get("transcription", None),
+            economy_days=(
+                data.get("economyDays", None) if "economyDays" in data else -1
+            ),
+            expended_dose=(
+                data.get("expendedDose", None) if "expendedDose" in data else -1
+            ),
+            agg_id_prescription=data.get("aggIdPrescription", None),
+            update_responsible=data.get("updateResponsible", False),
+        )
 
-    return tryCommit(db, result, user.permission())
-
-
-def sortReasons(e):
-    return e["description"]
+    return result
 
 
 @app_itrv.route("/intervention/reasons", methods=["GET"])
-@jwt_required()
+@api_endpoint()
 def getInterventionReasons():
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
-
     list = admin_intervention_reason_service.get_reasons(active_only=True)
 
-    return {
-        "status": "success",
-        "data": admin_intervention_reason_service.list_to_dto(list),
-    }, status.HTTP_200_OK
+    return admin_intervention_reason_service.list_to_dto(list)
 
 
 @app_itrv.route("/intervention/search", methods=["POST"])
-@jwt_required()
+@api_endpoint()
 def search_interventions():
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
     data = request.get_json()
 
-    results = intervention_service.get_interventions(
+    return intervention_service.get_interventions(
         admissionNumber=data.get("admissionNumber", None),
         startDate=data.get("startDate", None),
         endDate=data.get("endDate", None),
@@ -121,48 +78,31 @@ def search_interventions():
         prescriber_name=data.get("prescriberName", None),
     )
 
-    return {"status": "success", "data": results}, status.HTTP_200_OK
-
 
 @app_itrv.route("/intervention/outcome-data", methods=["GET"])
-@jwt_required()
+@api_endpoint()
 def outcome_data():
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
-
-    try:
-        intervention = intervention_service.get_outcome_data(
-            id_intervention=request.args.get("idIntervention", None),
-            user=user,
-            edit=request.args.get("edit", False),
-        )
-    except ValidationError as e:
-        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
-
-    return {"status": "success", "data": intervention}, status.HTTP_200_OK
+    return intervention_service.get_outcome_data(
+        id_intervention=request.args.get("idIntervention", None),
+        edit=request.args.get("edit", False),
+    )
 
 
 @app_itrv.route("/intervention/set-outcome", methods=["POST"])
-@jwt_required()
+@api_endpoint()
 def set_outcome():
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
     data = request.get_json()
 
-    try:
-        intervention_service.set_intervention_outcome(
-            id_intervention=data.get("idIntervention", None),
-            outcome=data.get("outcome", None),
-            user=user,
-            economy_day_amount=data.get("economyDayAmount", None),
-            economy_day_amount_manual=data.get("economyDayAmountManual", None),
-            economy_day_value=data.get("economyDayValue", None),
-            economy_day_value_manual=data.get("economyDayValueManual", None),
-            id_prescription_drug_destiny=data.get("idPrescriptionDrugDestiny", None),
-            origin_data=data.get("origin"),
-            destiny_data=data.get("destiny"),
-        )
-    except ValidationError as e:
-        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+    intervention_service.set_intervention_outcome(
+        id_intervention=data.get("idIntervention", None),
+        outcome=data.get("outcome", None),
+        economy_day_amount=data.get("economyDayAmount", None),
+        economy_day_amount_manual=data.get("economyDayAmountManual", None),
+        economy_day_value=data.get("economyDayValue", None),
+        economy_day_value_manual=data.get("economyDayValueManual", None),
+        id_prescription_drug_destiny=data.get("idPrescriptionDrugDestiny", None),
+        origin_data=data.get("origin"),
+        destiny_data=data.get("destiny"),
+    )
 
-    return tryCommit(db, True, user.permission())
+    return True

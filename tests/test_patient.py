@@ -1,10 +1,11 @@
 from conftest import *
 from models.prescription import Patient
+from security.role import Role
 
 
 def test_post_patient_permission(client):
     """Teste post /patient/admission - Deve retornar erro [401 UNAUTHORIZED] devido ao usuário utilizado"""
-    access_token = get_access(client, roles=["staging", "readonly"])
+    access_token = get_access(client, roles=[Role.VIEWER.value])
 
     admission = "5"
     data = {"height": "15.0"}
@@ -19,7 +20,7 @@ def test_post_patient_permission(client):
 
 def test_post_patient_permission_support(client):
     """Teste post /patient/admission - Não deve atualizar informacao"""
-    access_token = get_access(client, roles=["staging", "suporte"])
+    access_token = get_access(client, roles=[Role.VIEWER.value])
 
     admission = "5"
     data = {"height": "18.0"}
@@ -29,17 +30,13 @@ def test_post_patient_permission_support(client):
         url, data=json.dumps(data), headers=make_headers(access_token)
     )
 
-    responseData = json.loads(response.data)["data"]
-    patient = session.query(Patient).get(admission)
-    assert response.status_code == 200
-    assert data["height"] != str(patient.height)
-    assert admission == str(responseData)
+    assert response.status_code == 401
 
 
 def test_post_patient(client):
     """Teste post /patient/admission - Compara dados enviados com dados salvos no banco e valida status_code 200"""
 
-    access_token = get_access(client, roles=["staging"])
+    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
 
     admission = "5"
     data = {"height": "15.0"}
@@ -58,7 +55,7 @@ def test_post_patient(client):
 def test_get_notes_by_idAdmission(client):
     """Teste get /notes/idAdmission - Valida status_code 200"""
 
-    access_token = get_access(client)
+    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
 
     idAdmission = "5"
 
@@ -74,7 +71,7 @@ def test_get_notes_by_idAdmission(client):
 def test_get_exams_by_idAdmission(client):
     """Teste get /exams/idAdmission - Valida status_code 200"""
 
-    access_token = get_access(client)
+    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
 
     idAdmission = "5"
 

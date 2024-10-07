@@ -1,10 +1,30 @@
 from flask_jwt_extended import get_jwt_identity
+from datetime import datetime
 
-from models.main import db
-from models.appendix import *
-from models.prescription import *
+from models.main import db, User
+from models.appendix import Memory
 from models.enums import MemoryEnum
 from exception.validation_error import ValidationError
+from decorators.has_permission_decorator import has_permission, Permission
+from utils import status
+
+
+@has_permission(Permission.READ_BASIC_FEATURES)
+def get_memory_by_kind(kind: str):
+    if is_admin_memory(kind) and not kind == MemoryEnum.CUSTOM_FORMS.value:
+        raise ValidationError(
+            "Memória inexistente",
+            "errors.invalidRecord",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    memList = Memory.query.filter(Memory.kind == kind).all()
+
+    results = []
+    for m in memList:
+        results.append({"key": m.key, "value": m.value})
+
+    return results
 
 
 def has_feature(feature: str):
@@ -56,7 +76,8 @@ def get_by_kind(kinds) -> dict:
     return memory_itens
 
 
-def save_memory(id, kind, value, user):
+@has_permission(Permission.WRITE_BASIC_FEATURES)
+def save_memory(id, kind, value, user_context: User):
     newMem = False
     if id:
         mem = Memory.query.get(id)
@@ -67,7 +88,7 @@ def save_memory(id, kind, value, user):
                 status.HTTP_400_BAD_REQUEST,
             )
 
-        if is_private(key=kind) and user.id != mem.user:
+        if is_private(key=kind) and user_context.id != mem.user:
             raise ValidationError(
                 "Usuário não possui permissão para alterar este registro",
                 "errors.unauthorizedUser",
@@ -81,7 +102,7 @@ def save_memory(id, kind, value, user):
     mem.kind = kind
     mem.value = value
     mem.update = datetime.today()
-    mem.user = user.id
+    mem.user = user_context.id
 
     if is_admin_memory(mem.kind):
         raise ValidationError(
@@ -97,7 +118,8 @@ def save_memory(id, kind, value, user):
     return mem
 
 
-def save_unique_memory(kind, value, user):
+@has_permission(Permission.WRITE_BASIC_FEATURES)
+def save_unique_memory(kind, value, user_context: User):
     if is_admin_memory(kind):
         raise ValidationError(
             "Usuário não possui permissão para alterar este registro",
@@ -112,7 +134,7 @@ def save_unique_memory(kind, value, user):
         newMem = True
         mem = Memory()
     else:
-        if is_private(key=kind) and user.id != mem.user:
+        if is_private(key=kind) and user_context.id != mem.user:
             raise ValidationError(
                 "Usuário não possui permissão para alterar este registro",
                 "errors.unauthorizedUser",
@@ -122,7 +144,7 @@ def save_unique_memory(kind, value, user):
     mem.kind = kind
     mem.value = value
     mem.update = datetime.today()
-    mem.user = user.id
+    mem.user = user_context.id
 
     if newMem:
         db.session.add(mem)
@@ -163,6 +185,7 @@ def is_private(key):
     return False
 
 
+@has_permission(Permission.READ_REPORTS)
 def get_reports():
     external = get_memory(MemoryEnum.REPORTS.value)
     internal = get_memory(MemoryEnum.REPORTS_INTERNAL.value)

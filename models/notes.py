@@ -1,7 +1,7 @@
 from .main import db
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import deferred
-from sqlalchemy import inspect, func, desc, distinct
+from sqlalchemy import func, desc
 from datetime import datetime, timedelta
 
 
@@ -40,9 +40,6 @@ class ClinicalNotes(db.Model):
 
     summary = deferred(db.Column("sumario", postgresql.JSONB, nullable=True))
     annotations = deferred(db.Column("anotacoes", postgresql.JSONB, nullable=True))
-
-    def exists():
-        return True
 
     def getSigns(admissionNumber):
         return (

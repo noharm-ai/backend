@@ -1,8 +1,9 @@
 import xmlrpc.client
 import base64
 
-from models.main import *
+from models.main import db, User
 from config import Config
+from decorators.has_permission_decorator import has_permission, Permission
 
 
 def _get_client():
@@ -26,8 +27,9 @@ def _get_client():
     return execute
 
 
-def create_ticket(user, from_url, filelist, category, description, title):
-    db_user = db.session.query(User).filter(User.id == user.id).first()
+@has_permission(Permission.WRITE_SUPPORT)
+def create_ticket(user_context: User, from_url, filelist, category, description, title):
+    db_user = db.session.query(User).filter(User.id == user_context.id).first()
 
     client = _get_client()
 
@@ -107,8 +109,9 @@ def create_ticket(user, from_url, filelist, category, description, title):
     return ticket
 
 
-def list_tickets(user):
-    db_user = db.session.query(User).filter(User.id == user.id).first()
+@has_permission(Permission.READ_SUPPORT)
+def list_tickets(user_context: User):
+    db_user = db.session.query(User).filter(User.id == user_context.id).first()
 
     client = _get_client()
 

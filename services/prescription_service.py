@@ -1,27 +1,34 @@
-from sqlalchemy import desc, nullsfirst
-from datetime import date, datetime, timedelta
-from utils import status
+from sqlalchemy import desc, nullsfirst, func, and_, or_, text
+from datetime import date, datetime
 
-from models.main import db
-from models.appendix import *
-from models.prescription import *
-from models.enums import (
-    RoleEnum,
-    PrescriptionAuditTypeEnum,
-    DrugTypeEnum,
-    FeatureEnum,
-    PrescriptionReviewTypeEnum,
+from models.main import db, User
+from models.prescription import (
+    Prescription,
+    Patient,
+    Department,
+    PrescriptionDrug,
+    PrescriptionAudit,
 )
+from models.enums import FeatureEnum, PrescriptionAuditTypeEnum
 from exception.validation_error import ValidationError
 from services import (
-    prescription_drug_service,
     memory_service,
-    permission_service,
+    feature_service,
     data_authorization_service,
 )
+from decorators.has_permission_decorator import has_permission, Permission
+from utils import status, prescriptionutils
 
 
+@has_permission(Permission.READ_PRESCRIPTION, Permission.READ_DISCHARGE_SUMMARY)
 def search(search_key):
+    if search_key == None:
+        raise ValidationError(
+            "Parâmetro inválido",
+            "errors.invalidParam",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
     q_presc_admission = (
         db.session.query(
             Prescription,
@@ -80,341 +87,40 @@ def search(search_key):
         .limit(1)
     )
 
-    return (
+    results = (
         q_presc_admission.union_all(q_concilia)
         .order_by("priority", nullsfirst(Prescription.concilia))
         .all()
     )
 
+    list = []
 
-def check_prescription(
-    idPrescription,
-    p_status,
-    user,
-    evaluation_time,
-    alerts,
-    service_user=False,
-    fast_check=False,
-):
-    roles = user.config["roles"] if user.config and "roles" in user.config else []
-    if not permission_service.is_pharma(user):
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
+    for p in results:
+        list.append(
+            {
+                "idPrescription": str(p[0].id),
+                "admissionNumber": p[0].admissionNumber,
+                "date": p[0].date.isoformat() if p[0].date else None,
+                "status": p[0].status,
+                "agg": p[0].agg,
+                "concilia": p[0].concilia,
+                "birthdate": p[1].isoformat() if p[1] else None,
+                "gender": p[2],
+                "department": p[3],
+                "admissionDate": p[4].isoformat() if p[4] else None,
+            }
         )
 
-    p = Prescription.query.get(idPrescription)
-    if p is None:
-        raise ValidationError(
-            "Prescrição inexistente",
-            "errors.businessRules",
-            status.HTTP_400_BAD_REQUEST,
-        )
-
-    if p.status == p_status:
-        raise ValidationError(
-            (
-                "Não houve alteração da situação: Prescrição já está checada"
-                if p_status == "s"
-                else "Não houve alteração da situação: A checagem já foi desfeita"
-            ),
-            "errors.businessRules",
-            status.HTTP_400_BAD_REQUEST,
-        )
-
-    if not data_authorization_service.has_segment_authorization(
-        id_segment=p.idSegment, user=user
-    ):
-        raise ValidationError(
-            "Usuário não autorizado neste segmento",
-            "errors.businessRules",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-
-    has_lock_feature = memory_service.has_feature(
-        FeatureEnum.LOCK_CHECKED_PRESCRIPTION.value
-    )
-
-    if p_status == "0" and p.user != user.id:
-        if has_lock_feature and RoleEnum.UNLOCK_CHECKED_PRESCRIPTION.value not in roles:
-            raise ValidationError(
-                "A checagem não pode ser desfeita, pois foi efetuada por outro usuário",
-                "errors.businessError",
-                status.HTTP_400_BAD_REQUEST,
-            )
-
-    extra_info = {
-        "main_prescription": str(p.id),
-        "main_is_agg": bool(p.agg),
-        "main_evaluationStartDate": (
-            p.features["evaluation"]["startDate"]
-            if p.features != None
-            and "evaluation" in p.features
-            and "startDate" in p.features["evaluation"]
-            else None
-        ),
-        "evaluationTime": evaluation_time or 0,
-        "alerts": alerts,
-        "serviceUser": service_user,
-        "fastCheck": fast_check,
-    }
-
-    results = []
-
-    if p.agg:
-        internals = _check_agg_internal_prescriptions(
-            prescription=p,
-            p_status=p_status,
-            user=user,
-            has_lock_feature=has_lock_feature,
-            extra=extra_info,
-        )
-        single = _check_single_prescription(
-            prescription=p,
-            p_status=p_status,
-            user=user,
-            has_lock_feature=has_lock_feature,
-            extra=extra_info,
-        )
-
-        for i in internals:
-            results.append(i)
-        if single:
-            results.append(single)
-
-    else:
-        single = _check_single_prescription(
-            prescription=p,
-            p_status=p_status,
-            user=user,
-            has_lock_feature=has_lock_feature,
-            extra=extra_info,
-        )
-        _update_agg_status(prescription=p, user=user, extra=extra_info)
-
-        if single:
-            results.append(single)
-
-    return results
+    return list
 
 
-def _update_agg_status(prescription: Prescription, user: User, extra={}):
-    unchecked_prescriptions = get_query_prescriptions_by_agg(
-        agg_prescription=prescription, is_cpoe=user.cpoe()
-    )
-    unchecked_prescriptions = unchecked_prescriptions.filter(Prescription.status != "s")
-
-    agg_status = "0" if unchecked_prescriptions.count() > 0 else "s"
-
-    agg_prescription = (
+@has_permission(Permission.WRITE_PRESCRIPTION)
+def start_evaluation(id_prescription, user_context: User):
+    p = (
         db.session.query(Prescription)
-        .filter(Prescription.admissionNumber == prescription.admissionNumber)
-        .filter(Prescription.idSegment == prescription.idSegment)
-        .filter(Prescription.agg != None)
-        .filter(func.date(Prescription.date) == func.date(prescription.date))
+        .filter(Prescription.id == id_prescription)
         .first()
     )
-
-    if agg_prescription is not None and agg_prescription.status != agg_status:
-        _check_single_prescription(
-            prescription=agg_prescription, p_status=agg_status, user=user, extra=extra
-        )
-
-
-def get_query_prescriptions_by_agg(
-    agg_prescription: Prescription, is_cpoe=False, only_id=False
-):
-    is_pmc = memory_service.has_feature_nouser(FeatureEnum.PRIMARY_CARE.value)
-
-    q = (
-        db.session.query(Prescription.id if only_id else Prescription)
-        .filter(Prescription.admissionNumber == agg_prescription.admissionNumber)
-        .filter(Prescription.concilia == None)
-        .filter(Prescription.agg == None)
-    )
-
-    q = get_period_filter(q, Prescription, agg_prescription.date, is_pmc, is_cpoe)
-
-    if not is_cpoe:
-        q = q.filter(Prescription.idSegment == agg_prescription.idSegment)
-    else:
-        # discard all suspended
-        active_count = (
-            db.session.query(func.count().label("count"))
-            .filter(PrescriptionDrug.idPrescription == Prescription.id)
-            .filter(
-                or_(
-                    PrescriptionDrug.suspendedDate == None,
-                    func.date(PrescriptionDrug.suspendedDate) >= agg_prescription.date,
-                )
-            )
-            .as_scalar()
-        )
-        q = q.filter(active_count > 0)
-
-    return q
-
-
-def _check_agg_internal_prescriptions(
-    prescription, p_status, user, has_lock_feature=False, extra={}
-):
-    q_internal_prescription = get_query_prescriptions_by_agg(
-        agg_prescription=prescription, is_cpoe=user.cpoe()
-    )
-    q_internal_prescription = q_internal_prescription.filter(
-        Prescription.status != p_status
-    )
-
-    prescriptions = q_internal_prescription.all()
-
-    results = []
-
-    for p in prescriptions:
-        result = _check_single_prescription(
-            prescription=p,
-            p_status=p_status,
-            user=user,
-            parent_agg_date=prescription.date,
-            has_lock_feature=has_lock_feature,
-            extra=extra,
-        )
-
-        if result:
-            results.append(result)
-
-    return results
-
-
-def _check_single_prescription(
-    prescription, p_status, user, parent_agg_date=None, has_lock_feature=False, extra={}
-):
-    roles = user.config["roles"] if user.config and "roles" in user.config else []
-
-    if p_status == "0" and prescription.user != user.id:
-        if has_lock_feature and RoleEnum.UNLOCK_CHECKED_PRESCRIPTION.value not in roles:
-            # skip this one
-            return None
-
-    prescription.status = p_status
-    prescription.update = datetime.today()
-    prescription.user = user.id
-
-    audit_check(
-        prescription=prescription,
-        user=user,
-        parent_agg_date=parent_agg_date,
-        extra=extra,
-    )
-
-    _add_checkedindex(prescription=prescription, user=user)
-
-    db.session.flush()
-
-    return {"idPrescription": str(prescription.id), "status": p_status}
-
-
-def _add_checkedindex(prescription: Prescription, user: User):
-    if prescription.status != "s" or prescription.agg or prescription.concilia != None:
-        return
-
-    query = text(
-        f"""
-        INSERT INTO {user.schema}.checkedindex
-        (
-            nratendimento, fkmedicamento, doseconv, frequenciadia, sletapas, slhorafase,
-            sltempoaplicacao, sldosagem, dtprescricao, via, horario, dose, complemento, fkprescricao, 
-            created_at, created_by
-        )
-        SELECT 
-            p.nratendimento,
-            pm.fkmedicamento, 
-            pm.doseconv, 
-            pm.frequenciadia, 
-            COALESCE(pm.sletapas, 0), 
-            COALESCE(pm.slhorafase, 0), 
-            COALESCE(pm.sltempoaplicacao, 0), 
-            COALESCE(pm.sldosagem, 0),
-            p.dtprescricao, 
-            COALESCE(pm.via, ''), 
-            COALESCE(left(pm.horario ,50), ''),
-            pm.dose, 
-            MD5(pm.complemento),
-            p.fkprescricao,
-            :createdAt,
-            :idUser
-        FROM 
-            {user.schema}.prescricao p
-            INNER JOIN {user.schema}.presmed pm ON pm.fkprescricao = p.fkprescricao 
-        WHERE 
-            p.fkprescricao = :idPrescription
-            AND pm.dtsuspensao is null
-    """
-    )
-
-    db.session.execute(
-        query,
-        {
-            "createdAt": datetime.today(),
-            "idUser": user.id,
-            "idPrescription": prescription.id,
-        },
-    )
-
-    # delete old records to force revalidation
-    db.session.execute(
-        text(f"""DELETE FROM {user.schema}.checkedindex WHERE created_at < :maxDate"""),
-        {"maxDate": (datetime.today() - timedelta(days=15))},
-    )
-
-
-def audit_check(prescription: Prescription, user: User, parent_agg_date=None, extra={}):
-    a = PrescriptionAudit()
-    a.auditType = (
-        PrescriptionAuditTypeEnum.CHECK.value
-        if prescription.status == "s"
-        else PrescriptionAuditTypeEnum.UNCHECK.value
-    )
-    a.admissionNumber = prescription.admissionNumber
-    a.idPrescription = prescription.id
-    a.prescriptionDate = prescription.date
-    a.idDepartment = prescription.idDepartment
-    a.idSegment = prescription.idSegment
-
-    a.totalItens = prescription_drug_service.count_drugs_by_prescription(
-        prescription=prescription,
-        drug_types=[
-            DrugTypeEnum.DRUG.value,
-            DrugTypeEnum.PROCEDURE.value,
-            DrugTypeEnum.SOLUTION.value,
-        ],
-        user=user,
-        parent_agg_date=parent_agg_date,
-    )
-
-    a.agg = prescription.agg
-    a.concilia = prescription.concilia
-    a.bed = prescription.bed
-    a.extra = extra
-    a.createdAt = datetime.today()
-    a.createdBy = user.id
-
-    db.session.add(a)
-
-    return a.totalItens
-
-
-def start_evaluation(id_prescription, user):
-    roles = user.config["roles"] if user.config and "roles" in user.config else []
-    if (
-        RoleEnum.SUPPORT.value in roles
-        or RoleEnum.ADMIN.value in roles
-        or RoleEnum.READONLY.value in roles
-        or RoleEnum.TRAINING.value in roles
-    ):
-        return
-
-    p = Prescription.query.get(id_prescription)
     if p is None:
         raise ValidationError(
             "Prescrição inexistente",
@@ -432,9 +138,9 @@ def start_evaluation(id_prescription, user):
     if is_being_evaluated(p.features):
         return p.features["evaluation"] if "evaluation" in p.features else None
     else:
-        current_user = db.session.query(User).filter(User.id == user.id).first()
+        current_user = db.session.query(User).filter(User.id == user_context.id).first()
         evaluation_object = {
-            "userId": user.id,
+            "userId": user_context.id,
             "userName": current_user.name,
             "startDate": datetime.today().isoformat(),
         }
@@ -464,104 +170,8 @@ def is_being_evaluated(features):
     return False
 
 
-def review_prescription(idPrescription, user, review_type, evaluation_time):
-    if not permission_service.is_pharma(user):
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-
-    prescription = Prescription.query.get(idPrescription)
-    if prescription is None:
-        raise ValidationError(
-            "Prescrição inexistente",
-            "errors.invalidRegister",
-            status.HTTP_400_BAD_REQUEST,
-        )
-
-    if not data_authorization_service.has_segment_authorization(
-        id_segment=prescription.idSegment, user=user
-    ):
-        raise ValidationError(
-            "Usuário não autorizado neste segmento",
-            "errors.businessRules",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-
-    if not prescription.agg:
-        raise ValidationError(
-            "A revisão somente está disponível para Pacientes. Não é possível revisar prescrições individuais.",
-            "errors.invalidRegister",
-            status.HTTP_400_BAD_REQUEST,
-        )
-
-    if (
-        review_type != PrescriptionReviewTypeEnum.REVIEWED.value
-        and review_type != PrescriptionReviewTypeEnum.PENDING.value
-    ):
-        raise ValidationError(
-            "Status de revisão inexistente",
-            "errors.invalidRegister",
-            status.HTTP_400_BAD_REQUEST,
-        )
-
-    prescription.reviewType = review_type
-    db.session.flush()
-
-    a = PrescriptionAudit()
-    a.auditType = (
-        PrescriptionAuditTypeEnum.REVISION.value
-        if review_type == PrescriptionReviewTypeEnum.REVIEWED.value
-        else PrescriptionAuditTypeEnum.UNDO_REVISION.value
-    )
-    a.admissionNumber = prescription.admissionNumber
-    a.idPrescription = prescription.id
-    a.prescriptionDate = prescription.date
-    a.idDepartment = prescription.idDepartment
-    a.idSegment = prescription.idSegment
-
-    a.totalItens = prescription_drug_service.count_drugs_by_prescription(
-        prescription=prescription,
-        drug_types=[
-            DrugTypeEnum.DRUG.value,
-            DrugTypeEnum.PROCEDURE.value,
-            DrugTypeEnum.SOLUTION.value,
-        ],
-        user=user,
-    )
-
-    a.extra = {
-        "main_evaluationStartDate": (
-            prescription.features["evaluation"]["startDate"]
-            if prescription.features != None
-            and "evaluation" in prescription.features
-            and "startDate" in prescription.features["evaluation"]
-            else None
-        ),
-        "evaluationTime": evaluation_time or 0,
-    }
-
-    a.agg = prescription.agg
-    a.concilia = prescription.concilia
-    a.bed = prescription.bed
-    a.createdAt = datetime.today()
-    a.createdBy = user.id
-
-    db.session.add(a)
-
-    db_user = db.session.query(User).filter(User.id == user.id).first()
-
-    return {
-        "reviewed": (
-            True if review_type == PrescriptionReviewTypeEnum.REVIEWED.value else False
-        ),
-        "reviewedAt": datetime.today().isoformat(),
-        "reviewedBy": db_user.name,
-    }
-
-
-def recalculate_prescription(id_prescription: int, user: User):
+@has_permission(Permission.WRITE_PRESCRIPTION, Permission.WRITE_DRUG_SCORE)
+def recalculate_prescription(id_prescription: int, user_context: User):
     p = Prescription.query.get(id_prescription)
     if p is None:
         raise ValidationError(
@@ -571,9 +181,9 @@ def recalculate_prescription(id_prescription: int, user: User):
         )
 
     if p.agg:
-        if user.cpoe():
+        if feature_service.is_cpoe():
             prescription_results = get_query_prescriptions_by_agg(
-                agg_prescription=p, is_cpoe=user.cpoe(), only_id=True
+                agg_prescription=p, is_cpoe=feature_service.is_cpoe(), only_id=True
             ).all()
 
             prescription_ids = []
@@ -594,11 +204,11 @@ def recalculate_prescription(id_prescription: int, user: User):
             db.session.flush()
 
             query = text(
-                f"""INSERT INTO {user.schema}.presmed
+                f"""INSERT INTO {user_context.schema}.presmed
                     SELECT
                         pm.*
                     FROM
-                        {user.schema}.presmed pm
+                        {user_context.schema}.presmed pm
                     WHERE 
                         fkprescricao = ANY(:prescriptionIds)
                 """
@@ -608,16 +218,16 @@ def recalculate_prescription(id_prescription: int, user: User):
         else:
             query = text(
                 "INSERT INTO "
-                + user.schema
+                + user_context.schema
                 + ".presmed \
                     SELECT pm.*\
                     FROM "
-                + user.schema
+                + user_context.schema
                 + ".presmed pm\
                     WHERE fkprescricao IN (\
                         SELECT fkprescricao\
                         FROM "
-                + user.schema
+                + user_context.schema
                 + ".prescricao p\
                         WHERE p.nratendimento = :admissionNumber"
                 + "\
@@ -637,14 +247,101 @@ def recalculate_prescription(id_prescription: int, user: User):
     else:
         query = text(
             "INSERT INTO "
-            + user.schema
+            + user_context.schema
             + ".presmed \
                     SELECT *\
                     FROM "
-            + user.schema
+            + user_context.schema
             + ".presmed\
                     WHERE fkprescricao = :idPrescription"
             + ";"
         )
 
         db.session.execute(query, {"idPrescription": p.id})
+
+
+def get_query_prescriptions_by_agg(
+    agg_prescription: Prescription, is_cpoe=False, only_id=False
+):
+    is_pmc = memory_service.has_feature_nouser(FeatureEnum.PRIMARY_CARE.value)
+
+    q = (
+        db.session.query(Prescription.id if only_id else Prescription)
+        .filter(Prescription.admissionNumber == agg_prescription.admissionNumber)
+        .filter(Prescription.concilia == None)
+        .filter(Prescription.agg == None)
+    )
+
+    q = prescriptionutils.get_period_filter(
+        q, Prescription, agg_prescription.date, is_pmc, is_cpoe
+    )
+
+    if not is_cpoe:
+        q = q.filter(Prescription.idSegment == agg_prescription.idSegment)
+    else:
+        # discard all suspended
+        active_count = (
+            db.session.query(func.count().label("count"))
+            .filter(PrescriptionDrug.idPrescription == Prescription.id)
+            .filter(
+                or_(
+                    PrescriptionDrug.suspendedDate == None,
+                    func.date(PrescriptionDrug.suspendedDate) >= agg_prescription.date,
+                )
+            )
+            .as_scalar()
+        )
+        q = q.filter(active_count > 0)
+
+    return q
+
+
+@has_permission(Permission.WRITE_PRESCRIPTION)
+def update_prescription_data(id_prescription: int, data: dict, user_context: User):
+    p = (
+        db.session.query(Prescription)
+        .filter(Prescription.id == id_prescription)
+        .first()
+    )
+    if p is None:
+        raise ValidationError(
+            "Prescrição inexistente.",
+            "errors.invalidRegister",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    if not data_authorization_service.has_segment_authorization(
+        id_segment=p.idSegment, user=user_context
+    ):
+        return {
+            "status": "error",
+            "message": "Usuário não autorizado neste segmento",
+        }, status.HTTP_401_UNAUTHORIZED
+
+    if "notes" in data.keys():
+        p.notes = data.get("notes", None)
+        p.notes_at = datetime.today()
+
+        audit = PrescriptionAudit()
+        audit.auditType = PrescriptionAuditTypeEnum.UPSERT_CLINICAL_NOTES.value
+        audit.admissionNumber = p.admissionNumber
+        audit.idPrescription = p.id
+        audit.prescriptionDate = p.date
+        audit.idDepartment = p.idDepartment
+        audit.idSegment = p.idSegment
+        audit.totalItens = 0
+        audit.agg = p.agg
+        audit.concilia = p.concilia
+        audit.bed = p.bed
+        audit.extra = {"text": data.get("notes", None)}
+        audit.createdAt = datetime.today()
+        audit.createdBy = user_context.id
+        db.session.add(audit)
+
+    if "concilia" in data.keys():
+        concilia = data.get("concilia", "s")
+        p.concilia = str(concilia)[:1]
+
+    p.user = user_context.id
+
+    return p

@@ -3,7 +3,6 @@ from flask import (
     request,
     after_this_request,
 )
-from utils import status
 from flask_jwt_extended import (
     jwt_required,
     get_jwt_identity,
@@ -13,8 +12,8 @@ from flask_jwt_extended import (
 
 from models.main import db, dbSession
 from services import auth_service
-from .utils import tryCommit
 from exception.validation_error import ValidationError
+from utils import status, sessionutils
 
 app_auth = Blueprint("app_auth", __name__)
 
@@ -41,9 +40,7 @@ def auth():
     email = data.get("email", None)
     password = data.get("password", None)
     schema = data.get("schema", None) if data.get("schema", None) != None else None
-    default_roles = data.get("defaultRoles", [])
     extra_features = data.get("extraFeatures", [])
-    run_as_basic_user = data.get("runAsBasicUser", False)
     refresh_token = None
 
     try:
@@ -51,8 +48,6 @@ def auth():
             email,
             password,
             force_schema=schema,
-            default_roles=default_roles,
-            run_as_basic_user=run_as_basic_user,
             extra_features=extra_features,
         )
 
@@ -101,7 +96,7 @@ def auth_provider():
         set_refresh_cookies(response, refresh_token)
         return response
 
-    return tryCommit(db, auth_data)
+    return sessionutils.tryCommit(db, auth_data)
 
 
 @app_auth.route("/auth-provider/<schema>", methods=["GET"])

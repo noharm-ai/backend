@@ -6,8 +6,9 @@ import re
 from typing import List
 
 from config import Config
-from models.main import *
 from exception.validation_error import ValidationError
+from models.prescription import Drug
+from utils import status
 
 
 def get_substance(drugs: List[Drug]):

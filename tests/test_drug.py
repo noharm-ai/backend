@@ -1,10 +1,11 @@
 from conftest import *
 from models.main import Drug, Outlier, Substance
+from security.role import Role
 
 
 def test_get_drugs(client):
     """Teste get /drugs/ - Valida status_code 200"""
-    access_token = get_access(client)
+    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
 
     response = client.get("/drugs", headers=make_headers(access_token))
     data = json.loads(response.data)
@@ -16,7 +17,7 @@ def test_get_drugs(client):
 
 def test_get_drugs_by_idSegmento(client):
     """Teste get /drugs/idSegment - Valida status_code 200"""
-    access_token = get_access(client)
+    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
 
     id = "1"
     response = client.get("/drugs/" + id, headers=make_headers(access_token))
@@ -37,7 +38,7 @@ def test_get_drugs_by_idSegmento(client):
 
 def test_get_drugs_by_idSegment_and_qParam(client):
     """Teste get /drugs/idSegment - Valida status_code 200"""
-    access_token = get_access(client)
+    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
 
     id = "1"
 
@@ -64,7 +65,7 @@ def test_get_drugs_by_idSegment_and_qParam(client):
 
 def test_get_drugs_by_non_existing_idSegment(client):
     """Teste get /drugs/idSegment - Valida status_code 200"""
-    access_token = get_access(client)
+    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
 
     id = "7"
 
@@ -79,7 +80,7 @@ def test_get_drugs_units_by_id(client):
     """Teste get /drugs/id/units - Valida status_code 200"""
     # in this test instead of checking units in database, checking if it returns properties correctly
 
-    access_token = get_access(client)
+    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
 
     id = "2"
 
@@ -111,7 +112,7 @@ def test_get_substance(client):
     """Teste get /substance - Valida status_code 200"""
     # add substance since there's no in database. add before the response
 
-    access_token = get_access(client)
+    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
 
     allSubstances = session.query(Substance).delete()
     session.commit()
@@ -134,7 +135,7 @@ def test_get_substance(client):
 def test_get_outliers_by_segment_and_drug(client):
     """Teste get /outliers/idSegment/idDrug - Valida status_code 200"""
 
-    access_token = get_access(client)
+    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
 
     testIdSegment = 1
     testIdDrug = 5

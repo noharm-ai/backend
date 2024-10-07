@@ -1,13 +1,14 @@
-from sqlalchemy import select
+from sqlalchemy import select, desc
 
-from models.main import db, desc, User
+from models.main import db
 from models.appendix import CultureHeader, Culture
 from exception.validation_error import ValidationError
-from utils import dateutils, status
-from routes.utils import none2zero
+from utils import dateutils, status, numberutils
+from decorators.has_permission_decorator import has_permission, Permission
 
 
-def get_cultures(idPatient: int, user: User):
+@has_permission(Permission.READ_REPORTS)
+def get_cultures(idPatient: int):
     if idPatient == None:
         raise ValidationError(
             "idPatient inválido", "errors.invalidParams", status.HTTP_400_BAD_REQUEST
@@ -66,8 +67,8 @@ def _group_culture_results(results):
     def prediction(row):
         if (
             row.prediction != None
-            and none2zero(row.predict_proba) > 0.7
-            and none2zero(row.drug_proba) > 0.025
+            and numberutils.none2zero(row.predict_proba) > 0.7
+            and numberutils.none2zero(row.drug_proba) > 0.025
         ):
             return {
                 "drug": row.drug,

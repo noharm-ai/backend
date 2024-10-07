@@ -1,12 +1,13 @@
-from models.main import *
-from models.appendix import *
-from models.segment import *
 from models.enums import ReportEnum
+from models.main import User
 from services.reports import reports_cache_service
+from utils import status
 from exception.validation_error import ValidationError
+from decorators.has_permission_decorator import has_permission, Permission
 
 
-def get_report(user, report, filename="current"):
+@has_permission(Permission.READ_REPORTS)
+def get_report(report, user_context: User, filename="current"):
     available_reports = list(map(lambda c: c.value, ReportEnum))
     if report not in available_reports:
         raise ValidationError(
@@ -16,7 +17,7 @@ def get_report(user, report, filename="current"):
         )
 
     cached_link = reports_cache_service.generate_link(
-        report=report, schema=user.schema, filename=filename
+        report=report, schema=user_context.schema, filename=filename
     )
 
     if cached_link == None:
@@ -25,7 +26,7 @@ def get_report(user, report, filename="current"):
     return {
         "cached": True,
         "availableReports": reports_cache_service.list_available_reports(
-            schema=user.schema, report=report
+            schema=user_context.schema, report=report
         ),
         "url": cached_link,
     }

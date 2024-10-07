@@ -1,22 +1,18 @@
+from sqlalchemy import func, and_, asc
+
+from models.main import db, User
+from models.prescription import Segment, Department
+from models.appendix import SegmentDepartment
+from models.segment import Hospital
+from models.enums import IntegrationStatusEnum
+from services.admin import admin_integration_status_service
+from decorators.has_permission_decorator import has_permission, Permission
+from exception.validation_error import ValidationError
 from utils import status
 
-from models.main import *
-from models.appendix import *
-from models.segment import *
-from models.enums import RoleEnum, IntegrationStatusEnum
-from services.admin import admin_integration_status_service
 
-from exception.validation_error import ValidationError
-
-
-def upsert_segment(id_segment, description, active, user):
-    roles = user.config["roles"] if user.config and "roles" in user.config else []
-    if RoleEnum.ADMIN.value not in roles and RoleEnum.TRAINING.value not in roles:
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
+@has_permission(Permission.ADMIN_SEGMENTS)
+def upsert_segment(id_segment, description, active, user_context: User):
 
     if id_segment:
         segment = db.session.query(Segment).filter(Segment.id == id_segment).first()
@@ -28,7 +24,7 @@ def upsert_segment(id_segment, description, active, user):
             )
     else:
         if (
-            admin_integration_status_service.get_integration_status(user.schema)
+            admin_integration_status_service.get_integration_status(user_context.schema)
             == IntegrationStatusEnum.PRODUCTION.value
         ):
             raise ValidationError(
@@ -45,6 +41,7 @@ def upsert_segment(id_segment, description, active, user):
     db.session.add(segment)
 
 
+@has_permission(Permission.ADMIN_SEGMENTS)
 def get_departments(id_segment):
     sd = db.aliased(SegmentDepartment)
     q_department = (
@@ -91,15 +88,8 @@ def get_departments(id_segment):
     return deps
 
 
-def update_segment_departments(id_segment, department_list, user):
-    roles = user.config["roles"] if user.config and "roles" in user.config else []
-    if RoleEnum.ADMIN.value not in roles and RoleEnum.TRAINING.value not in roles:
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-
+@has_permission(Permission.ADMIN_SEGMENTS)
+def update_segment_departments(id_segment, department_list):
     if id_segment == None:
         raise ValidationError(
             "Parâmetro inválido", "errors.invalidParam", status.HTTP_400_BAD_REQUEST

@@ -1,19 +1,19 @@
-from utils import status
-from sqlalchemy import desc
-from datetime import datetime
+from sqlalchemy import desc, asc, text, func
+from datetime import datetime, date, timedelta
 from markupsafe import escape as escape_html
 
-from models.main import *
-from models.appendix import *
-from models.segment import *
-from models.enums import RoleEnum
+from models.main import db, User
+from models.prescription import Segment
+from models.segment import Segment, SegmentExam, Exams
 from services.admin import admin_integration_service
 from services import data_authorization_service
-
+from decorators.has_permission_decorator import has_permission, Permission
+from utils import status
 from exception.validation_error import ValidationError
 
 
-def get_segment_exams(id_segment: int, user: User):
+@has_permission(Permission.ADMIN_EXAMS)
+def get_segment_exams(id_segment: int):
     segExams = (
         db.session.query(SegmentExam, Segment)
         .filter(SegmentExam.idSegment == id_segment)
@@ -45,15 +45,8 @@ def get_segment_exams(id_segment: int, user: User):
     return exams
 
 
-def copy_exams(id_segment_origin, id_segment_destiny, user):
-    roles = user.config["roles"] if user.config and "roles" in user.config else []
-    if RoleEnum.ADMIN.value not in roles and RoleEnum.TRAINING.value not in roles:
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-
+@has_permission(Permission.ADMIN_EXAMS__COPY)
+def copy_exams(id_segment_origin, id_segment_destiny, user_context: User):
     if id_segment_origin == None:
         raise ValidationError(
             "Parâmetros inválidos",
@@ -70,7 +63,7 @@ def copy_exams(id_segment_origin, id_segment_destiny, user):
 
     query = text(
         f"""
-            insert into {user.schema}.segmentoexame 
+            insert into {user_context.schema}.segmentoexame 
             (idsegmento, tpexame, abrev, nome, min, max, referencia, posicao, ativo, update_at, update_by)
             select
                 :idSegmentDestiny,
@@ -85,7 +78,7 @@ def copy_exams(id_segment_origin, id_segment_destiny, user):
                 now(), 
                 :idUser
             from
-                {user.schema}.segmentoexame 
+                {user_context.schema}.segmentoexame 
             where
                 idsegmento = :idSegmentOrigin
             on conflict (idsegmento, tpexame)
@@ -98,21 +91,17 @@ def copy_exams(id_segment_origin, id_segment_destiny, user):
         {
             "idSegmentOrigin": id_segment_origin,
             "idSegmentDestiny": id_segment_destiny,
-            "idUser": user.id,
+            "idUser": user_context.id,
         },
     )
 
 
-def get_most_frequent(user):
-    roles = user.config["roles"] if user.config and "roles" in user.config else []
-    if RoleEnum.ADMIN.value not in roles and RoleEnum.TRAINING.value not in roles:
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-
-    if admin_integration_service.get_table_count(user.schema, "exame") > 1000000:
+@has_permission(Permission.ADMIN_EXAMS__MOST_FREQUENT)
+def get_most_frequent(user_context: User):
+    if (
+        admin_integration_service.get_table_count(user_context.schema, "exame")
+        > 1000000
+    ):
         raise ValidationError(
             "A tabela é grande demais para ser consultada",
             "errors.invalidParams",
@@ -140,14 +129,8 @@ def get_most_frequent(user):
     return exams
 
 
-def add_most_frequent(user, exam_types, id_segment):
-    roles = user.config["roles"] if user.config and "roles" in user.config else []
-    if RoleEnum.ADMIN.value not in roles and RoleEnum.TRAINING.value not in roles:
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
+@has_permission(Permission.ADMIN_EXAMS__MOST_FREQUENT)
+def add_most_frequent(exam_types, id_segment, user_context: User):
 
     exams_result = (
         db.session.query(SegmentExam)
@@ -165,7 +148,7 @@ def add_most_frequent(user, exam_types, id_segment):
             se.typeExam = e.lower()
             se.idSegment = id_segment
             se.name = e
-            se.user = user.id
+            se.user = user_context.id
             se.active = False
             se.update = datetime.today()
             se.order = 99
@@ -173,6 +156,7 @@ def add_most_frequent(user, exam_types, id_segment):
             db.session.add(se)
 
 
+@has_permission(Permission.ADMIN_EXAMS)
 def get_exam_types():
     typesExam = (
         db.session.query(Exams.typeExam)
@@ -189,7 +173,8 @@ def get_exam_types():
     return results
 
 
-def upsert_seg_exam(data: dict, user: User):
+@has_permission(Permission.ADMIN_EXAMS)
+def upsert_seg_exam(data: dict, user_context: User):
     id_segment = data.get("idSegment", None)
     typeExam = data.get("type", None)
 
@@ -203,7 +188,7 @@ def upsert_seg_exam(data: dict, user: User):
     typeExam = escape_html(typeExam)
 
     if not data_authorization_service.has_segment_authorization(
-        id_segment=id_segment, user=user
+        id_segment=id_segment, user=user_context
     ):
         raise ValidationError(
             "Usuário não autorizado neste segmento",
@@ -246,7 +231,7 @@ def upsert_seg_exam(data: dict, user: User):
         segExam.active = bool(data.get("active", False))
 
     segExam.update = datetime.today()
-    segExam.user = user.id
+    segExam.user = user_context.id
 
     if newSegExam:
         db.session.add(segExam)
@@ -267,7 +252,8 @@ def upsert_seg_exam(data: dict, user: User):
     }
 
 
-def set_exams_order(exams, id_segment, user: User):
+@has_permission(Permission.ADMIN_EXAMS)
+def set_exams_order(exams, id_segment, user_context: User):
     if not exams or not id_segment:
         raise ValidationError(
             "Parametros inválidos",
@@ -276,7 +262,7 @@ def set_exams_order(exams, id_segment, user: User):
         )
 
     if not data_authorization_service.has_segment_authorization(
-        id_segment=id_segment, user=user
+        id_segment=id_segment, user=user_context
     ):
         raise ValidationError(
             "Usuário não autorizado neste segmento",

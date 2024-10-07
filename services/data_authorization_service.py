@@ -1,6 +1,8 @@
 from models.main import db, UserAuthorization, User
 from models.enums import FeatureEnum
-from services import memory_service, permission_service
+from services import memory_service
+from security.role import Role
+from security.permission import Permission
 
 
 def has_segment_authorization(id_segment: int, user: User):
@@ -8,7 +10,8 @@ def has_segment_authorization(id_segment: int, user: User):
         # some cases dont have a segment defined
         return True
 
-    if permission_service.has_maintainer_permission(user):
+    permissions = Role.get_permissions_from_user(user=user)
+    if Permission.MAINTAINER in permissions:
         return True
 
     if memory_service.has_feature(FeatureEnum.AUTHORIZATION_SEGMENT.value):
