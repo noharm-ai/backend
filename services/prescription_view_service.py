@@ -13,7 +13,6 @@ from models.prescription import (
     PrescriptionAudit,
 )
 from models.segment import Exams
-from models.notes import ClinicalNotes
 from models.enums import (
     MemoryEnum,
     FeatureEnum,
@@ -27,6 +26,7 @@ from services import (
     patient_service,
     intervention_service,
     clinical_notes_service,
+    clinical_notes_queries_service,
     alert_interaction_service,
     alert_service,
     feature_service,
@@ -184,14 +184,20 @@ def internal_get_prescription(
     if cn_count > 0 and is_complete:
         # TODO: add cache
         if cn_stats.get("signs", 0) != 0:
-            notesSigns = ClinicalNotes.getSigns(prescription[0].admissionNumber)
+            notesSigns = clinical_notes_queries_service.get_signs(
+                admission_number=prescription[0].admissionNumber
+            )
 
-        notesInfo = ClinicalNotes.getInfo(prescription[0].admissionNumber)
-
-        allergies = ClinicalNotes.getAllergies(
-            prescription[0].admissionNumber, admission_date=patient.admissionDate
+        notesInfo = clinical_notes_queries_service.get_infos(
+            admission_number=prescription[0].admissionNumber
         )
-        dialysis = ClinicalNotes.getDialysis(prescription[0].admissionNumber)
+        allergies = clinical_notes_queries_service.get_allergies(
+            admission_number=prescription[0].admissionNumber,
+            admission_date=patient.admissionDate,
+        )
+        dialysis = clinical_notes_queries_service.get_dialysis(
+            admission_number=prescription[0].admissionNumber
+        )
 
         for a in allergies:
             notesAllergies.append(
