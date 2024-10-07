@@ -1,4 +1,6 @@
 from flask import Blueprint, request
+from markupsafe import escape
+
 
 from services import conciliation_service
 from decorators.api_endpoint_decorator import api_endpoint
@@ -15,7 +17,7 @@ def create_conciliation():
         admission_number=data.get("admissionNumber", None)
     )
 
-    return str(id)
+    return escape(str(id))
 
 
 @app_conciliation.route("/conciliation/list-available", methods=["GET"])

@@ -917,7 +917,7 @@ def get_outcome_data(id_intervention, user_context: User, edit=False):
 
     if economy_type == None or len(origin_list) == 0:
         return {
-            "idIntervention": id_intervention,
+            "idIntervention": intervention.idIntervention,
             "header": {
                 "patient": prescription_drug == None,
                 "status": intervention.status,
