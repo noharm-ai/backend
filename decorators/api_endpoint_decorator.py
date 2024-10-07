@@ -34,7 +34,6 @@ def api_endpoint():
 
                 # should check for permission at least once
                 if g.get("permission_test_count", 0) == 0:
-                    print("sshould check for permission at least once")
                     raise AuthorizationError()
 
                 db.session.commit()
