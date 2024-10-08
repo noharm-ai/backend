@@ -1,162 +1,46 @@
-from services.alert_interaction_service import find_relations
+from typing import List
 
+from services.alert_interaction_service import find_relations
 from conftest import get_mock_row
 
 
-def _mock_get_allergies(*args, **kwargs):
-    # Simulate an allergy to Drug A
+def _mock_get_allergies(data: List[dict]):
+    def allergies(*args, **kwargs):
+        # Simulate an allergy to Drug A
 
-    return []
+        return data
 
-    """
-    return [
-        type(
-            "obj",
-            (object,),
+    return allergies
+
+
+def _mock_get_active_relations(kind: str):
+    def mock(*args, **kwargs):
+        # Simulate the response from the database
+        active_relations = {}
+        # Example mock data that mimics the database response
+        mock_data = [
             {
-                "idDrug": "1",
-                "idPatient": "1",
-                "drugName": "Drug A Substance",
-                "active": True,
-                "createdAt": datetime.now(),
+                "sctida": "211111",
+                "sctidb": "111111",
+                "kind": kind,
+                "text": "Drug A interacts with Drug B",
+                "level": 1,
             },
-        )
-    ]
-    """
+        ]
 
+        for item in mock_data:
+            key = f"{item['sctida']}-{item['sctidb']}-{item['kind']}"
+            active_relations[key] = {
+                "sctida": item["sctida"],
+                "sctidb": item["sctidb"],
+                "kind": item["kind"],
+                "text": item["text"],
+                "level": item["level"],
+            }
 
-def _mock_get_active_relations_kind_it(*args, **kwargs):
-    # Simulate the response from the database
-    active_relations = {}
-    # Example mock data that mimics the database response
-    mock_data = [
-        {
-            "sctida": "211111",
-            "sctidb": "111111",
-            "kind": "it",
-            "text": "Drug A interacts with Drug B",
-            "level": 1,
-        },
-    ]
+        return active_relations
 
-    for item in mock_data:
-        key = f"{item['sctida']}-{item['sctidb']}-{item['kind']}"
-        active_relations[key] = {
-            "sctida": item["sctida"],
-            "sctidb": item["sctidb"],
-            "kind": item["kind"],
-            "text": item["text"],
-            "level": item["level"],
-        }
-
-    return active_relations
-
-
-def _mock_get_active_relations_kind_dt(*args, **kwargs):
-    # Simulate the response from the database
-    active_relations = {}
-    # Example mock data that mimics the database response
-    mock_data = [
-        {
-            "sctida": "211111",
-            "sctidb": "111111",
-            "kind": "dt",
-            "text": "Drug A interacts with Drug B",
-            "level": 1,
-        },
-    ]
-
-    for item in mock_data:
-        key = f"{item['sctida']}-{item['sctidb']}-{item['kind']}"
-        active_relations[key] = {
-            "sctida": item["sctida"],
-            "sctidb": item["sctidb"],
-            "kind": item["kind"],
-            "text": item["text"],
-            "level": item["level"],
-        }
-
-    return active_relations
-
-
-def _mock_get_active_relations_kind_dm(*args, **kwargs):
-    # Simulate the response from the database
-    active_relations = {}
-    # Example mock data that mimics the database response
-    mock_data = [
-        {
-            "sctida": "211111",
-            "sctidb": "111111",
-            "kind": "dm",
-            "text": "Drug A interacts with Drug B",
-            "level": 1,
-        },
-    ]
-
-    for item in mock_data:
-        key = f"{item['sctida']}-{item['sctidb']}-{item['kind']}"
-        active_relations[key] = {
-            "sctida": item["sctida"],
-            "sctidb": item["sctidb"],
-            "kind": item["kind"],
-            "text": item["text"],
-            "level": item["level"],
-        }
-
-    return active_relations
-
-
-def _mock_get_active_relations_kind_iy(*args, **kwargs):
-    # Simulate the response from the database
-    active_relations = {}
-    # Example mock data that mimics the database response
-    mock_data = [
-        {
-            "sctida": "211111",
-            "sctidb": "111111",
-            "kind": "iy",
-            "text": "Drug A interacts with Drug B",
-            "level": 1,
-        },
-    ]
-
-    for item in mock_data:
-        key = f"{item['sctida']}-{item['sctidb']}-{item['kind']}"
-        active_relations[key] = {
-            "sctida": item["sctida"],
-            "sctidb": item["sctidb"],
-            "kind": item["kind"],
-            "text": item["text"],
-            "level": item["level"],
-        }
-
-    return active_relations
-
-
-def _mock_get_active_relations_kind_sl(*args, **kwargs):
-    # Simulate the response from the database
-    active_relations = {}
-    # Example mock data that mimics the database response
-    mock_data = [
-        {
-            "sctida": "211111",
-            "sctidb": "111111",
-            "kind": "sl",
-            "text": "Drug A interacts with Drug B",
-            "level": 1,
-        },
-    ]
-
-    for item in mock_data:
-        key = f"{item['sctida']}-{item['sctidb']}-{item['kind']}"
-        active_relations[key] = {
-            "sctida": item["sctida"],
-            "sctidb": item["sctidb"],
-            "kind": item["kind"],
-            "text": item["text"],
-            "level": item["level"],
-        }
-    return active_relations
+    return mock
 
 
 def test_find_relations_drug_interaction_kind_it(monkeypatch):
@@ -169,11 +53,12 @@ def test_find_relations_drug_interaction_kind_it(monkeypatch):
     ]
 
     monkeypatch.setattr(
-        "services.alert_interaction_service._get_allergies", _mock_get_allergies
+        "services.alert_interaction_service._get_allergies",
+        _mock_get_allergies(data=[]),
     )
     monkeypatch.setattr(
         "services.alert_interaction_service._get_active_relations",
-        _mock_get_active_relations_kind_it,
+        _mock_get_active_relations(kind="it"),
     )
 
     results = find_relations(drug_list, id_patient=1, is_cpoe=False)
@@ -227,11 +112,12 @@ def test_find_relations_drug_interaction_kind_dt(monkeypatch):
     ]
 
     monkeypatch.setattr(
-        "services.alert_interaction_service._get_allergies", _mock_get_allergies
+        "services.alert_interaction_service._get_allergies",
+        _mock_get_allergies(data=[]),
     )
     monkeypatch.setattr(
         "services.alert_interaction_service._get_active_relations",
-        _mock_get_active_relations_kind_dt,
+        _mock_get_active_relations(kind="dt"),
     )
 
     results = find_relations(drug_list, id_patient=1, is_cpoe=False)
@@ -287,11 +173,12 @@ def test_find_relations_drug_interaction_kind_dm(monkeypatch):
     ]
 
     monkeypatch.setattr(
-        "services.alert_interaction_service._get_allergies", _mock_get_allergies
+        "services.alert_interaction_service._get_allergies",
+        _mock_get_allergies(data=[]),
     )
     monkeypatch.setattr(
         "services.alert_interaction_service._get_active_relations",
-        _mock_get_active_relations_kind_dm,
+        _mock_get_active_relations(kind="dm"),
     )
 
     results = find_relations(drug_list, id_patient=1, is_cpoe=False)
@@ -340,11 +227,12 @@ def test_find_relations_drug_interaction_kind_iy(monkeypatch):
     ]
 
     monkeypatch.setattr(
-        "services.alert_interaction_service._get_allergies", _mock_get_allergies
+        "services.alert_interaction_service._get_allergies",
+        _mock_get_allergies(data=[]),
     )
     monkeypatch.setattr(
         "services.alert_interaction_service._get_active_relations",
-        _mock_get_active_relations_kind_iy,
+        _mock_get_active_relations(kind="iy"),
     )
 
     results = find_relations(drug_list, id_patient=1, is_cpoe=False)
@@ -421,11 +309,12 @@ def test_find_relations_drug_interaction_kind_sl(monkeypatch):
     ]
 
     monkeypatch.setattr(
-        "services.alert_interaction_service._get_allergies", _mock_get_allergies
+        "services.alert_interaction_service._get_allergies",
+        _mock_get_allergies(data=[]),
     )
     monkeypatch.setattr(
         "services.alert_interaction_service._get_active_relations",
-        _mock_get_active_relations_kind_sl,
+        _mock_get_active_relations(kind="sl"),
     )
 
     results = find_relations(drug_list, id_patient=1, is_cpoe=False)
@@ -468,3 +357,65 @@ def test_find_relations_drug_interaction_kind_sl(monkeypatch):
     assert results["stats"]["iy"] == 0
     assert results["stats"]["sl"] == 1
     assert results["stats"]["rx"] == 0
+
+
+def test_find_relations_drug_interaction_kind_rx(monkeypatch):
+    """Alertas interação: Testa reatividade cruzada"""
+
+    drug_list = [
+        get_mock_row(
+            id_prescription_drug=2,
+            dose=10,
+            drug_name="Drug A",
+            group=None,
+            solutionGroup=True,
+            idPrescription="111",
+        ),
+    ]
+
+    monkeypatch.setattr(
+        "services.alert_interaction_service._get_allergies",
+        _mock_get_allergies(
+            data=[
+                {
+                    "id": None,
+                    "drug": "Drug test RX",
+                    "sctid": "111111",
+                    "intravenous": False,
+                    "group": None,
+                    "rx": True,
+                }
+            ]
+        ),
+    )
+    monkeypatch.setattr(
+        "services.alert_interaction_service._get_active_relations",
+        _mock_get_active_relations(kind="rx"),
+    )
+
+    results = find_relations(drug_list, id_patient=1, is_cpoe=False)
+    # Assert alerts structure
+    assert "alerts" in results
+    assert "2" in results["alerts"]
+
+    # Assert alert details for idPrescriptionDrug '2'
+    alert_2 = results["alerts"]["2"][0]
+    assert alert_2["idPrescriptionDrug"] == "2"
+    assert alert_2["key"] == "211111-111111-rx"
+    assert alert_2["type"] == "rx"
+    assert alert_2["level"] == 1
+    assert alert_2["relation"] == None
+
+    assert (
+        alert_2["text"]
+        == "Reatividade Cruzada: Drug A interacts with Drug B (Drug A e Drug test RX)"
+    )
+
+    # Assert stats structure
+    assert "stats" in results
+    assert results["stats"]["it"] == 0
+    assert results["stats"]["dt"] == 0
+    assert results["stats"]["dm"] == 0
+    assert results["stats"]["iy"] == 0
+    assert results["stats"]["sl"] == 0
+    assert results["stats"]["rx"] == 1
