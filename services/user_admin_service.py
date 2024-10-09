@@ -1,7 +1,8 @@
 from datetime import datetime
-from sqlalchemy import desc, func, or_, asc
+from sqlalchemy import desc, func, asc
 from password_generator import PasswordGenerator
 from flask import render_template
+from typing import List
 
 from models.main import User, db, UserAuthorization
 from models.enums import FeatureEnum, UserAuditTypeEnum
@@ -48,6 +49,9 @@ def get_user_list(user_context: User):
                 "email": u.email,
                 "active": u.active,
                 "roles": u.config["roles"] if u.config and "roles" in u.config else [],
+                "features": (
+                    u.config["features"] if u.config and "features" in u.config else []
+                ),
                 "segments": segments,
             }
         )
@@ -76,12 +80,15 @@ def _get_user_data(id_user: int):
         "email": user.email,
         "active": user.active,
         "roles": user.config["roles"] if user.config and "roles" in user.config else [],
+        "features": (
+            user.config["features"] if user.config and "features" in user.config else []
+        ),
         "segments": segments,
     }
 
 
 @has_permission(Permission.WRITE_USERS)
-def upsert_user(data: dict, user_context: User):
+def upsert_user(data: dict, user_context: User, user_permissions: List[Permission]):
     idUser = data.get("id", None)
     id_segment_list = data.get("segments", [])
 
@@ -112,7 +119,10 @@ def upsert_user(data: dict, user_context: User):
         pwo.maxlen = 16
         password = pwo.generate()
         newUser.password = func.crypt(password, func.gen_salt("bf", 8))
-        newUser.config = {"roles": data.get("roles", [])}
+        newUser.config = {"roles": data.get("roles", []), "features": []}
+
+        if Permission.ADMIN_USERS in user_permissions:
+            newUser.config["features"] = data.get("features", [])
 
         if memory_service.has_feature(FeatureEnum.OAUTH.value):
             template = "new_user_oauth.html"
@@ -122,6 +132,13 @@ def upsert_user(data: dict, user_context: User):
         if not _has_valid_roles(newUser.config["roles"]):
             raise ValidationError(
                 "Papel inválido",
+                "errors.businessRules",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not _has_valid_features(newUser.config.get("features", [])):
+            raise ValidationError(
+                "Feature inválida",
                 "errors.businessRules",
                 status.HTTP_400_BAD_REQUEST,
             )
@@ -167,6 +184,10 @@ def upsert_user(data: dict, user_context: User):
         return _get_user_data(newUser.id)
     else:
         updatedUser = db.session.query(User).filter(User.id == idUser).first()
+        current_roles = []
+        current_features = []
+        new_roles = data.get("roles", [])
+        new_features = data.get("features", [])
 
         if updatedUser is None:
             raise ValidationError(
@@ -182,28 +203,42 @@ def upsert_user(data: dict, user_context: User):
                 status.HTTP_401_UNAUTHORIZED,
             )
 
+        if updatedUser.config != None:
+            current_roles = updatedUser.config.get("roles", [])
+            current_features = updatedUser.config.get("features", [])
+
         updatedUser.name = data.get("name", None)
         updatedUser.external = data.get("external", None)
         updatedUser.active = bool(data.get("active", True))
 
-        if not _has_valid_roles(
-            updatedUser.config.get("roles", []) if updatedUser.config != None else []
-        ):
+        if not _has_valid_roles(current_roles):
             raise ValidationError(
                 "Este usuário não pode ser editado.",
                 "errors.businessRules",
                 status.HTTP_400_BAD_REQUEST,
             )
 
-        updatedUser.config = {"roles": data.get("roles", [])}
-        if not _has_valid_roles(updatedUser.config["roles"]):
+        updatedUser.config = {"roles": new_roles}
+        if Permission.ADMIN_USERS in user_permissions:
+            updatedUser.config["features"] = new_features
+        else:
+            updatedUser.config["features"] = current_features
+
+        if not _has_valid_roles(updatedUser.config.get("roles", [])):
             raise ValidationError(
                 "Papel inválido",
                 "errors.businessRules",
                 status.HTTP_400_BAD_REQUEST,
             )
 
-        if len(updatedUser.config["roles"]) == 0:
+        if not _has_valid_features(updatedUser.config.get("features", [])):
+            raise ValidationError(
+                "Feature inválida",
+                "errors.businessRules",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+        if len(updatedUser.config.get("roles", [])) == 0:
             raise ValidationError(
                 "O usuário deve ter ao menos um Papel definido",
                 "errors.businessRules",
@@ -242,6 +277,16 @@ def _has_valid_roles(roles):
 
     for r in roles:
         if r not in valid_roles:
+            return False
+
+    return True
+
+
+def _has_valid_features(features):
+    valid_features = [FeatureEnum.DISABLE_CPOE.value, FeatureEnum.STAGING_ACCESS.value]
+
+    for f in features:
+        if f not in valid_features:
             return False
 
     return True
