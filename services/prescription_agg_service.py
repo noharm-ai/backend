@@ -3,8 +3,17 @@ from flask_sqlalchemy.session import Session
 from datetime import date, datetime
 
 from models.main import db, User, dbSession
-from models.prescription import Prescription, PrescriptionDrug, PrescriptionDrugAudit
-from models.enums import PrescriptionDrugAuditTypeEnum, DrugTypeEnum
+from models.prescription import (
+    Prescription,
+    PrescriptionDrug,
+    PrescriptionDrugAudit,
+    Patient,
+)
+from models.enums import (
+    PrescriptionDrugAuditTypeEnum,
+    DrugTypeEnum,
+    PatientConciliationStatusEnum,
+)
 from services import (
     prescription_drug_service,
     prescription_check_service,
@@ -142,6 +151,7 @@ def create_agg_prescription_by_prescription(
         )
 
     _log_processed_date(id_prescription_array=[id_prescription], schema=schema)
+    _update_patient_conciliation_status(prescription=p)
 
 
 @has_permission(Permission.READ_STATIC)
@@ -307,3 +317,18 @@ def _get_processed_status(id_prescription: int):
         return "NEW_ITENS"
 
     return "PROCESSED"
+
+
+def _update_patient_conciliation_status(prescription: Prescription):
+    if prescription.concilia != None:
+        patient = (
+            db.session.query(Patient)
+            .filter(Patient.admissionNumber == prescription.admissionNumber)
+            .first()
+        )
+        if (
+            patient != None
+            and patient.st_conciliation == PatientConciliationStatusEnum.PENDING.value
+        ):
+            patient.st_conciliation = PatientConciliationStatusEnum.CREATED.value
+            db.session.flush()

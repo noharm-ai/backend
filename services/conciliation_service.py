@@ -1,9 +1,9 @@
 from datetime import datetime
 from sqlalchemy import desc
 
-from models.main import db
-from models.prescription import Prescription, User
-from models.enums import FeatureEnum
+from models.main import db, User
+from models.prescription import Prescription, Patient
+from models.enums import FeatureEnum, PatientConciliationStatusEnum
 from utils import status, prescriptionutils
 from services import memory_service, prescription_agg_service
 from exception.validation_error import ValidationError
@@ -62,6 +62,18 @@ def create_conciliation(admission_number: int, user_context: User):
 
     db.session.add(prescription)
     db.session.flush()
+
+    patient = (
+        db.session.query(Patient)
+        .filter(Patient.admissionNumber == ref.admissionNumber)
+        .first()
+    )
+    if (
+        patient != None
+        and patient.st_conciliation == PatientConciliationStatusEnum.PENDING.value
+    ):
+        patient.st_conciliation = PatientConciliationStatusEnum.CREATED.value
+        db.session.flush()
 
     return prescription.id
 

@@ -5,7 +5,7 @@ from sqlalchemy.orm import undefer
 from sqlalchemy.dialects import postgresql
 
 from models.main import db
-from models.enums import PrescriptionReviewTypeEnum
+from models.enums import PrescriptionReviewTypeEnum, PatientConciliationStatusEnum
 from models.prescription import Prescription, Patient, Department
 from decorators.has_permission_decorator import has_permission, Permission
 from utils import dateutils, numberutils, prescriptionutils
@@ -40,6 +40,7 @@ def get_prioritization_list(
     global_score_min=None,
     global_score_max=None,
     pending_interventions=None,
+    has_conciliation=None,
 ):
     is_cpoe = feature_service.is_cpoe()
 
@@ -234,6 +235,16 @@ def get_prioritization_list(
             q = q.filter(Prescription.features["diff"].astext.cast(Integer) > 0)
         else:
             q = q.filter(Prescription.features["diff"].astext.cast(Integer) == 0)
+
+    if has_conciliation != None:
+        if bool(int(has_conciliation)):
+            q = q.filter(
+                Patient.st_conciliation == PatientConciliationStatusEnum.CREATED.value
+            )
+        else:
+            q = q.filter(
+                Patient.st_conciliation == PatientConciliationStatusEnum.PENDING.value
+            )
 
     if pending_interventions != None:
         if bool(int(pending_interventions)):

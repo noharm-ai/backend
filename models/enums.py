@@ -159,3 +159,8 @@ class DrugAttributesAuditTypeEnum(Enum):
 
 class PatientAuditTypeEnum(Enum):
     UPSERT = 1
+
+
+class PatientConciliationStatusEnum(Enum):
+    PENDING = 0
+    CREATED = 1

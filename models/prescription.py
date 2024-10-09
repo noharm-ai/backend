@@ -1,5 +1,5 @@
 from sqlalchemy.orm import deferred
-from sqlalchemy import case, cast, between, literal, and_, func, desc, asc, or_
+from sqlalchemy import case, cast, literal, and_, func, desc, asc, or_
 from sqlalchemy.sql.expression import literal_column, case
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.dialects.postgresql import INTERVAL
@@ -102,24 +102,6 @@ class Prescription(db.Model):
         return (
             Prescription.getPrescriptionBasic()
             .filter(Prescription.id == idPrescription)
-            .first()
-        )
-
-    def getPrescriptionAgg(admissionNumber, aggDate, idSegment):
-        return (
-            Prescription.getPrescriptionBasic()
-            .filter(Prescription.admissionNumber == admissionNumber)
-            .filter(
-                between(
-                    func.date(aggDate),
-                    func.date(Prescription.date),
-                    func.coalesce(func.date(Prescription.expire), func.date(aggDate)),
-                )
-            )
-            .filter(Prescription.idSegment == idSegment)
-            .filter(Prescription.agg == None)
-            .filter(Prescription.concilia == None)
-            .order_by(asc(Prescription.date))
             .first()
         )
 
@@ -230,6 +212,7 @@ class Patient(db.Model):
     dialysis = db.Column("dialise", db.String(1), nullable=True)
     lactating = db.Column("lactante", db.Boolean, nullable=True)
     pregnant = db.Column("gestante", db.Boolean, nullable=True)
+    st_conciliation = db.Column("st_concilia", db.Integer, nullable=True)
 
     def findByAdmission(admissionNumber):
         return (

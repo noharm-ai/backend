@@ -71,6 +71,7 @@ def getPrescriptions():
         global_score_min=global_score_min,
         global_score_max=global_score_max,
         pending_interventions=pending_interventions,
+        has_conciliation=request.args.get("hasConciliation", None),
     )
 
 
