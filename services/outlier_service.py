@@ -32,7 +32,7 @@ FOLD_SIZE = 10
 def prepare(id_drug, id_segment, user_context: User):
     def add_history_and_validate():
         history_count = add_prescription_history(
-            id_drug=id_drug, id_segment=id_segment, user_context=user_context.schema
+            id_drug=id_drug, id_segment=id_segment, user_context=user_context
         )
 
         if history_count == 0:
