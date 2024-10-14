@@ -44,3 +44,6 @@ class Config:
     OPEN_AI_API_MODEL = getenv("OPEN_AI_API_MODEL") or ""
 
     MARITACA_API_KEY = getenv("MARITACA_API_KEY") or ""
+
+    REDIS_HOST = getenv("REDIS_HOST") or ""
+    REDIS_PORT = getenv("REDIS_PORT") or ""

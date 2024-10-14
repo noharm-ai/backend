@@ -1,12 +1,26 @@
 from sqlalchemy import func, desc
 from datetime import datetime, timedelta
 
-from models.main import db
+from models.main import db, User
 from models.notes import ClinicalNotes
+from services import cache_service
 
 
-def get_signs(admission_number):
-    return (
+def get_signs(admission_number: int, user_context: User, cache=True):
+    if cache:
+        result = cache_service.get_by_key(
+            f"""{user_context.schema}:{admission_number}:sinais"""
+        )
+
+        if result != None:
+            result_list = result.get("lista", [])
+            return {
+                "data": " ".join(result_list),
+                "date": result.get("dtevolucao", None),
+                "cache": True,
+            }
+
+    result = (
         db.session.query(ClinicalNotes.signsText, ClinicalNotes.date)
         .select_from(ClinicalNotes)
         .filter(ClinicalNotes.admissionNumber == admission_number)
@@ -17,9 +31,27 @@ def get_signs(admission_number):
         .first()
     )
 
+    if result != None:
+        return {"data": result[0], "date": result[1].isoformat(), "cache": False}
 
-def get_infos(admission_number):
-    return (
+    return {}
+
+
+def get_infos(admission_number, user_context: User, cache=True):
+    if cache:
+        result = cache_service.get_by_key(
+            f"""{user_context.schema}:{admission_number}:dados"""
+        )
+
+        if result != None:
+            result_list = result.get("lista", [])
+            return {
+                "data": " ".join(result_list),
+                "date": result.get("dtevolucao", None),
+                "cache": True,
+            }
+
+    result = (
         db.session.query(ClinicalNotes.infoText, ClinicalNotes.date)
         .select_from(ClinicalNotes)
         .filter(ClinicalNotes.admissionNumber == admission_number)
@@ -29,6 +61,11 @@ def get_infos(admission_number):
         .order_by(desc(ClinicalNotes.date))
         .first()
     )
+
+    if result != None:
+        return {"data": result[0], "date": result[1].isoformat(), "cache": False}
+
+    return {}
 
 
 def get_allergies(admission_number, admission_date=None):

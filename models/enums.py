@@ -27,6 +27,7 @@ class MemoryEnum(Enum):
 
 class GlobalMemoryEnum(Enum):
     SUMMARY_CONFIG = "summary-config"
+    FEATURE_FLAGS = "feature-flags"
 
 
 class NoHarmENV(Enum):
@@ -164,3 +165,7 @@ class PatientAuditTypeEnum(Enum):
 class PatientConciliationStatusEnum(Enum):
     PENDING = 0
     CREATED = 1
+
+
+class AppFeatureFlagEnum(Enum):
+    REDIS_CACHE = "redisCache"

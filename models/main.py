@@ -1,3 +1,4 @@
+import redis
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, or_, asc
 from datetime import date
@@ -6,8 +7,19 @@ from sqlalchemy.orm import deferred
 from flask_mail import Mail
 from flask_jwt_extended import get_jwt
 
+from config import Config
+
 db = SQLAlchemy()
 mail = Mail()
+redis_client = redis.StrictRedis(
+    host=Config.REDIS_HOST,
+    port=Config.REDIS_PORT,
+    db=0,
+    decode_responses=True,
+    ssl=True,
+    socket_timeout=2,
+    socket_connect_timeout=2,
+)
 
 
 class dbSession:
