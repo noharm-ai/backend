@@ -376,17 +376,23 @@ def get_outcome_data(id_intervention, user_context: User, edit=False):
         destiny_query = (
             _get_outcome_data_query()
             .filter(Prescription.admissionNumber == intervention.admissionNumber)
-            .filter(
+            .filter(Prescription.date >= origin[0]["item"]["prescriptionDate"])
+            .filter(Prescription.id != origin[0]["item"]["idPrescription"])
+        )
+
+        if destiny_drug != None and destiny_drug.sctid != None:
+            destiny_query = destiny_query.filter(
                 or_(
                     PrescriptionDrug.idDrug == destiny_id_drug,
                     Drug.sctid == destiny_drug.sctid,
                 )
             )
-            .filter(Prescription.date >= origin[0]["item"]["prescriptionDate"])
-            .filter(Prescription.id != origin[0]["item"]["idPrescription"])
-            .order_by(Prescription.date)
-            .limit(10)
-        )
+        else:
+            destiny_query = destiny_query.filter(
+                PrescriptionDrug.idDrug == destiny_id_drug
+            )
+
+        destiny_query = destiny_query.order_by(Prescription.date).limit(10)
 
         base_destiny = _outcome_calc(
             list=destiny_query.all(),
