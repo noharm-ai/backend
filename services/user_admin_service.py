@@ -204,19 +204,11 @@ def upsert_user(data: dict, user_context: User, user_permissions: List[Permissio
             )
 
         if updatedUser.config != None:
-            current_roles = updatedUser.config.get("roles", [])
             current_features = updatedUser.config.get("features", [])
 
         updatedUser.name = data.get("name", None)
         updatedUser.external = data.get("external", None)
         updatedUser.active = bool(data.get("active", True))
-
-        if not _has_valid_roles(current_roles):
-            raise ValidationError(
-                "Este usuário não pode ser editado.",
-                "errors.businessRules",
-                status.HTTP_400_BAD_REQUEST,
-            )
 
         updatedUser.config = {"roles": new_roles}
         if Permission.ADMIN_USERS in user_permissions:
