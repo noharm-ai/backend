@@ -1,9 +1,8 @@
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import func, text, and_, or_, desc, asc, distinct, cast
-from datetime import date, timedelta
+from sqlalchemy import func, or_, asc
+from datetime import date
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import deferred
-from routes.utils import *
 from flask_mail import Mail
 from flask_jwt_extended import get_jwt
 
@@ -46,14 +45,6 @@ class User(db.Model):
             .filter(User.active == True)
             .first()
         )
-
-    def permission(self):
-        roles = self.config["roles"] if self.config and "roles" in self.config else []
-        return "suporte" not in roles and "readonly" not in roles
-
-    def cpoe(self):
-        roles = self.config["roles"] if self.config and "roles" in self.config else []
-        return "cpoe" in roles
 
     def findByEmail(email):
         return User.query.filter_by(email=email).first()
@@ -123,44 +114,6 @@ class Relation(db.Model):
     user = db.Column("update_by", db.BigInteger, nullable=True)
     creator = db.Column("create_by", db.BigInteger, nullable=True)
 
-    def findBySctid(sctid, user):
-        SubstA = db.aliased(Substance)
-        SubstB = db.aliased(Substance)
-
-        relations = (
-            db.session.query(Relation, SubstA.name, SubstB.name)
-            .outerjoin(SubstA, SubstA.id == Relation.sctida)
-            .outerjoin(SubstB, SubstB.id == Relation.sctidb)
-            .filter(or_(Relation.sctida == sctid, Relation.sctidb == sctid))
-            .all()
-        )
-
-        results = []
-        for r in relations:
-            if r[0].sctida == sctid:
-                sctidB = r[0].sctidb
-                nameB = r[2]
-            else:
-                sctidB = r[0].sctida
-                nameB = r[1]
-
-            results.append(
-                {
-                    "sctidB": sctidB,
-                    "nameB": strNone(nameB).upper(),
-                    "type": r[0].kind,
-                    "text": r[0].text,
-                    "active": r[0].active,
-                    "level": r[0].level,
-                    "editable": bool(r[0].creator == user.id)
-                    or (not User.permission(user)),
-                }
-            )
-
-        results.sort(key=sortRelations)
-
-        return results
-
 
 class Notify(db.Model):
     __tablename__ = "notifica"
@@ -210,27 +163,6 @@ class Drug(db.Model):
     updated_by = db.Column("updated_by", db.BigInteger, nullable=True)
     created_at = db.Column("created_at", db.DateTime, nullable=False)
     updated_at = db.Column("updated_at", db.DateTime, nullable=True)
-
-    def getBySegment(idSegment, qDrug=None, idDrug=None):
-        segDrubs = (
-            db.session.query(Outlier.idDrug.label("idDrug"))
-            .filter(Outlier.idSegment == idSegment)
-            .group_by(Outlier.idDrug)
-            .subquery()
-        )
-
-        if idSegment != None:
-            drugs = Drug.query.filter(Drug.id.in_(segDrubs))
-        else:
-            drugs = db.session.query(Drug)
-
-        if qDrug:
-            drugs = drugs.filter(Drug.name.ilike("%" + str(qDrug) + "%"))
-
-        if len(idDrug) > 0:
-            drugs = drugs.filter(Drug.id.in_(idDrug))
-
-        return drugs.order_by(asc(Drug.name)).all()
 
 
 class DrugAttributesBase:

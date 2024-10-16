@@ -1,15 +1,13 @@
-from flask import Blueprint, request
+from flask import Blueprint, request, g
 from markupsafe import escape as escape_html
 from datetime import datetime
-from flask_jwt_extended import jwt_required, get_jwt_identity
 
-from models.main import *
-from models.prescription import *
-from .utils import tryCommit
-from services import prescription_agg_service
-from services.admin import admin_drug_service
-
+from models.main import db, User
+from services import prescription_agg_service, prescription_check_service
 from exception.validation_error import ValidationError
+from exception.authorization_error import AuthorizationError
+from utils import status, sessionutils
+from decorators.api_endpoint_decorator import api_endpoint
 
 app_stc = Blueprint("app_stc", __name__)
 
@@ -17,20 +15,33 @@ app_stc = Blueprint("app_stc", __name__)
 @app_stc.route(
     "/static/<string:schema>/prescription/<int:id_prescription>", methods=["GET"]
 )
-def computePrescription(schema, id_prescription):
+def create_aggregated_by_prescription(schema, id_prescription):
     is_cpoe = request.args.get("cpoe", False)
-    is_pmc = request.args.get("pmc", False)
     out_patient = request.args.get("outpatient", None)
     force = request.args.get("force", False)
 
+    user_context = User()
+    user_context.config = {"roles": ["STATIC_USER"]}
+    g.user_context = user_context
+    g.is_cpoe = bool(is_cpoe)
+
     try:
         prescription_agg_service.create_agg_prescription_by_prescription(
-            schema, id_prescription, is_cpoe, out_patient, is_pmc=is_pmc, force=force
+            schema=schema,
+            id_prescription=id_prescription,
+            out_patient=out_patient,
+            force=force,
         )
     except ValidationError as e:
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+    except AuthorizationError as e:
+        return {
+            "status": "error",
+            "message": "Usuário inválido",
+            "code": "errors.unauthorized",
+        }, status.HTTP_401_UNAUTHORIZED
 
-    return tryCommit(db, escape_html(str(id_prescription)))
+    return sessionutils.tryCommit(db, escape_html(str(id_prescription)))
 
 
 @app_stc.route(
@@ -45,25 +56,42 @@ def create_aggregated_prescription_by_date(schema, admission_number):
         else datetime.today().date()
     )
 
+    user_context = User()
+    user_context.config = {"roles": ["STATIC_USER"]}
+    g.user_context = user_context
+    g.is_cpoe = bool(is_cpoe)
+
     try:
         prescription_agg_service.create_agg_prescription_by_date(
-            schema, admission_number, p_date, is_cpoe
+            schema, admission_number, p_date
         )
     except ValidationError as e:
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+    except AuthorizationError as e:
+        return {
+            "status": "error",
+            "message": "Usuário inválido",
+            "code": "errors.unauthorized",
+        }, status.HTTP_401_UNAUTHORIZED
 
-    return tryCommit(db, escape_html(str(admission_number)))
+    return sessionutils.tryCommit(db, escape_html(str(admission_number)))
 
 
-@app_stc.route("/static/drug/update-substances")
-@jwt_required()
-def update_substances():
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
+@app_stc.route("/static/prescriptions/status", methods=["POST"])
+@api_endpoint()
+def static_prescription_status():
+    data = request.get_json()
 
-    try:
-        result = admin_drug_service.static_update_substances(user)
-    except ValidationError as e:
-        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+    id_prescription = data.get("idPrescription", None)
+    p_status = (
+        escape_html(data.get("status", None))
+        if data.get("status", None) != None
+        else None
+    )
+    id_origin_user = data.get("idOriginUser", None)
 
-    return tryCommit(db, result)
+    return prescription_check_service.static_check(
+        id_prescription=id_prescription,
+        p_status=p_status,
+        id_origin_user=id_origin_user,
+    )

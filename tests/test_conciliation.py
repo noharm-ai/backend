@@ -1,13 +1,14 @@
 from conftest import *
 
 from models.prescription import Prescription
+from security.role import Role
 
 
 def test_get_prescriptions_by_idPrescription_additional2(client):
     """Teste get /prescriptions/idPrescription - Compara response data com dados do banco e valida status_code 200
     Additional2 idPrescription data validation"""
 
-    access_token = get_access(client)
+    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
     idPrescription = "9199"
 
     response = client.get(
@@ -27,7 +28,7 @@ def test_putPrescriprionsCheck(client):
     """Teste put /prescriptions/idPrescription - Checa o status "s" na prescrição e a existência de um resgistro na tabela prescricao_audit."""
 
     url = f"/prescriptions/status"
-    access_token = get_access(client, roles=["staging"])
+    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
     PRESCRIPTION_ID = "9199"
     data = {"status": "s", "idPrescription": PRESCRIPTION_ID}
 

@@ -1,23 +1,11 @@
-from flask.json import jsonify
 from conftest import *
-from models.appendix import Department
-from models.segment import Segment
-
-# from models.prescription import Prescription
-
 from models.prescription import Prescription
-
-# def pres_getall():
-#   pres = Prescription()
-#   pres.id = 1
-#   pres.idHospital = 1
-#   pres.name = 'pres'
-#   return [pres, pres]
+from security.role import Role
 
 
 def test_get_prescriptions_status_code(client):
     """Teste get /prescriptions - Valida status_code 200"""
-    access_token = get_access(client)
+    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
 
     response = client.get("/prescriptions", headers=make_headers(access_token))
 
@@ -27,7 +15,7 @@ def test_get_prescriptions_status_code(client):
 def test_get_prescriptions_by_idPrescription(client):
     """Teste get /prescriptions/idPrescription - Compara response data com dados do banco e valida status_code 200"""
 
-    access_token = get_access(client)
+    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
 
     idPrescription = "20"
 
@@ -43,14 +31,13 @@ def test_get_prescriptions_by_idPrescription(client):
     assert data["bed"] == prescription.bed
     assert data["status"] == prescription.status
     assert len(data["prescription"]) > 0
-    
 
 
 def test_get_prescriptions_by_idPrescription_additional(client):
     """Teste get /prescriptions/idPrescription - Compara response data com dados do banco e valida status_code 200
-       Additional idPrescription data validation"""
+    Additional idPrescription data validation"""
 
-    access_token = get_access(client)
+    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
 
     idPrescription = "199"
 
@@ -58,18 +45,17 @@ def test_get_prescriptions_by_idPrescription_additional(client):
         "/prescriptions/" + idPrescription, headers=make_headers(access_token)
     )
     data = json.loads(response.data)["data"]
-    
-    assert len(data['prescription']) == 6
-    assert len(data['solution']) == 0
-    assert len(data['procedures']) == 0
-    assert data['birthdate'] == '1941-02-05'
 
+    assert len(data["prescription"]) == 6
+    assert len(data["solution"]) == 0
+    assert len(data["procedures"]) == 0
+    assert data["birthdate"] == "1941-02-05"
 
 
 def test_get_prescriptions_drug_by_idPrescription_and_period(client):
     """Teste get /prescriptions/drug/idPrescription/period - Compara response data com dados do banco e valida status_code 200"""
 
-    access_token = get_access(client)
+    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
 
     idPrescription = "20"
 
@@ -85,7 +71,7 @@ def test_get_prescriptions_drug_by_idPrescription_and_period(client):
 def test_put_prescriptions_by_id(client):
     """Teste put /prescriptions/id - Compara dados enviados com dados salvos no banco e valida status_code 200"""
 
-    access_token = get_access(client, roles=["staging"])
+    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
 
     idPrescription = "20"
     data = {"notes": "note test", "concilia": "s"}
@@ -106,7 +92,7 @@ def test_put_prescriptions_by_id(client):
 def test_put_prescriptions_by_id_permission(client):
     """Teste put /prescriptions/id - Deve retornar erro [401 UNAUTHORIZED] devido ao usuário utilizado"""
 
-    access_token = get_access(client)
+    access_token = get_access(client, roles=[Role.VIEWER.value])
 
     idPrescription = "20"
     data = {"notes": "note test", "concilia": "s"}
@@ -121,7 +107,7 @@ def test_put_prescriptions_by_id_permission(client):
 
 def test_get_static_demo_prescription_by_idPrescription(client):
     """Teste get /static/demo/prescription/idPrescription - Valida status_code 200"""
-    access_token = get_access(client)
+    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
 
     idPrescription = "20"
 

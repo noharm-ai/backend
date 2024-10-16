@@ -1,30 +1,33 @@
-import re
 from flask import Blueprint, request
-from flask_jwt_extended import jwt_required, get_jwt_identity
 
-from models.main import *
-from models.appendix import *
+from models.main import db
 from services import user_service
-from .utils import tryCommit
 from exception.validation_error import ValidationError
+from decorators.api_endpoint_decorator import api_endpoint
+from utils import sessionutils
 
 app_usr = Blueprint("app_usr", __name__)
 
 
 @app_usr.route("/user", methods=["PUT"])
-@jwt_required()
+@api_endpoint()
 def update_user_password():
     data = request.get_json()
 
-    try:
-        user_service.update_password(
-            password=data.get("password", None),
-            newpassword=data.get("newpassword", None),
-        )
-    except ValidationError as e:
-        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+    user_service.update_password(
+        password=data.get("password", None),
+        newpassword=data.get("newpassword", None),
+    )
 
-    return tryCommit(db, True)
+    return True
+
+
+@app_usr.route("/users/search", methods=["GET"])
+@api_endpoint()
+def search_users():
+    term = request.args.get("term", None)
+
+    return user_service.search_users(term=term)
 
 
 @app_usr.route("/user/forget", methods=["GET"])
@@ -36,7 +39,7 @@ def forgot_password():
     except ValidationError as e:
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
-    return tryCommit(db, True)
+    return sessionutils.tryCommit(db, True)
 
 
 @app_usr.route("/user/reset", methods=["POST"])
@@ -51,32 +54,4 @@ def reset_password():
     except ValidationError as e:
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
-    return tryCommit(db, True)
-
-
-@app_usr.route("/users/search", methods=["GET"])
-@jwt_required()
-def search_users():
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
-
-    term = request.args.get("term", None)
-
-    users = (
-        User.query.filter(User.schema == user.schema)
-        .filter(
-            or_(
-                ~User.config["roles"].astext.contains("suporte"),
-                User.config["roles"] == None,
-            )
-        )
-        .filter(User.name.ilike("%" + str(term) + "%"))
-        .order_by(desc(User.active), asc(User.name))
-        .all()
-    )
-
-    results = []
-    for u in users:
-        results.append({"id": u.id, "name": u.name})
-
-    return {"status": "success", "data": results}, status.HTTP_200_OK
+    return sessionutils.tryCommit(db, True)

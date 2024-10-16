@@ -2,13 +2,13 @@ from utils import status
 from sqlalchemy import asc, func
 
 from models.main import db
-from models.appendix import *
-from models.prescription import *
-from services import permission_service
-
+from models.prescription import Intervention
+from models.appendix import InterventionReason
+from decorators.has_permission_decorator import has_permission, Permission
 from exception.validation_error import ValidationError
 
 
+@has_permission(Permission.ADMIN_INTERVENTION_REASON, Permission.READ_PRESCRIPTION)
 def get_reasons(id=None, active_only=False):
     parent = db.aliased(InterventionReason)
     query_editable = (
@@ -39,14 +39,8 @@ def get_reasons(id=None, active_only=False):
     return q.all()
 
 
-def upsert_reason(id, reason: InterventionReason, user):
-    if not permission_service.has_maintainer_permission(user):
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-
+@has_permission(Permission.ADMIN_INTERVENTION_REASON)
+def upsert_reason(id, reason: InterventionReason):
     is_protected = False
 
     if id != None:

@@ -1,14 +1,12 @@
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, and_
 from datetime import datetime
 
 from models.main import db, Substance, User, Relation
-from services import permission_service
-from exception.validation_error import ValidationError
-from utils import status
+from decorators.has_permission_decorator import has_permission, Permission
 
 
+@has_permission(Permission.ADMIN_SUBSTANCE_RELATIONS)
 def get_relations(
-    user: User,
     id_origin_list=[],
     id_destination_list=[],
     kind_list=[],
@@ -17,13 +15,6 @@ def get_relations(
     limit=50,
     offset=0,
 ):
-    if not permission_service.has_maintainer_permission(user):
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-
     SubstA = db.aliased(Substance)
     SubstB = db.aliased(Substance)
 
@@ -33,7 +24,14 @@ def get_relations(
         .outerjoin(SubstB, SubstB.id == Relation.sctidb)
     )
 
-    if len(id_origin_list) > 0:
+    if len(id_origin_list) > 1:
+        q = q.filter(
+            and_(
+                Relation.sctida.in_(id_origin_list), Relation.sctidb.in_(id_origin_list)
+            ),
+        )
+
+    elif len(id_origin_list) == 1:
         q = q.filter(
             or_(
                 Relation.sctida.in_(id_origin_list), Relation.sctidb.in_(id_origin_list)
@@ -77,14 +75,8 @@ def get_relations(
     return {"count": 0, "data": []}
 
 
-def upsert_relation(data: dict, user):
-    if not permission_service.has_maintainer_permission(user):
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-
+@has_permission(Permission.ADMIN_SUBSTANCE_RELATIONS)
+def upsert_relation(data: dict, user_context: User):
     relation = (
         db.session.query(Relation)
         .filter(Relation.sctida == data.get("sctida", None))
@@ -98,7 +90,7 @@ def upsert_relation(data: dict, user):
         relation.sctida = data.get("sctida", None)
         relation.sctidb = data.get("sctidb", None)
         relation.kind = data.get("kind", None)
-        relation.creator = user.id
+        relation.creator = user_context.id
         db.session.add(relation)
 
     if "text" in data.keys():
@@ -109,7 +101,7 @@ def upsert_relation(data: dict, user):
         relation.level = data.get("level", None)
 
     relation.update = datetime.today()
-    relation.user = user.id
+    relation.user = user_context.id
 
     db.session.flush()
 

@@ -1,13 +1,12 @@
 from conftest import *
 from models.appendix import Memory
 from datetime import datetime
+from security.role import Role
 
 
 def test_get_non_existing_memory(client):
     """Test get /memory/ - check status_code 200 and empty array from API"""
-    access_token = get_access(
-        client
-    )  # client login > receive token(temporaly key for one day)
+    access_token = get_access(client, roles=[Role.VIEWER.value])
 
     response = client.get(
         "/memory/non-existing-memory", headers=make_headers(access_token)
@@ -51,9 +50,7 @@ def test_get_existing_memory(client):
 
     idMemory = add_memory(memory_kind_test, memory_value_test)
 
-    access_token = get_access(
-        client
-    )  # client login > receive token(temporaly key for one day)
+    access_token = get_access(client, roles=[Role.VIEWER.value])
 
     response = client.get(
         "/memory/" + memory_kind_test, headers=make_headers(access_token)
@@ -76,7 +73,7 @@ def test_get_existing_memory(client):
 def test_put_new_memory(client):
     """Test put /memory/ - check status_code 200 and data from database"""
 
-    access_token = get_access(client)
+    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
 
     data = {"type": "new-memory", "value": "7"}
     url = "memory/"
@@ -100,7 +97,7 @@ def test_update_memory(client):
     memory_kind_test = "update-memory"
     memory_value_test = 18
     idMemory = add_memory(memory_kind_test, memory_value_test)  # key of memory object
-    access_token = get_access(client)
+    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
 
     # data to update using API
     data = {"type": "updated-memory", "value": "7"}
@@ -122,7 +119,7 @@ def test_update_memory(client):
 
 
 def test_update_non_existing_memory(client):
-    access_token = get_access(client)
+    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
 
     delete_memory(900)  # make sure that record doesn't exist
     # data to update using API

@@ -1,6 +1,7 @@
 import pytest, json
 from mobile import app
 from models.main import User
+from models.enums import FeatureEnum
 from unittest.mock import patch
 from flask_jwt_extended import create_access_token
 
@@ -76,7 +77,7 @@ def get_access(client, email="demo", password="demo", roles=["suporte"]):
 def update_roles(email, roles):
     user = session.query(User).filter_by(email=email).first()
     if user != None:
-        user.config = {"roles": roles}
+        user.config = {"roles": roles, "features": [FeatureEnum.STAGING_ACCESS.value]}
         session_commit()
 
 
@@ -136,6 +137,10 @@ def get_mock_row(
     freq_obj: Frequency = None,
     use_weight: bool = False,
     expire_date: datetime = None,
+    intravenous: bool = False,
+    group: str = None,
+    solutionGroup: bool = False,
+    idPrescription: str = None,
 ):
     d = Drug()
     d.id = id_prescription_drug
@@ -151,7 +156,10 @@ def get_mock_row(
     pd.tube = tube
     pd.allergy = allergy
     pd.interval = interval
-    pd.intravenous = False
+    pd.intravenous = intravenous
+    pd.group = group
+    pd.solutionGroup = solutionGroup
+    pd.idPrescription = idPrescription
 
     da = DrugAttributes()
     da.idDrug = id_prescription_drug

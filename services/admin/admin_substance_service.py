@@ -1,14 +1,12 @@
 from sqlalchemy import func, or_
 from sqlalchemy.orm import undefer
 
-from models.main import db, Substance, User, SubstanceClass
-from services import permission_service
-from exception.validation_error import ValidationError
-from utils import status
+from models.main import db, Substance, SubstanceClass
+from decorators.has_permission_decorator import has_permission, Permission
 
 
+@has_permission(Permission.ADMIN_SUBSTANCES)
 def get_substances(
-    user: User,
     name=None,
     idClassList=[],
     has_class=None,
@@ -19,12 +17,6 @@ def get_substances(
     limit=50,
     offset=0,
 ):
-    if not permission_service.has_maintainer_permission(user):
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
 
     q = db.session.query(
         Substance, SubstanceClass, func.count().over().label("count")
@@ -84,14 +76,8 @@ def get_substances(
     return {"count": 0, "data": []}
 
 
-def upsert_substance(data: dict, user):
-    if not permission_service.has_maintainer_permission(user):
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-
+@has_permission(Permission.ADMIN_SUBSTANCES)
+def upsert_substance(data: dict):
     subs = (
         db.session.query(Substance).filter(Substance.id == data.get("id", None)).first()
     )

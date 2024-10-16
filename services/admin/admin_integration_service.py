@@ -1,11 +1,10 @@
 from utils import status
 from sqlalchemy import case, text
+from datetime import datetime
 
-from models.main import *
-from models.appendix import *
-from models.segment import *
-from models.enums import RoleEnum
-from services import permission_service
+from models.main import db, User
+from models.appendix import SchemaConfig, InterventionReason
+from decorators.has_permission_decorator import has_permission, Permission
 
 from exception.validation_error import ValidationError
 
@@ -33,17 +32,11 @@ def can_refresh_agg(schema):
     return get_table_count(schema, "prescricaoagg") <= max_table_count
 
 
-def refresh_agg(user):
-    roles = user.config["roles"] if user.config and "roles" in user.config else []
-    if RoleEnum.ADMIN.value not in roles and RoleEnum.TRAINING.value not in roles:
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-    schema = user.schema
+@has_permission(Permission.WRITE_SEGMENT_SCORE)
+def refresh_agg(user_context: User):
+    schema = user_context.schema
 
-    if not can_refresh_agg(user.schema):
+    if not can_refresh_agg(user_context.schema):
         raise ValidationError(
             "A tabela possui muitos registros. A operação deve ser feita manualmente, fora do horário comercial.",
             "errors.notSupported",
@@ -60,15 +53,9 @@ def refresh_agg(user):
     return db.session.execute(query)
 
 
-def refresh_prescriptions(user):
-    roles = user.config["roles"] if user.config and "roles" in user.config else []
-    if RoleEnum.ADMIN.value not in roles:
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-    schema = user.schema
+@has_permission(Permission.INTEGRATION_UTILS)
+def refresh_prescriptions(user_context: User):
+    schema = user_context.schema
     max_table_count = 100000
 
     if get_table_count(schema, "prescricao") > max_table_count:
@@ -96,15 +83,9 @@ def refresh_prescriptions(user):
     return db.session.execute(queryPresmed)
 
 
-def init_intervention_reason(user):
-    if not permission_service.has_maintainer_permission(user):
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-
-    schema = user.schema
+@has_permission(Permission.ADMIN_INTERVENTION_REASON)
+def init_intervention_reason(user_context: User):
+    schema = user_context.schema
 
     if db.session.query(InterventionReason).count() > 0:
         raise ValidationError(
@@ -132,16 +113,10 @@ def init_intervention_reason(user):
     return db.session.execute(reset_seq)
 
 
+@has_permission(Permission.INTEGRATION_UTILS)
 def update_integration_config(
-    schema, status, nh_care, fl1, fl2, fl3, fl4, config, user
+    schema, status, nh_care, fl1, fl2, fl3, fl4, config, user_context: User
 ):
-    if not permission_service.is_admin(user):
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-
     schema_config = (
         db.session.query(SchemaConfig).filter(SchemaConfig.schemaName == schema).first()
     )
@@ -162,7 +137,7 @@ def update_integration_config(
     schema_config.fl4 = bool(fl4) if fl4 != None else schema_config.fl4
 
     schema_config.updatedAt = datetime.today()
-    schema_config.updatedBy = user.id
+    schema_config.updatedBy = user_context.id
 
     db.session.flush()
 
@@ -173,18 +148,12 @@ def update_integration_config(
     return _object_to_dto(schema_config_db)
 
 
-def list_integrations(user):
-    if not permission_service.is_admin(user):
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-
+@has_permission(Permission.INTEGRATION_UTILS)
+def list_integrations(user_context: User):
     integrations = (
         db.session.query(
             SchemaConfig,
-            case((SchemaConfig.schemaName == user.schema, 0), else_=1).label(
+            case((SchemaConfig.schemaName == user_context.schema, 0), else_=1).label(
                 "priority"
             ),
         )

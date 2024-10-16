@@ -1,25 +1,37 @@
-from utils import status
 from sqlalchemy import desc, text, select, func, and_
 from flask_sqlalchemy.session import Session
-from datetime import date
+from datetime import date, datetime
 
-from models.main import db
-from models.appendix import *
-from models.prescription import *
-from models.enums import PrescriptionDrugAuditTypeEnum, DrugTypeEnum
-from routes.prescription import getPrescription
-from routes.utils import getFeatures, gen_agg_id
-from services import prescription_service, prescription_drug_service
-
+from models.main import db, User, dbSession
+from models.prescription import (
+    Prescription,
+    PrescriptionDrug,
+    PrescriptionDrugAudit,
+    Patient,
+)
+from models.enums import (
+    PrescriptionDrugAuditTypeEnum,
+    DrugTypeEnum,
+    PatientConciliationStatusEnum,
+)
+from services import (
+    prescription_drug_service,
+    prescription_check_service,
+    prescription_view_service,
+    feature_service,
+)
 from exception.validation_error import ValidationError
+from decorators.has_permission_decorator import has_permission, Permission
+from utils import status, prescriptionutils
 
 
+@has_permission(Permission.READ_STATIC)
 def create_agg_prescription_by_prescription(
-    schema, id_prescription, is_cpoe, out_patient, is_pmc=False, force=False
+    schema, id_prescription, out_patient, force=False
 ):
-    set_schema(schema)
+    _set_schema(schema)
 
-    if is_cpoe:
+    if feature_service.is_cpoe():
         raise ValidationError(
             "CPOE deve acionar o fluxo por atendimento",
             "errors.businessRules",
@@ -42,8 +54,10 @@ def create_agg_prescription_by_prescription(
     if not force and processed_status == "PROCESSED":
         return
 
-    resultPresc, stat = getPrescription(idPrescription=id_prescription)
-    p.features = getFeatures(resultPresc)
+    resultPresc = prescription_view_service.static_get_prescription(
+        idPrescription=id_prescription
+    )
+    p.features = prescriptionutils.getFeatures(resultPresc)
     p.aggDrugs = p.features["drugIDs"]
     p.aggDeps = [p.idDepartment]
 
@@ -58,9 +72,8 @@ def create_agg_prescription_by_prescription(
     if out_patient:
         PrescAggID = p.admissionNumber
     else:
-        PrescAggID = gen_agg_id(p.admissionNumber, p.idSegment, pdate)
+        PrescAggID = prescriptionutils.gen_agg_id(p.admissionNumber, p.idSegment, pdate)
 
-    newPrescAgg = False
     pAgg = Prescription.query.get(PrescAggID)
     if pAgg is None:
         pAgg = Prescription()
@@ -69,18 +82,10 @@ def create_agg_prescription_by_prescription(
         pAgg.admissionNumber = p.admissionNumber
         pAgg.date = pdate
         pAgg.status = 0
-        newPrescAgg = True
+        db.session.add(pAgg)
 
     if out_patient:
         pAgg.date = date(pdate.year, pdate.month, pdate.day)
-
-    resultAgg, stat = getPrescription(
-        admissionNumber=p.admissionNumber,
-        aggDate=pAgg.date,
-        idSegment=p.idSegment,
-        is_cpoe=is_cpoe,
-        is_pmc=is_pmc,
-    )
 
     pAgg.idHospital = p.idHospital
     pAgg.idDepartment = p.idDepartment
@@ -91,6 +96,11 @@ def create_agg_prescription_by_prescription(
     pAgg.insurance = p.insurance
     pAgg.agg = True
     pAgg.update = datetime.today()
+    db.session.flush()
+
+    resultAgg = prescription_view_service.static_get_prescription(
+        idPrescription=pAgg.id
+    )
 
     if p.concilia is None and (pAgg.status == "s" or p.status == "s"):
         prescalc_user = User()
@@ -117,7 +127,7 @@ def create_agg_prescription_by_prescription(
                 if remove_agg_check:
                     pAgg.status = 0
 
-                    prescription_service.audit_check(
+                    prescription_check_service.audit_check(
                         prescription=pAgg, user=prescalc_user, extra={"prescalc": True}
                     )
 
@@ -127,32 +137,26 @@ def create_agg_prescription_by_prescription(
                 p.user = None
                 p.status = 0
 
-                prescription_service.audit_check(
+                prescription_check_service.audit_check(
                     prescription=p, user=prescalc_user, extra={"prescalc": True}
                 )
 
-    if "data" in resultAgg:
-        pAgg.features = getFeatures(
+    if "idPrescription" in resultAgg:
+        pAgg.features = prescriptionutils.getFeatures(
             resultAgg, agg_date=pAgg.date, intervals_for_agg_date=True
         )
         pAgg.aggDrugs = pAgg.features["drugIDs"]
         pAgg.aggDeps = list(
-            set(
-                [
-                    resultAgg["data"]["headers"][h]["idDepartment"]
-                    for h in resultAgg["data"]["headers"]
-                ]
-            )
+            set([resultAgg["headers"][h]["idDepartment"] for h in resultAgg["headers"]])
         )
-        if newPrescAgg:
-            db.session.add(pAgg)
 
     _log_processed_date(id_prescription_array=[id_prescription], schema=schema)
+    _update_patient_conciliation_status(prescription=p)
 
 
-def create_agg_prescription_by_date(schema, admission_number, p_date, is_cpoe):
-    create_new = False
-    set_schema(schema)
+@has_permission(Permission.READ_STATIC)
+def create_agg_prescription_by_date(schema, admission_number, p_date):
+    _set_schema(schema)
 
     last_prescription = get_last_prescription(admission_number)
 
@@ -163,13 +167,13 @@ def create_agg_prescription_by_date(schema, admission_number, p_date, is_cpoe):
             status.HTTP_400_BAD_REQUEST,
         )
 
-    p_id = gen_agg_id(admission_number, last_prescription.idSegment, p_date)
+    p_id = prescriptionutils.gen_agg_id(
+        admission_number, last_prescription.idSegment, p_date
+    )
 
     agg_p = db.session.query(Prescription).get(p_id)
 
     if agg_p is None:
-        create_new = True
-
         agg_p = Prescription()
         agg_p.id = p_id
         agg_p.idPatient = last_prescription.idPatient
@@ -185,37 +189,27 @@ def create_agg_prescription_by_date(schema, admission_number, p_date, is_cpoe):
         agg_p.insurance = last_prescription.insurance
         agg_p.agg = True
         agg_p.update = datetime.today()
+        db.session.add(agg_p)
 
-    resultAgg, stat = getPrescription(
-        admissionNumber=admission_number,
-        aggDate=agg_p.date,
-        idSegment=agg_p.idSegment,
-        is_cpoe=is_cpoe,
+    resultAgg = prescription_view_service.static_get_prescription(
+        idPrescription=agg_p.id
     )
 
-    if "data" in resultAgg:
+    if "idPrescription" in resultAgg:
         agg_p.update = datetime.today()
-        agg_p.features = getFeatures(resultAgg)
+        agg_p.features = prescriptionutils.getFeatures(resultAgg)
         agg_p.aggDrugs = agg_p.features["drugIDs"]
         agg_p.aggDeps = list(
-            set(
-                [
-                    resultAgg["data"]["headers"][h]["idDepartment"]
-                    for h in resultAgg["data"]["headers"]
-                ]
-            )
+            set([resultAgg["headers"][h]["idDepartment"] for h in resultAgg["headers"]])
         )
 
         internal_prescription_ids = []
-        for h in resultAgg["data"]["headers"]:
+        for h in resultAgg["headers"]:
             internal_prescription_ids.append(h)
 
         _log_processed_date(
             id_prescription_array=internal_prescription_ids, schema=schema
         )
-
-    if create_new:
-        db.session.add(agg_p)
 
 
 def _log_processed_date(id_prescription_array, schema):
@@ -246,7 +240,7 @@ def _log_processed_date(id_prescription_array, schema):
     )
 
 
-def set_schema(schema):
+def _set_schema(schema):
     db_session = Session(db)
     result = db_session.execute(
         text("SELECT schema_name FROM information_schema.schemata")
@@ -323,3 +317,18 @@ def _get_processed_status(id_prescription: int):
         return "NEW_ITENS"
 
     return "PROCESSED"
+
+
+def _update_patient_conciliation_status(prescription: Prescription):
+    if prescription.concilia != None:
+        patient = (
+            db.session.query(Patient)
+            .filter(Patient.admissionNumber == prescription.admissionNumber)
+            .first()
+        )
+        if (
+            patient != None
+            and patient.st_conciliation == PatientConciliationStatusEnum.PENDING.value
+        ):
+            patient.st_conciliation = PatientConciliationStatusEnum.CREATED.value
+            db.session.flush()

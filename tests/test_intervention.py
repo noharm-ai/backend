@@ -3,13 +3,13 @@ from datetime import datetime
 
 from models.appendix import InterventionReason
 from models.prescription import Intervention
+from security.role import Role
 
 
 def test_get_interventions(client):
     """Teste get /intervention/search - Compara quantidade de intervenções enviadas com quantidade salva no banco e valida status_code 200"""
 
-    access_token = get_access(client)
-    interventions = session.query(Intervention).count()
+    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
 
     data = {"startDate": datetime.today().isoformat()}
 
@@ -27,7 +27,7 @@ def test_get_interventions(client):
 def test_get_interventions_by_reason(client):
     """Teste get /intervention/reasons - Compara quantidade de rasões enviadas com quantidade salva no banco e valida status_code 200"""
 
-    access_token = get_access(client)
+    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
     qtdReasons = session.query(InterventionReason).count()
 
     response = client.get("/intervention/reasons", headers=make_headers(access_token))
@@ -40,7 +40,7 @@ def test_get_interventions_by_reason(client):
 def test_put_interventions(client):
     """Teste put /intervention - Compara dados enviados com dados salvos no banco e valida status_code 200"""
 
-    access_token = get_access(client, roles=["staging"])
+    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
 
     idPrescriptionDrug = "1"
     data = {
@@ -82,7 +82,7 @@ def test_put_interventions(client):
 def test_put_interventions_permission(client):
     """Teste put /intervention - Deve retornar erro [401 UNAUTHORIZED] devido ao usuário utilizado"""
 
-    access_token = get_access(client, roles=["suporte"])
+    access_token = get_access(client, roles=[Role.VIEWER.value])
 
     idIntervention = "1"
     idPrescription = "0"
