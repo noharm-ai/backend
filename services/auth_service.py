@@ -162,17 +162,18 @@ def _auth_user(
             status.HTTP_401_UNAUTHORIZED,
         )
 
-    extra_audit = {
-        "schema": user_schema,
-        "env": Config.ENV,
-        "userAgent": request.headers.get("User-Agent"),
-    }
-    user_service.create_audit(
-        auditType=UserAuditTypeEnum.LOGIN,
-        id_user=user.id,
-        responsible=user,
-        extra=extra_audit,
-    )
+    if Config.ENV != NoHarmENV.DEVELOPMENT.value:
+        extra_audit = {
+            "schema": user_schema,
+            "env": Config.ENV,
+            "userAgent": request.headers.get("User-Agent"),
+        }
+        user_service.create_audit(
+            auditType=UserAuditTypeEnum.LOGIN,
+            id_user=user.id,
+            responsible=user,
+            extra=extra_audit,
+        )
 
     return {
         "status": "success",
