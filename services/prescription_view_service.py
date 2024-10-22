@@ -36,14 +36,14 @@ from utils import prescriptionutils, dateutils, status
 
 
 @has_permission(Permission.READ_PRESCRIPTION)
-def route_get_prescription(id_prescription: int, user_context: User):
+def route_get_prescription(id_prescription: int, user_context: User = None):
     return internal_get_prescription(
         idPrescription=id_prescription, is_complete=True, user_context=user_context
     )
 
 
 @has_permission(Permission.READ_STATIC)
-def static_get_prescription(idPrescription: int, user_context: User):
+def static_get_prescription(idPrescription: int, user_context: User = None):
     return internal_get_prescription(
         idPrescription=idPrescription, is_complete=False, user_context=user_context
     )
