@@ -61,6 +61,12 @@ def create_agg_prescription_by_prescription(
     p.aggDrugs = p.features["drugIDs"]
     p.aggDeps = [p.idDepartment]
 
+    if p.concilia != None:
+        db.session.flush()
+        _update_patient_conciliation_status(prescription=p)
+
+        return
+
     pdate = p.date
 
     if processed_status == "NEW_ITENS":
@@ -151,7 +157,6 @@ def create_agg_prescription_by_prescription(
         )
 
     _log_processed_date(id_prescription_array=[id_prescription], schema=schema)
-    _update_patient_conciliation_status(prescription=p)
 
 
 @has_permission(Permission.READ_STATIC)
