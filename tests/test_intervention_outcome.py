@@ -53,9 +53,9 @@ def test_put_interventions(client):
 
 
 # Retrieve data for concluding the intervention
+@pytest.mark.run(order=1)
 def test_outcome_data(client, test_put_interventions):
     "Tests /intervention/outcome-data - Checks if the API call for retrieving the data is successful."
-
     assert test_put_interventions is not None
 
     data = {"idIntervention": test_put_interventions, "edit": "False"}
@@ -81,6 +81,7 @@ def test_outcome_data(client, test_put_interventions):
     assert len(result_compare) == 0
 
 
+@pytest.mark.run(order=2)
 # Finishes the intervention
 def test_set_outcome(client, test_put_interventions):
     """Tests  /intervention/set-outcome - Checks if the API call for finishing the intervention is successful."""
@@ -100,9 +101,9 @@ def test_set_outcome(client, test_put_interventions):
 
 
 # Checks the outcome result
+@pytest.mark.run(order=3)
 def test_outcome_data_final(client, test_put_interventions):
     "Tests /intervention/outcome-data - Check if the API call for retrieving the data is successful."
-
     assert test_put_interventions is not None
 
     data = {"idIntervention": test_put_interventions, "edit": "False"}

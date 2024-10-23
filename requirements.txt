@@ -10,6 +10,7 @@ psycopg2-binary
 pytest==5.4.1
 pytest-flask
 pytest-cov
+pytest-order
 mock
 pandas==1.3.4
 pylint
