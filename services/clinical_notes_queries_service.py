@@ -15,13 +15,14 @@ def get_signs(admission_number: int, user_context: User, cache=True):
         if result != None:
             result_list = result.get("lista", [])
             return {
+                "id": str(result.get("fkevolucao", None)),
                 "data": " ".join(result_list),
                 "date": result.get("dtevolucao", None),
                 "cache": True,
             }
 
     result = (
-        db.session.query(ClinicalNotes.signsText, ClinicalNotes.date)
+        db.session.query(ClinicalNotes.signsText, ClinicalNotes.date, ClinicalNotes.id)
         .select_from(ClinicalNotes)
         .filter(ClinicalNotes.admissionNumber == admission_number)
         .filter(ClinicalNotes.signsText != "")
@@ -32,7 +33,12 @@ def get_signs(admission_number: int, user_context: User, cache=True):
     )
 
     if result != None:
-        return {"data": result[0], "date": result[1].isoformat(), "cache": False}
+        return {
+            "id": str(result[2]),
+            "data": result[0],
+            "date": result[1].isoformat(),
+            "cache": False,
+        }
 
     return {}
 
@@ -46,13 +52,14 @@ def get_infos(admission_number, user_context: User, cache=True):
         if result != None:
             result_list = result.get("lista", [])
             return {
+                "id": str(result.get("fkevolucao", None)),
                 "data": " ".join(result_list),
                 "date": result.get("dtevolucao", None),
                 "cache": True,
             }
 
     result = (
-        db.session.query(ClinicalNotes.infoText, ClinicalNotes.date)
+        db.session.query(ClinicalNotes.infoText, ClinicalNotes.date, ClinicalNotes.id)
         .select_from(ClinicalNotes)
         .filter(ClinicalNotes.admissionNumber == admission_number)
         .filter(ClinicalNotes.infoText != "")
@@ -63,7 +70,12 @@ def get_infos(admission_number, user_context: User, cache=True):
     )
 
     if result != None:
-        return {"data": result[0], "date": result[1].isoformat(), "cache": False}
+        return {
+            "id": str(result[2]),
+            "data": result[0],
+            "date": result[1].isoformat(),
+            "cache": False,
+        }
 
     return {}
 
