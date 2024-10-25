@@ -5,6 +5,8 @@ from models.enums import NoHarmENV
 
 
 class Config:
+    VERSION = "v4.02-beta"
+    FRONTEND_VERSION = "4.0.3"
     ENV = getenv("ENV") or NoHarmENV.DEVELOPMENT.value
     SECRET_KEY = getenv("SECRET_KEY") or "secret_key"
     API_KEY = getenv("API_KEY") or ""
@@ -44,3 +46,6 @@ class Config:
     OPEN_AI_API_MODEL = getenv("OPEN_AI_API_MODEL") or ""
 
     MARITACA_API_KEY = getenv("MARITACA_API_KEY") or ""
+
+    REDIS_HOST = getenv("REDIS_HOST") or ""
+    REDIS_PORT = getenv("REDIS_PORT") or ""

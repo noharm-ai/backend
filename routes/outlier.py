@@ -42,7 +42,9 @@ def getDrugs(idSegment=None):
 @app_out.route("/drugs/<int:idDrug>/units", methods=["GET"])
 @api_endpoint()
 def getUnits(idDrug, idSegment=1):
-    return outlier_service.get_drug_outlier_units(id_drug=idDrug, id_segment=idSegment)
+    return outlier_service.get_drug_outlier_units(
+        id_drug=idDrug, id_segment=request.args.get("idSegment", 1)
+    )
 
 
 @app_out.route("/drugs/<int:idSegment>/<int:idDrug>/convertunit", methods=["POST"])

@@ -2,8 +2,8 @@ from flask_jwt_extended import get_jwt_identity
 from datetime import datetime
 
 from models.main import db, User
-from models.appendix import Memory
-from models.enums import MemoryEnum
+from models.appendix import Memory, GlobalMemory
+from models.enums import MemoryEnum, GlobalMemoryEnum, AppFeatureFlagEnum
 from exception.validation_error import ValidationError
 from decorators.has_permission_decorator import has_permission, Permission
 from utils import status
@@ -194,3 +194,17 @@ def get_reports():
         "external": external.value if external else [],
         "internal": internal.value if internal else [],
     }
+
+
+def is_feature_active(feature_flag: AppFeatureFlagEnum):
+    # todo: cache this query
+    memory = (
+        db.session.query(GlobalMemory)
+        .filter(GlobalMemory.kind == GlobalMemoryEnum.FEATURE_FLAGS.value)
+        .first()
+    )
+
+    if memory != None:
+        return memory.value.get(feature_flag.value, False)
+
+    return False
