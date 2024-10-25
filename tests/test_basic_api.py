@@ -1,7 +1,9 @@
-from conftest import *
-from models.enums import FeatureEnum, MemoryEnum
+import json
+
+from conftest import get_access, make_headers, session
 from models.prescription import Prescription, PrescriptionAudit
 from security.role import Role
+from tests.utils import utils_test_prescription
 
 SEGMENT = "1"
 DRUG = "5"
@@ -235,7 +237,9 @@ def test_putAggregatePrescriprionsCheckStaging(client):
 
     access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
 
-    prepareTestAggregate(id, admissionNumber, prescriptionid1, prescriptionid2)
+    utils_test_prescription.prepare_test_aggregate(
+        id, admissionNumber, prescriptionid1, prescriptionid2
+    )
 
     """Criando novamente a prescrição agregada."""
 
@@ -298,7 +302,7 @@ def test_putAggregatePrescriprionsCheckStaging(client):
 
 #     access_token = get_access(client, roles=["staging", "cpoe"])
 
-#     prepareTestAggregate(id, admissionNumber, prescriptionid1, prescriptionid2)
+#     utils_test_prescription.prepare_test_aggregate(id, admissionNumber, prescriptionid1, prescriptionid2)
 
 #     pInAg = (
 #         session.query(Prescription)

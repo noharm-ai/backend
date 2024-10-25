@@ -1,7 +1,8 @@
 import json
+import pytest
 from unittest import TestCase
 
-from conftest import get_access, make_headers, pytest
+from conftest import get_access, make_headers
 from security.role import Role
 from tests.utils.utils_test_intervention import (
     dict_expected_before_outcome,

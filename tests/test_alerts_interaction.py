@@ -1,7 +1,7 @@
 from typing import List
 
 from services.alert_interaction_service import find_relations
-from conftest import get_mock_row
+from tests.utils import utils_test_prescription
 
 
 def _mock_get_allergies(data: List[dict]):
@@ -47,9 +47,15 @@ def test_find_relations_drug_interaction_kind_it(monkeypatch):
     """Alertas interação: Testa interação medicamentosa"""
 
     drug_list = [
-        get_mock_row(id_prescription_drug=1, dose=10, drug_name="Drug A"),
-        get_mock_row(id_prescription_drug=2, dose=20, drug_name="Drug B"),
-        get_mock_row(id_prescription_drug=3, dose=20, drug_name="Drug C"),
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=1, dose=10, drug_name="Drug A"
+        ),
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=2, dose=20, drug_name="Drug B"
+        ),
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=3, dose=20, drug_name="Drug C"
+        ),
     ]
 
     monkeypatch.setattr(
@@ -106,9 +112,15 @@ def test_find_relations_drug_interaction_kind_dt(monkeypatch):
     """Alertas interação: Testa interação medicamentosa"""
 
     drug_list = [
-        get_mock_row(id_prescription_drug=1, dose=10, drug_name="Drug A"),
-        get_mock_row(id_prescription_drug=2, dose=20, drug_name="Drug B"),
-        get_mock_row(id_prescription_drug=3, dose=20, drug_name="Drug C"),
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=1, dose=10, drug_name="Drug A"
+        ),
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=2, dose=20, drug_name="Drug B"
+        ),
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=3, dose=20, drug_name="Drug C"
+        ),
     ]
 
     monkeypatch.setattr(
@@ -167,9 +179,15 @@ def test_find_relations_drug_interaction_kind_dm(monkeypatch):
     """Alertas interação: Testa interação medicamentosa"""
 
     drug_list = [
-        get_mock_row(id_prescription_drug=1, dose=10, drug_name="Drug A"),
-        get_mock_row(id_prescription_drug=2, dose=20, drug_name="Drug B"),
-        get_mock_row(id_prescription_drug=3, dose=20, drug_name="Drug C"),
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=1, dose=10, drug_name="Drug A"
+        ),
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=2, dose=20, drug_name="Drug B"
+        ),
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=3, dose=20, drug_name="Drug C"
+        ),
     ]
 
     monkeypatch.setattr(
@@ -215,13 +233,13 @@ def test_find_relations_drug_interaction_kind_iy(monkeypatch):
     """Alertas interação: Testa interação medicamentosa"""
 
     drug_list = [
-        get_mock_row(
+        utils_test_prescription.get_prescription_drug_mock_row(
             id_prescription_drug=1, dose=10, drug_name="Drug A", intravenous=True
         ),
-        get_mock_row(
+        utils_test_prescription.get_prescription_drug_mock_row(
             id_prescription_drug=2, dose=20, drug_name="Drug B", intravenous=True
         ),
-        get_mock_row(
+        utils_test_prescription.get_prescription_drug_mock_row(
             id_prescription_drug=3, dose=20, drug_name="Drug C", intravenous=True
         ),
     ]
@@ -282,7 +300,7 @@ def test_find_relations_drug_interaction_kind_sl(monkeypatch):
     """Alertas interação: Testa interação medicamentosa"""
 
     drug_list = [
-        get_mock_row(
+        utils_test_prescription.get_prescription_drug_mock_row(
             id_prescription_drug=1,
             dose=10,
             drug_name="Drug A",
@@ -290,7 +308,7 @@ def test_find_relations_drug_interaction_kind_sl(monkeypatch):
             solutionGroup="99",
             idPrescription="111",
         ),
-        get_mock_row(
+        utils_test_prescription.get_prescription_drug_mock_row(
             id_prescription_drug=2,
             dose=20,
             drug_name="Drug B",
@@ -298,7 +316,7 @@ def test_find_relations_drug_interaction_kind_sl(monkeypatch):
             solutionGroup="99",
             idPrescription="111",
         ),
-        get_mock_row(
+        utils_test_prescription.get_prescription_drug_mock_row(
             id_prescription_drug=3,
             dose=20,
             drug_name="Drug C",
@@ -363,7 +381,7 @@ def test_find_relations_drug_interaction_kind_rx(monkeypatch):
     """Alertas interação: Testa reatividade cruzada"""
 
     drug_list = [
-        get_mock_row(
+        utils_test_prescription.get_prescription_drug_mock_row(
             id_prescription_drug=2,
             dose=10,
             drug_name="Drug A",
