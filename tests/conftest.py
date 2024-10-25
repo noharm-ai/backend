@@ -1,4 +1,5 @@
 import pytest, json
+import logging
 from mobile import app
 from models.main import User
 from models.enums import FeatureEnum
@@ -20,6 +21,9 @@ from datetime import datetime, timedelta
 from config import Config
 import sqlalchemy
 from sqlalchemy.orm import sessionmaker
+
+logging.basicConfig()
+logging.getLogger("sqlalchemy.engine").setLevel(logging.ERROR)
 
 engine = sqlalchemy.create_engine(Config.POTGRESQL_CONNECTION_STRING)
 DBSession = sessionmaker(bind=engine)

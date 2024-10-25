@@ -1,20 +1,13 @@
-from conftest import client, get_access, make_headers, pytest
-from datetime import datetime
-
-from models.appendix import InterventionReason
-from models.prescription import Intervention
-from security.role import Role
-
 import json
+from unittest import TestCase
 
+from conftest import get_access, make_headers, pytest
+from security.role import Role
 from tests.utils.utils_test_intervention import (
     dict_expected_before_outcome,
-    fields_to_compare_outcome,
     payload_api_set_outcome,
     dict_expected_after_outcome,
-    _get_nested_value,
-    _compare_specific_fields,
-    _compare_json_fields,
+    remove_not_comparable_attributes,
 )
 
 
@@ -66,19 +59,14 @@ def test_outcome_data(client, test_put_interventions):
         query_string=data,
         headers=make_headers(access_token),
     )
+    assert response.status_code == 200
+
     response_data = json.loads(response.data)
 
-    # response_data is what we get from the API
-    # dict_expected_before_outcome is the  data  that we expect to get from the API, except some fieds conatining dates and ids
-    # fields_to_compare is a list of fields that must be compared
-    result_compare = _compare_json_fields(
-        response_data,
-        dict_expected_before_outcome,
-        fields_to_compare_outcome,
-    )
+    remove_not_comparable_attributes(response_data)
+    remove_not_comparable_attributes(dict_expected_before_outcome)
 
-    assert response.status_code == 200
-    assert len(result_compare) == 0
+    TestCase().assertDictEqual(response_data, dict_expected_before_outcome)
 
 
 @pytest.mark.run(order=2)
@@ -96,7 +84,7 @@ def test_set_outcome(client, test_put_interventions):
         data=json.dumps(data),
         headers=make_headers(access_token),
     )
-    data = json.loads(response.data)
+
     assert response.status_code == 200
 
 
@@ -115,16 +103,11 @@ def test_outcome_data_final(client, test_put_interventions):
         headers=make_headers(access_token),
     )
 
+    assert response.status_code == 200
+
     response_data = json.loads(response.data)
 
-    # response_data is what we get from the API
-    # dict_expected_after_outcome is the  data  that we expect to get from the API, except some fieds conatining dates and ids
-    # fields_to_compare is a list of fields that must be compared
-    result_compare = _compare_json_fields(
-        response_data,
-        dict_expected_after_outcome,
-        fields_to_compare_outcome,
-    )
+    remove_not_comparable_attributes(response_data)
+    remove_not_comparable_attributes(dict_expected_after_outcome)
 
-    assert response.status_code == 200
-    assert len(result_compare) == 0
+    TestCase().assertDictEqual(response_data, dict_expected_before_outcome)
