@@ -689,20 +689,22 @@ def _alert_liver(
         text="",
     )
 
-    if (
-        "tgp" in exams
-        and exams["tgp"]["value"]
-        and float(exams["tgp"]["value"]) > drug_attributes.liver
-    ) or (
-        "tgo" in exams
-        and exams["tgo"]["value"]
-        and float(exams["tgo"]["value"]) > drug_attributes.liver
-    ):
+    tgp = (
+        float(exams["tgp"]["value"]) if "tgp" in exams and exams["tgp"]["value"] else 0
+    )
+    tgo = (
+        float(exams["tgo"]["value"]) if "tgo" in exams and exams["tgo"]["value"] else 0
+    )
+
+    if tgp > drug_attributes.liver or tgo > drug_attributes.liver:
+        exam_name = "TGP" if tgp > tgo else "TGO"
+        exam_value = tgp if tgp > tgo else tgo
+
         alert[
             "text"
         ] = f"""
-            Medicamento deve sofrer ajuste de posologia ou contraindicado, já que a função hepática do paciente 
-            está reduzida (acima de {str(drug_attributes.liver)} U/L).
+            Medicamento deve sofrer ajuste de posologia, exige monitoramento ou é contraindicado para paciente com função hepática reduzida.<br/>
+            Paciente com alteração nas transaminases ({exam_name} {stringutils.strFormatBR(exam_value)} U/L).
         """
 
         return alert
