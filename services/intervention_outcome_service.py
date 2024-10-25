@@ -39,7 +39,12 @@ def set_intervention_outcome(
     destiny_data,
     id_prescription_drug_destiny,
 ):
-    intervention: Intervention = Intervention.query.get(id_intervention)
+    intervention: Intervention = (
+        db.session.query(Intervention)
+        .filter(Intervention.idIntervention == id_intervention)
+        .first()
+    )
+
     if not intervention:
         raise ValidationError(
             "Registro inválido",
@@ -284,7 +289,7 @@ def get_outcome_data(id_intervention, user_context: User, edit=False):
             InterventionReasonParent.id == InterventionReason.mamy,
         )
         .filter(InterventionReason.id == func.any(Intervention.idInterventionReason))
-        .as_scalar()
+        .scalar_subquery()
     )
 
     record = (
