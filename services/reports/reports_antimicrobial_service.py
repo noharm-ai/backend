@@ -69,7 +69,7 @@ def get_history(admission_number: int, user_context: User):
                     AND ma.antimicro = TRUE
                 ORDER BY
                     p.dtprescricao desc
-                limit 2000
+                limit 1000
             ) antimicro
             JOIN {user_context.schema}.medicamento m ON antimicro.fkmedicamento = m.fkmedicamento
             LEFT OUTER JOIN public.substancia s ON m.sctid = s.sctid
