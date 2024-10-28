@@ -18,6 +18,7 @@ from models.enums import (
     FeatureEnum,
     PrescriptionReviewTypeEnum,
     PrescriptionAuditTypeEnum,
+    AppFeatureFlagEnum,
 )
 from utils.drug_list import DrugList
 from services import (
@@ -31,24 +32,26 @@ from services import (
     alert_service,
     feature_service,
 )
-from utils import prescriptionutils, dateutils, stringutils, status
+from utils import prescriptionutils, dateutils, status
 
 
 @has_permission(Permission.READ_PRESCRIPTION)
-def route_get_prescription(id_prescription):
-    return internal_get_prescription(idPrescription=id_prescription, is_complete=True)
+def route_get_prescription(id_prescription: int, user_context: User = None):
+    return internal_get_prescription(
+        idPrescription=id_prescription, is_complete=True, user_context=user_context
+    )
 
 
 @has_permission(Permission.READ_STATIC)
-def static_get_prescription(idPrescription=None):
+def static_get_prescription(idPrescription: int, user_context: User = None):
     return internal_get_prescription(
-        idPrescription=idPrescription,
-        is_complete=False,
+        idPrescription=idPrescription, is_complete=False, user_context=user_context
     )
 
 
 def internal_get_prescription(
-    idPrescription=None,
+    idPrescription: int,
+    user_context: User,
     is_complete=False,
 ):
     start_date = datetime.now()
@@ -176,20 +179,27 @@ def internal_get_prescription(
             admission_date=patient.admissionDate,
         )
 
-    notesSigns = None
-    notesInfo = None
+    notesSigns = {}
+    notesInfo = {}
     notesAllergies = []
     notesDialysis = None
 
     if cn_count > 0 and is_complete:
-        # TODO: add cache
+        is_cache_active = memory_service.is_feature_active(
+            AppFeatureFlagEnum.REDIS_CACHE
+        )
+
         if cn_stats.get("signs", 0) != 0:
             notesSigns = clinical_notes_queries_service.get_signs(
-                admission_number=prescription[0].admissionNumber
+                admission_number=prescription[0].admissionNumber,
+                user_context=user_context,
+                cache=is_cache_active,
             )
 
         notesInfo = clinical_notes_queries_service.get_infos(
-            admission_number=prescription[0].admissionNumber
+            admission_number=prescription[0].admissionNumber,
+            user_context=user_context,
+            cache=is_cache_active,
         )
         allergies = clinical_notes_queries_service.get_allergies(
             admission_number=prescription[0].admissionNumber,
@@ -409,10 +419,14 @@ def internal_get_prescription(
         ),
         "clinicalNotes": cn_count,
         "complication": cn_stats.get("complication", 0),
-        "notesSigns": stringutils.strNone(notesSigns[0]) if notesSigns else "",
-        "notesSignsDate": notesSigns[1].isoformat() if notesSigns else None,
-        "notesInfo": stringutils.strNone(notesInfo[0]) if notesInfo else "",
-        "notesInfoDate": notesInfo[1].isoformat() if notesInfo else None,
+        "notesSigns": notesSigns.get("data", ""),
+        "notesSignsId": notesSigns.get("id", None),
+        "notesSignsDate": notesSigns.get("date", None),
+        "notesSignsCache": notesSigns.get("cache", False),
+        "notesInfo": notesInfo.get("data", ""),
+        "notesInfoId": notesInfo.get("id", None),
+        "notesInfoDate": notesInfo.get("date", None),
+        "notesInfoCache": notesInfo.get("cache", False),
         "notesAllergies": notesAllergies,
         "notesAllergiesDate": notesAllergies[0]["date"] if notesAllergies else None,
         "notesDialysis": notesDialysis,

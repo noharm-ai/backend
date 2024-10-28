@@ -184,9 +184,8 @@ def upsert_user(data: dict, user_context: User, user_permissions: List[Permissio
         return _get_user_data(newUser.id)
     else:
         updatedUser = db.session.query(User).filter(User.id == idUser).first()
-        current_roles = []
         current_features = []
-        new_roles = data.get("roles", [])
+        new_roles = _remove_legacy_roles(data.get("roles", []))
         new_features = data.get("features", [])
 
         if updatedUser is None:
@@ -255,6 +254,35 @@ def upsert_user(data: dict, user_context: User, user_permissions: List[Permissio
         )
 
         return _get_user_data(updatedUser.id)
+
+
+def _remove_legacy_roles(roles):
+    legacy_roles = [
+        "alert-bt",
+        "beta-cards",
+        "care",
+        "concilia",
+        "cpoe",
+        "doctor",
+        "noimit",
+        "nolimit",
+        "oauth-test",
+        "prescriptionEdit",
+        "presmed-form",
+        "readonly",
+        "service-user",
+        "staging",
+        "summary",
+        "suporte",
+        "transcription",
+        "userAdmin",
+    ]
+
+    for lr in legacy_roles:
+        if lr in roles:
+            roles.remove(lr)
+
+    return roles
 
 
 def _has_valid_roles(roles):

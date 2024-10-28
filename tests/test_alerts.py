@@ -1,10 +1,10 @@
+import pytest
 from datetime import datetime
 
-from conftest import *
 from models.prescription import Frequency
 from models.enums import DrugAlertTypeEnum, DrugAlertLevelEnum
 from services import alert_service
-from conftest import get_mock_row
+from tests.utils import utils_test_prescription
 
 
 def test_dosemaxplus():
@@ -13,10 +13,14 @@ def test_dosemaxplus():
     drugs = []
 
     drugs.append(
-        get_mock_row(id_prescription_drug=61, dose=10, frequency=1, max_dose=10)
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=61, dose=10, frequency=1, max_dose=10
+        )
     )
     drugs.append(
-        get_mock_row(id_prescription_drug=62, dose=10, frequency=1, max_dose=10)
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=62, dose=10, frequency=1, max_dose=10
+        )
     )
 
     exams = {"age": 50, "weight": 80}
@@ -91,7 +95,7 @@ def test_max_dose_total_additional(
     doses, frequencies, max_dose, weight, use_weight, expire_dates, expected_alert
 ):
     drugs = [
-        get_mock_row(
+        utils_test_prescription.get_prescription_drug_mock_row(
             id_prescription_drug=i + 1,
             dose=dose,
             frequency=freq,
@@ -141,7 +145,9 @@ def test_dosemax():
     drugs = []
 
     drugs.append(
-        get_mock_row(id_prescription_drug=61, dose=20, frequency=1, max_dose=10)
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=61, dose=20, frequency=1, max_dose=10
+        )
     )
 
     exams = {"age": 50, "weight": 80}
@@ -182,7 +188,7 @@ def test_max_dose_additional(
     dose, frequency, max_dose, weight, use_weight, expected_alert
 ):
     drugs = [
-        get_mock_row(
+        utils_test_prescription.get_prescription_drug_mock_row(
             id_prescription_drug=61,
             dose=dose,
             frequency=frequency,
@@ -222,12 +228,12 @@ def test_kidney_dialysis():
     drugs = []
 
     drugs.append(
-        get_mock_row(
+        utils_test_prescription.get_prescription_drug_mock_row(
             id_prescription_drug=61, dose=10, frequency=1, max_dose=20, kidney=True
         )
     )
     drugs.append(
-        get_mock_row(
+        utils_test_prescription.get_prescription_drug_mock_row(
             id_prescription_drug=62, dose=10, frequency=1, max_dose=20, kidney=True
         )
     )
@@ -265,7 +271,7 @@ def test_kidney_ckd():
     drugs = []
 
     drugs.append(
-        get_mock_row(
+        utils_test_prescription.get_prescription_drug_mock_row(
             id_prescription_drug=61, dose=10, frequency=1, max_dose=20, kidney=10
         )
     )
@@ -299,7 +305,7 @@ def test_kidney_swrtz2():
     drugs = []
 
     drugs.append(
-        get_mock_row(
+        utils_test_prescription.get_prescription_drug_mock_row(
             id_prescription_drug=61, dose=10, frequency=1, max_dose=20, kidney=10
         )
     )
@@ -333,7 +339,7 @@ def test_kidney_swrtz1():
     drugs = []
 
     drugs.append(
-        get_mock_row(
+        utils_test_prescription.get_prescription_drug_mock_row(
             id_prescription_drug=61, dose=10, frequency=1, max_dose=20, kidney=10
         )
     )
@@ -377,7 +383,9 @@ def test_kidney_alert_multiple(
 ):
 
     drugs = [
-        get_mock_row(id_prescription_drug=1, dose=ckd_value, kidney=kidney_threshold)
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=1, dose=ckd_value, kidney=kidney_threshold
+        )
     ]
     exams = {
         "age": age,
@@ -410,8 +418,16 @@ def test_liver():
 
     drugs = []
 
-    drugs.append(get_mock_row(id_prescription_drug=61, dose=10, frequency=1, liver=1.1))
-    drugs.append(get_mock_row(id_prescription_drug=62, dose=10, frequency=1, liver=1.1))
+    drugs.append(
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=61, dose=10, frequency=1, liver=1.1
+        )
+    )
+    drugs.append(
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=62, dose=10, frequency=1, liver=1.1
+        )
+    )
 
     exams = {"tgp": {"value": 3.0}, "weight": 80}
 
@@ -446,10 +462,14 @@ def test_platelets():
     drugs = []
 
     drugs.append(
-        get_mock_row(id_prescription_drug=61, dose=10, frequency=1, platelets=10.1)
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=61, dose=10, frequency=1, platelets=10.1
+        )
     )
     drugs.append(
-        get_mock_row(id_prescription_drug=62, dose=10, frequency=1, platelets=10.1)
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=62, dose=10, frequency=1, platelets=10.1
+        )
     )
 
     exams = {"plqt": {"value": 3.0}, "weight": 80}
@@ -485,10 +505,14 @@ def test_elderly():
     drugs = []
 
     drugs.append(
-        get_mock_row(id_prescription_drug=61, dose=10, frequency=1, elderly=True)
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=61, dose=10, frequency=1, elderly=True
+        )
     )
     drugs.append(
-        get_mock_row(id_prescription_drug=62, dose=10, frequency=1, elderly=True)
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=62, dose=10, frequency=1, elderly=True
+        )
     )
     exams = {"weight": 80, "age": 68}
 
@@ -523,8 +547,16 @@ def test_tube():
 
     drugs = []
 
-    drugs.append(get_mock_row(id_prescription_drug=61, dose=10, frequency=1, tube=True))
-    drugs.append(get_mock_row(id_prescription_drug=62, dose=10, frequency=1, tube=True))
+    drugs.append(
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=61, dose=10, frequency=1, tube=True
+        )
+    )
+    drugs.append(
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=62, dose=10, frequency=1, tube=True
+        )
+    )
     exams = {"weight": 80, "tube": True}
 
     alerts = alert_service.find_alerts(
@@ -559,10 +591,14 @@ def test_allergy():
     drugs = []
 
     drugs.append(
-        get_mock_row(id_prescription_drug=61, dose=10, frequency=1, allergy="S")
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=61, dose=10, frequency=1, allergy="S"
+        )
     )
     drugs.append(
-        get_mock_row(id_prescription_drug=62, dose=10, frequency=1, allergy="S")
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=62, dose=10, frequency=1, allergy="S"
+        )
     )
     exams = {"weight": 80}
 
@@ -598,7 +634,7 @@ def test_ira():
 
     drugs = []
     drugs.append(
-        get_mock_row(
+        utils_test_prescription.get_prescription_drug_mock_row(
             id_prescription_drug=61, dose=10, frequency=10, drug_name="xxx vancoyyy"
         )
     )
@@ -646,7 +682,7 @@ def test_ira_alert_conditions(test_input, expected_alert):
 
     drugs = []
     drugs.append(
-        get_mock_row(
+        utils_test_prescription.get_prescription_drug_mock_row(
             id_prescription_drug=61, dose=dose, frequency=1, drug_name="Vancomicina"
         )
     )
@@ -691,10 +727,14 @@ def test_pregnant():
     drugs = []
 
     drugs.append(
-        get_mock_row(id_prescription_drug=61, dose=10, frequency=1, pregnant="D")
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=61, dose=10, frequency=1, pregnant="D"
+        )
     )
     drugs.append(
-        get_mock_row(id_prescription_drug=62, dose=10, frequency=1, pregnant="X")
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=62, dose=10, frequency=1, pregnant="X"
+        )
     )
 
     exams = {"weight": 80}
@@ -731,10 +771,14 @@ def test_lactating():
     drugs = []
 
     drugs.append(
-        get_mock_row(id_prescription_drug=61, dose=10, frequency=1, lactating="3")
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=61, dose=10, frequency=1, lactating="3"
+        )
     )
     drugs.append(
-        get_mock_row(id_prescription_drug=62, dose=10, frequency=1, lactating="3")
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=62, dose=10, frequency=1, lactating="3"
+        )
     )
 
     exams = {"weight": 80}
@@ -775,7 +819,9 @@ def test_fasting():
     freq_obj.fasting = False
 
     drugs.append(
-        get_mock_row(id_prescription_drug=61, dose=10, interval="12", freq_obj=freq_obj)
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=61, dose=10, interval="12", freq_obj=freq_obj
+        )
     )
 
     exams = {"weight": 80}

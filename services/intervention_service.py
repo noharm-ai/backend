@@ -57,7 +57,7 @@ def get_interventions(
         .select_from(InterventionReason)
         .outerjoin(mReasion, mReasion.id == InterventionReason.mamy)
         .filter(InterventionReason.id == func.any(Intervention.idInterventionReason))
-        .as_scalar()
+        .scalar_subquery()
     )
 
     splitStr = "!?"
@@ -66,7 +66,7 @@ def get_interventions(
         db.session.query(func.concat(dr1.name, splitStr, dr1.id))
         .select_from(dr1)
         .filter(dr1.id == func.any(Intervention.interactions))
-        .as_scalar()
+        .scalar_subquery()
     )
 
     PrescriptionB = db.aliased(Prescription)
