@@ -1,7 +1,6 @@
 from flask import Blueprint, request
 from markupsafe import escape
 
-
 from services import conciliation_service
 from decorators.api_endpoint_decorator import api_endpoint
 
@@ -26,3 +25,15 @@ def list_available():
     return conciliation_service.list_available(
         admission_number=request.args.get("admissionNumber", None)
     )
+
+
+@app_conciliation.route("/conciliation/copy", methods=["POST"])
+@api_endpoint()
+def copy():
+    data = request.get_json()
+
+    conciliation_service.copy_conciliation(
+        id_prescription=data.get("idPrescription", None)
+    )
+
+    return True
