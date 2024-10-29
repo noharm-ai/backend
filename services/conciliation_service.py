@@ -2,10 +2,14 @@ from datetime import datetime
 from sqlalchemy import desc
 
 from models.main import db, User
-from models.prescription import Prescription, Patient
+from models.prescription import Prescription, Patient, PrescriptionDrug
 from models.enums import FeatureEnum, PatientConciliationStatusEnum
 from utils import status, prescriptionutils
-from services import memory_service, prescription_agg_service
+from services import (
+    memory_service,
+    prescription_agg_service,
+    prescription_drug_edit_service,
+)
 from exception.validation_error import ValidationError
 from decorators.has_permission_decorator import has_permission, Permission
 
@@ -101,3 +105,86 @@ def list_available(admission_number: int):
         c_list.append({"id": str(p.id), "date": p.date.isoformat(), "status": p.status})
 
     return c_list
+
+
+@has_permission(Permission.WRITE_PRESCRIPTION)
+def copy_conciliation(id_prescription: int, user_context: User):
+    if not memory_service.has_feature(FeatureEnum.CONCILIATION_EDIT.value):
+        raise ValidationError(
+            "Feature desabilitada",
+            "errors.unauthorizedFeature",
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
+    prescription = (
+        db.session.query(Prescription)
+        .filter(Prescription.id == id_prescription)
+        .first()
+    )
+
+    if prescription == None:
+        raise ValidationError(
+            "Conciliação inexistente",
+            "errors.invalidRecord",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    if prescription.concilia == None:
+        raise ValidationError(
+            "Conciliação inválida",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    admissions = (
+        db.session.query(Patient)
+        .filter(Patient.idPatient == prescription.idPatient)
+        .order_by(desc(Patient.admissionDate))
+        .limit(2)
+        .all()
+    )
+
+    admission_list = [int(prescription.admissionNumber)]
+    for a in admissions:
+        admission_list.append(int(a.admissionNumber))
+
+    from_conciliation = (
+        db.session.query(Prescription)
+        .filter(Prescription.id != id_prescription)
+        .filter(Prescription.admissionNumber.in_(admission_list))
+        .filter(Prescription.concilia != None)
+        .filter(Prescription.date < prescription.date)
+        .order_by(desc(Prescription.date))
+        .first()
+    )
+
+    if from_conciliation == None:
+        raise ValidationError(
+            "Não foi encontrada conciliação anterior para este paciente",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    items = (
+        db.session.query(PrescriptionDrug)
+        .filter(PrescriptionDrug.idPrescription == from_conciliation.id)
+        .filter(PrescriptionDrug.suspendedDate == None)
+        .all()
+    )
+
+    for i in items:
+        data = {
+            "idPrescription": id_prescription,
+            "source": i.source,
+            "idDrug": i.idDrug,
+            "dose": i.dose,
+            "measureUnit": i.idMeasureUnit,
+            "frequency": i.idFrequency,
+            "interval": i.interval,
+            "route": i.route,
+            "recommendation": i.notes,
+        }
+
+        prescription_drug_edit_service.createPrescriptionDrug(
+            data=data, user_context=user_context
+        )
