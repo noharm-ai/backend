@@ -3,7 +3,11 @@ from markupsafe import escape as escape_html
 from datetime import datetime
 
 from models.main import db, User
-from services import prescription_agg_service, prescription_check_service
+from services import (
+    prescription_agg_service,
+    prescription_check_service,
+    prescription_stats_service,
+)
 from exception.validation_error import ValidationError
 from exception.authorization_error import AuthorizationError
 from utils import status, sessionutils
@@ -95,3 +99,29 @@ def static_prescription_status():
         p_status=p_status,
         id_origin_user=id_origin_user,
     )
+
+
+@app_stc.route("/static/stats", methods=["GET"])
+def get_stats():
+    user_context = User()
+    user_context.config = {"roles": ["STATIC_USER"]}
+    g.user_context = user_context
+    g.is_cpoe = False
+
+    try:
+        stats = prescription_stats_service.get_prescription_stats(
+            idPrescription=request.args.get("idPrescription", None),
+            schema=request.args.get("schema", None),
+        )
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+    except AuthorizationError as e:
+        return {
+            "status": "error",
+            "message": "Usuário inválido",
+            "code": "errors.unauthorized",
+        }, status.HTTP_401_UNAUTHORIZED
+
+    db.session.rollback()
+
+    return stats

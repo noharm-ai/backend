@@ -87,6 +87,7 @@ def getFeatures(result, agg_date: datetime = None, intervals_for_agg_date=False)
     drug_attributes = {}
     alert_levels = []
     alert_level = "low"
+    department_list = set()
 
     for attr in get_numeric_drug_attributes_list():
         drug_attributes[attr] = 0
@@ -116,7 +117,7 @@ def getFeatures(result, agg_date: datetime = None, intervals_for_agg_date=False)
         score3 += int(int(d["score"]) > 2)
         am += int(d["am"]) if not d["am"] is None else 0
         av += int(d["av"]) if not d["av"] is None else 0
-        np += int(d["np"]) if not d["np"] is None and not d["existIntervention"] else 0
+        np += int(d["np"]) if not d["np"] is None else 0
         control += int(d["c"]) if not d["c"] is None else 0
         diff += int(not d["checked"])
         tube += int(d["tubeAlert"])
@@ -151,6 +152,8 @@ def getFeatures(result, agg_date: datetime = None, intervals_for_agg_date=False)
         for a in d["alertsComplete"]:
             alert_levels.append(a["level"])
 
+        department_list.add(d["idDepartment"])
+
     interventions = 0
     for i in result["interventions"]:
         interventions += int(i["status"] == "s")
@@ -171,15 +174,6 @@ def getFeatures(result, agg_date: datetime = None, intervals_for_agg_date=False)
 
         if "high" in alert_levels:
             alert_level = "high"
-
-    p_dates = []
-    if "headers" in result:
-        for p_id in result["headers"]:
-            header = result["headers"][p_id]
-            if "date" in header:
-                p_dates.append(header["date"])
-
-        p_dates.sort()
 
     return {
         "alergy": allergy,
@@ -209,8 +203,8 @@ def getFeatures(result, agg_date: datetime = None, intervals_for_agg_date=False)
         "processedDate": datetime.today().isoformat(),
         "totalItens": len(drugList),
         "drugAttributes": drug_attributes,
-        "lastPrescriptionDate": p_dates[-1] if len(p_dates) > 0 else None,
         "intervals": intervals,
+        "departmentList": list(department_list),
     }
 
 
