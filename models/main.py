@@ -171,6 +171,7 @@ class Drug(db.Model):
     name = db.Column("nome", db.String, nullable=False)
     sctid = db.Column("sctid", db.BigInteger, nullable=True)
     ai_accuracy = db.Column("ia_acuracia", db.Float, nullable=True)
+    source = db.Column("origem", db.String, nullable=True)
     created_by = db.Column("created_by", db.BigInteger, nullable=True)
     updated_by = db.Column("updated_by", db.BigInteger, nullable=True)
     created_at = db.Column("created_at", db.DateTime, nullable=False)

@@ -38,6 +38,7 @@ def get_drug_list(
     has_ai_substance=None,
     ai_accuracy_range=None,
     has_max_dose=None,
+    source_list=None,
 ):
     SegmentOutlier = db.aliased(Segment)
     ConversionsAgg = db.aliased(MeasureUnitConvert)
@@ -222,6 +223,9 @@ def get_drug_list(
 
     if id_segment_list and len(id_segment_list) > 0:
         q = q.filter(DrugAttributes.idSegment.in_(id_segment_list))
+
+    if source_list and len(source_list) > 0:
+        q = q.filter(Drug.source.in_(source_list))
 
     return q.order_by(Drug.name, Segment.description).limit(limit).offset(offset).all()
 

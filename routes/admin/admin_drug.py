@@ -26,6 +26,7 @@ def get_drug_list():
         substance=request_data.get("substance", None),
         id_segment_list=request_data.get("idSegmentList", None),
         has_max_dose=request_data.get("hasMaxDose", None),
+        source_list=request_data.get("sourceList", []),
         limit=request_data.get("limit", 10),
         offset=request_data.get("offset", 0),
     )

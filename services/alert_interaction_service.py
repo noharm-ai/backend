@@ -2,7 +2,7 @@ from datetime import datetime
 from sqlalchemy import text
 from typing import List
 
-from models.prescription import PrescriptionDrug
+from models.prescription import PrescriptionDrug, DrugAttributes
 from models.main import db, Drug, Substance, Allergy
 from models.enums import DrugTypeEnum, DrugAlertLevelEnum
 from utils import examutils, stringutils
@@ -219,7 +219,9 @@ def _filter_drug_list(drug_list):
 
     for item in drug_list:
         prescription_drug: PrescriptionDrug = item[0]
+        drug_attributes: DrugAttributes = item[6]
         drug: Drug = item[1]
+
         if prescription_drug.source not in valid_sources:
             continue
 
@@ -227,6 +229,13 @@ def _filter_drug_list(drug_list):
             continue
 
         if drug == None or drug.sctid == None:
+            continue
+
+        if (
+            drug_attributes != None
+            and drug_attributes.whiteList
+            and not prescription_drug.source == DrugTypeEnum.SOLUTION.value
+        ):
             continue
 
         filtered_list.append(item)
