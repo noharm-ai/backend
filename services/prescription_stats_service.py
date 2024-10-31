@@ -1,20 +1,17 @@
-import logging
 from datetime import datetime, date
 from flask_sqlalchemy.session import Session
 from sqlalchemy import text
 
 from decorators.has_permission_decorator import has_permission, Permission
 from exception.validation_error import ValidationError
-from models.main import db, User, dbSession
+from models.main import db, dbSession
 from models.prescription import (
     Prescription,
     Patient,
     PrescriptionDrug,
 )
 from models.segment import Exams
-from models.enums import (
-    MemoryEnum,
-)
+from models.enums import MemoryEnum, FeatureEnum, DrugTypeEnum
 from utils.drug_list import DrugList
 from services import (
     memory_service,
@@ -29,195 +26,72 @@ from utils import prescriptionutils, dateutils, status
 
 @has_permission(Permission.READ_STATIC)
 def get_prescription_stats(
-    idPrescription: int,
+    id_prescription: int,
     schema: str,
-    user_context: User = None,
 ):
     _set_schema(schema)
 
-    start_date = datetime.now()
-
-    prescription = Prescription.getPrescription(idPrescription)
-    if prescription is None:
+    prescription_data = (
+        db.session.query(Prescription, Patient)
+        .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)
+        .filter(Prescription.id == id_prescription)
+        .first()
+    )
+    if prescription_data is None:
         raise ValidationError(
             "Prescrição inexistente",
             "errors.invalidRecord",
             status.HTTP_400_BAD_REQUEST,
         )
 
-    is_cpoe = feature_service.is_cpoe()
-    is_pmc = memory_service.has_feature("PRIMARYCARE")
+    prescription: Prescription = prescription_data[0]
+    patient: Patient = prescription_data[1]
+    configs = _get_configs(prescription=prescription, patient=patient)
 
-    patient = prescription[1]
-    patientWeight = None
-    patientHeight = None
-
-    if patient is None:
-        patient = Patient()
-        patient.idPatient = prescription[0].idPatient
-        patient.admissionNumber = prescription[0].admissionNumber
-
-    if patient.weight != None:
-        patientWeight = patient.weight
-        patientHeight = patient.height
-
-    _log_perf(start_date, "GET PRESCRIPTION")
-
-    start_date = datetime.now()
-    drugs = PrescriptionDrug.findByPrescription(
-        prescription[0].id,
-        patient.admissionNumber,
-        prescription[0].date if prescription[0].agg else None,
-        prescription[0].idSegment,
-        is_cpoe,
-        is_pmc,
-    )
     interventions = intervention_service.get_interventions(
         admissionNumber=patient.admissionNumber
     )
-    _log_perf(start_date, "GET DRUGS AND INTERVENTIONS")
 
-    # get memory configurations
-    start_date = datetime.now()
-    memory_itens = memory_service.get_by_kind(
-        [
-            MemoryEnum.MAP_SCHEDULES_FASTING.value,
-        ]
+    cn_data = _get_clinical_notes_stats(
+        prescription=prescription, patient=patient, configs=configs
     )
-
-    schedules_fasting = memory_itens.get(MemoryEnum.MAP_SCHEDULES_FASTING.value, [])
-    _log_perf(start_date, "GET MEMORY CONFIG")
-
-    start_date = datetime.now()
-
-    p_cache: Prescription = (
-        db.session.query(Prescription)
-        .filter(
-            Prescription.id
-            == prescriptionutils.gen_agg_id(
-                admission_number=prescription[0].admissionNumber,
-                id_segment=prescription[0].idSegment,
-                pdate=datetime.today(),
-            )
-        )
-        .first()
+    exam_data = _get_exams(patient=patient, prescription=prescription, configs=configs)
+    drug_data = _get_drug_data(
+        prescription=prescription,
+        patient=patient,
+        configs=configs,
+        exam_data=exam_data,
+        interventions=interventions,
     )
-
-    if (
-        p_cache != None
-        and p_cache.features != None
-        and p_cache.features.get("clinicalNotesStats", None) != None
-    ):
-        cn_stats = p_cache.features.get("clinicalNotesStats")
-    else:
-        cn_stats = clinical_notes_service.get_admission_stats(
-            admission_number=prescription[0].admissionNumber,
-        )
-
-    if (
-        p_cache != None
-        and p_cache.features != None
-        and p_cache.features.get("clinicalNotes", 0) != 0
-    ):
-        cn_count = p_cache.features.get("clinicalNotes", 0)
-    else:
-        cn_count = clinical_notes_service.get_count(
-            admission_number=prescription[0].admissionNumber,
-            admission_date=patient.admissionDate,
-        )
-
-    _log_perf(start_date, "GET CLINICAL NOTES")
-
-    start_date = datetime.now()
-
-    exams = Exams.findLatestByAdmission(
-        patient, prescription[0].idSegment, prevEx=False
-    )
-    age = dateutils.data2age(
-        patient.birthdate.isoformat() if patient.birthdate else date.today().isoformat()
-    )
-
-    examsJson = []
-    alertExams = 0
-    for e in exams:
-        examsJson.append({"key": e, "value": exams[e]})
-        alertExams += int(exams[e]["alert"])
-
-    exams = dict(
-        exams, **{"age": age, "weight": patientWeight, "height": patientHeight}
-    )
-    _log_perf(start_date, "ALLERGIES AND EXAMS")
-
-    start_date = datetime.now()
-    relations = alert_interaction_service.find_relations(
-        drug_list=drugs, is_cpoe=is_cpoe, id_patient=patient.idPatient
-    )
-    alerts = alert_service.find_alerts(
-        drug_list=drugs,
-        exams=exams,
-        dialisys=patient.dialysis,
-        pregnant=patient.pregnant,
-        lactating=patient.lactating,
-        schedules_fasting=schedules_fasting,
-    )
-
-    drugList = DrugList(
-        drugs,
-        interventions,
-        relations,
-        exams,
-        prescription[0].agg,
-        patient.dialysis,
-        alerts,
-        is_cpoe,
-    )
-    _log_perf(start_date, "ALERTS")
-
-    pDrugs = drugList.getDrugType([], ["Medicamentos"])
-    pSolution = drugList.getDrugType([], ["Soluções"])
-    pProcedures = drugList.getDrugType([], ["Proced/Exames"])
-    pDiet = drugList.getDrugType([], ["Dietas"])
-
-    drugList.sumAlerts()
 
     p_data = {
-        "idPrescription": str(prescription[0].id),
-        "agg": prescription[0].agg,
-        "concilia": prescription[0].concilia,
-        "admissionNumber": prescription[0].admissionNumber,
+        "idPrescription": str(prescription.id),
+        "agg": prescription.agg,
+        "concilia": prescription.concilia,
+        "admissionNumber": prescription.admissionNumber,
         "dischargeDate": (
             patient.dischargeDate.isoformat() if patient.dischargeDate else None
         ),
-        "date": prescription[0].date.isoformat(),
-        "expire": (
-            prescription[0].expire.isoformat() if prescription[0].expire else None
-        ),
-        "prescription": pDrugs,
-        "solution": pSolution,
-        "procedures": pProcedures,
-        "diet": pDiet,
+        "date": prescription.date.isoformat(),
+        "expire": (prescription.expire.isoformat() if prescription.expire else None),
+        "prescription": drug_data["source"][DrugTypeEnum.DRUG.value],
+        "solution": drug_data["source"][DrugTypeEnum.SOLUTION.value],
+        "procedures": drug_data["source"][DrugTypeEnum.PROCEDURE.value],
+        "diet": drug_data["source"][DrugTypeEnum.DIET.value],
         "interventions": interventions,
-        "alertExams": alertExams,
-        "status": prescription[0].status,
-        "clinicalNotes": cn_count,
-        "complication": cn_stats.get("complication", 0),
-        "clinicalNotesStats": cn_stats,
-        "alertStats": drugList.alertStats,
+        "alertExams": exam_data["alerts"],
+        "status": prescription.status,
+        "clinicalNotes": cn_data["cn_count"],
+        "complication": cn_data["cn_stats"].get("complication", 0),
+        "clinicalNotesStats": cn_data["cn_stats"],
+        "alertStats": drug_data["drug_list"].alertStats,
     }
 
     return prescriptionutils.getFeatures(
         result=p_data,
-        agg_date=prescription[0].date if prescription[0].agg else None,
-        intervals_for_agg_date=prescription[0].agg,
+        agg_date=prescription.date if prescription.agg else None,
+        intervals_for_agg_date=prescription.agg,
     )
-
-
-def _log_perf(start_date, section):
-    end_date = datetime.now()
-    logging.basicConfig()
-    logger = logging.getLogger("noharm.backend")
-
-    logger.debug(f"PERF {section}: {(end_date-start_date).total_seconds()}")
 
 
 def _set_schema(schema):
@@ -239,3 +113,152 @@ def _set_schema(schema):
     db_session.close()
 
     dbSession.setSchema(schema)
+
+
+def _get_configs(prescription: Prescription, patient: Patient):
+    data = {}
+
+    # memory
+    memory_itens = memory_service.get_by_kind(
+        [MemoryEnum.MAP_SCHEDULES_FASTING.value, MemoryEnum.FEATURES.value]
+    )
+    data["schedules_fasting"] = memory_itens.get(
+        MemoryEnum.MAP_SCHEDULES_FASTING.value, []
+    )
+    data["is_pmc"] = FeatureEnum.PRIMARY_CARE.value in memory_itens.get(
+        MemoryEnum.FEATURES.value, []
+    )
+
+    data["is_cpoe"] = feature_service.is_cpoe()
+
+    # patient data
+    data["weight"] = patient.weight if patient.weight else None
+    data["height"] = patient.height if patient.height else None
+    data["age"] = dateutils.data2age(
+        patient.birthdate.isoformat() if patient.birthdate else date.today().isoformat()
+    )
+
+    # features cache
+    p_cache = (
+        db.session.query(Prescription)
+        .filter(
+            Prescription.id
+            == prescriptionutils.gen_agg_id(
+                admission_number=prescription.admissionNumber,
+                id_segment=prescription.idSegment,
+                pdate=datetime.today(),
+            )
+        )
+        .first()
+    )
+    if p_cache != None and p_cache.features != None:
+        data["features_cache"] = p_cache.features
+    else:
+        data["features_cache"] = {}
+
+    return data
+
+
+def _get_exams(patient: Patient, prescription: Prescription, configs: dict):
+    exams = Exams.findLatestByAdmission(patient, prescription.idSegment, prevEx=False)
+
+    examsJson = []
+    alertExams = 0
+    for e in exams:
+        examsJson.append({"key": e, "value": exams[e]})
+        alertExams += int(exams[e]["alert"])
+
+    exams = dict(
+        exams,
+        **{
+            "age": configs["age"],
+            "weight": configs["weight"],
+            "height": configs["height"],
+        },
+    )
+
+    return {"exams": exams, "alerts": alertExams}
+
+
+def _get_drug_data(
+    prescription: Prescription,
+    patient: Patient,
+    configs: dict,
+    exam_data: dict,
+    interventions,
+):
+    drugs = PrescriptionDrug.findByPrescription(
+        idPrescription=prescription.id,
+        admissionNumber=patient.admissionNumber,
+        aggDate=prescription.date if prescription.agg else None,
+        idSegment=prescription.idSegment,
+        is_cpoe=configs.get("is_cpoe"),
+        is_pmc=configs.get("is_pmc"),
+    )
+
+    relations = alert_interaction_service.find_relations(
+        drug_list=drugs, is_cpoe=configs["is_cpoe"], id_patient=patient.idPatient
+    )
+
+    alerts = alert_service.find_alerts(
+        drug_list=drugs,
+        exams=exam_data["exams"],
+        dialisys=patient.dialysis,
+        pregnant=patient.pregnant,
+        lactating=patient.lactating,
+        schedules_fasting=configs["schedules_fasting"],
+    )
+
+    drug_list = DrugList(
+        drugList=drugs,
+        interventions=interventions,
+        relations=relations,
+        exams=exam_data["exams"],
+        agg=prescription.agg,
+        dialysis=patient.dialysis,
+        alerts=alerts,
+        is_cpoe=configs["is_cpoe"],
+    )
+
+    drug_list.sumAlerts()
+
+    return {
+        "relations": relations,
+        "alerts": alerts,
+        "drug_list": drug_list,
+        "source": {
+            DrugTypeEnum.DRUG.value: drug_list.getDrugType(
+                [], [DrugTypeEnum.DRUG.value]
+            ),
+            DrugTypeEnum.SOLUTION.value: drug_list.getDrugType(
+                [], [DrugTypeEnum.SOLUTION.value]
+            ),
+            DrugTypeEnum.PROCEDURE.value: drug_list.getDrugType(
+                [], [DrugTypeEnum.PROCEDURE.value]
+            ),
+            DrugTypeEnum.DIET.value: drug_list.getDrugType(
+                [], [DrugTypeEnum.DIET.value]
+            ),
+        },
+    }
+
+
+def _get_clinical_notes_stats(
+    prescription: Prescription, patient: Patient, configs: dict
+):
+    if configs["features_cache"].get("clinicalNotesStats", None) != None:
+        cn_stats = configs["features_cache"].get("clinicalNotesStats")
+    else:
+        cn_stats = clinical_notes_service.get_admission_stats(
+            admission_number=prescription.admissionNumber,
+        )
+
+    if configs["features_cache"].get("clinicalNotes", 0) != 0:
+        cn_count = configs["features_cache"].get("clinicalNotes", 0)
+    else:
+        cn_count = clinical_notes_service.get_count(
+            admission_number=prescription.admissionNumber,
+            admission_date=patient.admissionDate,
+        )
+
+    return {"cn_stats": cn_stats, "cn_count": cn_count}

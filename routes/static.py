@@ -110,7 +110,7 @@ def get_stats():
 
     try:
         stats = prescription_stats_service.get_prescription_stats(
-            idPrescription=request.args.get("idPrescription", None),
+            id_prescription=request.args.get("idPrescription", None),
             schema=request.args.get("schema", None),
         )
     except ValidationError as e:
