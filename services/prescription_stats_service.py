@@ -1,10 +1,9 @@
 from datetime import datetime, date
-from flask_sqlalchemy.session import Session
-from sqlalchemy import text
 
 from decorators.has_permission_decorator import has_permission, Permission
+from decorators.timed_decorator import timed
 from exception.validation_error import ValidationError
-from models.main import db, dbSession
+from models.main import db
 from models.prescription import (
     Prescription,
     Patient,
@@ -27,31 +26,11 @@ from utils import prescriptionutils, dateutils, status
 @has_permission(Permission.READ_STATIC)
 def get_prescription_stats(
     id_prescription: int,
-    schema: str,
 ):
-    _set_schema(schema)
+    prescription, patient = _get_prescription_data(id_prescription=id_prescription)
 
-    prescription_data = (
-        db.session.query(Prescription, Patient)
-        .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)
-        .filter(Prescription.id == id_prescription)
-        .first()
-    )
-    if prescription_data is None:
-        raise ValidationError(
-            "Prescrição inexistente",
-            "errors.invalidRecord",
-            status.HTTP_400_BAD_REQUEST,
-        )
-
-    prescription: Prescription = prescription_data[0]
-    patient: Patient = prescription_data[1]
     configs = _get_configs(prescription=prescription, patient=patient)
-
-    interventions = intervention_service.get_interventions(
-        admissionNumber=patient.admissionNumber
-    )
-
+    interventions = _get_interventions(admission_number=prescription.admissionNumber)
     cn_data = _get_clinical_notes_stats(
         prescription=prescription, patient=patient, configs=configs
     )
@@ -66,21 +45,14 @@ def get_prescription_stats(
 
     p_data = {
         "idPrescription": str(prescription.id),
-        "agg": prescription.agg,
-        "concilia": prescription.concilia,
         "admissionNumber": prescription.admissionNumber,
-        "dischargeDate": (
-            patient.dischargeDate.isoformat() if patient.dischargeDate else None
-        ),
         "date": prescription.date.isoformat(),
-        "expire": (prescription.expire.isoformat() if prescription.expire else None),
         "prescription": drug_data["source"][DrugTypeEnum.DRUG.value],
         "solution": drug_data["source"][DrugTypeEnum.SOLUTION.value],
         "procedures": drug_data["source"][DrugTypeEnum.PROCEDURE.value],
         "diet": drug_data["source"][DrugTypeEnum.DIET.value],
         "interventions": interventions,
         "alertExams": exam_data["alerts"],
-        "status": prescription.status,
         "clinicalNotes": cn_data["cn_count"],
         "complication": cn_data["cn_stats"].get("complication", 0),
         "clinicalNotesStats": cn_data["cn_stats"],
@@ -94,27 +66,25 @@ def get_prescription_stats(
     )
 
 
-def _set_schema(schema):
-    db_session = Session(db)
-    result = db_session.execute(
-        text("SELECT schema_name FROM information_schema.schemata")
+@timed()
+def _get_prescription_data(id_prescription: int) -> tuple[Prescription, Patient]:
+    prescription_data = (
+        db.session.query(Prescription, Patient)
+        .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)
+        .filter(Prescription.id == id_prescription)
+        .first()
     )
-
-    schemaExists = False
-    for r in result:
-        if r[0] == schema:
-            schemaExists = True
-
-    if not schemaExists:
+    if prescription_data is None:
         raise ValidationError(
-            "Schema Inexistente", "errors.invalidSchema", status.HTTP_400_BAD_REQUEST
+            "Prescrição inexistente",
+            "errors.invalidRecord",
+            status.HTTP_400_BAD_REQUEST,
         )
 
-    db_session.close()
-
-    dbSession.setSchema(schema)
+    return prescription_data
 
 
+@timed()
 def _get_configs(prescription: Prescription, patient: Patient):
     data = {}
 
@@ -159,6 +129,12 @@ def _get_configs(prescription: Prescription, patient: Patient):
     return data
 
 
+@timed()
+def _get_interventions(admission_number: int):
+    return intervention_service.get_interventions(admissionNumber=admission_number)
+
+
+@timed()
 def _get_exams(patient: Patient, prescription: Prescription, configs: dict):
     exams = Exams.findLatestByAdmission(patient, prescription.idSegment, prevEx=False)
 
@@ -180,6 +156,7 @@ def _get_exams(patient: Patient, prescription: Prescription, configs: dict):
     return {"exams": exams, "alerts": alertExams}
 
 
+@timed()
 def _get_drug_data(
     prescription: Prescription,
     patient: Patient,
@@ -243,6 +220,7 @@ def _get_drug_data(
     }
 
 
+@timed()
 def _get_clinical_notes_stats(
     prescription: Prescription, patient: Patient, configs: dict
 ):
