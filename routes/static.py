@@ -3,7 +3,10 @@ from markupsafe import escape as escape_html
 from datetime import datetime
 
 from models.main import db, User
-from services import prescription_agg_service, prescription_check_service
+from services import (
+    prescription_agg_service,
+    prescription_check_service,
+)
 from exception.validation_error import ValidationError
 from exception.authorization_error import AuthorizationError
 from utils import status, sessionutils
@@ -33,8 +36,10 @@ def create_aggregated_by_prescription(schema, id_prescription):
             force=force,
         )
     except ValidationError as e:
+        db.session.rollback()
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
     except AuthorizationError as e:
+        db.session.rollback()
         return {
             "status": "error",
             "message": "Usuário inválido",
@@ -66,8 +71,10 @@ def create_aggregated_prescription_by_date(schema, admission_number):
             schema, admission_number, p_date
         )
     except ValidationError as e:
+        db.session.rollback()
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
     except AuthorizationError as e:
+        db.session.rollback()
         return {
             "status": "error",
             "message": "Usuário inválido",

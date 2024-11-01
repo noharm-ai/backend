@@ -365,6 +365,7 @@ class PrescriptionDrug(db.Model):
                 Prescription.date.label("prescription_date"),
                 MeasureUnitConvert.factor.label("measure_unit_convert_factor"),
                 func.array(substance_handling).label("substance_handling_types"),
+                Prescription.idDepartment.label("idDepartment"),
             )
             .outerjoin(Outlier, Outlier.id == PrescriptionDrug.idOutlier)
             .outerjoin(Drug, Drug.id == PrescriptionDrug.idDrug)

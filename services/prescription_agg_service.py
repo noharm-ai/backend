@@ -54,10 +54,10 @@ def create_agg_prescription_by_prescription(
     if not force and processed_status == "PROCESSED":
         return
 
-    resultPresc = prescription_view_service.static_get_prescription(
-        idPrescription=id_prescription
+    prescription_data = prescription_view_service.static_get_prescription(
+        id_prescription=id_prescription
     )
-    p.features = prescriptionutils.getFeatures(resultPresc)
+    p.features = prescriptionutils.getFeatures(prescription_data)
     p.aggDrugs = p.features["drugIDs"]
     p.aggDeps = [p.idDepartment]
 
@@ -104,9 +104,15 @@ def create_agg_prescription_by_prescription(
     pAgg.update = datetime.today()
     db.session.flush()
 
-    resultAgg = prescription_view_service.static_get_prescription(
-        idPrescription=pAgg.id
+    agg_data = prescription_view_service.static_get_prescription(
+        id_prescription=pAgg.id
     )
+
+    pAgg.features = prescriptionutils.getFeatures(
+        result=agg_data, agg_date=pAgg.date, intervals_for_agg_date=True
+    )
+    pAgg.aggDrugs = pAgg.features["drugIDs"]
+    pAgg.aggDeps = pAgg.features["departmentList"]
 
     if p.concilia is None and (pAgg.status == "s" or p.status == "s"):
         prescalc_user = User()
@@ -147,15 +153,6 @@ def create_agg_prescription_by_prescription(
                     prescription=p, user=prescalc_user, extra={"prescalc": True}
                 )
 
-    if "idPrescription" in resultAgg:
-        pAgg.features = prescriptionutils.getFeatures(
-            resultAgg, agg_date=pAgg.date, intervals_for_agg_date=True
-        )
-        pAgg.aggDrugs = pAgg.features["drugIDs"]
-        pAgg.aggDeps = list(
-            set([resultAgg["headers"][h]["idDepartment"] for h in resultAgg["headers"]])
-        )
-
     _log_processed_date(id_prescription_array=[id_prescription], schema=schema)
 
 
@@ -176,7 +173,7 @@ def create_agg_prescription_by_date(schema, admission_number, p_date):
         admission_number, last_prescription.idSegment, p_date
     )
 
-    agg_p = db.session.query(Prescription).get(p_id)
+    agg_p = db.session.query(Prescription).filter(Prescription.id == p_id).first()
 
     if agg_p is None:
         agg_p = Prescription()
@@ -196,25 +193,20 @@ def create_agg_prescription_by_date(schema, admission_number, p_date):
         agg_p.update = datetime.today()
         db.session.add(agg_p)
 
-    resultAgg = prescription_view_service.static_get_prescription(
-        idPrescription=agg_p.id
+    agg_data = prescription_view_service.static_get_prescription(
+        id_prescription=agg_p.id
     )
 
-    if "idPrescription" in resultAgg:
-        agg_p.update = datetime.today()
-        agg_p.features = prescriptionutils.getFeatures(resultAgg)
-        agg_p.aggDrugs = agg_p.features["drugIDs"]
-        agg_p.aggDeps = list(
-            set([resultAgg["headers"][h]["idDepartment"] for h in resultAgg["headers"]])
-        )
+    agg_p.update = datetime.today()
+    agg_p.features = prescriptionutils.getFeatures(result=agg_data)
+    agg_p.aggDrugs = agg_p.features["drugIDs"]
+    agg_p.aggDeps = agg_p.features["departmentList"]
 
-        internal_prescription_ids = []
-        for h in resultAgg["headers"]:
-            internal_prescription_ids.append(h)
+    internal_prescription_ids = internal_prescription_ids = (
+        prescriptionutils.get_internal_prescription_ids(result=agg_data)
+    )
 
-        _log_processed_date(
-            id_prescription_array=internal_prescription_ids, schema=schema
-        )
+    _log_processed_date(id_prescription_array=internal_prescription_ids, schema=schema)
 
 
 def _log_processed_date(id_prescription_array, schema):

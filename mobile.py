@@ -118,6 +118,7 @@ if Config.ENV != NoHarmENV.PRODUCTION.value:
     logging.basicConfig()
     logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)
     logging.getLogger("noharm.backend").setLevel(logging.DEBUG)
+    logging.getLogger("noharm.performance").setLevel(logging.DEBUG)
 
 
 @app.route("/version", methods=["GET"])
