@@ -72,6 +72,20 @@ def get_numeric_drug_attributes_list():
     ]
 
 
+def get_internal_prescription_ids(result: dict):
+    id_prescription_list = set()
+
+    drug_list = result["prescription"]
+    drug_list.extend(result["solution"])
+    drug_list.extend(result["procedures"])
+
+    for d in drug_list:
+        # if cpoe search id inside cpoe attr (need refactor)
+        id_prescription_list.add(int(d.get("cpoe", d.get("idPrescription"))))
+
+    return list(id_prescription_list)
+
+
 def getFeatures(result, agg_date: datetime = None, intervals_for_agg_date=False):
     drugList = result["prescription"]
     drugList.extend(result["solution"])
@@ -88,13 +102,12 @@ def getFeatures(result, agg_date: datetime = None, intervals_for_agg_date=False)
     alert_levels = []
     alert_level = "low"
     department_list = set()
-    id_prescription_list = set()
 
     for attr in get_numeric_drug_attributes_list():
         drug_attributes[attr] = 0
 
     for d in drugList:
-        id_prescription_list.add(d["idPrescription"])
+
         drugIDs.append(d["idDrug"])
         if d["idSubstance"] != None:
             substanceIDs.append(d["idSubstance"])
@@ -207,7 +220,6 @@ def getFeatures(result, agg_date: datetime = None, intervals_for_agg_date=False)
         "drugAttributes": drug_attributes,
         "intervals": intervals,
         "departmentList": list(department_list),
-        "idPrescriptionList": list(id_prescription_list),
     }
 
 

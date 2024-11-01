@@ -17,7 +17,7 @@ from models.enums import (
 from services import (
     prescription_drug_service,
     prescription_check_service,
-    prescription_stats_service,
+    prescription_view_service,
     feature_service,
 )
 from exception.validation_error import ValidationError
@@ -54,10 +54,10 @@ def create_agg_prescription_by_prescription(
     if not force and processed_status == "PROCESSED":
         return
 
-    prescription_stats = prescription_stats_service.get_prescription_stats(
+    prescription_data = prescription_view_service.static_get_prescription(
         id_prescription=id_prescription
     )
-    p.features = prescription_stats
+    p.features = prescriptionutils.getFeatures(prescription_data)
     p.aggDrugs = p.features["drugIDs"]
     p.aggDeps = [p.idDepartment]
 
@@ -104,11 +104,13 @@ def create_agg_prescription_by_prescription(
     pAgg.update = datetime.today()
     db.session.flush()
 
-    agg_stats = prescription_stats_service.get_prescription_stats(
+    agg_data = prescription_view_service.static_get_prescription(
         id_prescription=pAgg.id
     )
 
-    pAgg.features = agg_stats
+    pAgg.features = prescriptionutils.getFeatures(
+        result=agg_data, agg_date=pAgg.date, intervals_for_agg_date=True
+    )
     pAgg.aggDrugs = pAgg.features["drugIDs"]
     pAgg.aggDeps = pAgg.features["departmentList"]
 
@@ -191,18 +193,18 @@ def create_agg_prescription_by_date(schema, admission_number, p_date):
         agg_p.update = datetime.today()
         db.session.add(agg_p)
 
-    agg_features = prescription_stats_service.get_prescription_stats(
+    agg_data = prescription_view_service.static_get_prescription(
         id_prescription=agg_p.id
     )
 
     agg_p.update = datetime.today()
-    agg_p.features = agg_features
+    agg_p.features = prescriptionutils.getFeatures(result=agg_data)
     agg_p.aggDrugs = agg_p.features["drugIDs"]
     agg_p.aggDeps = agg_p.features["departmentList"]
 
-    internal_prescription_ids = [
-        int(i) for i in agg_p.features.get("idPrescriptionList", [])
-    ]
+    internal_prescription_ids = internal_prescription_ids = (
+        prescriptionutils.get_internal_prescription_ids(result=agg_data)
+    )
 
     _log_processed_date(id_prescription_array=internal_prescription_ids, schema=schema)
 

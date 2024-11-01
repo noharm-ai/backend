@@ -1,7 +1,6 @@
-import logging
-import random
 from datetime import datetime, date
-from sqlalchemy import desc, and_
+from sqlalchemy import desc, and_, func
+from sqlalchemy.dialects.postgresql import INTERVAL
 
 from decorators.has_permission_decorator import has_permission, Permission
 from decorators.timed_decorator import timed
@@ -41,12 +40,19 @@ from utils import prescriptionutils, dateutils, status
 
 @has_permission(Permission.READ_PRESCRIPTION)
 def route_get_prescription(id_prescription: int, user_context: User = None):
-    return internal_get_prescription(
+    return _internal_get_prescription(
         id_prescription=id_prescription, is_complete=True, user_context=user_context
     )
 
 
-def internal_get_prescription(
+@has_permission(Permission.READ_STATIC)
+def static_get_prescription(id_prescription: int, user_context: User = None):
+    return _internal_get_prescription(
+        id_prescription=id_prescription, is_complete=False, user_context=user_context
+    )
+
+
+def _internal_get_prescription(
     id_prescription: int,
     user_context: User,
     is_complete=False,
@@ -54,14 +60,19 @@ def internal_get_prescription(
     prescription, patient, department, segment, prescription_user = (
         _get_prescription_data(id_prescription=id_prescription)
     )
+
     config_data = _get_configs(prescription=prescription, patient=patient)
+
     interventions = _get_interventions(admission_number=prescription.admissionNumber)
+
     cn_data = _get_clinical_notes_stats(
         prescription=prescription,
         patient=patient,
         config_data=config_data,
+        user_context=user_context,
         is_complete=is_complete,
     )
+
     exam_data = _get_exams(
         patient=patient,
         prescription=prescription,
@@ -69,27 +80,12 @@ def internal_get_prescription(
         is_complete=is_complete,
     )
 
-    lastDept = Prescription.lastDeptbyAdmission(
-        prescription.id,
-        patient.admissionNumber,
-        ref_date=prescription.date,
-    )
-
-    headers = (
-        Prescription.getHeaders(
-            admissionNumber=patient.admissionNumber,
-            aggDate=prescription.date,
-            idSegment=prescription.idSegment,
-            is_pmc=config_data["is_pmc"],
-            is_cpoe=config_data["is_cpoe"],
-        )
-        if prescription[0].agg
-        else []
-    )
+    last_dept = _get_last_dept(prescription=prescription, is_complete=is_complete)
 
     drug_list = _get_drug_list(
         prescription=prescription, patient=patient, config_data=config_data
     )
+
     alerts_data = _get_alerts(
         drug_list=drug_list,
         patient=patient,
@@ -107,159 +103,51 @@ def internal_get_prescription(
         config_data=config_data,
     )
 
-    reviewed = False
-    reviewed_by = None
-    reviewed_at = None
-    if prescription[0].reviewType == PrescriptionReviewTypeEnum.REVIEWED.value:
-        reviewed = True
+    review_data = _get_review_data(prescription=prescription, is_complete=is_complete)
 
-        if is_complete:
-            reviewed_log = (
-                db.session.query(PrescriptionAudit, User)
-                .join(User, PrescriptionAudit.createdBy == User.id)
-                .filter(PrescriptionAudit.idPrescription == prescription[0].id)
-                .filter(
-                    PrescriptionAudit.auditType
-                    == PrescriptionAuditTypeEnum.REVISION.value
-                )
-                .order_by(desc(PrescriptionAudit.createdAt))
-                .first()
+    return _format(
+        prescription=prescription,
+        patient=patient,
+        department=department,
+        segment=segment,
+        prescription_user=prescription_user,
+        config_data=config_data,
+        drug_data=drug_data,
+        interventions=interventions,
+        exams_data=exam_data,
+        last_dept=last_dept,
+        cn_data=cn_data,
+        review_data=review_data,
+    )
+
+
+@timed()
+def _get_last_dept(prescription: Prescription, is_complete: bool):
+    if is_complete:
+        return (
+            db.session.query(Department.name)
+            .select_from(Prescription)
+            .outerjoin(
+                Department,
+                and_(
+                    Department.id == Prescription.idDepartment,
+                    Department.idHospital == Prescription.idHospital,
+                ),
             )
-
-            if reviewed_log != None:
-                reviewed_by = reviewed_log[1].name
-                reviewed_at = reviewed_log[0].createdAt.isoformat()
-
-    conciliaList = []
-    if prescription[0].concilia:
-        pDrugs = drugList.changeDrugName(pDrugs)
-        last_agg_prescription = _get_last_agg_prescription(patient.admissionNumber)
-        if last_agg_prescription != None:
-            concilia_drugs = PrescriptionDrug.findByPrescription(
-                last_agg_prescription.id,
-                patient.admissionNumber,
-                last_agg_prescription.date,
-                idSegment=None,
-                is_cpoe=is_cpoe,
+            .filter(Prescription.admissionNumber == prescription.admissionNumber)
+            .filter(Prescription.id < prescription.id)
+            .filter(
+                Prescription.date
+                > (func.date(prescription.date) - func.cast("1 month", INTERVAL))
             )
-            conciliaList = drugList.conciliaList(concilia_drugs, [])
+            .order_by(desc(Prescription.id))
+            .first()
+        )
 
-    pIntervention = [
-        i
-        for i in interventions
-        if int(i["id"]) == 0 and int(i["idPrescription"]) == prescription[0].id
-    ]
-
-    _log_perf(start_date, "ADDITIONAL QUERIES")
-
-    return {
-        "idPrescription": str(prescription[0].id),
-        "idSegment": prescription[0].idSegment,
-        "segmentName": prescription[5],
-        "idPatient": str(prescription[0].idPatient),
-        "idHospital": prescription[0].idHospital,
-        "name": prescription[0].admissionNumber,
-        "agg": prescription[0].agg,
-        "prescriptionAggId": prescriptionutils.gen_agg_id(
-            admission_number=prescription[0].admissionNumber,
-            id_segment=prescription[0].idSegment,
-            pdate=prescription[0].date,
-        ),
-        "concilia": prescription[0].concilia,
-        "conciliaList": conciliaList,
-        "admissionNumber": prescription[0].admissionNumber,
-        "admissionDate": (
-            patient.admissionDate.isoformat() if patient.admissionDate else None
-        ),
-        "birthdate": patient.birthdate.isoformat() if patient.birthdate else None,
-        "gender": patient.gender,
-        "height": patientHeight,
-        "weight": patientWeight,
-        "dialysis": patient.dialysis,
-        "patient": {"lactating": patient.lactating, "pregnant": patient.pregnant},
-        "observation": prescription[6],
-        "notes": prescription[7],
-        "alert": prescription[8],
-        "alertExpire": (
-            patient.alertExpire.isoformat() if patient.alertExpire else None
-        ),
-        "age": age,
-        "weightUser": bool(patient.user),
-        "weightDate": patientWeightDate.isoformat() if patientWeightDate else None,
-        "dischargeDate": (
-            patient.dischargeDate.isoformat() if patient.dischargeDate else None
-        ),
-        "dischargeReason": patient.dischargeReason,
-        "bed": prescription[0].bed,
-        "record": prescription[0].record,
-        "class": random.choice(["green", "yellow", "red"]),
-        "skinColor": patient.skinColor,
-        "department": prescription[4],
-        "lastDepartment": lastDept[0] if lastDept else None,
-        "patientScore": "High",
-        "date": prescription[0].date.isoformat(),
-        "expire": (
-            prescription[0].expire.isoformat() if prescription[0].expire else None
-        ),
-        "prescription": pDrugs,
-        "solution": pSolution,
-        "procedures": pProcedures,
-        "infusion": pInfusion,
-        "diet": pDiet,
-        "interventions": interventions,
-        "alertExams": alertExams,
-        "exams": examsJson[:10],
-        "status": prescription[0].status,
-        "prescriber": prescription[9],
-        "headers": headers,
-        "intervention": pIntervention[0] if len(pIntervention) else None,
-        "prevIntervention": _get_prev_intervention(interventions, prescription[0].date),
-        "existIntervention": _get_exist_intervention(
-            interventions, prescription[0].date
-        ),
-        "clinicalNotes": cn_count,
-        "complication": cn_stats.get("complication", 0),
-        "notesSigns": notesSigns.get("data", ""),
-        "notesSignsId": notesSigns.get("id", None),
-        "notesSignsDate": notesSigns.get("date", None),
-        "notesSignsCache": notesSigns.get("cache", False),
-        "notesInfo": notesInfo.get("data", ""),
-        "notesInfoId": notesInfo.get("id", None),
-        "notesInfoDate": notesInfo.get("date", None),
-        "notesInfoCache": notesInfo.get("cache", False),
-        "notesAllergies": notesAllergies,
-        "notesAllergiesDate": notesAllergies[0]["date"] if notesAllergies else None,
-        "notesDialysis": notesDialysis,
-        "notesDialysisDate": notesDialysis[0]["date"] if notesDialysis else None,
-        "clinicalNotesStats": cn_stats,
-        "alertStats": drugList.alertStats,
-        "features": prescription[0].features,
-        "isBeingEvaluated": prescription_service.is_being_evaluated(
-            prescription[0].features
-        ),
-        "user": prescription[10],
-        "userId": prescription[0].user,
-        "insurance": prescription[11],
-        "formTemplate": formTemplate,
-        "admissionReports": admission_reports,
-        "admissionReportsInternal": admission_reports_internal,
-        "review": {
-            "reviewed": reviewed,
-            "reviewedAt": reviewed_at,
-            "reviewedBy": reviewed_by,
-        },
-    }
+    return None
 
 
-def _log_perf(start_date, section):
-    end_date = datetime.now()
-    logging.basicConfig()
-    logger = logging.getLogger("noharm.backend")
-
-    logger.debug(f"PERF {section}: {(end_date-start_date).total_seconds()}")
-
-
-# TODO: refactor (duplicated)
+@timed()
 def _get_last_agg_prescription(admission_number) -> Prescription:
     return (
         db.session.query(Prescription)
@@ -272,7 +160,22 @@ def _get_last_agg_prescription(admission_number) -> Prescription:
     )
 
 
-def _build_headers(headers, pDrugs, pSolution, pProcedures):
+@timed()
+def _build_headers(
+    prescription: Prescription,
+    config_data: dict,
+    pDrugs: dict,
+    pSolution: dict,
+    pProcedures: dict,
+):
+    headers = Prescription.getHeaders(
+        admissionNumber=prescription.admissionNumber,
+        aggDate=prescription.date,
+        idSegment=prescription.idSegment,
+        is_pmc=config_data["is_pmc"],
+        is_cpoe=config_data["is_cpoe"],
+    )
+
     for pid in headers.keys():
         drugs = [d for d in pDrugs if int(d["idPrescription"]) == pid]
         drugsInterv = [
@@ -371,6 +274,7 @@ def _get_prescription_data(
         .outerjoin(Segment, Segment.id == Prescription.idSegment)
         .outerjoin(User, Prescription.user == User.id)
         .filter(Prescription.id == id_prescription)
+        .first()
     )
 
     if data is None:
@@ -513,26 +417,25 @@ def _get_clinical_notes_stats(
 
         if cn_stats.get("signs", 0) != 0:
             signs_data = clinical_notes_queries_service.get_signs(
-                admission_number=prescription[0].admissionNumber,
+                admission_number=prescription.admissionNumber,
                 user_context=user_context,
                 cache=is_cache_active,
             )
 
-        if cn_stats.get("infos", 0) != 0:
-            infos_data = clinical_notes_queries_service.get_infos(
-                admission_number=prescription[0].admissionNumber,
-                user_context=user_context,
-                cache=is_cache_active,
-            )
+        infos_data = clinical_notes_queries_service.get_infos(
+            admission_number=prescription.admissionNumber,
+            user_context=user_context,
+            cache=is_cache_active,
+        )
 
         allergies = clinical_notes_queries_service.get_allergies(
-            admission_number=prescription[0].admissionNumber,
+            admission_number=prescription.admissionNumber,
             admission_date=patient.admissionDate,
         )
         db_allergies = patient_service.get_patient_allergies(patient.idPatient)
 
         dialysis = clinical_notes_queries_service.get_dialysis(
-            admission_number=prescription[0].admissionNumber
+            admission_number=prescription.admissionNumber
         )
 
         for a in allergies:
@@ -588,7 +491,7 @@ def _get_exams(
         },
     )
 
-    return {"exams": exams, "alerts": alertExams}
+    return {"exams": exams, "exams_card": examsJson[:10], "alerts": alertExams}
 
 
 @timed()
@@ -657,8 +560,15 @@ def _get_drug_data(
 
     drug_list.sumAlerts()
 
-    if prescription[0].agg:
-        headers = _build_headers(headers, p_drugs, p_solution, p_procedures)
+    headers = []
+    if prescription.agg:
+        headers = _build_headers(
+            prescription=prescription,
+            config_data=config_data,
+            pDrugs=p_drugs,
+            pSolution=p_solution,
+            pProcedures=p_procedures,
+        )
 
         if config_data["is_cpoe"]:
             p_drugs = drug_list.cpoeDrugs(p_drugs, prescription.id)
@@ -668,7 +578,7 @@ def _get_drug_data(
 
     # concilia data
     concilia_list = []
-    if prescription[0].concilia:
+    if prescription.concilia:
         p_drugs = drug_list.changeDrugName(p_drugs)
         last_agg_prescription = _get_last_agg_prescription(patient.admissionNumber)
         if last_agg_prescription != None:
@@ -683,6 +593,7 @@ def _get_drug_data(
 
     return {
         "drug_list": drug_list,
+        "headers": headers,
         "infusion": p_infusion,
         "concilia_list": concilia_list,
         "source": {
@@ -691,4 +602,151 @@ def _get_drug_data(
             DrugTypeEnum.PROCEDURE.value: p_procedures,
             DrugTypeEnum.DIET.value: p_diet,
         },
+    }
+
+
+@timed()
+def _get_review_data(prescription: Prescription, is_complete: bool):
+    reviewed = False
+    reviewed_by = None
+    reviewed_at = None
+    if prescription.reviewType == PrescriptionReviewTypeEnum.REVIEWED.value:
+        reviewed = True
+
+        if is_complete:
+            reviewed_log = (
+                db.session.query(PrescriptionAudit, User)
+                .join(User, PrescriptionAudit.createdBy == User.id)
+                .filter(PrescriptionAudit.idPrescription == prescription.id)
+                .filter(
+                    PrescriptionAudit.auditType
+                    == PrescriptionAuditTypeEnum.REVISION.value
+                )
+                .order_by(desc(PrescriptionAudit.createdAt))
+                .first()
+            )
+
+            if reviewed_log != None:
+                reviewed_by = reviewed_log[1].name
+                reviewed_at = reviewed_log[0].createdAt.isoformat()
+
+    return {
+        "reviewed": reviewed,
+        "reviewedAt": reviewed_at,
+        "reviewedBy": reviewed_by,
+    }
+
+
+@timed()
+def _format(
+    prescription: Prescription,
+    patient: Patient,
+    segment: Segment,
+    department: Department,
+    prescription_user: User,
+    config_data: dict,
+    drug_data: dict,
+    interventions,
+    exams_data: dict,
+    last_dept,
+    cn_data: dict,
+    review_data: dict,
+):
+    return {
+        # prescription
+        "idPrescription": str(prescription.id),
+        "idSegment": prescription.idSegment,
+        "idPatient": str(prescription.idPatient),
+        "idHospital": prescription.idHospital,
+        "name": prescription.admissionNumber,
+        "agg": prescription.agg,
+        "prescriptionAggId": prescriptionutils.gen_agg_id(
+            admission_number=prescription.admissionNumber,
+            id_segment=prescription.idSegment,
+            pdate=prescription.date,
+        ),
+        "concilia": prescription.concilia,
+        "admissionNumber": prescription.admissionNumber,
+        "notes": prescription.notes,
+        "bed": prescription.bed,
+        "record": prescription.record,
+        "skinColor": patient.skinColor,
+        "date": dateutils.to_iso(prescription.date),
+        "expire": dateutils.to_iso(prescription.expire),
+        "status": prescription.status,
+        "prescriber": prescription.prescriber,
+        "features": prescription.features,
+        "user": prescription_user.name if prescription_user else None,
+        "userId": prescription.user,
+        "insurance": prescription.insurance,
+        # patient
+        "admissionDate": dateutils.to_iso(patient.admissionDate),
+        "birthdate": dateutils.to_iso(patient.birthdate),
+        "gender": patient.gender,
+        "height": config_data["height"],
+        "weight": config_data["weight"],
+        "age": config_data["age"],
+        "weightUser": bool(patient.user),
+        "weightDate": dateutils.to_iso(config_data["weight_date"]),
+        "dialysis": patient.dialysis,
+        "observation": patient.observation,
+        "patient": {"lactating": patient.lactating, "pregnant": patient.pregnant},
+        "alert": patient.alert,
+        "alertExpire": dateutils.to_iso(patient.alertExpire),
+        "dischargeDate": dateutils.to_iso(patient.dischargeDate),
+        "dischargeReason": patient.dischargeReason,
+        # extra
+        "segmentName": segment.description if segment else None,
+        "department": department.name if department else None,
+        "lastDepartment": last_dept[0] if last_dept else None,
+        "patientScore": "High",
+        "formTemplate": config_data["form_template"],
+        "admissionReports": config_data["admission_reports"],
+        "admissionReportsInternal": config_data["admission_reports_internal"],
+        "isCpoe": config_data["is_cpoe"],
+        # drugs
+        "headers": drug_data["headers"],
+        "alertStats": drug_data["drug_list"].alertStats,
+        "prescription": drug_data["source"][DrugTypeEnum.DRUG.value],
+        "solution": drug_data["source"][DrugTypeEnum.SOLUTION.value],
+        "procedures": drug_data["source"][DrugTypeEnum.PROCEDURE.value],
+        "diet": drug_data["source"][DrugTypeEnum.DIET.value],
+        "infusion": drug_data["infusion"],
+        "conciliaList": drug_data["concilia_list"],
+        # interventions
+        "interventions": interventions,
+        "prevIntervention": _get_prev_intervention(interventions, prescription.date),
+        "existIntervention": _get_exist_intervention(interventions, prescription.date),
+        # exams
+        "alertExams": exams_data["alerts"],
+        "exams": exams_data["exams_card"],
+        # clinical notes
+        "clinicalNotes": cn_data["cn_count"],
+        "clinicalNotesStats": cn_data["cn_stats"],
+        "complication": cn_data["cn_stats"].get("complication", 0),
+        "notesSigns": cn_data["notes"]["signs"].get("data", ""),
+        "notesSignsId": cn_data["notes"]["signs"].get("id", None),
+        "notesSignsDate": cn_data["notes"]["signs"].get("date", None),
+        "notesSignsCache": cn_data["notes"]["signs"].get("cache", False),
+        "notesInfo": cn_data["notes"]["infos"].get("data", ""),
+        "notesInfoId": cn_data["notes"]["infos"].get("id", None),
+        "notesInfoDate": cn_data["notes"]["infos"].get("date", None),
+        "notesInfoCache": cn_data["notes"]["infos"].get("cache", False),
+        "notesAllergies": cn_data["notes"]["allergies"],
+        "notesAllergiesDate": (
+            cn_data["notes"]["allergies"][0]["date"]
+            if cn_data["notes"]["allergies"]
+            else None
+        ),
+        "notesDialysis": cn_data["notes"]["dialysis"],
+        "notesDialysisDate": (
+            cn_data["notes"]["dialysis"][0]["date"]
+            if cn_data["notes"]["dialysis"]
+            else None
+        ),
+        # review
+        "isBeingEvaluated": prescription_service.is_being_evaluated(
+            prescription.features
+        ),
+        "review": review_data,
     }
