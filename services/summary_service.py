@@ -422,7 +422,7 @@ def _get_all_drugs_used(admission_number, schema, report_connection):
                 left join public.classe cm on (c.idclassemae  = cm.idclasse)
             where 
                 p.nratendimento = :admission_number
-                and origem <> 'Dietas'
+                and pm.origem <> 'Dietas'
         ) meds
         group by
             nome, idclasse, classe
