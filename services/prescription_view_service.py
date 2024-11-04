@@ -356,24 +356,6 @@ def _get_configs(prescription: Prescription, patient: Patient):
                 patient_previous_data.height if patient_previous_data.height else None
             )
 
-    # features cache
-    p_cache = (
-        db.session.query(Prescription)
-        .filter(
-            Prescription.id
-            == prescriptionutils.gen_agg_id(
-                admission_number=prescription.admissionNumber,
-                id_segment=prescription.idSegment,
-                pdate=datetime.today(),
-            )
-        )
-        .first()
-    )
-    if p_cache != None and p_cache.features != None:
-        data["features_cache"] = p_cache.features
-    else:
-        data["features_cache"] = {}
-
     return data
 
 
@@ -390,12 +372,13 @@ def _get_clinical_notes_stats(
     is_complete: bool,
     user_context: User,
 ):
-    if config_data["features_cache"].get("clinicalNotesStats", None) != None:
-        cn_stats = config_data["features_cache"].get("clinicalNotesStats")
-    else:
-        cn_stats = clinical_notes_service.get_admission_stats(
-            admission_number=prescription.admissionNumber,
-        )
+    is_cache_active = memory_service.is_feature_active(AppFeatureFlagEnum.REDIS_CACHE)
+
+    cn_stats = clinical_notes_queries_service.get_admission_stats(
+        admission_number=prescription.admissionNumber,
+        user_context=user_context,
+        cache=is_cache_active,
+    )
 
     cn_count = 1
     if config_data["is_pmc"]:
@@ -410,10 +393,6 @@ def _get_clinical_notes_stats(
     dialysis_data = []
 
     if is_complete:
-        is_cache_active = memory_service.is_feature_active(
-            AppFeatureFlagEnum.REDIS_CACHE
-        )
-
         if cn_stats.get("signs", 0) != 0:
             signs_data = clinical_notes_queries_service.get_signs(
                 admission_number=prescription.admissionNumber,
@@ -421,11 +400,12 @@ def _get_clinical_notes_stats(
                 cache=is_cache_active,
             )
 
-        infos_data = clinical_notes_queries_service.get_infos(
-            admission_number=prescription.admissionNumber,
-            user_context=user_context,
-            cache=is_cache_active,
-        )
+        if cn_stats.get("info", 0) != 0:
+            infos_data = clinical_notes_queries_service.get_infos(
+                admission_number=prescription.admissionNumber,
+                user_context=user_context,
+                cache=is_cache_active,
+            )
 
         allergies = clinical_notes_queries_service.get_allergies(
             admission_number=prescription.admissionNumber,

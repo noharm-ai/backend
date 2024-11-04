@@ -320,40 +320,6 @@ def get_user_last_clinical_notes(admission_number: int):
     return None
 
 
-def get_admission_stats(admission_number: int):
-    tags = get_tags()
-    stats = {}
-    q_stats = db.session.query().select_from(ClinicalNotes)
-
-    for tag in tags:
-        stats[tag["key"]] = 0
-
-        q_stats = q_stats.add_columns(
-            func.sum(
-                func.cast(
-                    func.coalesce(
-                        ClinicalNotes.annotations[tag["name"] + "_count"].astext, "0"
-                    ),
-                    Integer,
-                )
-            ).label(tag["key"])
-        )
-
-    q_stats = (
-        q_stats.filter(ClinicalNotes.admissionNumber == admission_number)
-        .filter(ClinicalNotes.isExam == None)
-        .filter(ClinicalNotes.date > (datetime.today() - timedelta(days=6)))
-    )
-
-    stats_result = q_stats.first()
-
-    if stats_result:
-        for tag in tags:
-            stats[tag["key"]] = getattr(stats_result, tag["key"])
-
-    return stats
-
-
 def get_count(admission_number: int, admission_date: datetime) -> int:
     cutoff_date = (
         datetime.today() - timedelta(days=120)

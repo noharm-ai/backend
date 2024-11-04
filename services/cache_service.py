@@ -1,4 +1,6 @@
 import logging
+import time
+import json
 from redis.exceptions import TimeoutError
 
 from models.main import redis_client
@@ -14,3 +16,19 @@ def get_by_key(key: str):
             f"redis timeout error: {key}",
         )
         return None
+
+
+def get_range(key: str, days_ago: int):
+    now = time.time()
+    min_date = now - (days_ago * 24 * 60 * 60)
+
+    cache_data = redis_client.zrangebyscore(key, min=min_date, max=now)
+
+    if cache_data != None:
+        result = []
+        for i in cache_data:
+            result.append(json.loads(i))
+
+        return result
+
+    return None
