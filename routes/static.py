@@ -35,6 +35,7 @@ def create_aggregated_by_prescription(schema, id_prescription):
             id_prescription=id_prescription,
             out_patient=out_patient,
             force=force,
+            user_context=user_context,
         )
     except ValidationError as e:
         db.session.rollback()
@@ -70,7 +71,7 @@ def create_aggregated_prescription_by_date(schema, admission_number):
 
     try:
         prescription_agg_service.create_agg_prescription_by_date(
-            schema, admission_number, p_date
+            schema, admission_number, p_date, user_context=user_context
         )
     except ValidationError as e:
         db.session.rollback()

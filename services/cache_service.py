@@ -24,7 +24,7 @@ def get_range(key: str, days_ago: int):
 
     cache_data = redis_client.zrangebyscore(key, min=min_date, max=now)
 
-    if cache_data != None:
+    if cache_data:
         result = []
         for i in cache_data:
             result.append(json.loads(i))

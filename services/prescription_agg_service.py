@@ -27,7 +27,7 @@ from utils import status, prescriptionutils
 
 @has_permission(Permission.READ_STATIC)
 def create_agg_prescription_by_prescription(
-    schema, id_prescription, out_patient, force=False
+    schema, id_prescription, out_patient, user_context: User, force=False
 ):
     _set_schema(schema)
 
@@ -55,7 +55,7 @@ def create_agg_prescription_by_prescription(
         return
 
     prescription_data = prescription_view_service.static_get_prescription(
-        id_prescription=id_prescription
+        id_prescription=id_prescription, user_context=user_context
     )
     p.features = prescriptionutils.getFeatures(prescription_data)
     p.aggDrugs = p.features["drugIDs"]
@@ -105,7 +105,7 @@ def create_agg_prescription_by_prescription(
     db.session.flush()
 
     agg_data = prescription_view_service.static_get_prescription(
-        id_prescription=pAgg.id
+        id_prescription=pAgg.id, user_context=user_context
     )
 
     pAgg.features = prescriptionutils.getFeatures(
@@ -157,7 +157,9 @@ def create_agg_prescription_by_prescription(
 
 
 @has_permission(Permission.READ_STATIC)
-def create_agg_prescription_by_date(schema, admission_number, p_date):
+def create_agg_prescription_by_date(
+    schema, admission_number, p_date, user_context: User
+):
     _set_schema(schema)
 
     last_prescription = get_last_prescription(admission_number)
@@ -194,7 +196,7 @@ def create_agg_prescription_by_date(schema, admission_number, p_date):
         db.session.add(agg_p)
 
     agg_data = prescription_view_service.static_get_prescription(
-        id_prescription=agg_p.id
+        id_prescription=agg_p.id, user_context=user_context
     )
 
     agg_p.update = datetime.today()
