@@ -241,6 +241,7 @@ class DrugList:
                     "idPrescription": str(pd[0].idPrescription),
                     "idPrescriptionDrug": str(pd[0].id),
                     "idDrug": pd[0].idDrug,
+                    "idDepartment": pd.idDepartment,
                     "drug": (
                         pd[1].name
                         if pd[1] is not None

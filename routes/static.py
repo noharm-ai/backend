@@ -3,7 +3,10 @@ from markupsafe import escape as escape_html
 from datetime import datetime
 
 from models.main import db, User
-from services import prescription_agg_service, prescription_check_service
+from services import (
+    prescription_agg_service,
+    prescription_check_service,
+)
 from exception.validation_error import ValidationError
 from exception.authorization_error import AuthorizationError
 from utils import status, sessionutils
@@ -21,6 +24,7 @@ def create_aggregated_by_prescription(schema, id_prescription):
     force = request.args.get("force", False)
 
     user_context = User()
+    user_context.schema = schema
     user_context.config = {"roles": ["STATIC_USER"]}
     g.user_context = user_context
     g.is_cpoe = bool(is_cpoe)
@@ -31,10 +35,13 @@ def create_aggregated_by_prescription(schema, id_prescription):
             id_prescription=id_prescription,
             out_patient=out_patient,
             force=force,
+            user_context=user_context,
         )
     except ValidationError as e:
+        db.session.rollback()
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
     except AuthorizationError as e:
+        db.session.rollback()
         return {
             "status": "error",
             "message": "Usuário inválido",
@@ -57,17 +64,20 @@ def create_aggregated_prescription_by_date(schema, admission_number):
     )
 
     user_context = User()
+    user_context.schema = schema
     user_context.config = {"roles": ["STATIC_USER"]}
     g.user_context = user_context
     g.is_cpoe = bool(is_cpoe)
 
     try:
         prescription_agg_service.create_agg_prescription_by_date(
-            schema, admission_number, p_date
+            schema, admission_number, p_date, user_context=user_context
         )
     except ValidationError as e:
+        db.session.rollback()
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
     except AuthorizationError as e:
+        db.session.rollback()
         return {
             "status": "error",
             "message": "Usuário inválido",

@@ -1,9 +1,9 @@
-from sqlalchemy import func, desc
+from sqlalchemy import func, desc, Integer
 from datetime import datetime, timedelta
 
 from models.main import db, User
 from models.notes import ClinicalNotes
-from services import cache_service
+from services import cache_service, clinical_notes_service
 
 
 def get_signs(admission_number: int, user_context: User, cache=True):
@@ -130,3 +130,58 @@ def get_dialysis(admission_number):
         .order_by(desc("date"))
         .all()
     )
+
+
+def get_admission_stats(admission_number: int, user_context: User, cache=True):
+    tags = clinical_notes_service.get_tags()
+    stats = {}
+
+    if cache:
+        result = cache_service.get_range(
+            key=f"""{user_context.schema}:{admission_number}:stats""", days_ago=6
+        )
+
+        total_counts = {}
+        if result != None:
+            for i in result:
+                cache_stats = i.get("lista", [])
+
+                for count_key, count_value in cache_stats.items():
+                    total_counts[count_key] = (
+                        total_counts.get(count_key, 0) + count_value
+                    )
+
+            for tag in tags:
+                stats[tag["key"]] = total_counts[tag["name"] + "_count"]
+
+        return stats
+
+    q_stats = db.session.query().select_from(ClinicalNotes)
+
+    for tag in tags:
+        stats[tag["key"]] = 0
+
+        q_stats = q_stats.add_columns(
+            func.sum(
+                func.cast(
+                    func.coalesce(
+                        ClinicalNotes.annotations[tag["name"] + "_count"].astext, "0"
+                    ),
+                    Integer,
+                )
+            ).label(tag["key"])
+        )
+
+    q_stats = (
+        q_stats.filter(ClinicalNotes.admissionNumber == admission_number)
+        .filter(ClinicalNotes.isExam == None)
+        .filter(ClinicalNotes.date > (datetime.today() - timedelta(days=6)))
+    )
+
+    stats_result = q_stats.first()
+
+    if stats_result:
+        for tag in tags:
+            stats[tag["key"]] = getattr(stats_result, tag["key"])
+
+    return stats
