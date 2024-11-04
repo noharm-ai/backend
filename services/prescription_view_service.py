@@ -397,9 +397,8 @@ def _get_clinical_notes_stats(
             admission_number=prescription.admissionNumber,
         )
 
-    if config_data["features_cache"].get("clinicalNotes", 0) != 0:
-        cn_count = config_data["features_cache"].get("clinicalNotes", 0)
-    else:
+    cn_count = 1
+    if config_data["is_pmc"]:
         cn_count = clinical_notes_service.get_count(
             admission_number=prescription.admissionNumber,
             admission_date=patient.admissionDate,
@@ -410,7 +409,7 @@ def _get_clinical_notes_stats(
     allergies_data = []
     dialysis_data = []
 
-    if cn_count > 0 and is_complete:
+    if is_complete:
         is_cache_active = memory_service.is_feature_active(
             AppFeatureFlagEnum.REDIS_CACHE
         )
