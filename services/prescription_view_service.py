@@ -400,12 +400,11 @@ def _get_clinical_notes_stats(
                 cache=is_cache_active,
             )
 
-        if cn_stats.get("info", 0) != 0:
-            infos_data = clinical_notes_queries_service.get_infos(
-                admission_number=prescription.admissionNumber,
-                user_context=user_context,
-                cache=is_cache_active,
-            )
+        infos_data = clinical_notes_queries_service.get_infos(
+            admission_number=prescription.admissionNumber,
+            user_context=user_context,
+            cache=is_cache_active,
+        )
 
         allergies = clinical_notes_queries_service.get_allergies(
             admission_number=prescription.admissionNumber,
