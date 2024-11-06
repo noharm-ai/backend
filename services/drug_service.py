@@ -19,8 +19,8 @@ from models.prescription import (
     DrugAttributes,
     MeasureUnitConvert,
     Substance,
-    Segment,
 )
+from models.segment import Segment
 from models.enums import DrugAdminSegment, DrugAttributesAuditTypeEnum
 from services import data_authorization_service
 from exception.validation_error import ValidationError

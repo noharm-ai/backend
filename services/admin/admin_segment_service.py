@@ -1,9 +1,9 @@
 from sqlalchemy import func, and_, asc
 
 from models.main import db, User
-from models.prescription import Segment, Department
+from models.prescription import Department
 from models.appendix import SegmentDepartment
-from models.segment import Hospital
+from models.segment import Hospital, Segment
 from models.enums import IntegrationStatusEnum
 from services.admin import admin_integration_status_service
 from decorators.has_permission_decorator import has_permission, Permission

@@ -12,9 +12,8 @@ from models.prescription import (
     PrescriptionDrug,
     PrescriptionAudit,
     Department,
-    Segment,
 )
-from models.segment import Exams
+from models.segment import Exams, Segment
 from models.enums import (
     MemoryEnum,
     FeatureEnum,

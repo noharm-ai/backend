@@ -5,7 +5,6 @@ from datetime import datetime
 
 from models.main import db, User, PrescriptionAgg
 from models.prescription import (
-    Segment,
     MeasureUnit,
     MeasureUnitConvert,
     Outlier,
@@ -13,6 +12,7 @@ from models.prescription import (
     DrugAttributes,
     Substance,
 )
+from models.segment import Segment
 from models.enums import DrugAdminSegment, DrugAttributesAuditTypeEnum
 from services.admin import admin_ai_service
 from services import drug_service as main_drug_service
