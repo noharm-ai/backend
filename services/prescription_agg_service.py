@@ -111,7 +111,7 @@ def create_agg_prescription_by_prescription(
     features = prescriptionutils.getFeatures(
         result=agg_data, agg_date=pAgg.date, intervals_for_agg_date=True
     )
-    score_variation = _get_score_variation(prescription=pAgg)
+    score_variation = _get_score_variation(prescription=pAgg, features=features)
     features.update({"scoreVariation": score_variation})
 
     pAgg.features = features
@@ -206,7 +206,7 @@ def create_agg_prescription_by_date(
     features = prescriptionutils.getFeatures(
         result=agg_data, agg_date=agg_p.date, intervals_for_agg_date=True
     )
-    score_variation = _get_score_variation(prescription=agg_p)
+    score_variation = _get_score_variation(prescription=agg_p, features=features)
     features.update({"scoreVariation": score_variation})
 
     agg_p.features = features
@@ -343,8 +343,8 @@ def _update_patient_conciliation_status(prescription: Prescription):
             db.session.flush()
 
 
-def _get_score_variation(prescription: Prescription):
-    new_score = int(prescription.features.get("globalScore", 0))
+def _get_score_variation(prescription: Prescription, features: dict):
+    new_score = int(features.get("globalScore", 0))
     initial_value = {
         "variation": 100,
         "currentGlobalScore": new_score,
