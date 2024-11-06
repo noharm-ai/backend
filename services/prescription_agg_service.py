@@ -1,6 +1,6 @@
 from sqlalchemy import desc, text, select, func, and_
 from flask_sqlalchemy.session import Session
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from models.main import db, User, dbSession
 from models.prescription import (
@@ -108,9 +108,13 @@ def create_agg_prescription_by_prescription(
         id_prescription=pAgg.id, user_context=user_context
     )
 
-    pAgg.features = prescriptionutils.getFeatures(
+    features = prescriptionutils.getFeatures(
         result=agg_data, agg_date=pAgg.date, intervals_for_agg_date=True
     )
+    score_variation = _get_score_variation(prescription=pAgg)
+    features.update({"scoreVariation": score_variation})
+
+    pAgg.features = features
     pAgg.aggDrugs = pAgg.features["drugIDs"]
     pAgg.aggDeps = pAgg.features["departmentList"]
 
@@ -199,10 +203,16 @@ def create_agg_prescription_by_date(
         id_prescription=agg_p.id, user_context=user_context
     )
 
-    agg_p.update = datetime.today()
-    agg_p.features = prescriptionutils.getFeatures(result=agg_data)
+    features = prescriptionutils.getFeatures(
+        result=agg_data, agg_date=agg_p.date, intervals_for_agg_date=True
+    )
+    score_variation = _get_score_variation(prescription=agg_p)
+    features.update({"scoreVariation": score_variation})
+
+    agg_p.features = features
     agg_p.aggDrugs = agg_p.features["drugIDs"]
     agg_p.aggDeps = agg_p.features["departmentList"]
+    agg_p.update = datetime.today()
 
     internal_prescription_ids = internal_prescription_ids = (
         prescriptionutils.get_internal_prescription_ids(result=agg_data)
@@ -331,3 +341,38 @@ def _update_patient_conciliation_status(prescription: Prescription):
         ):
             patient.st_conciliation = PatientConciliationStatusEnum.CREATED.value
             db.session.flush()
+
+
+def _get_score_variation(prescription: Prescription):
+    new_score = int(prescription.features.get("globalScore", 0))
+    initial_value = {
+        "variation": 100,
+        "currentGlobalScore": new_score,
+        "previousGlobalScore": 0,
+    }
+
+    previous_prescription = (
+        db.session.query(Prescription)
+        .filter(
+            Prescription.id
+            == prescriptionutils.gen_agg_id(
+                admission_number=prescription.admissionNumber,
+                id_segment=prescription.idSegment,
+                pdate=prescription.date - timedelta(days=1),
+            )
+        )
+        .first()
+    )
+
+    if not previous_prescription:
+        return initial_value
+
+    previous_score = int(previous_prescription.features.get("globalScore", 0))
+    if previous_score == 0:
+        return initial_value
+
+    variation = (new_score - previous_score) / previous_score * 100
+
+    return initial_value.update(
+        {"variation": round(variation, 2), "previousGlobalScore": previous_score}
+    )
