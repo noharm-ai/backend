@@ -22,7 +22,15 @@ def get_range(key: str, days_ago: int):
     now = time.time()
     min_date = now - (days_ago * 24 * 60 * 60)
 
-    cache_data = redis_client.zrangebyscore(key, min=min_date, max=now)
+    try:
+        cache_data = redis_client.zrangebyscore(key, min=min_date, max=now)
+    except TimeoutError:
+        logging.basicConfig()
+        logger = logging.getLogger("noharm.backend")
+        logger.error(
+            f"redis timeout error: {key}",
+        )
+        return None
 
     if cache_data:
         result = []

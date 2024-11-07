@@ -373,6 +373,9 @@ def _get_score_variation(prescription: Prescription, features: dict):
 
     variation = (new_score - previous_score) / previous_score * 100
 
-    return initial_value.update(
+    variation_data = initial_value
+    variation_data.update(
         {"variation": round(variation, 2), "previousGlobalScore": previous_score}
     )
+
+    return variation_data
