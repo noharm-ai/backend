@@ -3,7 +3,6 @@ from datetime import datetime, date, timedelta
 from markupsafe import escape as escape_html
 
 from models.main import db, User
-from models.prescription import Segment
 from models.segment import Segment, SegmentExam, Exams
 from services.admin import admin_integration_service
 from services import data_authorization_service

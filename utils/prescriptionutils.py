@@ -107,7 +107,6 @@ def getFeatures(result, agg_date: datetime = None, intervals_for_agg_date=False)
         drug_attributes[attr] = 0
 
     for d in drugList:
-
         drugIDs.append(d["idDrug"])
         if d["idSubstance"] != None:
             substanceIDs.append(d["idSubstance"])
@@ -190,6 +189,8 @@ def getFeatures(result, agg_date: datetime = None, intervals_for_agg_date=False)
         if "high" in alert_levels:
             alert_level = "high"
 
+    global_score = pScore + av + am + exams + alerts + diff
+
     return {
         "alergy": allergy,
         "allergy": allergy,
@@ -220,6 +221,7 @@ def getFeatures(result, agg_date: datetime = None, intervals_for_agg_date=False)
         "drugAttributes": drug_attributes,
         "intervals": intervals,
         "departmentList": list(department_list),
+        "globalScore": global_score,
     }
 
 

@@ -11,8 +11,8 @@ from models.prescription import (
     Drug,
     MeasureUnit,
     Substance,
-    Segment,
 )
+from models.segment import Segment
 from models.enums import IntegrationStatusEnum
 from services import drug_service as main_drug_service
 from services.admin import (

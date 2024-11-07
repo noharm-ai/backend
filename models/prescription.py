@@ -2,11 +2,9 @@ from sqlalchemy.orm import deferred
 from sqlalchemy import case, cast, literal, and_, func, desc, asc, or_
 from sqlalchemy.sql.expression import literal_column, case
 from sqlalchemy.dialects import postgresql
-from sqlalchemy.dialects.postgresql import INTERVAL
 
 from .main import db, User, DrugAttributes, Outlier, Substance, Drug
 from .appendix import Department, Notes, MeasureUnit, Frequency, MeasureUnitConvert
-from .segment import Segment
 from utils import prescriptionutils
 
 
@@ -46,62 +44,6 @@ class Prescription(db.Model):
             db.session.query(Prescription)
             .filter(Prescription.admissionNumber == admissionNumber)
             .filter(Prescription.id > idPrescription)
-            .first()
-        )
-
-    def lastDeptbyAdmission(idPrescription, admissionNumber, ref_date):
-        return (
-            db.session.query(Department.name)
-            .select_from(Prescription)
-            .outerjoin(
-                Department,
-                and_(
-                    Department.id == Prescription.idDepartment,
-                    Department.idHospital == Prescription.idHospital,
-                ),
-            )
-            .filter(Prescription.admissionNumber == admissionNumber)
-            .filter(Prescription.id < idPrescription)
-            .filter(
-                Prescription.date
-                > (func.date(ref_date) - func.cast("1 month", INTERVAL))
-            )
-            .order_by(desc(Prescription.id))
-            .first()
-        )
-
-    def getPrescriptionBasic():
-        return (
-            db.session.query(
-                Prescription,
-                Patient,
-                literal("0"),
-                literal("0"),
-                Department.name.label("department"),
-                Segment.description,
-                Patient.observation,
-                Prescription.notes,
-                Patient.alert,
-                Prescription.prescriber,
-                User.name,
-                Prescription.insurance,
-            )
-            .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)
-            .outerjoin(
-                Department,
-                and_(
-                    Department.id == Prescription.idDepartment,
-                    Department.idHospital == Prescription.idHospital,
-                ),
-            )
-            .outerjoin(Segment, Segment.id == Prescription.idSegment)
-            .outerjoin(User, Prescription.user == User.id)
-        )
-
-    def getPrescription(idPrescription):
-        return (
-            Prescription.getPrescriptionBasic()
-            .filter(Prescription.id == idPrescription)
             .first()
         )
 

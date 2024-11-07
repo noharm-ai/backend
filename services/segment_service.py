@@ -1,7 +1,8 @@
 from sqlalchemy import asc, func
 
 from models.main import db
-from models.prescription import Department, Segment
+from models.prescription import Department
+from models.segment import Segment
 from models.appendix import SegmentDepartment
 from decorators.has_permission_decorator import has_permission, Permission
 

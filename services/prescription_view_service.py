@@ -12,9 +12,8 @@ from models.prescription import (
     PrescriptionDrug,
     PrescriptionAudit,
     Department,
-    Segment,
 )
-from models.segment import Exams
+from models.segment import Exams, Segment
 from models.enums import (
     MemoryEnum,
     FeatureEnum,
@@ -198,7 +197,7 @@ def _build_headers(
                 "solution": [],
                 "procedures": [],
                 "interventions": drugsInterv,
-                "alertExams": [],
+                "alertExams": 0,
                 "complication": 0,
             }
         )
@@ -208,7 +207,7 @@ def _build_headers(
                 "solution": solutions,
                 "procedures": [],
                 "interventions": solutionsInterv,
-                "alertExams": [],
+                "alertExams": 0,
                 "complication": 0,
             }
         )
@@ -218,7 +217,7 @@ def _build_headers(
                 "solution": [],
                 "procedures": procedures,
                 "interventions": proceduresInterv,
-                "alertExams": [],
+                "alertExams": 0,
                 "complication": 0,
             }
         )
