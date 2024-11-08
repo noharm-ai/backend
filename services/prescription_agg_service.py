@@ -346,7 +346,7 @@ def _update_patient_conciliation_status(prescription: Prescription):
 def _get_score_variation(prescription: Prescription, features: dict):
     new_score = int(features.get("globalScore", 0))
     initial_value = {
-        "variation": 100,
+        "variation": 0,
         "currentGlobalScore": new_score,
         "previousGlobalScore": 0,
     }
