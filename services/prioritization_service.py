@@ -41,6 +41,7 @@ def get_prioritization_list(
     global_score_max=None,
     pending_interventions=None,
     has_conciliation=None,
+    alert_level=None,
 ):
     is_cpoe = feature_service.is_cpoe()
 
@@ -235,6 +236,9 @@ def get_prioritization_list(
             q = q.filter(Prescription.features["diff"].astext.cast(Integer) > 0)
         else:
             q = q.filter(Prescription.features["diff"].astext.cast(Integer) == 0)
+
+    if alert_level != None:
+        q = q.filter(Prescription.features["alertLevel"].astext == alert_level)
 
     if has_conciliation != None:
         if bool(int(has_conciliation)):
