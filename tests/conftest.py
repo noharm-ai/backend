@@ -49,7 +49,7 @@ def get_access(client, email="demo", password="demo", roles=["suporte"]):
     data_response = json.loads(my_json)
     access_token = data_response["access_token"]
 
-    print(f"NHTEST get_access {access_token}")
+    print(f"NHTEST get_access2", data_response)
     return access_token
 
 
