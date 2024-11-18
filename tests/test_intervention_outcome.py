@@ -17,7 +17,6 @@ from tests.utils.utils_test_intervention import (
 def test_put_interventions(client):
     """Tests put /intervention  and returns idIntervention"""
     access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
-    print("NHTEST", access_token)
 
     data = {
         "idPrescription": "198",

@@ -42,6 +42,8 @@ def has_permission(*permissions: List[Permission]):
 
             user_permissions = Role.get_permissions_from_user(user=user_context)
 
+            print("NHPERMISSION", user_permissions)
+
             # inject extra params
             if "user_permissions" in inspect.signature(f).parameters:
                 kwargs["user_permissions"] = user_permissions
