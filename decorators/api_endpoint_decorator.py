@@ -34,6 +34,7 @@ def api_endpoint():
 
                 # should check for permission at least once
                 if g.get("permission_test_count", 0) == 0:
+                    print("NHDEBUG", "permission test count")
                     raise AuthorizationError()
 
                 db.session.commit()
@@ -43,6 +44,7 @@ def api_endpoint():
                 return {"status": "success", "data": result}, status.HTTP_200_OK
 
             except (JWTExtendedException, PyJWTError):
+                print("NHDEBUG", "jwtextendedexception")
                 db.session.rollback()
                 db.session.close()
                 db.session.remove()
