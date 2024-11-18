@@ -33,6 +33,7 @@ from services import (
     alert_interaction_service,
     alert_service,
     feature_service,
+    exams_service,
 )
 from utils import prescriptionutils, dateutils, status
 
@@ -77,6 +78,7 @@ def _internal_get_prescription(
         prescription=prescription,
         config_data=config_data,
         is_complete=is_complete,
+        user_context=user_context,
     )
 
     last_dept = _get_last_dept(prescription=prescription, is_complete=is_complete)
@@ -447,10 +449,18 @@ def _get_clinical_notes_stats(
 
 @timed()
 def _get_exams(
-    patient: Patient, prescription: Prescription, config_data: dict, is_complete: bool
+    patient: Patient,
+    prescription: Prescription,
+    config_data: dict,
+    is_complete: bool,
+    user_context: User,
 ):
-    exams = Exams.findLatestByAdmission(
-        patient, prescription.idSegment, prevEx=is_complete
+    exams = exams_service.find_latest_exams(
+        patient=patient,
+        idSegment=prescription.idSegment,
+        schema=user_context.schema,
+        add_previous_exams=is_complete,
+        cache=False,
     )
 
     examsJson = []

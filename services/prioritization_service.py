@@ -348,9 +348,18 @@ def get_prioritization_list(
             features["alertStats"] = (
                 p[0].features["alertStats"] if "alertStats" in p[0].features else None
             )
+
+            if "scoreVariation" in p[0].features:
+                features["scoreVariation"] = (
+                    p[0].features.get("scoreVariation").get("variation")
+                )
+            else:
+                features["scoreVariation"] = 0
+
         else:
             features["processed"] = False
             features["globalScore"] = 0
+            features["scoreVariation"] = 0
             features["class"] = "blue"
 
         observation = None

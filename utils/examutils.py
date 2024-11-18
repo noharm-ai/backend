@@ -26,9 +26,9 @@ class refEmpty:
     ref = initials = min = max = name = ""
 
 
-def formatExam(exam, typeExam, segExam, prevValue=None):
-    if exam is not None:
-        value = numberutils.none2zero(exam.value)
+def formatExam(value, typeExam, unit, date, segExam, prevValue=None):
+    if value is not None:
+        value = numberutils.none2zero(value)
 
         if typeExam in segExam:
             ref = segExam[typeExam]
@@ -50,9 +50,9 @@ def formatExam(exam, typeExam, segExam, prevValue=None):
 
         return {
             "value": value,
-            "unit": stringutils.strNone(exam.unit),
+            "unit": stringutils.strNone(unit),
             "alert": alert,
-            "date": exam.date.isoformat(),
+            "date": date,
             "ref": ref.ref,
             "initials": ref.initials,
             "min": ref.min,

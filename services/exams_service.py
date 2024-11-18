@@ -1,15 +1,15 @@
 import copy
-from sqlalchemy import text, desc
-from datetime import datetime, timedelta
+from sqlalchemy import text, desc, and_
+from datetime import datetime, timedelta, date
 
 from models.main import db
 from models.prescription import Patient
 from models.segment import Exams, SegmentExam
 from models.notes import ClinicalNotes
-from services import memory_service
+from services import memory_service, cache_service
 from decorators.has_permission_decorator import has_permission, Permission
 from exception.validation_error import ValidationError
-from utils import status, examutils, stringutils
+from utils import status, examutils, stringutils, dateutils
 
 
 def create_exam(
@@ -109,7 +109,13 @@ def get_exams_by_admission(admission_number: int, id_segment: int):
     for e in examsList:
         if not e.typeExam.lower() in typeExams and e.typeExam.lower() in segExam:
             key = e.typeExam.lower()
-            item = examutils.formatExam(e, key, segExam)
+            item = examutils.formatExam(
+                value=e.value,
+                typeExam=key,
+                unit=e.unit,
+                date=e.date.isoformat(),
+                segExam=segExam,
+            )
             item["name"] = segExam[key].name
             item["perc"] = None
             item["history"] = _history_exam(e.typeExam, examsList, segExam)
@@ -208,7 +214,13 @@ def _history_exam(typeExam, examsList, segExam):
     results = []
     for e in examsList:
         if e.typeExam == typeExam:
-            item = examutils.formatExam(e, e.typeExam.lower(), segExam)
+            item = examutils.formatExam(
+                value=e.value,
+                typeExam=e.typeExam.lower(),
+                unit=e.unit,
+                date=e.date.isoformat(),
+                segExam=segExam,
+            )
             del item["ref"]
             results.append(item)
     return results
@@ -293,3 +305,197 @@ def get_exams_default_refs():
         )
 
     return results
+
+
+def _get_exams_previous_results(id_patient: int):
+    examLatest = (
+        db.session.query(Exams.typeExam.label("typeExam"), Exams.date.label("date"))
+        .select_from(Exams)
+        .distinct(Exams.typeExam)
+        .filter(Exams.idPatient == id_patient)
+        .filter(Exams.date >= (date.today() - timedelta(days=90)))
+        .order_by(Exams.typeExam, Exams.date.desc())
+        .subquery()
+    )
+
+    el = db.aliased(examLatest)
+
+    resultsPrev = (
+        Exams.query.distinct(Exams.typeExam)
+        .join(el, and_(Exams.typeExam == el.c.typeExam, Exams.date < el.c.date))
+        .filter(Exams.idPatient == id_patient)
+        .filter(Exams.date >= (date.today() - timedelta(days=90)))
+        .order_by(Exams.typeExam, Exams.date.desc())
+    )
+
+    previous_exams = {}
+
+    for e in resultsPrev:
+        previous_exams[e.typeExam.lower()] = e.value
+
+    return previous_exams
+
+
+def _get_exams_current_results(
+    id_patient: int, add_previous_exams: bool, cache: bool, schema: str
+):
+    if cache:
+        exams = cache_service.get_hgetall(
+            key=f"{schema}:{id_patient}:exames", lower_key=True
+        )
+        if exams:
+            return exams
+
+    previous_exams = {}
+    if add_previous_exams:
+        previous_exams = _get_exams_previous_results(id_patient=id_patient)
+
+    results = (
+        Exams.query.distinct(Exams.typeExam)
+        .filter(Exams.idPatient == id_patient)
+        .filter(Exams.date >= (date.today() - timedelta(days=5)))
+        .order_by(Exams.typeExam, Exams.date.desc())
+        .all()
+    )
+
+    exams = {}
+    for e in results:
+        exams[e.typeExam.lower()] = {
+            "value": e.value,
+            "unit": e.unit,
+            "date": e.date.isoformat(),
+            "prev": previous_exams.get(e.typeExam.lower(), None),
+        }
+
+    return exams
+
+
+def find_latest_exams(
+    patient: Patient, idSegment: int, schema: str, add_previous_exams=False, cache=True
+):
+    current_exams = _get_exams_current_results(
+        id_patient=patient.idPatient,
+        add_previous_exams=add_previous_exams,
+        cache=cache,
+        schema=schema,
+    )
+
+    segExam = SegmentExam.refDict(idSegment)
+    age = dateutils.data2age(
+        patient.birthdate.isoformat() if patient.birthdate else date.today().isoformat()
+    )
+
+    exams = {}
+    for e in segExam:
+        examEmpty = {
+            "value": None,
+            "alert": False,
+            "ref": None,
+            "name": None,
+            "unit": None,
+            "delta": None,
+        }
+        examEmpty["date"] = None
+        examEmpty["min"] = segExam[e].min
+        examEmpty["max"] = segExam[e].max
+        examEmpty["name"] = segExam[e].name
+        examEmpty["initials"] = segExam[e].initials
+        if segExam[e].initials.lower().strip() == "creatinina":
+            exams["cr"] = examEmpty
+        else:
+            exams[e.lower()] = examEmpty
+
+    examsExtra = {}
+    for exam_type, exam_object in current_exams.items():
+        if exam_type not in [
+            "mdrd",
+            "ckd",
+            "ckd21",
+            "cg",
+            "swrtz2",
+            "swrtz1",
+        ]:
+            exams[exam_type] = examutils.formatExam(
+                value=exam_object.get("value", None),
+                typeExam=exam_type,
+                unit=exam_object.get("unit", None),
+                date=exam_object.get("date", None),
+                segExam=segExam,
+                prevValue=exam_object.get("prev", None),
+            )
+
+        if exam_type in segExam:
+            if (
+                segExam[exam_type].initials.lower().strip() == "creatinina"
+                and "cr" in exams
+                and exams["cr"]["value"] == None
+            ):
+                exams["cr"] = examutils.formatExam(
+                    value=exam_object.get("value", None),
+                    typeExam=exam_type,
+                    unit=exam_object.get("unit", None),
+                    date=exam_object.get("date", None),
+                    segExam=segExam,
+                    prevValue=exam_object.get("prev", None),
+                )
+
+            extra_config = [
+                {"exam_key": "tgo", "extra_key": "tgo"},
+                {"exam_key": "tgp", "extra_key": "tgp"},
+                {"exam_key": "plaquetas", "extra_key": "plqt"},
+            ]
+            for ec in extra_config:
+                if segExam[exam_type].initials.lower().strip() == ec.get("exam_key"):
+                    examsExtra[ec.get("extra_key")] = examutils.formatExam(
+                        value=exam_object.get("value", None),
+                        typeExam=exam_type,
+                        unit=exam_object.get("unit", None),
+                        date=exam_object.get("date", None),
+                        segExam=segExam,
+                        prevValue=exam_object.get("prev", None),
+                    )
+
+    if "cr" in exams:
+        if age > 17:
+            if "mdrd" in exams:
+                exams["mdrd"] = examutils.mdrd_calc(
+                    exams["cr"]["value"],
+                    patient.birthdate,
+                    patient.gender,
+                    patient.skinColor,
+                )
+            if "cg" in exams:
+                exams["cg"] = examutils.cg_calc(
+                    exams["cr"]["value"],
+                    patient.birthdate,
+                    patient.gender,
+                    patient.weight,
+                )
+            if "ckd" in exams:
+                exams["ckd"] = examutils.ckd_calc(
+                    exams["cr"]["value"],
+                    patient.birthdate,
+                    patient.gender,
+                    patient.skinColor,
+                    patient.height,
+                    patient.weight,
+                )
+            if "ckd21" in exams:
+                exams["ckd21"] = examutils.ckd_calc_21(
+                    exams["cr"]["value"], patient.birthdate, patient.gender
+                )
+        else:
+            if "swrtz2" in exams:
+                exams["swrtz2"] = examutils.schwartz2_calc(
+                    exams["cr"]["value"], patient.height
+                )
+
+            if "swrtz1" in exams:
+                exams["swrtz1"] = examutils.schwartz1_calc(
+                    exams["cr"]["value"],
+                    patient.birthdate,
+                    patient.gender,
+                    patient.height,
+                )
+
+    return dict(exams, **examsExtra)
