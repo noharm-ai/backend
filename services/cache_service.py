@@ -40,3 +40,21 @@ def get_range(key: str, days_ago: int):
         return result
 
     return None
+
+
+def get_hgetall(key: str, lower_key: bool = True):
+    try:
+        cache_data = redis_client.hgetall(key)
+    except:
+        logging.basicConfig()
+        logger = logging.getLogger("noharm.backend")
+        logger.error(
+            f"redis timeout error: {key}",
+        )
+        return None
+
+    data = {}
+    for data_key, data_object in cache_data.items():
+        data[data_key.lower() if lower_key else data_key] = json.loads(data_object)
+
+    return data
