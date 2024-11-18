@@ -43,8 +43,8 @@ def api_endpoint():
 
                 return {"status": "success", "data": result}, status.HTTP_200_OK
 
-            except (JWTExtendedException, PyJWTError):
-                print("NHDEBUG", "jwtextendedexception")
+            except (JWTExtendedException, PyJWTError) as e:
+                print("NHDEBUG", "jwtextendedexception2", e)
                 db.session.rollback()
                 db.session.close()
                 db.session.remove()

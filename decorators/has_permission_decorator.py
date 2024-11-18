@@ -38,13 +38,9 @@ def has_permission(*permissions: List[Permission]):
                     user_context = User.find(get_jwt_identity())
 
             if user_context == None:
-                print("NHDEBUG usercontext null")
                 raise AuthorizationError()
 
             user_permissions = Role.get_permissions_from_user(user=user_context)
-
-            print("NHDEBUG permission count", g.get("permission_test_count", 0))
-            print("NHDEBUG permissions", user_permissions)
 
             # inject extra params
             if "user_permissions" in inspect.signature(f).parameters:
@@ -52,7 +48,6 @@ def has_permission(*permissions: List[Permission]):
 
             if g.get("permission_test_count", 0) == 0:
                 if len(set.intersection(set(permissions), set(user_permissions))) == 0:
-                    print("NHDEBUG invalid permission", user_permissions)
                     raise AuthorizationError()
 
             g.permission_test_count = g.get("permission_test_count", 0) + 1
