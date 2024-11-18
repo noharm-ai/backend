@@ -20,6 +20,7 @@ numpy
 scikit-learn
 flask-mail
 random-password-generator
+PyJWT==2.9.0
 pyjwt[crypto]
 cryptography==37.0.4
 boto3==1.35.2
