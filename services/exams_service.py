@@ -221,7 +221,8 @@ def _history_exam(typeExam, examsList, segExam):
                 date=e.date.isoformat(),
                 segExam=segExam,
             )
-            del item["ref"]
+            if "ref" in item:
+                del item["ref"]
             results.append(item)
     return results
 
@@ -336,8 +337,8 @@ def _get_exams_previous_results(id_patient: int):
     return previous_exams
 
 
-def _get_exams_current_results(
-    id_patient: int, add_previous_exams: bool, cache: bool, schema: str
+def get_exams_current_results(
+    id_patient: int, add_previous_exams: bool, cache: bool, schema: str, lower_key=True
 ):
     if cache:
         exams = cache_service.get_hgetall(
@@ -360,7 +361,7 @@ def _get_exams_current_results(
 
     exams = {}
     for e in results:
-        exams[e.typeExam.lower()] = {
+        exams[e.typeExam.lower() if lower_key else e.typeExam] = {
             "value": e.value,
             "unit": e.unit,
             "date": e.date.isoformat(),
@@ -373,7 +374,7 @@ def _get_exams_current_results(
 def find_latest_exams(
     patient: Patient, idSegment: int, schema: str, add_previous_exams=False, cache=True
 ):
-    current_exams = _get_exams_current_results(
+    current_exams = get_exams_current_results(
         id_patient=patient.idPatient,
         add_previous_exams=add_previous_exams,
         cache=cache,
