@@ -13,7 +13,7 @@ from models.prescription import (
     PrescriptionAudit,
     Department,
 )
-from models.segment import Exams, Segment
+from models.segment import Segment
 from models.enums import (
     MemoryEnum,
     FeatureEnum,
