@@ -23,28 +23,39 @@ def proxy_name(idPatient):
 
     url = config["getname"]["url"]
     params = dict(config["getname"]["params"], **{"cd_paciente": idPatient})
-    response = requests.get(
-        url,
-        headers={"Authorization": token},
-        params=params,
-    )
 
-    if response.status_code == status.HTTP_200_OK:
-        data = response.json()
+    try:
+        response = requests.get(
+            url,
+            headers={"Authorization": token},
+            params=params,
+        )
 
-        if len(data["data"]) > 0:
-            patient = data["data"][0]
+        if response.status_code == status.HTTP_200_OK:
+            data = response.json()
 
-            return {
-                "status": "success",
-                "idPatient": patient["idPatient"],
-                "name": patient["name"],
-            }, status.HTTP_200_OK
+            if len(data["data"]) > 0:
+                patient = data["data"][0]
 
-    logging.basicConfig()
-    logger = logging.getLogger("noharm.backend")
-    logger.error(f"Service names error {response.status_code}")
-    logger.error(response.json())
+                return {
+                    "status": "success",
+                    "idPatient": patient["idPatient"],
+                    "name": patient["name"],
+                }, status.HTTP_200_OK
+
+        logging.basicConfig()
+        logger = logging.getLogger("noharm.backend")
+        logger.error(f"Service names ERROR: {response.status_code}")
+        logger.error(url)
+        logger.error(params)
+        logger.error(response.json())
+    except Exception as e:
+        logging.basicConfig()
+        logger = logging.getLogger("noharm.backend")
+        logger.error("Service names ERROR (exception)")
+        logger.error(url)
+        logger.error(params)
+        logger.exception(e)
 
     return {
         "status": "error",
@@ -69,23 +80,37 @@ def proxy_multiple():
         config["getname"]["params"],
         **{"cd_paciente": " ".join(str(id) for id in ids_list)},
     )
-    response = requests.get(url, headers={"Authorization": token}, params=params)
 
-    found = []
-    names = []
-    if response.status_code == status.HTTP_200_OK:
-        data = response.json()
+    try:
+        response = requests.get(url, headers={"Authorization": token}, params=params)
 
-        for p in data["data"]:
-            found.append(str(p["idPatient"]))
-            names.append(
-                {"status": "success", "idPatient": p["idPatient"], "name": p["name"]}
-            )
-    else:
+        found = []
+        names = []
+        if response.status_code == status.HTTP_200_OK:
+            data = response.json()
+
+            for p in data["data"]:
+                found.append(str(p["idPatient"]))
+                names.append(
+                    {
+                        "status": "success",
+                        "idPatient": p["idPatient"],
+                        "name": p["name"],
+                    }
+                )
+        else:
+            logging.basicConfig()
+            logger = logging.getLogger("noharm.backend")
+            logger.error(f"Service names error {response.status_code}")
+            logger.error(response.json())
+
+    except Exception as e:
         logging.basicConfig()
         logger = logging.getLogger("noharm.backend")
-        logger.error(f"Service names error {response.status_code}")
-        logger.error(response.json())
+        logger.error(f"Service names ERROR (exception)")
+        logger.error(url)
+        logger.error(params)
+        logger.exception(e)
 
     for id_patient in ids_list:
         if str(id_patient) not in found:
