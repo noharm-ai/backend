@@ -42,7 +42,7 @@ def get_range(key: str, days_ago: int):
     return None
 
 
-def get_hgetall(key: str, lower_key: bool = True):
+def get_hgetall(key: str):
     try:
         cache_data = redis_client.hgetall(key)
     except:
@@ -55,6 +55,6 @@ def get_hgetall(key: str, lower_key: bool = True):
 
     data = {}
     for data_key, data_object in cache_data.items():
-        data[data_key.lower() if lower_key else data_key] = json.loads(data_object)
+        data[data_key] = json.loads(data_object)
 
     return data

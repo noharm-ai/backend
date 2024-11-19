@@ -1,3 +1,4 @@
+import json
 from sqlalchemy import desc, nullsfirst, func, and_, or_, text
 from datetime import date, datetime
 
@@ -16,6 +17,7 @@ from services import (
     feature_service,
     data_authorization_service,
     clinical_notes_queries_service,
+    exams_service,
 )
 from decorators.has_permission_decorator import has_permission, Permission
 from utils import status, prescriptionutils
@@ -173,7 +175,12 @@ def is_being_evaluated(features):
 
 @has_permission(Permission.WRITE_PRESCRIPTION, Permission.WRITE_DRUG_SCORE)
 def recalculate_prescription(id_prescription: int, user_context: User):
-    p = Prescription.query.get(id_prescription)
+    p = (
+        db.session.query(Prescription)
+        .filter(Prescription.id == id_prescription)
+        .first()
+    )
+
     if p is None:
         raise ValidationError(
             "Prescrição inexistente.",
@@ -261,9 +268,11 @@ def recalculate_prescription(id_prescription: int, user_context: User):
         db.session.execute(query, {"idPrescription": p.id})
 
     # refresh cache
-    _refresh_clinical_notes_stats(
-        admission_number=p.admissionNumber, user_context=user_context
-    )
+    if memory_service.is_feature_active(feature_flag=AppFeatureFlagEnum.REDIS_CACHE):
+        _refresh_clinical_notes_stats(
+            admission_number=p.admissionNumber, user_context=user_context
+        )
+        _refresh_exams(id_patient=p.idPatient, user_context=user_context)
 
 
 def get_query_prescriptions_by_agg(
@@ -365,11 +374,6 @@ def _refresh_clinical_notes_stats(admission_number: int, user_context: User):
             redis_client.json().set(key, "$", cache_data)
             redis_client.expire(key, expire_in)
 
-    if not memory_service.is_feature_active(
-        feature_flag=AppFeatureFlagEnum.REDIS_CACHE
-    ):
-        return
-
     # signs (expires in 60 days)
     signs = clinical_notes_queries_service.get_signs(
         admission_number=admission_number, user_context=user_context, cache=False
@@ -383,3 +387,17 @@ def _refresh_clinical_notes_stats(admission_number: int, user_context: User):
     )
     key = f"{user_context.schema}:{admission_number}:dados"
     _add_cache(key=key, data=infos, expire_in=5184000)
+
+
+def _refresh_exams(id_patient: int, user_context: User):
+    exams = exams_service.get_exams_current_results(
+        id_patient=id_patient,
+        add_previous_exams=True,
+        cache=False,
+        schema=user_context.schema,
+        lower_key=False,
+    )
+
+    key = f"{user_context.schema}:{id_patient}:exames"
+    for type_exam, exam in exams.items():
+        redis_client.hset(key, type_exam, json.dumps(exam))
