@@ -6,6 +6,7 @@ from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request, get_jwt
 from flask_jwt_extended.exceptions import JWTExtendedException
 from jwt.exceptions import PyJWTError
 from functools import wraps
+from pydantic import ValidationError as PydanticValidationError
 
 from models.main import db, dbSession, User
 from utils import status
@@ -74,6 +75,18 @@ def api_endpoint():
                     "message": str(e),
                     "code": e.code,
                 }, e.httpStatus
+
+            except PydanticValidationError as e:
+                db.session.rollback()
+                db.session.close()
+                db.session.remove()
+
+                return {
+                    "status": "error",
+                    "message": "Parâmetros inválidos",
+                    "code": 0,
+                    "validations": e.errors(),
+                }, status.HTTP_400_BAD_REQUEST
 
             except Exception as e:
                 db.session.rollback()
