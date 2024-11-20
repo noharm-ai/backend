@@ -49,3 +49,21 @@ def get_prioritization(request_data: RegulationPrioritizationRequest):
     query = query.limit(request_data.limit).offset(request_data.offset)
 
     return query.all()
+
+
+def get_solicitation(id: int):
+    query = (
+        db.session.query(
+            RegSolicitation,
+            RegSolicitationType,
+            Patient,
+        )
+        .outerjoin(
+            RegSolicitationType,
+            RegSolicitation.id_reg_solicitation_type == RegSolicitationType.id,
+        )
+        .outerjoin(Patient, RegSolicitation.admission_number == Patient.admissionNumber)
+        .filter(RegSolicitation.id == id)
+    )
+
+    return query.first()
