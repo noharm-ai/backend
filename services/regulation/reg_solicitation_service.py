@@ -1,8 +1,11 @@
+from datetime import datetime
+
 from decorators.has_permission_decorator import has_permission, Permission
 from repository.regulation import reg_solicitation_repository
-from models.main import User
+from models.main import db, User
 from models.regulation import RegSolicitation, RegSolicitationType, RegMovement
 from models.prescription import Patient
+from models.requests.regulation_movement_request import RegulationMovementRequest
 from utils import dateutils, status
 from exception.validation_error import ValidationError
 
@@ -78,3 +81,36 @@ def _get_movements(solicitation: RegSolicitation):
     )
 
     return movements
+
+
+@has_permission(Permission.WRITE_REGULATION)
+def move(request_data: RegulationMovementRequest, user_context: User):
+    solicitation: RegSolicitation = (
+        db.session.query(RegSolicitation)
+        .filter(RegSolicitation.id == request_data.id)
+        .first()
+    )
+
+    if not solicitation:
+        raise ValidationError(
+            "Registro inválido",
+            "errors.invalidRecord",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    movement = RegMovement()
+    movement.id_reg_solicitation = solicitation.id
+    movement.stage_origin = solicitation.stage
+    movement.stage_destination = request_data.nextStage
+    movement.action = request_data.action
+    movement.data = request_data.actionData
+    movement.created_at = datetime.today()
+    movement.created_by = user_context.id
+
+    db.session.add(movement)
+
+    # update solicitation data
+    solicitation.stage = request_data.nextStage
+    db.session.flush()
+
+    return True
