@@ -78,3 +78,5 @@ class Permission(Enum):
 
     MULTI_SCHEMA = "MULTI_SCHEMA"  # "grants multi schema access"
     MAINTAINER = "MAINTAINER"  # "grants access to closed contracts"
+
+    READ_REGULATION = "READ_REGULATION"  # grants access to regulation data
