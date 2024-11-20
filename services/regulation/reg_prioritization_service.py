@@ -32,4 +32,6 @@ def get_prioritization(request_data: RegulationPrioritizationRequest):
             }
         )
 
-    return records
+    total = results[0].total if results else 0
+
+    return {"count": total, "list": records}

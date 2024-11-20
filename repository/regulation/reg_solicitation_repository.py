@@ -1,4 +1,4 @@
-from sqlalchemy import asc, desc
+from sqlalchemy import asc, desc, func
 from datetime import timedelta
 
 from models.main import db
@@ -11,7 +11,12 @@ from models.requests.regulation_prioritization_request import (
 
 def get_prioritization(request_data: RegulationPrioritizationRequest):
     query = (
-        db.session.query(RegSolicitation, RegSolicitationType, Patient)
+        db.session.query(
+            RegSolicitation,
+            RegSolicitationType,
+            Patient,
+            func.count().over().label("total"),
+        )
         .outerjoin(
             RegSolicitationType,
             RegSolicitation.id_reg_solicitation_type == RegSolicitationType.id,
