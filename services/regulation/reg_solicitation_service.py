@@ -1,6 +1,7 @@
 from decorators.has_permission_decorator import has_permission, Permission
 from repository.regulation import reg_solicitation_repository
-from models.regulation import RegSolicitation, RegSolicitationType
+from models.main import User
+from models.regulation import RegSolicitation, RegSolicitationType, RegMovement
 from models.prescription import Patient
 from utils import dateutils, status
 from exception.validation_error import ValidationError
@@ -20,6 +21,7 @@ def get_solicitation(id: int):
     solicitation: RegSolicitation = solicitation_object.RegSolicitation
     solicitation_type: RegSolicitationType = solicitation_object.RegSolicitationType
     patient: Patient = solicitation_object.Patient
+    movements = _get_movements(solicitation=solicitation)
 
     return {
         "id": str(solicitation.id),
@@ -36,4 +38,43 @@ def get_solicitation(id: int):
             "birthdate": dateutils.to_iso(patient.birthdate) if patient else None,
             "gender": patient.gender if patient else None,
         },
+        "movements": movements,
     }
+
+
+def _get_movements(solicitation: RegSolicitation):
+    movements = []
+    records = reg_solicitation_repository.get_solicitation_movement(
+        id_reg_solicitation=solicitation.id
+    )
+
+    for i in records:
+        reg_movement: RegMovement = i.RegMovement
+        responsible: User = i.User
+
+        movements.append(
+            {
+                "id": str(reg_movement.id),
+                "origin": reg_movement.stage_origin,
+                "destination": reg_movement.stage_destination,
+                "action": reg_movement.action,
+                "data": reg_movement.data,
+                "createdAt": dateutils.to_iso(reg_movement.created_at),
+                "createdBy": responsible.name if responsible else None,
+            }
+        )
+
+    # initial event
+    movements.append(
+        {
+            "id": "0",
+            "origin": None,
+            "destination": None,
+            "action": -1,
+            "data": None,
+            "createdAt": dateutils.to_iso(solicitation.date),
+            "createdBy": None,
+        }
+    )
+
+    return movements

@@ -1,3 +1,5 @@
+from sqlalchemy.dialects import postgresql
+
 from .main import db
 
 
@@ -39,3 +41,17 @@ class RegSolicitationType(db.Model):
     created_by = db.Column("created_by", db.BigInteger, nullable=True)
     updated_at = db.Column("updated_at", db.DateTime, nullable=False)
     updated_by = db.Column("updated_by", db.BigInteger, nullable=True)
+
+
+class RegMovement(db.Model):
+    __tablename__ = "reg_movimentacao"
+
+    id = db.Column("idreg_movimentacao", db.BigInteger, primary_key=True)
+    id_reg_solicitation = db.Column("fkreg_solicitacao", db.BigInteger, nullable=False)
+    stage_origin = db.Column("etapa_origem", db.Integer, nullable=False)
+    stage_destination = db.Column("etapa_destino", db.Integer, nullable=False)
+    action = db.Column("acao", db.Integer, nullable=False)
+    data = db.Column("dados", postgresql.JSON, nullable=True)
+
+    created_at = db.Column("created_at", db.DateTime, nullable=False)
+    created_by = db.Column("created_by", db.BigInteger, nullable=True)

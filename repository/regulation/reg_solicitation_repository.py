@@ -1,9 +1,9 @@
 from sqlalchemy import asc, desc, func
 from datetime import timedelta
 
-from models.main import db
+from models.main import db, User
 from models.prescription import Patient
-from models.regulation import RegSolicitation, RegSolicitationType
+from models.regulation import RegSolicitation, RegSolicitationType, RegMovement
 from models.requests.regulation_prioritization_request import (
     RegulationPrioritizationRequest,
 )
@@ -67,3 +67,14 @@ def get_solicitation(id: int):
     )
 
     return query.first()
+
+
+def get_solicitation_movement(id_reg_solicitation: int):
+    query = (
+        db.session.query(RegMovement, User)
+        .outerjoin(User, RegMovement.created_by == User.id)
+        .filter(RegMovement.id_reg_solicitation == id_reg_solicitation)
+        .order_by(RegMovement.created_at.desc())
+    )
+
+    return query.all()
