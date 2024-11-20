@@ -113,4 +113,4 @@ def move(request_data: RegulationMovementRequest, user_context: User):
     solicitation.stage = request_data.nextStage
     db.session.flush()
 
-    return True
+    return _get_movements(solicitation=solicitation)
