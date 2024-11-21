@@ -1,4 +1,4 @@
-from sqlalchemy import asc, desc, func
+from sqlalchemy import asc, desc, func, nullslast
 from datetime import timedelta
 
 from models.main import db, User
@@ -44,7 +44,9 @@ def get_prioritization(request_data: RegulationPrioritizationRequest):
     for order in request_data.order:
         direction = desc if order.direction == "desc" else asc
         if order.field in ["date", "risk"]:
-            query = query.order_by(direction(getattr(RegSolicitation, order.field)))
+            query = query.order_by(
+                nullslast(direction(getattr(RegSolicitation, order.field)))
+            )
 
     query = query.limit(request_data.limit).offset(request_data.offset)
 
