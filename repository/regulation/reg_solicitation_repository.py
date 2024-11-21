@@ -78,3 +78,11 @@ def get_solicitation_movement(id_reg_solicitation: int):
     )
 
     return query.all()
+
+
+def get_types():
+    query = db.session.query(RegSolicitationType).order_by(
+        RegSolicitationType.name.asc()
+    )
+
+    return query.all()

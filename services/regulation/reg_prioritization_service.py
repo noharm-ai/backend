@@ -28,10 +28,25 @@ def get_prioritization(request_data: RegulationPrioritizationRequest):
                 "idRegSolicitationType": str(solicitation.id_reg_solicitation_type),
                 "type": solicitation_type.name if solicitation_type else None,
                 "birthdate": patient.birthdate if patient else None,
-                "age": dateutils.data2age(patient.birthdate) if patient else None,
+                "age": (
+                    dateutils.data2age(patient.birthdate.isoformat())
+                    if patient
+                    else None
+                ),
             }
         )
 
     total = results[0].total if results else 0
 
     return {"count": total, "list": records}
+
+
+@has_permission(Permission.READ_REGULATION)
+def get_types():
+    results = reg_solicitation_repository.get_types()
+    records = []
+
+    for i in results:
+        records.append({"id": str(i.id), "name": i.name})
+
+    return records

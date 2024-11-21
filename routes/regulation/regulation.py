@@ -30,3 +30,9 @@ def move():
     return reg_solicitation_service.move(
         request_data=RegulationMovementRequest(**request.get_json())
     )
+
+
+@app_regulation.route("/regulation/types", methods=["GET"])
+@api_endpoint()
+def types():
+    return reg_prioritization_service.get_types()
