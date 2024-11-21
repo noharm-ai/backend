@@ -27,43 +27,39 @@ class refEmpty:
 
 
 def formatExam(value, typeExam, unit, date, segExam, prevValue=None):
-    if value is not None:
-        value = numberutils.none2zero(value)
+    value = numberutils.none2zero(value)
 
-        if typeExam in segExam:
-            ref = segExam[typeExam]
-            alert = not (
-                value >= numberutils.none2zero(ref.min)
-                and value <= numberutils.none2zero(ref.max)
-            )
-        else:
-            ref = refEmpty()
-            ref.name = typeExam
-            ref.initials = typeExam
-            alert = False
-
-        prevValue = numberutils.none2zero(prevValue)
-        delta = None
-        if prevValue > 0 and value > 0:
-            delta = round(round(abs(prevValue - value) / prevValue, 2) * 100, 2)
-            delta = delta * (-1) if prevValue > value else delta
-
-        return {
-            "value": value,
-            "unit": stringutils.strNone(unit),
-            "alert": alert,
-            "date": date,
-            "ref": ref.ref,
-            "initials": ref.initials,
-            "min": ref.min,
-            "max": ref.max,
-            "name": ref.name,
-            "prev": prevValue,
-            "delta": delta,
-        }
+    if typeExam in segExam:
+        ref = segExam[typeExam]
+        alert = not (
+            value >= numberutils.none2zero(ref.min)
+            and value <= numberutils.none2zero(ref.max)
+        )
     else:
-        examEmpty["date"] = None
-        return examEmpty
+        ref = refEmpty()
+        ref.name = typeExam
+        ref.initials = typeExam
+        alert = False
+
+    prevValue = numberutils.none2zero(prevValue)
+    delta = None
+    if prevValue > 0 and value > 0:
+        delta = round(round(abs(prevValue - value) / prevValue, 2) * 100, 2)
+        delta = delta * (-1) if prevValue > value else delta
+
+    return {
+        "value": value,
+        "unit": stringutils.strNone(unit),
+        "alert": alert,
+        "date": date,
+        "ref": ref.ref,
+        "initials": ref.initials,
+        "min": ref.min,
+        "max": ref.max,
+        "name": ref.name,
+        "prev": prevValue,
+        "delta": delta,
+    }
 
 
 # Modification of Diet in Renal Disease
