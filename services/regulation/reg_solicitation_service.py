@@ -31,6 +31,7 @@ def get_solicitation(id: int):
         "stage": solicitation.stage,
         "date": dateutils.to_iso(solicitation.date),
         "type": solicitation_type.name if solicitation_type else None,
+        "idRegSolicitationType": solicitation.id_reg_solicitation_type,
         "risk": solicitation.risk,
         "attendant": solicitation.attendant,
         "attendantRecord": solicitation.attendant_record,
