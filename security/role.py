@@ -49,6 +49,7 @@ class Role(Enum):
         Permission.MULTI_SCHEMA,
         Permission.MAINTAINER,
         Permission.READ_DISPENSATION,
+        Permission.READ_REGULATION,
     ]
 
     CURATOR = "CURATOR", [
