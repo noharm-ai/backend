@@ -42,6 +42,10 @@ def get_solicitation(id: int):
             "birthdate": dateutils.to_iso(patient.birthdate) if patient else None,
             "gender": patient.gender if patient else None,
         },
+        "extra": {
+            "scheduleDate": dateutils.to_iso(solicitation.schedule_date),
+            "transportationDate": dateutils.to_iso(solicitation.transportation_date),
+        },
         "movements": movements,
     }
 
@@ -63,6 +67,7 @@ def _get_movements(solicitation: RegSolicitation):
                 "destination": reg_movement.stage_destination,
                 "action": reg_movement.action,
                 "data": reg_movement.data,
+                "template": reg_movement.template,
                 "createdAt": dateutils.to_iso(reg_movement.created_at),
                 "createdBy": responsible.name if responsible else None,
             }
@@ -105,6 +110,7 @@ def move(request_data: RegulationMovementRequest, user_context: User):
     movement.stage_destination = request_data.nextStage
     movement.action = request_data.action
     movement.data = request_data.actionData
+    movement.template = request_data.actionDataTemplate
     movement.created_at = datetime.today()
     movement.created_by = user_context.id
 
@@ -112,6 +118,25 @@ def move(request_data: RegulationMovementRequest, user_context: User):
 
     # update solicitation data
     solicitation.stage = request_data.nextStage
+
+    if "scheduleDate" in movement.data:
+        solicitation.schedule_date = datetime.strptime(
+            movement.data.get("scheduleDate"), "%d/%m/%Y %H:%M"
+        )
+
+    if "transportationDate" in movement.data:
+        solicitation.transportation_date = datetime.strptime(
+            movement.data.get("transportationDate"), "%d/%m/%Y %H:%M"
+        )
+
     db.session.flush()
 
-    return _get_movements(solicitation=solicitation)
+    return {
+        "id": str(solicitation.id),
+        "stage": solicitation.stage,
+        "extra": {
+            "scheduleDate": dateutils.to_iso(solicitation.schedule_date),
+            "transportationDate": dateutils.to_iso(solicitation.transportation_date),
+        },
+        "movements": _get_movements(solicitation=solicitation),
+    }

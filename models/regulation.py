@@ -51,7 +51,8 @@ class RegMovement(db.Model):
     stage_origin = db.Column("etapa_origem", db.Integer, nullable=False)
     stage_destination = db.Column("etapa_destino", db.Integer, nullable=False)
     action = db.Column("acao", db.Integer, nullable=False)
-    data = db.Column("dados", postgresql.JSON, nullable=True)
+    data = db.Column("dados", postgresql.JSON, nullable=False)
+    template = db.Column("template", postgresql.JSON, nullable=False)
 
     created_at = db.Column("created_at", db.DateTime, nullable=False)
     created_by = db.Column("created_by", db.BigInteger, nullable=True)
