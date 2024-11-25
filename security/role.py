@@ -49,6 +49,7 @@ class Role(Enum):
         Permission.MULTI_SCHEMA,
         Permission.MAINTAINER,
         Permission.READ_DISPENSATION,
+        Permission.READ_REGULATION,
     ]
 
     CURATOR = "CURATOR", [
@@ -137,14 +138,19 @@ class Role(Enum):
         Permission.WRITE_SUPPORT,
     ]
 
-    DISCHARGE_MANAGER = "DISCHARGE_MANAGER", [
-        Permission.WRITE_BASIC_FEATURES,
-        Permission.READ_BASIC_FEATURES,
-        Permission.READ_DISCHARGE_SUMMARY,
-        Permission.WRITE_DISCHARGE_SUMMARY,
-        Permission.READ_SUPPORT,
-        Permission.WRITE_SUPPORT,
-    ]
+    DISCHARGE_MANAGER = (
+        "DISCHARGE_MANAGER",
+        [
+            Permission.WRITE_BASIC_FEATURES,
+            Permission.READ_BASIC_FEATURES,
+            Permission.READ_DISCHARGE_SUMMARY,
+            Permission.WRITE_DISCHARGE_SUMMARY,
+            Permission.READ_SUPPORT,
+            Permission.WRITE_SUPPORT,
+        ],
+    )
+
+    REGULATOR = "REGULATOR", [Permission.READ_REGULATION, Permission.WRITE_REGULATION]
 
     STATIC_USER = "STATIC_USER", [Permission.READ_STATIC]
 

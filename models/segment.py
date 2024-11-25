@@ -1,8 +1,7 @@
 from datetime import date, timedelta
-from sqlalchemy import and_, desc, asc
+from sqlalchemy import desc, asc
 
 from .main import db
-from utils import examutils, dateutils
 
 
 class Segment(db.Model):

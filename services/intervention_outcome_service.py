@@ -363,6 +363,7 @@ def get_outcome_data(id_intervention, user_context: User, edit=False):
             if intervention.date_base_economy != None
             else intervention.date
         ),
+        destination=False,
     )
 
     if not readonly or intervention.origin == None:
@@ -403,6 +404,7 @@ def get_outcome_data(id_intervention, user_context: User, edit=False):
             list=destiny_query.all(),
             user=user_context,
             date_base_economy=None,
+            destination=True,
         )
 
         if not readonly:
@@ -595,7 +597,7 @@ def _get_price_kit(id_prescription, prescription_drug: PrescriptionDrug, user: U
     return {"price": str(kit_price), "list": drugs}
 
 
-def _outcome_calc(list, user: User, date_base_economy):
+def _outcome_calc(list, user: User, date_base_economy, destination=False):
     results = []
 
     for item in list:
@@ -688,6 +690,8 @@ def _outcome_calc(list, user: User, date_base_economy):
 
             if agg_presc != None:
                 id_prescription_aggregate = agg_presc.id
+            elif destination:
+                continue
             else:
                 raise ValidationError(
                     "Não foi possível determinar o segmento desta intervenção. Tente recalcular a prescrição. Se não surtir efeito, contate o suporte.",
