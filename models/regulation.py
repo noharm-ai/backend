@@ -13,6 +13,7 @@ class RegSolicitation(db.Model):
     id_reg_solicitation_type = db.Column(
         "fkreg_tipo_solicitacao", db.BigInteger, nullable=False
     )
+    id_department = db.Column("fksetor", db.BigInteger, nullable=False)
 
     risk = db.Column("risco", db.Integer, nullable=True)
     cid = db.Column("cid", db.String, nullable=True)
@@ -36,6 +37,7 @@ class RegSolicitationType(db.Model):
     id = db.Column("fkreg_tipo_solicitacao", db.BigInteger, primary_key=True)
     name = db.Column("nome", db.String, nullable=False)
     status = db.Column("status", db.Integer, nullable=False)
+    tp_type = db.Column("tp_tipo", db.Integer, nullable=False)
 
     created_at = db.Column("created_at", db.DateTime, nullable=False)
     created_by = db.Column("created_by", db.BigInteger, nullable=True)
