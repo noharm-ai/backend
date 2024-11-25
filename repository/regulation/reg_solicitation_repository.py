@@ -84,6 +84,9 @@ def get_prioritization(request_data: RegulationPrioritizationRequest):
                 nullslast(direction(getattr(RegSolicitation, order.field)))
             )
 
+        if order.field in ["birthdate"]:
+            query = query.order_by(nullslast(direction(getattr(Patient, order.field))))
+
     query = query.limit(request_data.limit).offset(request_data.offset)
 
     return query.all()
