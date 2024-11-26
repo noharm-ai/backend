@@ -2,6 +2,8 @@ import requests
 import logging
 from flask import Blueprint, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
+from jwt import encode
+from datetime import datetime, timedelta, timezone
 
 from models.main import User, dbSession, db
 from models.appendix import SchemaConfig
@@ -123,6 +125,40 @@ def proxy_multiple():
             )
 
     return names, status.HTTP_200_OK
+
+
+@app_names.route("/names/auth-token", methods=["GET"])
+@jwt_required()
+def auth_token():
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+
+    schema_config = (
+        db.session.query(SchemaConfig)
+        .filter(SchemaConfig.schemaName == user.schema)
+        .first()
+    )
+
+    getname_config = (
+        schema_config.config.get("getname", {}) if schema_config.config else {}
+    )
+    key = getname_config.get("secret", "")
+
+    if not key:
+        return {
+            "status": "error",
+            "message": "Invalid key",
+        }, status.HTTP_400_BAD_REQUEST
+
+    token = encode(
+        payload={
+            "exp": datetime.now(tz=timezone.utc) + timedelta(minutes=2),
+            "iss": "noharm",
+        },
+        key=key,
+    )
+
+    return {"status": "success", "data": token}
 
 
 def _get_token(config):
