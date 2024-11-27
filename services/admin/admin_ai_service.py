@@ -57,7 +57,7 @@ def get_substance_by_drug_name(drug_names: list[str]):
         return drugs_dict
 
     for n in drug_names:
-        drug_names_words.append(" ".join(re.findall("\w{4,}", n)))
+        drug_names_words.append(" ".join(re.findall("\w{3,}", n)).upper())
 
     model_subst = _get_model("models/noharm-ml-subst.gz")
     token_subst = _get_model("models/noharm-tk-subst.gz")
