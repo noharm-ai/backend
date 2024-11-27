@@ -4,6 +4,7 @@ import tempfile
 import numpy
 import re
 import gc
+import logging
 from typing import List
 
 from config import Config
@@ -50,14 +51,81 @@ def get_substance(drugs: List[Drug]):
 
 
 def get_substance_by_drug_name(drug_names: list[str]):
+    def _prepare_drug_name(name):
+        words = name.split()
+        bad_words = [
+            n.upper()
+            for n in [
+                "manhã",
+                "manha",
+                "noite",
+                "pela",
+                "café",
+                "cafe",
+                "dia",
+                "conforme",
+                "HGT",
+                "antes",
+                "1cp",
+                "2cp",
+                "almoço",
+                "almoco",
+                "das",
+                "refeições",
+                "refeicoes",
+                "jejum",
+                "semana",
+                "horas",
+                "segunda",
+                "terça",
+                "terca",
+                "quarta",
+                "quinta",
+                "sexta",
+                "sábado",
+                "sabado",
+                "domingo",
+                "ao",
+                "as",
+                "às",
+            ]
+        ]
+
+        final_words = []
+        for w in words:
+            if w.upper() in bad_words:
+                continue
+
+            if len(w) < 2:
+                continue
+
+            final_words.append(w.upper())
+
+        if final_words:
+            complete = " ".join(final_words)
+            # 12-12
+            complete = re.sub("\d{1,2}[\-\/:]\d{1,2}", " ", complete)
+            # 3x/dia
+            complete = re.sub(
+                "\d{1,2}[a-zA-Z]{1,3}\/?(dia|hora|semana)",
+                " ",
+                complete,
+                flags=re.IGNORECASE,
+            )
+
+            return complete.strip()
+
+        return " ".join(words).upper()
+
     drugs_dict = {}
     drug_names_words = []
 
     if not drug_names:
         return drugs_dict
 
-    for n in drug_names:
-        drug_names_words.append(" ".join(re.findall("\w{3,}", n)).upper())
+    logging.basicConfig()
+    logger = logging.getLogger("noharm.backend")
+    drug_names_words = [_prepare_drug_name(n) for n in drug_names]
 
     model_subst = _get_model("models/noharm-ml-subst.gz")
     token_subst = _get_model("models/noharm-tk-subst.gz")
@@ -65,7 +133,7 @@ def get_substance_by_drug_name(drug_names: list[str]):
     vector = token_subst.transform(drug_names_words)
     prediction = model_subst.predict(vector)
     probabilities = model_subst.predict_proba(vector).round(2)
-    MIN_PROB = 0.5
+    MIN_PROB = 0.35
 
     for idx, p in enumerate(prediction):
         subst_idx = numpy.where(model_subst.classes_ == p)[0][0]
@@ -73,6 +141,10 @@ def get_substance_by_drug_name(drug_names: list[str]):
 
         if subst_prob >= MIN_PROB:
             drugs_dict[drug_names[idx]] = p
+
+        logger.debug(
+            f"AI INFER SUBSTANCE {drug_names[idx]} - {drug_names_words[idx]} - {subst_prob} - {p}"
+        )
 
     del model_subst, token_subst, vector, prediction, probabilities
     gc.collect()

@@ -4,6 +4,7 @@ import math
 from utils.dateutils import to_iso
 from services import drug_service
 from services.admin import admin_ai_service
+from models.enums import DrugTypeEnum
 from utils import stringutils, numberutils, prescriptionutils
 
 
@@ -432,7 +433,16 @@ class DrugList:
                 ),
                 False,
             )
-            if not existsDrug and not bool(pd[0].suspendedDate):
+            valid_sources = [
+                DrugTypeEnum.DRUG.value,
+                DrugTypeEnum.PROCEDURE.value,
+                DrugTypeEnum.SOLUTION.value,
+            ]
+            if (
+                not existsDrug
+                and not bool(pd[0].suspendedDate)
+                and pd[0].source in valid_sources
+            ):
                 result.append(
                     {
                         "idPrescription": str(pd[0].idPrescription),
