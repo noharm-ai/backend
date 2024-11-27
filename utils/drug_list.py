@@ -3,6 +3,7 @@ import math
 
 from utils.dateutils import to_iso
 from services import drug_service
+from services.admin import admin_ai_service
 from utils import stringutils, numberutils, prescriptionutils
 
 
@@ -399,6 +400,27 @@ class DrugList:
         return result
 
     @staticmethod
+    def infer_substance(pDrugs):
+        names = []
+        for p in pDrugs:
+            if p["idDrug"] == 0:
+                names.append(p["drug"])
+
+        substances = admin_ai_service.get_substance_by_drug_name(drug_names=names)
+
+        result = []
+        for p in pDrugs:
+            if p["idDrug"] == 0:
+                if p["drug"] in substances:
+                    p["sctid_infer"] = substances[p["drug"]]
+
+                result.append(p)
+            else:
+                result.append(p)
+
+        return result
+
+    @staticmethod
     def conciliaList(pDrugs, result=[]):
         for pd in pDrugs:
             existsDrug = next(
@@ -434,6 +456,7 @@ class DrugList:
                         ),
                         "time": prescriptionutils.timeValue(pd[0].interval),
                         "recommendation": pd[0].notes,
+                        "sctid": str(pd.Substance.id) if pd.Substance else None,
                     }
                 )
 
