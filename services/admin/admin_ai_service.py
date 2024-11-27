@@ -10,7 +10,7 @@ from typing import List
 from config import Config
 from exception.validation_error import ValidationError
 from models.prescription import Drug
-from utils import status
+from utils import status, stringutils
 
 
 def get_substance(drugs: List[Drug]):
@@ -51,72 +51,6 @@ def get_substance(drugs: List[Drug]):
 
 
 def get_substance_by_drug_name(drug_names: list[str]):
-    def _prepare_drug_name(name):
-        words = name.split()
-        bad_words = [
-            n.upper()
-            for n in [
-                "manhã",
-                "manha",
-                "noite",
-                "pela",
-                "café",
-                "cafe",
-                "dia",
-                "conforme",
-                "HGT",
-                "antes",
-                "1cp",
-                "2cp",
-                "almoço",
-                "almoco",
-                "das",
-                "refeições",
-                "refeicoes",
-                "jejum",
-                "semana",
-                "horas",
-                "segunda",
-                "terça",
-                "terca",
-                "quarta",
-                "quinta",
-                "sexta",
-                "sábado",
-                "sabado",
-                "domingo",
-                "ao",
-                "as",
-                "às",
-            ]
-        ]
-
-        final_words = []
-        for w in words:
-            if w.upper() in bad_words:
-                continue
-
-            if len(w) < 2:
-                continue
-
-            final_words.append(w.upper())
-
-        if final_words:
-            complete = " ".join(final_words)
-            # 12-12
-            complete = re.sub("\d{1,2}[\-\/:]\d{1,2}", " ", complete)
-            # 3x/dia
-            complete = re.sub(
-                "\d{1,2}[a-zA-Z]{1,3}\/?(dia|hora|semana)",
-                " ",
-                complete,
-                flags=re.IGNORECASE,
-            )
-
-            return complete.strip()
-
-        return " ".join(words).upper()
-
     drugs_dict = {}
     drug_names_words = []
 
@@ -125,7 +59,7 @@ def get_substance_by_drug_name(drug_names: list[str]):
 
     logging.basicConfig()
     logger = logging.getLogger("noharm.backend")
-    drug_names_words = [_prepare_drug_name(n) for n in drug_names]
+    drug_names_words = [stringutils.prepare_drug_name(n) for n in drug_names]
 
     model_subst = _get_model("models/noharm-ml-subst.gz")
     token_subst = _get_model("models/noharm-tk-subst.gz")
