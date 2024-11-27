@@ -32,6 +32,10 @@ jobs:
           psql -h localhost -U postgres -d noharm -a -f database/noharm-triggers.sql -v ON_ERROR_STOP=1
           psql -h localhost -U postgres -d noharm -a -f database/noharm-insert.sql -v ON_ERROR_STOP=1
       - name: Run Python Tests
+        env:
+          CACHE_BUCKET_ID: ${{ secrets.CACHE_BUCKET_ID }}
+          CACHE_BUCKET_KEY: ${{ secrets.CACHE_BUCKET_KEY }}
+          CACHE_BUCKET_NAME: ${{ secrets.CACHE_BUCKET_NAME }}
         run: python -m pytest -v
   deploy:
     needs: [build]
