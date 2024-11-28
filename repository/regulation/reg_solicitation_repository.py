@@ -2,7 +2,7 @@ from sqlalchemy import asc, desc, func, nullslast
 from datetime import timedelta
 
 from models.main import db, User
-from models.prescription import Patient
+from models.prescription import Patient, Department
 from models.regulation import RegSolicitation, RegSolicitationType, RegMovement
 from models.requests.regulation_prioritization_request import (
     RegulationPrioritizationRequest,
@@ -15,6 +15,7 @@ def get_prioritization(request_data: RegulationPrioritizationRequest):
             RegSolicitation,
             RegSolicitationType,
             Patient,
+            Department,
             func.count().over().label("total"),
         )
         .outerjoin(
@@ -22,6 +23,7 @@ def get_prioritization(request_data: RegulationPrioritizationRequest):
             RegSolicitation.id_reg_solicitation_type == RegSolicitationType.id,
         )
         .outerjoin(Patient, RegSolicitation.admission_number == Patient.admissionNumber)
+        .outerjoin(Department, Department.id == RegSolicitation.id_department)
     )
 
     if request_data.startDate:
@@ -32,6 +34,40 @@ def get_prioritization(request_data: RegulationPrioritizationRequest):
             RegSolicitation.date
             <= (request_data.endDate + timedelta(hours=23, minutes=59))
         )
+
+    if request_data.scheduleStartDate:
+        query = query.filter(
+            RegSolicitation.schedule_date >= request_data.scheduleStartDate.date()
+        )
+
+    if request_data.scheduleEndDate:
+        query = query.filter(
+            RegSolicitation.schedule_date
+            <= (request_data.scheduleEndDate + timedelta(hours=23, minutes=59))
+        )
+
+    if request_data.transportationStartDate:
+        query = query.filter(
+            RegSolicitation.transportation_date
+            >= request_data.transportationStartDate.date()
+        )
+
+    if request_data.transportationEndDate:
+        query = query.filter(
+            RegSolicitation.transportation_date
+            <= (request_data.transportationEndDate + timedelta(hours=23, minutes=59))
+        )
+
+    if request_data.riskList:
+        query = query.filter(RegSolicitation.risk.in_(request_data.riskList))
+
+    if request_data.idDepartmentList:
+        query = query.filter(
+            RegSolicitation.id_department.in_(request_data.idDepartmentList)
+        )
+
+    if request_data.typeType:
+        query = query.filter(RegSolicitationType.tp_type == request_data.typeType)
 
     if request_data.typeList:
         query = query.filter(
@@ -47,6 +83,9 @@ def get_prioritization(request_data: RegulationPrioritizationRequest):
             query = query.order_by(
                 nullslast(direction(getattr(RegSolicitation, order.field)))
             )
+
+        if order.field in ["birthdate"]:
+            query = query.order_by(nullslast(direction(getattr(Patient, order.field))))
 
     query = query.limit(request_data.limit).offset(request_data.offset)
 

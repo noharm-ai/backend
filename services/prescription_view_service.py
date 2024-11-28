@@ -102,6 +102,7 @@ def _internal_get_prescription(
         alerts_data=alerts_data,
         exams_data=exam_data,
         config_data=config_data,
+        is_complete=is_complete,
     )
 
     review_data = _get_review_data(prescription=prescription, is_complete=is_complete)
@@ -522,6 +523,7 @@ def _get_drug_data(
     alerts_data: dict,
     exams_data: dict,
     config_data: dict,
+    is_complete: bool,
 ):
     drug_list = DrugList(
         drugList=drugs,
@@ -577,6 +579,9 @@ def _get_drug_data(
                 is_cpoe=config_data["is_cpoe"],
             )
             concilia_list = drug_list.conciliaList(concilia_drugs, [])
+
+        if is_complete and concilia_list:
+            p_drugs = drug_list.infer_substance(pDrugs=p_drugs)
 
     return {
         "drug_list": drug_list,

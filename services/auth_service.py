@@ -175,6 +175,10 @@ def _auth_user(
             extra=extra_audit,
         )
 
+    getname_config = (
+        schema_config.config.get("getname", {}) if schema_config.config else {}
+    )
+
     return {
         "status": "success",
         "userName": user.name,
@@ -190,7 +194,10 @@ def _auth_user(
         "nameUrl": nameUrl["value"] if "value" in nameUrl else None,
         "multipleNameUrl": nameUrl["multiple"] if "multiple" in nameUrl else None,
         "nameHeaders": nameUrl["headers"] if "headers" in nameUrl else {},
-        "proxy": nameUrl["proxy"] if "proxy" in nameUrl else False,
+        "getnameType": getname_config.get("type", "default"),
+        "proxy": (
+            nameUrl["proxy"] if "proxy" in nameUrl else False
+        ),  # deprecated (use getnameType)
         "notify": notification,
         "access_token": access_token,
         "refresh_token": refresh_token,

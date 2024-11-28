@@ -3,12 +3,14 @@ import boto3
 import tempfile
 import numpy
 import re
+import gc
+import logging
 from typing import List
 
 from config import Config
 from exception.validation_error import ValidationError
 from models.prescription import Drug
-from utils import status
+from utils import status, stringutils
 
 
 def get_substance(drugs: List[Drug]):
@@ -46,6 +48,42 @@ def get_substance(drugs: List[Drug]):
         )
 
     return drugs_array
+
+
+def get_substance_by_drug_name(drug_names: list[str]):
+    drugs_dict = {}
+    drug_names_words = []
+
+    if not drug_names:
+        return drugs_dict
+
+    logging.basicConfig()
+    logger = logging.getLogger("noharm.backend")
+    drug_names_words = [stringutils.prepare_drug_name(n) for n in drug_names]
+
+    model_subst = _get_model("models/noharm-ml-subst.gz")
+    token_subst = _get_model("models/noharm-tk-subst.gz")
+
+    vector = token_subst.transform(drug_names_words)
+    prediction = model_subst.predict(vector)
+    probabilities = model_subst.predict_proba(vector).round(2)
+    MIN_PROB = 0.35
+
+    for idx, p in enumerate(prediction):
+        subst_idx = numpy.where(model_subst.classes_ == p)[0][0]
+        subst_prob = probabilities[idx][subst_idx]
+
+        if subst_prob >= MIN_PROB:
+            drugs_dict[drug_names[idx]] = p
+
+        logger.debug(
+            f"AI INFER SUBSTANCE {drug_names[idx]} - {drug_names_words[idx]} - {subst_prob} - {p}"
+        )
+
+    del model_subst, token_subst, vector, prediction, probabilities
+    gc.collect()
+
+    return drugs_dict
 
 
 def get_factors(conversions):

@@ -4,7 +4,7 @@ from typing import List
 
 from models.prescription import PrescriptionDrug, DrugAttributes
 from models.main import db, Drug, Substance, Allergy
-from models.enums import DrugTypeEnum, DrugAlertLevelEnum
+from models.enums import DrugTypeEnum, DrugAlertLevelEnum, FrequencyEnum
 from utils import examutils, stringutils
 
 
@@ -62,6 +62,7 @@ def find_relations(drug_list, id_patient: int, is_cpoe: bool):
                             pd=prescription_drug, is_cpoe=is_cpoe
                         ),
                         "expireDate": prescription_expire_date.isoformat(),
+                        "frequency": prescription_drug.frequency,
                         "rx": False,
                     },
                     "to": {
@@ -77,6 +78,7 @@ def find_relations(drug_list, id_patient: int, is_cpoe: bool):
                             pd=cp_prescription_drug, is_cpoe=is_cpoe
                         ),
                         "expireDate": cp_prescription_expire_date.isoformat(),
+                        "frequency": cp_prescription_drug.frequency,
                         "rx": False,
                     },
                 }
@@ -98,6 +100,7 @@ def find_relations(drug_list, id_patient: int, is_cpoe: bool):
                             pd=prescription_drug, is_cpoe=is_cpoe
                         ),
                         "expireDate": prescription_expire_date.isoformat(),
+                        "frequency": prescription_drug.frequency,
                         "rx": True,
                     },
                     "to": a,
@@ -140,6 +143,13 @@ def find_relations(drug_list, id_patient: int, is_cpoe: bool):
             # sl must be in the same group
             if kind == "sl" and (
                 drug_from["group"] != drug_to["group"] or drug_from["group"] == None
+            ):
+                continue
+
+            # dm cant have frequency 66
+            if kind == "dm" and (
+                drug_from["frequency"] == FrequencyEnum.NOW.value
+                or drug_to["frequency"] == FrequencyEnum.NOW.value
             ):
                 continue
 
@@ -276,6 +286,7 @@ def _get_allergies(id_patient: int):
                     "sctid": a.id,
                     "intravenous": False,
                     "group": None,
+                    "frequency": None,
                     "rx": True,
                 }
             )

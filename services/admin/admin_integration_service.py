@@ -1,3 +1,4 @@
+import json
 from utils import status
 from sqlalchemy import case, text
 from datetime import datetime
@@ -130,7 +131,10 @@ def update_integration_config(
 
     schema_config.status = status if status != None else schema_config.status
     schema_config.nh_care = nh_care if nh_care != None else schema_config.nh_care
-    schema_config.config = config if config != None else schema_config.config
+    schema_config.config = _set_new_config(
+        old_config=schema_config.config if schema_config.config else {},
+        new_config=config,
+    )
     schema_config.fl1 = bool(fl1) if fl1 != None else schema_config.fl1
     schema_config.fl2 = bool(fl2) if fl2 != None else schema_config.fl2
     schema_config.fl3 = bool(fl3) if fl3 != None else schema_config.fl3
@@ -146,6 +150,33 @@ def update_integration_config(
     )
 
     return _object_to_dto(schema_config_db)
+
+
+def _set_new_config(old_config: dict, new_config: dict):
+    config = dict({}, **old_config)
+
+    if "getname" in new_config:
+        config["getname"] = {"type": new_config["getname"]["type"]}
+
+        if "auth" == config["getname"]["type"]:
+            config["getname"]["secret"] = new_config["getname"]["secret"]
+        elif "proxy" == config["getname"]["type"]:
+            config["getname"]["url"] = new_config["getname"]["url"]
+            config["getname"]["params"] = json.loads(new_config["getname"]["params"])
+            config["getname"]["token"] = {
+                "url": new_config["getname"]["token"]["url"],
+                "params": {
+                    "client_id": new_config["getname"]["token"]["params"]["client_id"],
+                    "client_secret": new_config["getname"]["token"]["params"][
+                        "client_secret"
+                    ],
+                    "grant_type": new_config["getname"]["token"]["params"][
+                        "grant_type"
+                    ],
+                },
+            }
+
+    return config
 
 
 @has_permission(Permission.INTEGRATION_UTILS)
@@ -178,4 +209,5 @@ def _object_to_dto(schema_config: SchemaConfig):
         "fl2": schema_config.fl2,
         "fl3": schema_config.fl3,
         "fl4": schema_config.fl4,
+        "cpoe": schema_config.cpoe,
     }
