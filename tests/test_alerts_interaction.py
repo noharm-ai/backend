@@ -401,6 +401,7 @@ def test_find_relations_drug_interaction_kind_rx(monkeypatch):
                     "sctid": "111111",
                     "intravenous": False,
                     "group": None,
+                    "frequency": None,
                     "rx": True,
                 }
             ]
@@ -437,3 +438,43 @@ def test_find_relations_drug_interaction_kind_rx(monkeypatch):
     assert results["stats"]["iy"] == 0
     assert results["stats"]["sl"] == 0
     assert results["stats"]["rx"] == 1
+
+
+def test_find_relations_drug_interaction_kind_dm_freq_now(monkeypatch):
+    """Alertas interação: Testa interação medicamentosa tipo DM com frequencia AGORA"""
+
+    drug_list = [
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=1, dose=10, drug_name="Drug A", frequency=66
+        ),
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=2, dose=20, drug_name="Drug B"
+        ),
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=3, dose=20, drug_name="Drug C"
+        ),
+    ]
+
+    monkeypatch.setattr(
+        "services.alert_interaction_service._get_allergies",
+        _mock_get_allergies(data=[]),
+    )
+    monkeypatch.setattr(
+        "services.alert_interaction_service._get_active_relations",
+        _mock_get_active_relations(kind="dm"),
+    )
+
+    results = find_relations(drug_list, id_patient=1, is_cpoe=False)
+
+    # Assert alerts structure
+    assert "alerts" in results
+    assert 0 == len(results["alerts"])
+
+    # Assert stats structure
+    assert "stats" in results
+    assert results["stats"]["it"] == 0
+    assert results["stats"]["dt"] == 0
+    assert results["stats"]["dm"] == 0
+    assert results["stats"]["iy"] == 0
+    assert results["stats"]["sl"] == 0
+    assert results["stats"]["rx"] == 0

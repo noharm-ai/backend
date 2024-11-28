@@ -169,3 +169,11 @@ class PatientConciliationStatusEnum(Enum):
 
 class AppFeatureFlagEnum(Enum):
     REDIS_CACHE = "redisCache"
+
+
+class FrequencyEnum(Enum):
+    SN = 33
+    ACM = 44
+    CONT = 55
+    NOW = 66
+    UNDEFINED = 99
