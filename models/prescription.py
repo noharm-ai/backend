@@ -38,6 +38,7 @@ class Prescription(db.Model):
     reviewType = db.Column("tp_revisao", db.Integer, nullable=True)
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.BigInteger, nullable=True)
+    origin_created_at = db.Column("dtcriacao_origem", db.DateTime, nullable=True)
 
     def getFuturePrescription(idPrescription, admissionNumber):
         return (
