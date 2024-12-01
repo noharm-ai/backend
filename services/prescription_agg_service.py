@@ -8,8 +8,10 @@ from models.prescription import (
     PrescriptionDrug,
     PrescriptionDrugAudit,
     Patient,
+    PrescriptionAudit,
 )
 from models.enums import (
+    PrescriptionAuditTypeEnum,
     PrescriptionDrugAuditTypeEnum,
     DrugTypeEnum,
     PatientConciliationStatusEnum,
@@ -80,6 +82,7 @@ def create_agg_prescription_by_prescription(
     else:
         PrescAggID = prescriptionutils.gen_agg_id(p.admissionNumber, p.idSegment, pdate)
 
+    is_new_prescription = False
     pAgg = Prescription.query.get(PrescAggID)
     if pAgg is None:
         pAgg = Prescription()
@@ -89,6 +92,7 @@ def create_agg_prescription_by_prescription(
         pAgg.date = pdate
         pAgg.status = 0
         db.session.add(pAgg)
+        is_new_prescription = True
 
     if out_patient:
         pAgg.date = date(pdate.year, pdate.month, pdate.day)
@@ -103,6 +107,9 @@ def create_agg_prescription_by_prescription(
     pAgg.agg = True
     pAgg.update = datetime.today()
     db.session.flush()
+
+    if is_new_prescription:
+        _audit_create(prescription=pAgg)
 
     agg_data = prescription_view_service.static_get_prescription(
         id_prescription=pAgg.id, user_context=user_context
@@ -198,6 +205,8 @@ def create_agg_prescription_by_date(
         agg_p.agg = True
         agg_p.update = datetime.today()
         db.session.add(agg_p)
+
+        _audit_create(prescription=agg_p)
 
     agg_data = prescription_view_service.static_get_prescription(
         id_prescription=agg_p.id, user_context=user_context
@@ -379,3 +388,24 @@ def _get_score_variation(prescription: Prescription, features: dict):
     )
 
     return variation_data
+
+
+def _audit_create(prescription: Prescription):
+    a = PrescriptionAudit()
+    a.auditType = PrescriptionAuditTypeEnum.CREATE_AGG.value
+    a.admissionNumber = prescription.admissionNumber
+    a.idPrescription = prescription.id
+    a.prescriptionDate = prescription.date
+    a.idDepartment = prescription.idDepartment
+    a.idSegment = prescription.idSegment
+
+    a.totalItens = -1
+
+    a.agg = prescription.agg
+    a.concilia = prescription.concilia
+    a.bed = prescription.bed
+    a.extra = None
+    a.createdAt = datetime.today()
+    a.createdBy = 0
+
+    db.session.add(a)
