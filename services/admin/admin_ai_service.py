@@ -10,7 +10,6 @@ from typing import List
 from config import Config
 from exception.validation_error import ValidationError
 from models.prescription import Drug
-from models.enums import NoHarmENV
 from utils import status, stringutils
 
 
@@ -121,13 +120,6 @@ def get_factors(conversions):
 
 
 def _get_client():
-    if Config.ENV == NoHarmENV.DEVELOPMENT.value:
-        return boto3.client(
-            "s3",
-            aws_access_key_id=Config.CACHE_BUCKET_ID,
-            aws_secret_access_key=Config.CACHE_BUCKET_KEY,
-        )
-
     return boto3.client("s3")
 
 
