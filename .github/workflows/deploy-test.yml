@@ -36,6 +36,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.CACHE_BUCKET_ID }}
           aws-secret-access-key: ${{ secrets.CACHE_BUCKET_KEY }}
+          aws-region: sa-east-1
       - name: Run Python Tests
         run: python -m pytest -v
   deploy:
