@@ -39,7 +39,7 @@ jobs:
           aws-region: sa-east-1
       - name: Run Python Tests
         env:
-          CACHE_BUCKET_NAME: ${{ secrets.CACHE_BUCKET_NAME }}
+          CACHE_BUCKET_NAME: ${{ secrets.CACHE_BUCKET_NAME  }}
         run: python -m pytest -v
   deploy:
     needs: [build]
