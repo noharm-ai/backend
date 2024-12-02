@@ -5,14 +5,18 @@ from botocore.exceptions import ClientError
 
 from config import Config
 from utils.dateutils import to_iso
+from models.enums import NoHarmENV
 
 
 def _get_client():
-    return boto3.client(
-        "s3",
-        aws_access_key_id=Config.CACHE_BUCKET_ID,
-        aws_secret_access_key=Config.CACHE_BUCKET_KEY,
-    )
+    if Config.ENV == NoHarmENV.DEVELOPMENT.value:
+        return boto3.client(
+            "s3",
+            aws_access_key_id=Config.CACHE_BUCKET_ID,
+            aws_secret_access_key=Config.CACHE_BUCKET_KEY,
+        )
+
+    return boto3.client("s3")
 
 
 def get_resource_name(report, schema, filename="current"):
