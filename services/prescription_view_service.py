@@ -580,8 +580,8 @@ def _get_drug_data(
             )
             concilia_list = drug_list.conciliaList(concilia_drugs, [])
 
-        if is_complete and concilia_list:
-            p_drugs = drug_list.infer_substance(pDrugs=p_drugs)
+        # if is_complete and concilia_list:
+        #     p_drugs = drug_list.infer_substance(pDrugs=p_drugs)
 
     return {
         "drug_list": drug_list,
