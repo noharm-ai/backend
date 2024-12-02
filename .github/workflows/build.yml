@@ -35,10 +35,14 @@ jobs:
         run: |
           python mobile.py &
           sleep 10
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: sa-east-1
       - name: Run Coverage Report
         env:
-          CACHE_BUCKET_ID: ${{ secrets.CACHE_BUCKET_ID }}
-          CACHE_BUCKET_KEY: ${{ secrets.CACHE_BUCKET_KEY }}
           CACHE_BUCKET_NAME: ${{ secrets.CACHE_BUCKET_NAME }}
         run: python -m pytest --cov-report xml --cov=.
       - name: Submit Coverage Report

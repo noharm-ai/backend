@@ -120,11 +120,7 @@ def get_factors(conversions):
 
 
 def _get_client():
-    return boto3.client(
-        "s3",
-        aws_access_key_id=Config.CACHE_BUCKET_ID,
-        aws_secret_access_key=Config.CACHE_BUCKET_KEY,
-    )
+    return boto3.client("s3")
 
 
 def _get_model(model_name):
