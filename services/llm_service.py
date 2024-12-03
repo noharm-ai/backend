@@ -44,7 +44,7 @@ def prompt(messages, options={}):
         return _prompt_claude(messages=messages)
 
     if summary_config.value["provider"] == "llama":
-        return _prompt_claude(messages=messages)
+        return _prompt_llama(messages=messages)
 
 
 def _prompt_openai(messages):
@@ -95,22 +95,20 @@ def _prompt_claude(messages):
 
     return {"answer": response_body["content"][0]["text"]}
 
+
 def _prompt_llama(messages):
     session = boto3.session.Session()
     client = session.client("bedrock-runtime", region_name="us-west-2")
 
     prompt = "<|begin_of_text|>"
     for m in messages:
-        prompt += '<|start_header_id|>' + m['role'] + '<|end_header_id|>\n'
-        prompt += m['content'] + '<|eot_id|>\n'
-    prompt += '<|start_header_id|>assistant<|end_header_id|>'
+        prompt += "<|start_header_id|>" + m["role"] + "<|end_header_id|>\n"
+        prompt += m["content"] + "<|eot_id|>\n"
+    prompt += "<|start_header_id|>assistant<|end_header_id|>"
 
-    body = json.dumps({
-        "prompt": prompt, 
-        "max_gen_len":1024,
-        "temperature":0.5,
-        "top_p":0.9
-    })
+    body = json.dumps(
+        {"prompt": prompt, "max_gen_len": 1024, "temperature": 0.5, "top_p": 0.9}
+    )
 
     modelId = "meta.llama3-1-405b-instruct-v1:0"
     accept = "application/json"
@@ -122,4 +120,4 @@ def _prompt_llama(messages):
 
     response_body = json.loads(response.get("body").read())
 
-    return {"answer": response_body['generation']}
+    return {"answer": response_body["generation"]}
