@@ -22,28 +22,47 @@ def proxy_name(idPatient):
 
     config = _get_config(user)
     token = _get_token(config)
+    client_id = config["getname"]["token"]["params"]["client_id"]
 
     url = config["getname"]["url"]
-    params = dict(config["getname"]["params"], **{"cd_paciente": idPatient})
+
+    if client_id == "noharm-internal":
+        url = url.replace("{idPatient}", str(idPatient))
+        params = dict(config["getname"]["params"])
+    else:
+        params = dict(config["getname"]["params"], **{"cd_paciente": idPatient})
 
     try:
         response = requests.get(
             url,
-            headers={"Authorization": token},
+            headers={
+                "Authorization": (
+                    f"Bearer {token}" if client_id == "noharm-internal" else token
+                )
+            },
             params=params,
         )
 
         if response.status_code == status.HTTP_200_OK:
             data = response.json()
 
-            if len(data["data"]) > 0:
-                patient = data["data"][0]
-
+            if client_id == "noharm-internal":
                 return {
                     "status": "success",
-                    "idPatient": patient["idPatient"],
-                    "name": patient["name"],
+                    "idPatient": data["idPatient"],
+                    "name": data["name"],
+                    "data": data["data"],
                 }, status.HTTP_200_OK
+
+            else:
+                if len(data["data"]) > 0:
+                    patient = data["data"][0]
+
+                    return {
+                        "status": "success",
+                        "idPatient": patient["idPatient"],
+                        "name": patient["name"],
+                    }, status.HTTP_200_OK
 
         logging.basicConfig()
         logger = logging.getLogger("noharm.backend")
@@ -164,6 +183,17 @@ def auth_token():
 def _get_token(config):
     token_url = config["getname"]["token"]["url"]
     params = config["getname"]["token"]["params"]
+
+    if params["client_id"] == "noharm-internal":
+        token = encode(
+            payload={
+                "exp": datetime.now(tz=timezone.utc) + timedelta(minutes=2),
+                "iss": "noharm",
+            },
+            key=params["client_secret"],
+        )
+
+        return token
 
     response = requests.post(url=token_url, data=params)
 
