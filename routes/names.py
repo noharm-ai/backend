@@ -7,7 +7,9 @@ from datetime import datetime, timedelta, timezone
 
 from models.main import User, dbSession, db
 from models.appendix import SchemaConfig
+from models.enums import NoHarmENV
 from exception.validation_error import ValidationError
+from config import Config
 from utils import status
 
 # TODO: refactor
@@ -24,7 +26,11 @@ def proxy_name(idPatient):
     token = _get_token(config)
     client_id = config["getname"]["token"]["params"]["client_id"]
 
-    url = config["getname"]["url"]
+    url = (
+        config["getname"]["urlDev"]
+        if Config.ENV == NoHarmENV.DEVELOPMENT.value
+        else config["getname"]["url"]
+    )
 
     if client_id == "noharm-internal":
         url = url.replace("{idPatient}", str(idPatient))
@@ -95,22 +101,45 @@ def proxy_multiple():
     ids_list = data.get("patients", [])
     config = _get_config(user)
     token = _get_token(config)
+    client_id = config["getname"]["token"]["params"]["client_id"]
 
-    url = config["getname"]["url"]
-    params = dict(
-        config["getname"]["params"],
-        **{"cd_paciente": " ".join(str(id) for id in ids_list)},
+    url = (
+        config["getname"]["urlDev"]
+        if Config.ENV == NoHarmENV.DEVELOPMENT.value
+        else config["getname"]["url"]
     )
 
     try:
-        response = requests.get(url, headers={"Authorization": token}, params=params)
+        if client_id == "noharm-internal":
+            url = url.replace("{idPatient}", "multiple")
+            params = dict(
+                config["getname"]["params"],
+                **{"patients": [str(id) for id in ids_list]},
+            )
+            response = requests.post(
+                url,
+                headers={
+                    "Authorization": f"Bearer {token}",
+                    "Content-Type": "application/json",
+                },
+                json=params,
+            )
+        else:
+            params = dict(
+                config["getname"]["params"],
+                **{"cd_paciente": " ".join(str(id) for id in ids_list)},
+            )
+            response = requests.get(
+                url, headers={"Authorization": token}, params=params
+            )
 
         found = []
         names = []
         if response.status_code == status.HTTP_200_OK:
             data = response.json()
+            results = data if client_id == "noharm-internal" else data["data"]
 
-            for p in data["data"]:
+            for p in results:
                 found.append(str(p["idPatient"]))
                 names.append(
                     {
@@ -124,6 +153,8 @@ def proxy_multiple():
             logger = logging.getLogger("noharm.backend")
             logger.error(f"Service names error {response.status_code}")
             logger.error(response.json())
+            logger.error(url)
+            logger.error(params)
 
     except Exception as e:
         logging.basicConfig()

@@ -30,7 +30,7 @@ def get_prioritization(request_data: RegulationPrioritizationRequest):
                 "risk": solicitation.risk,
                 "idRegSolicitationType": str(solicitation.id_reg_solicitation_type),
                 "type": solicitation_type.name if solicitation_type else None,
-                "birthdate": patient.birthdate if patient else None,
+                "birthdate": dateutils.to_iso(patient.birthdate) if patient else None,
                 "age": (
                     dateutils.data2age(patient.birthdate.isoformat())
                     if patient
