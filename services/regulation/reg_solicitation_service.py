@@ -28,6 +28,7 @@ def get_solicitation(id: int):
 
     return {
         "id": str(solicitation.id),
+        "admissionNumber": solicitation.admission_number,
         "stage": solicitation.stage,
         "date": dateutils.to_iso(solicitation.date),
         "type": solicitation_type.name if solicitation_type else None,
