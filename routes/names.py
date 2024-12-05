@@ -211,6 +211,59 @@ def auth_token():
     return {"status": "success", "data": token}
 
 
+@app_names.route("/names/search/<string:term>", methods=["GET"])
+@jwt_required()
+def search_name(term):
+    user = User.find(get_jwt_identity())
+    dbSession.setSchema(user.schema)
+
+    config = _get_config(user)
+    token = _get_token(config)
+
+    url = (
+        config["getname"]["urlDev"]
+        if Config.ENV == NoHarmENV.DEVELOPMENT.value
+        else config["getname"]["url"]
+    )
+
+    url = url.replace("/patient-name/{idPatient}", f"/search-name/{term}")
+    params = dict(config["getname"]["params"])
+
+    try:
+        response = requests.get(
+            url,
+            headers={"Authorization": f"Bearer {token}"},
+            params=params,
+        )
+
+        if response.status_code == status.HTTP_200_OK:
+            data = response.json()
+            results = []
+            for p in data["results"]:
+                results.append({"name": p["name"], "idPatient": p["idPatient"]})
+
+            return {
+                "status": "success",
+                "data": sorted(results, key=lambda d: d["name"]),
+            }, status.HTTP_200_OK
+
+        logging.basicConfig()
+        logger = logging.getLogger("noharm.backend")
+        logger.error(f"Service names ERROR: {response.status_code}")
+        logger.error(url)
+        logger.error(params)
+        logger.error(response.json())
+    except Exception as e:
+        logging.basicConfig()
+        logger = logging.getLogger("noharm.backend")
+        logger.error("Service names ERROR (exception)")
+        logger.error(url)
+        logger.error(params)
+        logger.exception(e)
+
+    return {"status": "error", "data": []}, status.HTTP_400_BAD_REQUEST
+
+
 def _get_token(config):
     token_url = config["getname"]["token"]["url"]
     params = config["getname"]["token"]["params"]
