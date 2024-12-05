@@ -88,6 +88,7 @@ def get_prioritization(request_data: RegulationPrioritizationRequest):
             )
 
         if order.field in ["birthdate"]:
+            direction = asc if order.direction == "desc" else desc
             query = query.order_by(nullslast(direction(getattr(Patient, order.field))))
 
     query = query.limit(request_data.limit).offset(request_data.offset)
