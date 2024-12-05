@@ -9,8 +9,14 @@ from models.prescription import (
     Department,
     PrescriptionDrug,
     PrescriptionAudit,
+    PatientAudit,
 )
-from models.enums import FeatureEnum, PrescriptionAuditTypeEnum, AppFeatureFlagEnum
+from models.enums import (
+    FeatureEnum,
+    PrescriptionAuditTypeEnum,
+    AppFeatureFlagEnum,
+    PatientAuditTypeEnum,
+)
 from exception.validation_error import ValidationError
 from services import (
     memory_service,
@@ -18,9 +24,10 @@ from services import (
     data_authorization_service,
     clinical_notes_queries_service,
     exams_service,
+    patient_service,
 )
 from decorators.has_permission_decorator import has_permission, Permission
-from utils import status, prescriptionutils
+from utils import status, prescriptionutils, dateutils
 
 
 @has_permission(Permission.READ_PRESCRIPTION, Permission.READ_DISCHARGE_SUMMARY)
@@ -187,6 +194,10 @@ def recalculate_prescription(id_prescription: int, user_context: User):
             "errors.invalidRegister",
             status.HTTP_400_BAD_REQUEST,
         )
+
+    _update_patient_weight(
+        admission_number=p.admissionNumber, user_context=user_context
+    )
 
     if p.agg:
         if feature_service.is_cpoe():
@@ -401,3 +412,36 @@ def _refresh_exams(id_patient: int, user_context: User):
     key = f"{user_context.schema}:{id_patient}:exames"
     for type_exam, exam in exams.items():
         redis_client.hset(key, type_exam, json.dumps(exam))
+
+
+def _update_patient_weight(admission_number: int, user_context: User):
+    patient = (
+        db.session.query(Patient)
+        .filter(Patient.admissionNumber == admission_number)
+        .first()
+    )
+    if patient and not patient.weight and not patient.weightDate:
+        # try to update patient weight based on previous admissions
+        patient_previous_data = patient_service.get_patient_weight(patient.idPatient)
+        if patient_previous_data != None:
+            patient.weight = (
+                patient_previous_data.weight if patient_previous_data.weight else None
+            )
+            patient.weightDate = (
+                patient_previous_data.weightDate
+                if patient_previous_data.weightDate
+                else None
+            )
+            db.session.flush()
+
+            audit = PatientAudit()
+            audit.admissionNumber = patient.admissionNumber
+            audit.auditType = PatientAuditTypeEnum.UPSERT.value
+            audit.extra = {
+                "weight": patient.weight,
+                "weightDate": dateutils.to_iso(patient.weightDate),
+                "source": "recalculate_prescription",
+            }
+            audit.createdAt = datetime.today()
+            audit.createdBy = user_context.id
+            db.session.add(audit)

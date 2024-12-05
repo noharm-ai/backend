@@ -1,3 +1,5 @@
+import boto3
+import json
 from openai import AzureOpenAI
 
 from config import Config
@@ -22,7 +24,9 @@ def prompt(messages, options={}):
 
     if summary_config == None or (
         summary_config.value["provider"] != "openai_azure"
+        and summary_config.value["provider"] != "claude"
         and summary_config.value["provider"] != "maritaca"
+        and summary_config.value["provider"] != "llama"
     ):
         raise ValidationError(
             "Configuração inválida",
@@ -35,6 +39,12 @@ def prompt(messages, options={}):
 
     if summary_config.value["provider"] == "maritaca":
         return _prompt_maritaca(messages=messages, options=options)
+
+    if summary_config.value["provider"] == "claude":
+        return _prompt_claude(messages=messages)
+
+    if summary_config.value["provider"] == "llama":
+        return _prompt_llama(messages=messages)
 
 
 def _prompt_openai(messages):
@@ -59,3 +69,55 @@ def _prompt_maritaca(messages, options={}):
         "errors.invalidModule",
         status.HTTP_400_BAD_REQUEST,
     )
+
+
+def _prompt_claude(messages):
+    session = boto3.session.Session()
+    client = session.client("bedrock-runtime", region_name="us-east-1")
+
+    body = json.dumps(
+        {
+            "max_tokens": 1024,
+            "messages": messages,
+            "anthropic_version": "bedrock-2023-05-31",
+        }
+    )
+
+    modelId = "anthropic.claude-3-5-sonnet-20240620-v1:0"
+    accept = "application/json"
+    contentType = "application/json"
+
+    response = client.invoke_model(
+        body=body, modelId=modelId, accept=accept, contentType=contentType
+    )
+
+    response_body = json.loads(response.get("body").read())
+
+    return {"answer": response_body["content"][0]["text"]}
+
+
+def _prompt_llama(messages):
+    session = boto3.session.Session()
+    client = session.client("bedrock-runtime", region_name="us-west-2")
+
+    prompt = "<|begin_of_text|>"
+    for m in messages:
+        prompt += "<|start_header_id|>" + m["role"] + "<|end_header_id|>\n"
+        prompt += m["content"] + "<|eot_id|>\n"
+    prompt += "<|start_header_id|>assistant<|end_header_id|>"
+
+    body = json.dumps(
+        {"prompt": prompt, "max_gen_len": 1024, "temperature": 0.5, "top_p": 0.9}
+    )
+
+    modelId = "meta.llama3-1-405b-instruct-v1:0"
+    accept = "application/json"
+    contentType = "application/json"
+
+    response = client.invoke_model(
+        body=body, modelId=modelId, accept=accept, contentType=contentType
+    )
+
+    response_body = json.loads(response.get("body").read())
+
+    return {"answer": response_body["generation"]}

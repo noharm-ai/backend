@@ -441,7 +441,11 @@ def _get_all_drugs_used(admission_number, schema, report_connection):
     return list
 
 
+# refactor
 def _get_all_drugs_suspended(admission_number, schema, report_connection):
+    # needs refactor
+    return []
+
     query = text(
         f"""
     select 
