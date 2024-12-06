@@ -305,7 +305,7 @@ def _clean_outliers(id_drug, id_segment):
     q.delete()
 
 
-@has_permission(Permission.WRITE_DRUG_SCORE)
+@has_permission(Permission.MAINTAINER)
 def add_prescription_history(
     id_drug, id_segment, user_context: User, clean=False, rollback_when_empty=False
 ):
