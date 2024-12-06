@@ -12,8 +12,9 @@ from cryptography.hazmat.primitives import serialization
 from flask_sqlalchemy.session import Session
 from markupsafe import escape as escape_html
 from sqlalchemy import asc
+from sqlalchemy.orm import make_transient
 
-from models.main import db, dbSession, Notify, User
+from models.main import db, dbSession, Notify, User, UserExtra
 from models.appendix import Memory, SchemaConfig
 from models.segment import Hospital, Segment
 from models.enums import (
@@ -23,6 +24,7 @@ from models.enums import (
     IntegrationStatusEnum,
     UserAuditTypeEnum,
 )
+from repository import user_repository
 from services import memory_service, user_service
 from services.admin import admin_integration_status_service
 from config import Config
@@ -32,13 +34,58 @@ from security.role import Role
 from security.permission import Permission
 
 
-def _has_force_schema_permission(user: User):
-    if user.schema != "hsc_test":
-        return False
+def _login(email: str, password: str) -> User:
+    user = user_repository.get_user_by_credentials(email=email, password=password)
 
+    if not user:
+        raise ValidationError(
+            "Usuário inválido",
+            "errors.unauthorizedUser",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    # detach from session
+    make_transient(user)
+
+    # TODO: add special roles test
+    # special_roles = Role.get_special_roles()
+    special_roles = []
+    if (
+        len(set.intersection(set(user.config.get("roles", [])), set(special_roles))) > 0
+        or len(user.config.get("schemas", [])) > 0
+    ):
+        raise ValidationError(
+            "Configuração de usuário corrompida/inválida",
+            "errors.unauthorizedUser",
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+    extra = db.session.query(UserExtra).filter(UserExtra.idUser == user.id).first()
+    if extra:
+        extra_roles = extra.config.get("roles", [])
+        extra_schemas = extra.config.get("schemas", [])
+        user.config = dict(
+            user.config,
+            **{
+                "roles": user.config.get("roles", []) + extra_roles,
+                "schemas": user.config.get("schemas", []) + extra_schemas,
+            },
+        )
+
+    return user
+
+
+def _has_force_schema_permission(user: User, force_schema: str = None):
     permissions = Role.get_permissions_from_user(user=user)
 
-    return Permission.MULTI_SCHEMA in permissions
+    if not Permission.MULTI_SCHEMA in permissions:
+        return False
+
+    if not Permission.MAINTAINER in permissions and force_schema != None:
+        valid_schemas = [schema["name"] for schema in user.config.get("schemas", [])]
+        return force_schema in valid_schemas
+
+    return True
 
 
 def _auth_user(
@@ -64,14 +111,26 @@ def _auth_user(
 
     user_schema = user.schema
     user_config = user.config
-    if force_schema and _has_force_schema_permission(user):
-        user_schema = force_schema
-        user_config = dict(
-            user.config,
-            **{
-                "features": user_features + extra_features,
-            },
+    if force_schema and not _has_force_schema_permission(
+        user=user, force_schema=force_schema
+    ):
+        raise ValidationError(
+            "Usuário não autorizado neste recurso",
+            "errors.invalidParams",
+            status.HTTP_401_UNAUTHORIZED,
         )
+
+    if force_schema and _has_force_schema_permission(
+        user=user, force_schema=force_schema
+    ):
+        user_schema = force_schema
+        if Permission.MAINTAINER in permissions:
+            user_config = dict(
+                user.config,
+                **{
+                    "features": user_features + extra_features,
+                },
+            )
 
     schema_config = (
         db.session.query(SchemaConfig)
@@ -212,39 +271,27 @@ def _auth_user(
 
 
 def pre_auth(email, password):
-    user = User.authenticate(email, password)
+    user = _login(email, password)
 
-    if user is None:
-        raise ValidationError(
-            "Usuário inválido",
-            "errors.unauthorizedUser",
-            status.HTTP_400_BAD_REQUEST,
-        )
+    if _has_force_schema_permission(user=user, force_schema=None):
+        permissions = Role.get_permissions_from_user(user=user)
 
-    if _has_force_schema_permission(user):
-        schema_results = db.session.query(SchemaConfig).order_by(
-            SchemaConfig.schemaName
-        )
-
-        schemas = []
-        for s in schema_results:
-            schemas.append(
-                {
-                    "name": s.schemaName,
-                    "defaultRoles": (
-                        s.config["defaultRoles"]
-                        if s.config != None and "defaultRoles" in s.config
-                        else []
-                    ),
-                    "extraRoles": (
-                        s.config["extraRoles"]
-                        if s.config != None and "extraRoles" in s.config
-                        else []
-                    ),
-                }
+        if Permission.MAINTAINER in permissions:
+            schema_results = db.session.query(SchemaConfig).order_by(
+                SchemaConfig.schemaName
             )
 
-        return {"maintainer": True, "schemas": schemas}
+            schemas = []
+            for s in schema_results:
+                schemas.append(
+                    {
+                        "name": s.schemaName,
+                    }
+                )
+
+            return {"maintainer": True, "schemas": schemas}
+        else:
+            return {"maintainer": False, "schemas": user.config.get("schemas", [])}
 
     return {"maintainer": False, "schemas": []}
 
@@ -287,14 +334,7 @@ def auth_local(
             status.HTTP_401_UNAUTHORIZED,
         )
 
-    user = User.authenticate(email, password)
-
-    if user is None:
-        raise ValidationError(
-            "Usuário inválido",
-            "errors.unauthorizedUser",
-            status.HTTP_400_BAD_REQUEST,
-        )
+    user = _login(email, password)
 
     return _auth_user(
         user,
