@@ -20,6 +20,7 @@ class RegulationPrioritizationRequest(BaseModel):
     riskList: Optional[list[int]] = None
     typeList: Optional[list[str]] = []
     stageList: Optional[list[int]] = []
+    idPatientList: Optional[list[int]] = []
     limit: int
     offset: int
     order: list[Order]

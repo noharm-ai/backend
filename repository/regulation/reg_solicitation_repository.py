@@ -61,6 +61,9 @@ def get_prioritization(request_data: RegulationPrioritizationRequest):
     if request_data.riskList:
         query = query.filter(RegSolicitation.risk.in_(request_data.riskList))
 
+    if request_data.idPatientList:
+        query = query.filter(RegSolicitation.id_patient.in_(request_data.idPatientList))
+
     if request_data.idDepartmentList:
         query = query.filter(
             RegSolicitation.id_department.in_(request_data.idDepartmentList)
@@ -85,6 +88,7 @@ def get_prioritization(request_data: RegulationPrioritizationRequest):
             )
 
         if order.field in ["birthdate"]:
+            direction = asc if order.direction == "desc" else desc
             query = query.order_by(nullslast(direction(getattr(Patient, order.field))))
 
     query = query.limit(request_data.limit).offset(request_data.offset)
