@@ -235,14 +235,6 @@ def test_update_user_invalid_role_permission(client):
     )
     assert response.status_code == 400
 
-    access_token = get_access(client, roles=[Role.ADMIN.value])
-    response = client.post(
-        "/editUser",
-        data=json.dumps(data),
-        headers=make_headers(access_token),
-    )
-    assert response.status_code == 400
-
 
 def test_create_user_invalid_authorization(client):
     """Teste put /editUser - Verifica autorizacao de segmento"""

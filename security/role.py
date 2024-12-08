@@ -154,6 +154,8 @@ class Role(Enum):
 
     STATIC_USER = "STATIC_USER", [Permission.READ_STATIC]
 
+    ORGANIZATION_MANAGER = "ORGANIZATION_MANAGER", [Permission.MULTI_SCHEMA]
+
     @staticmethod
     def get_permissions_from_user(user: User) -> List[Permission]:
         roles = user.config["roles"] if user.config and "roles" in user.config else []
@@ -166,3 +168,13 @@ class Role(Enum):
                 pass
 
         return user_permissions
+
+    @staticmethod
+    def get_special_roles():
+        return [
+            Role.ADMIN.value,
+            Role.CURATOR.value,
+            Role.ORGANIZATION_MANAGER.value,
+            Role.STATIC_USER.value,
+            Role.SERVICE_INTEGRATOR.value,
+        ]

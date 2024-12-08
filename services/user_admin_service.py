@@ -1,11 +1,12 @@
 from datetime import datetime
-from sqlalchemy import desc, func, asc
+from sqlalchemy import func
 from password_generator import PasswordGenerator
 from flask import render_template
 from typing import List
 
 from models.main import User, db, UserAuthorization
 from models.enums import FeatureEnum, UserAuditTypeEnum
+from repository import user_repository
 from services import memory_service, user_service
 from utils import status
 from config import Config
@@ -17,24 +18,7 @@ from security.role import Role
 
 @has_permission(Permission.READ_USERS)
 def get_user_list(user_context: User):
-
-    segments_query = db.session.query(
-        func.array_agg(UserAuthorization.idSegment)
-    ).filter(User.id == UserAuthorization.idUser)
-
-    users = (
-        db.session.query(User, segments_query.scalar_subquery())
-        .filter(User.schema == user_context.schema)
-        .filter(
-            ~User.config["roles"].astext.contains(Role.ADMIN.value),
-            ~User.config["roles"].astext.contains(Role.CURATOR.value),
-            ~User.config["roles"].astext.contains(Role.RESEARCHER.value),
-            ~User.config["roles"].astext.contains(Role.SERVICE_INTEGRATOR.value),
-            ~User.config["roles"].astext.contains(Role.STATIC_USER.value),
-        )
-        .order_by(desc(User.active), asc(User.name))
-        .all()
-    )
+    users = user_repository.get_admin_users_list(schema=user_context.schema)
 
     results = []
     for user in users:
@@ -99,7 +83,7 @@ def upsert_user(data: dict, user_context: User, user_permissions: List[Permissio
         if userEmail != None:
             userEmail = userEmail.lower()
 
-        emailExists = User.findByEmail(userEmail) != None
+        emailExists = user_repository.get_user_by_email(email=userEmail) != None
 
         if emailExists:
             raise ValidationError(

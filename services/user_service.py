@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 
 from models.main import User, UserAudit, db, mail
 from models.enums import UserAuditTypeEnum
+from repository import user_repository
 from config import Config
 from decorators.has_permission_decorator import has_permission, Permission
 from exception.validation_error import ValidationError
@@ -205,8 +206,9 @@ def update_password(password, newpassword, user_context: User):
             status.HTTP_400_BAD_REQUEST,
         )
 
-    # TODO: refactor
-    auth_user = User.authenticate(user.email, password)
+    auth_user = user_repository.get_user_by_credentials(
+        email=user.email, password=password
+    )
 
     if not auth_user or not newpassword:
         raise ValidationError(

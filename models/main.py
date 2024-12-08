@@ -50,17 +50,6 @@ class User(db.Model):
         user.config = claims["config"]
         return user
 
-    def authenticate(email, password):
-        return (
-            User.query.filter(func.lower(User.email) == email.lower())
-            .filter(User.password == func.crypt(password, User.password))
-            .filter(User.active == True)
-            .first()
-        )
-
-    def findByEmail(email):
-        return User.query.filter_by(email=email).first()
-
 
 class UserAudit(db.Model):
     __tablename__ = "usuario_audit"
@@ -84,6 +73,16 @@ class UserAuthorization(db.Model):
     idUser = db.Column("idusuario", db.BigInteger, nullable=False)
     idSegment = db.Column("idsegmento", db.BigInteger, nullable=True)
     schemaName = db.Column("schema_name", db.String, nullable=True)
+    createdAt = db.Column("created_at", db.DateTime, nullable=False)
+    createdBy = db.Column("created_by", db.BigInteger, nullable=False)
+
+
+class UserExtra(db.Model):
+    __tablename__ = "usuario_extra"
+    __table_args__ = {"schema": "public"}
+
+    idUser = db.Column("idusuario", db.BigInteger, primary_key=True)
+    config = db.Column("config", postgresql.JSON, nullable=False)
     createdAt = db.Column("created_at", db.DateTime, nullable=False)
     createdBy = db.Column("created_by", db.BigInteger, nullable=False)
 

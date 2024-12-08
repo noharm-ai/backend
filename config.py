@@ -5,7 +5,7 @@ from models.enums import NoHarmENV
 
 
 class Config:
-    VERSION = "v4.15-beta"
+    VERSION = "v4.16-beta"
     FRONTEND_VERSION = "4.0.10"
     ENV = getenv("ENV") or NoHarmENV.DEVELOPMENT.value
     SECRET_KEY = getenv("SECRET_KEY") or "secret_key"
@@ -30,6 +30,8 @@ class Config:
     MAIL_PASSWORD = getenv("MAIL_PASSWORD") or "password"
     MAIL_SENDER = getenv("MAIL_SENDER") or "user@gmail.com"
     MAIL_HOST = getenv("MAIL_HOST") or "localhost"
+
+    NIFI_BUCKET_NAME = getenv("NIFI_BUCKET_NAME") or ""
 
     CACHE_BUCKET_NAME = getenv("CACHE_BUCKET_NAME") or ""
     CACHE_BUCKET_ID = getenv("CACHE_BUCKET_ID") or ""
