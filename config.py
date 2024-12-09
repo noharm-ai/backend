@@ -32,6 +32,7 @@ class Config:
     MAIL_HOST = getenv("MAIL_HOST") or "localhost"
 
     NIFI_BUCKET_NAME = getenv("NIFI_BUCKET_NAME") or ""
+    NIFI_SQS_QUEUE_REGION = getenv("NIFI_SQS_QUEUE_REGION") or ""
 
     CACHE_BUCKET_NAME = getenv("CACHE_BUCKET_NAME") or ""
     CACHE_BUCKET_ID = getenv("CACHE_BUCKET_ID") or ""
