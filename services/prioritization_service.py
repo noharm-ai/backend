@@ -51,14 +51,9 @@ def get_prioritization_list(
             Patient,
             Department.name.label("department"),
             func.count().over(),
-            (
-                Prescription.features["prescriptionScore"].astext.cast(Integer)
-                + Prescription.features["av"].astext.cast(Integer)
-                + Prescription.features["am"].astext.cast(Integer)
-                + Prescription.features["alertExams"].astext.cast(Integer)
-                + Prescription.features["alerts"].astext.cast(Integer)
-                + Prescription.features["diff"].astext.cast(Integer)
-            ).label("globalScore"),
+            (Prescription.features["globalScore"].astext.cast(Integer)).label(
+                "globalScore"
+            ),
         )
         .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)
         .outerjoin(
@@ -262,27 +257,13 @@ def get_prioritization_list(
 
     if global_score_min != None:
         q = q.filter(
-            (
-                Prescription.features["prescriptionScore"].astext.cast(Integer)
-                + Prescription.features["av"].astext.cast(Integer)
-                + Prescription.features["am"].astext.cast(Integer)
-                + Prescription.features["alertExams"].astext.cast(Integer)
-                + Prescription.features["alerts"].astext.cast(Integer)
-                + Prescription.features["diff"].astext.cast(Integer)
-            )
+            (Prescription.features["globalScore"].astext.cast(Integer))
             >= global_score_min
         )
 
     if global_score_max != None:
         q = q.filter(
-            (
-                Prescription.features["prescriptionScore"].astext.cast(Integer)
-                + Prescription.features["av"].astext.cast(Integer)
-                + Prescription.features["am"].astext.cast(Integer)
-                + Prescription.features["alertExams"].astext.cast(Integer)
-                + Prescription.features["alerts"].astext.cast(Integer)
-                + Prescription.features["diff"].astext.cast(Integer)
-            )
+            (Prescription.features["globalScore"].astext.cast(Integer))
             <= global_score_max
         )
 
