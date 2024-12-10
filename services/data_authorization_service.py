@@ -11,7 +11,7 @@ def has_segment_authorization(id_segment: int, user: User):
         return True
 
     permissions = Role.get_permissions_from_user(user=user)
-    if Permission.MAINTAINER in permissions:
+    if Permission.MAINTAINER in permissions or Permission.CHECK_STATIC in permissions:
         return True
 
     if memory_service.has_feature(FeatureEnum.AUTHORIZATION_SEGMENT.value):
