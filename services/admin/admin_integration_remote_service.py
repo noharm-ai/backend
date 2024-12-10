@@ -1,14 +1,17 @@
 import re
 import boto3
+import json
 import dateutil as pydateutil
 from utils import status
 from markupsafe import escape
 from datetime import datetime, timedelta
 from sqlalchemy import desc
+from sqlalchemy.orm import Session
 from botocore.exceptions import ClientError
+from botocore.config import Config as BotoConfig
 
 from models.main import db, User
-from models.appendix import NifiStatus, NifiQueue
+from models.appendix import NifiQueue
 from utils import dateutils
 from models.enums import NifiQueueActionTypeEnum
 from exception.validation_error import ValidationError
@@ -64,12 +67,12 @@ def _get_cache_data(client, schema, filename="current"):
 @has_permission(Permission.ADMIN_INTEGRATION_REMOTE)
 def get_template_date(user_context: User):
     client = boto3.client("s3")
-    url, metadata = _get_cache_data(
+    cache_data = _get_cache_data(
         client=client, schema=user_context.schema, filename="template"
     )
 
-    if metadata != None:
-        return {"updatedAt": metadata["updatedAt"]}
+    if cache_data != None:
+        return {"updatedAt": cache_data["updatedAt"]}
 
     return {"updatedAt": None}
 
@@ -129,7 +132,9 @@ def get_template(user_context: User):
 
 
 @has_permission(Permission.ADMIN_INTEGRATION_REMOTE)
-def push_queue_request(id_processor: str, action_type: str, data: dict):
+def push_queue_request(
+    id_processor: str, action_type: str, data: dict, user_context: User
+):
     if id_processor == None and (
         action_type != NifiQueueActionTypeEnum.CUSTOM_CALLBACK.value
         and action_type != NifiQueueActionTypeEnum.REFRESH_TEMPLATE.value
@@ -177,11 +182,45 @@ def push_queue_request(id_processor: str, action_type: str, data: dict):
     db.session.add(queue)
     db.session.flush()
 
+    _send_to_sqs(queue=queue, schema=user_context.schema)
+
     return {
         "id": queue.id,
         "extra": queue.extra,
         "createdAt": queue.createdAt.isoformat(),
     }
+
+
+def _send_to_sqs(queue: NifiQueue, schema: str):
+    sqs = boto3.client(
+        "sqs",
+        config=BotoConfig(
+            region_name=Config.NIFI_SQS_QUEUE_REGION,
+        ),
+    )
+    response = sqs.get_queue_url(
+        QueueName=schema,
+    )
+    queue_url = response["QueueUrl"]
+    body_data = {
+        "schema": schema,
+        "id": queue.id,
+        "url": queue.url,
+        "method": queue.method,
+        "runStatus": queue.runStatus,
+        "body": queue.body if queue.body else {"empty": True},
+        "type": queue.extra.get("type", "default"),
+    }
+
+    sqs.send_message(
+        QueueUrl=queue_url,
+        DelaySeconds=10,
+        MessageAttributes={
+            "schema": {"DataType": "String", "StringValue": schema},
+            "type": {"DataType": "String", "StringValue": "request"},
+        },
+        MessageBody=json.dumps(body_data),
+    )
 
 
 def _get_new_queue(id_processor: str, action_type: str, data: dict):
@@ -225,27 +264,50 @@ def _get_new_queue(id_processor: str, action_type: str, data: dict):
 
 
 @has_permission(Permission.ADMIN_INTEGRATION_REMOTE)
-def get_queue_status(id_queue_list):
-    queue_list = (
-        db.session.query(NifiQueue).filter(NifiQueue.id.in_(id_queue_list)).all()
-    )
+def get_queue_status(id_queue_list, user_context: User):
     queue_results = []
-    for q in queue_list:
-        queue_results.append(
-            {
-                "id": q.id,
-                "url": q.url,
-                "body": q.body,
-                "method": q.method,
-                "extra": q.extra,
-                "responseCode": q.responseCode,
-                "response": q.response,
-                "responseAt": dateutils.to_iso(q.responseAt),
-                "createdAt": dateutils.to_iso(q.createdAt),
-            }
+    update_status = False
+
+    engine = db.engines["report"]
+    with Session(engine) as session:
+        session.connection(
+            execution_options={"schema_translate_map": {None: user_context.schema}}
+        )
+        queue_list = (
+            session.query(NifiQueue).filter(NifiQueue.id.in_(id_queue_list)).all()
         )
 
-    return queue_results
+        for q in queue_list:
+            if q.responseCode == status.HTTP_200_OK:
+                update_status = True
+
+            queue_results.append(
+                {
+                    "id": q.id,
+                    "url": q.url,
+                    "body": q.body,
+                    "method": q.method,
+                    "extra": q.extra,
+                    "responseCode": q.responseCode,
+                    "response": q.response,
+                    "responseAt": dateutils.to_iso(q.responseAt),
+                    "createdAt": dateutils.to_iso(q.createdAt),
+                }
+            )
+
+    status_url = None
+    status_updated_at = None
+    if update_status:
+        status_url, status_updated_at = get_file_url(
+            schema=user_context.schema, filename="status"
+        )
+
+    return {
+        "queue": queue_results,
+        "updateStatus": update_status,
+        "statusUrl": status_url,
+        "statusUpdatedAt": status_updated_at,
+    }
 
 
 def _validate_custom_endpoint(endpoint: str):

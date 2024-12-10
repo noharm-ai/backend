@@ -5,8 +5,8 @@ from models.enums import NoHarmENV
 
 
 class Config:
-    VERSION = "v4.16-beta"
-    FRONTEND_VERSION = "4.0.10"
+    VERSION = "v4.17-beta"
+    FRONTEND_VERSION = "4.0.13"
     ENV = getenv("ENV") or NoHarmENV.DEVELOPMENT.value
     SECRET_KEY = getenv("SECRET_KEY") or "secret_key"
     API_KEY = getenv("API_KEY") or ""
@@ -32,6 +32,7 @@ class Config:
     MAIL_HOST = getenv("MAIL_HOST") or "localhost"
 
     NIFI_BUCKET_NAME = getenv("NIFI_BUCKET_NAME") or ""
+    NIFI_SQS_QUEUE_REGION = getenv("NIFI_SQS_QUEUE_REGION") or ""
 
     CACHE_BUCKET_NAME = getenv("CACHE_BUCKET_NAME") or ""
     CACHE_BUCKET_ID = getenv("CACHE_BUCKET_ID") or ""

@@ -15,6 +15,7 @@ from models.enums import (
     PrescriptionDrugAuditTypeEnum,
     DrugTypeEnum,
     PatientConciliationStatusEnum,
+    FeatureEnum,
 )
 from services import (
     prescription_drug_service,
@@ -228,6 +229,7 @@ def create_agg_prescription_by_date(
     )
 
     _log_processed_date(id_prescription_array=internal_prescription_ids, schema=schema)
+    _automatic_check(prescription=agg_p, features=features, user_context=user_context)
 
 
 def _log_processed_date(id_prescription_array, schema):
@@ -409,3 +411,23 @@ def _audit_create(prescription: Prescription):
     a.createdBy = 0
 
     db.session.add(a)
+
+
+def _automatic_check(prescription: Prescription, features: dict, user_context: User):
+    # automatic check prescription if there are no items with validation (drugs, solutions, procedures)
+    if (
+        features.get("totalItens") == 0
+        and prescription.status != "s"
+        and feature_service.has_feature(
+            FeatureEnum.AUTOMATIC_CHECK_IF_NOT_VALIDATED_ITENS
+        )
+    ):
+        prescription_check_service.check_prescription(
+            idPrescription=prescription.id,
+            p_status="s",
+            user_context=user_context,
+            evaluation_time=0,
+            alerts=[],
+            service_user=False,
+            fast_check=True,
+        )

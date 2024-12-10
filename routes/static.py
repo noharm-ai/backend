@@ -24,6 +24,7 @@ def create_aggregated_by_prescription(schema, id_prescription):
     force = request.args.get("force", False)
 
     user_context = User()
+    user_context.id = 0
     user_context.schema = schema
     user_context.config = {"roles": ["STATIC_USER"]}
     g.user_context = user_context
@@ -64,6 +65,7 @@ def create_aggregated_prescription_by_date(schema, admission_number):
     )
 
     user_context = User()
+    user_context.id = 0
     user_context.schema = schema
     user_context.config = {"roles": ["STATIC_USER"]}
     g.user_context = user_context
