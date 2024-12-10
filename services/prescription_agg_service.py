@@ -416,9 +416,11 @@ def _audit_create(prescription: Prescription):
 def _automatic_check(prescription: Prescription, features: dict, user_context: User):
     # automatic check prescription if there are no items with validation (drugs, solutions, procedures)
     if (
-        feature_service.has_feature(FeatureEnum.AUTOMATIC_CHECK_IF_NOT_VALIDATED_ITENS)
-        and features.get("totalItens") == 0
+        features.get("totalItens") == 0
         and prescription.status != "s"
+        and feature_service.has_feature(
+            FeatureEnum.AUTOMATIC_CHECK_IF_NOT_VALIDATED_ITENS
+        )
     ):
         prescription_check_service.check_prescription(
             idPrescription=prescription.id,
