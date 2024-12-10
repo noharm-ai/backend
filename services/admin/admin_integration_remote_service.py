@@ -67,12 +67,12 @@ def _get_cache_data(client, schema, filename="current"):
 @has_permission(Permission.ADMIN_INTEGRATION_REMOTE)
 def get_template_date(user_context: User):
     client = boto3.client("s3")
-    url, metadata = _get_cache_data(
+    cache_data = _get_cache_data(
         client=client, schema=user_context.schema, filename="template"
     )
 
-    if metadata != None:
-        return {"updatedAt": metadata["updatedAt"]}
+    if cache_data != None:
+        return {"updatedAt": cache_data["updatedAt"]}
 
     return {"updatedAt": None}
 
@@ -209,6 +209,7 @@ def _send_to_sqs(queue: NifiQueue, schema: str):
         "method": queue.method,
         "runStatus": queue.runStatus,
         "body": queue.body if queue.body else {"empty": True},
+        "type": queue.extra.get("type", "default"),
     }
 
     sqs.send_message(
@@ -265,6 +266,7 @@ def _get_new_queue(id_processor: str, action_type: str, data: dict):
 @has_permission(Permission.ADMIN_INTEGRATION_REMOTE)
 def get_queue_status(id_queue_list, user_context: User):
     queue_results = []
+    update_status = False
 
     engine = db.engines["report"]
     with Session(engine) as session:
@@ -276,6 +278,9 @@ def get_queue_status(id_queue_list, user_context: User):
         )
 
         for q in queue_list:
+            if q.responseCode == status.HTTP_200_OK:
+                update_status = True
+
             queue_results.append(
                 {
                     "id": q.id,
@@ -290,7 +295,19 @@ def get_queue_status(id_queue_list, user_context: User):
                 }
             )
 
-    return queue_results
+    status_url = None
+    status_updated_at = None
+    if update_status:
+        status_url, status_updated_at = get_file_url(
+            schema=user_context.schema, filename="status"
+        )
+
+    return {
+        "queue": queue_results,
+        "updateStatus": update_status,
+        "statusUrl": status_url,
+        "statusUpdatedAt": status_updated_at,
+    }
 
 
 def _validate_custom_endpoint(endpoint: str):
