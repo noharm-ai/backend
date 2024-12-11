@@ -65,19 +65,6 @@ def _get_cache_data(client, schema, filename="current"):
 
 
 @has_permission(Permission.ADMIN_INTEGRATION_REMOTE)
-def get_template_date(user_context: User):
-    client = boto3.client("s3")
-    cache_data = _get_cache_data(
-        client=client, schema=user_context.schema, filename="template"
-    )
-
-    if cache_data != None:
-        return {"updatedAt": cache_data["updatedAt"]}
-
-    return {"updatedAt": None}
-
-
-@has_permission(Permission.ADMIN_INTEGRATION_REMOTE)
 def get_template(user_context: User):
     template_url, template_updated_at = get_file_url(
         schema=user_context.schema, filename="template"
@@ -127,6 +114,7 @@ def get_template(user_context: User):
         "status": status_url,
         "diagnostics": diagnostics_url,
         "updatedAt": dateutils.to_iso(template_updated_at),
+        "statusUpdatedAt": status_updated_at,
         "queue": queue_results,
     }
 
@@ -266,45 +254,38 @@ def _get_new_queue(id_processor: str, action_type: str, data: dict):
 @has_permission(Permission.ADMIN_INTEGRATION_REMOTE)
 def get_queue_status(id_queue_list, user_context: User):
     queue_results = []
-    update_status = False
 
-    engine = db.engines["report"]
-    with Session(engine) as session:
-        session.connection(
-            execution_options={"schema_translate_map": {None: user_context.schema}}
-        )
-        queue_list = (
-            session.query(NifiQueue).filter(NifiQueue.id.in_(id_queue_list)).all()
-        )
-
-        for q in queue_list:
-            if q.responseCode == status.HTTP_200_OK:
-                update_status = True
-
-            queue_results.append(
-                {
-                    "id": q.id,
-                    "url": q.url,
-                    "body": q.body,
-                    "method": q.method,
-                    "extra": q.extra,
-                    "responseCode": q.responseCode,
-                    "response": q.response,
-                    "responseAt": dateutils.to_iso(q.responseAt),
-                    "createdAt": dateutils.to_iso(q.createdAt),
-                }
+    if id_queue_list:
+        engine = db.engines["report"]
+        with Session(engine) as session:
+            session.connection(
+                execution_options={"schema_translate_map": {None: user_context.schema}}
+            )
+            queue_list = (
+                session.query(NifiQueue).filter(NifiQueue.id.in_(id_queue_list)).all()
             )
 
-    status_url = None
-    status_updated_at = None
-    if update_status:
-        status_url, status_updated_at = get_file_url(
-            schema=user_context.schema, filename="status"
-        )
+            for q in queue_list:
+                queue_results.append(
+                    {
+                        "id": q.id,
+                        "url": q.url,
+                        "body": q.body,
+                        "method": q.method,
+                        "extra": q.extra,
+                        "responseCode": q.responseCode,
+                        "response": q.response,
+                        "responseAt": dateutils.to_iso(q.responseAt),
+                        "createdAt": dateutils.to_iso(q.createdAt),
+                    }
+                )
+
+    status_url, status_updated_at = get_file_url(
+        schema=user_context.schema, filename="status"
+    )
 
     return {
         "queue": queue_results,
-        "updateStatus": update_status,
         "statusUrl": status_url,
         "statusUpdatedAt": status_updated_at,
     }
