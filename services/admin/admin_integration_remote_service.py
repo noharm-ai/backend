@@ -247,6 +247,13 @@ def _get_new_queue(id_processor: str, action_type: str, data: dict):
     elif NifiQueueActionTypeEnum.REFRESH_TEMPLATE.value == action_type:
         queue.url = f"nifi-api/system-diagnostics"
         queue.method = "GET"
+    elif NifiQueueActionTypeEnum.UPDATE_PROPERTY.value == action_type:
+        queue.url = f"nifi-api/processors/{escape(id_processor)}"
+        queue.method = "PUT"
+        queue.body = {
+            "id": id_processor,
+            "config": {"properties": data["properties"]},
+        }
 
     return queue
 
