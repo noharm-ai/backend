@@ -33,7 +33,7 @@ def get_file_url(schema: str, filename="template") -> tuple[str, str]:
                     "Bucket": Config.NIFI_BUCKET_NAME,
                     "Key": _get_resource_name(schema=schema, filename=filename),
                 },
-                ExpiresIn=3600,
+                ExpiresIn=120,
             ),
             cache_data["updatedAt"],
         )
