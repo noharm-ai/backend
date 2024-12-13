@@ -33,7 +33,7 @@ def proxy_name(idPatient):
     )
 
     if client_id == "noharm-internal":
-        url = url.replace("{idPatient}", str(idPatient))
+        url = url.replace("{idPatient}", str(int(idPatient)))
         params = dict(config["getname"]["params"])
     else:
         params = dict(config["getname"]["params"], **{"cd_paciente": idPatient})
