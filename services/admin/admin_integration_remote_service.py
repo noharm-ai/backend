@@ -186,9 +186,18 @@ def _send_to_sqs(queue: NifiQueue, schema: str):
             region_name=Config.NIFI_SQS_QUEUE_REGION,
         ),
     )
-    response = sqs.get_queue_url(
-        QueueName=schema,
-    )
+
+    try:
+        response = sqs.get_queue_url(
+            QueueName=schema,
+        )
+    except ClientError:
+        raise ValidationError(
+            "Fila inexistente",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
     queue_url = response["QueueUrl"]
     body_data = {
         "schema": schema,
