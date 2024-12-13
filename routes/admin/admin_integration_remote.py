@@ -38,3 +38,11 @@ def push_queue_request():
         action_type=request_data.get("actionType", None),
         data=request_data,
     )
+
+
+@app_admin_integration_remote.route(
+    "/admin/integration-remote/get-errors", methods=["GET"]
+)
+@api_endpoint()
+def get_errors():
+    return admin_integration_remote_service.get_errors()

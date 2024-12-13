@@ -4,7 +4,7 @@ import json
 import dateutil as pydateutil
 from utils import status
 from markupsafe import escape
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
 from botocore.exceptions import ClientError
@@ -75,6 +75,9 @@ def get_template(user_context: User):
     diagnostics_url, diagnostics_updated_at = get_file_url(
         schema=user_context.schema, filename="diagnostics"
     )
+    bulletin_url, bulletin_updated_at = get_file_url(
+        schema=user_context.schema, filename="bulletin"
+    )
 
     if not template_url:
         raise ValidationError(
@@ -115,6 +118,8 @@ def get_template(user_context: User):
         "diagnostics": diagnostics_url,
         "updatedAt": dateutils.to_iso(template_updated_at),
         "statusUpdatedAt": status_updated_at,
+        "bulletin": bulletin_url,
+        "bulletinUpdatedAt": bulletin_updated_at,
         "queue": queue_results,
     }
 
@@ -300,11 +305,44 @@ def get_queue_status(id_queue_list, user_context: User):
         schema=user_context.schema, filename="status"
     )
 
+    bulletin_url, bulletin_updated_at = get_file_url(
+        schema=user_context.schema, filename="bulletin"
+    )
+
     return {
         "queue": queue_results,
         "statusUrl": status_url,
         "statusUpdatedAt": status_updated_at,
+        "bulletinUrl": bulletin_url,
+        "bulletinUpdatedAt": bulletin_updated_at,
     }
+
+
+@has_permission(Permission.ADMIN_INTEGRATION_REMOTE)
+def get_errors(user_context: User):
+    client = boto3.client("logs", region_name=Config.NIFI_SQS_QUEUE_REGION)
+
+    response = client.get_log_events(
+        logGroupName=Config.NIFI_LOG_GROUP_NAME,
+        logStreamName=f"nifi/{user_context.schema}",
+        startTime=int(
+            (datetime.now(tz=timezone.utc) - timedelta(minutes=60)).timestamp() * 1000
+        ),
+        endTime=int(datetime.now(tz=timezone.utc).timestamp()) * 1000,
+    )
+
+    results = []
+    for event in response.get("events", []):
+        results.append(
+            {
+                "message": event.get("message"),
+                "date": datetime.fromtimestamp(
+                    int(event.get("timestamp")) / 1000
+                ).isoformat(),
+            }
+        )
+
+    return results
 
 
 def _validate_custom_endpoint(endpoint: str):

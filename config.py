@@ -33,6 +33,7 @@ class Config:
 
     NIFI_BUCKET_NAME = getenv("NIFI_BUCKET_NAME") or ""
     NIFI_SQS_QUEUE_REGION = getenv("NIFI_SQS_QUEUE_REGION") or ""
+    NIFI_LOG_GROUP_NAME = getenv("NIFI_LOG_GROUP_NAME") or ""
 
     CACHE_BUCKET_NAME = getenv("CACHE_BUCKET_NAME") or ""
     CACHE_BUCKET_ID = getenv("CACHE_BUCKET_ID") or ""
