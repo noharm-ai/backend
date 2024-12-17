@@ -15,23 +15,22 @@ def get_exams(id_patient: int, user_context: User):
             status.HTTP_400_BAD_REQUEST,
         )
 
-    else:
-        exams_list = reports_exams_search_repository.get_exams_by_patient(
-            id_patient, days=30
-        )
-        results = []
+    exams_list = reports_exams_search_repository.get_exams_by_patient(
+        id_patient, days=30
+    )
+    results = []
 
-        for i in exams_list:
-            exam: Exams = i
-            results.append(
-                {
-                    "idExam": exam.idExame,
-                    "typeExam": exam.typeExam,
-                    "idPatient": exam.idPatient,
-                    "admissionNumber": exam.admissionNumber,
-                    "dateExam": dateutils.to_iso(exam.date),
-                    "value": str(exam.value),
-                    "unit": exam.unit,
-                }
-            )
-        return results
+    for i in exams_list:
+        exam: Exams = i
+        results.append(
+            {
+                "idExam": exam.idExame,
+                "typeExam": exam.typeExam,
+                "idPatient": exam.idPatient,
+                "admissionNumber": exam.admissionNumber,
+                "dateExam": dateutils.to_iso(exam.date),
+                "value": str(exam.value),
+                "unit": exam.unit,
+            }
+        )
+    return results
