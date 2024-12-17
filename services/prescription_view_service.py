@@ -374,7 +374,7 @@ def _get_clinical_notes_stats(
     is_complete: bool,
     user_context: User,
 ):
-    is_cache_active = memory_service.is_feature_active(AppFeatureFlagEnum.REDIS_CACHE)
+    is_cache_active = False
 
     cn_stats = clinical_notes_queries_service.get_admission_stats(
         admission_number=prescription.admissionNumber,
