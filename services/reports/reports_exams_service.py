@@ -7,7 +7,7 @@ from decorators.has_permission_decorator import has_permission, Permission
 
 
 @has_permission(Permission.READ_REPORTS)
-def get_exams(id_patient: int, user_context: User):
+def get_raw_exams(id_patient: int, user_context: User):
     if id_patient == None:
         raise ValidationError(
             "idPatient inválido",
