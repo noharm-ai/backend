@@ -6,7 +6,7 @@ from models.main import db
 from models.prescription import Patient
 from models.segment import Exams, SegmentExam
 from models.notes import ClinicalNotes
-from repository.reports.reports_exams_search_repository import get_exams_by_patient
+from repository.reports import reports_exams_search_repository
 from services import memory_service, cache_service
 from decorators.has_permission_decorator import has_permission, Permission
 from exception.validation_error import ValidationError
@@ -89,7 +89,9 @@ def get_exams_by_admission(admission_number: int, id_segment: int):
         )
 
     # TODO: refactor
-    examsList = get_exams_by_patient(patient.idPatient, days=90)
+    examsList = reports_exams_search_repository.get_exams_by_patient(
+        patient.idPatient, days=90
+    )
     segExam = SegmentExam.refDict(idSegment=id_segment)
 
     perc = {
