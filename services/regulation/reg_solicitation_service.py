@@ -92,52 +92,75 @@ def _get_movements(solicitation: RegSolicitation):
 
 @has_permission(Permission.WRITE_REGULATION)
 def move(request_data: RegulationMovementRequest, user_context: User):
-    solicitation: RegSolicitation = (
-        db.session.query(RegSolicitation)
-        .filter(RegSolicitation.id == request_data.id)
-        .first()
-    )
+    solicitation_ids = []
+    if request_data.id:
+        solicitation_ids.append(request_data.id)
+    else:
+        solicitation_ids = request_data.ids
 
-    if not solicitation:
+    if not solicitation_ids:
         raise ValidationError(
-            "Registro inválido",
-            "errors.invalidRecord",
+            "Nenhuma solicitção selecionada",
+            "errors.invalidParams",
             status.HTTP_400_BAD_REQUEST,
         )
 
-    movement = RegMovement()
-    movement.id_reg_solicitation = solicitation.id
-    movement.stage_origin = solicitation.stage
-    movement.stage_destination = request_data.nextStage
-    movement.action = request_data.action
-    movement.data = request_data.actionData
-    movement.template = request_data.actionDataTemplate
-    movement.created_at = datetime.today()
-    movement.created_by = user_context.id
-
-    db.session.add(movement)
-
-    # update solicitation data
-    solicitation.stage = request_data.nextStage
-
-    if "scheduleDate" in movement.data:
-        solicitation.schedule_date = datetime.strptime(
-            movement.data.get("scheduleDate"), "%d/%m/%Y %H:%M"
+    results = []
+    for id in solicitation_ids:
+        solicitation: RegSolicitation = (
+            db.session.query(RegSolicitation).filter(RegSolicitation.id == id).first()
         )
 
-    if "transportationDate" in movement.data:
-        solicitation.transportation_date = datetime.strptime(
-            movement.data.get("transportationDate"), "%d/%m/%Y %H:%M"
+        if not solicitation:
+            raise ValidationError(
+                "Registro inválido",
+                "errors.invalidRecord",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+        movement = RegMovement()
+        movement.id_reg_solicitation = solicitation.id
+        movement.stage_origin = solicitation.stage
+        movement.stage_destination = request_data.nextStage
+        movement.action = request_data.action
+        movement.data = request_data.actionData
+        movement.template = request_data.actionDataTemplate
+        movement.created_at = datetime.today()
+        movement.created_by = user_context.id
+
+        db.session.add(movement)
+
+        # update solicitation data
+        solicitation.stage = request_data.nextStage
+
+        if "scheduleDate" in movement.data:
+            solicitation.schedule_date = datetime.strptime(
+                movement.data.get("scheduleDate"), "%d/%m/%Y %H:%M"
+            )
+
+        if "transportationDate" in movement.data:
+            solicitation.transportation_date = datetime.strptime(
+                movement.data.get("transportationDate"), "%d/%m/%Y %H:%M"
+            )
+
+        db.session.flush()
+
+        results.append(
+            {
+                "id": str(solicitation.id),
+                "stage": solicitation.stage,
+                "extra": {
+                    "scheduleDate": dateutils.to_iso(solicitation.schedule_date),
+                    "transportationDate": dateutils.to_iso(
+                        solicitation.transportation_date
+                    ),
+                },
+                "movements": (
+                    _get_movements(solicitation=solicitation)
+                    if len(solicitation_ids) == 1
+                    else []
+                ),
+            }
         )
 
-    db.session.flush()
-
-    return {
-        "id": str(solicitation.id),
-        "stage": solicitation.stage,
-        "extra": {
-            "scheduleDate": dateutils.to_iso(solicitation.schedule_date),
-            "transportationDate": dateutils.to_iso(solicitation.transportation_date),
-        },
-        "movements": _get_movements(solicitation=solicitation),
-    }
+    return results

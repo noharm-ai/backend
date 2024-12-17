@@ -17,14 +17,6 @@ def get_template():
 
 
 @app_admin_integration_remote.route(
-    "/admin/integration-remote/template-date", methods=["GET"]
-)
-@api_endpoint()
-def get_template_date():
-    return admin_integration_remote_service.get_template_date()
-
-
-@app_admin_integration_remote.route(
     "/admin/integration-remote/queue-status", methods=["GET"]
 )
 @api_endpoint()
@@ -46,3 +38,11 @@ def push_queue_request():
         action_type=request_data.get("actionType", None),
         data=request_data,
     )
+
+
+@app_admin_integration_remote.route(
+    "/admin/integration-remote/get-errors", methods=["GET"]
+)
+@api_endpoint()
+def get_errors():
+    return admin_integration_remote_service.get_errors()

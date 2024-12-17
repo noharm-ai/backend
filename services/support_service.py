@@ -109,6 +109,7 @@ def create_ticket(user_context: User, from_url, filelist, category, description,
     return ticket
 
 
+# deprecated
 @has_permission(Permission.READ_SUPPORT)
 def list_tickets(user_context: User):
     db_user = db.session.query(User).filter(User.id == user_context.id).first()
@@ -138,3 +139,91 @@ def list_tickets(user_context: User):
     )
 
     return tickets
+
+
+@has_permission(Permission.READ_SUPPORT)
+def list_tickets_v2(user_context: User, user_permissions: list[Permission]):
+    db_user = db.session.query(User).filter(User.id == user_context.id).first()
+
+    client = _get_client()
+
+    partner = client(
+        model="res.partner",
+        action="search_read",
+        payload=[[["email", "=", db_user.email]]],
+        options={"fields": ["id", "name", "parent_id"]},
+    )
+
+    options = {
+        "fields": [
+            "name",
+            "partner_name",
+            "access_token",
+            "message_needaction",
+            "message_needaction_counter",
+            "has_message",
+            "create_date",
+            "stage_id",
+            "date_last_stage_update",
+            "description",
+            "ticket_ref",
+        ],
+        "limit": 50,
+        "order": "create_date desc",
+    }
+
+    my_tickets = []
+    following = []
+    organization = []
+
+    if partner:
+        my_tickets = client(
+            model="helpdesk.ticket",
+            action="search_read",
+            payload=[
+                [
+                    ["partner_id", "in", [partner[0].get("id")]],
+                ]
+            ],
+            options=options,
+        )
+
+        following = client(
+            model="helpdesk.ticket",
+            action="search_read",
+            payload=[
+                [
+                    ["message_partner_ids", "in", [partner[0].get("id")]],
+                ]
+            ],
+            options=options,
+        )
+
+        if Permission.WRITE_USERS in user_permissions:
+            organization = client(
+                model="helpdesk.ticket",
+                action="search_read",
+                payload=[
+                    [
+                        [
+                            "commercial_partner_id",
+                            "in",
+                            [partner[0].get("parent_id", [])[0]],
+                        ],
+                    ]
+                ],
+                options=options,
+            )
+    else:
+        my_tickets = client(
+            model="helpdesk.ticket",
+            action="search_read",
+            payload=[[["partner_email", "=", db_user.email]]],
+            options=options,
+        )
+
+    return {
+        "myTickets": my_tickets,
+        "following": following,
+        "organization": organization,
+    }

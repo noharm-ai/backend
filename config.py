@@ -5,7 +5,7 @@ from models.enums import NoHarmENV
 
 
 class Config:
-    VERSION = "v4.17-beta"
+    VERSION = "v4.18-beta"
     FRONTEND_VERSION = "4.0.13"
     ENV = getenv("ENV") or NoHarmENV.DEVELOPMENT.value
     SECRET_KEY = getenv("SECRET_KEY") or "secret_key"
@@ -33,6 +33,7 @@ class Config:
 
     NIFI_BUCKET_NAME = getenv("NIFI_BUCKET_NAME") or ""
     NIFI_SQS_QUEUE_REGION = getenv("NIFI_SQS_QUEUE_REGION") or ""
+    NIFI_LOG_GROUP_NAME = getenv("NIFI_LOG_GROUP_NAME") or ""
 
     CACHE_BUCKET_NAME = getenv("CACHE_BUCKET_NAME") or ""
     CACHE_BUCKET_ID = getenv("CACHE_BUCKET_ID") or ""
