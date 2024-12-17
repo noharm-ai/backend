@@ -22,10 +22,10 @@ def get_raw_exams(id_patient: int, user_context: User):
         exam: Exams = i
         results.append(
             {
-                "idExam": exam.idExame,
+                "idExam": str(exam.idExame),
                 "typeExam": exam.typeExam,
-                "idPatient": exam.idPatient,
-                "admissionNumber": exam.admissionNumber,
+                "idPatient": str(exam.idPatient),
+                "admissionNumber": str(exam.admissionNumber),
                 "dateExam": dateutils.to_iso(exam.date),
                 "value": str(exam.value),
                 "unit": exam.unit,
