@@ -1,5 +1,4 @@
-from datetime import date, timedelta
-from sqlalchemy import desc, asc
+from sqlalchemy import asc
 
 from .main import db
 
@@ -62,12 +61,3 @@ class Exams(db.Model):
     typeExam = db.Column("tpexame", db.String, primary_key=True)
     value = db.Column("resultado", db.Float, nullable=False)
     unit = db.Column("unidade", db.String, nullable=True)
-
-    def findByPatient(idPatient):
-        return (
-            db.session.query(Exams)
-            .filter(Exams.idPatient == idPatient)
-            .filter(Exams.date >= (date.today() - timedelta(days=90)))
-            .order_by(asc(Exams.typeExam), desc(Exams.date))
-            .all()
-        )
