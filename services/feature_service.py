@@ -1,8 +1,8 @@
 from flask import g
 
 from models.main import db
-from models.appendix import Memory
-from models.enums import MemoryEnum, FeatureEnum
+from models.appendix import Memory, GlobalMemory
+from models.enums import MemoryEnum, FeatureEnum, AppFeatureFlagEnum, GlobalMemoryEnum
 
 
 def is_cpoe():
@@ -10,6 +10,9 @@ def is_cpoe():
 
 
 def has_feature(user_feature: FeatureEnum):
+    """
+    Tenant features
+    """
     features = g.get("features", [])
 
     if not features:
@@ -23,3 +26,23 @@ def has_feature(user_feature: FeatureEnum):
             g.features = features
 
     return user_feature.value in features
+
+
+def has_feature_flag(flag: AppFeatureFlagEnum):
+    """
+    System features
+    """
+    feature_flags = g.get("feature_flags", {})
+
+    if not feature_flags:
+        memory = (
+            db.session.query(GlobalMemory)
+            .filter(GlobalMemory.kind == GlobalMemoryEnum.FEATURE_FLAGS.value)
+            .first()
+        )
+
+        if memory != None:
+            feature_flags = memory.value
+            g.feature_flags = feature_flags
+
+    return feature_flags.get(flag.value, False)
