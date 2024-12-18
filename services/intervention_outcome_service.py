@@ -1,4 +1,4 @@
-from sqlalchemy import case, and_, func, or_
+from sqlalchemy import and_, func, or_
 from datetime import timedelta, datetime
 
 from models.main import db, User
@@ -12,7 +12,6 @@ from models.prescription import (
     MeasureUnitConvert,
     DrugAttributes,
 )
-from models.appendix import InterventionReason
 from models.enums import (
     InterventionEconomyTypeEnum,
     InterventionStatusEnum,
@@ -21,6 +20,7 @@ from services import (
     data_authorization_service,
     feature_service,
 )
+from repository import intervention_outcome_repository, patient_repository
 from decorators.has_permission_decorator import has_permission, Permission
 from exception.validation_error import ValidationError
 from utils import status, prescriptionutils, numberutils
@@ -212,99 +212,10 @@ def _validate_authorization(id_prescription, id_prescription_drug, user: User):
         )
 
 
-def _get_outcome_data_query():
-    PrescriptionDrugConvert = db.aliased(MeasureUnitConvert)
-    PrescriptionDrugPriceConvert = db.aliased(MeasureUnitConvert)
-    PrescriptionDrugFrequency = db.aliased(Frequency)
-    DefaultMeasureUnit = db.aliased(MeasureUnit)
-
-    return (
-        db.session.query(
-            PrescriptionDrug,
-            Drug,
-            DrugAttributes,
-            PrescriptionDrugConvert,
-            PrescriptionDrugPriceConvert,
-            Prescription,
-            DefaultMeasureUnit,
-            PrescriptionDrugFrequency,
-        )
-        .join(Drug, PrescriptionDrug.idDrug == Drug.id)
-        .join(Prescription, PrescriptionDrug.idPrescription == Prescription.id)
-        .outerjoin(
-            DrugAttributes,
-            and_(
-                PrescriptionDrug.idDrug == DrugAttributes.idDrug,
-                PrescriptionDrug.idSegment == DrugAttributes.idSegment,
-            ),
-        )
-        .outerjoin(
-            PrescriptionDrugConvert,
-            and_(
-                PrescriptionDrugConvert.idDrug == PrescriptionDrug.idDrug,
-                PrescriptionDrugConvert.idSegment == PrescriptionDrug.idSegment,
-                PrescriptionDrugConvert.idMeasureUnit == PrescriptionDrug.idMeasureUnit,
-            ),
-        )
-        .outerjoin(
-            PrescriptionDrugPriceConvert,
-            and_(
-                PrescriptionDrugPriceConvert.idDrug == PrescriptionDrug.idDrug,
-                PrescriptionDrugPriceConvert.idSegment == PrescriptionDrug.idSegment,
-                PrescriptionDrugPriceConvert.idMeasureUnit
-                == DrugAttributes.idMeasureUnitPrice,
-            ),
-        )
-        .outerjoin(
-            DefaultMeasureUnit,
-            DrugAttributes.idMeasureUnit == DefaultMeasureUnit.id,
-        )
-        .outerjoin(
-            PrescriptionDrugFrequency,
-            PrescriptionDrug.idFrequency == PrescriptionDrugFrequency.id,
-        )
-    )
-
-
 @has_permission(Permission.READ_PRESCRIPTION)
 def get_outcome_data(id_intervention, user_context: User, edit=False):
-    InterventionReasonParent = db.aliased(InterventionReason)
-    reason_column = case(
-        (
-            InterventionReasonParent.description != None,
-            func.concat(
-                InterventionReasonParent.description,
-                " - ",
-                InterventionReason.description,
-            ),
-        ),
-        else_=InterventionReason.description,
-    )
-
-    reason = (
-        db.session.query(reason_column)
-        .select_from(InterventionReason)
-        .outerjoin(
-            InterventionReasonParent,
-            InterventionReasonParent.id == InterventionReason.mamy,
-        )
-        .filter(InterventionReason.id == func.any(Intervention.idInterventionReason))
-        .scalar_subquery()
-    )
-
-    record = (
-        db.session.query(
-            Intervention,
-            PrescriptionDrug,
-            Drug,
-            User,
-            func.array(reason).label("reason"),
-        )
-        .outerjoin(PrescriptionDrug, PrescriptionDrug.id == Intervention.id)
-        .outerjoin(Drug, PrescriptionDrug.idDrug == Drug.id)
-        .outerjoin(User, Intervention.outcome_by == User.id)
-        .filter(Intervention.idIntervention == id_intervention)
-        .first()
+    record = intervention_outcome_repository.get_outcome(
+        id_intervention=id_intervention
     )
 
     if not record:
@@ -332,7 +243,7 @@ def get_outcome_data(id_intervention, user_context: User, edit=False):
         )
 
     # origin
-    origin_query = _get_outcome_data_query().filter(
+    origin_query = intervention_outcome_repository.get_outcome_data_query().filter(
         PrescriptionDrug.id == intervention.id
     )
     origin_list = origin_query.all()
@@ -379,9 +290,17 @@ def get_outcome_data(id_intervention, user_context: User, edit=False):
 
         destiny_drug = db.session.query(Drug).filter(Drug.id == destiny_id_drug).first()
 
+        next_admissions = patient_repository.get_next_admissions(
+            admission_number=intervention.admissionNumber, limit=2
+        )
+
         destiny_query = (
-            _get_outcome_data_query()
-            .filter(Prescription.admissionNumber == intervention.admissionNumber)
+            intervention_outcome_repository.get_outcome_data_query()
+            .filter(
+                Prescription.admissionNumber.in_(
+                    [intervention.admissionNumber] + next_admissions
+                )
+            )
             .filter(Prescription.date >= origin[0]["item"]["prescriptionDate"])
             .filter(Prescription.id != origin[0]["item"]["idPrescription"])
         )
