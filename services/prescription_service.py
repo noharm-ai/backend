@@ -279,7 +279,7 @@ def recalculate_prescription(id_prescription: int, user_context: User):
         db.session.execute(query, {"idPrescription": p.id})
 
     # refresh cache
-    if memory_service.is_feature_active(feature_flag=AppFeatureFlagEnum.REDIS_CACHE):
+    if feature_service.has_feature_flag(flag=AppFeatureFlagEnum.REDIS_CACHE):
         _refresh_clinical_notes_stats(
             admission_number=p.admissionNumber, user_context=user_context
         )

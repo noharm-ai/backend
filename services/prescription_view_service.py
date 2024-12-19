@@ -374,7 +374,9 @@ def _get_clinical_notes_stats(
     is_complete: bool,
     user_context: User,
 ):
-    is_cache_active = memory_service.is_feature_active(AppFeatureFlagEnum.REDIS_CACHE)
+    is_cache_active = feature_service.has_feature_flag(
+        flag=AppFeatureFlagEnum.REDIS_CACHE
+    )
 
     cn_stats = clinical_notes_queries_service.get_admission_stats(
         admission_number=prescription.admissionNumber,
@@ -456,12 +458,18 @@ def _get_exams(
     is_complete: bool,
     user_context: User,
 ):
+    if is_complete:
+        is_cache_active = False
+    else:
+        is_cache_active = feature_service.has_feature_flag(
+            flag=AppFeatureFlagEnum.REDIS_CACHE_EXAMS
+        )
     exams = exams_service.find_latest_exams(
         patient=patient,
         idSegment=prescription.idSegment,
         schema=user_context.schema,
         add_previous_exams=is_complete,
-        cache=False,
+        cache=is_cache_active,
     )
 
     examsJson = []
