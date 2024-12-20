@@ -176,7 +176,12 @@ def is_admin_memory(key):
 
 
 def is_private(key):
-    private_keys = ["config-signature", "filter-private", "user-preferences"]
+    private_keys = [
+        "config-signature",
+        "filter-private",
+        "user-preferences",
+        "clinical-notes-private",
+    ]
 
     for k in private_keys:
         if k in key:
