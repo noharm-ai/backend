@@ -150,12 +150,16 @@ def move(request_data: RegulationMovementRequest, user_context: User):
                 "reg_type", {}
             ).get("value")
 
+        if "reg_risk" in movement.data:
+            solicitation.risk = movement.data.get("reg_risk")
+
         db.session.flush()
 
         results.append(
             {
                 "id": str(solicitation.id),
                 "stage": solicitation.stage,
+                "risk": solicitation.risk,
                 "extra": {
                     "scheduleDate": dateutils.to_iso(solicitation.schedule_date),
                     "transportationDate": dateutils.to_iso(
