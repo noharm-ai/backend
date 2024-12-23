@@ -143,6 +143,13 @@ def move(request_data: RegulationMovementRequest, user_context: User):
                 movement.data.get("transportationDate"), "%d/%m/%Y %H:%M"
             )
 
+        update_reg_type = False
+        if "reg_type" in movement.data and movement.data.get("reg_type", None) != None:
+            update_reg_type = True
+            solicitation.id_reg_solicitation_type = movement.data.get(
+                "reg_type", {}
+            ).get("value")
+
         db.session.flush()
 
         results.append(
@@ -154,6 +161,18 @@ def move(request_data: RegulationMovementRequest, user_context: User):
                     "transportationDate": dateutils.to_iso(
                         solicitation.transportation_date
                     ),
+                    "regType": {
+                        "type": (
+                            movement.data.get("reg_type", {}).get("label")
+                            if update_reg_type
+                            else None
+                        ),
+                        "idRegSolicitationType": (
+                            movement.data.get("reg_type", {}).get("value")
+                            if update_reg_type
+                            else None
+                        ),
+                    },
                 },
                 "movements": (
                     _get_movements(solicitation=solicitation)
