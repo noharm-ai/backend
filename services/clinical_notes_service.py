@@ -216,9 +216,8 @@ def get_notes(admission_number: int, filter_date: str):
             admission_list = (
                 db.session.query(Patient)
                 .filter(Patient.idPatient == admission.idPatient)
-                .filter(Patient.admissionNumber < admission_number)
                 .order_by(desc(Patient.admissionDate))
-                .limit(10)
+                .limit(15)
                 .all()
             )
 

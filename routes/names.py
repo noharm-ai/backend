@@ -33,7 +33,7 @@ def proxy_name(idPatient):
     )
 
     if client_id == "noharm-internal":
-        url = url.replace("{idPatient}", str(int(idPatient)))
+        url += f"patient-name/{int(idPatient)}"
         params = dict(config["getname"]["params"])
     else:
         params = dict(config["getname"]["params"], **{"cd_paciente": idPatient})
@@ -111,7 +111,7 @@ def proxy_multiple():
 
     try:
         if client_id == "noharm-internal":
-            url = url.replace("{idPatient}", "multiple")
+            url += "patient-name/multiple"
             params = dict(
                 config["getname"]["params"],
                 **{"patients": [str(id) for id in ids_list]},
@@ -226,7 +226,7 @@ def search_name(term):
         else config["getname"]["url"]
     )
 
-    url = url.replace("/patient-name/{idPatient}", f"/search-name/{term}")
+    url += f"search-name/{term}"
     params = dict(config["getname"]["params"])
 
     try:
