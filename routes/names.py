@@ -240,7 +240,14 @@ def search_name(term):
             data = response.json()
             results = []
             for p in data["results"]:
-                results.append({"name": p["name"], "idPatient": p["idPatient"]})
+                results.append(
+                    {
+                        "name": p["name"],
+                        "idPatient": p["idPatient"],
+                        "birthdate": p["dtnascimento"],
+                        "number": p["cpf"],
+                    }
+                )
 
             return {
                 "status": "success",
