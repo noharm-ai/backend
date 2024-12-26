@@ -6,6 +6,7 @@ from models.main import db, User
 from models.regulation import RegSolicitation, RegSolicitationType, RegMovement
 from models.prescription import Patient
 from models.requests.regulation_movement_request import RegulationMovementRequest
+from models.enums import RegulationAction
 from utils import dateutils, status
 from exception.validation_error import ValidationError
 
@@ -152,6 +153,13 @@ def move(request_data: RegulationMovementRequest, user_context: User):
 
         if "reg_risk" in movement.data:
             solicitation.risk = movement.data.get("reg_risk")
+
+        # undo actions
+        if movement.action == RegulationAction.UNDO_SCHEDULE.value:
+            solicitation.schedule_date = None
+
+        if movement.action == RegulationAction.UNDO_TRANSPORTATION_SCHEDULE.value:
+            solicitation.transportation_date = None
 
         db.session.flush()
 

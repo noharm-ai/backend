@@ -183,3 +183,14 @@ class FrequencyEnum(Enum):
     CONT = 55
     NOW = 66
     UNDEFINED = 99
+
+
+class RegulationAction(Enum):
+    UPDATE_STAGE = 1
+    SCHEDULE = 2
+    SCHEDULE_TRANSPORT = 3
+    SCHEDULE_EXTERNAL = 4
+    UPDATE_TYPE = 5
+    UPDATE_RISK = 6
+    UNDO_SCHEDULE = 7
+    UNDO_TRANSPORTATION_SCHEDULE = 8
