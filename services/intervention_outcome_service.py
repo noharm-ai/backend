@@ -263,6 +263,7 @@ def get_outcome_data(id_intervention, user_context: User, edit=False):
                     else None
                 ),
                 "outcomeUser": (outcome_user.name if outcome_user != None else None),
+                "notes": intervention.notes,
             },
         }
 
@@ -391,6 +392,7 @@ def _get_outcome_dict(
                 else None
             ),
             "interventionReason": outcome_data.reason,
+            "notes": intervention.notes,
         },
     }
 
