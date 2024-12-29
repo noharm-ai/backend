@@ -26,14 +26,17 @@ def get_prioritization(request_data: RegulationPrioritizationRequest):
         .outerjoin(Department, Department.id == RegSolicitation.id_department)
     )
 
-    if request_data.startDate:
-        query = query.filter(RegSolicitation.date >= request_data.startDate.date())
+    if request_data.idList:
+        query = query.filter(RegSolicitation.id.in_(request_data.idList))
+    else:
+        if request_data.startDate:
+            query = query.filter(RegSolicitation.date >= request_data.startDate.date())
 
-    if request_data.endDate:
-        query = query.filter(
-            RegSolicitation.date
-            <= (request_data.endDate + timedelta(hours=23, minutes=59))
-        )
+        if request_data.endDate:
+            query = query.filter(
+                RegSolicitation.date
+                <= (request_data.endDate + timedelta(hours=23, minutes=59))
+            )
 
     if request_data.scheduleStartDate:
         query = query.filter(

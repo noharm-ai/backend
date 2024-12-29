@@ -6,6 +6,7 @@ from models.main import db, User
 from models.regulation import RegSolicitation, RegSolicitationType, RegMovement
 from models.prescription import Patient
 from models.requests.regulation_movement_request import RegulationMovementRequest
+from models.enums import RegulationAction
 from utils import dateutils, status
 from exception.validation_error import ValidationError
 
@@ -143,17 +144,47 @@ def move(request_data: RegulationMovementRequest, user_context: User):
                 movement.data.get("transportationDate"), "%d/%m/%Y %H:%M"
             )
 
+        update_reg_type = False
+        if "reg_type" in movement.data and movement.data.get("reg_type", None) != None:
+            update_reg_type = True
+            solicitation.id_reg_solicitation_type = movement.data.get(
+                "reg_type", {}
+            ).get("value")
+
+        if "reg_risk" in movement.data:
+            solicitation.risk = movement.data.get("reg_risk")
+
+        # undo actions
+        if movement.action == RegulationAction.UNDO_SCHEDULE.value:
+            solicitation.schedule_date = None
+
+        if movement.action == RegulationAction.UNDO_TRANSPORTATION_SCHEDULE.value:
+            solicitation.transportation_date = None
+
         db.session.flush()
 
         results.append(
             {
                 "id": str(solicitation.id),
                 "stage": solicitation.stage,
+                "risk": solicitation.risk,
                 "extra": {
                     "scheduleDate": dateutils.to_iso(solicitation.schedule_date),
                     "transportationDate": dateutils.to_iso(
                         solicitation.transportation_date
                     ),
+                    "regType": {
+                        "type": (
+                            movement.data.get("reg_type", {}).get("label")
+                            if update_reg_type
+                            else None
+                        ),
+                        "idRegSolicitationType": (
+                            movement.data.get("reg_type", {}).get("value")
+                            if update_reg_type
+                            else None
+                        ),
+                    },
                 },
                 "movements": (
                     _get_movements(solicitation=solicitation)

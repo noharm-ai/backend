@@ -188,7 +188,7 @@ def list_tickets_v2(user_context: User, user_permissions: list[Permission]):
             options=options,
         )
 
-        following = client(
+        following_all = client(
             model="helpdesk.ticket",
             action="search_read",
             payload=[
@@ -198,6 +198,12 @@ def list_tickets_v2(user_context: User, user_permissions: list[Permission]):
             ],
             options=options,
         )
+
+        my_tickets_ids = [t.get("id") for t in my_tickets]
+        following = []
+        for f in following_all:
+            if f.get("id") not in my_tickets_ids:
+                following.append(f)
 
         if Permission.WRITE_USERS in user_permissions:
             organization = client(
