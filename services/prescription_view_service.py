@@ -421,9 +421,10 @@ def _get_clinical_notes_stats(
         allergies_data += allergies
 
         for a in db_allergies:
-            allergies_data.append(
-                {"date": dateutils.to_iso(a[0]), "text": a[1], "source": "pep"}
-            )
+            if a[1] and a[1].strip():
+                allergies_data.append(
+                    {"date": dateutils.to_iso(a[0]), "text": a[1], "source": "pep"}
+                )
 
         dialysis_data = clinical_notes_repository.get_dialysis(
             admission_number=prescription.admissionNumber,
