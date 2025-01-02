@@ -1,8 +1,9 @@
 import copy
+import json
 from sqlalchemy import text, desc, and_
 from datetime import datetime, timedelta, date
 
-from models.main import db
+from models.main import db, redis_client, User
 from models.prescription import Patient
 from models.segment import Exams, SegmentExam
 from models.notes import ClinicalNotes
@@ -507,3 +508,18 @@ def find_latest_exams(
                 )
 
     return dict(exams, **examsExtra)
+
+
+@has_permission(Permission.WRITE_PRESCRIPTION, Permission.MAINTAINER)
+def refresh_exams_cache(id_patient: int, user_context: User):
+    exams = get_exams_current_results(
+        id_patient=id_patient,
+        add_previous_exams=True,
+        cache=False,
+        schema=user_context.schema,
+        lower_key=False,
+    )
+
+    key = f"{user_context.schema}:{id_patient}:exames"
+    for type_exam, exam in exams.items():
+        redis_client.hset(key, type_exam, json.dumps(exam))

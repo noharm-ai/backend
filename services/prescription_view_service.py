@@ -29,12 +29,12 @@ from services import (
     patient_service,
     intervention_service,
     clinical_notes_service,
-    clinical_notes_queries_service,
     alert_interaction_service,
     alert_service,
     feature_service,
     exams_service,
 )
+from repository import clinical_notes_repository
 from utils import prescriptionutils, dateutils, status
 
 
@@ -378,7 +378,7 @@ def _get_clinical_notes_stats(
         flag=AppFeatureFlagEnum.REDIS_CACHE
     )
 
-    cn_stats = clinical_notes_queries_service.get_admission_stats(
+    cn_stats = clinical_notes_repository.get_admission_stats(
         admission_number=prescription.admissionNumber,
         user_context=user_context,
         cache=is_cache_active,
@@ -398,45 +398,38 @@ def _get_clinical_notes_stats(
 
     if is_complete:
         if cn_stats.get("signs", 0) != 0:
-            signs_data = clinical_notes_queries_service.get_signs(
+            signs_data = clinical_notes_repository.get_signs(
                 admission_number=prescription.admissionNumber,
                 user_context=user_context,
                 cache=is_cache_active,
             )
 
-        infos_data = clinical_notes_queries_service.get_infos(
+        infos_data = clinical_notes_repository.get_infos(
             admission_number=prescription.admissionNumber,
             user_context=user_context,
             cache=is_cache_active,
         )
 
-        allergies = clinical_notes_queries_service.get_allergies(
+        allergies = clinical_notes_repository.get_allergies(
             admission_number=prescription.admissionNumber,
             admission_date=patient.admissionDate,
+            user_context=user_context,
+            cache=is_cache_active,
         )
         db_allergies = patient_service.get_patient_allergies(patient.idPatient)
 
-        dialysis = clinical_notes_queries_service.get_dialysis(
-            admission_number=prescription.admissionNumber
-        )
-
-        for a in allergies:
-            allergies_data.append(
-                {
-                    "date": a[1].isoformat(),
-                    "text": a[0],
-                    "source": "care",
-                    "id": str(a[2]),
-                }
-            )
+        allergies_data += allergies
 
         for a in db_allergies:
-            allergies_data.append({"date": a[0], "text": a[1], "source": "pep"})
-
-        for a in dialysis:
-            dialysis_data.append(
-                {"date": a[1].isoformat(), "text": a[0], "id": str(a[3])}
+            allergies_data.append(
+                {"date": dateutils.to_iso(a[0]), "text": a[1], "source": "pep"}
             )
+
+        dialysis_data = clinical_notes_repository.get_dialysis(
+            admission_number=prescription.admissionNumber,
+            user_context=user_context,
+            cache=is_cache_active,
+        )
 
     return {
         "cn_stats": cn_stats,
