@@ -8,8 +8,9 @@ from models.main import db
 from models.enums import PrescriptionReviewTypeEnum, PatientConciliationStatusEnum
 from models.prescription import Prescription, Patient, Department
 from decorators.has_permission_decorator import has_permission, Permission
-from utils import dateutils, numberutils, prescriptionutils
+from utils import dateutils, numberutils, prescriptionutils, status
 from services import prescription_service, feature_service
+from exception.validation_error import ValidationError
 
 
 @has_permission(Permission.READ_PRESCRIPTION)
@@ -273,11 +274,20 @@ def get_prioritization_list(
     if endDate is None:
         endDate = startDate
 
-    q = q.filter(Prescription.date >= dateutils.parse_date_or_today(startDate))
-    q = q.filter(
-        Prescription.date
-        <= (dateutils.parse_date_or_today(endDate) + timedelta(hours=23, minutes=59))
-    )
+    start = dateutils.parse_date_or_today(startDate)
+    end = dateutils.parse_date_or_today(endDate) + timedelta(hours=23, minutes=59)
+    days_between = (end - start).days
+    max_days = 120
+
+    if days_between > max_days:
+        raise ValidationError(
+            "O intervalo de datas não pode ser maior que 120 dias",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    q = q.filter(Prescription.date >= start)
+    q = q.filter(Prescription.date <= end)
 
     if agg:
         q = q.order_by(desc("globalScore"))
