@@ -4,9 +4,40 @@ from datetime import datetime, timedelta
 from models.main import db, User
 from models.notes import ClinicalNotes
 from services import cache_service, clinical_notes_service
+from decorators.timed_decorator import timed
 
 
+def get_dialysis_cache(admission_number: int):
+    return (
+        db.session.query(
+            ClinicalNotes.id, ClinicalNotes.annotations, ClinicalNotes.date
+        )
+        .filter(ClinicalNotes.admissionNumber == admission_number)
+        .filter(ClinicalNotes.dialysisText != "")
+        .filter(ClinicalNotes.dialysisText != None)
+        .filter(ClinicalNotes.date > func.current_date() - 3)
+        .order_by(desc(ClinicalNotes.date))
+        .all()
+    )
+
+
+def get_allergies_cache(admission_number: int):
+    return (
+        db.session.query(
+            ClinicalNotes.id, ClinicalNotes.annotations, ClinicalNotes.date
+        )
+        .filter(ClinicalNotes.admissionNumber == admission_number)
+        .filter(ClinicalNotes.allergyText != "")
+        .filter(ClinicalNotes.allergyText != None)
+        .filter(ClinicalNotes.date > func.current_date() - 120)
+        .order_by(desc(ClinicalNotes.date))
+        .all()
+    )
+
+
+@timed()
 def get_signs(admission_number: int, user_context: User, cache=True):
+    signs = {}
     if cache:
         result = cache_service.get_by_key(
             f"""{user_context.schema}:{admission_number}:sinais"""
@@ -14,12 +45,14 @@ def get_signs(admission_number: int, user_context: User, cache=True):
 
         if result != None:
             result_list = result.get("lista", [])
-            return {
+            signs = {
                 "id": str(result.get("fkevolucao", None)),
                 "data": " ".join(result_list),
                 "date": result.get("dtevolucao", None),
                 "cache": True,
             }
+
+        return signs
 
     result = (
         db.session.query(ClinicalNotes.signsText, ClinicalNotes.date, ClinicalNotes.id)
@@ -33,17 +66,19 @@ def get_signs(admission_number: int, user_context: User, cache=True):
     )
 
     if result != None:
-        return {
+        signs = {
             "id": str(result[2]),
             "data": result[0],
             "date": result[1].isoformat(),
             "cache": False,
         }
 
-    return {}
+    return signs
 
 
+@timed()
 def get_infos(admission_number, user_context: User, cache=True):
+    infos = {}
     if cache:
         result = cache_service.get_by_key(
             f"""{user_context.schema}:{admission_number}:dados"""
@@ -51,12 +86,14 @@ def get_infos(admission_number, user_context: User, cache=True):
 
         if result != None:
             result_list = result.get("lista", [])
-            return {
+            infos = {
                 "id": str(result.get("fkevolucao", None)),
                 "data": " ".join(result_list),
                 "date": result.get("dtevolucao", None),
                 "cache": True,
             }
+
+        return infos
 
     result = (
         db.session.query(ClinicalNotes.infoText, ClinicalNotes.date, ClinicalNotes.id)
@@ -70,24 +107,58 @@ def get_infos(admission_number, user_context: User, cache=True):
     )
 
     if result != None:
-        return {
+        infos = {
             "id": str(result[2]),
             "data": result[0],
             "date": result[1].isoformat(),
             "cache": False,
         }
 
-    return {}
+    return infos
 
 
-def get_allergies(admission_number, admission_date=None):
+@timed()
+def get_allergies(
+    admission_number, user_context: User, admission_date=None, cache=True
+):
+    allergies = []
+
+    if cache:
+        results = cache_service.get_range(
+            key=f"""{user_context.schema}:{admission_number}:alergia""", days_ago=120
+        )
+
+        if results:
+            texts = []
+            for a in sorted(
+                results,
+                key=lambda d: d["dtevolucao"],
+                reverse=True,
+            ):
+                text = " ".join(a.get("lista", []))
+                if text in texts:
+                    continue
+
+                texts.append(text)
+                allergies.append(
+                    {
+                        "id": str(a.get("fkevolucao", None)),
+                        "text": text,
+                        "date": a.get("dtevolucao", None),
+                        "cache": True,
+                        "source": "care",
+                    }
+                )
+
+        return allergies
+
     cutoff_date = (
         datetime.today() - timedelta(days=120)
         if admission_date == None
         else admission_date
     ) - timedelta(days=1)
 
-    return (
+    results = (
         db.session.query(
             ClinicalNotes.allergyText,
             func.max(ClinicalNotes.date).label("maxdate"),
@@ -104,9 +175,52 @@ def get_allergies(admission_number, admission_date=None):
         .all()
     )
 
+    allergies = []
+    for a in results:
+        allergies.append(
+            {
+                "date": a[1].isoformat(),
+                "text": a[0],
+                "source": "care",
+                "id": str(a[2]),
+                "cache": False,
+            }
+        )
+    return allergies
 
-def get_dialysis(admission_number):
-    return (
+
+@timed()
+def get_dialysis(admission_number: int, user_context: User, cache=True):
+    dialysis_data = []
+
+    if cache:
+        results = cache_service.get_range(
+            key=f"""{user_context.schema}:{admission_number}:dialise""", days_ago=3
+        )
+
+        if results:
+            texts = []
+            for d in sorted(
+                results,
+                key=lambda d: d["dtevolucao"] if d["dtevolucao"] != None else "",
+                reverse=True,
+            ):
+                text = " ".join(d.get("lista", []))
+                if text in texts:
+                    continue
+
+                dialysis_data.append(
+                    {
+                        "id": str(d.get("fkevolucao", None)),
+                        "text": " ".join(d.get("lista", [])),
+                        "date": d.get("dtevolucao", None),
+                        "cache": True,
+                    }
+                )
+
+        return dialysis_data
+
+    results = (
         db.session.query(
             func.first_value(ClinicalNotes.dialysisText).over(
                 partition_by=func.date(ClinicalNotes.date),
@@ -131,7 +245,15 @@ def get_dialysis(admission_number):
         .all()
     )
 
+    for d in results:
+        dialysis_data.append(
+            {"date": d[1].isoformat(), "text": d[0], "id": str(d[3]), "cache": False}
+        )
 
+    return dialysis_data
+
+
+@timed()
 def get_admission_stats(admission_number: int, user_context: User, cache=True):
     tags = clinical_notes_service.get_tags()
     stats = {}

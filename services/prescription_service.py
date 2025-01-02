@@ -1,8 +1,7 @@
-import json
 from sqlalchemy import desc, nullsfirst, func, and_, or_, text
 from datetime import date, datetime
 
-from models.main import db, redis_client, User
+from models.main import db, User
 from models.prescription import (
     Prescription,
     Patient,
@@ -22,9 +21,9 @@ from services import (
     memory_service,
     feature_service,
     data_authorization_service,
-    clinical_notes_queries_service,
     exams_service,
     patient_service,
+    clinical_notes_service,
 )
 from decorators.has_permission_decorator import has_permission, Permission
 from utils import status, prescriptionutils, dateutils
@@ -228,7 +227,7 @@ def recalculate_prescription(id_prescription: int, user_context: User):
                         pm.*
                     FROM
                         {user_context.schema}.presmed pm
-                    WHERE 
+                    WHERE
                         fkprescricao = ANY(:prescriptionIds)
                 """
             )
@@ -280,10 +279,19 @@ def recalculate_prescription(id_prescription: int, user_context: User):
 
     # refresh cache
     if feature_service.has_feature_flag(flag=AppFeatureFlagEnum.REDIS_CACHE):
-        _refresh_clinical_notes_stats(
+        clinical_notes_service.refresh_clinical_notes_stats_cache(
             admission_number=p.admissionNumber, user_context=user_context
         )
-        _refresh_exams(id_patient=p.idPatient, user_context=user_context)
+
+        clinical_notes_service.refresh_dialysis_cache(
+            admission_number=p.admissionNumber, user_context=user_context
+        )
+        clinical_notes_service.refresh_allergies_cache(
+            admission_number=p.admissionNumber, user_context=user_context
+        )
+        exams_service.refresh_exams_cache(
+            id_patient=p.idPatient, user_context=user_context
+        )
 
 
 def get_query_prescriptions_by_agg(
@@ -371,47 +379,6 @@ def update_prescription_data(id_prescription: int, data: dict, user_context: Use
     p.user = user_context.id
 
     return p
-
-
-def _refresh_clinical_notes_stats(admission_number: int, user_context: User):
-    def _add_cache(key: str, data: dict, expire_in: int):
-        if data.get("data", None) != None:
-            cache_data = {
-                "dtevolucao": data.get("date", None),
-                "fkevolucao": data.get("id", None),
-                "lista": [data.get("data", None)],
-            }
-
-            redis_client.json().set(key, "$", cache_data)
-            redis_client.expire(key, expire_in)
-
-    # signs (expires in 60 days)
-    signs = clinical_notes_queries_service.get_signs(
-        admission_number=admission_number, user_context=user_context, cache=False
-    )
-    key = f"{user_context.schema}:{admission_number}:sinais"
-    _add_cache(key=key, data=signs, expire_in=5184000)
-
-    # infos (expires in 60 days)
-    infos = clinical_notes_queries_service.get_infos(
-        admission_number=admission_number, user_context=user_context, cache=False
-    )
-    key = f"{user_context.schema}:{admission_number}:dados"
-    _add_cache(key=key, data=infos, expire_in=5184000)
-
-
-def _refresh_exams(id_patient: int, user_context: User):
-    exams = exams_service.get_exams_current_results(
-        id_patient=id_patient,
-        add_previous_exams=True,
-        cache=False,
-        schema=user_context.schema,
-        lower_key=False,
-    )
-
-    key = f"{user_context.schema}:{id_patient}:exames"
-    for type_exam, exam in exams.items():
-        redis_client.hset(key, type_exam, json.dumps(exam))
 
 
 def _update_patient_weight(admission_number: int, user_context: User):
