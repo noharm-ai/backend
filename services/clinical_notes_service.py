@@ -430,18 +430,19 @@ def refresh_dialysis_cache(admission_number: int, user_context: User):
     redis_client.delete(key)
 
     for d in dialysis:
-        data = {
-            "dtevolucao": d.date.isoformat(),
-            "fkevolucao": d.id,
-            "lista": d.annotations.get("dialise", []),
-        }
-        data_json = json.dumps(data)
-        timestamp = int(
-            time.mktime(time.strptime(data["dtevolucao"], "%Y-%m-%dT%H:%M:%S"))
-        )
-        redis_client.zadd(key, {data_json: timestamp})
-        redis_client.zremrangebyscore(key, min=0, max=ten_days_ago)
-        redis_client.expire(key, (10 * 24 * 60 * 60))  # 10 days
+        if d.annotations:
+            data = {
+                "dtevolucao": d.date.isoformat(),
+                "fkevolucao": d.id,
+                "lista": d.annotations.get("dialise", []),
+            }
+            data_json = json.dumps(data)
+            timestamp = int(
+                time.mktime(time.strptime(data["dtevolucao"], "%Y-%m-%dT%H:%M:%S"))
+            )
+            redis_client.zadd(key, {data_json: timestamp})
+            redis_client.zremrangebyscore(key, min=0, max=ten_days_ago)
+            redis_client.expire(key, (10 * 24 * 60 * 60))  # 10 days
 
 
 @has_permission(Permission.WRITE_PRESCRIPTION, Permission.MAINTAINER)
@@ -453,14 +454,15 @@ def refresh_allergies_cache(admission_number: int, user_context: User):
     redis_client.delete(key)
 
     for a in allergies:
-        data = {
-            "dtevolucao": a.date.isoformat(),
-            "fkevolucao": a.id,
-            "lista": a.annotations.get("allergiesComposed", []),
-        }
-        data_json = json.dumps(data)
-        timestamp = int(
-            time.mktime(time.strptime(data["dtevolucao"], "%Y-%m-%dT%H:%M:%S"))
-        )
-        redis_client.zadd(key, {data_json: timestamp})
-        redis_client.expire(key, (120 * 24 * 60 * 60))  # 120 days
+        if a.annotations:
+            data = {
+                "dtevolucao": a.date.isoformat(),
+                "fkevolucao": a.id,
+                "lista": a.annotations.get("allergiesComposed", []),
+            }
+            data_json = json.dumps(data)
+            timestamp = int(
+                time.mktime(time.strptime(data["dtevolucao"], "%Y-%m-%dT%H:%M:%S"))
+            )
+            redis_client.zadd(key, {data_json: timestamp})
+            redis_client.expire(key, (120 * 24 * 60 * 60))  # 120 days
