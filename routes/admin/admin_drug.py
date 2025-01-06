@@ -12,7 +12,7 @@ app_admin_drug = Blueprint("app_admin_drug", __name__)
 def get_drug_list():
     request_data = request.get_json()
 
-    list = admin_drug_service.get_drug_list(
+    return admin_drug_service.get_drug_list(
         has_price_conversion=request_data.get("hasPriceConversion", None),
         has_substance=request_data.get("hasSubstance", None),
         has_default_unit=request_data.get("hasDefaultUnit", None),
@@ -30,34 +30,6 @@ def get_drug_list():
         limit=request_data.get("limit", 10),
         offset=request_data.get("offset", 0),
     )
-
-    result = []
-    for i in list:
-        result.append(
-            {
-                "idDrug": i[0],
-                "name": i[1],
-                "idSegment": i[2],
-                "segment": i[3],
-                "idMeasureUnitDefault": i[4],
-                "idMeasureUnitPrice": i[5],
-                "measureUnitPriceFactor": i[8],
-                "price": i[6],
-                "sctid": i[7],
-                "substance": i[10],
-                "segmentOutlier": i[11],
-                "substanceAccuracy": i[12],
-                "maxDose": i.maxDose,
-                "useWeight": i.useWeight,
-                "measureUnitDefaultName": i.measure_unit_default_name,
-            }
-        )
-
-    count = 0
-    if len(list) > 0:
-        count = list[0][9]
-
-    return {"list": result, "count": count}
 
 
 @app_admin_drug.route("/admin/drug/price-factor", methods=["POST"])

@@ -1,0 +1,223 @@
+from sqlalchemy import and_, or_, func
+
+from models.main import db, PrescriptionAgg
+from models.prescription import (
+    MeasureUnit,
+    MeasureUnitConvert,
+    Outlier,
+    Drug,
+    DrugAttributes,
+    Substance,
+)
+from models.segment import Segment
+
+
+def get_admin_drug_list(
+    has_substance=None,
+    has_price_conversion=None,
+    has_default_unit=None,
+    has_price_unit=None,
+    has_inconsistency=None,
+    has_missing_conversion=None,
+    attribute_list=[],
+    term=None,
+    substance=None,
+    limit=10,
+    offset=0,
+    id_segment_list=None,
+    has_ai_substance=None,
+    ai_accuracy_range=None,
+    has_max_dose=None,
+    source_list=None,
+):
+    SegmentOutlier = db.aliased(Segment)
+    ConversionsAgg = db.aliased(MeasureUnitConvert)
+    MeasureUnitAgg = db.aliased(MeasureUnit)
+
+    presc_query = (
+        db.session.query(
+            Outlier.idDrug.label("idDrug"), Outlier.idSegment.label("idSegment")
+        )
+        .group_by(Outlier.idDrug, Outlier.idSegment)
+        .subquery()
+    )
+
+    conversions_query = (
+        db.session.query(
+            PrescriptionAgg.idDrug.label("idDrug"),
+            PrescriptionAgg.idSegment.label("idSegment"),
+        )
+        .select_from(PrescriptionAgg)
+        .join(
+            MeasureUnitAgg,
+            PrescriptionAgg.idMeasureUnit == MeasureUnitAgg.id,
+        )
+        .outerjoin(
+            ConversionsAgg,
+            and_(
+                ConversionsAgg.idSegment == PrescriptionAgg.idSegment,
+                ConversionsAgg.idDrug == PrescriptionAgg.idDrug,
+                ConversionsAgg.idMeasureUnit == PrescriptionAgg.idMeasureUnit,
+            ),
+        )
+        .filter(PrescriptionAgg.idSegment != None)
+        .filter(PrescriptionAgg.idMeasureUnit != None)
+        .filter(ConversionsAgg.factor == None)
+        .group_by(PrescriptionAgg.idDrug, PrescriptionAgg.idSegment)
+        .subquery()
+    )
+
+    q = (
+        db.session.query(
+            Drug.id,
+            Drug.name,
+            Segment.id,
+            Segment.description,
+            DrugAttributes.idMeasureUnit,
+            DrugAttributes.idMeasureUnitPrice,
+            DrugAttributes.price,
+            Drug.sctid,
+            MeasureUnitConvert.factor,
+            func.count().over().label("total"),
+            Substance.name,
+            SegmentOutlier.description,
+            Drug.ai_accuracy,
+            DrugAttributes.maxDose,
+            DrugAttributes.useWeight,
+            MeasureUnit.description.label("measure_unit_default_name"),
+            Substance.maxdose_adult,
+            Substance.maxdose_pediatric,
+            Substance.default_measureunit,
+        )
+        .select_from(presc_query)
+        .join(Drug, presc_query.c.idDrug == Drug.id)
+        .outerjoin(
+            DrugAttributes,
+            and_(
+                DrugAttributes.idDrug == Drug.id,
+                DrugAttributes.idSegment == presc_query.c.idSegment,
+            ),
+        )
+        .outerjoin(MeasureUnit, MeasureUnit.id == DrugAttributes.idMeasureUnit)
+        .outerjoin(Segment, Segment.id == DrugAttributes.idSegment)
+        .outerjoin(
+            MeasureUnitConvert,
+            and_(
+                MeasureUnitConvert.idSegment == Segment.id,
+                MeasureUnitConvert.idDrug == Drug.id,
+                MeasureUnitConvert.idMeasureUnit == DrugAttributes.idMeasureUnitPrice,
+            ),
+        )
+        .outerjoin(Substance, Drug.sctid == Substance.id)
+        .outerjoin(SegmentOutlier, SegmentOutlier.id == presc_query.c.idSegment)
+    )
+
+    if has_missing_conversion:
+        q = q.outerjoin(
+            conversions_query,
+            and_(
+                conversions_query.c.idDrug == presc_query.c.idDrug,
+                conversions_query.c.idSegment == presc_query.c.idSegment,
+            ),
+        ).filter(conversions_query.c.idDrug != None)
+
+    if has_substance != None:
+        if has_substance:
+            q = q.filter(Substance.id != None)
+        else:
+            q = q.filter(Substance.id == None)
+
+    if has_default_unit != None:
+        if has_default_unit:
+            q = q.filter(DrugAttributes.idMeasureUnit != None)
+        else:
+            q = q.filter(DrugAttributes.idMeasureUnit == None)
+
+    if has_price_unit != None:
+        if has_price_unit:
+            q = q.filter(DrugAttributes.idMeasureUnitPrice != None)
+        else:
+            q = q.filter(DrugAttributes.idMeasureUnitPrice == None)
+
+    if has_price_conversion != None:
+        if has_price_conversion:
+            q = q.filter(
+                or_(
+                    MeasureUnitConvert.factor != None,
+                    DrugAttributes.idMeasureUnitPrice == DrugAttributes.idMeasureUnit,
+                )
+            )
+        else:
+            q = q.filter(
+                and_(
+                    MeasureUnitConvert.factor == None,
+                    func.coalesce(DrugAttributes.idMeasureUnitPrice, "")
+                    != func.coalesce(DrugAttributes.idMeasureUnit, ""),
+                    DrugAttributes.idMeasureUnitPrice != None,
+                )
+            )
+
+    if has_inconsistency != None:
+        if has_inconsistency:
+            q = q.filter(DrugAttributes.idDrug == None)
+        else:
+            q = q.filter(DrugAttributes.idDrug != None)
+
+    if has_ai_substance != None:
+        if has_ai_substance:
+            q = q.filter(Drug.ai_accuracy != None)
+
+            if ai_accuracy_range != None and len(ai_accuracy_range) == 2:
+                q = q.filter(Drug.ai_accuracy >= ai_accuracy_range[0]).filter(
+                    Drug.ai_accuracy <= ai_accuracy_range[1]
+                )
+        else:
+            q = q.filter(Drug.ai_accuracy == None)
+
+    if has_max_dose != None:
+        if has_max_dose:
+            q = q.filter(DrugAttributes.maxDose != None)
+        else:
+            q = q.filter(DrugAttributes.maxDose == None)
+
+    if len(attribute_list) > 0:
+        bool_attributes = [
+            ["mav", DrugAttributes.mav],
+            ["idoso", DrugAttributes.elderly],
+            ["controlados", DrugAttributes.controlled],
+            ["antimicro", DrugAttributes.antimicro],
+            ["quimio", DrugAttributes.chemo],
+            ["sonda", DrugAttributes.tube],
+            ["naopadronizado", DrugAttributes.notdefault],
+            ["linhabranca", DrugAttributes.whiteList],
+            ["dialisavel", DrugAttributes.dialyzable],
+            ["renal", DrugAttributes.kidney],
+            ["hepatico", DrugAttributes.liver],
+            ["plaquetas", DrugAttributes.platelets],
+            ["dosemaxima", DrugAttributes.maxDose],
+            ["risco_queda", DrugAttributes.fallRisk],
+            ["lactante", DrugAttributes.lactating],
+            ["gestante", DrugAttributes.pregnant],
+            ["jejum", DrugAttributes.fasting],
+        ]
+
+        for a in bool_attributes:
+            if a[0] in attribute_list:
+                if str(a[1].type) == "BOOLEAN":
+                    q = q.filter(a[1] == True)
+                else:
+                    q = q.filter(a[1] != None)
+
+    if term:
+        q = q.filter(Drug.name.ilike(term))
+
+    if substance:
+        q = q.filter(Substance.name.ilike(substance))
+
+    if id_segment_list and len(id_segment_list) > 0:
+        q = q.filter(DrugAttributes.idSegment.in_(id_segment_list))
+
+    if source_list and len(source_list) > 0:
+        q = q.filter(Drug.source.in_(source_list))
+
+    return q.order_by(Drug.name, Segment.description).limit(limit).offset(offset).all()

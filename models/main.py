@@ -96,6 +96,9 @@ class Substance(db.Model):
     link = db.Column("link", db.String(255), nullable=False)
     idclass = db.Column("idclasse", db.String(255), nullable=False)
     active = db.Column("ativo", db.Boolean, nullable=False)
+    maxdose_adult = db.Column("dosemax_adulto", db.Float, nullable=True)
+    maxdose_pediatric = db.Column("dosemax_pediatrico", db.Float, nullable=True)
+    default_measureunit = db.Column("unidadepadrao", db.String, nullable=True)
     handling = deferred(
         db.Column("manejo", postgresql.JSONB(none_as_null=True), nullable=True)
     )
