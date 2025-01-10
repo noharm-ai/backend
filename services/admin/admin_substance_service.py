@@ -18,6 +18,10 @@ def get_substances(
     handling_type_list=[],
     limit=50,
     offset=0,
+    has_max_dose_adult=None,
+    has_max_dose_adult_weight=None,
+    has_max_dose_pediatric=None,
+    has_max_dose_pediatric_weight=None,
 ):
 
     q = db.session.query(
@@ -54,6 +58,30 @@ def get_substances(
             q = q.filter(Substance.admin_text != None)
         else:
             q = q.filter(Substance.admin_text == None)
+
+    if has_max_dose_adult != None:
+        if has_max_dose_adult:
+            q = q.filter(Substance.maxdose_adult != None)
+        else:
+            q = q.filter(Substance.maxdose_adult == None)
+
+    if has_max_dose_adult_weight != None:
+        if has_max_dose_adult_weight:
+            q = q.filter(Substance.maxdose_adult_weight != None)
+        else:
+            q = q.filter(Substance.maxdose_adult_weight == None)
+
+    if has_max_dose_pediatric != None:
+        if has_max_dose_pediatric:
+            q = q.filter(Substance.maxdose_pediatric != None)
+        else:
+            q = q.filter(Substance.maxdose_pediatric == None)
+
+    if has_max_dose_pediatric_weight != None:
+        if has_max_dose_pediatric_weight:
+            q = q.filter(Substance.maxdose_pediatric_weight != None)
+        else:
+            q = q.filter(Substance.maxdose_pediatric_weight == None)
 
     q = (
         q.options(undefer(Substance.handling), undefer(Substance.admin_text))
