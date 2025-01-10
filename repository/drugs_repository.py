@@ -85,9 +85,15 @@ def get_admin_drug_list(
             DrugAttributes.maxDose,
             DrugAttributes.useWeight,
             MeasureUnit.description.label("measure_unit_default_name"),
+            Segment.type.label("segment_type"),
+            DrugAttributes.ref_maxdose,
+            DrugAttributes.ref_maxdose_weight,
             Substance.maxdose_adult,
+            Substance.maxdose_adult_weight,
             Substance.maxdose_pediatric,
+            Substance.maxdose_pediatric_weight,
             Substance.default_measureunit,
+            MeasureUnit.measureunit_nh,
         )
         .select_from(presc_query)
         .join(Drug, presc_query.c.idDrug == Drug.id)
@@ -221,3 +227,30 @@ def get_admin_drug_list(
         q = q.filter(Drug.source.in_(source_list))
 
     return q.order_by(Drug.name, Segment.description).limit(limit).offset(offset).all()
+
+
+def get_all_drug_attributes():
+    """
+    Returns a list of drugs (with substances) from medatributos table
+    """
+
+    return (
+        db.session.query(DrugAttributes, Drug, Substance, Segment)
+        .join(Drug, Drug.id == DrugAttributes.idDrug)
+        .join(Substance, Drug.sctid == Substance.id)
+        .join(Segment, Segment.id == DrugAttributes.idSegment)
+        .all()
+    )
+
+
+def get_all_conversions():
+    """
+    Returns all conversion records
+    """
+
+    return (
+        db.session.query(MeasureUnitConvert, MeasureUnit)
+        .join(MeasureUnit, MeasureUnitConvert.idMeasureUnit == MeasureUnit.id)
+        .order_by(MeasureUnitConvert.idDrug)
+        .all()
+    )

@@ -13,7 +13,7 @@ from models.prescription import (
     Substance,
 )
 from models.segment import Segment
-from models.enums import IntegrationStatusEnum
+from models.enums import IntegrationStatusEnum, SegmentTypeEnum
 from services import drug_service as main_drug_service
 from services.admin import (
     admin_ai_service,
@@ -23,6 +23,7 @@ from services.admin import (
 from decorators.has_permission_decorator import has_permission, Permission
 from exception.validation_error import ValidationError
 from utils import status
+from models.requests.admin.admin_unit_conversion_request import SetFactorRequest
 
 
 @has_permission(Permission.ADMIN_UNIT_CONVERSION)
@@ -366,3 +367,113 @@ def copy_unit_conversion(id_segment_origin, id_segment_destiny, user_context: Us
         query,
         {"idSegmentOrigin": id_segment_origin, "idSegmentDestiny": id_segment_destiny},
     )
+
+
+@has_permission(Permission.ADMIN_DRUGS)
+def sut_substanceunit_factor(request_data: SetFactorRequest):
+    drug_info = (
+        db.session.query(DrugAttributes, Drug, Substance, Segment, MeasureUnit)
+        .join(Drug, DrugAttributes.idDrug == Drug.id)
+        .join(Segment, DrugAttributes.idSegment == Segment.id)
+        .join(Substance, Drug.sctid == Substance.id)
+        .outerjoin(MeasureUnit, DrugAttributes.idMeasureUnit == MeasureUnit.id)
+        .filter(DrugAttributes.idDrug == request_data.idDrug)
+        .filter(DrugAttributes.idSegment == request_data.idSegment)
+        .first()
+    )
+
+    if drug_info == None:
+        raise ValidationError(
+            "Registro inexistente", "errors.invalidRecord", status.HTTP_400_BAD_REQUEST
+        )
+
+    attributes: DrugAttributes = drug_info.DrugAttributes
+    substance: Substance = drug_info.Substance
+    default_measure_unit: MeasureUnit = drug_info.MeasureUnit
+    segment: Segment = drug_info.Segment
+
+    if not attributes.idMeasureUnit:
+        raise ValidationError(
+            "Medicamento não possui unidade padrão definida",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    if not substance.default_measureunit:
+        raise ValidationError(
+            "Substância não possui unidade padrão definida",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    if (
+        default_measure_unit
+        and default_measure_unit.measureunit_nh == substance.default_measureunit
+    ):
+        raise ValidationError(
+            "A unidade de medida da substância é igual a do medicamento",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    measureunit = (
+        db.session.query(MeasureUnit)
+        .filter(MeasureUnit.measureunit_nh == substance.default_measureunit)
+        .first()
+    )
+
+    if not measureunit:
+        raise ValidationError(
+            f"Não há relação para a unidade: {substance.default_measureunit}",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    conversion = (
+        db.session.query(MeasureUnitConvert)
+        .filter(
+            MeasureUnitConvert.idDrug == request_data.idDrug,
+            MeasureUnitConvert.idSegment == request_data.idSegment,
+            MeasureUnitConvert.idMeasureUnit == measureunit.id,
+        )
+        .first()
+    )
+
+    factor = 1 / request_data.factor
+
+    if conversion is None:
+        conversion = MeasureUnitConvert()
+        conversion.idMeasureUnit = measureunit.id
+        conversion.idDrug = request_data.idDrug
+        conversion.idSegment = request_data.idSegment
+        conversion.factor = factor
+
+        db.session.add(conversion)
+    else:
+        conversion.factor = factor
+        db.session.flush()
+
+    # update ref max dose
+    subst_max_dose = None
+    subst_max_dose_weight = None
+
+    if segment.type == SegmentTypeEnum.ADULT.value:
+        subst_max_dose = substance.maxdose_adult
+        subst_max_dose_weight = substance.maxdose_adult_weight
+
+    if segment.type == SegmentTypeEnum.PEDIATRIC.value:
+        subst_max_dose = substance.maxdose_pediatric
+        subst_max_dose_weight = substance.maxdose_pediatric_weight
+
+    attributes.ref_maxdose = subst_max_dose * factor if subst_max_dose else None
+    attributes.ref_maxdose_weight = (
+        subst_max_dose_weight * factor if subst_max_dose_weight else None
+    )
+    db.session.flush()
+
+    return {
+        "idDrug": attributes.idDrug,
+        "idSegment": attributes.idSegment,
+        "refMaxDose": attributes.ref_maxdose,
+        "refMaxDoseWeight": attributes.ref_maxdose_weight,
+    }

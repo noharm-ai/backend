@@ -100,3 +100,9 @@ def add_new_outlier():
     result = admin_drug_service.add_new_drugs_to_outlier()
 
     return result.rowcount
+
+
+@app_admin_drug.route("/admin/drug/calculate-dosemax", methods=["POST"])
+@api_endpoint()
+def calculate_dosemax():
+    return admin_drug_service.calculate_dosemax()

@@ -194,3 +194,8 @@ class RegulationAction(Enum):
     UPDATE_RISK = 6
     UNDO_SCHEDULE = 7
     UNDO_TRANSPORTATION_SCHEDULE = 8
+
+
+class SegmentTypeEnum(Enum):
+    ADULT = 1
+    PEDIATRIC = 2

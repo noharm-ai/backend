@@ -1,4 +1,4 @@
-from sqlalchemy import and_, or_, func, text, distinct
+from sqlalchemy import and_, func, text, distinct
 from sqlalchemy.orm import undefer
 from typing import List
 from datetime import datetime
@@ -11,10 +11,11 @@ from models.prescription import (
     DrugAttributes,
     Substance,
 )
-from models.enums import DrugAdminSegment, DrugAttributesAuditTypeEnum
+from models.segment import Segment
+from models.enums import DrugAdminSegment, DrugAttributesAuditTypeEnum, SegmentTypeEnum
 from services.admin import admin_ai_service
 from services import drug_service as main_drug_service
-from repository import drugs_repository
+from repository import drugs_repository, drug_attributes_repository
 from decorators.has_permission_decorator import has_permission, Permission
 from utils import status
 from exception.validation_error import ValidationError
@@ -60,6 +61,17 @@ def get_drug_list(
 
     items = []
     for i in results:
+        subst_max_dose = None
+        subst_max_dose_weight = None
+
+        if i.segment_type == SegmentTypeEnum.ADULT.value:
+            subst_max_dose = i.maxdose_adult
+            subst_max_dose_weight = i.maxdose_adult_weight
+
+        if i.segment_type == SegmentTypeEnum.PEDIATRIC.value:
+            subst_max_dose = i.maxdose_pediatric
+            subst_max_dose_weight = i.maxdose_pediatric_weight
+
         items.append(
             {
                 "idDrug": i[0],
@@ -77,6 +89,12 @@ def get_drug_list(
                 "maxDose": i.maxDose,
                 "useWeight": i.useWeight,
                 "measureUnitDefaultName": i.measure_unit_default_name,
+                "refMaxDose": i.ref_maxdose,
+                "refMaxDoseWeight": i.ref_maxdose_weight,
+                "substanceMaxDose": subst_max_dose,
+                "substanceMaxDoseWeight": subst_max_dose_weight,
+                "substanceMeasureUnit": i.default_measureunit,
+                "measureUnitNH": i.measureunit_nh,
             }
         )
 
@@ -445,3 +463,94 @@ def get_drugs_missing_substance():
         id_drugs.append(d[0])
 
     return id_drugs
+
+
+@has_permission(Permission.ADMIN_DRUGS)
+def calculate_dosemax(user_context: User):
+    current_drugs = drugs_repository.get_all_drug_attributes()
+    conversions = drugs_repository.get_all_conversions()
+    update_list = []
+
+    def get_conversion(id_drug: int, id_segment: int, measureunit_nh: str):
+        c_list = filter(
+            lambda item: item.MeasureUnitConvert.idDrug == id_drug
+            and item.MeasureUnitConvert.idSegment == id_segment
+            and item.MeasureUnit.measureunit_nh == measureunit_nh,
+            conversions,
+        )
+
+        result = next(c_list, None)
+
+        if result:
+            return result.MeasureUnitConvert.factor
+
+        return None
+
+    converted = 0
+    not_converted = 0
+    no_reference = 0
+
+    for item in current_drugs:
+        attributes: DrugAttributes = item.DrugAttributes
+        drug: Drug = item.Drug
+        substance: Substance = item.Substance
+        segment: Segment = item.Segment
+
+        ref_dose = None
+        ref_dose_weight = None
+
+        if not segment.type:
+            raise ValidationError(
+                "Tipo de segmento não está configurado",
+                "errors.businessRules",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+        if segment.type == SegmentTypeEnum.ADULT.value:
+            ref_dose = substance.maxdose_adult
+            ref_dose_weight = substance.maxdose_adult_weight
+        if segment.type == SegmentTypeEnum.PEDIATRIC.value:
+            ref_dose = substance.maxdose_pediatric
+            ref_dose_weight = substance.maxdose_pediatric_weight
+
+        if ref_dose or ref_dose_weight:
+            conversion = get_conversion(
+                id_drug=drug.id,
+                id_segment=attributes.idSegment,
+                measureunit_nh=substance.default_measureunit,
+            )
+
+            if conversion:
+                converted += 1
+                max_decimals = 3
+                dose_max_item = {
+                    "idDrug": drug.id,
+                    "idSegment": attributes.idSegment,
+                }
+
+                if ref_dose:
+                    dose_max_item["dosemax"] = round(
+                        ref_dose * conversion, max_decimals
+                    )
+
+                if ref_dose_weight:
+                    dose_max_item["dosemaxWeight"] = round(
+                        ref_dose_weight * conversion, max_decimals
+                    )
+
+                update_list.append(dose_max_item)
+            else:
+                not_converted += 1
+        else:
+            no_reference += 1
+
+    if update_list:
+        drug_attributes_repository.update_dose_max(
+            update_list=update_list, schema=user_context.schema
+        )
+
+    return {
+        "converted": converted,
+        "notConverted": not_converted,
+        "noReference": no_reference,
+    }

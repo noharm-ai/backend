@@ -1,8 +1,6 @@
-from .main import db
-from sqlalchemy import text
 from sqlalchemy.dialects import postgresql
-from sqlalchemy.orm import deferred
-from flask_sqlalchemy.session import Session
+
+from .main import db
 
 
 class Department(db.Model):
@@ -27,6 +25,7 @@ class MeasureUnit(db.Model):
     id = db.Column("fkunidademedida", db.String, primary_key=True)
     idHospital = db.Column("fkhospital", db.BigInteger, nullable=False)
     description = db.Column("nome", db.String, nullable=False)
+    measureunit_nh = db.Column("unidademedida_nh", db.String, nullable=True)
 
 
 class MeasureUnitConvert(db.Model):
