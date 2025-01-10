@@ -19,8 +19,8 @@ def update_dose_max(update_list: list[dict], schema: str):
         update
             {schema}.medatributos
         set 
-            ref_dosemaxima = update_table.ref_dosemaxima,
-            ref_dosemaxima_peso = update_table.ref_dosemaxima_peso
+            ref_dosemaxima = update_table.ref_dosemaxima::float,
+            ref_dosemaxima_peso = update_table.ref_dosemaxima_peso::float
         from
             update_table
         where 

@@ -62,7 +62,21 @@ def get_conversion_list(id_segment, show_prediction=False):
         .group_by(DrugAttributes.idDrug, DrugAttributes.idMeasureUnitPrice)
     )
 
-    units = prescribed_units.union(price_units, current_units).cte("units")
+    substance_units = (
+        db.session.query(
+            DrugAttributes.idDrug.label("idDrug"),
+            func.min(MeasureUnit.id).label("idMeasureUnit"),
+        )
+        .join(Drug, Drug.id == DrugAttributes.idDrug)
+        .join(Substance, Substance.id == Drug.sctid)
+        .join(MeasureUnit, Substance.default_measureunit == MeasureUnit.measureunit_nh)
+        .filter(Substance.default_measureunit != None)
+        .group_by(DrugAttributes.idDrug)
+    )
+
+    units = prescribed_units.union(price_units, current_units, substance_units).cte(
+        "units"
+    )
 
     conversion_list = (
         db.session.query(
