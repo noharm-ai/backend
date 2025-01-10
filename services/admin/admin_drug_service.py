@@ -489,6 +489,7 @@ def calculate_dosemax(user_context: User):
     converted = 0
     not_converted = 0
     no_reference = 0
+    updated = 0
 
     for item in current_drugs:
         attributes: DrugAttributes = item.DrugAttributes
@@ -549,8 +550,14 @@ def calculate_dosemax(user_context: User):
             update_list=update_list, schema=user_context.schema
         )
 
+        copy_result = drug_attributes_repository.copy_dose_max_from_ref(
+            schema=user_context.schema
+        )
+        updated = copy_result.rowcount
+
     return {
         "converted": converted,
         "notConverted": not_converted,
         "noReference": no_reference,
+        "updated": updated,
     }
