@@ -3,6 +3,8 @@ from sqlalchemy.orm import undefer
 
 from models.main import db, Substance, SubstanceClass
 from decorators.has_permission_decorator import has_permission, Permission
+from exception.validation_error import ValidationError
+from utils import status
 
 
 @has_permission(Permission.ADMIN_SUBSTANCES)
@@ -16,6 +18,10 @@ def get_substances(
     handling_type_list=[],
     limit=50,
     offset=0,
+    has_max_dose_adult=None,
+    has_max_dose_adult_weight=None,
+    has_max_dose_pediatric=None,
+    has_max_dose_pediatric_weight=None,
 ):
 
     q = db.session.query(
@@ -52,6 +58,30 @@ def get_substances(
             q = q.filter(Substance.admin_text != None)
         else:
             q = q.filter(Substance.admin_text == None)
+
+    if has_max_dose_adult != None:
+        if has_max_dose_adult:
+            q = q.filter(Substance.maxdose_adult != None)
+        else:
+            q = q.filter(Substance.maxdose_adult == None)
+
+    if has_max_dose_adult_weight != None:
+        if has_max_dose_adult_weight:
+            q = q.filter(Substance.maxdose_adult_weight != None)
+        else:
+            q = q.filter(Substance.maxdose_adult_weight == None)
+
+    if has_max_dose_pediatric != None:
+        if has_max_dose_pediatric:
+            q = q.filter(Substance.maxdose_pediatric != None)
+        else:
+            q = q.filter(Substance.maxdose_pediatric == None)
+
+    if has_max_dose_pediatric_weight != None:
+        if has_max_dose_pediatric_weight:
+            q = q.filter(Substance.maxdose_pediatric_weight != None)
+        else:
+            q = q.filter(Substance.maxdose_pediatric_weight == None)
 
     q = (
         q.options(undefer(Substance.handling), undefer(Substance.admin_text))
@@ -93,6 +123,23 @@ def upsert_substance(data: dict):
     subs.link = data.get("link", None)
     subs.handling = data.get("handling", None)
     subs.admin_text = data.get("adminText", None)
+    subs.maxdose_adult = data.get("maxdoseAdult", None)
+    subs.maxdose_adult_weight = data.get("maxdoseAdultWeight", None)
+    subs.maxdose_pediatric = data.get("maxdosePediatric", None)
+    subs.maxdose_pediatric_weight = data.get("maxdosePediatricWeight", None)
+    subs.default_measureunit = data.get("defaultMeasureUnit", None)
+
+    if (
+        subs.maxdose_adult
+        or subs.maxdose_adult_weight
+        or subs.maxdose_pediatric
+        or subs.maxdose_pediatric_weight
+    ) and not subs.default_measureunit:
+        raise ValidationError(
+            "Unidade de medida padrão deve ser especificada",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
 
     if not subs.handling:
         subs.handling = None
@@ -121,4 +168,9 @@ def _to_dto(s: Substance):
         "link": s.link,
         "handling": s.handling,
         "adminText": s.admin_text,
+        "maxdoseAdult": s.maxdose_adult,
+        "maxdoseAdultWeight": s.maxdose_adult_weight,
+        "maxdosePediatric": s.maxdose_pediatric,
+        "maxdosePediatricWeight": s.maxdose_pediatric_weight,
+        "defaultMeasureUnit": s.default_measureunit,
     }

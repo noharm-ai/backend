@@ -1,6 +1,6 @@
 import redis
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import func, or_, asc
+from sqlalchemy import or_, asc
 from datetime import date
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import deferred
@@ -96,6 +96,13 @@ class Substance(db.Model):
     link = db.Column("link", db.String(255), nullable=False)
     idclass = db.Column("idclasse", db.String(255), nullable=False)
     active = db.Column("ativo", db.Boolean, nullable=False)
+    maxdose_adult = db.Column("dosemax_adulto", db.Float, nullable=True)
+    maxdose_pediatric = db.Column("dosemax_pediatrico", db.Float, nullable=True)
+    maxdose_adult_weight = db.Column("dosemax_peso_adulto", db.Float, nullable=True)
+    maxdose_pediatric_weight = db.Column(
+        "dosemax_peso_pediatrico", db.Float, nullable=True
+    )
+    default_measureunit = db.Column("unidadepadrao", db.String, nullable=True)
     handling = deferred(
         db.Column("manejo", postgresql.JSONB(none_as_null=True), nullable=True)
     )
@@ -207,6 +214,8 @@ class DrugAttributesBase:
     fasting = db.Column("jejum", db.Boolean, nullable=True)
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.BigInteger, nullable=True)
+    ref_maxdose = db.Column("ref_dosemaxima", db.Float, nullable=True)
+    ref_maxdose_weight = db.Column("ref_dosemaxima_peso", db.Float, nullable=True)
 
 
 class DrugAttributes(db.Model, DrugAttributesBase):

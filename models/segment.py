@@ -9,6 +9,7 @@ class Segment(db.Model):
     id = db.Column("idsegmento", db.BigInteger, primary_key=True)
     description = db.Column("nome", db.String, nullable=False)
     status = db.Column("status", db.Integer, nullable=False)
+    type = db.Column("tp_segmento", db.Integer, nullable=True)
 
 
 class SegmentExam(db.Model):

@@ -21,6 +21,10 @@ def get_substances():
         handling_type_list=data.get("handlingTypeList", []),
         has_class=data.get("hasClass", None),
         has_admin_text=data.get("hasAdminText", None),
+        has_max_dose_adult=data.get("hasMaxDoseAdult", None),
+        has_max_dose_adult_weight=data.get("hasMaxDoseAdultWeight", None),
+        has_max_dose_pediatric=data.get("hasMaxDosePediatric", None),
+        has_max_dose_pediatric_weight=data.get("hasMaxDosePediatricWeight", None),
     )
 
     return list

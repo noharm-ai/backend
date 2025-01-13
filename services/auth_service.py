@@ -197,7 +197,12 @@ def _auth_user(
     segmentList = []
     for s in segments:
         segmentList.append(
-            {"id": s.id, "description": s.description, "status": s.status}
+            {
+                "id": s.id,
+                "description": s.description,
+                "status": s.status,
+                "type": s.type,
+            }
         )
 
     logout_url = None

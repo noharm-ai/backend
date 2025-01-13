@@ -13,7 +13,14 @@ def getSegments():
 
     list = []
     for i in results:
-        list.append({"id": i.id, "description": i.description, "status": i.status})
+        list.append(
+            {
+                "id": i.id,
+                "description": i.description,
+                "status": i.status,
+                "type": i.type,
+            }
+        )
 
     return list
 
