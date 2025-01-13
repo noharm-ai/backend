@@ -29,6 +29,7 @@ def get_admin_drug_list(
     ai_accuracy_range=None,
     has_max_dose=None,
     source_list=None,
+    tp_ref_max_dose=None,
 ):
     SegmentOutlier = db.aliased(Segment)
     ConversionsAgg = db.aliased(MeasureUnitConvert)
@@ -185,6 +186,56 @@ def get_admin_drug_list(
             q = q.filter(DrugAttributes.maxDose != None)
         else:
             q = q.filter(DrugAttributes.maxDose == None)
+
+    if tp_ref_max_dose != None:
+        if tp_ref_max_dose == "empty":
+            q = q.filter(
+                or_(
+                    and_(
+                        DrugAttributes.useWeight == True,
+                        DrugAttributes.ref_maxdose_weight == None,
+                    ),
+                    and_(
+                        or_(
+                            DrugAttributes.useWeight == None,
+                            DrugAttributes.useWeight == False,
+                        ),
+                        DrugAttributes.ref_maxdose == None,
+                    ),
+                )
+            )
+        elif tp_ref_max_dose == "diff":
+            q = q.filter(
+                or_(
+                    and_(
+                        DrugAttributes.useWeight == True,
+                        DrugAttributes.ref_maxdose_weight != DrugAttributes.maxDose,
+                    ),
+                    and_(
+                        or_(
+                            DrugAttributes.useWeight == None,
+                            DrugAttributes.useWeight == False,
+                        ),
+                        DrugAttributes.ref_maxdose != DrugAttributes.maxDose,
+                    ),
+                )
+            )
+        elif tp_ref_max_dose == "equal":
+            q = q.filter(
+                or_(
+                    and_(
+                        DrugAttributes.useWeight == True,
+                        DrugAttributes.ref_maxdose_weight == DrugAttributes.maxDose,
+                    ),
+                    and_(
+                        or_(
+                            DrugAttributes.useWeight == None,
+                            DrugAttributes.useWeight == False,
+                        ),
+                        DrugAttributes.ref_maxdose == DrugAttributes.maxDose,
+                    ),
+                )
+            )
 
     if len(attribute_list) > 0:
         bool_attributes = [

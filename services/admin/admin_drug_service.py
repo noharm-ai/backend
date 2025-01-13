@@ -39,6 +39,7 @@ def get_drug_list(
     ai_accuracy_range=None,
     has_max_dose=None,
     source_list=None,
+    tp_ref_max_dose=None,
 ):
     results = drugs_repository.get_admin_drug_list(
         has_substance=has_substance,
@@ -57,6 +58,7 @@ def get_drug_list(
         ai_accuracy_range=ai_accuracy_range,
         has_max_dose=has_max_dose,
         source_list=source_list,
+        tp_ref_max_dose=tp_ref_max_dose,
     )
 
     items = []

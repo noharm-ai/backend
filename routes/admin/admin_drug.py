@@ -29,6 +29,7 @@ def get_drug_list():
         source_list=request_data.get("sourceList", []),
         limit=request_data.get("limit", 10),
         offset=request_data.get("offset", 0),
+        tp_ref_max_dose=request_data.get("tpRefMaxDose", None),
     )
 
 
