@@ -50,6 +50,7 @@ class Role(Enum):
         Permission.MAINTAINER,
         Permission.READ_DISPENSATION,
         Permission.READ_REGULATION,
+        Permission.ADMIN_UNIT,
     ]
 
     CURATOR = "CURATOR", [
@@ -81,6 +82,7 @@ class Role(Enum):
         Permission.MULTI_SCHEMA,
         Permission.MAINTAINER,
         Permission.READ_DISPENSATION,
+        Permission.ADMIN_UNIT,
     ]
 
     SERVICE_INTEGRATOR = "SERVICE_INTEGRATOR", [
