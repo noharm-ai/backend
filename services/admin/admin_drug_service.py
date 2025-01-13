@@ -17,7 +17,7 @@ from services.admin import admin_ai_service
 from services import drug_service as main_drug_service
 from repository import drugs_repository, drug_attributes_repository
 from decorators.has_permission_decorator import has_permission, Permission
-from utils import status
+from utils import status, dateutils
 from exception.validation_error import ValidationError
 
 
@@ -97,6 +97,8 @@ def get_drug_list(
                 "substanceMaxDoseWeight": subst_max_dose_weight,
                 "substanceMeasureUnit": i.default_measureunit,
                 "measureUnitNH": i.measureunit_nh,
+                "responsible": i.responsible,
+                "updateAt": dateutils.to_iso(i.update),
             }
         )
 

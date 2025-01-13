@@ -1,6 +1,6 @@
 from sqlalchemy import and_, or_, func
 
-from models.main import db, PrescriptionAgg
+from models.main import db, PrescriptionAgg, User
 from models.prescription import (
     MeasureUnit,
     MeasureUnitConvert,
@@ -95,6 +95,8 @@ def get_admin_drug_list(
             Substance.maxdose_pediatric_weight,
             Substance.default_measureunit,
             MeasureUnit.measureunit_nh,
+            User.name.label("responsible"),
+            DrugAttributes.update,
         )
         .select_from(presc_query)
         .join(Drug, presc_query.c.idDrug == Drug.id)
@@ -117,6 +119,7 @@ def get_admin_drug_list(
         )
         .outerjoin(Substance, Drug.sctid == Substance.id)
         .outerjoin(SegmentOutlier, SegmentOutlier.id == presc_query.c.idSegment)
+        .outerjoin(User, User.id == DrugAttributes.user)
     )
 
     if has_missing_conversion:
