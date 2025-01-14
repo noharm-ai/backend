@@ -315,26 +315,3 @@ def _get_config(user: User):
         )
 
     return schema_config.config
-
-
-@app_names.route("/names/test/1", methods=["GET"])
-@jwt_required()
-def proxy_test():
-    user = User.find(get_jwt_identity())
-    dbSession.setSchema(user.schema)
-
-    config = _get_config(user)
-
-    token_url = config["getname"]["token"]["url"]
-    params = config["getname"]["token"]["params"]
-
-    logging.basicConfig()
-    logger = logging.getLogger("noharm.backend")
-
-    response = requests.post(url=token_url, data=params)
-
-    logger.debug(token_url)
-    logger.debug(params)
-    logger.debug(response)
-
-    return {"test": True}
