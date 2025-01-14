@@ -32,7 +32,7 @@ def update_dose_max(update_list: list[dict], schema: str):
     db.session.execute(query)
 
 
-def copy_dose_max_from_ref(schema: str):
+def copy_dose_max_from_ref(schema: str, update_by: int):
     query = text(
         f"""
         with update_table as (
@@ -56,7 +56,9 @@ def copy_dose_max_from_ref(schema: str):
         update
             {schema}.medatributos
         set 
-            dosemaxima = update_table.dosemaxima::float
+            dosemaxima = update_table.dosemaxima::float,
+            update_at = now(),
+            update_by = :updateBy
         from
             update_table
         where 
@@ -65,4 +67,4 @@ def copy_dose_max_from_ref(schema: str):
         """
     )
 
-    return db.session.execute(query)
+    return db.session.execute(query, {"updateBy": update_by})

@@ -555,7 +555,7 @@ def calculate_dosemax(user_context: User):
         )
 
         copy_result = drug_attributes_repository.copy_dose_max_from_ref(
-            schema=user_context.schema
+            schema=user_context.schema, update_by=user_context.id
         )
         updated = copy_result.rowcount
 
