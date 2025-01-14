@@ -107,6 +107,8 @@ class Substance(db.Model):
         db.Column("manejo", postgresql.JSONB(none_as_null=True), nullable=True)
     )
     admin_text = deferred(db.Column("curadoria", db.String, nullable=True))
+    updatedAt = db.Column("update_at", db.DateTime, nullable=True)
+    updatedBy = db.Column("update_by", db.BigInteger, nullable=True)
 
 
 class SubstanceClass(db.Model):

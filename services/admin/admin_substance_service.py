@@ -1,10 +1,11 @@
 from sqlalchemy import func, or_
 from sqlalchemy.orm import undefer
+from datetime import datetime
 
-from models.main import db, Substance, SubstanceClass
+from models.main import db, Substance, SubstanceClass, User
 from decorators.has_permission_decorator import has_permission, Permission
 from exception.validation_error import ValidationError
-from utils import status
+from utils import status, dateutils
 
 
 @has_permission(Permission.ADMIN_SUBSTANCES)
@@ -24,9 +25,13 @@ def get_substances(
     has_max_dose_pediatric_weight=None,
 ):
 
-    q = db.session.query(
-        Substance, SubstanceClass, func.count().over().label("count")
-    ).outerjoin(SubstanceClass, SubstanceClass.id == Substance.idclass)
+    q = (
+        db.session.query(
+            Substance, SubstanceClass, func.count().over().label("count"), User
+        )
+        .outerjoin(SubstanceClass, SubstanceClass.id == Substance.idclass)
+        .outerjoin(User, Substance.updatedBy == User.id)
+    )
 
     if name != None:
         q = q.filter(Substance.name.ilike(name))
@@ -97,7 +102,11 @@ def get_substances(
             "count": results[0].count,
             "data": [
                 dict(
-                    _to_dto(i[0]), **{"className": i[1].name if i[1] != None else None}
+                    _to_dto(i[0]),
+                    **{
+                        "className": i[1].name if i[1] != None else None,
+                        "responsible": i.User.name if i.User else None,
+                    }
                 )
                 for i in results
             ],
@@ -107,7 +116,7 @@ def get_substances(
 
 
 @has_permission(Permission.ADMIN_SUBSTANCES)
-def upsert_substance(data: dict):
+def upsert_substance(data: dict, user_context: User):
     subs = (
         db.session.query(Substance).filter(Substance.id == data.get("id", None)).first()
     )
@@ -144,18 +153,25 @@ def upsert_substance(data: dict):
     if not subs.handling:
         subs.handling = None
 
+    subs.updatedAt = datetime.today()
+    subs.updatedBy = user_context.id
+
     db.session.flush()
 
     db_substance = (
-        db.session.query(Substance, SubstanceClass)
+        db.session.query(Substance, SubstanceClass, User)
         .outerjoin(SubstanceClass, SubstanceClass.id == Substance.idclass)
+        .outerjoin(User, Substance.updatedBy == User.id)
         .filter(Substance.id == subs.id)
         .first()
     )
 
     return dict(
         _to_dto(db_substance[0]),
-        **{"className": db_substance[1].name if db_substance[1] != None else None}
+        **{
+            "className": db_substance[1].name if db_substance[1] != None else None,
+            "responsible": db_substance.User.name if db_substance.User else None,
+        }
     )
 
 
@@ -173,4 +189,5 @@ def _to_dto(s: Substance):
         "maxdosePediatric": s.maxdose_pediatric,
         "maxdosePediatricWeight": s.maxdose_pediatric_weight,
         "defaultMeasureUnit": s.default_measureunit,
+        "updatedAt": dateutils.to_iso(s.updatedAt),
     }
