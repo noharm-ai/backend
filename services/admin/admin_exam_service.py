@@ -7,7 +7,7 @@ from models.segment import Segment, SegmentExam, Exams
 from services.admin import admin_integration_service
 from services import data_authorization_service
 from decorators.has_permission_decorator import has_permission, Permission
-from utils import status
+from utils import status, dateutils
 from exception.validation_error import ValidationError
 
 
@@ -38,6 +38,7 @@ def get_segment_exams(id_segment: int):
                 "ref": se.ref,
                 "order": se.order,
                 "active": se.active,
+                "updatedAt": dateutils.to_iso(se.update),
             }
         )
 
@@ -248,6 +249,7 @@ def upsert_seg_exam(data: dict, user_context: User):
         "ref": segExam.ref,
         "order": segExam.order,
         "active": segExam.active,
+        "updatedAt": dateutils.to_iso(segExam.update),
     }
 
 
