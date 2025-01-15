@@ -30,6 +30,8 @@ def get_admin_drug_list(
     has_max_dose=None,
     source_list=None,
     tp_ref_max_dose=None,
+    substance_list=[],
+    tp_substance_list=None,
 ):
     SegmentOutlier = db.aliased(Segment)
     ConversionsAgg = db.aliased(MeasureUnitConvert)
@@ -279,6 +281,12 @@ def get_admin_drug_list(
 
     if source_list and len(source_list) > 0:
         q = q.filter(Drug.source.in_(source_list))
+
+    if substance_list:
+        if tp_substance_list == "in":
+            q = q.filter(Substance.id.in_(substance_list))
+        else:
+            q = q.filter(~Substance.id.in_(substance_list))
 
     return q.order_by(Drug.name, Segment.description).limit(limit).offset(offset).all()
 
