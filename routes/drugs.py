@@ -60,9 +60,7 @@ def update_substance():
     id_drug = data.get("idDrug", None)
     sctid = data.get("sctid", None)
 
-    drug_service.update_substance(
+    return drug_service.update_substance(
         id_drug=id_drug,
         sctid=sctid,
     )
-
-    return {"idDrug": escape_html(id_drug), "sctid": escape_html(str(sctid))}

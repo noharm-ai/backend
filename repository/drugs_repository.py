@@ -32,6 +32,7 @@ def get_admin_drug_list(
     tp_ref_max_dose=None,
     substance_list=[],
     tp_substance_list=None,
+    id_drug_list=[],
 ):
     SegmentOutlier = db.aliased(Segment)
     ConversionsAgg = db.aliased(MeasureUnitConvert)
@@ -288,31 +289,43 @@ def get_admin_drug_list(
         else:
             q = q.filter(~Substance.id.in_(substance_list))
 
+    if id_drug_list:
+        q = q.filter(DrugAttributes.idDrug.in_(id_drug_list))
+
     return q.order_by(Drug.name, Segment.description).limit(limit).offset(offset).all()
 
 
-def get_all_drug_attributes():
+def get_drug_attributes(id_drug: int = None, id_segment: int = None):
     """
     Returns a list of drugs (with substances) from medatributos table
     """
 
-    return (
+    query = (
         db.session.query(DrugAttributes, Drug, Substance, Segment)
         .join(Drug, Drug.id == DrugAttributes.idDrug)
         .join(Substance, Drug.sctid == Substance.id)
         .join(Segment, Segment.id == DrugAttributes.idSegment)
-        .all()
     )
 
+    if id_drug:
+        query = query.filter(DrugAttributes.idDrug == id_drug)
 
-def get_all_conversions():
+    if id_segment:
+        query = query.filter(DrugAttributes.idSegment == id_segment)
+
+    return query.all()
+
+
+def get_conversions(id_drug: int = None):
     """
     Returns all conversion records
     """
 
-    return (
-        db.session.query(MeasureUnitConvert, MeasureUnit)
-        .join(MeasureUnit, MeasureUnitConvert.idMeasureUnit == MeasureUnit.id)
-        .order_by(MeasureUnitConvert.idDrug)
-        .all()
+    query = db.session.query(MeasureUnitConvert, MeasureUnit).join(
+        MeasureUnit, MeasureUnitConvert.idMeasureUnit == MeasureUnit.id
     )
+
+    if id_drug:
+        query = query.filter(MeasureUnitConvert.idDrug == id_drug)
+
+    return query.order_by(MeasureUnitConvert.idDrug).all()
