@@ -228,6 +228,13 @@ def drug_config_to_generate_score(
             id_drug=id_drug, id_segment=id_segment, user=user_context
         )
 
+    calc_dose_max = False
+
+    if drugAttr.idMeasureUnit != id_measure_unit or drugAttr.division != (
+        division if division != 0 else None
+    ):
+        calc_dose_max = True
+
     drugAttr.idMeasureUnit = id_measure_unit
     drugAttr.division = division if division != 0 else None
     drugAttr.useWeight = use_weight
@@ -241,6 +248,11 @@ def drug_config_to_generate_score(
     )
 
     db.session.flush()
+
+    if calc_dose_max:
+        admin_drug_service.calculate_dosemax_uniq(
+            id_drug=id_drug, id_segment=id_segment
+        )
 
 
 def _setDrugUnit(idDrug, idMeasureUnit, idSegment, factor):
