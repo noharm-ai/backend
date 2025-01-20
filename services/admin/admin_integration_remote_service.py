@@ -233,6 +233,9 @@ def _get_new_queue(id_processor: str, action_type: str, data: dict):
     if NifiQueueActionTypeEnum.CLEAR_STATE.value == action_type:
         queue.url = f"nifi-api/processors/{escape(id_processor)}/state/clear-requests"
         queue.method = "POST"
+    if NifiQueueActionTypeEnum.VIEW_STATE.value == action_type:
+        queue.url = f"nifi-api/processors/{escape(id_processor)}/state"
+        queue.method = "GET"
     elif NifiQueueActionTypeEnum.SET_STATE.value == action_type:
         queue.url = f"nifi-api/processors/{escape(id_processor)}/diagnostics"
         queue.method = "GET"
