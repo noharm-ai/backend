@@ -25,7 +25,7 @@ def find_substance(term):
     for d in items:
         results.append(
             {
-                "sctid": d.id,
+                "sctid": str(d.id),
                 "name": d.name.upper(),
             }
         )

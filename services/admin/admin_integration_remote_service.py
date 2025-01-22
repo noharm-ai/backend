@@ -13,7 +13,7 @@ from botocore.config import Config as BotoConfig
 from models.main import db, User
 from models.appendix import NifiQueue
 from utils import dateutils
-from models.enums import NifiQueueActionTypeEnum
+from models.enums import NifiQueueActionTypeEnum, NoHarmENV
 from exception.validation_error import ValidationError
 from decorators.has_permission_decorator import has_permission, Permission
 from config import Config
@@ -169,6 +169,9 @@ def push_queue_request(
             if data.get("idProcessor", None) != None
             else None
         ),
+        "hasVersion": action_type == NifiQueueActionTypeEnum.SET_STATE.value
+        or action_type == NifiQueueActionTypeEnum.UPDATE_PROPERTY.value,
+        "versionUrl": f"nifi-api/processors/{id_processor}/diagnostics",
     }
     queue.createdAt = datetime.today()
 
@@ -212,6 +215,10 @@ def _send_to_sqs(queue: NifiQueue, schema: str):
         "runStatus": queue.runStatus,
         "body": queue.body if queue.body else {"empty": True},
         "type": queue.extra.get("type", "default"),
+        "hasVersion": queue.extra.get("hasVersion", False),
+        "idEntity": queue.extra.get("idEntity", None),
+        "componentType": queue.extra.get("componentType", None),
+        "versionUrl": queue.extra.get("versionUrl", None),
     }
 
     sqs.send_message(
@@ -233,11 +240,19 @@ def _get_new_queue(id_processor: str, action_type: str, data: dict):
     if NifiQueueActionTypeEnum.CLEAR_STATE.value == action_type:
         queue.url = f"nifi-api/processors/{escape(id_processor)}/state/clear-requests"
         queue.method = "POST"
-    elif NifiQueueActionTypeEnum.SET_STATE.value == action_type:
-        queue.url = f"nifi-api/processors/{escape(id_processor)}/diagnostics"
+    if NifiQueueActionTypeEnum.VIEW_STATE.value == action_type:
+        queue.url = f"nifi-api/processors/{escape(id_processor)}/state"
         queue.method = "GET"
-        queue.body = {"state": data["state"]}
-        queue.runStatus = True
+    elif NifiQueueActionTypeEnum.SET_STATE.value == action_type:
+        if Config.ENV == NoHarmENV.PRODUCTION.value:
+            queue.url = f"nifi-api/processors/{escape(id_processor)}/diagnostics"
+            queue.method = "GET"
+            queue.body = {"state": data["state"]}
+            queue.runStatus = True
+        else:
+            queue.url = f"nifi-api/processors/{escape(id_processor)}/run-status"
+            queue.method = "PUT"
+            queue.body = {"state": data["state"]}
     elif NifiQueueActionTypeEnum.TERMINATE_PROCESS.value == action_type:
         queue.url = f"nifi-api/processors/{escape(id_processor)}/threads"
         queue.method = "DELETE"
@@ -264,10 +279,19 @@ def _get_new_queue(id_processor: str, action_type: str, data: dict):
     elif NifiQueueActionTypeEnum.UPDATE_PROPERTY.value == action_type:
         queue.url = f"nifi-api/processors/{escape(id_processor)}"
         queue.method = "PUT"
-        queue.body = {
-            "id": id_processor,
-            "config": {"properties": data["properties"]},
-        }
+
+        if Config.ENV == NoHarmENV.PRODUCTION.value:
+            queue.body = {
+                "id": id_processor,
+                "config": {"properties": data["properties"]},
+            }
+        else:
+            queue.body = {
+                "component": {
+                    "id": id_processor,
+                    "config": {"properties": data["properties"]},
+                }
+            }
 
     return queue
 

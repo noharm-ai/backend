@@ -33,6 +33,10 @@ def update_dose_max(update_list: list[dict], schema: str):
 
 
 def copy_dose_max_from_ref(schema: str, update_by: int):
+    """
+    Updates dosemax attribute if its empty or updated by internal staff
+    """
+
     query = text(
         f"""
         with update_table as (
@@ -45,8 +49,12 @@ def copy_dose_max_from_ref(schema: str, update_by: int):
                 end as dosemaxima
             from 
                 {schema}.medatributos m 
+                left join public.usuario u on (m.update_by = u.idusuario)
             where 
-                m.dosemaxima is null
+                (
+                    m.dosemaxima is null
+                    or u."schema" = 'hsc_test'
+                )
                 and (
                     (m.usapeso = true and m.ref_dosemaxima_peso is not null)
                     or 

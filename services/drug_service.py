@@ -23,6 +23,7 @@ from models.prescription import (
 from models.segment import Segment
 from models.enums import DrugAdminSegment, DrugAttributesAuditTypeEnum
 from services import data_authorization_service
+from services.admin import admin_drug_service
 from exception.validation_error import ValidationError
 from decorators.has_permission_decorator import has_permission, Permission
 from utils import status, prescriptionutils
@@ -227,6 +228,13 @@ def drug_config_to_generate_score(
             id_drug=id_drug, id_segment=id_segment, user=user_context
         )
 
+    calc_dose_max = False
+
+    if drugAttr.idMeasureUnit != id_measure_unit or drugAttr.division != (
+        division if division != 0 else None
+    ):
+        calc_dose_max = True
+
     drugAttr.idMeasureUnit = id_measure_unit
     drugAttr.division = division if division != 0 else None
     drugAttr.useWeight = use_weight
@@ -240,6 +248,11 @@ def drug_config_to_generate_score(
     )
 
     db.session.flush()
+
+    if calc_dose_max:
+        admin_drug_service.calculate_dosemax_uniq(
+            id_drug=id_drug, id_segment=id_segment
+        )
 
 
 def _setDrugUnit(idDrug, idMeasureUnit, idSegment, factor):
@@ -399,7 +412,7 @@ def save_attributes(id_segment, id_drug, data, user_context: User):
 
 @has_permission(Permission.WRITE_DRUG_ATTRIBUTES)
 def update_substance(id_drug, sctid, user_context: User):
-    drug = Drug.query.get(id_drug)
+    drug = db.session.query(Drug).filter(Drug.id == id_drug).first()
 
     if drug == None:
         raise ValidationError(
@@ -413,11 +426,17 @@ def update_substance(id_drug, sctid, user_context: User):
 
     db.session.flush()
 
-    copy_substance_default_attributes(drug.id, drug.sctid, user=user_context)
+    copy_substance_default_attributes(
+        drug.id, drug.sctid, user=user_context, calc_dose_max=True
+    )
+
+    return admin_drug_service.get_drug_list(id_drug_list=[id_drug], limit=20, offset=0)
 
 
 # TODO: check where is called
-def copy_substance_default_attributes(id_drug, sctid, user: User, overwrite=True):
+def copy_substance_default_attributes(
+    id_drug, sctid, user: User, overwrite=True, calc_dose_max=False
+):
     reference = (
         db.session.query(DrugAttributesReference)
         .filter(DrugAttributesReference.idDrug == sctid)
@@ -472,6 +491,11 @@ def copy_substance_default_attributes(id_drug, sctid, user: User, overwrite=True
                 db.session.add(da)
             else:
                 db.session.flush()
+
+            if calc_dose_max:
+                admin_drug_service.calculate_dosemax_uniq(
+                    id_drug=id_drug, id_segment=da.idSegment
+                )
 
             _audit(
                 drug_attributes=da,

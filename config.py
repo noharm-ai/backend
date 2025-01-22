@@ -5,8 +5,8 @@ from models.enums import NoHarmENV
 
 
 class Config:
-    VERSION = "v4.25-beta"
-    FRONTEND_VERSION = "4.0.18"
+    VERSION = "v4.26-beta"
+    FRONTEND_VERSION = "4.0.20"
     ENV = getenv("ENV") or NoHarmENV.DEVELOPMENT.value
     SECRET_KEY = getenv("SECRET_KEY") or "secret_key"
     API_KEY = getenv("API_KEY") or ""

@@ -129,12 +129,13 @@ def save_conversions(
     id_drug, id_segment, id_measure_unit_default, conversion_list, user_context: User
 ):
 
-    overwrite = False
-    if (
-        admin_integration_status_service.get_integration_status(user_context.schema)
-        != IntegrationStatusEnum.PRODUCTION.value
-    ):
-        overwrite = True
+    # overwrite = False
+    # if (
+    #     admin_integration_status_service.get_integration_status(user_context.schema)
+    #     != IntegrationStatusEnum.PRODUCTION.value
+    # ):
+    # test always overwrite
+    overwrite = True
 
     if (
         id_drug == None
