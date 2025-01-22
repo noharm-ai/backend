@@ -13,8 +13,7 @@ def get_unit_conversion_list():
     request_data = request.get_json()
 
     return admin_unit_conversion_service.get_conversion_list(
-        id_segment=request_data.get("idSegment"),
-        show_prediction=request_data.get("showPrediction", False),
+        id_segment=request_data.get("idSegment")
     )
 
 

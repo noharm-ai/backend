@@ -200,3 +200,10 @@ class RegulationAction(Enum):
 class SegmentTypeEnum(Enum):
     ADULT = 1
     PEDIATRIC = 2
+
+
+class DefaultMeasureUnitEnum(Enum):
+    MG = "mg"
+    ML = "ml"
+    MCG = "mcg"
+    UI = "UI"

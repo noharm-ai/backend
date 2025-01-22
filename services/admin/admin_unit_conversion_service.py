@@ -13,12 +13,10 @@ from models.prescription import (
     Substance,
 )
 from models.segment import Segment
-from models.enums import IntegrationStatusEnum, SegmentTypeEnum
+from models.enums import SegmentTypeEnum, DefaultMeasureUnitEnum
 from services import drug_service as main_drug_service
 from services.admin import (
-    admin_ai_service,
     admin_drug_service,
-    admin_integration_status_service,
 )
 from decorators.has_permission_decorator import has_permission, Permission
 from exception.validation_error import ValidationError
@@ -27,7 +25,36 @@ from models.requests.admin.admin_unit_conversion_request import SetFactorRequest
 
 
 @has_permission(Permission.ADMIN_UNIT_CONVERSION)
-def get_conversion_list(id_segment, show_prediction=False):
+def get_conversion_list(id_segment):
+    nh_default_units = (
+        db.session.query(MeasureUnit)
+        .filter(
+            MeasureUnit.measureunit_nh.in_(
+                [
+                    DefaultMeasureUnitEnum.MCG.value,
+                    DefaultMeasureUnitEnum.MG.value,
+                    DefaultMeasureUnitEnum.ML.value,
+                    DefaultMeasureUnitEnum.UI.value,
+                ]
+            )
+        )
+        .all()
+    )
+
+    if not nh_default_units:
+        raise ValidationError(
+            "Pendência de configuração das unidades de medida",
+            "errors.invalidParams",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    default_units = {}
+    for du in nh_default_units:
+        default_units[du.measureunit_nh] = {
+            "idMeasureUnit": du.id,
+            "description": du.description,
+        }
+
     active_drugs = db.session.query(distinct(Outlier.idDrug).label("idDrug")).cte(
         "active_drugs"
     )
@@ -62,21 +89,7 @@ def get_conversion_list(id_segment, show_prediction=False):
         .group_by(DrugAttributes.idDrug, DrugAttributes.idMeasureUnitPrice)
     )
 
-    substance_units = (
-        db.session.query(
-            DrugAttributes.idDrug.label("idDrug"),
-            func.min(MeasureUnit.id).label("idMeasureUnit"),
-        )
-        .join(Drug, Drug.id == DrugAttributes.idDrug)
-        .join(Substance, Substance.id == Drug.sctid)
-        .join(MeasureUnit, Substance.default_measureunit == MeasureUnit.measureunit_nh)
-        .filter(Substance.default_measureunit != None)
-        .group_by(DrugAttributes.idDrug)
-    )
-
-    units = prescribed_units.union(price_units, current_units, substance_units).cte(
-        "units"
-    )
+    units = prescribed_units.union(price_units, current_units).cte("units")
 
     conversion_list = (
         db.session.query(
@@ -87,6 +100,8 @@ def get_conversion_list(id_segment, show_prediction=False):
             MeasureUnitConvert.factor,
             MeasureUnit.description,
             Drug.sctid,
+            Substance.default_measureunit,
+            MeasureUnit.measureunit_nh,
         )
         .join(active_drugs, Drug.id == active_drugs.c.idDrug)
         .join(units, Drug.id == units.c.idDrug)
@@ -105,7 +120,11 @@ def get_conversion_list(id_segment, show_prediction=False):
     )
 
     result = []
+    drug_defaultunit = set()
     for i in conversion_list:
+        if i.default_measureunit == i.measureunit_nh:
+            drug_defaultunit.add(i.id)
+
         result.append(
             {
                 "idDrug": i[1],
@@ -118,8 +137,24 @@ def get_conversion_list(id_segment, show_prediction=False):
             }
         )
 
-    if show_prediction:
-        return admin_ai_service.get_factors(result)
+    for i in conversion_list:
+        if i.id not in drug_defaultunit and i.default_measureunit:
+            drug_defaultunit.add(i.id)
+
+            d_unit = default_units.get(i.default_measureunit, None)
+
+            if d_unit:
+                result.append(
+                    {
+                        "idDrug": i.id,
+                        "name": i.name,
+                        "idMeasureUnit": d_unit.get("idMeasureUnit"),
+                        "factor": None,
+                        "idSegment": escape_html(id_segment),
+                        "measureUnit": d_unit.get("description"),
+                        "sctid": i.sctid,
+                    }
+                )
 
     return result
 

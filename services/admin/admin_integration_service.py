@@ -162,7 +162,7 @@ def _set_new_config(old_config: dict, new_config: dict):
             config["getname"]["secret"] = new_config["getname"]["secret"]
         elif "proxy" == config["getname"]["type"]:
             config["getname"]["url"] = new_config["getname"]["url"]
-            config["getname"]["urlDev"] = new_config["getname"]["urlDev"]
+            config["getname"]["urlDev"] = new_config["getname"].get("urlDev", None)
             config["getname"]["params"] = new_config["getname"]["params"]
             config["getname"]["token"] = {
                 "url": new_config["getname"]["token"]["url"],
