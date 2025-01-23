@@ -47,6 +47,7 @@ def proxy_name(idPatient):
                 )
             },
             params=params,
+            verify=False,
         )
 
         if response.status_code == status.HTTP_200_OK:
@@ -130,7 +131,7 @@ def proxy_multiple():
                 **{"cd_paciente": " ".join(str(id) for id in ids_list)},
             )
             response = requests.get(
-                url, headers={"Authorization": token}, params=params
+                url, headers={"Authorization": token}, params=params, verify=False
             )
 
         found = []
