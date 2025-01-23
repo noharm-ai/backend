@@ -26,6 +26,7 @@ def get_substances(
     has_max_dose_pediatric=None,
     has_max_dose_pediatric_weight=None,
     tags=[],
+    tp_substance_tag_list="in",
 ):
 
     q = (
@@ -92,7 +93,16 @@ def get_substances(
             q = q.filter(Substance.maxdose_pediatric_weight == None)
 
     if tags:
-        q = q.filter(cast(tags, postgresql.ARRAY(db.String)).overlap(Substance.tags))
+        if tp_substance_tag_list == "notin":
+            q = q.filter(
+                ~cast(tags, postgresql.ARRAY(db.String)).overlap(
+                    func.coalesce(Substance.tags, [])
+                )
+            )
+        else:
+            q = q.filter(
+                cast(tags, postgresql.ARRAY(db.String)).overlap(Substance.tags)
+            )
 
     q = (
         q.options(undefer(Substance.handling), undefer(Substance.admin_text))
