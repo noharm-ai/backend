@@ -24,7 +24,7 @@ def proxy_name(idPatient):
 
     config = _get_config(user)
     token = _get_token(config)
-    client_id = config["getname"]["token"]["params"]["client_id"]
+    getname_type = config["getname"].get("type", "proxy")
 
     url = (
         config["getname"]["urlDev"]
@@ -32,7 +32,7 @@ def proxy_name(idPatient):
         else config["getname"]["url"]
     )
 
-    if client_id == "noharm-internal":
+    if getname_type == "auth":
         url += f"patient-name/{int(idPatient)}"
         params = dict(config["getname"]["params"])
     else:
@@ -43,7 +43,7 @@ def proxy_name(idPatient):
             url,
             headers={
                 "Authorization": (
-                    f"Bearer {token}" if client_id == "noharm-internal" else token
+                    f"Bearer {token}" if getname_type == "auth" else token
                 )
             },
             params=params,
@@ -52,7 +52,7 @@ def proxy_name(idPatient):
         if response.status_code == status.HTTP_200_OK:
             data = response.json()
 
-            if client_id == "noharm-internal":
+            if getname_type == "auth":
                 return {
                     "status": "success",
                     "idPatient": data["idPatient"],
@@ -101,7 +101,7 @@ def proxy_multiple():
     ids_list = data.get("patients", [])
     config = _get_config(user)
     token = _get_token(config)
-    client_id = config["getname"]["token"]["params"]["client_id"]
+    getname_type = config["getname"].get("type", "proxy")
 
     url = (
         config["getname"]["urlDev"]
@@ -110,7 +110,7 @@ def proxy_multiple():
     )
 
     try:
-        if client_id == "noharm-internal":
+        if getname_type == "auth":
             url += "patient-name/multiple"
             params = dict(
                 config["getname"]["params"],
@@ -137,7 +137,7 @@ def proxy_multiple():
         names = []
         if response.status_code == status.HTTP_200_OK:
             data = response.json()
-            results = data if client_id == "noharm-internal" else data["data"]
+            results = data if getname_type == "auth" else data["data"]
 
             for p in results:
                 found.append(str(p["idPatient"]))
@@ -274,8 +274,9 @@ def search_name(term):
 def _get_token(config):
     token_url = config["getname"]["token"]["url"]
     params = config["getname"]["token"]["params"]
+    getname_type = config["getname"].get("type", "proxy")
 
-    if params["client_id"] == "noharm-internal":
+    if getname_type == "auth":
         token = encode(
             payload={
                 "exp": datetime.now(tz=timezone.utc) + timedelta(minutes=2),
