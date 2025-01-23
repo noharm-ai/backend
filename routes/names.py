@@ -73,7 +73,6 @@ def proxy_name(idPatient):
         logger.error(f"Service names ERROR: {response.status_code}")
         logger.error(url)
         logger.error(params)
-        logger.error(f"{auth_prefix}{token}")
         logger.error(response.text)
         logger.error(response.__dict__)
     except Exception as e:
