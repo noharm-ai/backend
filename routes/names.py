@@ -288,7 +288,7 @@ def _get_token(config):
 
         return token
 
-    response = requests.post(url=token_url, data=params)
+    response = requests.post(url=token_url, data=params, verify=False)
 
     if response.status_code != status.HTTP_200_OK:
         raise ValidationError(
