@@ -25,6 +25,7 @@ def proxy_name(idPatient):
     config = _get_config(user)
     token = _get_token(config)
     getname_type = config["getname"].get("type", "proxy")
+    auth_prefix = config["getname"]["token"].get("authPrefix", "")
 
     url = (
         config["getname"]["urlDev"]
@@ -41,7 +42,7 @@ def proxy_name(idPatient):
     try:
         response = requests.get(
             url,
-            headers={"Authorization": f"Bearer {token}"},
+            headers={"Authorization": f"{auth_prefix}{token}"},
             params=params,
             verify=False,
         )
@@ -72,7 +73,6 @@ def proxy_name(idPatient):
         logger.error(f"Service names ERROR: {response.status_code}")
         logger.error(url)
         logger.error(params)
-        logger.error(token)
         logger.error(response.text)
         logger.error(response.__dict__)
     except Exception as e:
@@ -101,6 +101,7 @@ def proxy_multiple():
     config = _get_config(user)
     token = _get_token(config)
     getname_type = config["getname"].get("type", "proxy")
+    auth_prefix = config["getname"]["token"].get("authPrefix", "")
 
     url = (
         config["getname"]["urlDev"]
@@ -129,7 +130,10 @@ def proxy_multiple():
                 **{"cd_paciente": " ".join(str(id) for id in ids_list)},
             )
             response = requests.get(
-                url, headers={"Authorization": token}, params=params, verify=False
+                url,
+                headers={"Authorization": f"{auth_prefix}{token}"},
+                params=params,
+                verify=False,
             )
 
         found = []
@@ -151,9 +155,10 @@ def proxy_multiple():
             logging.basicConfig()
             logger = logging.getLogger("noharm.backend")
             logger.error(f"Service names error {response.status_code}")
-            logger.error(response.json())
             logger.error(url)
             logger.error(params)
+            logger.error(response.text)
+            logger.error(response.__dict__)
 
     except Exception as e:
         logging.basicConfig()
