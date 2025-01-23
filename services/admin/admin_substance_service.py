@@ -1,8 +1,10 @@
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, cast
 from sqlalchemy.orm import undefer
 from datetime import datetime
+from sqlalchemy.dialects import postgresql
 
 from models.main import db, Substance, SubstanceClass, User
+from models.requests.admin.admin_substance import AdminSubstanceRequest
 from decorators.has_permission_decorator import has_permission, Permission
 from exception.validation_error import ValidationError
 from utils import status, dateutils
@@ -23,6 +25,7 @@ def get_substances(
     has_max_dose_adult_weight=None,
     has_max_dose_pediatric=None,
     has_max_dose_pediatric_weight=None,
+    tags=[],
 ):
 
     q = (
@@ -88,6 +91,9 @@ def get_substances(
         else:
             q = q.filter(Substance.maxdose_pediatric_weight == None)
 
+    if tags:
+        q = q.filter(cast(tags, postgresql.ARRAY(db.String)).overlap(Substance.tags))
+
     q = (
         q.options(undefer(Substance.handling), undefer(Substance.admin_text))
         .order_by(Substance.name)
@@ -116,27 +122,35 @@ def get_substances(
 
 
 @has_permission(Permission.ADMIN_SUBSTANCES)
-def upsert_substance(data: dict, user_context: User):
-    subs = (
-        db.session.query(Substance).filter(Substance.id == data.get("id", None)).first()
-    )
+def upsert_substance(request_data: AdminSubstanceRequest, user_context: User):
+    subs = db.session.query(Substance).filter(Substance.id == request_data.id).first()
 
     if subs is None:
         subs = Substance()
-        subs.id = data.get("id")
+        subs.id = request_data.id
         db.session.add(subs)
 
-    subs.name = data.get("name", None)
-    subs.idclass = data.get("idClass", None)
-    subs.active = data.get("active", None)
-    subs.link = data.get("link", None)
-    subs.handling = data.get("handling", None)
-    subs.admin_text = data.get("adminText", None)
-    subs.maxdose_adult = data.get("maxdoseAdult", None)
-    subs.maxdose_adult_weight = data.get("maxdoseAdultWeight", None)
-    subs.maxdose_pediatric = data.get("maxdosePediatric", None)
-    subs.maxdose_pediatric_weight = data.get("maxdosePediatricWeight", None)
-    subs.default_measureunit = data.get("defaultMeasureUnit", None)
+    subs.name = request_data.name
+    subs.idclass = request_data.idClass
+    subs.active = request_data.active
+    subs.link = request_data.link
+    subs.handling = request_data.handling
+    subs.admin_text = request_data.adminText
+    subs.maxdose_adult = request_data.maxdoseAdult
+    subs.maxdose_adult_weight = request_data.maxdoseAdultWeight
+    subs.maxdose_pediatric = request_data.maxdosePediatric
+    subs.maxdose_pediatric_weight = request_data.maxdosePediatricWeight
+    subs.default_measureunit = request_data.defaultMeasureUnit
+    subs.division_range = request_data.divisionRange
+    subs.tags = request_data.tags
+    subs.kidney_adult = request_data.kidneyAdult
+    subs.kidney_pediatric = request_data.kidneyPediatric
+    subs.liver_adult = request_data.liverAdult
+    subs.liver_pediatric = request_data.liverPediatric
+    subs.platelets = request_data.platelets
+    subs.fall_risk = request_data.fallRisk
+    subs.pregnant = request_data.pregnant
+    subs.lactating = request_data.lactating
 
     if (
         subs.maxdose_adult
@@ -190,4 +204,14 @@ def _to_dto(s: Substance):
         "maxdosePediatricWeight": s.maxdose_pediatric_weight,
         "defaultMeasureUnit": s.default_measureunit,
         "updatedAt": dateutils.to_iso(s.updatedAt),
+        "tags": s.tags,
+        "divisionRange": s.division_range,
+        "kidneyAdult": s.kidney_adult,
+        "kidneyPediatric": s.kidney_pediatric,
+        "liverAdult": s.liver_adult,
+        "liverPediatric": s.liver_pediatric,
+        "platelets": s.platelets,
+        "fallRisk": s.fall_risk,
+        "pregnant": s.pregnant,
+        "lactating": s.lactating,
     }

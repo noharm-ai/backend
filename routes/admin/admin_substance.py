@@ -2,6 +2,7 @@ from flask import Blueprint, request
 
 from services.admin import admin_substance_service
 from decorators.api_endpoint_decorator import api_endpoint
+from models.requests.admin.admin_substance import AdminSubstanceRequest
 
 app_admin_subs = Blueprint("app_admin_subs", __name__)
 
@@ -25,6 +26,7 @@ def get_substances():
         has_max_dose_adult_weight=data.get("hasMaxDoseAdultWeight", None),
         has_max_dose_pediatric=data.get("hasMaxDosePediatric", None),
         has_max_dose_pediatric_weight=data.get("hasMaxDosePediatricWeight", None),
+        tags=data.get("tags", []),
     )
 
     return list
@@ -34,7 +36,7 @@ def get_substances():
 @api_endpoint()
 def update_substance():
     subs = admin_substance_service.upsert_substance(
-        data=request.get_json(),
+        request_data=AdminSubstanceRequest(**request.get_json()),
     )
 
     return subs
