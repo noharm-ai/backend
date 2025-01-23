@@ -41,11 +41,7 @@ def proxy_name(idPatient):
     try:
         response = requests.get(
             url,
-            headers={
-                "Authorization": (
-                    f"Bearer {token}" if getname_type == "auth" else token
-                )
-            },
+            headers={"Authorization": f"Bearer {token}"},
             params=params,
             verify=False,
         )
@@ -76,7 +72,7 @@ def proxy_name(idPatient):
         logger.error(f"Service names ERROR: {response.status_code}")
         logger.error(url)
         logger.error(params)
-        logger.error(response.json())
+        logger.error(response)
     except Exception as e:
         logging.basicConfig()
         logger = logging.getLogger("noharm.backend")
