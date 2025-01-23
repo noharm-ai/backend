@@ -207,3 +207,17 @@ class DefaultMeasureUnitEnum(Enum):
     ML = "ml"
     MCG = "mcg"
     UI = "UI"
+
+
+class SubstanceTagEnum(Enum):
+    ANTIMICRO = "antimicro"
+    SURVEILLANCE = "surveillance"
+    CONTROLLED = "controlled"
+    DIALYZABLE = "dialyzable"
+    FASTING = "fasting"
+    PIM = "pim"
+    NOT_STANDARDIZED = "not_standardized"
+    CHEMOTERAPY = "chemoterapy"
+    NOT_VALIDATED = "not_validated"
+    TUBE = "tube"
+    NO_DOSEMAX = "no_dosemax"

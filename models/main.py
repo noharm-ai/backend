@@ -234,11 +234,6 @@ class DrugAttributes(db.Model, DrugAttributesBase):
     __tablename__ = "medatributos"
 
 
-class DrugAttributesReference(db.Model, DrugAttributesBase):
-    __tablename__ = "medatributos"
-    __table_args__ = {"schema": "hsc_test"}
-
-
 class DrugAttributesAudit(db.Model):
     __tablename__ = "medatributos_audit"
 
