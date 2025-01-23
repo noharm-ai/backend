@@ -538,15 +538,18 @@ def create_attributes_from_reference(id_drug, id_segment, user):
 def _fill_drug_attributes_from_ref(
     reference: Substance, drug_attributes: DrugAttributes, segment: Segment
 ):
-    drug_attributes.antimicro = SubstanceTagEnum.ANTIMICRO.value in reference.tags
-    drug_attributes.mav = SubstanceTagEnum.SURVEILLANCE.value in reference.tags
-    drug_attributes.controlled = SubstanceTagEnum.CONTROLLED.value in reference.tags
-    drug_attributes.tube = SubstanceTagEnum.TUBE.value in reference.tags
-    drug_attributes.chemo = SubstanceTagEnum.CHEMOTERAPY.value in reference.tags
-    drug_attributes.elderly = SubstanceTagEnum.PIM.value in reference.tags
-    drug_attributes.whiteList = SubstanceTagEnum.NOT_VALIDATED.value in reference.tags
-    drug_attributes.dialyzable = SubstanceTagEnum.DIALYZABLE.value in reference.tags
-    drug_attributes.fasting = SubstanceTagEnum.FASTING.value in reference.tags
+    if reference.tags:
+        drug_attributes.antimicro = SubstanceTagEnum.ANTIMICRO.value in reference.tags
+        drug_attributes.mav = SubstanceTagEnum.SURVEILLANCE.value in reference.tags
+        drug_attributes.controlled = SubstanceTagEnum.CONTROLLED.value in reference.tags
+        drug_attributes.tube = SubstanceTagEnum.TUBE.value in reference.tags
+        drug_attributes.chemo = SubstanceTagEnum.CHEMOTERAPY.value in reference.tags
+        drug_attributes.elderly = SubstanceTagEnum.PIM.value in reference.tags
+        drug_attributes.whiteList = (
+            SubstanceTagEnum.NOT_VALIDATED.value in reference.tags
+        )
+        drug_attributes.dialyzable = SubstanceTagEnum.DIALYZABLE.value in reference.tags
+        drug_attributes.fasting = SubstanceTagEnum.FASTING.value in reference.tags
 
     if segment.type == SegmentTypeEnum.PEDIATRIC.value:
         drug_attributes.kidney = reference.kidney_pediatric
