@@ -102,7 +102,7 @@ def proxy_multiple():
     config = _get_config(user)
     token = _get_token(config)
     getname_type = config["getname"].get("type", "proxy")
-    auth_prefix = config["getname"]["token"].get("authPrefix", "")
+    auth_prefix = config["getname"].get("authPrefix", "")
 
     url = (
         config["getname"]["urlDev"]
