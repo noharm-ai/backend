@@ -593,8 +593,8 @@ def get_outliers_list(
         "sctidA": str(drug.sctid) if d else "",
         "sctNameA": stringutils.strNone(substance.name).upper() if substance else "",
         "substance": {
-            "divisionRange": substance.division_range,
-            "unit": substance.default_measureunit,
+            "divisionRange": substance.division_range if substance else None,
+            "unit": substance.default_measureunit if substance else None,
         },
         "relations": relations,
         "relationTypes": [
