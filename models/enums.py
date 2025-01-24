@@ -80,11 +80,6 @@ class PrescriptionReviewTypeEnum(Enum):
     REVIEWED = 1
 
 
-class DrugAdminSegment(Enum):
-    ADULT = 5
-    KIDS = 7
-
-
 class DrugTypeEnum(Enum):
     DRUG = "Medicamentos"
     SOLUTION = "Soluções"
