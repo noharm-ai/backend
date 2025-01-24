@@ -422,6 +422,12 @@ def update_substance(id_drug, sctid, user_context: User):
             "Registro inexistente", "errors.invalidRecord", status.HTTP_400_BAD_REQUEST
         )
 
+    substance = db.session.query(Substance).filter(Substance.id == sctid).first()
+    if not substance or not substance.active:
+        raise ValidationError(
+            "Substância inválida", "errors.businessRules", status.HTTP_400_BAD_REQUEST
+        )
+
     drug.sctid = sctid
     drug.ai_accuracy = None
     drug.updated_at = datetime.today()

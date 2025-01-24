@@ -27,6 +27,7 @@ def get_substances(
     has_max_dose_pediatric_weight=None,
     tags=[],
     tp_substance_tag_list="in",
+    active=None,
 ):
 
     q = (
@@ -103,6 +104,9 @@ def get_substances(
             q = q.filter(
                 cast(tags, postgresql.ARRAY(db.String)).overlap(Substance.tags)
             )
+
+    if active != None:
+        q = q.filter(Substance.active == active)
 
     q = (
         q.options(undefer(Substance.handling), undefer(Substance.admin_text))

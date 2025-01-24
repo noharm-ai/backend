@@ -28,6 +28,7 @@ def get_substances():
         has_max_dose_pediatric_weight=data.get("hasMaxDosePediatricWeight", None),
         tags=data.get("tags", []),
         tp_substance_tag_list=data.get("tpSubstanceTagList", "in"),
+        active=data.get("active", None),
     )
 
     return list
