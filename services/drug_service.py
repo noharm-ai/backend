@@ -538,18 +538,18 @@ def create_attributes_from_reference(id_drug, id_segment, user):
 def _fill_drug_attributes_from_ref(
     reference: Substance, drug_attributes: DrugAttributes, segment: Segment
 ):
-    if reference.tags:
-        drug_attributes.antimicro = SubstanceTagEnum.ANTIMICRO.value in reference.tags
-        drug_attributes.mav = SubstanceTagEnum.SURVEILLANCE.value in reference.tags
-        drug_attributes.controlled = SubstanceTagEnum.CONTROLLED.value in reference.tags
-        drug_attributes.tube = SubstanceTagEnum.TUBE.value in reference.tags
-        drug_attributes.chemo = SubstanceTagEnum.CHEMOTERAPY.value in reference.tags
-        drug_attributes.elderly = SubstanceTagEnum.PIM.value in reference.tags
-        drug_attributes.whiteList = (
-            SubstanceTagEnum.NOT_VALIDATED.value in reference.tags
-        )
-        drug_attributes.dialyzable = SubstanceTagEnum.DIALYZABLE.value in reference.tags
-        drug_attributes.fasting = SubstanceTagEnum.FASTING.value in reference.tags
+    def has_tag(tag: str):
+        return True if reference.tags and tag in reference.tags else False
+
+    drug_attributes.antimicro = has_tag(SubstanceTagEnum.ANTIMICRO.value)
+    drug_attributes.mav = has_tag(SubstanceTagEnum.SURVEILLANCE.value)
+    drug_attributes.controlled = has_tag(SubstanceTagEnum.CONTROLLED.value)
+    drug_attributes.tube = has_tag(SubstanceTagEnum.TUBE.value)
+    drug_attributes.chemo = has_tag(SubstanceTagEnum.CHEMOTERAPY.value)
+    drug_attributes.elderly = has_tag(SubstanceTagEnum.PIM.value)
+    drug_attributes.whiteList = has_tag(SubstanceTagEnum.NOT_VALIDATED.value)
+    drug_attributes.dialyzable = has_tag(SubstanceTagEnum.DIALYZABLE.value)
+    drug_attributes.fasting = has_tag(SubstanceTagEnum.FASTING.value)
 
     if segment.type == SegmentTypeEnum.PEDIATRIC.value:
         drug_attributes.kidney = reference.kidney_pediatric
