@@ -457,11 +457,14 @@ def get_outliers_list(
         .all()
     )
     d = (
-        db.session.query(Drug, Substance.name)
+        db.session.query(Drug, Substance)
         .outerjoin(Substance, Substance.id == Drug.sctid)
         .filter(Drug.id == id_drug)
         .first()
     )
+
+    drug: Drug = d.Drug
+    substance: Substance = d.Substance
 
     drugAttr = (
         db.session.query(DrugAttributes)
@@ -472,8 +475,8 @@ def get_outliers_list(
 
     relations = []
     defaultNote = None
-    if d and d[0].sctid:
-        relations = substance_service.get_substance_relations(sctid=d[0].sctid)
+    if drug and drug.sctid:
+        relations = substance_service.get_substance_relations(sctid=drug.sctid)
 
     if drugAttr is None:
         drugAttr = DrugAttributes()
@@ -587,8 +590,12 @@ def get_outliers_list(
         "maxTime": drugAttr.maxTime,
         "whiteList": drugAttr.whiteList,
         "chemo": drugAttr.chemo,
-        "sctidA": str(d[0].sctid) if d else "",
-        "sctNameA": stringutils.strNone(d[1]).upper() if d else "",
+        "sctidA": str(drug.sctid) if d else "",
+        "sctNameA": stringutils.strNone(substance.name).upper() if substance else "",
+        "substance": {
+            "divisionRange": substance.division_range if substance else None,
+            "unit": substance.default_measureunit if substance else None,
+        },
         "relations": relations,
         "relationTypes": [
             {"key": t, "value": examutils.typeRelations[t]}

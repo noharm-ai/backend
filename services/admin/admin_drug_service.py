@@ -13,7 +13,8 @@ from models.prescription import (
     Substance,
 )
 from models.segment import Segment
-from models.enums import DrugAdminSegment, DrugAttributesAuditTypeEnum, SegmentTypeEnum
+from models.enums import SegmentTypeEnum
+from repository.admin import admin_drug_repository
 from services.admin import admin_ai_service
 from services import drug_service as main_drug_service
 from repository import drugs_repository, drug_attributes_repository
@@ -230,17 +231,6 @@ def copy_drug_attributes(
     from_admin_schema=True,
     overwrite_all=False,
 ):
-    if (
-        from_admin_schema
-        and id_segment_origin != DrugAdminSegment.ADULT.value
-        and id_segment_origin != DrugAdminSegment.KIDS.value
-    ):
-        raise ValidationError(
-            "Segmento origem inválido",
-            "errors.invalidParams",
-            status.HTTP_400_BAD_REQUEST,
-        )
-
     if not from_admin_schema and id_segment_origin == id_segment_destiny:
         raise ValidationError(
             "Segmento origem igual ao segmento destino",
@@ -250,7 +240,7 @@ def copy_drug_attributes(
 
     if (
         overwrite_all
-        and Permission.ADMIN_DRUGS__OVERWRITE_ATTRIBUTES in user_permissions
+        and Permission.ADMIN_DRUGS__OVERWRITE_ATTRIBUTES not in user_permissions
     ):
         raise ValidationError(
             "Usuário não autorizado",
@@ -258,136 +248,27 @@ def copy_drug_attributes(
             status.HTTP_401_UNAUTHORIZED,
         )
 
-    origin_schema = "hsc_test" if from_admin_schema else user_context.schema
-    schema = user_context.schema
-
-    only_support_filter = """
-        and (
-            ma.update_by = 0
-            or ma.update_by is null
-            or u.config::text like '%ADMIN%'
-            or u.config::text like '%CURATOR%'
+    if not from_admin_schema and not id_segment_origin:
+        raise ValidationError(
+            "Segmento origem inválido",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
         )
-    """
 
-    base_attributes = [
-        "renal",
-        "hepatico",
-        "plaquetas",
-        "mav",
-        "idoso",
-        "controlados",
-        "antimicro",
-        "quimio",
-        "sonda",
-        "naopadronizado",
-        "linhabranca",
-        "dosemaxima",
-        "risco_queda",
-        "dialisavel",
-        "lactante",
-        "gestante",
-        "fkunidademedidacusto",
-        "custo",
-        "jejum",
-    ]
-    set_attributes = []
-    for a in attributes:
-        if a in base_attributes:
-            set_attributes.append(f"{a} = destino.{a},")
-
-    query = f"""
-        with modelo as (
-            select
-                m.sctid,
-                ma.renal,
-                ma.hepatico,
-                ma.plaquetas,
-                ma.dosemaxima,
-                ma.risco_queda,
-                ma.lactante,
-                ma.gestante,
-                coalesce(ma.mav, false) as mav,
-                coalesce(ma.idoso, false) as idoso,
-                coalesce(ma.controlados, false) as controlados,
-                coalesce(ma.antimicro, false) as antimicro,
-                coalesce(ma.quimio, false) as quimio,
-                coalesce(ma.sonda, false) as sonda,
-                coalesce(ma.naopadronizado, false) as naopadronizado,
-                coalesce(ma.linhabranca, false) as linhabranca,
-                coalesce(ma.dialisavel, false) as dialisavel,
-                coalesce(ma.jejum, false) as jejum,
-                ma.fkunidademedidacusto,
-                ma.custo
-            from
-                {origin_schema}.medatributos ma
-                inner join {origin_schema}.medicamento m on (ma.fkmedicamento = m.fkmedicamento)
-                inner join public.substancia s on (m.sctid = s.sctid)
-            where 
-                ma.idsegmento = :idSegmentOrigin
-        ),
-        destino as (
-            select 
-                ma.fkmedicamento, ma.idsegmento, mo.*
-            from
-                {schema}.medatributos ma
-                inner join {schema}.medicamento m on (ma.fkmedicamento = m.fkmedicamento)
-                inner join public.substancia s on (m.sctid = s.sctid)
-                inner join modelo mo on (s.sctid = mo.sctid)
-                left join public.usuario u on (ma.update_by = u.idusuario)
-            where 
-                ma.idsegmento = :idSegmentDestiny
-                {only_support_filter if not overwrite_all else ''}
+    if not id_segment_destiny:
+        raise ValidationError(
+            "Segmento destino inválido",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
         )
-    """
 
-    audit_stmt = text(
-        f"""
-        {query}
-        insert into 
-            {schema}.medatributos_audit 
-            (tp_audit, fkmedicamento, idsegmento, extra, created_at, created_by)
-        select 
-            {DrugAttributesAuditTypeEnum.COPY_FROM_REFERENCE.value}, d.fkmedicamento, d.idsegmento, :extra, now(), :idUser
-        from
-	        destino d
-    """
-    )
-
-    db.session.execute(
-        audit_stmt,
-        {
-            "idSegmentOrigin": id_segment_origin,
-            "idSegmentDestiny": id_segment_destiny,
-            "idUser": user_context.id,
-            "extra": '{"attributes": "' + ",".join(attributes) + '"}',
-        },
-    )
-
-    update_stmt = text(
-        f"""
-        {query}
-        update 
-            {schema}.medatributos origem
-        set 
-            {''.join(set_attributes)}
-            update_at = now(),
-            update_by = :idUser
-        from 
-            destino
-        where 
-            origem.fkmedicamento = destino.fkmedicamento
-            and origem.idsegmento = destino.idsegmento
-    """
-    )
-
-    return db.session.execute(
-        update_stmt,
-        {
-            "idSegmentOrigin": id_segment_origin,
-            "idSegmentDestiny": id_segment_destiny,
-            "idUser": user_context.id,
-        },
+    return admin_drug_repository.copy_attributes(
+        from_admin_schema=from_admin_schema,
+        id_segment_origin=id_segment_origin,
+        id_segment_destiny=id_segment_destiny,
+        attributes=attributes,
+        user_context=user_context,
+        overwrite_all=overwrite_all,
     )
 
 

@@ -368,6 +368,15 @@ def _get_outcome_dict(
             "date": intervention.date.isoformat(),
             "originDrug": origin_drug.name if origin_drug != None else None,
             "destinyDrug": destiny_drug.name if destiny_drug != None else None,
+            "destinyDrugSubstance": (
+                destiny_drug.sctid if destiny_drug != None else None
+            ),
+            "destinyDrugId": (destiny_drug.id if destiny_drug != None else None),
+            "idSegment": (
+                outcome_data.PrescriptionDrug.idSegment
+                if outcome_data.PrescriptionDrug
+                else None
+            ),
             "economyDayValueManual": intervention.economy_day_value_manual,
             "economyDayAmount": intervention.economy_days,
             "economyDayAmountManual": intervention.economy_days != None,

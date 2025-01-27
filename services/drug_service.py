@@ -7,7 +7,6 @@ from models.main import (
     db,
     User,
     PrescriptionAgg,
-    DrugAttributesReference,
     DrugAttributesAudit,
 )
 from models.prescription import (
@@ -21,7 +20,11 @@ from models.prescription import (
     Substance,
 )
 from models.segment import Segment
-from models.enums import DrugAdminSegment, DrugAttributesAuditTypeEnum
+from models.enums import (
+    DrugAttributesAuditTypeEnum,
+    SubstanceTagEnum,
+    SegmentTypeEnum,
+)
 from services import data_authorization_service
 from services.admin import admin_drug_service
 from exception.validation_error import ValidationError
@@ -419,6 +422,12 @@ def update_substance(id_drug, sctid, user_context: User):
             "Registro inexistente", "errors.invalidRecord", status.HTTP_400_BAD_REQUEST
         )
 
+    substance = db.session.query(Substance).filter(Substance.id == sctid).first()
+    if not substance or not substance.active:
+        raise ValidationError(
+            "Substância inválida", "errors.businessRules", status.HTTP_400_BAD_REQUEST
+        )
+
     drug.sctid = sctid
     drug.ai_accuracy = None
     drug.updated_at = datetime.today()
@@ -433,16 +442,10 @@ def update_substance(id_drug, sctid, user_context: User):
     return admin_drug_service.get_drug_list(id_drug_list=[id_drug], limit=20, offset=0)
 
 
-# TODO: check where is called
 def copy_substance_default_attributes(
     id_drug, sctid, user: User, overwrite=True, calc_dose_max=False
 ):
-    reference = (
-        db.session.query(DrugAttributesReference)
-        .filter(DrugAttributesReference.idDrug == sctid)
-        .filter(DrugAttributesReference.idSegment == DrugAdminSegment.ADULT.value)
-        .first()
-    )
+    reference = db.session.query(Substance).filter(Substance.id == sctid).first()
 
     if reference != None:
         segments = db.session.query(Segment).all()
@@ -465,23 +468,10 @@ def copy_substance_default_attributes(
             elif not overwrite:
                 continue
 
-            # attributes
-            da.antimicro = reference.antimicro
-            da.mav = reference.mav
-            da.controlled = reference.controlled
-            da.tube = reference.tube
-            da.chemo = reference.chemo
-            da.elderly = reference.elderly
-            da.whiteList = reference.whiteList
-            da.dialyzable = reference.dialyzable
-            da.fasting = reference.fasting
-
-            da.kidney = reference.kidney
-            da.liver = reference.liver
-            da.platelets = reference.platelets
-            da.fallRisk = reference.fallRisk
-            da.lactating = reference.lactating
-            da.pregnant = reference.pregnant
+            # set attrs from reference
+            da = _fill_drug_attributes_from_ref(
+                reference=reference, drug_attributes=da, segment=s
+            )
 
             # controls
             da.update = datetime.today()
@@ -504,7 +494,6 @@ def copy_substance_default_attributes(
             )
 
 
-# TODO: called from other services
 def create_attributes_from_reference(id_drug, id_segment, user):
     da = (
         db.session.query(DrugAttributes)
@@ -518,12 +507,8 @@ def create_attributes_from_reference(id_drug, id_segment, user):
             "Registro inexistente", "errors.invalidRecord", status.HTTP_400_BAD_REQUEST
         )
 
-    reference = (
-        db.session.query(DrugAttributesReference)
-        .filter(DrugAttributesReference.idDrug == drug.sctid)
-        .filter(DrugAttributesReference.idSegment == DrugAdminSegment.ADULT.value)
-        .first()
-    )
+    reference = db.session.query(Substance).filter(Substance.id == drug.sctid).first()
+    segment = db.session.query(Segment).filter(Segment.id == id_segment).first()
 
     if da == None:
         da = DrugAttributes()
@@ -533,23 +518,10 @@ def create_attributes_from_reference(id_drug, id_segment, user):
         da.idSegment = id_segment
 
         if reference != None:
-            # attributes
-            da.antimicro = reference.antimicro
-            da.mav = reference.mav
-            da.controlled = reference.controlled
-            da.tube = reference.tube
-            da.chemo = reference.chemo
-            da.elderly = reference.elderly
-            da.whiteList = reference.whiteList
-            da.dialyzable = reference.dialyzable
-            da.fasting = reference.fasting
-
-            da.kidney = reference.kidney
-            da.liver = reference.liver
-            da.platelets = reference.platelets
-            da.fallRisk = reference.fallRisk
-            da.lactating = reference.lactating
-            da.pregnant = reference.pregnant
+            # set attrs from reference
+            da = _fill_drug_attributes_from_ref(
+                reference=reference, drug_attributes=da, segment=segment
+            )
 
         # controls
         da.update = datetime.today()
@@ -567,6 +539,37 @@ def create_attributes_from_reference(id_drug, id_segment, user):
         return da
 
     return None
+
+
+def _fill_drug_attributes_from_ref(
+    reference: Substance, drug_attributes: DrugAttributes, segment: Segment
+):
+    def has_tag(tag: str):
+        return True if reference.tags and tag in reference.tags else False
+
+    drug_attributes.antimicro = has_tag(SubstanceTagEnum.ANTIMICRO.value)
+    drug_attributes.mav = has_tag(SubstanceTagEnum.SURVEILLANCE.value)
+    drug_attributes.controlled = has_tag(SubstanceTagEnum.CONTROLLED.value)
+    drug_attributes.tube = has_tag(SubstanceTagEnum.TUBE.value)
+    drug_attributes.chemo = has_tag(SubstanceTagEnum.CHEMOTERAPY.value)
+    drug_attributes.elderly = has_tag(SubstanceTagEnum.PIM.value)
+    drug_attributes.whiteList = has_tag(SubstanceTagEnum.NOT_VALIDATED.value)
+    drug_attributes.dialyzable = has_tag(SubstanceTagEnum.DIALYZABLE.value)
+    drug_attributes.fasting = has_tag(SubstanceTagEnum.FASTING.value)
+
+    if segment.type == SegmentTypeEnum.PEDIATRIC.value:
+        drug_attributes.kidney = reference.kidney_pediatric
+        drug_attributes.liver = reference.liver_pediatric
+    else:
+        drug_attributes.kidney = reference.kidney_adult
+        drug_attributes.liver = reference.liver_adult
+
+    drug_attributes.platelets = reference.platelets
+    drug_attributes.fallRisk = reference.fall_risk
+    drug_attributes.lactating = reference.lactating
+    drug_attributes.pregnant = reference.pregnant
+
+    return drug_attributes
 
 
 def to_dict(attr: DrugAttributes):

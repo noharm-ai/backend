@@ -1,4 +1,4 @@
-from sqlalchemy import or_, asc, func
+from sqlalchemy import or_, asc, func, desc
 
 from models.main import db, Substance, SubstanceClass, Relation
 from decorators.has_permission_decorator import has_permission, Permission
@@ -72,7 +72,11 @@ def find_substance_class(term):
 
 @has_permission(Permission.READ_BASIC_FEATURES)
 def get_substances():
-    results = db.session.query(Substance).order_by(asc(Substance.name)).all()
+    results = (
+        db.session.query(Substance)
+        .order_by(desc(Substance.active), asc(Substance.name))
+        .all()
+    )
 
     list = []
     for d in results:

@@ -34,6 +34,8 @@ dict_expected_before_outcome = {
         "header": {
             "date": "2024-10-20T10:18:12.911249",
             "destinyDrug": "BISACODIL 5 mg CP",
+            "destinyDrugSubstance": None,
+            "destinyDrugId": 4,
             "economyDayAmount": None,
             "economyDayAmountManual": False,
             "economyDayValue": 0.0,
@@ -243,6 +245,8 @@ dict_expected_after_outcome = {
         "header": {
             "date": "2024-10-21T09:14:02.640918",
             "destinyDrug": "BISACODIL 5 mg CP",
+            "destinyDrugSubstance": None,
+            "destinyDrugId": 4,
             "economyDayAmount": None,
             "economyDayAmountManual": False,
             "economyDayValue": 0.0,

@@ -109,6 +109,16 @@ class Substance(db.Model):
     admin_text = deferred(db.Column("curadoria", db.String, nullable=True))
     updatedAt = db.Column("update_at", db.DateTime, nullable=True)
     updatedBy = db.Column("update_by", db.BigInteger, nullable=True)
+    tags = db.Column("tags", postgresql.ARRAY(db.String(100)), nullable=True)
+    kidney_adult = db.Column("renal_adulto", db.Integer, nullable=True)
+    kidney_pediatric = db.Column("renal_pediatrico", db.Integer, nullable=True)
+    liver_adult = db.Column("hepatico_adulto", db.Integer, nullable=True)
+    liver_pediatric = db.Column("hepatico_pediatrico", db.Integer, nullable=True)
+    fall_risk = db.Column("risco_queda", db.Integer, nullable=True)
+    pregnant = db.Column("gestante", db.String, nullable=True)
+    lactating = db.Column("lactante", db.String, nullable=True)
+    platelets = db.Column("plaquetas", db.Integer, nullable=True)
+    division_range = db.Column("divisor_faixa", db.Float, nullable=True)
 
 
 class SubstanceClass(db.Model):
@@ -222,11 +232,6 @@ class DrugAttributesBase:
 
 class DrugAttributes(db.Model, DrugAttributesBase):
     __tablename__ = "medatributos"
-
-
-class DrugAttributesReference(db.Model, DrugAttributesBase):
-    __tablename__ = "medatributos"
-    __table_args__ = {"schema": "hsc_test"}
 
 
 class DrugAttributesAudit(db.Model):

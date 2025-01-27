@@ -80,11 +80,6 @@ class PrescriptionReviewTypeEnum(Enum):
     REVIEWED = 1
 
 
-class DrugAdminSegment(Enum):
-    ADULT = 5
-    KIDS = 7
-
-
 class DrugTypeEnum(Enum):
     DRUG = "Medicamentos"
     SOLUTION = "Soluções"
@@ -200,3 +195,24 @@ class RegulationAction(Enum):
 class SegmentTypeEnum(Enum):
     ADULT = 1
     PEDIATRIC = 2
+
+
+class DefaultMeasureUnitEnum(Enum):
+    MG = "mg"
+    ML = "ml"
+    MCG = "mcg"
+    UI = "UI"
+
+
+class SubstanceTagEnum(Enum):
+    ANTIMICRO = "antimicro"
+    SURVEILLANCE = "surveillance"
+    CONTROLLED = "controlled"
+    DIALYZABLE = "dialyzable"
+    FASTING = "fasting"
+    PIM = "pim"
+    NOT_STANDARDIZED = "not_standardized"
+    CHEMOTERAPY = "chemoterapy"
+    NOT_VALIDATED = "not_validated"
+    TUBE = "tube"
+    NO_DOSEMAX = "no_dosemax"

@@ -24,7 +24,8 @@ def proxy_name(idPatient):
 
     config = _get_config(user)
     token = _get_token(config)
-    client_id = config["getname"]["token"]["params"]["client_id"]
+    getname_type = config["getname"].get("type", "proxy")
+    auth_prefix = config["getname"].get("authPrefix", "")
 
     url = (
         config["getname"]["urlDev"]
@@ -32,7 +33,7 @@ def proxy_name(idPatient):
         else config["getname"]["url"]
     )
 
-    if client_id == "noharm-internal":
+    if getname_type == "auth":
         url += f"patient-name/{int(idPatient)}"
         params = dict(config["getname"]["params"])
     else:
@@ -41,18 +42,15 @@ def proxy_name(idPatient):
     try:
         response = requests.get(
             url,
-            headers={
-                "Authorization": (
-                    f"Bearer {token}" if client_id == "noharm-internal" else token
-                )
-            },
+            headers={"Authorization": f"{auth_prefix}{token}"},
             params=params,
+            verify=False,
         )
 
         if response.status_code == status.HTTP_200_OK:
             data = response.json()
 
-            if client_id == "noharm-internal":
+            if getname_type == "auth":
                 return {
                     "status": "success",
                     "idPatient": data["idPatient"],
@@ -75,7 +73,8 @@ def proxy_name(idPatient):
         logger.error(f"Service names ERROR: {response.status_code}")
         logger.error(url)
         logger.error(params)
-        logger.error(response.json())
+        logger.error(response.text)
+        logger.error(response.__dict__)
     except Exception as e:
         logging.basicConfig()
         logger = logging.getLogger("noharm.backend")
@@ -101,7 +100,8 @@ def proxy_multiple():
     ids_list = data.get("patients", [])
     config = _get_config(user)
     token = _get_token(config)
-    client_id = config["getname"]["token"]["params"]["client_id"]
+    getname_type = config["getname"].get("type", "proxy")
+    auth_prefix = config["getname"].get("authPrefix", "")
 
     url = (
         config["getname"]["urlDev"]
@@ -110,7 +110,7 @@ def proxy_multiple():
     )
 
     try:
-        if client_id == "noharm-internal":
+        if getname_type == "auth":
             url += "patient-name/multiple"
             params = dict(
                 config["getname"]["params"],
@@ -130,14 +130,17 @@ def proxy_multiple():
                 **{"cd_paciente": " ".join(str(id) for id in ids_list)},
             )
             response = requests.get(
-                url, headers={"Authorization": token}, params=params
+                url,
+                headers={"Authorization": f"{auth_prefix}{token}"},
+                params=params,
+                verify=False,
             )
 
         found = []
         names = []
         if response.status_code == status.HTTP_200_OK:
             data = response.json()
-            results = data if client_id == "noharm-internal" else data["data"]
+            results = data if getname_type == "auth" else data["data"]
 
             for p in results:
                 found.append(str(p["idPatient"]))
@@ -152,9 +155,10 @@ def proxy_multiple():
             logging.basicConfig()
             logger = logging.getLogger("noharm.backend")
             logger.error(f"Service names error {response.status_code}")
-            logger.error(response.json())
             logger.error(url)
             logger.error(params)
+            logger.error(response.text)
+            logger.error(response.__dict__)
 
     except Exception as e:
         logging.basicConfig()
@@ -274,8 +278,9 @@ def search_name(term):
 def _get_token(config):
     token_url = config["getname"]["token"]["url"]
     params = config["getname"]["token"]["params"]
+    getname_type = config["getname"].get("type", "proxy")
 
-    if params["client_id"] == "noharm-internal":
+    if getname_type == "auth":
         token = encode(
             payload={
                 "exp": datetime.now(tz=timezone.utc) + timedelta(minutes=2),
@@ -286,7 +291,7 @@ def _get_token(config):
 
         return token
 
-    response = requests.post(url=token_url, data=params)
+    response = requests.post(url=token_url, data=params, verify=False)
 
     if response.status_code != status.HTTP_200_OK:
         raise ValidationError(

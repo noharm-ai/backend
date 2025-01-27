@@ -41,7 +41,11 @@ def create_agg_prescription_by_prescription(
             status.HTTP_400_BAD_REQUEST,
         )
 
-    p = Prescription.query.get(id_prescription)
+    p = (
+        db.session.query(Prescription)
+        .filter(Prescription.id == id_prescription)
+        .first()
+    )
     if p is None:
         raise ValidationError(
             "Prescrição inexistente",
@@ -57,6 +61,8 @@ def create_agg_prescription_by_prescription(
     if not force and processed_status == "PROCESSED":
         return
 
+    _update_patient_conciliation_status(prescription=p)
+
     prescription_data = prescription_view_service.static_get_prescription(
         id_prescription=id_prescription, user_context=user_context
     )
@@ -66,7 +72,6 @@ def create_agg_prescription_by_prescription(
 
     if p.concilia != None:
         db.session.flush()
-        _update_patient_conciliation_status(prescription=p)
 
         return
 
@@ -340,16 +345,30 @@ def _get_processed_status(id_prescription: int):
 
 
 def _update_patient_conciliation_status(prescription: Prescription):
-    if prescription.concilia != None:
-        patient = (
-            db.session.query(Patient)
-            .filter(Patient.admissionNumber == prescription.admissionNumber)
-            .first()
-        )
-        if (
-            patient != None
-            and patient.st_conciliation == PatientConciliationStatusEnum.PENDING.value
-        ):
+    patient = (
+        db.session.query(Patient)
+        .filter(Patient.admissionNumber == prescription.admissionNumber)
+        .first()
+    )
+
+    if (
+        patient
+        and patient.st_conciliation == PatientConciliationStatusEnum.PENDING.value
+    ):
+        update_concilia_status = False
+        if prescription.concilia != None:
+            update_concilia_status = True
+        else:
+            conciliation = (
+                db.session.query(Prescription)
+                .filter(Prescription.admissionNumber == prescription.admissionNumber)
+                .filter(Prescription.concilia != None)
+                .first()
+            )
+            if conciliation:
+                update_concilia_status = True
+
+        if update_concilia_status:
             patient.st_conciliation = PatientConciliationStatusEnum.CREATED.value
             db.session.flush()
 
