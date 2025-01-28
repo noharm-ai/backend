@@ -463,8 +463,8 @@ def get_outliers_list(
         .first()
     )
 
-    drug: Drug = d.Drug
-    substance: Substance = d.Substance
+    drug: Drug = d.Drug if d else None
+    substance: Substance = d.Substance if d else None
 
     drugAttr = (
         db.session.query(DrugAttributes)
