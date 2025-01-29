@@ -1,7 +1,7 @@
 import os
 import logging
 import inspect
-from flask import g
+from flask import g, request
 from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request, get_jwt
 from flask_jwt_extended.exceptions import JWTExtendedException
 from jwt.exceptions import PyJWTError
@@ -96,6 +96,7 @@ def api_endpoint():
                 logging.basicConfig()
                 logger = logging.getLogger("noharm.backend")
                 logger.exception(str(e))
+                logger.error("Request data: %s", request.get_data())
 
                 return {
                     "status": "error",

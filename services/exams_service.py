@@ -1,5 +1,6 @@
 import copy
 import json
+import logging
 from sqlalchemy import text, desc, and_
 from datetime import datetime, timedelta, date
 
@@ -339,7 +340,45 @@ def _get_exams_previous_results(id_patient: int):
     return previous_exams
 
 
-def get_exams_current_results(
+def _get_exams_current_results_hybrid(id_patient: int, schema: str):
+    MIN_DATE = date.today() - timedelta(days=5)
+    logging.basicConfig()
+    logger = logging.getLogger("noharm.backend")
+
+    results = (
+        Exams.query.distinct(Exams.typeExam)
+        .filter(Exams.idPatient == id_patient)
+        .filter(Exams.date >= MIN_DATE)
+        .order_by(Exams.typeExam, Exams.date.desc())
+        .all()
+    )
+
+    cache_key = f"{schema}:{id_patient}:exames"
+    cache_result = cache_service.get_hgetall(key=cache_key)
+    cache_exams = {}
+    if cache_result:
+        cache_exams = {}
+        for exam_type, exam_object in cache_result.items():
+            cache_exams[exam_type.lower()] = exam_object
+
+    exams = {}
+    for e in results:
+        prev_value = cache_exams.get(e.typeExam.lower())
+
+        if not prev_value:
+            logger.warning(f"CACHE_MISS: {cache_key} - type: {e.typeExam.lower()}")
+
+        exams[e.typeExam.lower()] = {
+            "value": e.value,
+            "unit": e.unit,
+            "date": e.date.isoformat(),
+            "prev": prev_value.get("prev", None) if prev_value else None,
+        }
+
+    return exams
+
+
+def _get_exams_current_results(
     id_patient: int, add_previous_exams: bool, cache: bool, schema: str, lower_key=True
 ):
     MIN_DATE = date.today() - timedelta(days=5)
@@ -379,15 +418,29 @@ def get_exams_current_results(
     return exams
 
 
+@has_permission(Permission.READ_PRESCRIPTION)
 def find_latest_exams(
-    patient: Patient, idSegment: int, schema: str, add_previous_exams=False, cache=True
+    patient: Patient,
+    idSegment: int,
+    schema: str,
+    add_previous_exams=False,
+    cache=True,
+    cache_hybrid=True,
+    is_complete=True,
 ):
-    current_exams = get_exams_current_results(
-        id_patient=patient.idPatient,
-        add_previous_exams=add_previous_exams,
-        cache=cache,
-        schema=schema,
-    )
+    if is_complete and cache_hybrid:
+        # hybrid approach (cache and db)
+        # test better performance ensuring most recent results
+        current_exams = _get_exams_current_results_hybrid(
+            id_patient=patient.idPatient, schema=schema
+        )
+    else:
+        current_exams = _get_exams_current_results(
+            id_patient=patient.idPatient,
+            add_previous_exams=add_previous_exams,
+            cache=cache,
+            schema=schema,
+        )
 
     segExam = SegmentExam.refDict(idSegment)
     age = dateutils.data2age(
@@ -512,7 +565,7 @@ def find_latest_exams(
 
 @has_permission(Permission.WRITE_PRESCRIPTION, Permission.MAINTAINER)
 def refresh_exams_cache(id_patient: int, user_context: User):
-    exams = get_exams_current_results(
+    exams = _get_exams_current_results(
         id_patient=id_patient,
         add_previous_exams=True,
         cache=False,

@@ -24,7 +24,7 @@ def proxy_name(idPatient):
 
     config = _get_config(user)
     token = _get_token(config)
-    getname_type = config["getname"].get("type", "proxy")
+    is_internal = config["getname"].get("internal", False)
     auth_prefix = config["getname"].get("authPrefix", "")
 
     url = (
@@ -33,7 +33,7 @@ def proxy_name(idPatient):
         else config["getname"]["url"]
     )
 
-    if getname_type == "auth":
+    if is_internal:
         url += f"patient-name/{int(idPatient)}"
         params = dict(config["getname"]["params"])
     else:
@@ -50,7 +50,7 @@ def proxy_name(idPatient):
         if response.status_code == status.HTTP_200_OK:
             data = response.json()
 
-            if getname_type == "auth":
+            if is_internal:
                 return {
                     "status": "success",
                     "idPatient": data["idPatient"],
@@ -100,7 +100,7 @@ def proxy_multiple():
     ids_list = data.get("patients", [])
     config = _get_config(user)
     token = _get_token(config)
-    getname_type = config["getname"].get("type", "proxy")
+    is_internal = config["getname"].get("internal", False)
     auth_prefix = config["getname"].get("authPrefix", "")
 
     url = (
@@ -110,7 +110,7 @@ def proxy_multiple():
     )
 
     try:
-        if getname_type == "auth":
+        if is_internal:
             url += "patient-name/multiple"
             params = dict(
                 config["getname"]["params"],
@@ -140,7 +140,7 @@ def proxy_multiple():
         names = []
         if response.status_code == status.HTTP_200_OK:
             data = response.json()
-            results = data if getname_type == "auth" else data["data"]
+            results = data if is_internal else data["data"]
 
             for p in results:
                 found.append(str(p["idPatient"]))
@@ -278,9 +278,9 @@ def search_name(term):
 def _get_token(config):
     token_url = config["getname"]["token"]["url"]
     params = config["getname"]["token"]["params"]
-    getname_type = config["getname"].get("type", "proxy")
+    is_internal = config["getname"].get("internal", False)
 
-    if getname_type == "auth":
+    if is_internal:
         token = encode(
             payload={
                 "exp": datetime.now(tz=timezone.utc) + timedelta(minutes=2),

@@ -1,10 +1,10 @@
 from sqlalchemy import distinct, text
 from datetime import datetime
 
-from models.main import db, User
+from models.main import db, User, Substance
 from models.prescription import Prescription, PrescriptionDrug, Drug
 from models.enums import FeatureEnum
-from services import memory_service
+from services import memory_service, drug_service
 from exception.validation_error import ValidationError
 from decorators.has_permission_decorator import has_permission, Permission
 from utils import status
@@ -55,7 +55,11 @@ def createPrescriptionDrug(data, user_context: User):
     pdCreate.idPrescription = data.get("idPrescription", None)
     pdCreate.source = data.get("source", None)
 
-    pdCreate.idDrug = data.get("idDrug", None)
+    pdCreate.idDrug = _get_drug_or_create_from_substance(
+        id_drug=data.get("idDrug", None),
+        id_segment=prescription.idSegment,
+        user_context=user_context,
+    )
     pdCreate.dose = data.get("dose", None)
     pdCreate.idMeasureUnit = data.get("measureUnit", None)
     pdCreate.idFrequency = data.get("frequency", None)
@@ -70,6 +74,54 @@ def createPrescriptionDrug(data, user_context: User):
     db.session.flush()
 
     return pdCreate.id
+
+
+def _get_drug_or_create_from_substance(
+    id_drug: int, id_segment: int, user_context: User
+):
+    """
+    checks if it would be necessary to create a new drug based on the substance
+    util for conciliation
+    """
+
+    drug = db.session.query(Drug).filter(Drug.id == id_drug).first()
+    if drug:
+        return drug.id
+
+    sub_drug_id = 900000000000000000 + int(id_drug)
+    sub_drug = (
+        db.session.query(Drug)
+        .filter(Drug.id == sub_drug_id, Drug.source == "SUBNH")
+        .first()
+    )
+    if sub_drug:
+        return sub_drug.id
+
+    # otherwise create a new drug based on substance
+    substance = db.session.query(Substance).filter(Substance.id == id_drug).first()
+
+    if not substance:
+        raise ValidationError(
+            "Medicamento inválido!",
+            "errors.invalidRegister",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    sub_drug = Drug()
+    sub_drug.id = sub_drug_id
+    sub_drug.name = f"[SUB] {substance.name}"
+    sub_drug.sctid = substance.id
+    sub_drug.source = "SUBNH"
+    sub_drug.created_at = datetime.today()
+    sub_drug.created_by = user_context.id
+    db.session.add(sub_drug)
+    db.session.flush()
+
+    drug_service.create_attributes_from_reference(
+        id_drug=sub_drug_id, id_segment=id_segment, user=user_context
+    )
+
+    return sub_drug.id
 
 
 @has_permission(Permission.WRITE_PRESCRIPTION)
