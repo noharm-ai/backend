@@ -4,7 +4,7 @@ import logging
 from multiprocessing import Process, Manager
 from datetime import datetime
 from math import ceil
-from sqlalchemy import text, func, distinct, and_, or_, asc
+from sqlalchemy import text, func, distinct, and_, or_, asc, literal, literal_column
 from typing import List
 from decimal import Decimal, ROUND_HALF_UP
 
@@ -693,26 +693,44 @@ def update_outlier(id_outlier: int, data: dict, user_context: User):
 
 
 @has_permission(Permission.READ_PRESCRIPTION)
-def get_outlier_drugs(id_segment: int, term: str = None, id_drug: List[int] = []):
-    segDrubs = (
-        db.session.query(Outlier.idDrug.label("idDrug"))
-        .filter(Outlier.idSegment == id_segment)
-        .group_by(Outlier.idDrug)
-        .subquery()
-    )
+def get_outlier_drugs(
+    id_segment: int, term: str = None, id_drug: List[int] = [], add_substance=False
+):
+    if add_substance:
+        query_drug = db.session.query(
+            Drug.id, Drug.name.label("name"), literal("drug").label("r_type")
+        ).filter(Drug.source.is_distinct_from("SUBNH"))
+        query_substance = db.session.query(
+            Substance.id,
+            Substance.name.label("name"),
+            literal("substance").label("r_type"),
+        ).filter(Substance.active == True)
 
-    if id_segment != None:
-        drugs = Drug.query.filter(Drug.id.in_(segDrubs))
+        query = query_drug.union(query_substance).filter(
+            literal_column("name").ilike("%" + str(term) + "%")
+        )
+
+        results = query.order_by(literal_column("name")).all()
     else:
-        drugs = db.session.query(Drug)
+        segDrubs = (
+            db.session.query(Outlier.idDrug.label("idDrug"))
+            .filter(Outlier.idSegment == id_segment)
+            .group_by(Outlier.idDrug)
+            .subquery()
+        )
 
-    if term:
-        drugs = drugs.filter(Drug.name.ilike("%" + str(term) + "%"))
+        if id_segment != None:
+            drugs = Drug.query.filter(Drug.id.in_(segDrubs))
+        else:
+            drugs = db.session.query(Drug)
 
-    if len(id_drug) > 0:
-        drugs = drugs.filter(Drug.id.in_(id_drug))
+        if term:
+            drugs = drugs.filter(Drug.name.ilike("%" + str(term) + "%"))
 
-    results = drugs.order_by(asc(Drug.name)).all()
+        if len(id_drug) > 0:
+            drugs = drugs.filter(Drug.id.in_(id_drug))
+
+        results = drugs.order_by(asc(Drug.name)).all()
 
     items = []
     for d in results:
