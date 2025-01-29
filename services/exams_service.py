@@ -425,9 +425,10 @@ def find_latest_exams(
     schema: str,
     add_previous_exams=False,
     cache=True,
+    cache_hybrid=True,
     is_complete=True,
 ):
-    if is_complete and cache:
+    if is_complete and cache_hybrid:
         # hybrid approach (cache and db)
         # test better performance ensuring most recent results
         current_exams = _get_exams_current_results_hybrid(

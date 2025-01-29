@@ -171,6 +171,7 @@ class PatientConciliationStatusEnum(Enum):
 class AppFeatureFlagEnum(Enum):
     REDIS_CACHE = "redisCache"
     REDIS_CACHE_EXAMS = "redisCacheExams"
+    REDIS_CACHE_EXAMS_HYBRID = "redisCacheExamsHybrid"
 
 
 class FrequencyEnum(Enum):
