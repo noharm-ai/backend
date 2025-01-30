@@ -108,6 +108,7 @@ def _get_drug_or_create_from_substance(
         )
 
     sub_drug = Drug()
+    sub_drug.idHospital = 1
     sub_drug.id = sub_drug_id
     sub_drug.name = f"[SUB] {substance.name}"
     sub_drug.sctid = substance.id
