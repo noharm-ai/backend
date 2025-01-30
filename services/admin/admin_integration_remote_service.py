@@ -376,11 +376,17 @@ def _validate_custom_endpoint(endpoint: str):
     pattern2 = re.compile(
         "^nifi-api\/flowfile-queues\/[\w-]{36}\/listing-requests\/[\w-]{36}$"
     )
+    pattern3 = re.compile(
+        "^nifi-api\/flowfile-queues\/[\w-]{36}\/flowfiles\/[\w-]{36}$"
+    )
 
     if pattern1.match(endpoint):
         return True
 
     if pattern2.match(endpoint):
+        return True
+
+    if pattern3.match(endpoint):
         return True
 
     raise ValidationError(
