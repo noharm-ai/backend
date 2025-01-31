@@ -100,14 +100,26 @@ def proxy_multiple():
     ids_list = data.get("patients", [])
     config = _get_config(user)
     token = _get_token(config)
-    is_internal = config["getname"].get("internal", False)
-    auth_prefix = config["getname"].get("authPrefix", "")
 
+    CHUNK_SIZE = 200
+    chunks = [ids_list[i : i + CHUNK_SIZE] for i in range(0, len(ids_list), CHUNK_SIZE)]
+    names = []
+
+    for chunk in chunks:
+        names += _getname_multiple_iteration(config=config, ids_list=chunk, token=token)
+
+    return names, status.HTTP_200_OK
+
+
+def _getname_multiple_iteration(config: dict, ids_list: list, token: str):
     url = (
         config["getname"]["urlDev"]
         if Config.ENV == NoHarmENV.DEVELOPMENT.value
         else config["getname"]["url"]
     )
+    is_internal = config["getname"].get("internal", False)
+    auth_prefix = config["getname"].get("authPrefix", "")
+    names = []
 
     try:
         if is_internal:
@@ -137,7 +149,6 @@ def proxy_multiple():
             )
 
         found = []
-        names = []
         if response.status_code == status.HTTP_200_OK:
             data = response.json()
             results = data if is_internal else data["data"]
@@ -178,7 +189,7 @@ def proxy_multiple():
                 }
             )
 
-    return names, status.HTTP_200_OK
+    return names
 
 
 @app_names.route("/names/auth-token", methods=["GET"])

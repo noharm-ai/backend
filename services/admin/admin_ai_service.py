@@ -2,7 +2,6 @@ import joblib
 import boto3
 import tempfile
 import numpy
-import re
 import gc
 import logging
 from typing import List

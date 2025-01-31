@@ -292,6 +292,21 @@ def _get_new_queue(id_processor: str, action_type: str, data: dict):
                     "config": {"properties": data["properties"]},
                 }
             }
+    elif NifiQueueActionTypeEnum.VIEW_PROVENANCE.value == action_type:
+        queue.url = f"nifi-api/provenance"
+        queue.method = "POST"
+        queue.body = {
+            "provenance": {
+                "request": {
+                    "maxResults": 100,
+                    "summarize": True,
+                    "incrementalResults": False,
+                    "searchTerms": {
+                        "ProcessorID": {"value": escape(id_processor), "inverse": False}
+                    },
+                }
+            }
+        }
 
     return queue
 
@@ -370,18 +385,26 @@ def get_errors(user_context: User):
 
 
 def _validate_custom_endpoint(endpoint: str):
-    pattern1 = re.compile(
-        "^nifi-api\/flowfile-queues\/[\w-]{36}\/flowfiles\/[\w-]{36}\/content$"
+    patterns = []
+    patterns.append(
+        re.compile(
+            "^nifi-api\/flowfile-queues\/[\w-]{36}\/flowfiles\/[\w-]{36}\/content$"
+        )
     )
-    pattern2 = re.compile(
-        "^nifi-api\/flowfile-queues\/[\w-]{36}\/listing-requests\/[\w-]{36}$"
+    patterns.append(
+        re.compile(
+            "^nifi-api\/flowfile-queues\/[\w-]{36}\/listing-requests\/[\w-]{36}$"
+        )
     )
+    patterns.append(
+        re.compile("^nifi-api\/flowfile-queues\/[\w-]{36}\/flowfiles\/[\w-]{36}$")
+    )
+    patterns.append(re.compile("^nifi-api\/provenance-events\/\d*$"))
+    patterns.append(re.compile("^nifi-api\/provenance-events\/\d*\/content\/output$"))
 
-    if pattern1.match(endpoint):
-        return True
-
-    if pattern2.match(endpoint):
-        return True
+    for p in patterns:
+        if p.match(endpoint):
+            return True
 
     raise ValidationError(
         "Endpoint custom inválido",
