@@ -43,6 +43,7 @@ def get_prioritization_list(
     pending_interventions=None,
     has_conciliation=None,
     alert_level=None,
+    tags=[],
 ):
     is_cpoe = feature_service.is_cpoe()
 
@@ -271,6 +272,9 @@ def get_prioritization_list(
     if prescriber != None:
         q = q.filter(Prescription.prescriber.ilike(f"%{prescriber}%"))
 
+    if tags:
+        q = q.filter(cast(tags, postgresql.ARRAY(db.String)).overlap(Patient.tags))
+
     if endDate is None:
         endDate = startDate
 
@@ -404,6 +408,7 @@ def get_prioritization_list(
                         id_segment=p[0].idSegment,
                         pdate=p[0].date,
                     ),
+                    "patientTags": patient.tags,
                 },
             )
         )

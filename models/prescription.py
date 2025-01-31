@@ -156,6 +156,7 @@ class Patient(db.Model):
     lactating = db.Column("lactante", db.Boolean, nullable=True)
     pregnant = db.Column("gestante", db.Boolean, nullable=True)
     st_conciliation = db.Column("st_concilia", db.Integer, nullable=True)
+    tags = db.Column("tags", postgresql.ARRAY(db.String(100)), nullable=True)
 
     def findByAdmission(admissionNumber):
         return (

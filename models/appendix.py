@@ -180,3 +180,15 @@ class NifiQueue(db.Model):
     response = db.Column("response", postgresql.JSONB, nullable=True)
     responseAt = db.Column("response_at", db.Date, nullable=True)
     createdAt = db.Column("create_at", db.Date, nullable=False)
+
+
+class Tag(db.Model):
+    __tablename__ = "tag"
+
+    tag = db.Column("tag", db.String(100), primary_key=True)
+    tag_type = db.Column("tp_tag", db.Integer, primary_key=True)
+    active = db.Column("ativo", db.Boolean, nullable=False)
+    updated_at = db.Column("updated_at", db.DateTime, nullable=False)
+    updated_by = db.Column("updated_by", db.BigInteger, nullable=False)
+    created_at = db.Column("created_at", db.DateTime, nullable=False)
+    created_by = db.Column("created_by", db.BigInteger, nullable=False)

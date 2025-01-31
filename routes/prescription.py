@@ -73,6 +73,7 @@ def getPrescriptions():
         pending_interventions=pending_interventions,
         has_conciliation=request.args.get("hasConciliation", None),
         alert_level=request.args.get("alertLevel", None),
+        tags=request.args.getlist("tags[]"),
     )
 
 
