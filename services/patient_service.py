@@ -17,6 +17,7 @@ from models.appendix import Tag
 from models.enums import PatientAuditTypeEnum, FeatureEnum, TagTypeEnum
 from utils.dateutils import to_iso
 from services import memory_service
+from services.admin import admin_tag_service
 from decorators.has_permission_decorator import has_permission, Permission
 from exception.validation_error import ValidationError
 from utils import status
@@ -272,7 +273,7 @@ def _get_tags(tags: list[str], user_context: User):
     if current_tags:
         found_tags = [t.name for t in current_tags]
 
-    MAX_CHARS = 40
+    MAX_CHARS = admin_tag_service.MAX_TAG_CHARS
     for tag in tags_uppercase:
         if tag not in found_tags:
             if len(tag) > MAX_CHARS:
