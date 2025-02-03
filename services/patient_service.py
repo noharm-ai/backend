@@ -264,7 +264,7 @@ def _get_tags(tags: list[str], user_context: User):
 
     current_tags = (
         db.session.query(Tag)
-        .filter(Tag.tag.in_(tags_uppercase), Tag.tag_type == TagTypeEnum.PATIENT.value)
+        .filter(Tag.name.in_(tags_uppercase), Tag.tag_type == TagTypeEnum.PATIENT.value)
         .all()
     )
 
@@ -283,7 +283,7 @@ def _get_tags(tags: list[str], user_context: User):
                 )
 
             new_tag = Tag()
-            new_tag.tag = tag
+            new_tag.name = tag
             new_tag.tag_type = TagTypeEnum.PATIENT.value
             new_tag.active = True
             new_tag.created_at = datetime.today()

@@ -28,6 +28,7 @@ from routes.names import app_names
 from routes.summary import app_summary
 from routes.support import app_support
 from routes.conciliation import app_conciliation
+from routes.tag import app_tag
 from routes.admin.admin_frequency import app_admin_freq
 from routes.admin.admin_intervention_reason import app_admin_interv
 from routes.admin.admin_memory import app_admin_memory
@@ -95,6 +96,7 @@ app.register_blueprint(app_names)
 app.register_blueprint(app_summary)
 app.register_blueprint(app_support)
 app.register_blueprint(app_conciliation)
+app.register_blueprint(app_tag)
 
 app.register_blueprint(app_user_admin)
 app.register_blueprint(app_pres_crud)

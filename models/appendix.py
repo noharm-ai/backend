@@ -183,10 +183,10 @@ class NifiQueue(db.Model):
 
 
 class Tag(db.Model):
-    __tablename__ = "tag"
+    __tablename__ = "marcador"
 
-    tag = db.Column("tag", db.String(100), primary_key=True)
-    tag_type = db.Column("tp_tag", db.Integer, primary_key=True)
+    name = db.Column("nome", db.String, primary_key=True)
+    tag_type = db.Column("tp_marcador", db.Integer, primary_key=True)
     active = db.Column("ativo", db.Boolean, nullable=False)
     updated_at = db.Column("updated_at", db.DateTime, nullable=False)
     updated_by = db.Column("updated_by", db.BigInteger, nullable=False)
