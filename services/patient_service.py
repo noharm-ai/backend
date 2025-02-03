@@ -270,7 +270,7 @@ def _get_tags(tags: list[str], user_context: User):
 
     found_tags = []
     if current_tags:
-        found_tags = [t.tag for t in current_tags]
+        found_tags = [t.name for t in current_tags]
 
     MAX_CHARS = 40
     for tag in tags_uppercase:
