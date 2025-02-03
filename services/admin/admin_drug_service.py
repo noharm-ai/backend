@@ -373,11 +373,7 @@ def calculate_dosemax_uniq(id_drug: int, id_segment: int):
     conversions = drugs_repository.get_conversions(id_drug=id_drug)
 
     if not drug_attributes:
-        raise ValidationError(
-            "Registro inválido/inconsistente",
-            "errors.businessRules",
-            status.HTTP_400_BAD_REQUEST,
-        )
+        return None
 
     attributes: DrugAttributes = drug_attributes[0].DrugAttributes
     segment: Segment = drug_attributes[0].Segment
