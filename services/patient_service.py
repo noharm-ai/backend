@@ -171,6 +171,7 @@ def save_patient(
         p.idPatient = first_prescription.idPatient
         db.session.add(p)
 
+    update_prescription = False
     if Permission.WRITE_PRESCRIPTION in user_permissions:
         if "weight" in request_data.keys():
             weight = request_data.get("weight", None)
@@ -178,6 +179,7 @@ def save_patient(
             if weight != p.weight:
                 p.weightDate = datetime.today()
                 p.weight = weight
+                update_prescription = True
 
         alertExpire = request_data.get("alertExpire", None)
         if alertExpire and alertExpire != p.alertExpire:
@@ -224,7 +226,10 @@ def save_patient(
 
     _audit(patient=p, audit_type=PatientAuditTypeEnum.UPSERT, user=user_context)
 
-    return p
+    return {
+        "updatePrescription": update_prescription,
+        "admissionNumber": int(admission_number),
+    }
 
 
 def _audit(patient: Patient, audit_type: PatientAuditTypeEnum, user: User):

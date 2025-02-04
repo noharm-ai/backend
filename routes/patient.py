@@ -18,11 +18,9 @@ def getExamsbyAdmission(admissionNumber):
 @app_pat.route("/patient/<int:admissionNumber>", methods=["POST"])
 @api_endpoint()
 def setPatientData(admissionNumber):
-    result = patient_service.save_patient(
+    return patient_service.save_patient(
         request_data=request.get_json(), admission_number=admissionNumber
     )
-
-    return escape_html(result.admissionNumber)
 
 
 @app_pat.route("/patient", methods=["GET"])
