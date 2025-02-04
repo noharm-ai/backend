@@ -688,7 +688,11 @@ def _format(
         "weightDate": dateutils.to_iso(config_data["weight_date"]),
         "dialysis": patient.dialysis,
         "observation": patient.observation,
-        "patient": {"lactating": patient.lactating, "pregnant": patient.pregnant},
+        "patient": {
+            "lactating": patient.lactating,
+            "pregnant": patient.pregnant,
+            "tags": patient.tags,
+        },
         "alert": patient.alert,
         "alertExpire": dateutils.to_iso(patient.alertExpire),
         "dischargeDate": dateutils.to_iso(patient.dischargeDate),

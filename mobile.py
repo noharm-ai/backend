@@ -28,6 +28,7 @@ from routes.names import app_names
 from routes.summary import app_summary
 from routes.support import app_support
 from routes.conciliation import app_conciliation
+from routes.tag import app_tag
 from routes.admin.admin_frequency import app_admin_freq
 from routes.admin.admin_intervention_reason import app_admin_interv
 from routes.admin.admin_memory import app_admin_memory
@@ -40,6 +41,7 @@ from routes.admin.admin_unit_conversion import app_admin_unit_conversion
 from routes.admin.admin_substance import app_admin_subs
 from routes.admin.admin_relation import app_admin_relation
 from routes.admin.admin_unit import app_admin_unit
+from routes.admin.admin_tag import app_admin_tag
 from routes.reports.reports_general import app_rpt_general
 from routes.reports.reports_config_rpt import app_rpt_config
 from routes.reports.reports_culture import app_rpt_culture
@@ -95,6 +97,7 @@ app.register_blueprint(app_names)
 app.register_blueprint(app_summary)
 app.register_blueprint(app_support)
 app.register_blueprint(app_conciliation)
+app.register_blueprint(app_tag)
 
 app.register_blueprint(app_user_admin)
 app.register_blueprint(app_pres_crud)
@@ -111,6 +114,7 @@ app.register_blueprint(app_admin_unit_conversion)
 app.register_blueprint(app_admin_subs)
 app.register_blueprint(app_admin_relation)
 app.register_blueprint(app_admin_unit)
+app.register_blueprint(app_admin_tag)
 
 app.register_blueprint(app_rpt_general)
 app.register_blueprint(app_rpt_culture)
