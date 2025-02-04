@@ -268,6 +268,14 @@ def _get_tags(tags: list[str], user_context: User):
 
     tags_uppercase = [t.upper() for t in tags]
 
+    MAX_TAGS = 10
+    if len(tags_uppercase) > MAX_TAGS:
+        raise ValidationError(
+            f"Limite de marcadores atingido ({MAX_TAGS})",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
     current_tags = (
         db.session.query(Tag)
         .filter(Tag.name.in_(tags_uppercase), Tag.tag_type == TagTypeEnum.PATIENT.value)
@@ -283,7 +291,7 @@ def _get_tags(tags: list[str], user_context: User):
         if tag not in found_tags:
             if len(tag) > MAX_CHARS:
                 raise ValidationError(
-                    f"Limite de caracteres para a Tag foi atingido ({MAX_CHARS})",
+                    f"Marcador: Limite de caracteres atingido ({MAX_CHARS})",
                     "errors.businessRules",
                     status.HTTP_400_BAD_REQUEST,
                 )
