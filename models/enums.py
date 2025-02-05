@@ -218,3 +218,7 @@ class SubstanceTagEnum(Enum):
     NOT_VALIDATED = "not_validated"
     TUBE = "tube"
     NO_DOSEMAX = "no_dosemax"
+
+
+class TagTypeEnum(Enum):
+    PATIENT = 1

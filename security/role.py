@@ -51,6 +51,7 @@ class Role(Enum):
         Permission.READ_DISPENSATION,
         Permission.READ_REGULATION,
         Permission.ADMIN_UNIT,
+        Permission.WRITE_TAGS,
     ]
 
     CURATOR = "CURATOR", [
@@ -83,6 +84,7 @@ class Role(Enum):
         Permission.MAINTAINER,
         Permission.READ_DISPENSATION,
         Permission.ADMIN_UNIT,
+        Permission.WRITE_TAGS,
     ]
 
     SERVICE_INTEGRATOR = "SERVICE_INTEGRATOR", [
@@ -121,6 +123,7 @@ class Role(Enum):
         Permission.WRITE_DRUG_SCORE,
         Permission.READ_SUPPORT,
         Permission.WRITE_SUPPORT,
+        Permission.WRITE_TAGS,
     ]
 
     VIEWER = "VIEWER", [

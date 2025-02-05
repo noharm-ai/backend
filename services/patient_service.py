@@ -13,9 +13,11 @@ from models.prescription import (
     PatientAudit,
 )
 from models.notes import ClinicalNotes
-from models.enums import PatientAuditTypeEnum, FeatureEnum
+from models.appendix import Tag
+from models.enums import PatientAuditTypeEnum, FeatureEnum, TagTypeEnum
 from utils.dateutils import to_iso
 from services import memory_service
+from services.admin import admin_tag_service
 from decorators.has_permission_decorator import has_permission, Permission
 from exception.validation_error import ValidationError
 from utils import status
@@ -169,8 +171,7 @@ def save_patient(
         p.idPatient = first_prescription.idPatient
         db.session.add(p)
 
-    updateWeight = False
-
+    update_prescription = False
     if Permission.WRITE_PRESCRIPTION in user_permissions:
         if "weight" in request_data.keys():
             weight = request_data.get("weight", None)
@@ -178,7 +179,7 @@ def save_patient(
             if weight != p.weight:
                 p.weightDate = datetime.today()
                 p.weight = weight
-                updateWeight = True
+                update_prescription = True
 
         alertExpire = request_data.get("alertExpire", None)
         if alertExpire and alertExpire != p.alertExpire:
@@ -203,6 +204,18 @@ def save_patient(
             p.gender = request_data.get("gender", None)
         if "birthdate" in request_data.keys():
             p.birthdate = request_data.get("birthdate", None)
+        if "tags" in request_data.keys():
+            tags = request_data.get("tags", None)
+
+            MAX_TAGS = 10
+            if tags and len(tags) > MAX_TAGS:
+                raise ValidationError(
+                    f"Número máximo de tags ultrapassado ({MAX_TAGS})",
+                    "errors.businessRules",
+                    status.HTTP_400_BAD_REQUEST,
+                )
+
+            p.tags = _get_tags(tags=tags, user_context=user_context)
 
     if Permission.ADMIN_PATIENT in user_permissions:
         if "dischargeDate" in request_data.keys():
@@ -211,25 +224,12 @@ def save_patient(
     p.update = datetime.today()
     p.user = user_context.id
 
-    if "idPrescription" in request_data.keys() and updateWeight:
-        idPrescription = request_data.get("idPrescription")
-
-        query = text(
-            "INSERT INTO "
-            + user_context.schema
-            + ".presmed \
-                    SELECT *\
-                    FROM "
-            + user_context.schema
-            + ".presmed\
-                    WHERE fkprescricao = :idPrescription ;"
-        )
-
-        db.session.execute(query, {"idPrescription": idPrescription})
-
     _audit(patient=p, audit_type=PatientAuditTypeEnum.UPSERT, user=user_context)
 
-    return p
+    return {
+        "updatePrescription": update_prescription,
+        "admissionNumber": int(admission_number),
+    }
 
 
 def _audit(patient: Patient, audit_type: PatientAuditTypeEnum, user: User):
@@ -258,4 +258,51 @@ def _to_dict(patient: Patient):
         "dialysis": patient.dialysis,
         "lactating": patient.lactating,
         "pregnant": patient.pregnant,
+        "tags": patient.tags,
     }
+
+
+def _get_tags(tags: list[str], user_context: User):
+    if not tags:
+        return None
+
+    tags_uppercase = [t.upper() for t in tags]
+
+    MAX_TAGS = 10
+    if len(tags_uppercase) > MAX_TAGS:
+        raise ValidationError(
+            f"Limite de marcadores atingido ({MAX_TAGS})",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    current_tags = (
+        db.session.query(Tag)
+        .filter(Tag.name.in_(tags_uppercase), Tag.tag_type == TagTypeEnum.PATIENT.value)
+        .all()
+    )
+
+    found_tags = []
+    if current_tags:
+        found_tags = [t.name for t in current_tags]
+
+    MAX_CHARS = admin_tag_service.MAX_TAG_CHARS
+    for tag in tags_uppercase:
+        if tag not in found_tags:
+            if len(tag) > MAX_CHARS:
+                raise ValidationError(
+                    f"Marcador: Limite de caracteres atingido ({MAX_CHARS})",
+                    "errors.businessRules",
+                    status.HTTP_400_BAD_REQUEST,
+                )
+
+            new_tag = Tag()
+            new_tag.name = tag
+            new_tag.tag_type = TagTypeEnum.PATIENT.value
+            new_tag.active = True
+            new_tag.created_at = datetime.today()
+            new_tag.created_by = user_context.id
+
+            db.session.add(new_tag)
+
+    return tags_uppercase

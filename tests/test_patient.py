@@ -51,7 +51,7 @@ def test_post_patient(client):
     patient = session.query(Patient).get(admission)
     assert response.status_code == 200
     assert data["height"] == str(patient.height)
-    assert admission == str(responseData)
+    assert admission == str(responseData.get("admissionNumber", None))
 
 
 def test_get_notes_by_idAdmission(client):
