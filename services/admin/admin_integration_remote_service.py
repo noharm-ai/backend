@@ -348,12 +348,18 @@ def get_queue_status(id_queue_list, user_context: User):
         schema=user_context.schema, filename="bulletin"
     )
 
+    template_url, template_updated_at = get_file_url(
+        schema=user_context.schema, filename="template"
+    )
+
     return {
         "queue": queue_results,
         "statusUrl": status_url,
         "statusUpdatedAt": status_updated_at,
         "bulletinUrl": bulletin_url,
         "bulletinUpdatedAt": bulletin_updated_at,
+        "templateUrl": template_url,
+        "templateUpdatedAt": template_updated_at,
     }
 
 
