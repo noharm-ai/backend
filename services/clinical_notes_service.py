@@ -144,6 +144,8 @@ def get_tags():
         {"name": "sintomas", "column": "symptoms", "key": "symptoms"},
         {"name": "complicacoes", "column": "complication", "key": "complication"},
         {"name": "medicamentos", "column": "medications", "key": "medications"},
+        {"name": "paliativo", "column": None, "key": "palliative"},
+        {"name": "medprevio", "column": None, "key": "prevdrug"},
     ]
 
 
