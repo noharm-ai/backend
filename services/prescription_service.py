@@ -347,14 +347,32 @@ def update_prescription_data(id_prescription: int, data: dict, user_context: Use
     if not data_authorization_service.has_segment_authorization(
         id_segment=p.idSegment, user=user_context
     ):
-        return {
-            "status": "error",
-            "message": "Usuário não autorizado neste segmento",
-        }, status.HTTP_401_UNAUTHORIZED
+        raise ValidationError(
+            "Usuário não autorizado neste segmento",
+            "errors.invalidRegister",
+            status.HTTP_401_UNAUTHORIZED,
+        )
 
     if "notes" in data.keys():
         p.notes = data.get("notes", None)
         p.notes_at = datetime.today()
+
+        has_integration_event = (
+            db.session.query(PrescriptionAudit)
+            .filter(
+                PrescriptionAudit.idPrescription == id_prescription,
+                PrescriptionAudit.auditType
+                == PrescriptionAuditTypeEnum.INTEGRATION_CLINICAL_NOTES.value,
+            )
+            .first()
+        )
+
+        if has_integration_event:
+            raise ValidationError(
+                "Esta evolução não pode ser alterada, pois já foi integrada.",
+                "errors.businessRules",
+                status.HTTP_400_BAD_REQUEST,
+            )
 
         audit = PrescriptionAudit()
         audit.auditType = PrescriptionAuditTypeEnum.UPSERT_CLINICAL_NOTES.value
