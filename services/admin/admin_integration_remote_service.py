@@ -11,7 +11,7 @@ from botocore.exceptions import ClientError
 from botocore.config import Config as BotoConfig
 
 from models.main import db, User
-from models.appendix import NifiQueue
+from models.appendix import NifiQueue, SchemaConfig
 from utils import dateutils
 from models.enums import NifiQueueActionTypeEnum, NoHarmENV
 from exception.validation_error import ValidationError
@@ -124,6 +124,31 @@ def get_template(user_context: User):
     }
 
 
+def _check_schema(schema: str):
+    schema_config = (
+        db.session.query(SchemaConfig).filter(SchemaConfig.schemaName == schema).first()
+    )
+
+    if not schema_config:
+        raise ValidationError(
+            "Schema inválido",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    config = schema_config.config
+
+    if config:
+        main_schema = config.get("remotenifi", {}).get("main", schema)
+
+        if main_schema and main_schema != schema:
+            raise ValidationError(
+                f"O nifi remoto deve ser acessado através do schema: {main_schema}",
+                "errors.businessRules",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+
 @has_permission(Permission.ADMIN_INTEGRATION_REMOTE)
 def push_queue_request(
     id_processor: str, action_type: str, data: dict, user_context: User
@@ -137,6 +162,8 @@ def push_queue_request(
             "errors.businessRules",
             status.HTTP_400_BAD_REQUEST,
         )
+
+    _check_schema(schema=user_context.schema)
 
     valid_actions = []
     for a in NifiQueueActionTypeEnum:
