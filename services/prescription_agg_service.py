@@ -17,6 +17,7 @@ from models.enums import (
     PatientConciliationStatusEnum,
     FeatureEnum,
 )
+from models.appendix import SchemaConfig
 from services import (
     prescription_drug_service,
     prescription_check_service,
@@ -179,7 +180,18 @@ def create_agg_prescription_by_date(
 ):
     _set_schema(schema)
 
-    last_prescription = get_last_prescription(admission_number)
+    schema_config = (
+        db.session.query(SchemaConfig).filter(SchemaConfig.schemaName == schema).first()
+    )
+    ignore_segments = []
+    if schema_config.config:
+        ignore_segments = schema_config.config.get("admissionCalc", {}).get(
+            "ignoreSegments", []
+        )
+
+    last_prescription = get_last_prescription(
+        admission_number, ignore_segments=ignore_segments
+    )
 
     if last_prescription == None or last_prescription.idSegment == None:
         raise ValidationError(
@@ -286,16 +298,19 @@ def _set_schema(schema):
     dbSession.setSchema(schema)
 
 
-def get_last_prescription(admission_number):
-    return (
+def get_last_prescription(admission_number, ignore_segments=None):
+    query = (
         db.session.query(Prescription)
         .filter(Prescription.admissionNumber == admission_number)
         .filter(Prescription.agg == None)
         .filter(Prescription.concilia == None)
         .filter(Prescription.idSegment != None)
-        .order_by(desc(Prescription.date))
-        .first()
     )
+
+    if ignore_segments:
+        query = query.filter(~Prescription.idSegment.in_(ignore_segments))
+
+    return query.order_by(desc(Prescription.date)).first()
 
 
 def get_last_agg_prescription(admission_number) -> Prescription:
