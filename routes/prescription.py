@@ -74,6 +74,7 @@ def getPrescriptions():
         has_conciliation=request.args.get("hasConciliation", None),
         alert_level=request.args.get("alertLevel", None),
         tags=request.args.getlist("tags[]"),
+        has_clinical_notes=request.args.get("hasClinicalNotes", None),
     )
 
 

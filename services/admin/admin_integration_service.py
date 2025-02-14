@@ -177,6 +177,10 @@ def _set_new_config(old_config: dict, new_config: dict):
                 },
             }
 
+    if "remotenifi" in new_config:
+        main_schema = new_config["remotenifi"].get("main", None)
+        config["remotenifi"] = {"main": main_schema if main_schema != "" else None}
+
     return config
 
 

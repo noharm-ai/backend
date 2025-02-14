@@ -44,6 +44,7 @@ def get_prioritization_list(
     has_conciliation=None,
     alert_level=None,
     tags=[],
+    has_clinical_notes=None,
 ):
     is_cpoe = feature_service.is_cpoe()
 
@@ -246,6 +247,12 @@ def get_prioritization_list(
             q = q.filter(
                 Patient.st_conciliation == PatientConciliationStatusEnum.PENDING.value
             )
+
+    if has_clinical_notes != None:
+        if bool(int(has_clinical_notes)):
+            q = q.filter(Prescription.notes != None)
+        else:
+            q = q.filter(Prescription.notes == None)
 
     if pending_interventions != None:
         if bool(int(pending_interventions)):
