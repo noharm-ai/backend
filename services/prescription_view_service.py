@@ -92,6 +92,7 @@ def _internal_get_prescription(
         patient=patient,
         config_data=config_data,
         exam_data=exam_data,
+        cn_data=cn_data,
     )
 
     drug_data = _get_drug_data(
@@ -501,7 +502,9 @@ def _get_drug_list(prescription: Prescription, patient: Patient, config_data: di
 
 
 @timed()
-def _get_alerts(drug_list, patient: Patient, config_data: dict, exam_data: dict):
+def _get_alerts(
+    drug_list, patient: Patient, config_data: dict, exam_data: dict, cn_data: dict
+):
     relations = alert_interaction_service.find_relations(
         drug_list=drug_list,
         is_cpoe=config_data["is_cpoe"],
@@ -515,6 +518,7 @@ def _get_alerts(drug_list, patient: Patient, config_data: dict, exam_data: dict)
         pregnant=patient.pregnant,
         lactating=patient.lactating,
         schedules_fasting=config_data["schedules_fasting"],
+        cn_data=cn_data,
     )
 
     return {"relations": relations, "alerts": alerts}
