@@ -116,7 +116,7 @@ def init_intervention_reason(user_context: User):
 
 @has_permission(Permission.INTEGRATION_UTILS)
 def update_integration_config(
-    schema, status, nh_care, fl1, fl2, fl3, fl4, config, user_context: User
+    schema, status, nh_care, fl1, fl2, fl3, fl4, config, user_context: User, cpoe: bool
 ):
     schema_config = (
         db.session.query(SchemaConfig).filter(SchemaConfig.schemaName == schema).first()
@@ -139,6 +139,7 @@ def update_integration_config(
     schema_config.fl2 = bool(fl2) if fl2 != None else schema_config.fl2
     schema_config.fl3 = bool(fl3) if fl3 != None else schema_config.fl3
     schema_config.fl4 = bool(fl4) if fl4 != None else schema_config.fl4
+    schema_config.cpoe = cpoe
 
     schema_config.updatedAt = datetime.today()
     schema_config.updatedBy = user_context.id
