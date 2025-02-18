@@ -1,7 +1,7 @@
 import pytest
 from datetime import datetime
 
-from models.prescription import Frequency
+from models.appendix import Frequency
 from models.enums import DrugAlertTypeEnum, DrugAlertLevelEnum
 from services import alert_service
 from tests.utils import utils_test_prescription
