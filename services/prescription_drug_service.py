@@ -1,18 +1,12 @@
 from sqlalchemy import literal, and_, func, or_, asc, case
 from datetime import datetime, date, timedelta
 
-from models.main import db, User
-from models.prescription import (
-    Prescription,
-    PrescriptionDrug,
-    Drug,
-    MeasureUnit,
-    Frequency,
-    Outlier,
-    DrugAttributes,
-)
-from models.appendix import Notes
-from services import prescription_service, data_authorization_service, feature_service
+from models.main import db, User, Drug, Outlier, DrugAttributes
+from models.prescription import Prescription, PrescriptionDrug
+from models.appendix import Notes, MeasureUnit, Frequency
+from models.enums import FeatureEnum
+from repository import prescription_view_repository
+from services import data_authorization_service, feature_service, memory_service
 from exception.validation_error import ValidationError
 from decorators.has_permission_decorator import has_permission, Permission
 from utils import status, prescriptionutils
@@ -69,10 +63,15 @@ def count_drugs_by_prescription(
     prescription: Prescription, drug_types, user: User, parent_agg_date=None
 ):
     if prescription.agg:
-        prescription_query = prescription_service.get_query_prescriptions_by_agg(
-            agg_prescription=prescription,
-            is_cpoe=feature_service.is_cpoe(),
-            only_id=True,
+        is_pmc = memory_service.has_feature_nouser(FeatureEnum.PRIMARY_CARE.value)
+        prescription_query = (
+            prescription_view_repository.get_query_prescriptions_by_agg(
+                agg_prescription=prescription,
+                is_cpoe=feature_service.is_cpoe(),
+                only_id=True,
+                is_pmc=is_pmc,
+                schema=user.schema,
+            )
         )
 
         q = (

@@ -2,7 +2,9 @@ import re
 from typing import List
 
 from models.enums import DrugTypeEnum, DrugAlertTypeEnum, DrugAlertLevelEnum
-from models.prescription import PrescriptionDrug, Drug, DrugAttributes, Frequency
+from models.main import Drug, DrugAttributes
+from models.prescription import PrescriptionDrug
+from models.appendix import Frequency
 from utils import numberutils, stringutils
 
 

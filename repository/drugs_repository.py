@@ -1,14 +1,15 @@
 from sqlalchemy import and_, or_, func
 
-from models.main import db, PrescriptionAgg, User
-from models.prescription import (
-    MeasureUnit,
-    MeasureUnitConvert,
+from models.main import (
+    db,
+    PrescriptionAgg,
+    User,
     Outlier,
     Drug,
     DrugAttributes,
     Substance,
 )
+from models.appendix import MeasureUnit, MeasureUnitConvert
 from models.segment import Segment
 
 

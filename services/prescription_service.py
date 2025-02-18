@@ -5,17 +5,17 @@ from models.main import db, User
 from models.prescription import (
     Prescription,
     Patient,
-    Department,
-    PrescriptionDrug,
     PrescriptionAudit,
     PatientAudit,
 )
+from models.appendix import Department
 from models.enums import (
     FeatureEnum,
     PrescriptionAuditTypeEnum,
     AppFeatureFlagEnum,
     PatientAuditTypeEnum,
 )
+from repository import prescription_view_repository
 from exception.validation_error import ValidationError
 from services import (
     memory_service,
@@ -26,7 +26,7 @@ from services import (
     clinical_notes_service,
 )
 from decorators.has_permission_decorator import has_permission, Permission
-from utils import status, prescriptionutils, dateutils
+from utils import status, dateutils
 
 
 @has_permission(Permission.READ_PRESCRIPTION, Permission.READ_DISCHARGE_SUMMARY)
@@ -200,9 +200,16 @@ def recalculate_prescription(id_prescription: int, user_context: User):
 
     if p.agg:
         if feature_service.is_cpoe():
-            prescription_results = get_query_prescriptions_by_agg(
-                agg_prescription=p, is_cpoe=feature_service.is_cpoe(), only_id=True
-            ).all()
+            is_pmc = memory_service.has_feature_nouser(FeatureEnum.PRIMARY_CARE.value)
+            prescription_results = (
+                prescription_view_repository.get_query_prescriptions_by_agg(
+                    agg_prescription=p,
+                    is_cpoe=feature_service.is_cpoe(),
+                    only_id=True,
+                    is_pmc=is_pmc,
+                    schema=user_context.schema,
+                ).all()
+            )
 
             prescription_ids = []
             for item in prescription_results:
@@ -292,42 +299,6 @@ def recalculate_prescription(id_prescription: int, user_context: User):
         exams_service.refresh_exams_cache(
             id_patient=p.idPatient, user_context=user_context
         )
-
-
-def get_query_prescriptions_by_agg(
-    agg_prescription: Prescription, is_cpoe=False, only_id=False
-):
-    is_pmc = memory_service.has_feature_nouser(FeatureEnum.PRIMARY_CARE.value)
-
-    q = (
-        db.session.query(Prescription.id if only_id else Prescription)
-        .filter(Prescription.admissionNumber == agg_prescription.admissionNumber)
-        .filter(Prescription.concilia == None)
-        .filter(Prescription.agg == None)
-    )
-
-    q = prescriptionutils.get_period_filter(
-        q, Prescription, agg_prescription.date, is_pmc, is_cpoe
-    )
-
-    if not is_cpoe:
-        q = q.filter(Prescription.idSegment == agg_prescription.idSegment)
-    else:
-        # discard all suspended
-        active_count = (
-            db.session.query(func.count().label("count"))
-            .filter(PrescriptionDrug.idPrescription == Prescription.id)
-            .filter(
-                or_(
-                    PrescriptionDrug.suspendedDate == None,
-                    func.date(PrescriptionDrug.suspendedDate) >= agg_prescription.date,
-                )
-            )
-            .as_scalar()
-        )
-        q = q.filter(active_count > 0)
-
-    return q
 
 
 @has_permission(Permission.WRITE_PRESCRIPTION)

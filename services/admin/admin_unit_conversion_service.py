@@ -3,15 +3,16 @@ from sqlalchemy import func, and_, text
 from markupsafe import escape as escape_html
 from datetime import datetime
 
-from models.main import db, User, PrescriptionAgg
-from models.prescription import (
+from models.main import (
+    db,
+    User,
+    PrescriptionAgg,
     Outlier,
-    MeasureUnitConvert,
-    DrugAttributes,
     Drug,
-    MeasureUnit,
+    DrugAttributes,
     Substance,
 )
+from models.appendix import MeasureUnit, MeasureUnitConvert
 from models.segment import Segment
 from models.enums import SegmentTypeEnum, DefaultMeasureUnitEnum
 from services import drug_service as main_drug_service

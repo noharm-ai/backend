@@ -13,12 +13,12 @@ from models.enums import (
     DrugTypeEnum,
     PrescriptionReviewTypeEnum,
 )
+from repository import prescription_view_repository
 from exception.validation_error import ValidationError
 from utils import status
 from services import (
     data_authorization_service,
     memory_service,
-    prescription_service,
     prescription_drug_service,
     feature_service,
 )
@@ -132,8 +132,14 @@ def check_prescription(
 
 
 def _update_agg_status(prescription: Prescription, user: User, extra={}):
-    unchecked_prescriptions = prescription_service.get_query_prescriptions_by_agg(
-        agg_prescription=prescription, is_cpoe=feature_service.is_cpoe()
+    is_pmc = memory_service.has_feature_nouser(FeatureEnum.PRIMARY_CARE.value)
+    unchecked_prescriptions = (
+        prescription_view_repository.get_query_prescriptions_by_agg(
+            agg_prescription=prescription,
+            is_cpoe=feature_service.is_cpoe(),
+            is_pmc=is_pmc,
+            schema=user.schema,
+        )
     )
     unchecked_prescriptions = unchecked_prescriptions.filter(Prescription.status != "s")
 
@@ -157,8 +163,14 @@ def _update_agg_status(prescription: Prescription, user: User, extra={}):
 def _check_agg_internal_prescriptions(
     prescription, p_status, user, has_lock_feature=False, extra={}
 ):
-    q_internal_prescription = prescription_service.get_query_prescriptions_by_agg(
-        agg_prescription=prescription, is_cpoe=feature_service.is_cpoe()
+    is_pmc = memory_service.has_feature_nouser(FeatureEnum.PRIMARY_CARE.value)
+    q_internal_prescription = (
+        prescription_view_repository.get_query_prescriptions_by_agg(
+            agg_prescription=prescription,
+            is_cpoe=feature_service.is_cpoe(),
+            is_pmc=is_pmc,
+            schema=user.schema,
+        )
     )
     q_internal_prescription = q_internal_prescription.filter(
         Prescription.status != p_status

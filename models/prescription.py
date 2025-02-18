@@ -1,11 +1,7 @@
 from sqlalchemy.orm import deferred
-from sqlalchemy import case, cast, literal, and_, func, desc, asc, or_
-from sqlalchemy.sql.expression import literal_column, case
 from sqlalchemy.dialects import postgresql
 
-from .main import db, User, DrugAttributes, Outlier, Substance, Drug
-from .appendix import Department, Notes, MeasureUnit, Frequency, MeasureUnitConvert
-from utils import prescriptionutils
+from .main import db
 
 
 class Prescription(db.Model):
@@ -47,66 +43,6 @@ class Prescription(db.Model):
             .filter(Prescription.id > idPrescription)
             .first()
         )
-
-    def getHeaders(admissionNumber, aggDate, idSegment, is_pmc=False, is_cpoe=False):
-        q = (
-            db.session.query(Prescription, Department.name, User.name)
-            .outerjoin(
-                Department,
-                and_(
-                    Department.id == Prescription.idDepartment,
-                    Department.idHospital == Prescription.idHospital,
-                ),
-            )
-            .outerjoin(User, Prescription.user == User.id)
-            .filter(Prescription.admissionNumber == admissionNumber)
-            .filter(Prescription.agg == None)
-            .filter(Prescription.concilia == None)
-        )
-
-        q = prescriptionutils.get_period_filter(
-            q, Prescription, aggDate, is_pmc, is_cpoe
-        )
-
-        if not is_cpoe:
-            q = q.filter(Prescription.idSegment == idSegment)
-        else:
-            # discard all suspended
-            active_count = (
-                db.session.query(func.count().label("count"))
-                .filter(PrescriptionDrug.idPrescription == Prescription.id)
-                .filter(
-                    or_(
-                        PrescriptionDrug.suspendedDate == None,
-                        func.date(PrescriptionDrug.suspendedDate) >= aggDate,
-                    )
-                )
-                .as_scalar()
-            )
-            q = q.filter(active_count > 0)
-
-        prescriptions = q.all()
-
-        headers = {}
-        for p in prescriptions:
-            headers[p[0].id] = {
-                "date": p[0].date.isoformat() if p[0].date else None,
-                "expire": p[0].expire.isoformat() if p[0].expire else None,
-                "status": p[0].status,
-                "bed": p[0].bed,
-                "prescriber": p[0].prescriber,
-                "idSegment": p[0].idSegment,
-                "idHospital": p[0].idHospital,
-                "idDepartment": p[0].idDepartment,
-                "department": p[1],
-                "drugs": {},
-                "procedures": {},
-                "solutions": {},
-                "user": p[2],
-                "userId": p[0].user,
-            }
-
-        return headers
 
 
 class PrescriptionAudit(db.Model):
@@ -166,38 +102,6 @@ class Patient(db.Model):
         )
 
 
-def getPrevNotes(admissionNumber):
-    prevNotes = db.aliased(Notes)
-    prevUser = db.aliased(User)
-
-    return (
-        db.session.query(
-            case(
-                (
-                    and_(prevNotes.notes != None, prevNotes.notes != ""),
-                    func.concat(
-                        prevNotes.notes,
-                        " ##@",
-                        prevUser.name,
-                        " em ",
-                        func.to_char(prevNotes.update, "DD/MM/YYYY HH24:MI"),
-                        "@##",
-                    ),
-                ),
-                else_=None,
-            )
-        )
-        .select_from(prevNotes)
-        .outerjoin(prevUser, prevNotes.user == prevUser.id)
-        .filter(prevNotes.admissionNumber == admissionNumber)
-        .filter(prevNotes.idDrug == PrescriptionDrug.idDrug)
-        .filter(prevNotes.idPrescriptionDrug < PrescriptionDrug.id)
-        .order_by(desc(prevNotes.update))
-        .limit(1)
-        .as_scalar()
-    )
-
-
 class PatientAudit(db.Model):
     __tablename__ = "pessoa_audit"
 
@@ -251,128 +155,6 @@ class PrescriptionDrug(db.Model):
     cpoe_group = db.Column("cpoe_grupo", db.BigInteger, nullable=True)
     form = db.Column("form", postgresql.JSON, nullable=True)
     schedule = db.Column("aprazamento", postgresql.ARRAY(db.DateTime), nullable=True)
-
-    def findByPrescription(
-        idPrescription,
-        admissionNumber,
-        aggDate=None,
-        idSegment=None,
-        is_cpoe=False,
-        is_pmc=False,
-    ):
-        prevNotes = getPrevNotes(admissionNumber)
-
-        if aggDate != None and is_cpoe:
-            agg_date_with_time = cast(
-                func.concat(func.date(aggDate), " ", "23:59:59"), postgresql.TIMESTAMP
-            )
-
-            period_calc = func.ceil(
-                func.extract("epoch", agg_date_with_time - Prescription.date) / 86400
-            )
-            max_period = func.ceil(
-                func.extract("epoch", Prescription.expire - Prescription.date) / 86400
-            )
-            period_cpoe = case(
-                (agg_date_with_time > Prescription.expire, max_period),
-                else_=period_calc,
-            )
-
-        else:
-            period_cpoe = literal_column("0")
-
-        substance_handling = (
-            db.session.query(("*"))
-            .select_from(func.jsonb_object_keys(Substance.handling))
-            .filter(Substance.handling != None)
-            .filter(Substance.handling != "null")
-            .as_scalar()
-        )
-
-        q = (
-            db.session.query(
-                PrescriptionDrug,
-                Drug,
-                MeasureUnit,
-                Frequency,
-                literal("0"),
-                func.coalesce(
-                    PrescriptionDrug.finalscore,
-                    func.coalesce(func.coalesce(Outlier.manualScore, Outlier.score), 4),
-                ).label("score"),
-                DrugAttributes,
-                Notes.notes,
-                prevNotes.label("prevNotes"),
-                Prescription.status,
-                Prescription.expire.label("prescription_expire"),
-                Substance,
-                period_cpoe.label("period_cpoe"),
-                Prescription.date.label("prescription_date"),
-                MeasureUnitConvert.factor.label("measure_unit_convert_factor"),
-                func.array(substance_handling).label("substance_handling_types"),
-                Prescription.idDepartment.label("idDepartment"),
-            )
-            .outerjoin(Outlier, Outlier.id == PrescriptionDrug.idOutlier)
-            .outerjoin(Drug, Drug.id == PrescriptionDrug.idDrug)
-            .outerjoin(Notes, Notes.idPrescriptionDrug == PrescriptionDrug.id)
-            .outerjoin(Prescription, Prescription.id == PrescriptionDrug.idPrescription)
-            .outerjoin(
-                MeasureUnit,
-                and_(
-                    MeasureUnit.id == PrescriptionDrug.idMeasureUnit,
-                    MeasureUnit.idHospital == Prescription.idHospital,
-                ),
-            )
-            .outerjoin(
-                MeasureUnitConvert,
-                and_(
-                    MeasureUnitConvert.idSegment == PrescriptionDrug.idSegment,
-                    MeasureUnitConvert.idDrug == PrescriptionDrug.idDrug,
-                    MeasureUnitConvert.idMeasureUnit == MeasureUnit.id,
-                ),
-            )
-            .outerjoin(
-                Frequency,
-                and_(
-                    Frequency.id == PrescriptionDrug.idFrequency,
-                    Frequency.idHospital == Prescription.idHospital,
-                ),
-            )
-            .outerjoin(
-                DrugAttributes,
-                and_(
-                    DrugAttributes.idDrug == PrescriptionDrug.idDrug,
-                    DrugAttributes.idSegment == PrescriptionDrug.idSegment,
-                ),
-            )
-            .outerjoin(Substance, Drug.sctid == Substance.id)
-        )
-
-        if aggDate is None:
-            q = q.filter(PrescriptionDrug.idPrescription == idPrescription)
-        else:
-            q = (
-                q.filter(Prescription.admissionNumber == admissionNumber)
-                .filter(Prescription.agg == None)
-                .filter(Prescription.concilia == None)
-            )
-
-            q = prescriptionutils.get_period_filter(
-                q, Prescription, aggDate, is_pmc, is_cpoe
-            )
-
-            if is_cpoe:
-                q = q.filter(
-                    or_(
-                        PrescriptionDrug.suspendedDate == None,
-                        func.date(PrescriptionDrug.suspendedDate) >= func.date(aggDate),
-                    )
-                )
-            else:
-                if idSegment != None:
-                    q = q.filter(Prescription.idSegment == idSegment)
-
-        return q.order_by(asc(Drug.name)).all()
 
 
 class PrescriptionDrugAudit(db.Model):

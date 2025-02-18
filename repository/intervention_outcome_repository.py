@@ -1,17 +1,17 @@
 from sqlalchemy import and_, case, func
 
-from models.main import db, User
+from models.main import db, User, Drug, DrugAttributes
 from models.prescription import (
     Prescription,
     PrescriptionDrug,
-    Drug,
-    MeasureUnit,
-    Frequency,
-    MeasureUnitConvert,
-    DrugAttributes,
     Intervention,
 )
-from models.appendix import InterventionReason
+from models.appendix import (
+    InterventionReason,
+    MeasureUnit,
+    MeasureUnitConvert,
+    Frequency,
+)
 
 
 def get_outcome(id_intervention: int):

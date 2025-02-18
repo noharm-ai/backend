@@ -1,17 +1,13 @@
 from sqlalchemy import and_, func, or_
 from datetime import timedelta, datetime
 
-from models.main import db, User
+from models.main import db, User, Drug, DrugAttributes
 from models.prescription import (
     Intervention,
     Prescription,
     PrescriptionDrug,
-    Drug,
-    MeasureUnit,
-    Frequency,
-    MeasureUnitConvert,
-    DrugAttributes,
 )
+from models.appendix import MeasureUnit, MeasureUnitConvert, Frequency
 from models.enums import (
     InterventionEconomyTypeEnum,
     InterventionStatusEnum,
