@@ -1,7 +1,7 @@
 import pytest
 from datetime import datetime
 
-from models.prescription import Frequency
+from models.appendix import Frequency
 from models.enums import DrugAlertTypeEnum, DrugAlertLevelEnum
 from services import alert_service
 from tests.utils import utils_test_prescription
@@ -32,6 +32,7 @@ def test_dosemaxplus():
         pregnant=None,
         lactating=None,
         schedules_fasting=None,
+        cn_data=None,
     )
 
     stats = alerts.get("stats")
@@ -116,6 +117,7 @@ def test_max_dose_total_additional(
         pregnant=None,
         lactating=None,
         schedules_fasting=None,
+        cn_data=None,
     )
     max_dose_total_alerts = [
         alert
@@ -159,6 +161,7 @@ def test_dosemax():
         pregnant=None,
         lactating=None,
         schedules_fasting=None,
+        cn_data=None,
     )
 
     stats = alerts.get("stats")
@@ -205,6 +208,7 @@ def test_max_dose_additional(
         pregnant=None,
         lactating=None,
         schedules_fasting=None,
+        cn_data=None,
     )
 
     max_dose_alerts = alerts.get("alerts", {}).get("61", [])
@@ -247,6 +251,7 @@ def test_kidney_dialysis():
         pregnant=None,
         lactating=None,
         schedules_fasting=None,
+        cn_data=None,
     )
     stats = alerts.get("stats")
 
@@ -285,6 +290,7 @@ def test_kidney_ckd():
         pregnant=None,
         lactating=None,
         schedules_fasting=None,
+        cn_data=None,
     )
     stats = alerts.get("stats")
 
@@ -319,6 +325,7 @@ def test_kidney_swrtz2():
         pregnant=None,
         lactating=None,
         schedules_fasting=None,
+        cn_data=None,
     )
     stats = alerts.get("stats")
 
@@ -353,6 +360,7 @@ def test_kidney_swrtz1():
         pregnant=None,
         lactating=None,
         schedules_fasting=None,
+        cn_data=None,
     )
     stats = alerts.get("stats")
 
@@ -399,6 +407,7 @@ def test_kidney_alert_multiple(
         pregnant=None,
         lactating=None,
         schedules_fasting=None,
+        cn_data=None,
     )
     kidney_alerts = alerts.get("alerts", {}).get("1", [])
     kidney_alert_count = alerts.get("stats", {}).get(DrugAlertTypeEnum.KIDNEY.value, 0)
@@ -438,6 +447,7 @@ def test_liver():
         pregnant=None,
         lactating=None,
         schedules_fasting=None,
+        cn_data=None,
     )
     stats = alerts.get("stats")
 
@@ -481,6 +491,7 @@ def test_platelets():
         pregnant=None,
         lactating=None,
         schedules_fasting=None,
+        cn_data=None,
     )
     stats = alerts.get("stats")
 
@@ -523,6 +534,7 @@ def test_elderly():
         pregnant=None,
         lactating=None,
         schedules_fasting=None,
+        cn_data=None,
     )
 
     stats = alerts.get("stats")
@@ -566,6 +578,7 @@ def test_tube():
         pregnant=None,
         lactating=None,
         schedules_fasting=None,
+        cn_data=None,
     )
 
     stats = alerts.get("stats")
@@ -609,6 +622,7 @@ def test_allergy():
         pregnant=None,
         lactating=None,
         schedules_fasting=None,
+        cn_data=None,
     )
 
     stats = alerts.get("stats")
@@ -648,6 +662,7 @@ def test_ira():
         pregnant=None,
         lactating=None,
         schedules_fasting=None,
+        cn_data=None,
     )
 
     stats = alerts.get("stats")
@@ -667,18 +682,43 @@ def test_ira():
 @pytest.mark.parametrize(
     "test_input,expected_alert",
     [
-        ((3000, 40, 70, None), True),  # Should trigger alert (baseline case)
-        ((2000, 50, 70, None), False),  # Should not trigger alert (below threshold)
-        ((4000, 30, 60, None), True),  # Should trigger alert (high dose, low CKD)
-        ((3000, 40, 70, "c"), False),  # Should not trigger alert (patient on dialysis)
-        ((3000, 0, 70, None), False),  # Should not trigger alert (CKD is 0)
-        ((3000, 40, 0, None), False),  # Should not trigger alert (weight is 0)
-        ((1000, 20, 50, None), True),  # Should trigger alert (low dose, very low CKD)
+        (
+            (3000, 40, 70, None, {"cn_stats": {"dialysis": 0}}),
+            True,
+        ),  # Should trigger alert (baseline case)
+        (
+            (2000, 50, 70, None, {"cn_stats": {"dialysis": 0}}),
+            False,
+        ),  # Should not trigger alert (below threshold)
+        (
+            (4000, 30, 60, None, {"cn_stats": {"dialysis": 0}}),
+            True,
+        ),  # Should trigger alert (high dose, low CKD)
+        (
+            (3000, 40, 70, "c", {"cn_stats": {"dialysis": 1}}),
+            False,
+        ),  # Should not trigger alert (patient on dialysis)
+        (
+            (3000, 0, 70, None, {"cn_stats": {"dialysis": 0}}),
+            False,
+        ),  # Should not trigger alert (CKD is 0)
+        (
+            (3000, 40, 0, None, {"cn_stats": {"dialysis": 0}}),
+            False,
+        ),  # Should not trigger alert (weight is 0)
+        (
+            (1000, 20, 50, None, {"cn_stats": {"dialysis": 0}}),
+            True,
+        ),  # Should trigger alert (low dose, very low CKD)
+        (
+            (1000, 20, 50, None, {"cn_stats": {"dialysis": 1}}),
+            False,
+        ),  # Should not trigger alert (patient on dialysis)
     ],
 )
 def test_ira_alert_conditions(test_input, expected_alert):
     """IRA alerts: Test various conditions for triggering or not triggering the IRA alert"""
-    dose, ckd, weight, dialysis = test_input
+    dose, ckd, weight, dialysis, cn_data = test_input
 
     drugs = []
     drugs.append(
@@ -696,6 +736,7 @@ def test_ira_alert_conditions(test_input, expected_alert):
         pregnant=None,
         lactating=None,
         schedules_fasting=None,
+        cn_data=cn_data,
     )
 
     alert1 = alerts.get("alerts", {}).get("61", [])
@@ -746,6 +787,7 @@ def test_pregnant():
         pregnant=True,
         lactating=None,
         schedules_fasting=None,
+        cn_data=None,
     )
 
     stats = alerts.get("stats")
@@ -790,6 +832,7 @@ def test_lactating():
         pregnant=None,
         lactating=True,
         schedules_fasting=None,
+        cn_data=None,
     )
 
     stats = alerts.get("stats")
@@ -833,6 +876,7 @@ def test_fasting():
         pregnant=None,
         lactating=None,
         schedules_fasting=["8", "24"],
+        cn_data=None,
     )
 
     stats = alerts.get("stats")

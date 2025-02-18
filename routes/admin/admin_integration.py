@@ -57,6 +57,7 @@ def update_config():
         fl2=request_data.get("fl2", None),
         fl3=request_data.get("fl3", None),
         fl4=request_data.get("fl4", None),
+        cpoe=request_data.get("cpoe", False),
     )
 
 

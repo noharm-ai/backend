@@ -2,7 +2,9 @@ import re
 from typing import List
 
 from models.enums import DrugTypeEnum, DrugAlertTypeEnum, DrugAlertLevelEnum
-from models.prescription import PrescriptionDrug, Drug, DrugAttributes, Frequency
+from models.main import Drug, DrugAttributes
+from models.prescription import PrescriptionDrug
+from models.appendix import Frequency
 from utils import numberutils, stringutils
 
 
@@ -15,6 +17,7 @@ def find_alerts(
     pregnant: bool,
     lactating: bool,
     schedules_fasting: List[str],
+    cn_data: dict,
 ):
     filtered_list = _filter_drug_list(drug_list=drug_list)
     dose_total = _get_dose_total(drug_list=filtered_list, exams=exams)
@@ -143,6 +146,7 @@ def find_alerts(
                 prescription_expire_date=prescription_expire_date,
                 dose_total=dose_total,
                 dialysis=dialisys,
+                cn_data=cn_data,
             ),
             handling_types=handling_types,
         )
@@ -285,6 +289,7 @@ def _alert_ira(
     prescription_expire_date,
     dose_total: dict,
     dialysis: str,
+    cn_data: dict,
 ):
     alert = _create_alert(
         id_prescription_drug=str(prescription_drug.id),
@@ -302,6 +307,9 @@ def _alert_ira(
             exams["ckd"]["value"] if "ckd" in exams and exams["ckd"]["value"] else None
         )
         weight = exams["weight"]
+        dialysis_ia_count = (
+            cn_data.get("cn_stats", {}).get("dialysis", 0) if cn_data else 0
+        )
 
         if (
             maxdose != None
@@ -313,7 +321,7 @@ def _alert_ira(
             ira = maxdose / ckd / weight
             maxira = 0.6219
 
-            if ira > maxira and dialysis is None:
+            if ira > maxira and dialysis is None and dialysis_ia_count == 0:
                 alert[
                     "text"
                 ] = f"""

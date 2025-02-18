@@ -8,7 +8,7 @@ from typing import List
 
 from config import Config
 from exception.validation_error import ValidationError
-from models.prescription import Drug
+from models.main import Drug
 from utils import status, stringutils
 
 

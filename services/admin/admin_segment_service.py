@@ -1,8 +1,7 @@
 from sqlalchemy import func, and_, asc
 
 from models.main import db, User
-from models.prescription import Department
-from models.appendix import SegmentDepartment
+from models.appendix import SegmentDepartment, Department
 from models.segment import Hospital, Segment
 from models.enums import IntegrationStatusEnum
 from services.admin import admin_integration_status_service

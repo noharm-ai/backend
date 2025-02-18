@@ -6,7 +6,8 @@ from sqlalchemy.dialects import postgresql
 
 from models.main import db
 from models.enums import PrescriptionReviewTypeEnum, PatientConciliationStatusEnum
-from models.prescription import Prescription, Patient, Department
+from models.prescription import Prescription, Patient
+from models.appendix import Department
 from decorators.has_permission_decorator import has_permission, Permission
 from utils import dateutils, numberutils, prescriptionutils, status
 from services import prescription_service, feature_service

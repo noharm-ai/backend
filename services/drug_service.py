@@ -8,17 +8,12 @@ from models.main import (
     User,
     PrescriptionAgg,
     DrugAttributesAudit,
-)
-from models.prescription import (
-    Drug,
-    MeasureUnit,
-    Prescription,
-    PrescriptionDrug,
-    Frequency,
     DrugAttributes,
-    MeasureUnitConvert,
+    Drug,
     Substance,
 )
+from models.prescription import PrescriptionDrug, Prescription
+from models.appendix import MeasureUnit, Frequency, MeasureUnitConvert
 from models.segment import Segment
 from models.enums import (
     DrugAttributesAuditTypeEnum,

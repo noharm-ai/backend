@@ -2,7 +2,8 @@ from sqlalchemy import asc, desc, func, nullslast
 from datetime import timedelta
 
 from models.main import db, User
-from models.prescription import Patient, Department
+from models.prescription import Patient
+from models.appendix import Department
 from models.regulation import RegSolicitation, RegSolicitationType, RegMovement
 from models.requests.regulation_prioritization_request import (
     RegulationPrioritizationRequest,

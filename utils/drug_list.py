@@ -336,6 +336,7 @@ class DrugList:
                     "drugAttributes": drug_service.to_dict(pd[6]),
                     "prescriptionDate": to_iso(pd.prescription_date),
                     "prescriptionExpire": to_iso(pd.prescription_expire),
+                    "schedule": self.schedule_to_array(pd[0].schedule),
                 }
             )
 
@@ -479,3 +480,17 @@ class DrugList:
             drugs[drugs.index(d)]["idPrescription"] = idPrescription
 
         return drugs
+
+    @staticmethod
+    def schedule_to_array(schedule):
+        results = []
+
+        if not schedule:
+            return []
+
+        for i in schedule:
+            results.append([to_iso(i[0]), to_iso(i[1])])
+
+        return sorted(
+            results, key=lambda d: d[0] if d[0] != None else None, reverse=True
+        )[:10]

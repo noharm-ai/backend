@@ -2,17 +2,13 @@ from sqlalchemy import case, and_, func, or_, desc
 from sqlalchemy.dialects import postgresql
 from datetime import timedelta, datetime
 
-from models.main import db, User
+from models.main import db, User, Drug
 from models.prescription import (
     Intervention,
     Prescription,
-    Department,
     PrescriptionDrug,
-    Drug,
-    MeasureUnit,
-    Frequency,
 )
-from models.appendix import InterventionReason
+from models.appendix import InterventionReason, MeasureUnit, Frequency, Department
 from models.enums import (
     InterventionEconomyTypeEnum,
 )

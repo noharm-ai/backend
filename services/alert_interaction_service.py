@@ -2,8 +2,8 @@ from datetime import datetime
 from sqlalchemy import text
 from typing import List
 
-from models.prescription import PrescriptionDrug, DrugAttributes
-from models.main import db, Drug, Substance, Allergy
+from models.prescription import PrescriptionDrug
+from models.main import db, Drug, Substance, Allergy, DrugAttributes
 from models.enums import DrugTypeEnum, DrugAlertLevelEnum, FrequencyEnum
 from utils import examutils, stringutils
 

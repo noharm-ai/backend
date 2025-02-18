@@ -1,17 +1,12 @@
 from sqlalchemy import func, text, distinct, and_
 
-from models.main import db, User, PrescriptionAgg
-from models.prescription import (
-    Outlier,
-    Drug,
-    DrugAttributes,
-    MeasureUnitConvert,
-)
+from models.main import db, User, PrescriptionAgg, Outlier, Drug, DrugAttributes
 from models.appendix import (
     SchemaConfig,
     Frequency,
     SegmentDepartment,
     InterventionReason,
+    MeasureUnitConvert,
 )
 from models.segment import SegmentExam, Segment
 from models.enums import MemoryEnum

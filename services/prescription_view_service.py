@@ -9,10 +9,9 @@ from models.main import db, User
 from models.prescription import (
     Prescription,
     Patient,
-    PrescriptionDrug,
     PrescriptionAudit,
-    Department,
 )
+from models.appendix import Department
 from models.segment import Segment
 from models.enums import (
     MemoryEnum,
@@ -22,6 +21,7 @@ from models.enums import (
     AppFeatureFlagEnum,
     DrugTypeEnum,
 )
+from repository import prescription_view_repository
 from utils.drug_list import DrugList
 from services import (
     prescription_service,
@@ -84,7 +84,10 @@ def _internal_get_prescription(
     last_dept = _get_last_dept(prescription=prescription, is_complete=is_complete)
 
     drug_list = _get_drug_list(
-        prescription=prescription, patient=patient, config_data=config_data
+        prescription=prescription,
+        patient=patient,
+        config_data=config_data,
+        user_context=user_context,
     )
 
     alerts_data = _get_alerts(
@@ -92,6 +95,7 @@ def _internal_get_prescription(
         patient=patient,
         config_data=config_data,
         exam_data=exam_data,
+        cn_data=cn_data,
     )
 
     drug_data = _get_drug_data(
@@ -103,6 +107,7 @@ def _internal_get_prescription(
         exams_data=exam_data,
         config_data=config_data,
         is_complete=is_complete,
+        user_context=user_context,
     )
 
     review_data = _get_review_data(prescription=prescription, is_complete=is_complete)
@@ -169,13 +174,15 @@ def _build_headers(
     pDrugs: dict,
     pSolution: dict,
     pProcedures: dict,
+    user_context: User,
 ):
-    headers = Prescription.getHeaders(
+    headers = prescription_view_repository.get_headers(
         admissionNumber=prescription.admissionNumber,
         aggDate=prescription.date,
         idSegment=prescription.idSegment,
         is_pmc=config_data["is_pmc"],
         is_cpoe=config_data["is_cpoe"],
+        schema=user_context.schema,
     )
 
     for pid in headers.keys():
@@ -489,10 +496,13 @@ def _get_exams(
 
 
 @timed()
-def _get_drug_list(prescription: Prescription, patient: Patient, config_data: dict):
-    return PrescriptionDrug.findByPrescription(
+def _get_drug_list(
+    prescription: Prescription, patient: Patient, config_data: dict, user_context: User
+):
+    return prescription_view_repository.find_drugs_by_prescription(
         idPrescription=prescription.id,
         admissionNumber=patient.admissionNumber,
+        schema=user_context.schema,
         aggDate=prescription.date if prescription.agg else None,
         idSegment=prescription.idSegment,
         is_cpoe=config_data.get("is_cpoe"),
@@ -501,7 +511,9 @@ def _get_drug_list(prescription: Prescription, patient: Patient, config_data: di
 
 
 @timed()
-def _get_alerts(drug_list, patient: Patient, config_data: dict, exam_data: dict):
+def _get_alerts(
+    drug_list, patient: Patient, config_data: dict, exam_data: dict, cn_data: dict
+):
     relations = alert_interaction_service.find_relations(
         drug_list=drug_list,
         is_cpoe=config_data["is_cpoe"],
@@ -515,6 +527,7 @@ def _get_alerts(drug_list, patient: Patient, config_data: dict, exam_data: dict)
         pregnant=patient.pregnant,
         lactating=patient.lactating,
         schedules_fasting=config_data["schedules_fasting"],
+        cn_data=cn_data,
     )
 
     return {"relations": relations, "alerts": alerts}
@@ -530,6 +543,7 @@ def _get_drug_data(
     exams_data: dict,
     config_data: dict,
     is_complete: bool,
+    user_context: User,
 ):
     drug_list = DrugList(
         drugList=drugs,
@@ -563,6 +577,7 @@ def _get_drug_data(
             pDrugs=p_drugs,
             pSolution=p_solution,
             pProcedures=p_procedures,
+            user_context=user_context,
         )
 
         if config_data["is_cpoe"]:
@@ -577,10 +592,11 @@ def _get_drug_data(
         p_drugs = drug_list.changeDrugName(p_drugs)
         last_agg_prescription = _get_last_agg_prescription(patient.admissionNumber)
         if last_agg_prescription != None:
-            concilia_drugs = PrescriptionDrug.findByPrescription(
-                last_agg_prescription.id,
-                patient.admissionNumber,
-                last_agg_prescription.date,
+            concilia_drugs = prescription_view_repository.find_drugs_by_prescription(
+                idPrescription=last_agg_prescription.id,
+                admissionNumber=patient.admissionNumber,
+                schema=user_context.schema,
+                aggDate=last_agg_prescription.date,
                 idSegment=None,
                 is_cpoe=config_data["is_cpoe"],
             )

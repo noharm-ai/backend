@@ -5,11 +5,10 @@ from tests.conftest import session, session_commit
 from models.prescription import (
     Prescription,
     PrescriptionDrug,
-    DrugAttributes,
-    Drug,
-    Frequency,
     PrescriptionAudit,
 )
+from models.main import Drug, DrugAttributes
+from models.appendix import Frequency
 
 
 def prepare_test_aggregate(id, admissionNumber, prescriptionid1, prescriptionid2):

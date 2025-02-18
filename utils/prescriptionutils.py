@@ -1,6 +1,4 @@
 from datetime import datetime
-from sqlalchemy.dialects.postgresql import INTERVAL
-from sqlalchemy import between, func
 
 from . import numberutils, stringutils, dateutils
 
@@ -240,28 +238,6 @@ def split_interval(interval):
         return results
 
     return []
-
-
-def get_period_filter(query, model, agg_date, is_pmc, is_cpoe):
-    if not is_pmc:
-        if is_cpoe:
-            query = query.filter(
-                between(
-                    func.date(agg_date),
-                    func.date(model.date - func.cast("2 DAY", INTERVAL)),
-                    func.coalesce(func.date(model.expire), func.date(agg_date)),
-                )
-            )
-        else:
-            query = query.filter(
-                between(
-                    func.date(agg_date),
-                    func.date(model.date),
-                    func.coalesce(func.date(model.expire), func.date(agg_date)),
-                )
-            )
-
-    return query
 
 
 def gen_agg_id(admission_number, id_segment, pdate):

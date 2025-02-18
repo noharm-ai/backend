@@ -1,7 +1,8 @@
 from decorators.has_permission_decorator import has_permission, Permission
 from repository.regulation import reg_solicitation_repository
 from models.regulation import RegSolicitation, RegSolicitationType
-from models.prescription import Patient, Department
+from models.prescription import Patient
+from models.appendix import Department
 from models.requests.regulation_prioritization_request import (
     RegulationPrioritizationRequest,
 )

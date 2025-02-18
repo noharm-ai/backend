@@ -3,15 +3,8 @@ from sqlalchemy.orm import undefer
 from typing import List
 from datetime import datetime
 
-from models.main import db, User
-from models.prescription import (
-    MeasureUnitConvert,
-    MeasureUnit,
-    Outlier,
-    Drug,
-    DrugAttributes,
-    Substance,
-)
+from models.main import db, User, Outlier, Drug, DrugAttributes, Substance
+from models.appendix import MeasureUnit, MeasureUnitConvert
 from models.segment import Segment
 from models.enums import SegmentTypeEnum
 from repository.admin import admin_drug_repository

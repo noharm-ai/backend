@@ -1,8 +1,8 @@
 from sqlalchemy import distinct, text
 from datetime import datetime
 
-from models.main import db, User, Substance
-from models.prescription import Prescription, PrescriptionDrug, Drug
+from models.main import db, User, Substance, Drug
+from models.prescription import Prescription, PrescriptionDrug
 from models.enums import FeatureEnum
 from services import memory_service, drug_service
 from exception.validation_error import ValidationError

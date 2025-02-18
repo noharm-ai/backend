@@ -8,16 +8,16 @@ from sqlalchemy import text, func, distinct, and_, or_, asc, literal, literal_co
 from typing import List
 from decimal import Decimal, ROUND_HALF_UP
 
-from models.main import db, User, PrescriptionAgg
-from models.prescription import (
+from models.main import (
+    db,
+    User,
+    PrescriptionAgg,
     Outlier,
-    Notes,
     Drug,
     Substance,
     DrugAttributes,
-    MeasureUnit,
-    MeasureUnitConvert,
 )
+from models.appendix import Notes, MeasureUnit, MeasureUnitConvert
 from utils.outlier_lib import add_score
 from exception.validation_error import ValidationError
 from services.admin import admin_drug_service, admin_integration_status_service
