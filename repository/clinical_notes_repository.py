@@ -1,5 +1,7 @@
-from sqlalchemy import func, desc, Integer
+"""Repository: clinical notes related operations"""
+
 from datetime import datetime, timedelta
+from sqlalchemy import func, desc, Integer
 
 from models.main import db, User
 from models.notes import ClinicalNotes
@@ -8,6 +10,7 @@ from decorators.timed_decorator import timed
 
 
 def get_dialysis_cache(admission_number: int):
+    """Get dialysis data to cache"""
     return (
         db.session.query(
             ClinicalNotes.id, ClinicalNotes.annotations, ClinicalNotes.date
@@ -22,6 +25,7 @@ def get_dialysis_cache(admission_number: int):
 
 
 def get_allergies_cache(admission_number: int):
+    """Get allergies data to cache"""
     return (
         db.session.query(
             ClinicalNotes.id, ClinicalNotes.annotations, ClinicalNotes.date
@@ -37,6 +41,7 @@ def get_allergies_cache(admission_number: int):
 
 @timed()
 def get_signs(admission_number: int, user_context: User, cache=True):
+    """Get signs data from db or cache"""
     signs = {}
     if cache:
         result = cache_service.get_by_key(
@@ -78,6 +83,7 @@ def get_signs(admission_number: int, user_context: User, cache=True):
 
 @timed()
 def get_infos(admission_number, user_context: User, cache=True):
+    """Get info data from db or cache"""
     infos = {}
     if cache:
         result = cache_service.get_by_key(
@@ -121,6 +127,7 @@ def get_infos(admission_number, user_context: User, cache=True):
 def get_allergies(
     admission_number, user_context: User, admission_date=None, cache=True
 ):
+    """Get allergies data from db or cache"""
     allergies = []
 
     if cache:
@@ -191,6 +198,7 @@ def get_allergies(
 
 @timed()
 def get_dialysis(admission_number: int, user_context: User, cache=True):
+    """Get dialysis data from db or cache"""
     dialysis_data = []
 
     if cache:
@@ -255,6 +263,7 @@ def get_dialysis(admission_number: int, user_context: User, cache=True):
 
 @timed()
 def get_admission_stats(admission_number: int, user_context: User, cache=True):
+    """Get clinical notes stats by admission from db or cache"""
     tags = clinical_notes_service.get_tags()
     stats = {}
 

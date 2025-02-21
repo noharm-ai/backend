@@ -1,3 +1,5 @@
+"""Repository: drug related operations"""
+
 from sqlalchemy import text
 
 from models.main import db, User
@@ -13,6 +15,9 @@ def copy_attributes(
     user_context: User,
     overwrite_all: bool = False,
 ):
+    """ "
+    Copy attributes from substance or one segment to another
+    """
     only_support_filter = """
         and (
             ma.update_by = 0

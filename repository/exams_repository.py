@@ -1,3 +1,5 @@
+"""Repository: exams related operations"""
+
 from datetime import date, timedelta
 from sqlalchemy import desc, asc
 
@@ -6,6 +8,7 @@ from models.segment import Exams
 
 
 def get_exams_by_patient(idPatient: int, days: int):
+    """Get exams by patient"""
     return (
         db.session.query(Exams)
         .filter(Exams.idPatient == idPatient)

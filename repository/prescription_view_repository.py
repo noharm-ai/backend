@@ -1,7 +1,8 @@
-from sqlalchemy import between, func
+"""Repository: prescription view related operations"""
+
+from sqlalchemy import between, func, case, cast, literal, and_, desc, asc, or_
 from sqlalchemy.dialects.postgresql import INTERVAL
-from sqlalchemy import case, cast, literal, and_, func, desc, asc, or_
-from sqlalchemy.sql.expression import literal_column, case
+from sqlalchemy.sql.expression import literal_column
 from sqlalchemy.dialects import postgresql
 
 from models.main import db, User, DrugAttributes, Outlier, Substance, Drug
