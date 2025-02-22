@@ -1,3 +1,5 @@
+"""Repository: intervention outcome related operations"""
+
 from sqlalchemy import and_, case, func
 
 from models.main import db, User, Drug, DrugAttributes

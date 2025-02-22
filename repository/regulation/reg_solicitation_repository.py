@@ -1,5 +1,7 @@
-from sqlalchemy import asc, desc, func, nullslast
+"""Repository for regulation prioritization related operations"""
+
 from datetime import timedelta
+from sqlalchemy import asc, desc, func, nullslast
 
 from models.main import db, User
 from models.prescription import Patient
@@ -11,6 +13,7 @@ from models.requests.regulation_prioritization_request import (
 
 
 def get_prioritization(request_data: RegulationPrioritizationRequest):
+    """Get regulation prioritization data"""
     query = (
         db.session.query(
             RegSolicitation,
@@ -101,6 +104,7 @@ def get_prioritization(request_data: RegulationPrioritizationRequest):
 
 
 def get_solicitation(id: int):
+    """Get regulation solicitation data"""
     query = (
         db.session.query(
             RegSolicitation,
@@ -119,6 +123,7 @@ def get_solicitation(id: int):
 
 
 def get_solicitation_movement(id_reg_solicitation: int):
+    """Get regulation solicitation movement data"""
     query = (
         db.session.query(RegMovement, User)
         .outerjoin(User, RegMovement.created_by == User.id)
@@ -130,6 +135,7 @@ def get_solicitation_movement(id_reg_solicitation: int):
 
 
 def get_types():
+    """Get regulation solicitation types"""
     query = db.session.query(RegSolicitationType).order_by(
         RegSolicitationType.name.asc()
     )

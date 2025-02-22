@@ -1,3 +1,5 @@
+"""Repository: prescription history report related operations"""
+
 from sqlalchemy import func, select
 
 from models.main import db, User
@@ -10,6 +12,7 @@ from models.enums import PrescriptionDrugAuditTypeEnum
 
 
 def get_audit_report(id_prescription: int):
+    """Get data from prescricao_audit table ordered by createdAt asc"""
     return (
         db.session.query(PrescriptionAudit, User)
         .outerjoin(User, PrescriptionAudit.createdBy == User.id)
@@ -20,6 +23,7 @@ def get_audit_report(id_prescription: int):
 
 
 def get_prescription_audit_dates(id_prescription: int):
+    """Get the arrival and prescalc dates of a prescription"""
     dates = {"arrival_date": None, "process_date": None}
     prescription_query = select(PrescriptionDrug.id).where(
         PrescriptionDrug.idPrescription == id_prescription

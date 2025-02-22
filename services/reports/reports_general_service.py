@@ -20,7 +20,7 @@ def get_report(report, user_context: User, filename="current"):
         report=report, schema=user_context.schema, filename=filename
     )
 
-    if cached_link == None:
+    if not cached_link:
         return {"cached": False}
 
     return {

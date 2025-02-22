@@ -1,3 +1,5 @@
+"""Repository: patient related operations"""
+
 from sqlalchemy import select, desc
 
 from models.main import db

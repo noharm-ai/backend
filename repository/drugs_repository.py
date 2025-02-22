@@ -1,3 +1,5 @@
+"""Repository: drugs related operations"""
+
 from sqlalchemy import and_, or_, func
 
 from models.main import (
@@ -35,6 +37,7 @@ def get_admin_drug_list(
     tp_substance_list=None,
     id_drug_list=[],
 ):
+    """Gets list of drugs with attributes and conversions for management"""
     SegmentOutlier = db.aliased(Segment)
     ConversionsAgg = db.aliased(MeasureUnitConvert)
     MeasureUnitAgg = db.aliased(MeasureUnit)

@@ -1,9 +1,12 @@
+"""Repository: drug attributes related operations"""
+
 from sqlalchemy import text
 
 from models.main import db
 
 
 def update_dose_max(update_list: list[dict], schema: str):
+    """Bulk update dosemax and dosemaxWeight attributes"""
     update_table = []
 
     for item in update_list:

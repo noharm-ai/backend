@@ -1,9 +1,12 @@
+"""Repository: tag related operations"""
+
 from models.main import db
 from models.appendix import Tag
 from models.requests.tag_request import TagListRequest
 
 
 def list_tags(request_data: TagListRequest) -> list[Tag]:
+    """List tags"""
     query = db.session.query(Tag)
 
     if request_data.active != None:

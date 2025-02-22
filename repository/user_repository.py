@@ -1,3 +1,5 @@
+"""Repository: User related operations"""
+
 from sqlalchemy import func, or_, desc, asc
 
 from models.main import db, User, UserAuthorization, UserExtra
@@ -5,6 +7,7 @@ from security.role import Role
 
 
 def get_user_by_credentials(email: str, password: str) -> User:
+    """Get user by email and password"""
     return (
         db.session.query(User)
         .filter(func.lower(User.email) == email.lower())
@@ -15,12 +18,14 @@ def get_user_by_credentials(email: str, password: str) -> User:
 
 
 def get_user_by_email(email: str) -> User:
+    """Get user by email"""
     return (
         db.session.query(User).filter(func.lower(User.email) == email.lower()).first()
     )
 
 
 def get_admin_users_list(schema: str):
+    """Get users list removing staff users"""
     segments_query = db.session.query(
         func.array_agg(UserAuthorization.idSegment)
     ).filter(User.id == UserAuthorization.idUser)
