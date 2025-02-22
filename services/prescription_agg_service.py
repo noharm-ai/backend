@@ -230,6 +230,14 @@ def create_agg_prescription_by_date(
         id_prescription=agg_p.id, user_context=user_context
     )
 
+    # force reload prescription to get updated data from trigger
+    db.session.expire(agg_p)
+    agg_p = db.session.query(Prescription).filter(Prescription.id == p_id).first()
+
+    if not agg_p.idSegment:
+        # fix segment issue caused by trigger
+        agg_p.idSegment = last_prescription.idSegment
+
     features = prescriptionutils.getFeatures(
         result=agg_data, agg_date=agg_p.date, intervals_for_agg_date=True
     )
@@ -240,6 +248,7 @@ def create_agg_prescription_by_date(
     agg_p.aggDrugs = agg_p.features["drugIDs"]
     agg_p.aggDeps = agg_p.features["departmentList"]
     agg_p.update = datetime.today()
+    db.session.flush()
 
     internal_prescription_ids = internal_prescription_ids = (
         prescriptionutils.get_internal_prescription_ids(result=agg_data)
