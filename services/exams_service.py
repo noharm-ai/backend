@@ -1,8 +1,10 @@
+"""Service: exams related operations"""
+
 import copy
 import json
 import logging
-from sqlalchemy import text, desc, and_
 from datetime import datetime, timedelta, date
+from sqlalchemy import text, desc, and_
 
 from models.main import db, redis_client, User
 from models.prescription import Patient
@@ -428,6 +430,9 @@ def find_latest_exams(
     cache_hybrid=True,
     is_complete=True,
 ):
+    """
+    Get the latest exams for a patient
+    """
     if is_complete and cache_hybrid:
         # hybrid approach (cache and db)
         # test better performance ensuring most recent results
@@ -565,6 +570,7 @@ def find_latest_exams(
 
 @has_permission(Permission.WRITE_PRESCRIPTION, Permission.MAINTAINER)
 def refresh_exams_cache(id_patient: int, user_context: User):
+    """get current exams and save in cache"""
     exams = _get_exams_current_results(
         id_patient=id_patient,
         add_previous_exams=True,
