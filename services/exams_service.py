@@ -81,8 +81,9 @@ def _get_textual_exams(admission_number: int = None, id_patient: int = None):
     )
 
 
-@has_permission(Permission.READ_PRESCRIPTION)
+@has_permission(Permission.READ_PRESCRIPTION, Permission.READ_REGULATION)
 def get_exams_by_admission(admission_number: int, id_segment: int):
+    """Get exams by admission number"""
     # TODO: refactor
     patient = Patient.findByAdmission(admissionNumber=admission_number)
     if patient is None:
