@@ -155,7 +155,11 @@ class Role(Enum):
         ],
     )
 
-    REGULATOR = "REGULATOR", [Permission.READ_REGULATION, Permission.WRITE_REGULATION]
+    REGULATOR = "REGULATOR", [
+        Permission.READ_REGULATION,
+        Permission.WRITE_REGULATION,
+        Permission.READ_BASIC_FEATURES,
+    ]
 
     STATIC_USER = "STATIC_USER", [Permission.READ_STATIC, Permission.CHECK_STATIC]
 

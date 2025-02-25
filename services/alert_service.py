@@ -1,3 +1,5 @@
+"""Service: module for drug alerts"""
+
 import re
 from typing import List
 
@@ -8,8 +10,6 @@ from models.appendix import Frequency
 from utils import numberutils, stringutils
 
 
-# analyze alerts
-# drug_list (PrescriptionDrug.findByPrescription)
 def find_alerts(
     drug_list,
     exams: dict,
@@ -19,6 +19,9 @@ def find_alerts(
     schedules_fasting: List[str],
     cn_data: dict,
 ):
+    """
+    Find alerts for a list of drugs
+    :param drug_list: list of drugs"""
     filtered_list = _filter_drug_list(drug_list=drug_list)
     dose_total = _get_dose_total(drug_list=filtered_list, exams=exams)
     alerts = {}
@@ -303,9 +306,7 @@ def _alert_ira(
         expireDay = prescription_expire_date.day if prescription_expire_date else 0
         idDrugAgg = str(prescription_drug.idDrug) + "_" + str(expireDay)
         maxdose = dose_total[idDrugAgg]["value"] if idDrugAgg in dose_total else None
-        ckd = (
-            exams["ckd"]["value"] if "ckd" in exams and exams["ckd"]["value"] else None
-        )
+        ckd = _get_ckd_value(exams=exams)
         weight = exams["weight"]
         dialysis_ia_count = (
             cn_data.get("cn_stats", {}).get("dialysis", 0) if cn_data else 0
@@ -765,17 +766,13 @@ def _alert_kidney(
         )
         return alert
 
-    if (
-        "ckd" in exams
-        and exams["ckd"]["value"]
-        and drug_attributes.kidney > exams["ckd"]["value"]
-        and exams["age"] > 17
-    ):
+    ckd_value = _get_ckd_value(exams=exams)
+    if ckd_value and drug_attributes.kidney > ckd_value and exams["age"] > 17:
         alert[
             "text"
         ] = f"""
             Medicamento deve sofrer ajuste de posologia ou contraindicado, já que a função renal do paciente (
-            {str(exams["ckd"]["value"])} mL/min) está abaixo de {str(drug_attributes.kidney)} mL/min.
+            {str(ckd_value)} mL/min) está abaixo de {str(drug_attributes.kidney)} mL/min.
         """
         return alert
 
@@ -832,3 +829,13 @@ def _filter_drug_list(drug_list):
         filtered_list.append(item)
 
     return filtered_list
+
+
+def _get_ckd_value(exams: dict):
+    if "ckd21" in exams and exams["ckd21"]["value"]:
+        return exams["ckd21"]["value"]
+
+    if "ckd" in exams and exams["ckd"]["value"]:
+        return exams["ckd"]["value"]
+
+    return None

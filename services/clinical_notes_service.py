@@ -167,7 +167,7 @@ def get_single_note(id_clinical_notes: int):
     return convert_notes(notes=cn, has_primary_care=False, tags=[])
 
 
-@has_permission(Permission.READ_PRESCRIPTION)
+@has_permission(Permission.READ_PRESCRIPTION, Permission.READ_REGULATION)
 def get_notes(admission_number: int, filter_date: str):
     has_primary_care = memory_service.has_feature("PRIMARYCARE")
     dates = None

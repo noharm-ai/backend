@@ -1,8 +1,10 @@
+"""Service: user admin related operations"""
+
 from datetime import datetime
+from typing import List
 from sqlalchemy import func
 from password_generator import PasswordGenerator
 from flask import render_template
-from typing import List
 
 from models.main import User, db, UserAuthorization
 from models.enums import FeatureEnum, UserAuditTypeEnum
@@ -18,12 +20,13 @@ from security.role import Role
 
 @has_permission(Permission.READ_USERS)
 def get_user_list(user_context: User):
+    """get users list, ignores staff users"""
     users = user_repository.get_admin_users_list(schema=user_context.schema)
 
     results = []
     for user in users:
         u = user[0]
-        segments = user[1] if user[1] != None else []
+        segments = user[1] if user[1] else []
 
         results.append(
             {
@@ -35,6 +38,9 @@ def get_user_list(user_context: User):
                 "roles": u.config["roles"] if u.config and "roles" in u.config else [],
                 "features": (
                     u.config["features"] if u.config and "features" in u.config else []
+                ),
+                "ignoreReports": (
+                    u.reports_config.get("ignore", []) if u.reports_config else []
                 ),
                 "segments": segments,
             }
@@ -55,7 +61,7 @@ def _get_user_data(id_user: int):
     )
 
     user = user_result[0]
-    segments = segments = user_result[1] if user_result[1] != None else []
+    segments = segments = user_result[1] if user_result[1] else []
 
     return {
         "id": user.id,
@@ -67,177 +73,185 @@ def _get_user_data(id_user: int):
         "features": (
             user.config["features"] if user.config and "features" in user.config else []
         ),
+        "ignoreReports": (
+            user.reports_config.get("ignore", []) if user.reports_config else []
+        ),
         "segments": segments,
     }
 
 
 @has_permission(Permission.WRITE_USERS)
 def upsert_user(data: dict, user_context: User, user_permissions: List[Permission]):
-    idUser = data.get("id", None)
+    """upsert user"""
+    id_user = data.get("id", None)
     id_segment_list = data.get("segments", [])
 
-    if not idUser:
-        userEmail = data.get("email", None)
-        userName = data.get("name", None)
+    if not id_user:
+        # add new user
+        user_email = data.get("email", None)
+        user_name = data.get("name", None)
 
-        if userEmail != None:
-            userEmail = userEmail.lower()
+        if user_email:
+            user_email = user_email.lower()
 
-        emailExists = user_repository.get_user_by_email(email=userEmail) != None
+        email_exists = user_repository.get_user_by_email(email=user_email)
 
-        if emailExists:
+        if email_exists:
             raise ValidationError(
                 "Já existe um usuário com este email",
                 "errors.businessRules",
                 status.HTTP_400_BAD_REQUEST,
             )
 
-        newUser = User()
-        newUser.email = userEmail
-        newUser.name = userName
-        newUser.external = data.get("external", None)
-        newUser.active = bool(data.get("active", False))
-        newUser.schema = user_context.schema
+        new_user = User()
+        new_user.email = user_email
+        new_user.name = user_name
+        new_user.external = data.get("external", None)
+        new_user.active = bool(data.get("active", False))
+        new_user.schema = user_context.schema
         pwo = PasswordGenerator()
         pwo.minlen = 6
         pwo.maxlen = 16
         password = pwo.generate()
-        newUser.password = func.crypt(password, func.gen_salt("bf", 8))
-        newUser.config = {"roles": data.get("roles", []), "features": []}
+        new_user.password = func.crypt(password, func.gen_salt("bf", 8))
+        new_user.config = {"roles": data.get("roles", []), "features": []}
+        new_user.reports_config = {"ignore": data.get("ignoreReports", [])}
 
         if Permission.ADMIN_USERS in user_permissions:
-            newUser.config["features"] = data.get("features", [])
+            new_user.config["features"] = data.get("features", [])
 
         if memory_service.has_feature(FeatureEnum.OAUTH.value):
             template = "new_user_oauth.html"
         else:
             template = "new_user.html"
 
-        if not _has_valid_roles(newUser.config["roles"]):
+        if not _has_valid_roles(new_user.config["roles"]):
             raise ValidationError(
                 "Papel inválido",
                 "errors.businessRules",
                 status.HTTP_400_BAD_REQUEST,
             )
 
-        if not _has_valid_features(newUser.config.get("features", [])):
+        if not _has_valid_features(new_user.config.get("features", [])):
             raise ValidationError(
                 "Feature inválida",
                 "errors.businessRules",
                 status.HTTP_400_BAD_REQUEST,
             )
 
-        if len(newUser.config["roles"]) == 0:
+        if len(new_user.config["roles"]) == 0:
             raise ValidationError(
                 "O usuário deve ter ao menos um Papel definido",
                 "errors.businessRules",
                 status.HTTP_400_BAD_REQUEST,
             )
 
-        db.session.add(newUser)
+        db.session.add(new_user)
         db.session.flush()
 
         # authorizations
         _add_authorizations(
             id_segment_list=id_segment_list,
-            user=newUser,
+            user=new_user,
             responsible=user_context,
         )
 
         user_service.create_audit(
             auditType=UserAuditTypeEnum.CREATE,
-            id_user=newUser.id,
+            id_user=new_user.id,
             responsible=user_context,
-            extra={"config": newUser.config, "segments": id_segment_list},
+            extra={"config": new_user.config, "segments": id_segment_list},
         )
 
         emailutils.sendEmail(
             "Boas-vindas NoHarm: Credenciais",
             Config.MAIL_SENDER,
-            [userEmail],
+            [user_email],
             render_template(
                 template,
-                user=userName,
-                email=userEmail,
+                user=user_name,
+                email=user_email,
                 password=password,
                 host=Config.MAIL_HOST,
                 schema=user_context.schema,
             ),
         )
 
-        return _get_user_data(newUser.id)
+        return _get_user_data(new_user.id)
+
+    # update user
+    updated_user = db.session.query(User).filter(User.id == id_user).first()
+    current_features = []
+    new_roles = _remove_legacy_roles(data.get("roles", []))
+    new_features = data.get("features", [])
+
+    if updated_user is None:
+        raise ValidationError(
+            "Usuário inexistente",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    if updated_user.schema != user_context.schema:
+        raise ValidationError(
+            "Usuário não autorizado",
+            "errors.businessRules",
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
+    if updated_user.config:
+        current_features = updated_user.config.get("features", [])
+
+    updated_user.name = data.get("name", None)
+    updated_user.external = data.get("external", None)
+    updated_user.active = bool(data.get("active", True))
+    updated_user.reports_config = {"ignore": data.get("ignoreReports", [])}
+
+    updated_user.config = {"roles": new_roles}
+    if Permission.ADMIN_USERS in user_permissions:
+        updated_user.config["features"] = new_features
     else:
-        updatedUser = db.session.query(User).filter(User.id == idUser).first()
-        current_features = []
-        new_roles = _remove_legacy_roles(data.get("roles", []))
-        new_features = data.get("features", [])
+        updated_user.config["features"] = current_features
 
-        if updatedUser is None:
-            raise ValidationError(
-                "Usuário inexistente",
-                "errors.businessRules",
-                status.HTTP_400_BAD_REQUEST,
-            )
-
-        if updatedUser.schema != user_context.schema:
-            raise ValidationError(
-                "Usuário não autorizado",
-                "errors.businessRules",
-                status.HTTP_401_UNAUTHORIZED,
-            )
-
-        if updatedUser.config != None:
-            current_features = updatedUser.config.get("features", [])
-
-        updatedUser.name = data.get("name", None)
-        updatedUser.external = data.get("external", None)
-        updatedUser.active = bool(data.get("active", True))
-
-        updatedUser.config = {"roles": new_roles}
-        if Permission.ADMIN_USERS in user_permissions:
-            updatedUser.config["features"] = new_features
-        else:
-            updatedUser.config["features"] = current_features
-
-        if not _has_valid_roles(updatedUser.config.get("roles", [])):
-            raise ValidationError(
-                "Papel inválido",
-                "errors.businessRules",
-                status.HTTP_400_BAD_REQUEST,
-            )
-
-        if not _has_valid_features(updatedUser.config.get("features", [])):
-            raise ValidationError(
-                "Feature inválida",
-                "errors.businessRules",
-                status.HTTP_400_BAD_REQUEST,
-            )
-
-        if len(updatedUser.config.get("roles", [])) == 0:
-            raise ValidationError(
-                "O usuário deve ter ao menos um Papel definido",
-                "errors.businessRules",
-                status.HTTP_400_BAD_REQUEST,
-            )
-
-        db.session.add(updatedUser)
-        db.session.flush()
-
-        # authorizations
-        _add_authorizations(
-            id_segment_list=id_segment_list,
-            user=updatedUser,
-            responsible=user_context,
+    if not _has_valid_roles(updated_user.config.get("roles", [])):
+        raise ValidationError(
+            "Papel inválido",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
         )
 
-        user_service.create_audit(
-            auditType=UserAuditTypeEnum.UPDATE,
-            id_user=updatedUser.id,
-            responsible=user_context,
-            extra={"config": updatedUser.config, "segments": id_segment_list},
+    if not _has_valid_features(updated_user.config.get("features", [])):
+        raise ValidationError(
+            "Feature inválida",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
         )
 
-        return _get_user_data(updatedUser.id)
+    if len(updated_user.config.get("roles", [])) == 0:
+        raise ValidationError(
+            "O usuário deve ter ao menos um Papel definido",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    db.session.add(updated_user)
+    db.session.flush()
+
+    # authorizations
+    _add_authorizations(
+        id_segment_list=id_segment_list,
+        user=updated_user,
+        responsible=user_context,
+    )
+
+    user_service.create_audit(
+        auditType=UserAuditTypeEnum.UPDATE,
+        id_user=updated_user.id,
+        responsible=user_context,
+        extra={"config": updated_user.config, "segments": id_segment_list},
+    )
+
+    return _get_user_data(updated_user.id)
 
 
 def _remove_legacy_roles(roles):

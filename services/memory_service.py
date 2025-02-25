@@ -1,5 +1,7 @@
-from flask_jwt_extended import get_jwt_identity
+"""Service: memory related operations"""
+
 from datetime import datetime
+from flask_jwt_extended import get_jwt_identity
 
 from models.main import db, User
 from models.appendix import Memory
@@ -191,11 +193,28 @@ def is_private(key):
 
 
 @has_permission(Permission.READ_REPORTS)
-def get_reports():
+def get_reports(user_context: User):
+    """Get reports configuration. Consider ignored reports from user configuration."""
+    user = db.session.query(User).filter(User.id == user_context.id).first()
+    ignored_reports = (
+        user.reports_config.get("ignore", []) if user.reports_config else []
+    )
+
     external = get_memory(MemoryEnum.REPORTS.value)
     internal = get_memory(MemoryEnum.REPORTS_INTERNAL.value)
 
+    internal_reports = filter(
+        lambda i: i not in ignored_reports, (internal.value if internal else [])
+    )
+    external_reports = filter(
+        lambda i: i.get("title") not in ignored_reports,
+        (external.value if external else []),
+    )
+
+    if "CUSTOM" in ignored_reports:
+        external_reports = []
+
     return {
-        "external": external.value if external else [],
-        "internal": internal.value if internal else [],
+        "external": list(external_reports),
+        "internal": list(internal_reports),
     }

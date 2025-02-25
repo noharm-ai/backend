@@ -39,6 +39,7 @@ class User(db.Model):
     password = db.Column("senha", db.String(128), nullable=False)
     schema = db.Column("schema", db.String, nullable=False)
     config = db.Column("config", postgresql.JSON, nullable=False)
+    reports_config = db.Column("relatorios", postgresql.JSON, nullable=True)
     external = db.Column("fkusuario", db.String, nullable=False)
     active = db.Column("ativo", db.Boolean, nullable=True)
 
