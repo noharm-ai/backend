@@ -1,5 +1,7 @@
-from sqlalchemy import and_, func, or_
+"""Service: Intervention outcome related operations"""
+
 from datetime import timedelta, datetime
+from sqlalchemy import and_, func, or_
 
 from models.main import db, User, Drug, DrugAttributes
 from models.prescription import (
@@ -291,18 +293,15 @@ def get_outcome_data(id_intervention, user_context: User, edit=False):
             admission_number=intervention.admissionNumber, limit=2
         )
 
-        destiny_query = (
-            intervention_outcome_repository.get_outcome_data_query()
-            .filter(
-                Prescription.admissionNumber.in_(
-                    [intervention.admissionNumber] + next_admissions
-                )
+        # admission filter
+        destiny_query = intervention_outcome_repository.get_outcome_data_query().filter(
+            Prescription.admissionNumber.in_(
+                [intervention.admissionNumber] + next_admissions
             )
-            .filter(Prescription.date >= origin[0]["item"]["prescriptionDate"])
-            .filter(Prescription.id != origin[0]["item"]["idPrescription"])
         )
 
         if destiny_drug != None and destiny_drug.sctid != None:
+            # substance filter
             destiny_query = destiny_query.filter(
                 or_(
                     PrescriptionDrug.idDrug == destiny_id_drug,
@@ -310,14 +309,37 @@ def get_outcome_data(id_intervention, user_context: User, edit=False):
                 )
             )
         else:
+            # idDrug filter
             destiny_query = destiny_query.filter(
                 PrescriptionDrug.idDrug == destiny_id_drug
             )
 
-        destiny_query = destiny_query.order_by(Prescription.date).limit(10)
+        # filter only next prescriptions
+        destiny_list = (
+            destiny_query.filter(
+                Prescription.date >= origin[0]["item"]["prescriptionDate"]
+            )
+            .filter(Prescription.id != origin[0]["item"]["idPrescription"])
+            .order_by(Prescription.date)
+            .limit(10)
+            .all()
+        )
+
+        if not destiny_list and feature_service.is_cpoe():
+            # if no destiny is found, try to get the next 10 prescriptions based on id order
+            # useful for cpoe only
+            # (substitute drug gets a new prescription before the current one ends)
+            destiny_list = (
+                destiny_query.filter(
+                    Prescription.id > origin[0]["item"]["idPrescription"]
+                )
+                .order_by(Prescription.date)
+                .limit(10)
+                .all()
+            )
 
         base_destiny = _outcome_calc(
-            list=destiny_query.all(),
+            list=destiny_list,
             user=user_context,
             date_base_economy=None,
             destination=True,
