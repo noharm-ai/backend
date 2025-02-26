@@ -85,6 +85,7 @@ class Role(Enum):
         Permission.READ_DISPENSATION,
         Permission.ADMIN_UNIT,
         Permission.WRITE_TAGS,
+        Permission.READ_REGULATION,
     ]
 
     SERVICE_INTEGRATOR = "SERVICE_INTEGRATOR", [
