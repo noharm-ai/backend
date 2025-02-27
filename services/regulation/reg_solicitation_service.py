@@ -6,6 +6,9 @@ from models.main import db, User
 from models.regulation import RegSolicitation, RegSolicitationType, RegMovement
 from models.prescription import Patient
 from models.requests.regulation_movement_request import RegulationMovementRequest
+from models.requests.regulation_solicitation_request import (
+    RegulationSolicitationRequest,
+)
 from models.enums import RegulationAction
 from utils import dateutils, status
 from exception.validation_error import ValidationError
@@ -195,3 +198,40 @@ def move(request_data: RegulationMovementRequest, user_context: User):
         )
 
     return results
+
+
+@has_permission(Permission.WRITE_REGULATION)
+def create(request_data: RegulationSolicitationRequest, user_context: User):
+    """Creates new solicitations"""
+    # add patient
+    patient = Patient()
+    patient.idHospital = 1
+    patient.idPatient = request_data.idPatient
+    patient.birthdate = request_data.birthdate
+    patient.admissionNumber = reg_solicitation_repository.get_next_admission_number()
+    patient.admissionDate = datetime.today()
+    patient.update = datetime.today()
+    patient.user = user_context.id
+    db.session.add(patient)
+    db.session.flush()
+
+    # add reg solicitation
+    solicitation = RegSolicitation()
+    solicitation.id = reg_solicitation_repository.get_next_solicitation_id()
+    solicitation.admission_number = patient.admissionNumber
+    solicitation.id_patient = request_data.idPatient
+    solicitation.date = request_data.solicitationDate
+    solicitation.id_reg_solicitation_type = request_data.idRegSolicitationType
+    solicitation.id_department = request_data.idDepartment
+    solicitation.risk = request_data.risk
+    solicitation.cid = request_data.cid
+    solicitation.attendant = request_data.attendant
+    solicitation.attendant_record = request_data.attendantRecord
+    solicitation.justification = request_data.justification
+    solicitation.stage = 0
+    solicitation.created_at = datetime.today()
+    solicitation.created_by = user_context.id
+    db.session.add(solicitation)
+    db.session.flush()
+
+    return {"id": str(solicitation.id)}
