@@ -34,7 +34,7 @@ def get_prioritization(request_data: RegulationPrioritizationRequest):
                 "birthdate": dateutils.to_iso(patient.birthdate) if patient else None,
                 "age": (
                     dateutils.data2age(patient.birthdate.isoformat())
-                    if patient
+                    if patient and patient.birthdate
                     else None
                 ),
             }

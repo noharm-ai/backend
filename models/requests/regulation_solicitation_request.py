@@ -9,12 +9,12 @@ class RegulationSolicitationRequest(BaseModel):
     """Request model for regulation solicitation (create request)"""
 
     idPatient: int
-    birthdate: Optional[date]
+    birthdate: Optional[date] = None
     idDepartment: int
     solicitationDate: datetime
     idRegSolicitationType: int
     risk: int
-    cid: Optional[str]
-    attendant: Optional[str]
-    attendantRecord: Optional[str]
+    cid: Optional[str] = None
+    attendant: Optional[str] = None
+    attendantRecord: Optional[str] = None
     justification: Optional[str]
