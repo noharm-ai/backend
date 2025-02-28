@@ -81,12 +81,13 @@ def get_next_id(schema):
 
 @has_permission(Permission.WRITE_PRESCRIPTION)
 def remove_annotation(id_clinical_notes: int, annotation_type: str, user_context: User):
+    """Removes allergies or dialysis annotations"""
     clinical_notes = (
         db.session.query(ClinicalNotes)
         .filter(ClinicalNotes.id == id_clinical_notes)
         .first()
     )
-    if clinical_notes == None:
+    if not clinical_notes:
         raise ValidationError(
             "Registro inválido", "errors.businessRules", status.HTTP_400_BAD_REQUEST
         )
@@ -94,8 +95,11 @@ def remove_annotation(id_clinical_notes: int, annotation_type: str, user_context
     old_note = None
     if annotation_type == "allergy":
         old_note = clinical_notes.allergyText
-        clinical_notes.allergy = 0
-        clinical_notes.allergyText = None
+        update = {"allergy": 0, "allergyText": None}
+        db.session.query(ClinicalNotes).filter(
+            ClinicalNotes.admissionNumber == clinical_notes.admissionNumber,
+            ClinicalNotes.allergyText == old_note,
+        ).update(update, synchronize_session="fetch")
         db.session.flush()
 
         refresh_allergies_cache(
@@ -103,8 +107,11 @@ def remove_annotation(id_clinical_notes: int, annotation_type: str, user_context
         )
     elif annotation_type == "dialysis":
         old_note = clinical_notes.dialysisText
-        clinical_notes.dialysis = 0
-        clinical_notes.dialysisText = None
+        update = {"dialysis": 0, "dialysisText": None}
+        db.session.query(ClinicalNotes).filter(
+            ClinicalNotes.admissionNumber == clinical_notes.admissionNumber,
+            ClinicalNotes.dialysisText == old_note,
+        ).update(update, synchronize_session="fetch")
         db.session.flush()
 
         refresh_dialysis_cache(
