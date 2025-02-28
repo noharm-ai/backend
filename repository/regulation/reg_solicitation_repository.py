@@ -141,3 +141,17 @@ def get_types():
     )
 
     return query.all()
+
+
+def get_next_solicitation_id():
+    """creates a new solicitation id (manual record)"""
+    mask = 9000000000
+    count = db.session.query(RegSolicitation).filter(RegSolicitation.id >= mask).count()
+    return mask + count + 1
+
+
+def get_next_admission_number():
+    """creates a new admission number (manual record)"""
+    mask = 90000000
+    count = db.session.query(Patient).filter(Patient.admissionNumber >= mask).count()
+    return mask + count + 1
