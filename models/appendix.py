@@ -183,6 +183,8 @@ class NifiQueue(db.Model):
 
 
 class Tag(db.Model):
+    """SQLALCHEMY model for marcador table"""
+
     __tablename__ = "marcador"
 
     name = db.Column("nome", db.String, primary_key=True)
@@ -190,5 +192,21 @@ class Tag(db.Model):
     active = db.Column("ativo", db.Boolean, nullable=False)
     updated_at = db.Column("updated_at", db.DateTime, nullable=False)
     updated_by = db.Column("updated_by", db.BigInteger, nullable=False)
+    created_at = db.Column("created_at", db.DateTime, nullable=False)
+    created_by = db.Column("created_by", db.BigInteger, nullable=False)
+
+
+class Protocol(db.Model):
+    """SQLALCHEMY model for protocolo table"""
+
+    __tablename__ = "protocolo"
+
+    id = db.Column("idprotocolo", db.Integer, primary_key=True)
+    name = db.Column("nome", db.String, nullable=False)
+    protocol_type = db.Column("tp_protocolo", db.Integer, nullable=False)
+    active = db.Column("ativo", db.Boolean, nullable=False)
+    config = db.Column("configuracao", postgresql.JSON, nullable=False)
+    updated_at = db.Column("updated_at", db.DateTime, nullable=True)
+    updated_by = db.Column("updated_by", db.BigInteger, nullable=True)
     created_at = db.Column("created_at", db.DateTime, nullable=False)
     created_by = db.Column("created_by", db.BigInteger, nullable=False)

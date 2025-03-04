@@ -14,18 +14,25 @@ class AlertProtocol:
 
     drugs = None
     filtered_drugs = None
-    substance_list = []
-    class_list = []
-    id_drug_list = []
-    route_list = []
+    substance_list = None
+    class_list = None
+    id_drug_list = None
+    route_list = None
     exams = None
-    protocol_variables = {}
-    protocol_msgs = []
+    protocol_variables = None
+    protocol_msgs = None
 
     def __init__(self, drugs: dict, exams: dict):
         self.drugs = drugs
         self.filtered_drugs = self._filter_drug_list()
         self.exams = exams
+
+        self.substance_list = []
+        self.class_list = []
+        self.id_drug_list = []
+        self.route_list = []
+        self.protocol_variables = {}
+        self.protocol_msgs = []
 
         # fill lists
         for d in self.filtered_drugs:
@@ -36,7 +43,7 @@ class AlertProtocol:
                 self.id_drug_list.append(prescription_drug.idDrug)
 
             if prescription_drug.route:
-                self.route_list.append(prescription_drug.route)
+                self.route_list.append(prescription_drug.route.upper())
 
             if substance:
                 self.substance_list.append(substance.id)
@@ -46,6 +53,9 @@ class AlertProtocol:
 
     def get_protocol_alerts(self, protocol: dict):
         """get configured protocol alerts"""
+
+        self.protocol_variables = {}
+        self.protocol_msgs = []
 
         for v in protocol.get("variables", []):
             self.protocol_variables[v.get("name")] = self._fill_variable(variable=v)
