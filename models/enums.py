@@ -221,4 +221,12 @@ class SubstanceTagEnum(Enum):
 
 
 class TagTypeEnum(Enum):
+    """Enum: tag types"""
+
     PATIENT = 1
+
+
+class ProtocolTypeEnum(Enum):
+    """Enum: protocol types"""
+
+    PRESCRIPTION = 1

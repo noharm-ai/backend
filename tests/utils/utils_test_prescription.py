@@ -7,7 +7,7 @@ from models.prescription import (
     PrescriptionDrug,
     PrescriptionAudit,
 )
-from models.main import Drug, DrugAttributes
+from models.main import Drug, DrugAttributes, Substance
 from models.appendix import Frequency
 
 
@@ -54,16 +54,22 @@ def get_prescription_drug_mock_row(
     group: str = None,
     solutionGroup: bool = False,
     idPrescription: str = None,
+    drug_class: str = None,
+    sctid: str = None,
+    route: str = None,
 ):
     MockRow = namedtuple(
         "Mockrow",
         "prescription_drug drug measure_unit frequency not_used score drug_attributes notes prevnotes status expire substance period_cpoe prescription_date measure_unit_convert_factor substance_handling_types",
     )
 
+    sctid = (
+        sctid if sctid else f"{id_prescription_drug}11111"
+    )  # Generate a unique sctid
     d = Drug()
     d.id = id_prescription_drug
     d.name = drug_name
-    d.sctid = f"{id_prescription_drug}11111"  # Generate a unique sctid
+    d.sctid = sctid
 
     pd = PrescriptionDrug()
     pd.id = id_prescription_drug
@@ -78,6 +84,7 @@ def get_prescription_drug_mock_row(
     pd.group = group
     pd.solutionGroup = solutionGroup
     pd.idPrescription = idPrescription
+    pd.route = route
 
     da = DrugAttributes()
     da.idDrug = id_prescription_drug
@@ -93,6 +100,10 @@ def get_prescription_drug_mock_row(
     da.fasting = True
     da.useWeight = use_weight
 
+    substance = Substance()
+    substance.id = sctid
+    substance.idclass = drug_class
+
     return MockRow(
         pd,
         d,
@@ -105,7 +116,7 @@ def get_prescription_drug_mock_row(
         None,
         None,
         expire_date or datetime.now() + timedelta(days=1),
-        None,
+        substance,
         0,
         datetime.now(),
         1,

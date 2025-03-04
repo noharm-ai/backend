@@ -30,6 +30,7 @@ from services import (
     intervention_service,
     clinical_notes_service,
     alert_interaction_service,
+    alert_protocol_service,
     alert_service,
     feature_service,
     exams_service,
@@ -91,6 +92,7 @@ def _internal_get_prescription(
     )
 
     alerts_data = _get_alerts(
+        prescription=prescription,
         drug_list=drug_list,
         patient=patient,
         config_data=config_data,
@@ -125,6 +127,7 @@ def _internal_get_prescription(
         last_dept=last_dept,
         cn_data=cn_data,
         review_data=review_data,
+        alerts_data=alerts_data,
     )
 
 
@@ -512,7 +515,12 @@ def _get_drug_list(
 
 @timed()
 def _get_alerts(
-    drug_list, patient: Patient, config_data: dict, exam_data: dict, cn_data: dict
+    prescription: Prescription,
+    drug_list,
+    patient: Patient,
+    config_data: dict,
+    exam_data: dict,
+    cn_data: dict,
 ):
     relations = alert_interaction_service.find_relations(
         drug_list=drug_list,
@@ -530,7 +538,13 @@ def _get_alerts(
         cn_data=cn_data,
     )
 
-    return {"relations": relations, "alerts": alerts}
+    # TODO: activate
+    # protocols = alert_protocol_service.find_protocols(
+    #     drug_list=drug_list, exams=exam_data["exams"], prescription=prescription
+    # )
+    protocols = []
+
+    return {"relations": relations, "alerts": alerts, "protocols": protocols}
 
 
 @timed()
@@ -665,6 +679,7 @@ def _format(
     last_dept,
     cn_data: dict,
     review_data: dict,
+    alerts_data: dict,
 ):
     return {
         # prescription
@@ -767,4 +782,5 @@ def _format(
             prescription.features
         ),
         "review": review_data,
+        "protocolAlerts": alerts_data.get("protocols", None),
     }
