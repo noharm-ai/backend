@@ -125,6 +125,7 @@ def search(search_key):
 
 @has_permission(Permission.WRITE_PRESCRIPTION)
 def start_evaluation(id_prescription, user_context: User):
+    """Save or gets the user currently analysing the prescription"""
     p = (
         db.session.query(Prescription)
         .filter(Prescription.id == id_prescription)
@@ -137,28 +138,24 @@ def start_evaluation(id_prescription, user_context: User):
             status.HTTP_400_BAD_REQUEST,
         )
 
-    if p.features == None:
-        raise ValidationError(
-            "Esta prescrição ainda não possui indicadores.",
-            "errors.invalidRegister",
-            status.HTTP_400_BAD_REQUEST,
-        )
+    if not p.features:
+        return None
 
     if is_being_evaluated(p.features):
         return p.features["evaluation"] if "evaluation" in p.features else None
-    else:
-        current_user = db.session.query(User).filter(User.id == user_context.id).first()
-        evaluation_object = {
-            "userId": user_context.id,
-            "userName": current_user.name,
-            "startDate": datetime.today().isoformat(),
-        }
 
-        p.features = dict(p.features, **{"evaluation": evaluation_object})
+    current_user = db.session.query(User).filter(User.id == user_context.id).first()
+    evaluation_object = {
+        "userId": user_context.id,
+        "userName": current_user.name,
+        "startDate": datetime.today().isoformat(),
+    }
 
-        db.session.flush()
+    p.features = dict(p.features, **{"evaluation": evaluation_object})
 
-        return evaluation_object
+    db.session.flush()
+
+    return evaluation_object
 
 
 def is_being_evaluated(features):
