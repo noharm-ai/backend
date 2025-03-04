@@ -154,4 +154,4 @@ class AlertProtocol:
     def _is_safe_logical_expression(self, expr: str) -> bool:
         """Validates if the expression contains only safe logical operators and values"""
 
-        return bool(re.fullmatch(SAFE_LOGICAL_EXPR_REGEX, expr))
+        return len(expr) < 500 and bool(re.fullmatch(SAFE_LOGICAL_EXPR_REGEX, expr))
