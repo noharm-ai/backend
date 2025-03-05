@@ -75,7 +75,7 @@ class AlertProtocol:
 
         if eval(trigger, safe_globals, safe_locals):  # pylint: disable=eval-used
             result = protocol.get("result", {})
-            result["protocolMessages"] = self.protocol_msgs
+            result["variableMessages"] = self.protocol_msgs
             return result
 
         return None
@@ -100,6 +100,9 @@ class AlertProtocol:
         if field == "exam":
             exam_type = variable.get("examType")
             if exam_type not in self.exams:
+                return False
+
+            if not self.exams[exam_type]["value"]:
                 return False
 
             return self._compare(

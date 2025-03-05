@@ -26,6 +26,7 @@ def find_protocols(drug_list: dict, exams: dict, prescription: Prescription):
         return []
 
     results = {}
+    summary = set()
 
     drugs_by_expire_date = _split_drugs_by_date(
         drug_list=drug_list, prescription=prescription
@@ -41,6 +42,9 @@ def find_protocols(drug_list: dict, exams: dict, prescription: Prescription):
             if alert:
                 alert["id"] = protocol.id
                 results[expire_date].append(alert)
+                summary.add(protocol.id)
+
+    results["summary"] = list(summary)
 
     return results
 

@@ -535,8 +535,8 @@ def test_folfox():
     result = alert_protocol.get_protocol_alerts(protocol=protocol)
 
     assert result is not None
-    assert len(result.get("protocolMessages")) == 1
+    assert len(result.get("variableMessages")) == 1
     assert (
-        result.get("protocolMessages")[0]
+        result.get("variableMessages")[0]
         == "Prescrição deve conter um medicamento ANTIEMETICO"
     )

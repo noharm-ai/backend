@@ -538,11 +538,9 @@ def _get_alerts(
         cn_data=cn_data,
     )
 
-    # TODO: activate
-    # protocols = alert_protocol_service.find_protocols(
-    #     drug_list=drug_list, exams=exam_data["exams"], prescription=prescription
-    # )
-    protocols = []
+    protocols = alert_protocol_service.find_protocols(
+        drug_list=drug_list, exams=exam_data["exams"], prescription=prescription
+    )
 
     return {"relations": relations, "alerts": alerts, "protocols": protocols}
 
