@@ -780,5 +780,5 @@ def _format(
             prescription.features
         ),
         "review": review_data,
-        "protocolAlerts": alerts_data.get("protocols", None),
+        "protocolAlerts": alerts_data.get("protocols", {}),
     }
