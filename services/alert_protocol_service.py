@@ -23,7 +23,7 @@ def find_protocols(drug_list: dict, exams: dict, prescription: Prescription):
     )
 
     if not protocols:
-        return []
+        return {}
 
     results = {}
     summary = set()
