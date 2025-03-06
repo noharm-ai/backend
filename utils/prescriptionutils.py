@@ -220,6 +220,7 @@ def getFeatures(result, agg_date: datetime = None, intervals_for_agg_date=False)
         "intervals": intervals,
         "departmentList": list(department_list),
         "globalScore": global_score,
+        "alertProtocols": result.get("protocolAlerts", {}).get("summary", []),
     }
 
 
