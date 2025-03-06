@@ -98,6 +98,7 @@ def _internal_get_prescription(
         config_data=config_data,
         exam_data=exam_data,
         cn_data=cn_data,
+        user_context=user_context,
     )
 
     drug_data = _get_drug_data(
@@ -521,6 +522,7 @@ def _get_alerts(
     config_data: dict,
     exam_data: dict,
     cn_data: dict,
+    user_context: User,
 ):
     relations = alert_interaction_service.find_relations(
         drug_list=drug_list,
@@ -539,7 +541,10 @@ def _get_alerts(
     )
 
     protocols = alert_protocol_service.find_protocols(
-        drug_list=drug_list, exams=exam_data["exams"], prescription=prescription
+        drug_list=drug_list,
+        exams=exam_data["exams"],
+        prescription=prescription,
+        user_context=user_context,
     )
 
     return {"relations": relations, "alerts": alerts, "protocols": protocols}
