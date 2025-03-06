@@ -1,3 +1,5 @@
+"""Route: tag related endpoints"""
+
 from flask import Blueprint, request
 
 from services import tag_service
@@ -10,4 +12,5 @@ app_tag = Blueprint("app_tag", __name__)
 @app_tag.route("/tag/list", methods=["GET"])
 @api_endpoint()
 def list_tags():
+    """List tags and filter"""
     return tag_service.list_tags(request_data=TagListRequest(**request.args))

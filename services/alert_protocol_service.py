@@ -35,7 +35,9 @@ def find_protocols(drug_list: dict, exams: dict, prescription: Prescription):
     # protocols must be applied inside each date group
     for expire_date, drugs in drugs_by_expire_date.items():
         results[expire_date] = []
-        alert_protocol = AlertProtocol(drugs=drugs, exams=exams)
+        alert_protocol = AlertProtocol(
+            drugs=drugs, exams=exams, prescription=prescription
+        )
 
         for protocol in protocols:
             alert = alert_protocol.get_protocol_alerts(protocol=protocol.config)
