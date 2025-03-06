@@ -4,7 +4,7 @@ import re
 
 from models.enums import DrugTypeEnum
 from models.main import Substance
-from models.prescription import PrescriptionDrug
+from models.prescription import PrescriptionDrug, Prescription
 
 SAFE_LOGICAL_EXPR_REGEX = r"^\s*(?:True|False|\(|\)|and|or|not|\s+)+\s*$"
 
@@ -12,6 +12,7 @@ SAFE_LOGICAL_EXPR_REGEX = r"^\s*(?:True|False|\(|\)|and|or|not|\s+)+\s*$"
 class AlertProtocol:
     """AlertProtocol class: test protocol rules against prescription data"""
 
+    prescription = None
     drugs = None
     filtered_drugs = None
     substance_list = None
@@ -22,7 +23,8 @@ class AlertProtocol:
     protocol_variables = None
     protocol_msgs = None
 
-    def __init__(self, drugs: dict, exams: dict):
+    def __init__(self, drugs: dict, exams: dict, prescription: Prescription):
+        self.prescription = prescription
         self.drugs = drugs
         self.filtered_drugs = self._filter_drug_list()
         self.exams = exams
@@ -122,6 +124,24 @@ class AlertProtocol:
                 return False
 
             return self._compare(op=operator, value1=weight, value2=value)
+
+        if field == "idDepartment":
+            department = (
+                [self.prescription.idDepartment]
+                if operator in ["IN", "NOT IN"]
+                else self.prescription.idDepartment
+            )
+
+            return self._compare(op=operator, value1=department, value2=value)
+
+        if field == "idSegment":
+            segment = (
+                [self.prescription.idSegment]
+                if operator in ["IN", "NOT IN"]
+                else self.prescription.idSegment
+            )
+
+            return self._compare(op=operator, value1=segment, value2=value)
 
         raise NotImplementedError("field not supported")
 
