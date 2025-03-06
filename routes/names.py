@@ -1,9 +1,12 @@
-import requests
+"""Route: names proxy"""
+
+from datetime import datetime, timedelta, timezone
 import logging
+import requests
 from flask import Blueprint, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from jwt import encode
-from datetime import datetime, timedelta, timezone
+
 
 from models.main import User, dbSession, db
 from models.appendix import SchemaConfig
@@ -229,6 +232,7 @@ def auth_token():
 @app_names.route("/names/search/<string:term>", methods=["GET"])
 @jwt_required()
 def search_name(term):
+    """inverted name search"""
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
 
@@ -246,9 +250,7 @@ def search_name(term):
 
     try:
         response = requests.get(
-            url,
-            headers={"Authorization": f"Bearer {token}"},
-            params=params,
+            url, headers={"Authorization": f"Bearer {token}"}, params=params, timeout=20
         )
 
         if response.status_code == status.HTTP_200_OK:
@@ -269,13 +271,15 @@ def search_name(term):
                 "data": sorted(results, key=lambda d: d["name"]),
             }, status.HTTP_200_OK
 
-        logging.basicConfig()
-        logger = logging.getLogger("noharm.backend")
-        logger.error(f"Service names ERROR: {response.status_code}")
-        logger.error(url)
-        logger.error(params)
-        logger.error(response.json())
-    except Exception as e:
+        if response.status_code != status.HTTP_404_NOT_FOUND:
+            logging.basicConfig()
+            logger = logging.getLogger("noharm.backend")
+            logger.error("Service names ERROR: %s", response.status_code)
+            logger.error(url)
+            logger.error(params)
+            logger.error(response.json())
+
+    except requests.exceptions.RequestException as e:
         logging.basicConfig()
         logger = logging.getLogger("noharm.backend")
         logger.error("Service names ERROR (exception)")
@@ -283,7 +287,7 @@ def search_name(term):
         logger.error(params)
         logger.exception(e)
 
-    return {"status": "error", "data": []}, status.HTTP_400_BAD_REQUEST
+    return {"status": "error", "data": []}, status.HTTP_200_OK
 
 
 def _get_token(config):
