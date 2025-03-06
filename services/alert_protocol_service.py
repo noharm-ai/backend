@@ -13,7 +13,7 @@ from repository import protocol_repository
 
 @has_permission(Permission.READ_PRESCRIPTION)
 def find_protocols(
-    drug_list: dict, exams: dict, prescription: Prescription, user_context: User
+    drug_list: dict, exams: dict, prescription: Prescription, user_context: User = None
 ):
     """Gets all protocols and test against a prescription"""
 
