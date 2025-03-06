@@ -2,24 +2,23 @@
 
 from datetime import datetime
 
-from models.main import db
+from models.main import User
 from models.prescription import Prescription
-from models.appendix import Protocol
 from models.enums import ProtocolTypeEnum
 from services import feature_service
 from utils.alert_protocol import AlertProtocol
+from decorators.has_permission_decorator import has_permission, Permission
+from repository import protocol_repository
 
 
-def find_protocols(drug_list: dict, exams: dict, prescription: Prescription):
+@has_permission(Permission.READ_PRESCRIPTION)
+def find_protocols(
+    drug_list: dict, exams: dict, prescription: Prescription, user_context: User
+):
     """Gets all protocols and test against a prescription"""
 
-    protocols = (
-        db.session.query(Protocol)
-        .filter(
-            Protocol.protocol_type == ProtocolTypeEnum.PRESCRIPTION.value,
-            Protocol.active == True,
-        )
-        .all()
+    protocols = protocol_repository.get_active_protocols(
+        schema=user_context.schema, protocol_type=ProtocolTypeEnum.PRESCRIPTION
     )
 
     if not protocols:

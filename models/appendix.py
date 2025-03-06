@@ -200,8 +200,10 @@ class Protocol(db.Model):
     """SQLALCHEMY model for protocolo table"""
 
     __tablename__ = "protocolo"
+    __table_args__ = {"schema": "public"}
 
     id = db.Column("idprotocolo", db.Integer, primary_key=True)
+    schema = db.Column("schema_name", db.String, nullable=True)
     name = db.Column("nome", db.String, nullable=False)
     protocol_type = db.Column("tp_protocolo", db.Integer, nullable=False)
     active = db.Column("ativo", db.Boolean, nullable=False)
