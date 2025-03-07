@@ -87,14 +87,16 @@ def get_outcome_data_query():
             DrugAttributes,
             and_(
                 PrescriptionDrug.idDrug == DrugAttributes.idDrug,
-                PrescriptionDrug.idSegment == DrugAttributes.idSegment,
+                func.coalesce(PrescriptionDrug.idSegment, 1)
+                == DrugAttributes.idSegment,
             ),
         )
         .outerjoin(
             PrescriptionDrugConvert,
             and_(
                 PrescriptionDrugConvert.idDrug == PrescriptionDrug.idDrug,
-                PrescriptionDrugConvert.idSegment == PrescriptionDrug.idSegment,
+                PrescriptionDrugConvert.idSegment
+                == func.coalesce(PrescriptionDrug.idSegment, 1),
                 PrescriptionDrugConvert.idMeasureUnit == PrescriptionDrug.idMeasureUnit,
             ),
         )
@@ -102,7 +104,8 @@ def get_outcome_data_query():
             PrescriptionDrugPriceConvert,
             and_(
                 PrescriptionDrugPriceConvert.idDrug == PrescriptionDrug.idDrug,
-                PrescriptionDrugPriceConvert.idSegment == PrescriptionDrug.idSegment,
+                PrescriptionDrugPriceConvert.idSegment
+                == func.coalesce(PrescriptionDrug.idSegment, 1),
                 PrescriptionDrugPriceConvert.idMeasureUnit
                 == DrugAttributes.idMeasureUnitPrice,
             ),
