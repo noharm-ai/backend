@@ -14,7 +14,7 @@ from repository import exams_repository
 from services import memory_service, cache_service
 from decorators.has_permission_decorator import has_permission, Permission
 from exception.validation_error import ValidationError
-from utils import status, examutils, stringutils, dateutils
+from utils import status, examutils, stringutils, dateutils, numberutils
 
 
 def create_exam(
@@ -171,12 +171,17 @@ def get_exams_by_admission(admission_number: int, id_segment: int):
                                 patient.height,
                             )
 
+                        # set custom exams config
+                        itemCalc = _fill_custom_exams(
+                            exam_type=keyCalc, custom_exam=itemCalc, seg_exam=segExam
+                        )
+
                         if itemCalc["value"]:
                             itemCalc["name"] = segExam[keyCalc].name
                             itemCalc["perc"] = None
                             itemCalc["date"] = item["date"]
                             itemCalc["history"] = _history_calc(
-                                keyCalc, item["history"], patient
+                                keyCalc, item["history"], patient, segExam
                             )
                             bufferList[keyCalc] = itemCalc
 
@@ -233,8 +238,17 @@ def _history_exam(typeExam, examsList, segExam):
     return results
 
 
-def _history_calc(typeExam, examsList, patient):
+def _history_calc(typeExam, examsList, patient, segExam):
+    custom_exams = [
+        "mdrd",
+        "ckd",
+        "ckd21",
+        "cg",
+        "swrtz2",
+        "swrtz1",
+    ]
     results = []
+
     for e in examsList:
         item = {}
         if typeExam == "mdrd":
@@ -264,6 +278,11 @@ def _history_calc(typeExam, examsList, patient):
                 patient.birthdate,
                 patient.gender,
                 patient.height,
+            )
+
+        if typeExam in custom_exams:
+            item = _fill_custom_exams(
+                exam_type=typeExam, custom_exam=item, seg_exam=segExam
             )
 
         item["date"] = e["date"]
@@ -473,16 +492,17 @@ def find_latest_exams(
         else:
             exams[e.lower()] = examEmpty
 
+    custom_exams = [
+        "mdrd",
+        "ckd",
+        "ckd21",
+        "cg",
+        "swrtz2",
+        "swrtz1",
+    ]
     examsExtra = {}
     for exam_type, exam_object in current_exams.items():
-        if exam_type not in [
-            "mdrd",
-            "ckd",
-            "ckd21",
-            "cg",
-            "swrtz2",
-            "swrtz1",
-        ]:
+        if exam_type not in custom_exams:
             exams[exam_type] = examutils.formatExam(
                 value=exam_object.get("value", None),
                 typeExam=exam_type,
@@ -566,7 +586,37 @@ def find_latest_exams(
                     patient.height,
                 )
 
+    # set custom exams config
+    for ce in custom_exams:
+        if ce in exams:
+            exams[ce] = _fill_custom_exams(
+                exam_type=ce, custom_exam=exams[ce], seg_exam=segExam
+            )
+
     return dict(exams, **examsExtra)
+
+
+def _fill_custom_exams(exam_type: str, custom_exam: dict, seg_exam: dict):
+    if exam_type in seg_exam:
+        ref = seg_exam[exam_type]
+        if custom_exam["value"]:
+            alert = not (
+                custom_exam["value"] >= numberutils.none2zero(ref.min)
+                and custom_exam["value"] <= numberutils.none2zero(ref.max)
+            )
+        else:
+            alert = False
+
+        return custom_exam | {
+            "ref": ref.ref,
+            "initials": ref.initials,
+            "min": ref.min,
+            "max": ref.max,
+            "name": ref.name,
+            "alert": alert,
+        }
+
+    return custom_exam
 
 
 @has_permission(Permission.WRITE_PRESCRIPTION, Permission.MAINTAINER)

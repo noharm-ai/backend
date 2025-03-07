@@ -23,6 +23,8 @@ from decorators.has_permission_decorator import has_permission, Permission
 from exception.validation_error import ValidationError
 from utils import status, prescriptionutils, numberutils
 
+DEFAULT_SEGMENT = 1
+
 
 @has_permission(Permission.WRITE_PRESCRIPTION)
 def set_intervention_outcome(
@@ -393,7 +395,8 @@ def _get_outcome_dict(
             "idSegment": (
                 outcome_data.PrescriptionDrug.idSegment
                 if outcome_data.PrescriptionDrug
-                else None
+                and outcome_data.PrescriptionDrug.idSegment
+                else DEFAULT_SEGMENT
             ),
             "economyDayValueManual": intervention.economy_day_value_manual,
             "economyDayAmount": intervention.economy_days,
@@ -438,7 +441,14 @@ def _get_outcome_dict(
         )
 
         data["header"]["economyDayValue"] = economy_day_value
-        data["header"]["idSegment"] = prescription_drug.idSegment
+
+        if prescription_drug.idSegment:
+            data["header"]["idSegment"] = prescription_drug.idSegment
+            data["header"]["invalidSegment"] = False
+        else:
+            data["header"]["idSegment"] = DEFAULT_SEGMENT
+            data["header"]["invalidSegment"] = True
+
         data["original"] = original
         data["origin"] = origin[0]
         data["destiny"] = destiny
@@ -621,6 +631,7 @@ def _outcome_calc(list, user: User, date_base_economy, destination=False):
         base_date = (
             date_base_economy if date_base_economy != None else prescription.date
         )
+
         if prescription.idSegment:
             id_prescription_aggregate = prescriptionutils.gen_agg_id(
                 admission_number=prescription.admissionNumber,
@@ -632,7 +643,7 @@ def _outcome_calc(list, user: User, date_base_economy, destination=False):
                 db.session.query(Prescription)
                 .filter(Prescription.admissionNumber == prescription.admissionNumber)
                 .filter(Prescription.agg != None)
-                .filter(func.date(Prescription.date) == func.date(base_date))
+                .filter(func.date(Prescription.date) >= func.date(prescription.date))
                 .first()
             )
 
