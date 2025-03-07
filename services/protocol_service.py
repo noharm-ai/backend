@@ -17,7 +17,7 @@ def list_protocols(request_data: ProtocolListRequest):
                 "id": item.id,
                 "name": item.name,
                 "protocolType": item.protocol_type,
-                "active": item.active,
+                "status": item.status_type,
             }
         )
 

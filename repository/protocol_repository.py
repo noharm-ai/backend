@@ -5,7 +5,8 @@ from sqlalchemy import or_
 from models.main import db
 from models.appendix import Protocol
 from models.requests.protocol_request import ProtocolListRequest
-from models.enums import ProtocolTypeEnum
+from models.enums import ProtocolTypeEnum, ProtocolStatusTypeEnum, NoHarmENV
+from config import Config
 
 
 def list_protocols(request_data: ProtocolListRequest) -> list[Protocol]:
@@ -13,7 +14,9 @@ def list_protocols(request_data: ProtocolListRequest) -> list[Protocol]:
     query = db.session.query(Protocol)
 
     if request_data.active is not None:
-        query = query.filter(Protocol.active == request_data.active)
+        query = query.filter(
+            Protocol.status_type == ProtocolStatusTypeEnum.ACTIVE.value
+        )
 
     if request_data.protocolType:
         query = query.filter(Protocol.protocol_type == request_data.protocolType)
@@ -23,12 +26,23 @@ def list_protocols(request_data: ProtocolListRequest) -> list[Protocol]:
 
 def get_active_protocols(schema: str, protocol_type: ProtocolTypeEnum):
     """get protocols to apply"""
-    return (
-        db.session.query(Protocol)
-        .filter(
-            Protocol.protocol_type == protocol_type.value,
-            Protocol.active == True,
-            or_(Protocol.schema == None, Protocol.schema == schema),
-        )
-        .all()
+    query = db.session.query(Protocol).filter(
+        Protocol.protocol_type == protocol_type.value,
+        or_(Protocol.schema == None, Protocol.schema == schema),
     )
+
+    if Config.ENV == NoHarmENV.PRODUCTION.value:
+        query = query.filter(
+            Protocol.status_type == ProtocolStatusTypeEnum.ACTIVE.value
+        )
+    else:
+        query = query.filter(
+            Protocol.status_type.in_(
+                [
+                    ProtocolStatusTypeEnum.ACTIVE.value,
+                    ProtocolStatusTypeEnum.STAGING.value,
+                ]
+            )
+        )
+
+    return query.all()
