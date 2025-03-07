@@ -1,3 +1,5 @@
+"""Service: dedicated to prescription view data"""
+
 from datetime import datetime, date
 from sqlalchemy import desc, and_, func
 from sqlalchemy.dialects.postgresql import INTERVAL
@@ -22,7 +24,7 @@ from models.enums import (
     DrugTypeEnum,
 )
 from repository import prescription_view_repository
-from utils.drug_list import DrugList
+from repository import clinical_notes_repository
 from services import (
     prescription_service,
     memory_service,
@@ -35,7 +37,7 @@ from services import (
     feature_service,
     exams_service,
 )
-from repository import clinical_notes_repository
+from utils.drug_list import DrugList
 from utils import prescriptionutils, dateutils, status
 
 
