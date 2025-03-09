@@ -44,8 +44,9 @@ def get_prioritization_list(
     pending_interventions=None,
     has_conciliation=None,
     alert_level=None,
-    tags=[],
+    tags=None,
     has_clinical_notes=None,
+    protocols=None,
 ):
     is_cpoe = feature_service.is_cpoe()
 
@@ -282,6 +283,24 @@ def get_prioritization_list(
 
     if tags:
         q = q.filter(cast(tags, postgresql.ARRAY(db.String)).overlap(Patient.tags))
+
+    if protocols:
+        elm = db.Column("elm", type_=postgresql.JSONB)
+        protocols_query = (
+            db.session.query(elm.cast(postgresql.TEXT))
+            .select_from(
+                func.json_array_elements(Prescription.features["protocolAlerts"]).alias(
+                    "elm"
+                )
+            )
+            .as_scalar()
+        )
+
+        q = q.filter(
+            cast(func.array(protocols_query), postgresql.ARRAY(Integer)).overlap(
+                cast(protocols, postgresql.ARRAY(Integer))
+            )
+        )
 
     if endDate is None:
         endDate = startDate

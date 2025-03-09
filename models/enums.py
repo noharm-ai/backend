@@ -230,3 +230,11 @@ class ProtocolTypeEnum(Enum):
     """Enum: protocol types"""
 
     PRESCRIPTION = 1
+
+
+class ProtocolStatusTypeEnum(Enum):
+    """Enum: protocol status types"""
+
+    INACTIVE = 0
+    ACTIVE = 1
+    STAGING = 2

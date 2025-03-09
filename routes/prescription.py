@@ -1,6 +1,8 @@
+"""Route: prescription related endpoints"""
+
+from datetime import date
 from flask import Blueprint, request
 from markupsafe import escape as escape_html
-from datetime import date
 
 from services import (
     prescription_service,
@@ -16,7 +18,8 @@ app_pres = Blueprint("app_pres", __name__)
 
 @app_pres.route("/prescriptions", methods=["GET"])
 @api_endpoint()
-def getPrescriptions():
+def get_prescriptions():
+    """Prioritize prescriptions"""
     idSegment = request.args.get("idSegment", None)
     idSegmentList = request.args.getlist("idSegment[]")
     idDept = request.args.getlist("idDept[]")
@@ -75,6 +78,7 @@ def getPrescriptions():
         alert_level=request.args.get("alertLevel", None),
         tags=request.args.getlist("tags[]"),
         has_clinical_notes=request.args.get("hasClinicalNotes", None),
+        protocols=request.args.getlist("protocols[]"),
     )
 
 

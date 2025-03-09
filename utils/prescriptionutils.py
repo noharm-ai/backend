@@ -187,6 +187,9 @@ def getFeatures(result, agg_date: datetime = None, intervals_for_agg_date=False)
         if "high" in alert_levels:
             alert_level = "high"
 
+    protocol_alerts = result.get("protocolAlerts", {}).get("summary", [])
+    alerts += len(protocol_alerts)
+
     global_score = pScore + av + am + exams + alerts + diff
 
     return {
@@ -220,6 +223,7 @@ def getFeatures(result, agg_date: datetime = None, intervals_for_agg_date=False)
         "intervals": intervals,
         "departmentList": list(department_list),
         "globalScore": global_score,
+        "protocolAlerts": protocol_alerts,
     }
 
 

@@ -2,6 +2,7 @@
 
 import pytest
 
+from models.prescription import Prescription
 from tests.utils import utils_test_prescription
 from utils.alert_protocol import AlertProtocol
 
@@ -385,6 +386,66 @@ from utils.alert_protocol import AlertProtocol
             },
             True,
         ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
+                        "field": "idDepartment",
+                        "operator": "IN",
+                        "value": [1],
+                    },
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            False,
+        ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
+                        "field": "idDepartment",
+                        "operator": "IN",
+                        "value": [100],
+                    },
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            True,
+        ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
+                        "field": "idSegment",
+                        "operator": "IN",
+                        "value": [1],
+                    },
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            True,
+        ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
+                        "field": "idSegment",
+                        "operator": "IN",
+                        "value": [2],
+                    },
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            False,
+        ),
     ],
 )
 def test_trigger(protocol, has_result):
@@ -414,8 +475,13 @@ def test_trigger(protocol, has_result):
         ),
     ]
 
+    prescription = Prescription()
+    prescription.idDepartment = 100
+    prescription.idSegment = 1
     exams = {"age": 50, "weight": 80, "ckd21": {"value": 3.2}}
-    alert_protocol = AlertProtocol(drugs=drug_list, exams=exams)
+    alert_protocol = AlertProtocol(
+        drugs=drug_list, exams=exams, prescription=prescription
+    )
     results = alert_protocol.get_protocol_alerts(protocol=protocol)
 
     if has_result:
@@ -526,17 +592,19 @@ def test_folfox():
         "trigger": "{{possui_fluorouracil}} and {{possui_oxaliplatina}} and {{possui_acido_folico}} and ({{naopossui_difenidramina}} or {{naopossui_dexametasona}} or {{naopossui_antiemetico}})",
         "result": {
             "type": "SHOW_MESSAGE",
-            "level": "WARNING",
+            "level": "high",
             "message": "De acordo com o protocolo FOLFOX:",
         },
     }
 
-    alert_protocol = AlertProtocol(drugs=drug_list, exams={})
+    prescription = Prescription()
+    prescription.idDepartment = 100
+    alert_protocol = AlertProtocol(drugs=drug_list, exams={}, prescription=prescription)
     result = alert_protocol.get_protocol_alerts(protocol=protocol)
 
     assert result is not None
-    assert len(result.get("protocolMessages")) == 1
+    assert len(result.get("variableMessages")) == 1
     assert (
-        result.get("protocolMessages")[0]
+        result.get("variableMessages")[0]
         == "Prescrição deve conter um medicamento ANTIEMETICO"
     )

@@ -1,3 +1,5 @@
+"""Service: dedicated to prescription view data"""
+
 from datetime import datetime, date
 from sqlalchemy import desc, and_, func
 from sqlalchemy.dialects.postgresql import INTERVAL
@@ -22,7 +24,7 @@ from models.enums import (
     DrugTypeEnum,
 )
 from repository import prescription_view_repository
-from utils.drug_list import DrugList
+from repository import clinical_notes_repository
 from services import (
     prescription_service,
     memory_service,
@@ -35,7 +37,7 @@ from services import (
     feature_service,
     exams_service,
 )
-from repository import clinical_notes_repository
+from utils.drug_list import DrugList
 from utils import prescriptionutils, dateutils, status
 
 
@@ -98,6 +100,7 @@ def _internal_get_prescription(
         config_data=config_data,
         exam_data=exam_data,
         cn_data=cn_data,
+        user_context=user_context,
     )
 
     drug_data = _get_drug_data(
@@ -521,6 +524,7 @@ def _get_alerts(
     config_data: dict,
     exam_data: dict,
     cn_data: dict,
+    user_context: User,
 ):
     relations = alert_interaction_service.find_relations(
         drug_list=drug_list,
@@ -538,11 +542,12 @@ def _get_alerts(
         cn_data=cn_data,
     )
 
-    # TODO: activate
-    # protocols = alert_protocol_service.find_protocols(
-    #     drug_list=drug_list, exams=exam_data["exams"], prescription=prescription
-    # )
-    protocols = []
+    protocols = alert_protocol_service.find_protocols(
+        drug_list=drug_list,
+        exams=exam_data["exams"],
+        prescription=prescription,
+        user_context=user_context,
+    )
 
     return {"relations": relations, "alerts": alerts, "protocols": protocols}
 
@@ -782,5 +787,5 @@ def _format(
             prescription.features
         ),
         "review": review_data,
-        "protocolAlerts": alerts_data.get("protocols", None),
+        "protocolAlerts": alerts_data.get("protocols", {}),
     }
