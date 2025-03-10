@@ -104,7 +104,7 @@ class AlertProtocol:
             if exam_type not in self.exams:
                 return False
 
-            if not self.exams[exam_type]["value"]:
+            if self.exams[exam_type]["value"] is None:
                 return False
 
             return self._compare(
