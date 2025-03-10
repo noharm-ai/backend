@@ -171,7 +171,7 @@ class AlertProtocol:
             DrugTypeEnum.DRUG.value,
             DrugTypeEnum.SOLUTION.value,
             DrugTypeEnum.PROCEDURE.value,
-            DrugTypeEnum.DIET,
+            DrugTypeEnum.DIET.value,
         ]
 
         for item in self.drugs:
