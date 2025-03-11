@@ -1,5 +1,7 @@
-from sqlalchemy import desc, nullsfirst, func, and_, or_, text
+"""Service: prescription related operations"""
+
 from datetime import date, datetime
+from sqlalchemy import desc, nullsfirst, func, and_, or_, text
 
 from models.main import db, User
 from models.prescription import (
@@ -9,6 +11,7 @@ from models.prescription import (
     PatientAudit,
 )
 from models.appendix import Department
+from models.regulation import RegSolicitation
 from models.enums import (
     FeatureEnum,
     PrescriptionAuditTypeEnum,
@@ -29,98 +32,146 @@ from decorators.has_permission_decorator import has_permission, Permission
 from utils import status, dateutils
 
 
-@has_permission(Permission.READ_PRESCRIPTION, Permission.READ_DISCHARGE_SUMMARY)
-def search(search_key):
-    if search_key == None:
+@has_permission(
+    Permission.READ_PRESCRIPTION,
+    Permission.READ_DISCHARGE_SUMMARY,
+    Permission.READ_REGULATION,
+)
+def search(search_key: int, user_permissions: list[Permission]):
+    """fast search prescriptions, conciliations and regulations"""
+    if search_key is None:
         raise ValidationError(
             "Parâmetro inválido",
             "errors.invalidParam",
             status.HTTP_400_BAD_REQUEST,
         )
 
-    q_presc_admission = (
-        db.session.query(
-            Prescription,
-            Patient.birthdate.label("birthdate"),
-            Patient.gender.label("gender"),
-            Department.name.label("department"),
-            Patient.admissionDate.label("admission_date"),
-            func.row_number().over(order_by=desc(Prescription.date)).label("priority"),
-        )
-        .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)
-        .outerjoin(
-            Department,
-            and_(
-                Department.id == Prescription.idDepartment,
-                Department.idHospital == Prescription.idHospital,
-            ),
-        )
-        .filter(
-            or_(
-                Prescription.id == search_key,
+    result_list = []
+
+    if (
+        Permission.READ_PRESCRIPTION in user_permissions
+        or Permission.READ_DISCHARGE_SUMMARY in user_permissions
+    ):
+        q_presc_admission = (
+            db.session.query(
+                Prescription,
+                Patient.birthdate.label("birthdate"),
+                Patient.gender.label("gender"),
+                Department.name.label("department"),
+                Patient.admissionDate.label("admission_date"),
+                func.row_number()
+                .over(order_by=desc(Prescription.date))
+                .label("priority"),
+            )
+            .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)
+            .outerjoin(
+                Department,
                 and_(
-                    Prescription.admissionNumber == search_key,
-                    func.date(Prescription.date) <= date.today(),
-                    Prescription.agg != None,
+                    Department.id == Prescription.idDepartment,
+                    Department.idHospital == Prescription.idHospital,
                 ),
             )
-        )
-        .order_by(desc(Prescription.date))
-        .limit(5)
-    )
-
-    q_concilia = (
-        db.session.query(
-            Prescription,
-            Patient.birthdate.label("birthdate"),
-            Patient.gender.label("gender"),
-            Department.name.label("department"),
-            Patient.admissionDate.label("admission_date"),
-            func.row_number().over(order_by=desc(Prescription.date)).label("priority"),
-        )
-        .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)
-        .outerjoin(
-            Department,
-            and_(
-                Department.id == Prescription.idDepartment,
-                Department.idHospital == Prescription.idHospital,
-            ),
-        )
-        .filter(
-            and_(
-                Prescription.admissionNumber == search_key,
-                Prescription.concilia != None,
-            ),
-        )
-        .order_by(desc(Prescription.date))
-        .limit(1)
-    )
-
-    results = (
-        q_presc_admission.union_all(q_concilia)
-        .order_by("priority", nullsfirst(Prescription.concilia))
-        .all()
-    )
-
-    list = []
-
-    for p in results:
-        list.append(
-            {
-                "idPrescription": str(p[0].id),
-                "admissionNumber": p[0].admissionNumber,
-                "date": p[0].date.isoformat() if p[0].date else None,
-                "status": p[0].status,
-                "agg": p[0].agg,
-                "concilia": p[0].concilia,
-                "birthdate": p[1].isoformat() if p[1] else None,
-                "gender": p[2],
-                "department": p[3],
-                "admissionDate": p[4].isoformat() if p[4] else None,
-            }
+            .filter(
+                or_(
+                    Prescription.id == search_key,
+                    and_(
+                        Prescription.admissionNumber == search_key,
+                        func.date(Prescription.date) <= date.today(),
+                        Prescription.agg != None,
+                    ),
+                )
+            )
+            .order_by(desc(Prescription.date))
+            .limit(5)
         )
 
-    return list
+        q_concilia = (
+            db.session.query(
+                Prescription,
+                Patient.birthdate.label("birthdate"),
+                Patient.gender.label("gender"),
+                Department.name.label("department"),
+                Patient.admissionDate.label("admission_date"),
+                func.row_number()
+                .over(order_by=desc(Prescription.date))
+                .label("priority"),
+            )
+            .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)
+            .outerjoin(
+                Department,
+                and_(
+                    Department.id == Prescription.idDepartment,
+                    Department.idHospital == Prescription.idHospital,
+                ),
+            )
+            .filter(
+                and_(
+                    Prescription.admissionNumber == search_key,
+                    Prescription.concilia != None,
+                ),
+            )
+            .order_by(desc(Prescription.date))
+            .limit(1)
+        )
+
+        results = (
+            q_presc_admission.union_all(q_concilia)
+            .order_by("priority", nullsfirst(Prescription.concilia))
+            .all()
+        )
+
+        for p in results:
+            result_list.append(
+                {
+                    "idPrescription": str(p[0].id),
+                    "admissionNumber": p[0].admissionNumber,
+                    "date": p[0].date.isoformat() if p[0].date else None,
+                    "status": p[0].status,
+                    "agg": p[0].agg,
+                    "concilia": p[0].concilia,
+                    "birthdate": p[1].isoformat() if p[1] else None,
+                    "gender": p[2],
+                    "department": p[3],
+                    "admissionDate": p[4].isoformat() if p[4] else None,
+                    "type": "prescription",
+                }
+            )
+
+    if Permission.READ_REGULATION in user_permissions and feature_service.has_feature(
+        FeatureEnum.REGULATION
+    ):
+        reg_solicitations = (
+            db.session.query(RegSolicitation, Department)
+            .outerjoin(Department, RegSolicitation.id_department == Department.id)
+            .filter(RegSolicitation.id == search_key)
+            .order_by(desc(RegSolicitation.date))
+            .all()
+        )
+
+        for item in reg_solicitations:
+            solicitation: RegSolicitation = item.RegSolicitation
+            department: Department = item.Department
+
+            result_list.append(
+                {
+                    "idPrescription": None,
+                    "admissionNumber": solicitation.admission_number,
+                    "date": (
+                        solicitation.date.isoformat() if solicitation.date else None
+                    ),
+                    "status": solicitation.stage,
+                    "agg": False,
+                    "concilia": False,
+                    "birthdate": None,
+                    "gender": None,
+                    "department": department.name if department else None,
+                    "admissionDate": None,
+                    "type": "regulation",
+                    "idRegSolicitation": solicitation.id,
+                }
+            )
+
+    return result_list
 
 
 @has_permission(Permission.WRITE_PRESCRIPTION)

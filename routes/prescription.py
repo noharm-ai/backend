@@ -180,6 +180,7 @@ def getPrescriptionUpdate(idPrescription):
 @app_pres.route("/prescriptions/search", methods=["GET"])
 @api_endpoint()
 def search_prescriptions():
+    """fast search prescriptions"""
     search_key = request.args.get("term", None)
 
     return prescription_service.search(search_key)
@@ -188,6 +189,7 @@ def search_prescriptions():
 @app_pres.route("/prescriptions/start-evaluation", methods=["POST"])
 @api_endpoint()
 def start_evaluation():
+    """save user currently evaluating prescription"""
     data = request.get_json()
 
     return prescription_service.start_evaluation(
