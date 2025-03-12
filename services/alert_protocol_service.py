@@ -15,10 +15,16 @@ from repository import protocol_repository
 def find_protocols(
     drug_list: dict, exams: dict, prescription: Prescription, user_context: User = None
 ):
-    """Gets all protocols and test against a prescription"""
+    """Gets all prescription protocols and test against a prescription"""
+
+    protocol_types: list[ProtocolTypeEnum] = [ProtocolTypeEnum.PRESCRIPTION_ALL]
+    if prescription.agg:
+        protocol_types.append(ProtocolTypeEnum.PRESCRIPTION_AGG)
+    else:
+        protocol_types.append(ProtocolTypeEnum.PRESCRIPTION_INDIVIDUAL)
 
     protocols = protocol_repository.get_active_protocols(
-        schema=user_context.schema, protocol_type=ProtocolTypeEnum.PRESCRIPTION
+        schema=user_context.schema, protocol_type_list=protocol_types
     )
 
     if not protocols:

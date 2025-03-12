@@ -21,6 +21,9 @@ def list_protocols(request_data: ProtocolListRequest, schema: str) -> list[Proto
     if request_data.protocolType:
         query = query.filter(Protocol.protocol_type == request_data.protocolType)
 
+    if request_data.protocolTypeList:
+        query = query.filter(Protocol.protocol_type.in_(request_data.protocolTypeList))
+
     return (
         query.filter(
             or_(Protocol.schema == None, Protocol.schema == schema),
@@ -30,10 +33,13 @@ def list_protocols(request_data: ProtocolListRequest, schema: str) -> list[Proto
     )
 
 
-def get_active_protocols(schema: str, protocol_type: ProtocolTypeEnum):
+def get_active_protocols(schema: str, protocol_type_list: list[ProtocolTypeEnum]):
     """get protocols to apply"""
+
+    filter_types = [t.value for t in protocol_type_list]
+
     query = db.session.query(Protocol).filter(
-        Protocol.protocol_type == protocol_type.value,
+        Protocol.protocol_type.in_(filter_types),
         or_(Protocol.schema == None, Protocol.schema == schema),
     )
 
