@@ -9,7 +9,7 @@ from models.enums import ProtocolTypeEnum, ProtocolStatusTypeEnum, NoHarmENV
 from config import Config
 
 
-def list_protocols(request_data: ProtocolListRequest) -> list[Protocol]:
+def list_protocols(request_data: ProtocolListRequest, schema: str) -> list[Protocol]:
     """List protocols"""
     query = db.session.query(Protocol)
 
@@ -21,7 +21,13 @@ def list_protocols(request_data: ProtocolListRequest) -> list[Protocol]:
     if request_data.protocolType:
         query = query.filter(Protocol.protocol_type == request_data.protocolType)
 
-    return query.order_by(Protocol.name).all()
+    return (
+        query.filter(
+            or_(Protocol.schema == None, Protocol.schema == schema),
+        )
+        .order_by(Protocol.name)
+        .all()
+    )
 
 
 def get_active_protocols(schema: str, protocol_type: ProtocolTypeEnum):
