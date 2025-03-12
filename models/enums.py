@@ -230,7 +230,9 @@ class TagTypeEnum(Enum):
 class ProtocolTypeEnum(Enum):
     """Enum: protocol types"""
 
-    PRESCRIPTION = 1
+    PRESCRIPTION_AGG = 1
+    PRESCRIPTION_INDIVIDUAL = 2
+    PRESCRIPTION_ALL = 3
 
 
 class ProtocolStatusTypeEnum(Enum):

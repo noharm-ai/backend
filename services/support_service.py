@@ -205,7 +205,7 @@ def list_tickets_v2(user_context: User, user_permissions: list[Permission]):
             if f.get("id") not in my_tickets_ids:
                 following.append(f)
 
-        if Permission.WRITE_USERS in user_permissions:
+        if Permission.WRITE_USERS in user_permissions and partner[0]:
             organization = client(
                 model="helpdesk.ticket",
                 action="search_read",

@@ -18,10 +18,17 @@ from utils import status
 # TODO: refactor
 app_names = Blueprint("app_names", __name__)
 
+logging.basicConfig()
+logger = logging.getLogger("noharm.getname")
+
+TIMEOUT = 15
+CHUNK_SIZE = 200
+
 
 @app_names.route("/names/<int:idPatient>", methods=["GET"])
 @jwt_required()
 def proxy_name(idPatient):
+    """Proxy get single name"""
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
 
@@ -48,6 +55,7 @@ def proxy_name(idPatient):
             headers={"Authorization": f"{auth_prefix}{token}"},
             params=params,
             verify=False,
+            timeout=TIMEOUT,
         )
 
         if response.status_code == status.HTTP_200_OK:
@@ -61,30 +69,25 @@ def proxy_name(idPatient):
                     "data": data["data"],
                 }, status.HTTP_200_OK
 
-            else:
-                if len(data["data"]) > 0:
-                    patient = data["data"][0]
+            if len(data["data"]) > 0:
+                patient = data["data"][0]
 
-                    return {
-                        "status": "success",
-                        "idPatient": patient["idPatient"],
-                        "name": patient["name"],
-                    }, status.HTTP_200_OK
+                return {
+                    "status": "success",
+                    "idPatient": patient["idPatient"],
+                    "name": patient["name"],
+                }, status.HTTP_200_OK
 
-        logging.basicConfig()
-        logger = logging.getLogger("noharm.backend")
-        logger.error(f"Service names ERROR: {response.status_code}")
-        logger.error(url)
-        logger.error(params)
-        logger.error(response.text)
-        logger.error(response.__dict__)
-    except Exception as e:
-        logging.basicConfig()
-        logger = logging.getLogger("noharm.backend")
-        logger.error("Service names ERROR (exception)")
-        logger.error(url)
-        logger.error(params)
-        logger.exception(e)
+        logger.warning("GETNAME: %s", response.status_code)
+        logger.warning(url)
+        logger.warning(params)
+        logger.warning(response.text)
+        logger.warning(response.__dict__)
+    except requests.exceptions.RequestException as e:
+        logger.warning("GETNAME: exception")
+        logger.warning(url)
+        logger.warning(params)
+        logger.warning(str(e))
 
     return {
         "status": "error",
@@ -96,6 +99,7 @@ def proxy_name(idPatient):
 @app_names.route("/names", methods=["POST"])
 @jwt_required()
 def proxy_multiple():
+    """Proxy get multiple names"""
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
 
@@ -104,7 +108,6 @@ def proxy_multiple():
     config = _get_config(user)
     token = _get_token(config)
 
-    CHUNK_SIZE = 200
     chunks = [ids_list[i : i + CHUNK_SIZE] for i in range(0, len(ids_list), CHUNK_SIZE)]
     names = []
 
@@ -123,6 +126,7 @@ def _getname_multiple_iteration(config: dict, ids_list: list, token: str):
     is_internal = config["getname"].get("internal", False)
     auth_prefix = config["getname"].get("authPrefix", "")
     names = []
+    found = []
 
     try:
         if is_internal:
@@ -138,6 +142,7 @@ def _getname_multiple_iteration(config: dict, ids_list: list, token: str):
                     "Content-Type": "application/json",
                 },
                 json=params,
+                timeout=TIMEOUT,
             )
         else:
             params = dict(
@@ -149,9 +154,9 @@ def _getname_multiple_iteration(config: dict, ids_list: list, token: str):
                 headers={"Authorization": f"{auth_prefix}{token}"},
                 params=params,
                 verify=False,
+                timeout=TIMEOUT,
             )
 
-        found = []
         if response.status_code == status.HTTP_200_OK:
             data = response.json()
             results = data if is_internal else data["data"]
@@ -166,21 +171,17 @@ def _getname_multiple_iteration(config: dict, ids_list: list, token: str):
                     }
                 )
         else:
-            logging.basicConfig()
-            logger = logging.getLogger("noharm.backend")
-            logger.error(f"Service names error {response.status_code}")
-            logger.error(url)
-            logger.error(params)
-            logger.error(response.text)
-            logger.error(response.__dict__)
+            logger.warning("GETNAME: %s", response.status_code)
+            logger.warning(url)
+            logger.warning(params)
+            logger.warning(response.text)
+            logger.warning(response.__dict__)
 
-    except Exception as e:
-        logging.basicConfig()
-        logger = logging.getLogger("noharm.backend")
-        logger.error(f"Service names ERROR (exception)")
-        logger.error(url)
-        logger.error(params)
-        logger.exception(e)
+    except requests.exceptions.RequestException as e:
+        logger.warning("GETNAME: exception")
+        logger.warning(url)
+        logger.warning(params)
+        logger.warning(str(e))
 
     for id_patient in ids_list:
         if str(id_patient) not in found:
@@ -198,6 +199,7 @@ def _getname_multiple_iteration(config: dict, ids_list: list, token: str):
 @app_names.route("/names/auth-token", methods=["GET"])
 @jwt_required()
 def auth_token():
+    """get internal token"""
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
 
@@ -272,20 +274,16 @@ def search_name(term):
             }, status.HTTP_200_OK
 
         if response.status_code != status.HTTP_404_NOT_FOUND:
-            logging.basicConfig()
-            logger = logging.getLogger("noharm.backend")
-            logger.error("Service names ERROR: %s", response.status_code)
-            logger.error(url)
-            logger.error(params)
-            logger.error(response.json())
+            logger.warning("GETNAME: %s", response.status_code)
+            logger.warning(url)
+            logger.warning(params)
+            logger.warning(response.json())
 
     except requests.exceptions.RequestException as e:
-        logging.basicConfig()
-        logger = logging.getLogger("noharm.backend")
-        logger.error("Service names ERROR (exception)")
-        logger.error(url)
-        logger.error(params)
-        logger.exception(e)
+        logger.warning("GETNAME: exception")
+        logger.warning(url)
+        logger.warning(params)
+        logger.warning(str(e))
 
     return {"status": "error", "data": []}, status.HTTP_200_OK
 
@@ -306,7 +304,7 @@ def _get_token(config):
 
         return token
 
-    response = requests.post(url=token_url, data=params, verify=False)
+    response = requests.post(url=token_url, data=params, verify=False, timeout=TIMEOUT)
 
     if response.status_code != status.HTTP_200_OK:
         raise ValidationError(

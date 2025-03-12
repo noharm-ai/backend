@@ -9,3 +9,4 @@ class ProtocolListRequest(BaseModel):
 
     active: Optional[bool] = None
     protocolType: Optional[str] = None
+    protocolTypeList: list[int] = None
