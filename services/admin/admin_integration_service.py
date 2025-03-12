@@ -165,6 +165,10 @@ def _set_new_config(old_config: dict, new_config: dict):
             config["getname"]["url"] = new_config["getname"]["url"]
             config["getname"]["urlDev"] = new_config["getname"].get("urlDev", None)
             config["getname"]["params"] = new_config["getname"]["params"]
+            config["getname"]["internal"] = new_config["getname"].get("internal", False)
+            config["getname"]["authPrefix"] = new_config["getname"].get(
+                "authPrefix", ""
+            )
             config["getname"]["token"] = {
                 "url": new_config["getname"]["token"]["url"],
                 "params": {
