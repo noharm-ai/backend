@@ -126,6 +126,7 @@ def _getname_multiple_iteration(config: dict, ids_list: list, token: str):
     is_internal = config["getname"].get("internal", False)
     auth_prefix = config["getname"].get("authPrefix", "")
     names = []
+    found = []
 
     try:
         if is_internal:
@@ -156,7 +157,6 @@ def _getname_multiple_iteration(config: dict, ids_list: list, token: str):
                 timeout=TIMEOUT,
             )
 
-        found = []
         if response.status_code == status.HTTP_200_OK:
             data = response.json()
             results = data if is_internal else data["data"]
