@@ -36,12 +36,7 @@ def proxy_name(idPatient):
     token = _get_token(config)
     is_internal = config["getname"].get("internal", False)
     auth_prefix = config["getname"].get("authPrefix", "")
-
-    url = (
-        config["getname"]["urlDev"]
-        if Config.ENV == NoHarmENV.DEVELOPMENT.value
-        else config["getname"]["url"]
-    )
+    url = _get_url(config=config)
 
     if is_internal:
         url += f"patient-name/{int(idPatient)}"
@@ -78,13 +73,13 @@ def proxy_name(idPatient):
                     "name": patient["name"],
                 }, status.HTTP_200_OK
 
-        logger.warning("GETNAME: %s", response.status_code)
+        logger.warning("GETNAME: %s #%s#", response.status_code, user.schema)
         logger.warning(url)
         logger.warning(params)
         logger.warning(response.text)
         logger.warning(response.__dict__)
     except requests.exceptions.RequestException as e:
-        logger.warning("GETNAME: exception")
+        logger.warning("GETNAME: 500 #%s#", user.schema)
         logger.warning(url)
         logger.warning(params)
         logger.warning(str(e))
@@ -112,17 +107,15 @@ def proxy_multiple():
     names = []
 
     for chunk in chunks:
-        names += _getname_multiple_iteration(config=config, ids_list=chunk, token=token)
+        names += _getname_multiple_iteration(
+            config=config, ids_list=chunk, token=token, schema=user.schema
+        )
 
     return names, status.HTTP_200_OK
 
 
-def _getname_multiple_iteration(config: dict, ids_list: list, token: str):
-    url = (
-        config["getname"]["urlDev"]
-        if Config.ENV == NoHarmENV.DEVELOPMENT.value
-        else config["getname"]["url"]
-    )
+def _getname_multiple_iteration(config: dict, ids_list: list, token: str, schema: str):
+    url = _get_url(config=config)
     is_internal = config["getname"].get("internal", False)
     auth_prefix = config["getname"].get("authPrefix", "")
     names = []
@@ -171,14 +164,14 @@ def _getname_multiple_iteration(config: dict, ids_list: list, token: str):
                     }
                 )
         else:
-            logger.warning("GETNAME: %s", response.status_code)
+            logger.warning("GETNAME: %s #%s#", response.status_code, schema)
             logger.warning(url)
             logger.warning(params)
             logger.warning(response.text)
             logger.warning(response.__dict__)
 
     except requests.exceptions.RequestException as e:
-        logger.warning("GETNAME: exception")
+        logger.warning("GETNAME: 500 #%s#", schema)
         logger.warning(url)
         logger.warning(params)
         logger.warning(str(e))
@@ -240,12 +233,7 @@ def search_name(term):
 
     config = _get_config(user)
     token = _get_token(config)
-
-    url = (
-        config["getname"]["urlDev"]
-        if Config.ENV == NoHarmENV.DEVELOPMENT.value
-        else config["getname"]["url"]
-    )
+    url = _get_url(config=config)
 
     url += f"search-name/{term}"
     params = dict(config["getname"]["params"])
@@ -274,13 +262,13 @@ def search_name(term):
             }, status.HTTP_200_OK
 
         if response.status_code != status.HTTP_404_NOT_FOUND:
-            logger.warning("GETNAME: %s", response.status_code)
+            logger.warning("GETNAME: %s #%s#", response.status_code, user.schema)
             logger.warning(url)
             logger.warning(params)
             logger.warning(response.json())
 
     except requests.exceptions.RequestException as e:
-        logger.warning("GETNAME: exception")
+        logger.warning("GETNAME: 500 #%s#", user.schema)
         logger.warning(url)
         logger.warning(params)
         logger.warning(str(e))
@@ -333,3 +321,11 @@ def _get_config(user: User):
         )
 
     return schema_config.config
+
+
+def _get_url(config: dict):
+    url_dev = config["getname"].get("urlDev", None)
+    url_prod = config["getname"].get("url", None)
+    return (
+        url_dev if Config.ENV == NoHarmENV.DEVELOPMENT.value and url_dev else url_prod
+    )
