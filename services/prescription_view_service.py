@@ -733,6 +733,8 @@ def _format(
         "alertExpire": dateutils.to_iso(patient.alertExpire),
         "dischargeDate": dateutils.to_iso(patient.dischargeDate),
         "dischargeReason": patient.dischargeReason,
+        "dischargeDateForecast": dateutils.to_iso(patient.dischargeDateForecast),
+        "responsiblePhysician": patient.responsiblePhysician,
         # extra
         "segmentName": segment.description if segment else None,
         "department": department.name if department else None,
