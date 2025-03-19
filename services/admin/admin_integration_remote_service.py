@@ -316,7 +316,8 @@ def _get_new_queue(id_processor: str, action_type: str, data: dict):
             queue.body = {
                 "component": {
                     "id": id_processor,
-                    "config": {"properties": data["properties"]},
+                    "config": {"properties": data["properties"]}
+                    | data.get("config", {}),
                 }
             }
     elif NifiQueueActionTypeEnum.VIEW_PROVENANCE.value == action_type:
