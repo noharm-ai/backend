@@ -12,7 +12,7 @@ class RegulationSolicitationRequest(BaseModel):
     birthdate: Optional[date] = None
     idDepartment: int
     solicitationDate: datetime
-    idRegSolicitationType: int
+    idRegSolicitationTypeList: list[int]
     risk: int
     cid: Optional[str] = None
     attendant: Optional[str] = None

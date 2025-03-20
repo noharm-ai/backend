@@ -215,23 +215,27 @@ def create(request_data: RegulationSolicitationRequest, user_context: User):
     db.session.add(patient)
     db.session.flush()
 
+    results = []
     # add reg solicitation
-    solicitation = RegSolicitation()
-    solicitation.id = reg_solicitation_repository.get_next_solicitation_id()
-    solicitation.admission_number = patient.admissionNumber
-    solicitation.id_patient = request_data.idPatient
-    solicitation.date = request_data.solicitationDate
-    solicitation.id_reg_solicitation_type = request_data.idRegSolicitationType
-    solicitation.id_department = request_data.idDepartment
-    solicitation.risk = request_data.risk
-    solicitation.cid = request_data.cid
-    solicitation.attendant = request_data.attendant
-    solicitation.attendant_record = request_data.attendantRecord
-    solicitation.justification = request_data.justification
-    solicitation.stage = 0
-    solicitation.created_at = datetime.today()
-    solicitation.created_by = user_context.id
-    db.session.add(solicitation)
-    db.session.flush()
+    for idreg_solicitation_type in request_data.idRegSolicitationTypeList:
+        solicitation = RegSolicitation()
+        solicitation.id = reg_solicitation_repository.get_next_solicitation_id()
+        solicitation.admission_number = patient.admissionNumber
+        solicitation.id_patient = request_data.idPatient
+        solicitation.date = request_data.solicitationDate
+        solicitation.id_reg_solicitation_type = idreg_solicitation_type
+        solicitation.id_department = request_data.idDepartment
+        solicitation.risk = request_data.risk
+        solicitation.cid = request_data.cid
+        solicitation.attendant = request_data.attendant
+        solicitation.attendant_record = request_data.attendantRecord
+        solicitation.justification = request_data.justification
+        solicitation.stage = 0
+        solicitation.created_at = datetime.today()
+        solicitation.created_by = user_context.id
+        db.session.add(solicitation)
+        db.session.flush()
 
-    return {"id": str(solicitation.id)}
+        results.append(str(solicitation.id))
+
+    return {"idList": results}
