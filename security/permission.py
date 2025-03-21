@@ -1,7 +1,11 @@
+"""Module for defining permissions."""
+
 from enum import Enum
 
 
 class Permission(Enum):
+    """Enum class for user permissions."""
+
     ADMIN_DRUGS = "ADMIN_DRUGS"  # "admin drug attributes"
     ADMIN_DRUGS__OVERWRITE_ATTRIBUTES = (
         "ADMIN_DRUGS__OVERWRITE_ATTRIBUTES"  # "permits overwriting attributes on copy"

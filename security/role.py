@@ -1,3 +1,5 @@
+"""Module for the Role Enum class."""
+
 from enum import Enum
 from typing import List
 
@@ -6,6 +8,7 @@ from models.main import User
 
 
 class Role(Enum):
+    """Enum class for user roles."""
 
     def __new__(cls, *args, **kwds):
         obj = object.__new__(cls)
@@ -168,6 +171,7 @@ class Role(Enum):
 
     @staticmethod
     def get_permissions_from_user(user: User) -> List[Permission]:
+        """Return a list of permissions from a user."""
         roles = user.config["roles"] if user.config and "roles" in user.config else []
         user_permissions = []
         for r in roles:
@@ -181,6 +185,7 @@ class Role(Enum):
 
     @staticmethod
     def get_special_roles():
+        """Return a list of non assignable roles."""
         return [
             Role.ADMIN.value,
             Role.CURATOR.value,
