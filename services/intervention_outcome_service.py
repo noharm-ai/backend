@@ -665,8 +665,8 @@ def _outcome_calc(list, user: User, date_base_economy, destination=False):
                     "idPrescriptionAggregate": str(id_prescription_aggregate),
                     "idPrescriptionDrug": str(prescription_drug.id),
                     "prescriptionDate": prescription.date.isoformat(),
-                    "idDrug": drug.id,
-                    "name": drug.name,
+                    "idDrug": drug.id if drug else prescription_drug.idDrug,
+                    "name": drug.name if drug else "NP",
                     "price": str(origin_price) if origin_price != None else None,
                     "dose": str(dose) if dose != None else None,
                     "idMeasureUnit": (
