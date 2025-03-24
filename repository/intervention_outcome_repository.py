@@ -81,7 +81,7 @@ def get_outcome_data_query():
             DefaultMeasureUnit,
             PrescriptionDrugFrequency,
         )
-        .join(Drug, PrescriptionDrug.idDrug == Drug.id)
+        .outerjoin(Drug, PrescriptionDrug.idDrug == Drug.id)
         .join(Prescription, PrescriptionDrug.idPrescription == Prescription.id)
         .outerjoin(
             DrugAttributes,

@@ -11,7 +11,7 @@ def get_user_by_credentials(email: str, password: str) -> User:
     return (
         db.session.query(User)
         .filter(func.lower(User.email) == email.lower())
-        .filter(User.password == func.crypt(password, User.password))
+        .filter(User.password == func.public.crypt(password, User.password))
         .filter(User.active == True)
         .first()
     )
