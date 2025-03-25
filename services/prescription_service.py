@@ -10,7 +10,7 @@ from models.prescription import (
     PrescriptionAudit,
     PatientAudit,
 )
-from models.appendix import Department
+from models.appendix import Department, SchemaConfig
 from models.regulation import RegSolicitation
 from models.enums import (
     FeatureEnum,
@@ -449,3 +449,49 @@ def _update_patient_weight(admission_number: int, user_context: User):
             audit.createdAt = datetime.today()
             audit.createdBy = user_context.id
             db.session.add(audit)
+
+
+@has_permission(Permission.READ_PRESCRIPTION)
+def get_pep_link(id_prescription: int, user_context: User):
+    """Get the link to user local PEP"""
+
+    prescription = (
+        db.session.query(Prescription)
+        .filter(Prescription.id == id_prescription)
+        .first()
+    )
+    if prescription is None:
+        raise ValidationError(
+            "Prescrição inexistente.",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    user = db.session.query(User).filter(User.id == user_context.id).first()
+    if user is None or user.external is None:
+        raise ValidationError(
+            "Usuário externo não configurado.",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    schema_config = (
+        db.session.query(SchemaConfig)
+        .filter(SchemaConfig.schemaName == user_context.schema)
+        .first()
+    )
+
+    if schema_config is None or schema_config.config.get("pepLink", None) is None:
+        raise ValidationError(
+            "Schema não configurado.",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    link = schema_config.config.get("pepLink", None)
+
+    link = link.replace("{USER_EXTERNAL_ID}", user.external)
+    link = link.replace("{ADMISSION_NUMBER}", str(prescription.admissionNumber))
+    link = link.replace("{FKHOSPITAL}", str(prescription.idHospital))
+
+    return {"pepLink": link}

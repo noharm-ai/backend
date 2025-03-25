@@ -195,3 +195,12 @@ def start_evaluation():
     return prescription_service.start_evaluation(
         id_prescription=data.get("idPrescription", None)
     )
+
+
+@app_pres.route("/prescriptions/pep-link", methods=["GET"])
+@api_endpoint()
+def pep_link():
+    """get custom link for user to access their local pep"""
+    return prescription_service.get_pep_link(
+        id_prescription=request.args.get("idPrescription", None)
+    )
