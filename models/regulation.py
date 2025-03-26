@@ -31,6 +31,23 @@ class RegSolicitation(db.Model):
     updated_by = db.Column("updated_by", db.BigInteger, nullable=True)
 
 
+class RegSolicitationAttribute(db.Model):
+    """Solicitation attributes"""
+
+    __tablename__ = "reg_solicitacao_atributo"
+
+    id = db.Column("idreg_solicitacao_atributo", db.BigInteger, primary_key=True)
+    id_reg_solicitation = db.Column("fkreg_solicitacao", db.BigInteger, nullable=False)
+    tp_attribute = db.Column("tp_solicitacao_atributo", db.Integer, nullable=False)
+    tp_status = db.Column("tp_status", db.Integer, nullable=False)
+    value = db.Column("valor", postgresql.JSONB, nullable=False)
+
+    created_at = db.Column("created_at", db.DateTime, nullable=False)
+    created_by = db.Column("created_by", db.BigInteger, nullable=True)
+    updated_at = db.Column("updated_at", db.DateTime, nullable=False)
+    updated_by = db.Column("updated_by", db.BigInteger, nullable=True)
+
+
 class RegSolicitationType(db.Model):
     __tablename__ = "reg_tipo_solicitacao"
 

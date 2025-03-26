@@ -463,7 +463,7 @@ def find_latest_exams(
         current_exams = _get_exams_current_results(
             id_patient=patient.idPatient,
             add_previous_exams=add_previous_exams,
-            cache=cache,
+            cache=False,  # disable cache for prescalc
             schema=schema,
         )
 
