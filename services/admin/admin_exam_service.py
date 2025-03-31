@@ -275,11 +275,11 @@ def set_exams_order(exams, id_segment, user_context: User):
         {"order": 99}, synchronize_session="fetch"
     )
 
-    for idx, type in enumerate(exams):
+    for idx, type_exam in enumerate(exams):
         exam = (
             db.session.query(SegmentExam)
             .filter(SegmentExam.idSegment == id_segment)
-            .filter(SegmentExam.typeExam == type)
+            .filter(SegmentExam.typeExam == type_exam)
             .first()
         )
 
