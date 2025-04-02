@@ -8,6 +8,7 @@ zappa
 flask-cors==5.0.0
 psycopg2-binary
 numpy
+scipy==1.10.0
 scikit-learn
 flask-mail
 random-password-generator
