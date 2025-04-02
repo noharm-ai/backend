@@ -24,12 +24,11 @@ class Config:
     REPORT_CONNECTION_STRING = (
         getenv("REPORT_CONNECTION_STRING") or "postgresql://postgres@localhost/noharm"
     )
-    # JWT_ACCESS_TOKEN_EXPIRES = timedelta(
-    #     minutes=int(getenv("JWT_ACCESS_TOKEN_EXPIRES", 2))
-    # )
-    JWT_ACCESS_TOKEN_EXPIRES = timedelta(minutes=2)
+    JWT_ACCESS_TOKEN_EXPIRES = timedelta(
+        minutes=int(getenv("JWT_ACCESS_TOKEN_EXPIRES", "20"))
+    )
     JWT_REFRESH_TOKEN_EXPIRES = timedelta(
-        days=int(getenv("JWT_REFRESH_TOKEN_EXPIRES", 30))
+        days=int(getenv("JWT_REFRESH_TOKEN_EXPIRES", "30"))
     )
     MAIL_USERNAME = getenv("MAIL_USERNAME") or "user@gmail.com"
     MAIL_PASSWORD = getenv("MAIL_PASSWORD") or "password"
