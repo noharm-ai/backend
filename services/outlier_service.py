@@ -26,6 +26,7 @@ from services.admin import admin_drug_service, admin_integration_status_service
 from services import data_authorization_service, substance_service
 from decorators.has_permission_decorator import has_permission, Permission
 from utils import prescriptionutils, numberutils, stringutils, examutils, status
+from config import Config
 
 FOLD_SIZE = 10
 
@@ -116,9 +117,9 @@ def generate(
 
     start_date = datetime.now()
 
-    lambda_client = boto3.client("lambda", region_name="lambda-region")
+    lambda_client = boto3.client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
     response = lambda_client.invoke(
-        FunctionName="scoreslambda",
+        FunctionName=Config.SCORES_FUNCTION_NAME,
         InvocationType="RequestResponse",
         Payload=json.dumps(
             {

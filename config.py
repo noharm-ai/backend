@@ -57,3 +57,5 @@ class Config:
 
     REDIS_HOST = getenv("REDIS_HOST") or ""
     REDIS_PORT = getenv("REDIS_PORT") or ""
+
+    SCORES_FUNCTION_NAME = getenv("SCORES_FUNCTION_NAME", "")
