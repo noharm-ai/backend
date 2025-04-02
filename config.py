@@ -9,8 +9,8 @@ from models.enums import NoHarmENV
 class Config:
     """Configuration class for the application."""
 
-    VERSION = "v4.46-beta"
-    FRONTEND_VERSION = "5.0.9"
+    VERSION = "v4.47-beta"
+    FRONTEND_VERSION = "5.1.0"
     ENV = getenv("ENV") or NoHarmENV.DEVELOPMENT.value
     SECRET_KEY = getenv("SECRET_KEY") or "secret_key"
     API_KEY = getenv("API_KEY") or ""
@@ -25,10 +25,10 @@ class Config:
         getenv("REPORT_CONNECTION_STRING") or "postgresql://postgres@localhost/noharm"
     )
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(
-        minutes=int(getenv("JWT_ACCESS_TOKEN_EXPIRES", 20))
+        minutes=int(getenv("JWT_ACCESS_TOKEN_EXPIRES", "20"))
     )
     JWT_REFRESH_TOKEN_EXPIRES = timedelta(
-        days=int(getenv("JWT_REFRESH_TOKEN_EXPIRES", 30))
+        days=int(getenv("JWT_REFRESH_TOKEN_EXPIRES", "30"))
     )
     MAIL_USERNAME = getenv("MAIL_USERNAME") or "user@gmail.com"
     MAIL_PASSWORD = getenv("MAIL_PASSWORD") or "password"
@@ -57,3 +57,5 @@ class Config:
 
     REDIS_HOST = getenv("REDIS_HOST") or ""
     REDIS_PORT = getenv("REDIS_PORT") or ""
+
+    SCORES_FUNCTION_NAME = getenv("SCORES_FUNCTION_NAME", "")

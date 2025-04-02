@@ -1,12 +1,15 @@
+"""Service: outlier related operations"""
+
 import io
-import pandas
+import json
 import logging
-from multiprocessing import Process, Manager
 from datetime import datetime
 from math import ceil
-from sqlalchemy import text, func, distinct, and_, or_, asc, literal, literal_column
 from typing import List
 from decimal import Decimal, ROUND_HALF_UP
+
+import boto3
+from sqlalchemy import text, func, distinct, and_, or_, asc, literal, literal_column
 
 from models.main import (
     db,
@@ -18,18 +21,20 @@ from models.main import (
     DrugAttributes,
 )
 from models.appendix import Notes, MeasureUnit, MeasureUnitConvert
-from utils.outlier_lib import add_score
 from exception.validation_error import ValidationError
 from services.admin import admin_drug_service, admin_integration_status_service
 from services import data_authorization_service, substance_service
 from decorators.has_permission_decorator import has_permission, Permission
 from utils import prescriptionutils, numberutils, stringutils, examutils, status
+from config import Config
 
 FOLD_SIZE = 10
 
 
 @has_permission(Permission.WRITE_DRUG_SCORE)
 def prepare(id_drug, id_segment, user_context: User):
+    """step 1: prepare records to generate score. Refresh history and outliers"""
+
     def add_history_and_validate():
         history_count = add_prescription_history(
             id_drug=id_drug, id_segment=id_segment, user_context=user_context
@@ -112,65 +117,51 @@ def generate(
 
     start_date = datetime.now()
 
-    manager = Manager()
-    drugs = pandas.read_csv(csv_buffer)
-    drugs_list = drugs["medication"].unique().astype(float)
-    outliers = (
-        Outlier.query.filter(Outlier.idSegment == id_segment)
-        .filter(Outlier.idDrug.in_(drugs_list))
-        .all()
+    lambda_client = boto3.client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
+    response = lambda_client.invoke(
+        FunctionName=Config.SCORES_FUNCTION_NAME,
+        InvocationType="RequestResponse",
+        Payload=json.dumps(
+            {
+                "command": "lambda_scores.generate_scores",
+                "csv_string": csv_buffer.getvalue(),
+            }
+        ),
     )
 
-    _log_perf(start_date, "GET OUTLIERS LIST")
-
-    start_date = datetime.now()
-
-    with Manager() as manager:
-        poolDict = manager.dict()
-
-        processes = []
-        for idDrug in drugs["medication"].unique():
-            drugsItem = drugs[drugs["medication"] == idDrug]
-            process = Process(
-                target=_compute_outlier,
-                args=(
-                    idDrug,
-                    drugsItem,
-                    poolDict,
-                    fold,
-                ),
-            )
-            processes.append(process)
-
-        for process in processes:
-            process.start()
-
-        for process in processes:
-            process.join()
-
-        new_os = pandas.DataFrame()
-
-        for drug in poolDict:
-            new_os = new_os.append(poolDict[drug])
+    scores = json.loads(json.loads(response["Payload"].read().decode("utf-8")))
 
     _log_perf(start_date, "PROCESS SCORES")
 
     start_date = datetime.now()
 
     updates = []
+    drugs_list = list(scores.keys())
+    outliers = (
+        Outlier.query.filter(Outlier.idSegment == id_segment)
+        .filter(Outlier.idDrug.in_(drugs_list))
+        .all()
+    )
+
+    def _get_drug_score(id_drug: int, dose: float, frequency: int):
+        drug_scores = scores[str(id_drug)]
+
+        return next(
+            sc
+            for sc in drug_scores
+            if sc["dose"] == dose and sc["frequency"] == frequency
+        )
+
     for o in outliers:
-        no = new_os[
-            (new_os["medication"] == o.idDrug)
-            & (new_os["dose"] == o.dose)
-            & (new_os["frequency"] == o.frequency)
-        ]
+        no = _get_drug_score(id_drug=o.idDrug, dose=o.dose, frequency=o.frequency)
+
         if len(no) > 0:
             updates.append(
                 _to_update_row(
                     {
                         "id": o.id,
-                        "score": no["score"].values[0],
-                        "countNum": int(no["count"].values[0]),
+                        "score": no["score"],
+                        "countNum": int(no["count"]),
                     },
                     user_context,
                 )
@@ -288,12 +279,6 @@ def _log_perf(start_date, section):
     logger = logging.getLogger("noharm.backend")
 
     logger.debug(f"PERF {section}: {(end_date-start_date).total_seconds()}")
-
-
-def _compute_outlier(idDrug, drugsItem, poolDict, fold):
-    print("Starting...", fold, idDrug)
-    poolDict[idDrug] = add_score(drugsItem)
-    print("End...", fold, idDrug)
 
 
 def _clean_outliers(id_drug, id_segment):

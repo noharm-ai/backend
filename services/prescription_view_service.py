@@ -498,7 +498,7 @@ def _get_exams(
         },
     )
 
-    return {"exams": exams, "exams_card": examsJson[:10], "alerts": alertExams}
+    return {"exams": exams, "exams_card": examsJson[:20], "alerts": alertExams}
 
 
 @timed()
