@@ -7,9 +7,6 @@ troposphere
 zappa
 flask-cors==5.0.0
 psycopg2-binary
-numpy
-scipy==1.10.0
-scikit-learn
 flask-mail
 random-password-generator
 PyJWT==2.9.0
@@ -19,4 +16,3 @@ boto3==1.35.2
 openai==1.12.0
 redis==5.1.1
 pydantic==2.9.2
-joblib==1.4.0
