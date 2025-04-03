@@ -113,6 +113,12 @@ def generate(
     csv_buffer = _get_csv_buffer(
         id_segment=id_segment, schema=user_context.schema, id_drug=id_drug, fold=fold
     )
+    csv_string = csv_buffer.getvalue()
+
+    if csv_string.count("\n") < 2:
+        # list has only a header line, abort score generation
+        return False
+
     _log_perf(start_date, "GENERATE CSV BUFFER")
 
     start_date = datetime.now()
@@ -124,12 +130,23 @@ def generate(
         Payload=json.dumps(
             {
                 "command": "lambda_scores.generate_scores",
-                "csv_string": csv_buffer.getvalue(),
+                "csv_string": csv_string,
             }
         ),
     )
 
     scores = json.loads(json.loads(response["Payload"].read().decode("utf-8")))
+
+    if scores.get("error", None):
+        logging.basicConfig()
+        logger = logging.getLogger("noharm.backend")
+        logger.error("score error: %s", scores.get("requestId", "request id not found"))
+
+        raise ValidationError(
+            "Erro ao acionar geração de escore",
+            "errors.functionError",
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
 
     _log_perf(start_date, "PROCESS SCORES")
 

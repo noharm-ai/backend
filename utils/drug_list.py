@@ -1,11 +1,10 @@
 import re
 import math
 
-from utils.dateutils import to_iso
 from services import drug_service
 from services.admin import admin_ai_service
 from models.enums import DrugTypeEnum
-from utils import stringutils, numberutils, prescriptionutils
+from utils import stringutils, numberutils, prescriptionutils, dateutils
 
 
 def _get_legacy_alert(kind):
@@ -313,7 +312,7 @@ class DrugList:
                     "source": pd[0].source,
                     "checked": bool(pd[0].checked or pd[9] == "s"),
                     "suspended": bool(pd[0].suspendedDate),
-                    "suspensionDate": pd[0].suspendedDate,
+                    "suspensionDate": dateutils.to_iso(pd[0].suspendedDate),
                     "status": pd[0].status,
                     "near": pd[0].near,
                     "prevIntervention": self.getPrevIntervention(
@@ -334,8 +333,8 @@ class DrugList:
                     "infusionKey": self.getInfusionKey(pd),
                     "formValues": pd[0].form,
                     "drugAttributes": drug_service.to_dict(pd[6]),
-                    "prescriptionDate": to_iso(pd.prescription_date),
-                    "prescriptionExpire": to_iso(pd.prescription_expire),
+                    "prescriptionDate": dateutils.to_iso(pd.prescription_date),
+                    "prescriptionExpire": dateutils.to_iso(pd.prescription_expire),
                     "schedule": self.schedule_to_array(pd[0].schedule),
                 }
             )
@@ -489,7 +488,7 @@ class DrugList:
             return []
 
         for i in schedule:
-            results.append([to_iso(i[0]), to_iso(i[1])])
+            results.append([dateutils.to_iso(i[0]), dateutils.to_iso(i[1])])
 
         return sorted(
             results, key=lambda d: d[0] if d[0] != None else None, reverse=True

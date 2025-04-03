@@ -7,11 +7,15 @@ import boto3
 from config import Config
 from exception.validation_error import ValidationError
 from models.main import Drug
+from models.enums import NoHarmENV
 from utils import status
 
 
 def get_substance(drugs: list[Drug]):
     """Infer substances from drug list"""
+    if Config.ENV == NoHarmENV.TEST.value:
+        return {}
+
     if len(drugs) == 0:
         raise ValidationError(
             "Nenhum item selecionado",
@@ -40,6 +44,9 @@ def get_substance(drugs: list[Drug]):
 
 def get_substance_by_drug_name(drug_names: list[str]):
     """Infer substances from conciliation drug names"""
+    if Config.ENV == NoHarmENV.TEST.value:
+        return {}
+
     if not drug_names:
         return {}
 
