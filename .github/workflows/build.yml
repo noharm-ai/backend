@@ -44,6 +44,7 @@ jobs:
       - name: Run Coverage Report
         env:
           CACHE_BUCKET_NAME: ${{ secrets.CACHE_BUCKET_NAME }}
+          ENV: test
         run: python -m pytest --cov-report xml --cov=.
       - name: Submit Coverage Report
         if: ${{ env.CC_TEST_REPORTER_ID != '' }}
