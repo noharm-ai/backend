@@ -113,6 +113,12 @@ def generate(
     csv_buffer = _get_csv_buffer(
         id_segment=id_segment, schema=user_context.schema, id_drug=id_drug, fold=fold
     )
+    csv_string = csv_buffer.getvalue()
+
+    if csv_string.count("\n") < 2:
+        # list has only a header line, abort score generation
+        return False
+
     _log_perf(start_date, "GENERATE CSV BUFFER")
 
     start_date = datetime.now()
@@ -124,7 +130,7 @@ def generate(
         Payload=json.dumps(
             {
                 "command": "lambda_scores.generate_scores",
-                "csv_string": csv_buffer.getvalue(),
+                "csv_string": csv_string,
             }
         ),
     )
