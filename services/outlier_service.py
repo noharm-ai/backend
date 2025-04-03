@@ -137,6 +137,17 @@ def generate(
 
     scores = json.loads(json.loads(response["Payload"].read().decode("utf-8")))
 
+    if scores.get("error", None):
+        logging.basicConfig()
+        logger = logging.getLogger("noharm.backend")
+        logger.error("score error: %s", scores.get("requestId", "request id not found"))
+
+        raise ValidationError(
+            "Erro ao acionar geração de escore",
+            "errors.functionError",
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
     _log_perf(start_date, "PROCESS SCORES")
 
     start_date = datetime.now()
