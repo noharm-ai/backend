@@ -171,15 +171,7 @@ def _set_new_config(old_config: dict, new_config: dict):
             )
             config["getname"]["token"] = {
                 "url": new_config["getname"]["token"]["url"],
-                "params": {
-                    "client_id": new_config["getname"]["token"]["params"]["client_id"],
-                    "client_secret": new_config["getname"]["token"]["params"][
-                        "client_secret"
-                    ],
-                    "grant_type": new_config["getname"]["token"]["params"][
-                        "grant_type"
-                    ],
-                },
+                "params": new_config["getname"]["token"]["params"],
             }
 
     if "remotenifi" in new_config:
