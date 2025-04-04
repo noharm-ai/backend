@@ -169,6 +169,14 @@ def _set_new_config(old_config: dict, new_config: dict):
             config["getname"]["authPrefix"] = new_config["getname"].get(
                 "authPrefix", ""
             )
+
+            if isinstance(new_config["getname"]["token"]["params"], str):
+                raise ValidationError(
+                    "Parâmetros do token não são um JSON válido",
+                    "errors.businessRules",
+                    status.HTTP_400_BAD_REQUEST,
+                )
+
             config["getname"]["token"] = {
                 "url": new_config["getname"]["token"]["url"],
                 "params": new_config["getname"]["token"]["params"],
