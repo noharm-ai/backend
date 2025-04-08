@@ -76,6 +76,7 @@ def upsert_reason(id, reason: InterventionReason):
     record.suspension = reason.suspension
     record.substitution = reason.substitution
     record.customEconomy = reason.customEconomy
+    record.blocking = reason.blocking
     record.relation_type = reason.relation_type
 
     db.session.add(record)
@@ -99,6 +100,7 @@ def list_to_dto(reasons):
                 "substitution": r[0].substitution,
                 "relationType": r[0].relation_type,
                 "customEconomy": r[0].customEconomy,
+                "blocking": r[0].blocking,
                 "protected": r[3],
             }
         )
@@ -116,4 +118,5 @@ def data_to_object(data) -> InterventionReason:
         customEconomy=data.get("customEconomy", False),
         relation_type=data.get("relationType", 0),
         idHospital=data.get("idHospital", 1),
+        blocking=data.get("blocking", False),
     )

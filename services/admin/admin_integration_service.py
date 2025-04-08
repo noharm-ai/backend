@@ -98,8 +98,8 @@ def init_intervention_reason(user_context: User):
     insert = text(
         f"""
             insert into {schema}.motivointervencao
-            (fkhospital, idmotivointervencao,nome, idmotivomae, ativo, suspensao, substituicao, tp_relacao, economia_customizada)
-            select fkhospital, idmotivointervencao,nome, idmotivomae, ativo, suspensao, substituicao, tp_relacao, economia_customizada
+            (fkhospital, idmotivointervencao,nome, idmotivomae, ativo, suspensao, substituicao, tp_relacao, economia_customizada, bloqueante)
+            select fkhospital, idmotivointervencao,nome, idmotivomae, ativo, suspensao, substituicao, tp_relacao, economia_customizada, bloqueante
             from hsc_test.motivointervencao
         """
     )
