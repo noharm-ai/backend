@@ -213,3 +213,14 @@ class Protocol(db.Model):
     updated_by = db.Column("updated_by", db.BigInteger, nullable=True)
     created_at = db.Column("created_at", db.DateTime, nullable=False)
     created_by = db.Column("created_by", db.BigInteger, nullable=False)
+
+
+class ICDTable(db.Model):
+    """International Classification of Diseases table"""
+
+    __tablename__ = "tb_cid10"
+    __table_args__ = {"schema": "public"}
+
+    id_int = db.Column("co_cid10", db.Integer, primary_key=True)
+    id_str = db.Column("nu_cid10", db.String, nullable=False)
+    name = db.Column("no_cid10", db.String, nullable=False)
