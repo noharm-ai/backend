@@ -98,8 +98,8 @@ def init_intervention_reason(user_context: User):
     insert = text(
         f"""
             insert into {schema}.motivointervencao
-            (fkhospital, idmotivointervencao,nome, idmotivomae, ativo, suspensao, substituicao, tp_relacao, economia_customizada)
-            select fkhospital, idmotivointervencao,nome, idmotivomae, ativo, suspensao, substituicao, tp_relacao, economia_customizada
+            (fkhospital, idmotivointervencao,nome, idmotivomae, ativo, suspensao, substituicao, tp_relacao, economia_customizada, bloqueante)
+            select fkhospital, idmotivointervencao,nome, idmotivomae, ativo, suspensao, substituicao, tp_relacao, economia_customizada, bloqueante
             from hsc_test.motivointervencao
         """
     )
@@ -169,17 +169,17 @@ def _set_new_config(old_config: dict, new_config: dict):
             config["getname"]["authPrefix"] = new_config["getname"].get(
                 "authPrefix", ""
             )
+
+            if isinstance(new_config["getname"]["token"]["params"], str):
+                raise ValidationError(
+                    "Parâmetros do token não são um JSON válido",
+                    "errors.businessRules",
+                    status.HTTP_400_BAD_REQUEST,
+                )
+
             config["getname"]["token"] = {
                 "url": new_config["getname"]["token"]["url"],
-                "params": {
-                    "client_id": new_config["getname"]["token"]["params"]["client_id"],
-                    "client_secret": new_config["getname"]["token"]["params"][
-                        "client_secret"
-                    ],
-                    "grant_type": new_config["getname"]["token"]["params"][
-                        "grant_type"
-                    ],
-                },
+                "params": new_config["getname"]["token"]["params"],
             }
 
     if "remotenifi" in new_config:

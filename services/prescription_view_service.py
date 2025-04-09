@@ -13,7 +13,7 @@ from models.prescription import (
     Patient,
     PrescriptionAudit,
 )
-from models.appendix import Department
+from models.appendix import Department, ICDTable
 from models.segment import Segment
 from models.enums import (
     MemoryEnum,
@@ -60,7 +60,7 @@ def _internal_get_prescription(
     user_context: User,
     is_complete=False,
 ):
-    prescription, patient, department, segment, prescription_user = (
+    prescription, patient, department, segment, prescription_user, icd = (
         _get_prescription_data(id_prescription=id_prescription)
     )
 
@@ -131,6 +131,7 @@ def _internal_get_prescription(
         cn_data=cn_data,
         review_data=review_data,
         alerts_data=alerts_data,
+        icd=icd,
     )
 
 
@@ -271,14 +272,9 @@ def _get_prescription_data(
     id_prescription: int,
 ) -> tuple[Prescription, Patient, Department, Segment, User]:
     data = (
-        db.session.query(
-            Prescription,
-            Patient,
-            Department,
-            Segment,
-            User,
-        )
+        db.session.query(Prescription, Patient, Department, Segment, User, ICDTable)
         .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)
+        .outerjoin(ICDTable, Patient.id_icd == ICDTable.id_str)
         .outerjoin(
             Department,
             and_(
@@ -304,13 +300,14 @@ def _get_prescription_data(
     department: Department = data[2]
     segment: Segment = data[3]
     prescription_user: User = data[4]
+    icd: ICDTable = data[5]
 
     if patient is None:
         patient = Patient()
         patient.idPatient = prescription.idPatient
         patient.admissionNumber = prescription.admissionNumber
 
-    return prescription, patient, department, segment, prescription_user
+    return prescription, patient, department, segment, prescription_user, icd
 
 
 @timed()
@@ -685,6 +682,7 @@ def _format(
     cn_data: dict,
     review_data: dict,
     alerts_data: dict,
+    icd: ICDTable,
 ):
     return {
         # prescription
@@ -713,6 +711,8 @@ def _format(
         "user": prescription_user.name if prescription_user else None,
         "userId": prescription.user,
         "insurance": prescription.insurance,
+        "idICD": icd.id_str if icd else None,
+        "nameICD": icd.name if icd else None,
         # patient
         "admissionDate": dateutils.to_iso(patient.admissionDate),
         "birthdate": dateutils.to_iso(patient.birthdate),

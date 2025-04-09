@@ -94,7 +94,7 @@ class Patient(db.Model):
     st_conciliation = db.Column("st_concilia", db.Integer, nullable=True)
     tags = db.Column("marcadores", postgresql.ARRAY(db.String(100)), nullable=True)
     responsiblePhysician = db.Column("medico_responsavel", db.String, nullable=True)
-    idCid = db.Column("idcid", db.String, nullable=True)
+    id_icd = db.Column("idcid", db.String, nullable=True)
     dischargeDateForecast = db.Column("dt_alta_prevista", db.DateTime, nullable=True)
 
     def findByAdmission(admissionNumber):
