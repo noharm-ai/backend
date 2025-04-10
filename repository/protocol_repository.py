@@ -24,6 +24,9 @@ def list_protocols(request_data: ProtocolListRequest, schema: str) -> list[Proto
     if request_data.protocolTypeList:
         query = query.filter(Protocol.protocol_type.in_(request_data.protocolTypeList))
 
+    if request_data.statusType is not None:
+        query = query.filter(Protocol.status_type == request_data.statusType)
+
     return (
         query.filter(
             or_(Protocol.schema == None, Protocol.schema == schema),

@@ -55,6 +55,8 @@ class Role(Enum):
         Permission.READ_REGULATION,
         Permission.ADMIN_UNIT,
         Permission.WRITE_TAGS,
+        Permission.READ_PROTOCOLS,
+        Permission.WRITE_PROTOCOLS,
     ]
 
     CURATOR = "CURATOR", [
