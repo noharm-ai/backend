@@ -20,6 +20,7 @@ def list_protocols(request_data: ProtocolListRequest, user_context: User):
             {
                 "id": item.id,
                 "name": item.name,
+                "schema": item.schema,
                 "protocolType": item.protocol_type,
                 "config": item.config,
                 "statusType": item.status_type,
