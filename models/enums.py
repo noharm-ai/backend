@@ -242,3 +242,17 @@ class ProtocolStatusTypeEnum(Enum):
     INACTIVE = 0
     ACTIVE = 1
     STAGING = 2
+
+
+class ProtocolVariableFieldEnum(Enum):
+    """Enum: protocol fields"""
+
+    SUBSTANCE = "substance"
+    ID_DRUG = "idDrug"
+    DRUG_CLASS = "class"
+    ROUTE = "route"
+    EXAM = "exam"
+    AGE = "age"
+    WEIGHT = "weight"
+    ID_DEPARTMENT = "idDepartment"
+    ID_SEGMENT = "idSegment"
