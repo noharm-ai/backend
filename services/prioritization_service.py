@@ -47,6 +47,8 @@ def get_prioritization_list(
     tags=None,
     has_clinical_notes=None,
     protocols=None,
+    age_min=None,
+    age_max=None,
 ):
     is_cpoe = feature_service.is_cpoe()
 
@@ -276,6 +278,16 @@ def get_prioritization_list(
         q = q.filter(
             (Prescription.features["globalScore"].astext.cast(Integer))
             <= global_score_max
+        )
+
+    if age_min is not None:
+        q = q.filter(
+            Patient.birthdate <= (date.today() - timedelta(days=365 * int(age_min)))
+        )
+
+    if age_max is not None:
+        q = q.filter(
+            Patient.birthdate >= (date.today() - timedelta(days=365 * int(age_max)))
         )
 
     if prescriber != None:

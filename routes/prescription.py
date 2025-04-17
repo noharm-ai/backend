@@ -79,6 +79,8 @@ def get_prescriptions():
         tags=request.args.getlist("tags[]"),
         has_clinical_notes=request.args.get("hasClinicalNotes", None),
         protocols=request.args.getlist("protocols[]"),
+        age_min=request.args.get("ageMin", None),
+        age_max=request.args.get("ageMax", None),
     )
 
 

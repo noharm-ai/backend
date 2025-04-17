@@ -39,6 +39,7 @@ def get_interventions(
     responsible_name=None,
     prescriber_name=None,
 ):
+    """List and filter interventions"""
     mReasion = db.aliased(InterventionReason)
     descript = case(
         (
@@ -210,6 +211,18 @@ def get_interventions(
 
     interventions = interventions.order_by(desc(Intervention.date)).limit(1500).all()
 
+    def get_drug_name(i: Intervention, pd: PrescriptionDrug, drug_name: str):
+        if i.id == 0:
+            return "Intervenção no Paciente"
+
+        if drug_name:
+            return drug_name
+
+        if pd:
+            return "Medicamento " + str(pd.idDrug)
+
+        return "Intervenção arquivada"
+
     intervBuffer = []
     for i in interventions:
         intervBuffer.append(
@@ -225,15 +238,7 @@ def get_interventions(
                     i[1].idPrescription if i[1] else i[0].idPrescription
                 ),
                 "idDrug": i[1].idDrug if i[1] else None,
-                "drugName": (
-                    i[3]
-                    if i[3] is not None
-                    else (
-                        "Medicamento " + str(i[1].idDrug)
-                        if i[1]
-                        else "Intervenção no Paciente"
-                    )
-                ),
+                "drugName": get_drug_name(i=i[0], pd=i[1], drug_name=i[3]),
                 "dose": i[1].dose if i[1] else None,
                 "measureUnit": (
                     {"value": i[5].id, "label": i[5].description} if i[5] else ""
@@ -280,6 +285,7 @@ def add_multiple_interventions(
     observation=None,
     agg_id_prescription=None,
 ):
+    """Create multiple interventions in one request"""
     id_intervention_list = []
 
     # define economy
@@ -384,6 +390,7 @@ def save_intervention(
     agg_id_prescription=None,
     update_responsible=False,
 ):
+    """Create/update intervention"""
     if id_intervention == None and id_intervention_reason == None:
         # transition between versions
         raise ValidationError(
@@ -424,6 +431,35 @@ def save_intervention(
                 "errors.invalidRecord",
                 status.HTTP_400_BAD_REQUEST,
             )
+
+        if i.id != 0:
+            pd = (
+                db.session.query(PrescriptionDrug)
+                .filter(PrescriptionDrug.id == i.id)
+                .first()
+            )
+
+            if not pd:
+                raise ValidationError(
+                    "Esta intervenção não pode ser alterada, pois está arquivada",
+                    "errors.businessRules",
+                    status.HTTP_400_BAD_REQUEST,
+                )
+
+        # check if intervention fkprescricao is archived
+        if i.idPrescription != 0:
+            pd = (
+                db.session.query(Prescription)
+                .filter(Prescription.id == i.idPrescription)
+                .first()
+            )
+
+            if not pd:
+                raise ValidationError(
+                    "Esta intervenção não pode ser alterada, pois está arquivada",
+                    "errors.businessRules",
+                    status.HTTP_400_BAD_REQUEST,
+                )
 
     if not i:
         new_intv = True

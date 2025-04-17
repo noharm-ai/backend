@@ -42,13 +42,13 @@ class AlertProtocol:
             substance: Substance = d[11]
 
             if prescription_drug.idDrug:
-                self.id_drug_list.append(prescription_drug.idDrug)
+                self.id_drug_list.append(str(prescription_drug.idDrug))
 
             if prescription_drug.route:
                 self.route_list.append(prescription_drug.route.upper())
 
             if substance:
-                self.substance_list.append(substance.id)
+                self.substance_list.append(str(substance.id))
 
             if substance and substance.idclass:
                 self.class_list.append(substance.idclass)
@@ -88,12 +88,14 @@ class AlertProtocol:
         value = variable.get("value")
 
         if field == "substance":
+            value = [str(v) for v in value]
             return self._compare(op=operator, value1=self.substance_list, value2=value)
 
         if field == "class":
             return self._compare(op=operator, value1=self.class_list, value2=value)
 
         if field == "idDrug":
+            value = [str(v) for v in value]
             return self._compare(op=operator, value1=self.id_drug_list, value2=value)
 
         if field == "route":
@@ -107,13 +109,23 @@ class AlertProtocol:
             if self.exams[exam_type]["value"] is None:
                 return False
 
-            return self._compare(
-                op=operator, value1=self.exams[exam_type]["value"], value2=value
-            )
+            try:
+                exam_value = float(self.exams[exam_type]["value"])
+                value = float(value)
+            except ValueError:
+                return False
+
+            return self._compare(op=operator, value1=exam_value, value2=value)
 
         if field == "age":
             age = self.exams.get("age", None)
             if not age:
+                return False
+
+            try:
+                age = float(age)
+                value = float(value)
+            except ValueError:
                 return False
 
             return self._compare(op=operator, value1=age, value2=value)
@@ -122,24 +134,29 @@ class AlertProtocol:
             weight = self.exams.get("weight", None)
             if not weight:
                 return False
+            try:
+                weight = float(weight)
+                value = float(value)
+            except ValueError:
+                return False
 
             return self._compare(op=operator, value1=weight, value2=value)
 
         if field == "idDepartment":
-            department = (
-                [self.prescription.idDepartment]
-                if operator in ["IN", "NOT IN"]
-                else self.prescription.idDepartment
-            )
+            if operator in ["IN", "NOT IN"]:
+                department = [str(self.prescription.idDepartment)]
+                value = [str(v) for v in value]
+            else:
+                department = self.prescription.idDepartment
 
             return self._compare(op=operator, value1=department, value2=value)
 
         if field == "idSegment":
-            segment = (
-                [self.prescription.idSegment]
-                if operator in ["IN", "NOT IN"]
-                else self.prescription.idSegment
-            )
+            if operator in ["IN", "NOT IN"]:
+                segment = [str(self.prescription.idSegment)]
+                value = [str(v) for v in value]
+            else:
+                segment = self.prescription.idSegment
 
             return self._compare(op=operator, value1=segment, value2=value)
 

@@ -39,6 +39,7 @@ def set_intervention_outcome(
     destiny_data,
     id_prescription_drug_destiny,
 ):
+    """Set an outcome for an intervention"""
     intervention: Intervention = (
         db.session.query(Intervention)
         .filter(Intervention.idIntervention == id_intervention)
@@ -51,6 +52,36 @@ def set_intervention_outcome(
             "errors.invalidRecord",
             status.HTTP_400_BAD_REQUEST,
         )
+
+    # check if intervention fkpresmed is archived
+    if intervention.id != 0:
+        pd = (
+            db.session.query(PrescriptionDrug)
+            .filter(PrescriptionDrug.id == intervention.id)
+            .first()
+        )
+
+        if not pd:
+            raise ValidationError(
+                "Esta intervenção não pode ser alterada, pois está arquivada",
+                "errors.businessRules",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+    # check if intervention fkprescricao is archived
+    if intervention.idPrescription != 0:
+        pd = (
+            db.session.query(Prescription)
+            .filter(Prescription.id == intervention.idPrescription)
+            .first()
+        )
+
+        if not pd:
+            raise ValidationError(
+                "Esta intervenção não pode ser alterada, pois está arquivada",
+                "errors.businessRules",
+                status.HTTP_400_BAD_REQUEST,
+            )
 
     _validate_authorization(
         id_prescription=intervention.idPrescription,
@@ -214,6 +245,7 @@ def _validate_authorization(id_prescription, id_prescription_drug, user: User):
 
 @has_permission(Permission.READ_PRESCRIPTION)
 def get_outcome_data(id_intervention, user_context: User, edit=False):
+    """Get all the data UI needs related to this intervention"""
     record = intervention_outcome_repository.get_outcome(
         id_intervention=id_intervention
     )
@@ -230,6 +262,26 @@ def get_outcome_data(id_intervention, user_context: User, edit=False):
     readonly = intervention.status != InterventionStatusEnum.PENDING.value and not edit
     economy_type = intervention.economy_type
     outcome_user: User = record[3]
+
+    if intervention.id and not prescription_drug:
+        return {
+            "idIntervention": intervention.idIntervention,
+            "header": {
+                "archived": True,
+                "patient": prescription_drug == None,
+                "status": intervention.status,
+                "readonly": readonly,
+                "date": intervention.date.isoformat(),
+                "interventionReason": record.reason,
+                "outcomeAt": (
+                    intervention.outcome_at.isoformat()
+                    if intervention.outcome_at != None
+                    else None
+                ),
+                "outcomeUser": (outcome_user.name if outcome_user != None else None),
+                "notes": intervention.notes,
+            },
+        }
 
     # custom economy gets a simpler response
     if economy_type == InterventionEconomyTypeEnum.CUSTOM.value:
