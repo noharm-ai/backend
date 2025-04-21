@@ -1,6 +1,7 @@
 """AlertProtocol class: test protocol rules against prescription data"""
 
 import re
+from datetime import date
 
 from models.enums import DrugTypeEnum
 from models.main import Substance
@@ -103,11 +104,23 @@ class AlertProtocol:
 
         if field == "exam":
             exam_type = variable.get("examType")
+            exam_period = variable.get("examPeriod", None)
+
             if exam_type not in self.exams:
                 return False
 
             if self.exams[exam_type]["value"] is None:
                 return False
+
+            if exam_period is not None:
+                try:
+                    exam_date = date.fromisoformat(self.exams[exam_type]["date"])
+                    days_diff = (date.today() - exam_date).days
+
+                    if int(days_diff) > int(exam_period):
+                        return False
+                except ValueError:
+                    return False
 
             try:
                 exam_value = float(self.exams[exam_type]["value"])

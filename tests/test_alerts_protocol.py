@@ -1,5 +1,7 @@
 """Test: module for protocol alerts"""
 
+from datetime import date, timedelta
+
 import pytest
 
 from models.prescription import Prescription
@@ -289,6 +291,40 @@ from utils.alert_protocol import AlertProtocol
                         "name": "v1",
                         "field": "exam",
                         "examType": "ckd21",
+                        "operator": "<=",
+                        "value": 3.2,
+                    }
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            True,
+        ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
+                        "field": "exam",
+                        "examType": "ckd21",
+                        "examPeriod": 2,
+                        "operator": "<=",
+                        "value": 3.2,
+                    }
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            False,
+        ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
+                        "field": "exam",
+                        "examType": "ckd21",
+                        "examPeriod": 4,
                         "operator": "<=",
                         "value": 3.2,
                     }
@@ -597,7 +633,14 @@ def test_trigger(protocol, has_result):
     prescription = Prescription()
     prescription.idDepartment = 100
     prescription.idSegment = 1
-    exams = {"age": 50, "weight": 80, "ckd21": {"value": 3.2}}
+    exams = {
+        "age": 50,
+        "weight": 80,
+        "ckd21": {
+            "value": 3.2,
+            "date": (date.today() - timedelta(days=3)).isoformat(),
+        },
+    }
     alert_protocol = AlertProtocol(
         drugs=drug_list, exams=exams, prescription=prescription
     )
