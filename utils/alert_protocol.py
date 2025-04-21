@@ -160,6 +160,86 @@ class AlertProtocol:
 
             return self._compare(op=operator, value1=segment, value2=value)
 
+        if field == "combination":
+            v_substance = variable.get("substance", None)
+            v_drug = variable.get("drug", None)
+            v_class = variable.get("class", None)
+
+            v_dose = variable.get("dose", None)
+            v_dose_op = variable.get("doseOperator", None)
+
+            v_frequencyday = variable.get("frequencyday", None)
+            v_frequency_op = variable.get("frequencydayOperator", None)
+
+            v_period = variable.get("period", None)
+            v_period_op = variable.get("periodOperator", None)
+
+            v_route = variable.get("route", None)
+
+            found = False
+            for d in self.filtered_drugs:
+                prescription_drug: PrescriptionDrug = d[0]
+                substance: Substance = d[11]
+
+                exp_result = True
+
+                if v_substance is not None:
+                    exp_result = exp_result and self._compare(
+                        op="IN", value1=[str(substance.id)], value2=v_substance
+                    )
+
+                if v_drug is not None:
+                    exp_result = exp_result and self._compare(
+                        op="IN", value1=[str(prescription_drug.idDrug)], value2=v_drug
+                    )
+
+                if v_class is not None:
+                    exp_result = exp_result and self._compare(
+                        op="IN", value1=[str(substance.idclass)], value2=v_class
+                    )
+
+                if v_dose is not None:
+                    exp_result = exp_result and (
+                        self._compare(
+                            op=v_dose_op,
+                            value1=prescription_drug.doseconv,
+                            value2=v_dose,
+                        )
+                    )
+
+                if v_frequencyday is not None:
+                    exp_result = exp_result and (
+                        self._compare(
+                            op=v_frequency_op,
+                            value1=prescription_drug.frequency,
+                            value2=v_frequencyday,
+                        )
+                    )
+
+                if v_period is not None:
+                    exp_result = exp_result and (
+                        self._compare(
+                            op=v_period_op,
+                            value1=prescription_drug.period,
+                            value2=v_period,
+                        )
+                    )
+
+                if v_route is not None:
+                    exp_result = exp_result and (
+                        self._compare(
+                            op="IN",
+                            value1=[prescription_drug.route],
+                            value2=v_route,
+                        )
+                    )
+
+                if exp_result:
+                    found = True
+                    break
+
+            return found
+
         raise NotImplementedError("field not supported")
 
     def _compare(self, op: str, value1, value2):
