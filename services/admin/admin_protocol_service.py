@@ -94,6 +94,17 @@ def upsert_protocol(request_data: ProtocolUpsertRequest, user_context: User):
 
 
 def _validate_variables(variables: list[dict]):
+    valid_operators = [
+        ">",
+        "<",
+        ">=",
+        "<=",
+        "=",
+        "!=",
+        "IN",
+        "NOTIN",
+    ]
+
     if not variables:
         raise ValidationError(
             "Nenhuma variável foi definida",
@@ -106,6 +117,7 @@ def _validate_variables(variables: list[dict]):
         field = var.get("field", None)
         operator = var.get("operator", None)
         exam_type = var.get("examType", None)
+        exam_period = var.get("examPeriod", None)
         value = var.get("value", None)
 
         if not name:
@@ -115,9 +127,9 @@ def _validate_variables(variables: list[dict]):
                 status.HTTP_400_BAD_REQUEST,
             )
 
-        if not field or not operator or not value:
+        if not field:
             raise ValidationError(
-                f"Variável {name}: Todos os campos são obrigatórios",
+                f"Variável {name}: Campo Tipo é obrigatório",
                 "errors.businessRules",
                 status.HTTP_400_BAD_REQUEST,
             )
@@ -136,26 +148,66 @@ def _validate_variables(variables: list[dict]):
                 status.HTTP_400_BAD_REQUEST,
             )
 
-        if operator not in [">", "<", ">=", "<=", "=", "!=", "IN", "NOTIN"]:
-            raise ValidationError(
-                f"Variável {name}: Operador inválido",
-                "errors.businessRules",
-                status.HTTP_400_BAD_REQUEST,
-            )
+        if "examPeriod" in var and (exam_period is None or exam_period == ""):
+            var.pop("examPeriod")
 
-        if operator in ["IN", "NOTIN"] and not isinstance(value, list):
-            raise ValidationError(
-                f"Variável {name}: Valor deve ser uma lista",
-                "errors.businessRules",
-                status.HTTP_400_BAD_REQUEST,
-            )
+        if field == ProtocolVariableFieldEnum.COMBINATION.value:
+            combo_fields = [
+                "substance",
+                "drug",
+                "class",
+                "dose",
+                "doseOperator",
+                "frequencyday",
+                "frequencydayOperator",
+                "route",
+                "period",
+                "periodOperator",
+            ]
 
-        if operator not in ["IN", "NOTIN"] and isinstance(value, list):
-            raise ValidationError(
-                f"Variável {name}: Valor não deve ser uma lista",
-                "errors.businessRules",
-                status.HTTP_400_BAD_REQUEST,
-            )
+            for cf in combo_fields:
+                if cf not in var:
+                    continue
+
+                cf_value = var.get(cf, None)
+
+                if not cf_value:
+                    var.pop(cf)
+                elif "Operator" in cf and cf_value not in valid_operators:
+                    raise ValidationError(
+                        f"Variável {name}: Operador inválido ({cf})",
+                        "errors.businessRules",
+                        status.HTTP_400_BAD_REQUEST,
+                    )
+
+        else:
+            if not operator or not value:
+                raise ValidationError(
+                    f"Variável {name}: Todos os campos são obrigatórios",
+                    "errors.businessRules",
+                    status.HTTP_400_BAD_REQUEST,
+                )
+
+            if operator not in valid_operators:
+                raise ValidationError(
+                    f"Variável {name}: Operador inválido",
+                    "errors.businessRules",
+                    status.HTTP_400_BAD_REQUEST,
+                )
+
+            if operator in ["IN", "NOTIN"] and not isinstance(value, list):
+                raise ValidationError(
+                    f"Variável {name}: Valor deve ser uma lista",
+                    "errors.businessRules",
+                    status.HTTP_400_BAD_REQUEST,
+                )
+
+            if operator not in ["IN", "NOTIN"] and isinstance(value, list):
+                raise ValidationError(
+                    f"Variável {name}: Valor não deve ser uma lista",
+                    "errors.businessRules",
+                    status.HTTP_400_BAD_REQUEST,
+                )
 
 
 def _test_protocol(protocol: dict):
@@ -186,7 +238,14 @@ def _test_protocol(protocol: dict):
     prescription = Prescription()
     prescription.idDepartment = 100
     prescription.idSegment = 1
-    exams = {"age": 50, "weight": 80, "ckd21": {"value": 3.2}}
+    exams = {
+        "age": 50,
+        "weight": 80,
+        "ckd21": {
+            "value": 3.2,
+            "date": (datetime.today().date() - timedelta(days=3)).isoformat(),
+        },
+    }
     alert_protocol = AlertProtocol(
         drugs=drug_list, exams=exams, prescription=prescription
     )

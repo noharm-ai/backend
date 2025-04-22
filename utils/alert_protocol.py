@@ -114,12 +114,14 @@ class AlertProtocol:
 
             if exam_period is not None:
                 try:
-                    exam_date = date.fromisoformat(self.exams[exam_type]["date"])
+                    exam_date = date.fromisoformat(
+                        self.exams[exam_type]["date"].split("T")[0]
+                    )
                     days_diff = (date.today() - exam_date).days
 
                     if int(days_diff) > int(exam_period):
                         return False
-                except ValueError:
+                except (ValueError, KeyError):
                     return False
 
             try:
@@ -179,13 +181,13 @@ class AlertProtocol:
             v_class = variable.get("class", None)
 
             v_dose = variable.get("dose", None)
-            v_dose_op = variable.get("doseOperator", None)
+            v_dose_op = variable.get("doseOperator", "=")
 
             v_frequencyday = variable.get("frequencyday", None)
-            v_frequency_op = variable.get("frequencydayOperator", None)
+            v_frequency_op = variable.get("frequencydayOperator", "=")
 
             v_period = variable.get("period", None)
-            v_period_op = variable.get("periodOperator", None)
+            v_period_op = variable.get("periodOperator", "=")
 
             v_route = variable.get("route", None)
 
@@ -196,7 +198,7 @@ class AlertProtocol:
 
                 exp_result = True
 
-                if v_substance is not None:
+                if v_substance is not None and substance:
                     exp_result = exp_result and self._compare(
                         op="IN", value1=[str(substance.id)], value2=v_substance
                     )
@@ -206,12 +208,17 @@ class AlertProtocol:
                         op="IN", value1=[str(prescription_drug.idDrug)], value2=v_drug
                     )
 
-                if v_class is not None:
+                if v_class is not None and substance:
                     exp_result = exp_result and self._compare(
                         op="IN", value1=[str(substance.idclass)], value2=v_class
                     )
 
                 if v_dose is not None:
+                    try:
+                        v_dose = float(v_dose)
+                    except ValueError:
+                        return False
+
                     exp_result = exp_result and (
                         self._compare(
                             op=v_dose_op,
@@ -221,6 +228,11 @@ class AlertProtocol:
                     )
 
                 if v_frequencyday is not None:
+                    try:
+                        v_frequencyday = float(v_frequencyday)
+                    except ValueError:
+                        return False
+
                     exp_result = exp_result and (
                         self._compare(
                             op=v_frequency_op,
@@ -230,6 +242,11 @@ class AlertProtocol:
                     )
 
                 if v_period is not None:
+                    try:
+                        v_period = int(v_period)
+                    except ValueError:
+                        return False
+
                     exp_result = exp_result and (
                         self._compare(
                             op=v_period_op,
