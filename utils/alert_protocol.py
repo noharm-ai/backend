@@ -1,6 +1,7 @@
 """AlertProtocol class: test protocol rules against prescription data"""
 
 import re
+from datetime import date
 
 from models.enums import DrugTypeEnum
 from models.main import Substance
@@ -103,11 +104,25 @@ class AlertProtocol:
 
         if field == "exam":
             exam_type = variable.get("examType")
+            exam_period = variable.get("examPeriod", None)
+
             if exam_type not in self.exams:
                 return False
 
             if self.exams[exam_type]["value"] is None:
                 return False
+
+            if exam_period is not None:
+                try:
+                    exam_date = date.fromisoformat(
+                        self.exams[exam_type]["date"].split("T")[0]
+                    )
+                    days_diff = (date.today() - exam_date).days
+
+                    if int(days_diff) > int(exam_period):
+                        return False
+                except (ValueError, KeyError):
+                    return False
 
             try:
                 exam_value = float(self.exams[exam_type]["value"])
@@ -159,6 +174,101 @@ class AlertProtocol:
                 segment = self.prescription.idSegment
 
             return self._compare(op=operator, value1=segment, value2=value)
+
+        if field == "combination":
+            v_substance = variable.get("substance", None)
+            v_drug = variable.get("drug", None)
+            v_class = variable.get("class", None)
+
+            v_dose = variable.get("dose", None)
+            v_dose_op = variable.get("doseOperator", "=")
+
+            v_frequencyday = variable.get("frequencyday", None)
+            v_frequency_op = variable.get("frequencydayOperator", "=")
+
+            v_period = variable.get("period", None)
+            v_period_op = variable.get("periodOperator", "=")
+
+            v_route = variable.get("route", None)
+
+            found = False
+            for d in self.filtered_drugs:
+                prescription_drug: PrescriptionDrug = d[0]
+                substance: Substance = d[11]
+
+                exp_result = True
+
+                if v_substance is not None and substance:
+                    exp_result = exp_result and self._compare(
+                        op="IN", value1=[str(substance.id)], value2=v_substance
+                    )
+
+                if v_drug is not None:
+                    exp_result = exp_result and self._compare(
+                        op="IN", value1=[str(prescription_drug.idDrug)], value2=v_drug
+                    )
+
+                if v_class is not None and substance:
+                    exp_result = exp_result and self._compare(
+                        op="IN", value1=[str(substance.idclass)], value2=v_class
+                    )
+
+                if v_dose is not None:
+                    try:
+                        v_dose = float(v_dose)
+                    except ValueError:
+                        return False
+
+                    exp_result = exp_result and (
+                        self._compare(
+                            op=v_dose_op,
+                            value1=prescription_drug.doseconv,
+                            value2=v_dose,
+                        )
+                    )
+
+                if v_frequencyday is not None:
+                    try:
+                        v_frequencyday = float(v_frequencyday)
+                    except ValueError:
+                        return False
+
+                    exp_result = exp_result and (
+                        self._compare(
+                            op=v_frequency_op,
+                            value1=prescription_drug.frequency,
+                            value2=v_frequencyday,
+                        )
+                    )
+
+                if v_period is not None:
+                    try:
+                        v_period = int(v_period)
+                    except ValueError:
+                        return False
+
+                    exp_result = exp_result and (
+                        self._compare(
+                            op=v_period_op,
+                            value1=prescription_drug.period,
+                            value2=v_period,
+                        )
+                    )
+
+                if v_route is not None:
+                    exp_result = exp_result and (
+                        self._compare(
+                            op="IN",
+                            value1=[prescription_drug.route],
+                            value2=v_route,
+                        )
+                    )
+
+                if exp_result:
+                    found = True
+                    break
+
+            return found
 
         raise NotImplementedError("field not supported")
 

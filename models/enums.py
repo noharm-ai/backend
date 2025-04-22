@@ -256,3 +256,4 @@ class ProtocolVariableFieldEnum(Enum):
     WEIGHT = "weight"
     ID_DEPARTMENT = "idDepartment"
     ID_SEGMENT = "idSegment"
+    COMBINATION = "combination"

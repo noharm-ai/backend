@@ -1,5 +1,7 @@
 """Test: module for protocol alerts"""
 
+from datetime import date, timedelta
+
 import pytest
 
 from models.prescription import Prescription
@@ -304,6 +306,40 @@ from utils.alert_protocol import AlertProtocol
                     {
                         "name": "v1",
                         "field": "exam",
+                        "examType": "ckd21",
+                        "examPeriod": 2,
+                        "operator": "<=",
+                        "value": 3.2,
+                    }
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            False,
+        ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
+                        "field": "exam",
+                        "examType": "ckd21",
+                        "examPeriod": 4,
+                        "operator": "<=",
+                        "value": 3.2,
+                    }
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            True,
+        ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
+                        "field": "exam",
                         "examType": "notexistent",
                         "operator": "<",
                         "value": 5,
@@ -446,6 +482,119 @@ from utils.alert_protocol import AlertProtocol
             },
             False,
         ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
+                        "field": "combination",
+                        "substance": ["111111"],
+                        "dose": 5,
+                        "doseOperator": "<",
+                    },
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            False,
+        ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
+                        "field": "combination",
+                        "substance": ["111111"],
+                        "dose": 5,
+                        "doseOperator": ">",
+                    },
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            True,
+        ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
+                        "field": "combination",
+                        "substance": ["111111"],
+                        "dose": 5,
+                        "doseOperator": ">",
+                        "frequencyday": 2,
+                        "frequencydayOperator": "=",
+                    },
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            True,
+        ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
+                        "field": "combination",
+                        "substance": ["111111"],
+                        "dose": 5,
+                        "doseOperator": ">",
+                        "frequencyday": 2,
+                        "frequencydayOperator": "=",
+                        "route": ["IV", "ORAL"],
+                    },
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            True,
+        ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
+                        "field": "combination",
+                        "substance": ["111111"],
+                        "drug": ["1"],
+                        "class": ["J1"],
+                        "dose": 5,
+                        "doseOperator": ">",
+                        "frequencyday": 2,
+                        "frequencydayOperator": "=",
+                        "route": ["IV", "ORAL"],
+                    },
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            True,
+        ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
+                        "field": "combination",
+                        "substance": ["111111"],
+                        "drug": ["1"],
+                        "class": ["J1"],
+                        "dose": 5,
+                        "doseOperator": ">",
+                        "frequencyday": 2,
+                        "frequencydayOperator": "=",
+                        "route": ["IV", "ORAL"],
+                        "period": 2,
+                        "periodOperator": ">",
+                    },
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            True,
+        ),
     ],
 )
 def test_trigger(protocol, has_result):
@@ -458,6 +607,8 @@ def test_trigger(protocol, has_result):
             drug_name="Drug A",
             drug_class="J1",
             route="IV",
+            frequency=2,
+            period=5,
         ),
         utils_test_prescription.get_prescription_drug_mock_row(
             id_prescription_drug=2,
@@ -465,6 +616,8 @@ def test_trigger(protocol, has_result):
             drug_name="Drug B",
             drug_class="J2",
             route="IV",
+            frequency=1,
+            period=1,
         ),
         utils_test_prescription.get_prescription_drug_mock_row(
             id_prescription_drug=3,
@@ -472,13 +625,22 @@ def test_trigger(protocol, has_result):
             drug_name="Drug C",
             drug_class="J3",
             route="ORAL",
+            frequency=3,
+            period=5,
         ),
     ]
 
     prescription = Prescription()
     prescription.idDepartment = 100
     prescription.idSegment = 1
-    exams = {"age": 50, "weight": 80, "ckd21": {"value": 3.2}}
+    exams = {
+        "age": 50,
+        "weight": 80,
+        "ckd21": {
+            "value": 3.2,
+            "date": (date.today() - timedelta(days=3)).isoformat(),
+        },
+    }
     alert_protocol = AlertProtocol(
         drugs=drug_list, exams=exams, prescription=prescription
     )

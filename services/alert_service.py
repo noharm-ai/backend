@@ -771,7 +771,7 @@ def _alert_kidney(
         alert[
             "text"
         ] = f"""
-            Medicamento deve sofrer ajuste de posologia ou contraindicado, já que a função renal do paciente (
+            Avaliar se o medicamento já está com o ajuste adequado conforme a função renal ou suspenso no caso de contraindicação, já que a função renal do paciente (
             {str(ckd_value)} mL/min) está abaixo de {str(drug_attributes.kidney)} mL/min.
         """
         return alert
@@ -785,7 +785,7 @@ def _alert_kidney(
         alert[
             "text"
         ] = f"""
-            Medicamento deve sofrer ajuste de posologia ou contraindicado, já que a função renal do paciente 
+            Avaliar se o medicamento já está com o ajuste adequado conforme a função renal ou suspenso no caso de contraindicação, já que a função renal do paciente  
             ({str(exams["swrtz2"]["value"])} mL/min/1.73m²) está abaixo de 
             {str(drug_attributes.kidney)} mL/min. (Schwartz 2)
         """
@@ -800,7 +800,7 @@ def _alert_kidney(
         alert[
             "text"
         ] = f"""
-            Medicamento deve sofrer ajuste de posologia ou contraindicado, já que a função renal do paciente 
+            Avaliar se o medicamento já está com o ajuste adequado conforme a função renal ou suspenso no caso de contraindicação, já que a função renal do paciente  
             ({str(exams["swrtz1"]["value"])} mL/min/1.73m²) está abaixo de {str(drug_attributes.kidney)} 
             mL/min. (Schwartz 1)
         """
