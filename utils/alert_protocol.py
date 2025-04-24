@@ -198,20 +198,26 @@ class AlertProtocol:
 
                 exp_result = True
 
-                if v_substance is not None and substance:
-                    exp_result = exp_result and self._compare(
-                        op="IN", value1=[str(substance.id)], value2=v_substance
-                    )
+                if v_substance is not None:
+                    if substance:
+                        exp_result = exp_result and self._compare(
+                            op="IN", value1=[str(substance.id)], value2=v_substance
+                        )
+                    else:
+                        exp_result = False
 
                 if v_drug is not None:
                     exp_result = exp_result and self._compare(
                         op="IN", value1=[str(prescription_drug.idDrug)], value2=v_drug
                     )
 
-                if v_class is not None and substance:
-                    exp_result = exp_result and self._compare(
-                        op="IN", value1=[str(substance.idclass)], value2=v_class
-                    )
+                if v_class is not None:
+                    if substance:
+                        exp_result = exp_result and self._compare(
+                            op="IN", value1=[str(substance.idclass)], value2=v_class
+                        )
+                    else:
+                        exp_result = False
 
                 if v_dose is not None:
                     try:
