@@ -298,10 +298,19 @@ def get_notes_by_date(admission_number, dateList, has_primary_care):
 
 
 def convert_notes(notes, has_primary_care, tags):
+    """Convert notes to a dictionary format"""
+
+    max_length = 700000
+    notes_text = notes.text
+    if len(notes_text) > max_length:
+        notes_text = (
+            notes_text[:max_length] + "<p>Evolução cortada por texto muito longo.</p>"
+        )
+
     obj = {
         "id": str(notes.id),
         "admissionNumber": notes.admissionNumber,
-        "text": notes.text,
+        "text": notes_text,
         "form": notes.form if has_primary_care else None,
         "template": notes.template if has_primary_care else None,
         "date": notes.date.isoformat(),
