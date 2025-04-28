@@ -302,7 +302,7 @@ def convert_notes(notes, has_primary_care, tags):
 
     max_length = 700000
     notes_text = notes.text
-    if len(notes_text) > max_length:
+    if notes_text and len(notes_text) > max_length:
         notes_text = (
             notes_text[:max_length] + "<p>Evolução cortada por texto muito longo.</p>"
         )
