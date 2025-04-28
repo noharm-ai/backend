@@ -23,8 +23,11 @@ from models.enums import (
     AppFeatureFlagEnum,
     DrugTypeEnum,
 )
-from repository import prescription_view_repository
-from repository import clinical_notes_repository
+from repository import (
+    prescription_view_repository,
+    patient_repository,
+    clinical_notes_repository,
+)
 from services import (
     prescription_service,
     memory_service,
@@ -66,7 +69,9 @@ def _internal_get_prescription(
 
     config_data = _get_configs(prescription=prescription, patient=patient)
 
-    interventions = _get_interventions(admission_number=prescription.admissionNumber)
+    interventions = _get_interventions(
+        admission_number=prescription.admissionNumber, config_data=config_data
+    )
 
     cn_data = _get_clinical_notes_stats(
         prescription=prescription,
@@ -368,11 +373,24 @@ def _get_configs(prescription: Prescription, patient: Patient):
                 patient_previous_data.height if patient_previous_data.height else None
             )
 
+    # previous admissions
+    data["previous_admissions"] = patient_repository.get_previous_admissions(
+        admission_number=prescription.admissionNumber,
+        id_patient=patient.idPatient,
+        limit=2,
+    )
+
     return data
 
 
 @timed()
-def _get_interventions(admission_number: int):
+def _get_interventions(admission_number: int, config_data: dict):
+    if config_data["previous_admissions"]:
+        # get interventions from current and previous admissions
+        return intervention_service.get_interventions(
+            admission_number_list=config_data["previous_admissions"]
+        )
+
     return intervention_service.get_interventions(admissionNumber=admission_number)
 
 
