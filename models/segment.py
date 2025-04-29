@@ -62,3 +62,4 @@ class Exams(db.Model):
     typeExam = db.Column("tpexame", db.String, primary_key=True)
     value = db.Column("resultado", db.Float, nullable=False)
     unit = db.Column("unidade", db.String, nullable=True)
+    created_by = db.Column("created_by", db.Integer, nullable=True)
