@@ -39,7 +39,7 @@ def create_exam(request_data: ExamCreateRequest, user_context: User):
     exam.idPatient = admission.idPatient
     exam.admissionNumber = request_data.admissionNumber
     exam.date = request_data.examDate
-    exam.typeExam = request_data.examType
+    exam.typeExam = request_data.examType.upper()
     exam.value = request_data.result
     exam.created_by = user_context.id
 
