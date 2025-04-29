@@ -46,27 +46,7 @@ def create_clinical_notes(data, user_context: User):
     db.session.add(cn)
     db.session.flush()
 
-    # route data
-    if cn.template != None:
-        prescription = Prescription.query.get(data.get("idPrescription"))
-
-        for group in cn.template:
-            for q in group["questions"]:
-                if "integration" in q:
-                    if (
-                        q["integration"]["to"] == "exams"
-                        and q["id"] in cn.form
-                        and cn.form[q["id"]] != None
-                    ):
-                        exams_service.create_exam(
-                            admission_number=data.get("admissionNumber", None),
-                            id_prescription=prescription.id,
-                            id_patient=prescription.idPatient,
-                            type_exam=q["id"],
-                            value=cn.form[q["id"]],
-                            unit=q["integration"]["unit"],
-                            user=user_context,
-                        )
+    # route data removed (it wasnt being used)
 
     return cn.id
 

@@ -10,43 +10,45 @@ from models.main import db, redis_client, User
 from models.prescription import Patient
 from models.segment import Exams, SegmentExam
 from models.notes import ClinicalNotes
+from models.requests.exam_request import ExamCreateRequest
 from repository import exams_repository
-from services import memory_service, cache_service
+from services import cache_service
 from decorators.has_permission_decorator import has_permission, Permission
 from exception.validation_error import ValidationError
 from utils import status, examutils, stringutils, dateutils, numberutils
 
 
-def create_exam(
-    admission_number, id_prescription, id_patient, type_exam, value, unit, user
-):
-    if not memory_service.has_feature("PRIMARYCARE"):
+@has_permission(Permission.WRITE_PRESCRIPTION)
+def create_exam(request_data: ExamCreateRequest, user_context: User):
+    """Create a new exam"""
+
+    admission = (
+        db.session.query(Patient)
+        .filter(Patient.admissionNumber == request_data.admissionNumber)
+        .first()
+    )
+    if admission is None:
         raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
+            "Registro inexistente",
+            "errors.invalidRecord",
+            status.HTTP_400_BAD_REQUEST,
         )
 
     exam = Exams()
-    exam.idExame = get_next_id(user.schema)
-    exam.idPatient = id_patient
-    exam.idPrescription = id_prescription
-    exam.admissionNumber = admission_number
-    exam.date = datetime.today()
-    exam.typeExam = type_exam
-    exam.value = value
-    exam.unit = unit
+    exam.idExame = exams_repository.get_next_exam_id(id_patient=admission.idPatient)
+    exam.idPatient = admission.idPatient
+    exam.admissionNumber = request_data.admissionNumber
+    exam.date = request_data.examDate
+    exam.typeExam = request_data.examType
+    exam.value = request_data.result
 
     db.session.add(exam)
     db.session.flush()
 
+    # refresh cache
+    refresh_exams_cache(id_patient=admission.idPatient, user_context=user_context)
 
-def get_next_id(schema):
-    result = db.session.execute(
-        text("SELECT NEXTVAL('" + schema + ".exame_fkexame_seq')")
-    )
-
-    return ([row[0] for row in result])[0]
+    return True
 
 
 def _get_textual_exams(admission_number: int = None, id_patient: int = None):
@@ -633,3 +635,21 @@ def refresh_exams_cache(id_patient: int, user_context: User):
     key = f"{user_context.schema}:{id_patient}:exames"
     for type_exam, exam in exams.items():
         redis_client.hset(key, type_exam, json.dumps(exam))
+
+
+@has_permission(Permission.READ_PRESCRIPTION)
+def list_exam_types():
+    """List all exam types"""
+    results = exams_repository.get_exam_types()
+
+    exams = []
+    for e in results:
+        if e.typeExam not in examutils.CUSTOM_EXAMS:
+            exams.append(
+                {
+                    "examType": e.typeExam,
+                    "name": e.name,
+                }
+            )
+
+    return exams

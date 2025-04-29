@@ -21,6 +21,8 @@ ckdEmpty = dict(
 swrtz2Empty = dict(examEmpty, **{"initials": "Schwartz 2", "name": "Schwartz 2"})
 swrtz1Empty = dict(examEmpty, **{"initials": "Schwartz 1", "name": "Schwartz 1"})
 
+CUSTOM_EXAMS = ["mdrd", "ckd", "ckd21", "cg", "swrtz2", "swrtz1"]
+
 
 class refEmpty:
     ref = initials = min = max = name = ""
