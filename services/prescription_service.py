@@ -276,6 +276,17 @@ def recalculate_prescription(id_prescription: int, user_context: User):
 
             db.session.flush()
 
+            # first update idoutlier to force recalculation
+            updt_stmt = text(
+                f"""UPDATE {user_context.schema}.presmed
+                    SET
+                        idoutlier = 99999
+                    WHERE
+                        fkprescricao = ANY(:prescriptionIds)
+                """
+            )
+            db.session.execute(updt_stmt, {"prescriptionIds": prescription_ids})
+
             query = text(
                 f"""INSERT INTO {user_context.schema}.presmed
                     SELECT
@@ -286,50 +297,74 @@ def recalculate_prescription(id_prescription: int, user_context: User):
                         fkprescricao = ANY(:prescriptionIds)
                 """
             )
-
             db.session.execute(query, {"prescriptionIds": prescription_ids})
         else:
-            query = text(
-                "INSERT INTO "
-                + user_context.schema
-                + ".presmed \
-                    SELECT pm.*\
-                    FROM "
-                + user_context.schema
-                + ".presmed pm\
-                    WHERE fkprescricao IN (\
-                        SELECT fkprescricao\
-                        FROM "
-                + user_context.schema
-                + ".prescricao p\
-                        WHERE p.nratendimento = :admissionNumber"
-                + "\
-                        AND p.idsegmento IS NOT NULL \
-                        AND (\
-                            p.dtprescricao::date = "
-                + "date(:prescDate) OR\
-                            p.dtvigencia::date = "
-                + "date(:prescDate)\
-                        )\
-                    );"
+            subquery = f"""
+                SELECT 
+                    fkprescricao
+                FROM
+                    {user_context.schema}.prescricao p
+                WHERE 
+                    p.nratendimento = :admissionNumber
+                    AND p.idsegmento IS NOT NULL
+                    AND (
+                        p.dtprescricao::date = date(:prescDate) 
+                        OR p.dtvigencia::date = date(:prescDate)
+                    )
+            """
+
+            # first update idoutlier to force recalculation
+            updt_stmt = text(
+                f"""
+                    UPDATE {user_context.schema}.presmed
+                    SET
+                        idoutlier = 99999
+                    WHERE 
+                        fkprescricao IN ({subquery})
+                """
+            )
+            db.session.execute(
+                updt_stmt, {"admissionNumber": p.admissionNumber, "prescDate": p.date}
             )
 
+            query = text(
+                f"""
+                    INSERT INTO {user_context.schema}.presmed
+                    SELECT 
+                        pm.*
+                    FROM 
+                        {user_context.schema}.presmed pm
+                    WHERE 
+                        fkprescricao IN ({subquery})
+                """
+            )
             db.session.execute(
                 query, {"admissionNumber": p.admissionNumber, "prescDate": p.date}
             )
     else:
-        query = text(
-            "INSERT INTO "
-            + user_context.schema
-            + ".presmed \
-                    SELECT *\
-                    FROM "
-            + user_context.schema
-            + ".presmed\
-                    WHERE fkprescricao = :idPrescription"
-            + ";"
+        # first update idoutlier to force recalculation
+        updt_stmt = text(
+            f"""
+                UPDATE {user_context.schema}.presmed
+                SET
+                    idoutlier = 99999
+                WHERE 
+                    fkprescricao = :idPrescription
+            """
         )
+        db.session.execute(updt_stmt, {"idPrescription": p.id})
 
+        query = text(
+            f"""
+                INSERT INTO {user_context.schema}.presmed
+                SELECT
+                    pm.*
+                FROM
+                    {user_context.schema}.presmed pm
+                WHERE
+                    fkprescricao = :idPrescription
+            """
+        )
         db.session.execute(query, {"idPrescription": p.id})
 
     # refresh cache

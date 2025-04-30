@@ -38,6 +38,7 @@ def get_interventions(
     status_list=[],
     responsible_name=None,
     prescriber_name=None,
+    admission_number_list=None,
 ):
     """List and filter interventions"""
     mReasion = db.aliased(InterventionReason)
@@ -129,7 +130,12 @@ def get_interventions(
             Intervention.admissionNumber == admissionNumber
         )
 
-    if not startDate and admissionNumber == None:
+    if admission_number_list:
+        interventions = interventions.filter(
+            Intervention.admissionNumber.in_(admission_number_list)
+        )
+
+    if not startDate and admissionNumber is None and admission_number_list is None:
         raise ValidationError(
             "Data inicial inválida",
             "errors.invalidRequest",

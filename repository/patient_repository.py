@@ -32,3 +32,25 @@ def get_next_admissions(admission_number: int, limit: int = 2):
             admission_list.append(int(a.admissionNumber))
 
     return admission_list
+
+
+def get_previous_admissions(id_patient: int, admission_number: int, limit: int = 2):
+    """
+    Search for previous admission numbers
+    """
+    admission_list = [admission_number]
+
+    admissions_query = (
+        select(Patient.admissionNumber)
+        .select_from(Patient)
+        .where(Patient.idPatient == id_patient)
+        .where(Patient.admissionNumber < admission_number)
+        .order_by(desc(Patient.admissionDate))
+        .limit(limit)
+    )
+
+    a_list = db.session.execute(admissions_query).all()
+    for a in a_list:
+        admission_list.append(int(a.admissionNumber))
+
+    return admission_list
