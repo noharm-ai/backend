@@ -335,6 +335,17 @@ def _get_new_queue(id_processor: str, action_type: str, data: dict):
                 }
             }
         }
+    elif NifiQueueActionTypeEnum.GET_CONTROLLER_REFERENCE.value == action_type:
+        queue.url = f"nifi-api/controller-services/{escape(id_processor)}?uiOnly=true"
+        queue.method = "GET"
+    elif NifiQueueActionTypeEnum.PUT_CONTROLLER_REFERENCE.value == action_type:
+        queue.url = f"nifi-api/controller-services/{escape(id_processor)}/references"
+        queue.method = "PUT"
+        queue.body = data.get("body", {})
+    elif NifiQueueActionTypeEnum.SET_CONTROLLER_STATE.value == action_type:
+        queue.url = f"nifi-api/controller-services/{escape(id_processor)}/run-status"
+        queue.method = "PUT"
+        queue.body = data.get("body", {})
 
     return queue
 
