@@ -321,7 +321,7 @@ def _get_new_queue(id_processor: str, action_type: str, data: dict):
                 }
             }
     elif NifiQueueActionTypeEnum.VIEW_PROVENANCE.value == action_type:
-        queue.url = f"nifi-api/provenance"
+        queue.url = "nifi-api/provenance"
         queue.method = "POST"
         queue.body = {
             "provenance": {
@@ -344,6 +344,10 @@ def _get_new_queue(id_processor: str, action_type: str, data: dict):
         queue.body = data.get("body", {})
     elif NifiQueueActionTypeEnum.SET_CONTROLLER_STATE.value == action_type:
         queue.url = f"nifi-api/controller-services/{escape(id_processor)}/run-status"
+        queue.method = "PUT"
+        queue.body = data.get("body", {})
+    elif NifiQueueActionTypeEnum.PUT_PROCESS_GROUP_STATE.value == action_type:
+        queue.url = f"nifi-api/flow/process-groups/{escape(id_processor)}"
         queue.method = "PUT"
         queue.body = data.get("body", {})
 
