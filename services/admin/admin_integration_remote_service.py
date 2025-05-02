@@ -183,21 +183,24 @@ def push_queue_request(
         "type": escape(action_type),
         "entity": (
             escape(data.get("entity", None))
-            if data.get("entity", None) != None
+            if data.get("entity", None) is not None
             else None
         ),
         "componentType": (
             escape(data.get("componentType", None))
-            if data.get("componentType", None) != None
+            if data.get("componentType", None) is not None
             else None
         ),
         "idEntity": (
             escape(data.get("idProcessor", None))
-            if data.get("idProcessor", None) != None
+            if data.get("idProcessor", None) is not None
             else None
         ),
         "hasVersion": action_type == NifiQueueActionTypeEnum.SET_STATE.value
-        or action_type == NifiQueueActionTypeEnum.UPDATE_PROPERTY.value,
+        or (
+            action_type == NifiQueueActionTypeEnum.UPDATE_PROPERTY.value
+            and data.get("componentType", None) != "CONTROLLER_SERVICE"
+        ),
         "versionUrl": f"nifi-api/processors/{id_processor}/diagnostics",
     }
     queue.createdAt = datetime.today()
@@ -301,25 +304,30 @@ def _get_new_queue(id_processor: str, action_type: str, data: dict):
         queue.method = data["method"]
         _validate_custom_endpoint(data["endpoint"])
     elif NifiQueueActionTypeEnum.REFRESH_TEMPLATE.value == action_type:
-        queue.url = f"nifi-api/system-diagnostics"
+        queue.url = "nifi-api/system-diagnostics"
         queue.method = "GET"
     elif NifiQueueActionTypeEnum.UPDATE_PROPERTY.value == action_type:
-        queue.url = f"nifi-api/processors/{escape(id_processor)}"
-        queue.method = "PUT"
-
-        if Config.ENV == NoHarmENV.PRODUCTION.value:
-            queue.body = {
-                "id": id_processor,
-                "config": {"properties": data["properties"]},
-            }
+        if data.get("componentType", None) == "CONTROLLER_SERVICE":
+            queue.url = f"nifi-api/controller-services/{escape(id_processor)}"
+            queue.method = "PUT"
+            queue.body = data.get("body", {})
         else:
-            queue.body = {
-                "component": {
+            queue.url = f"nifi-api/processors/{escape(id_processor)}"
+            queue.method = "PUT"
+
+            if Config.ENV == NoHarmENV.PRODUCTION.value:
+                queue.body = {
                     "id": id_processor,
-                    "config": {"properties": data["properties"]}
-                    | data.get("config", {}),
+                    "config": {"properties": data["properties"]},
                 }
-            }
+            else:
+                queue.body = {
+                    "component": {
+                        "id": id_processor,
+                        "config": {"properties": data["properties"]}
+                        | data.get("config", {}),
+                    }
+                }
     elif NifiQueueActionTypeEnum.VIEW_PROVENANCE.value == action_type:
         queue.url = "nifi-api/provenance"
         queue.method = "POST"
