@@ -1,10 +1,12 @@
+"""Service: remote integration related operations"""
+
 import re
-import boto3
 import json
-import dateutil as pydateutil
-from utils import status
-from markupsafe import escape
 from datetime import datetime, timedelta, timezone
+
+import boto3
+import dateutil as pydateutil
+from markupsafe import escape
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
 from botocore.exceptions import ClientError
@@ -12,8 +14,8 @@ from botocore.config import Config as BotoConfig
 
 from models.main import db, User
 from models.appendix import NifiQueue, SchemaConfig
-from utils import dateutils
-from models.enums import NifiQueueActionTypeEnum, NoHarmENV
+from models.enums import NifiQueueActionTypeEnum
+from utils import dateutils, status
 from exception.validation_error import ValidationError
 from decorators.has_permission_decorator import has_permission, Permission
 from config import Config
@@ -274,15 +276,9 @@ def _get_new_queue(id_processor: str, action_type: str, data: dict):
         queue.url = f"nifi-api/processors/{escape(id_processor)}/state"
         queue.method = "GET"
     elif NifiQueueActionTypeEnum.SET_STATE.value == action_type:
-        if Config.ENV == NoHarmENV.PRODUCTION.value:
-            queue.url = f"nifi-api/processors/{escape(id_processor)}/diagnostics"
-            queue.method = "GET"
-            queue.body = {"state": data["state"]}
-            queue.runStatus = True
-        else:
-            queue.url = f"nifi-api/processors/{escape(id_processor)}/run-status"
-            queue.method = "PUT"
-            queue.body = {"state": data["state"]}
+        queue.url = f"nifi-api/processors/{escape(id_processor)}/run-status"
+        queue.method = "PUT"
+        queue.body = {"state": data["state"]}
     elif NifiQueueActionTypeEnum.TERMINATE_PROCESS.value == action_type:
         queue.url = f"nifi-api/processors/{escape(id_processor)}/threads"
         queue.method = "DELETE"
@@ -314,20 +310,13 @@ def _get_new_queue(id_processor: str, action_type: str, data: dict):
         else:
             queue.url = f"nifi-api/processors/{escape(id_processor)}"
             queue.method = "PUT"
-
-            if Config.ENV == NoHarmENV.PRODUCTION.value:
-                queue.body = {
+            queue.body = {
+                "component": {
                     "id": id_processor,
-                    "config": {"properties": data["properties"]},
+                    "config": {"properties": data["properties"]}
+                    | data.get("config", {}),
                 }
-            else:
-                queue.body = {
-                    "component": {
-                        "id": id_processor,
-                        "config": {"properties": data["properties"]}
-                        | data.get("config", {}),
-                    }
-                }
+            }
     elif NifiQueueActionTypeEnum.VIEW_PROVENANCE.value == action_type:
         queue.url = "nifi-api/provenance"
         queue.method = "POST"
