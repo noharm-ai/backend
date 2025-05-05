@@ -696,12 +696,23 @@ def update_outlier(id_outlier: int, data: dict, user_context: User):
 
 @has_permission(Permission.READ_PRESCRIPTION)
 def get_outlier_drugs(
-    id_segment: int, term: str = None, id_drug: List[int] = [], add_substance=False
+    id_segment: int, term: str = None, id_drug: List[int] = None, add_substance=False
 ):
+    """
+    Search for record in medicamento table.
+    Add substances in the list when add_substance is True
+    """
     if add_substance:
-        query_drug = db.session.query(
-            Drug.id, Drug.name.label("name"), literal("drug").label("r_type")
-        ).filter(Drug.source.is_distinct_from("SUBNH"))
+        query_drug = (
+            db.session.query(
+                func.max(Drug.id).label("id"),
+                Drug.name.label("name"),
+                literal("drug").label("r_type"),
+            )
+            .filter(Drug.source.is_distinct_from("SUBNH"))
+            .group_by(Drug.name)
+        )
+
         query_substance = db.session.query(
             Substance.id,
             Substance.name.label("name"),
@@ -721,7 +732,7 @@ def get_outlier_drugs(
             .subquery()
         )
 
-        if id_segment != None:
+        if id_segment is not None:
             drugs = Drug.query.filter(Drug.id.in_(segDrubs))
         else:
             drugs = db.session.query(Drug)
@@ -729,7 +740,7 @@ def get_outlier_drugs(
         if term:
             drugs = drugs.filter(Drug.name.ilike("%" + str(term) + "%"))
 
-        if len(id_drug) > 0:
+        if id_drug is not None and len(id_drug) > 0:
             drugs = drugs.filter(Drug.id.in_(id_drug))
 
         results = drugs.order_by(asc(Drug.name)).all()
