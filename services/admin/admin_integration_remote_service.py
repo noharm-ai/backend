@@ -198,12 +198,17 @@ def push_queue_request(
             if data.get("idProcessor", None) is not None
             else None
         ),
-        "hasVersion": action_type == NifiQueueActionTypeEnum.SET_STATE.value
-        or (
-            action_type == NifiQueueActionTypeEnum.UPDATE_PROPERTY.value
-            and data.get("componentType", None) != "CONTROLLER_SERVICE"
+        "hasVersion": action_type
+        in (
+            NifiQueueActionTypeEnum.SET_STATE.value,
+            NifiQueueActionTypeEnum.UPDATE_PROPERTY.value,
+            NifiQueueActionTypeEnum.SET_CONTROLLER_STATE.value,
         ),
-        "versionUrl": f"nifi-api/processors/{id_processor}/diagnostics",
+        "versionUrl": (
+            f"nifi-api/processors/{id_processor}/diagnostics"
+            if data.get("componentType", None) != "CONTROLLER_SERVICE"
+            else f"nifi-api/controller-services/{id_processor}"
+        ),
     }
     queue.createdAt = datetime.today()
 
