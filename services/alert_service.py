@@ -712,8 +712,8 @@ def _alert_liver(
         alert[
             "text"
         ] = f"""
-            Medicamento deve sofrer ajuste de posologia, exige monitoramento ou é contraindicado para paciente com função hepática reduzida.<br/>
-            Paciente com alteração nas transaminases ({exam_name} {stringutils.strFormatBR(exam_value)} U/L).
+            Avaliar se o medicamento já está com o ajuste adequado conforme a função hepática ou suspenso no caso de contraindicação, já que o paciente apresenta transaminase alterada. <br/>
+            ({exam_name} {stringutils.strFormatBR(exam_value)} U/L).
         """
 
         return alert
