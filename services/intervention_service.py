@@ -269,6 +269,7 @@ def get_interventions(
                 "prescriber": i[10] if i[10] else i[7].prescriber if i[7] else None,
                 "status": i[0].status,
                 "transcription": i[0].transcription,
+                "ram": i[0].ram,
                 "economyDays": i[0].economy_days,
                 "expendedDose": i[0].expended_dose,
             }
@@ -395,6 +396,7 @@ def save_intervention(
     new_status="s",
     agg_id_prescription=None,
     update_responsible=False,
+    ram=None,
 ):
     """Create/update intervention"""
     if id_intervention == None and id_intervention_reason == None:
@@ -499,8 +501,9 @@ def save_intervention(
     if expended_dose != -1:
         i.expended_dose = expended_dose
 
-    # define economy
+    # get economy type and ram
     economy_type = None
+    has_ram = False
     reasons = (
         db.session.query(InterventionReason)
         .filter(InterventionReason.id.in_(i.idInterventionReason))
@@ -514,6 +517,9 @@ def save_intervention(
         elif r.customEconomy:
             economy_type = InterventionEconomyTypeEnum.CUSTOM.value
 
+        if r.ram:
+            has_ram = True
+
     if (
         id_prescription != 0
         and economy_type != InterventionEconomyTypeEnum.CUSTOM.value
@@ -522,6 +528,7 @@ def save_intervention(
         economy_type = None
 
     i.economy_type = economy_type
+    i.ram = ram if ram and has_ram else None
 
     # date base economy
     if i.date_base_economy == None:
