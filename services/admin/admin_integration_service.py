@@ -86,6 +86,7 @@ def refresh_prescriptions(user_context: User):
 
 @has_permission(Permission.ADMIN_INTERVENTION_REASON)
 def init_intervention_reason(user_context: User):
+    """init motivointervencao table with records from test schema"""
     schema = user_context.schema
 
     if db.session.query(InterventionReason).count() > 0:
@@ -98,8 +99,8 @@ def init_intervention_reason(user_context: User):
     insert = text(
         f"""
             insert into {schema}.motivointervencao
-            (fkhospital, idmotivointervencao,nome, idmotivomae, ativo, suspensao, substituicao, tp_relacao, economia_customizada, bloqueante)
-            select fkhospital, idmotivointervencao,nome, idmotivomae, ativo, suspensao, substituicao, tp_relacao, economia_customizada, bloqueante
+            (fkhospital, idmotivointervencao,nome, idmotivomae, ativo, suspensao, substituicao, tp_relacao, economia_customizada, bloqueante, ram)
+            select fkhospital, idmotivointervencao,nome, idmotivomae, ativo, suspensao, substituicao, tp_relacao, economia_customizada, bloqueante, ram
             from hsc_test.motivointervencao
         """
     )
