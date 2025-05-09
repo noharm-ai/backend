@@ -1,5 +1,8 @@
-from sqlalchemy import literal, and_, func, or_, asc, case
+"""Service: prescription drug related operations"""
+
 from datetime import datetime, date, timedelta
+
+from sqlalchemy import literal, and_, func, or_, asc, case, select
 
 from models.main import db, User, Drug, Outlier, DrugAttributes
 from models.prescription import Prescription, PrescriptionDrug
@@ -7,6 +10,7 @@ from models.appendix import Notes, MeasureUnit, Frequency
 from models.enums import FeatureEnum
 from repository import prescription_view_repository
 from services import data_authorization_service, feature_service, memory_service
+from services.admin import admin_ai_service
 from exception.validation_error import ValidationError
 from decorators.has_permission_decorator import has_permission, Permission
 from utils import status, prescriptionutils
@@ -238,7 +242,9 @@ def get_drug_period(id_prescription_drug: int, future: bool, user_context: User)
             id_prescription_drug, future, is_cpoe=feature_service.is_cpoe()
         )
     else:
-        results[0][1].append("Intervenção no paciente não tem medicamento associado.")
+        results[0][1].append(
+            "Intervenção no paciente não possui medicamento associado."
+        )
 
     if future and len(results[0][1]) == 0:
         if admissionHistory:
@@ -283,7 +289,7 @@ def _drug_period_query(id_prescription_drug: int, future: bool, is_cpoe=False):
     admissionHistory = None
 
     if future:
-        drugHistory = _getDrugFuture(p.id, p.admissionNumber)
+        drugHistory = _getDrugFuture(p.id, p.admissionNumber, pd, p)
         admissionHistory = Prescription.getFuturePrescription(p.id, p.admissionNumber)
 
         return (
@@ -309,9 +315,54 @@ def _drug_period_query(id_prescription_drug: int, future: bool, is_cpoe=False):
 
 
 # TODO: needs refactor (very confuse)
-def _getDrugFuture(idPrescription, admissionNumber):
+def _getDrugFuture(
+    idPrescription,
+    admissionNumber,
+    prescription_drug: PrescriptionDrug,
+    prescription: Prescription,
+):
     pd1 = db.aliased(PrescriptionDrug)
     pr1 = db.aliased(Prescription)
+
+    if prescription_drug.idDrug == 0:
+        # conciliations dont have an id_drug. try to infer substance
+        drug_name = prescription_drug.interval
+        ai_result = admin_ai_service.get_substance_by_drug_name(drug_names=[drug_name])
+        substance = ai_result[drug_name] if drug_name in ai_result else None
+
+        if substance:
+            substance_query = (
+                select(Drug.id).select_from(Drug).where(Drug.sctid == substance)
+            )
+
+            query = (
+                db.session.query(
+                    func.concat(
+                        pr1.id,
+                        " = ",
+                        func.to_char(pr1.date, "DD/MM"),
+                        " (",
+                        pd1.frequency,
+                        "x ",
+                        pd1.dose,
+                        " ",
+                        pd1.idMeasureUnit,
+                        ") via ",
+                        pd1.route,
+                        "; ",
+                    )
+                )
+                .select_from(pd1)
+                .join(pr1, pr1.id == pd1.idPrescription)
+                .filter(pr1.admissionNumber == admissionNumber)
+                .filter(pd1.idDrug.in_(substance_query))
+                .filter(pd1.suspendedDate == None)
+                .filter(pr1.concilia == None)
+                .order_by(asc(pr1.date))
+                .as_scalar()
+            )
+
+            return func.array(query)
 
     query = (
         db.session.query(
@@ -333,14 +384,15 @@ def _getDrugFuture(idPrescription, admissionNumber):
         .select_from(pd1)
         .join(pr1, pr1.id == pd1.idPrescription)
         .filter(pr1.admissionNumber == admissionNumber)
-        .filter(pr1.id > idPrescription)
-        .filter(pd1.idDrug == PrescriptionDrug.idDrug)
+        .filter(pd1.idDrug == prescription_drug.idDrug)
         .filter(pd1.suspendedDate == None)
-        .order_by(asc(pr1.date))
-        .as_scalar()
+        .filter(pr1.concilia == None)
     )
 
-    return func.array(query)
+    if prescription.concilia is None:
+        query = query.filter(pr1.id > idPrescription)
+
+    return func.array(query.order_by(asc(pr1.date)).as_scalar())
 
 
 # TODO: needs refactor (very confuse)
