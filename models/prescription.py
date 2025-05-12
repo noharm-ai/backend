@@ -210,3 +210,5 @@ class Intervention(db.Model):
 
     origin = db.Column("origem", postgresql.JSONB, nullable=True)
     destiny = db.Column("destino", postgresql.JSONB, nullable=True)
+
+    ram = db.Column("ram", postgresql.JSONB, nullable=True)

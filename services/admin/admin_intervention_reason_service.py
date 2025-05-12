@@ -1,4 +1,5 @@
-from utils import status
+"""Service: admin intervention reason operations"""
+
 from sqlalchemy import asc, func
 
 from models.main import db
@@ -6,6 +7,7 @@ from models.prescription import Intervention
 from models.appendix import InterventionReason
 from decorators.has_permission_decorator import has_permission, Permission
 from exception.validation_error import ValidationError
+from utils import status
 
 
 @has_permission(Permission.ADMIN_INTERVENTION_REASON, Permission.READ_PRESCRIPTION)
@@ -78,6 +80,7 @@ def upsert_reason(id, reason: InterventionReason):
     record.customEconomy = reason.customEconomy
     record.blocking = reason.blocking
     record.relation_type = reason.relation_type
+    record.ram = reason.ram
 
     db.session.add(record)
     db.session.flush()
@@ -102,6 +105,7 @@ def list_to_dto(reasons):
                 "customEconomy": r[0].customEconomy,
                 "blocking": r[0].blocking,
                 "protected": r[3],
+                "ram": r[0].ram,
             }
         )
 
@@ -119,4 +123,5 @@ def data_to_object(data) -> InterventionReason:
         relation_type=data.get("relationType", 0),
         idHospital=data.get("idHospital", 1),
         blocking=data.get("blocking", False),
+        ram=data.get("ram", False),
     )

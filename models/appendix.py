@@ -49,6 +49,7 @@ class InterventionReason(db.Model):
     substitution = db.Column("substituicao", db.Boolean, nullable=False)
     customEconomy = db.Column("economia_customizada", db.Boolean, nullable=False)
     blocking = db.Column("bloqueante", db.Boolean, nullable=False)
+    ram = db.Column("ram", db.Boolean, nullable=False)
     relation_type = db.Column("tp_relacao", db.BigInteger, nullable=False)
 
 
