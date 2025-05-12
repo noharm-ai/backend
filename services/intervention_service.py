@@ -218,7 +218,7 @@ def get_interventions(
     interventions = interventions.order_by(desc(Intervention.date)).limit(1500).all()
 
     def get_drug_name(i: Intervention, pd: PrescriptionDrug, drug_name: str):
-        if i.id == 0:
+        if i.id == 0 or i.id == "0":
             return "Intervenção no Paciente"
 
         if drug_name:
