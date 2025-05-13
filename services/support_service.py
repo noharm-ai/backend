@@ -1,3 +1,5 @@
+"""Service: support related operations"""
+
 import xmlrpc.client
 import base64
 
@@ -29,6 +31,8 @@ def _get_client():
 
 @has_permission(Permission.WRITE_SUPPORT)
 def create_ticket(user_context: User, from_url, filelist, category, description, title):
+    """Creates a new ticket"""
+
     db_user = db.session.query(User).filter(User.id == user_context.id).first()
 
     client = _get_client()
@@ -109,40 +113,10 @@ def create_ticket(user_context: User, from_url, filelist, category, description,
     return ticket
 
 
-# deprecated
-@has_permission(Permission.READ_SUPPORT)
-def list_tickets(user_context: User):
-    db_user = db.session.query(User).filter(User.id == user_context.id).first()
-
-    client = _get_client()
-
-    tickets = client(
-        model="helpdesk.ticket",
-        action="search_read",
-        payload=[[["partner_email", "=", db_user.email]]],
-        options={
-            "fields": [
-                "name",
-                "partner_name",
-                "access_token",
-                "message_needaction",
-                "message_needaction_counter",
-                "has_message",
-                "create_date",
-                "stage_id",
-                "date_last_stage_update",
-                "description",
-                "ticket_ref",
-            ],
-            "limit": 50,
-        },
-    )
-
-    return tickets
-
-
 @has_permission(Permission.READ_SUPPORT)
 def list_tickets_v2(user_context: User, user_permissions: list[Permission]):
+    """List user tickets, following and organization tickets (when allowed)"""
+
     db_user = db.session.query(User).filter(User.id == user_context.id).first()
 
     client = _get_client()
@@ -167,6 +141,7 @@ def list_tickets_v2(user_context: User, user_permissions: list[Permission]):
             "date_last_stage_update",
             "description",
             "ticket_ref",
+            "x_studio_tipo_de_chamado",
         ],
         "limit": 50,
         "order": "create_date desc",
