@@ -94,6 +94,9 @@ def get_prioritization(request_data: RegulationPrioritizationRequest):
                 nullslast(direction(getattr(RegSolicitation, order.field)))
             )
 
+        if order.field in ["date_truncate"]:
+            query = query.order_by(direction(func.date(RegSolicitation.date)))
+
         if order.field in ["birthdate"]:
             direction = asc if order.direction == "desc" else desc
             query = query.order_by(nullslast(direction(getattr(Patient, order.field))))
