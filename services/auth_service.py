@@ -475,12 +475,12 @@ def auth_provider(code, schema):
         .first()
     )
 
-    if features is None or FeatureEnum.OAUTH.value not in features.value:
-        raise ValidationError(
-            "OAUTH bloqueado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
+    # if features is None or FeatureEnum.OAUTH.value not in features.value:
+    #     raise ValidationError(
+    #         "OAUTH bloqueado",
+    #         "errors.unauthorizedUser",
+    #         status.HTTP_401_UNAUTHORIZED,
+    #     )
 
     return _auth_user(nh_user)
 
