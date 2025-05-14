@@ -205,7 +205,9 @@ def get_exams_by_admission(admission_number: int, id_segment: int):
     examsText = _get_textual_exams(id_patient=patient.idPatient)
     resultsText = {}
     for e in examsText:
-        slugExam = stringutils.slugify(e.prescriber)
+        slugExam = (
+            stringutils.slugify(e.prescriber) if e.prescriber else "EXAMES TEXTUAIS"
+        )
         if not slugExam in resultsText.keys():
             resultsText[slugExam] = {
                 "name": e.prescriber,
