@@ -19,11 +19,10 @@ def get_exams_by_patient(idPatient: int, days: int):
 
 
 def get_next_exam_id(id_patient: int):
-    """Generate a 12-digit exam ID with format: 9{id_patient}00000000"""
+    """Generate a 13-digit exam ID with format: 9{id_patient}00000000"""
 
     patient_str = str(id_patient)
-    if len(patient_str) > 10:
-        raise ValueError("id_patient must be 8 digits or less")
+    patient_str = patient_str[-10:] if len(patient_str) > 10 else patient_str
 
     exam_id = "9" + patient_str + "0" * (12 - len(patient_str))
     mask = int(exam_id)
