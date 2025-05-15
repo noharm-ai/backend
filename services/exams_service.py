@@ -20,7 +20,7 @@ from utils import status, examutils, stringutils, dateutils, numberutils
 
 @has_permission(Permission.WRITE_PRESCRIPTION)
 def create_exam(request_data: ExamCreateRequest, user_context: User):
-    """Create a new exam"""
+    """Create a new exam (enabled by feature)"""
 
     admission = (
         db.session.query(Patient)
