@@ -152,12 +152,14 @@ def list_tickets_v2(user_context: User, user_permissions: list[Permission]):
     organization = []
 
     if partner:
+        partner_ids = [item.get("id") for item in partner]
+
         my_tickets = client(
             model="helpdesk.ticket",
             action="search_read",
             payload=[
                 [
-                    ["partner_id", "in", [partner[0].get("id")]],
+                    ["partner_id", "in", partner_ids],
                 ]
             ],
             options=options,
@@ -168,7 +170,7 @@ def list_tickets_v2(user_context: User, user_permissions: list[Permission]):
             action="search_read",
             payload=[
                 [
-                    ["message_partner_ids", "in", [partner[0].get("id")]],
+                    ["message_partner_ids", "in", partner_ids],
                 ]
             ],
             options=options,
