@@ -37,16 +37,27 @@ def create_ticket(user_context: User, from_url, filelist, category, description,
 
     client = _get_client()
 
+    partner = client(
+        model="res.partner",
+        action="search_read",
+        payload=[[["email", "=", db_user.email]]],
+        options={"fields": ["id", "name", "parent_id"]},
+    )
+
     ticket = {
         "name": f"[{category or 'Geral'}] {title or db_user.name}",
-        "partner_name": db_user.name,
-        "partner_email": db_user.email,
         "description": description,
         "x_studio_schema_1": db_user.schema,
         "x_studio_fromurl": from_url,
         "x_studio_tipo_de_chamado": category,
         "team_id": 1,
     }
+
+    if partner and partner[0].get("id", None) is not None:
+        ticket["partner_id"] = partner[0].get("id")
+    else:
+        ticket["partner_name"] = db_user.name
+        ticket["partner_email"] = db_user.email
 
     result = client(
         model="helpdesk.ticket",
@@ -152,12 +163,14 @@ def list_tickets_v2(user_context: User, user_permissions: list[Permission]):
     organization = []
 
     if partner:
+        partner_ids = [item.get("id") for item in partner]
+
         my_tickets = client(
             model="helpdesk.ticket",
             action="search_read",
             payload=[
                 [
-                    ["partner_id", "in", [partner[0].get("id")]],
+                    ["partner_id", "in", partner_ids],
                 ]
             ],
             options=options,
@@ -168,7 +181,7 @@ def list_tickets_v2(user_context: User, user_permissions: list[Permission]):
             action="search_read",
             payload=[
                 [
-                    ["message_partner_ids", "in", [partner[0].get("id")]],
+                    ["message_partner_ids", "in", partner_ids],
                 ]
             ],
             options=options,
