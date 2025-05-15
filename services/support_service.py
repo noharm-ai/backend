@@ -37,16 +37,27 @@ def create_ticket(user_context: User, from_url, filelist, category, description,
 
     client = _get_client()
 
+    partner = client(
+        model="res.partner",
+        action="search_read",
+        payload=[[["email", "=", db_user.email]]],
+        options={"fields": ["id", "name", "parent_id"]},
+    )
+
     ticket = {
         "name": f"[{category or 'Geral'}] {title or db_user.name}",
-        "partner_name": db_user.name,
-        "partner_email": db_user.email,
         "description": description,
         "x_studio_schema_1": db_user.schema,
         "x_studio_fromurl": from_url,
         "x_studio_tipo_de_chamado": category,
         "team_id": 1,
     }
+
+    if partner and partner[0].get("id", None) is not None:
+        ticket["partner_id"] = partner[0].get("id")
+    else:
+        ticket["partner_name"] = db_user.name
+        ticket["partner_email"] = db_user.email
 
     result = client(
         model="helpdesk.ticket",
