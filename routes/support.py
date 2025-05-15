@@ -1,3 +1,5 @@
+"""Route: support related operations"""
+
 from flask import Blueprint, request
 
 from services import support_service
@@ -16,13 +18,6 @@ def create_ticket():
         description=request.form.get("description", None),
         filelist=request.files.getlist("fileList[]"),
     )
-
-
-# deprecated
-@app_support.route("/support/list-tickets", methods=["GET"])
-@api_endpoint()
-def list_tickets():
-    return support_service.list_tickets()
 
 
 @app_support.route("/support/list-tickets/v2", methods=["GET"])

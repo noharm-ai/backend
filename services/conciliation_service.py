@@ -140,7 +140,7 @@ def copy_conciliation(id_prescription: int, user_context: User):
         db.session.query(Patient)
         .filter(Patient.idPatient == prescription.idPatient)
         .order_by(desc(Patient.admissionDate))
-        .limit(5)
+        .limit(20)
         .all()
     )
 
