@@ -5,7 +5,7 @@ SQLAlchemy==2.0.29
 Flask-SQLAlchemy==3.1.1
 troposphere
 zappa
-flask-cors==5.0.0
+flask-cors==6.0.0
 psycopg2-binary
 flask-mail
 random-password-generator
