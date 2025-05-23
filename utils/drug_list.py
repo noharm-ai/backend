@@ -336,6 +336,7 @@ class DrugList:
                     "prescriptionDate": dateutils.to_iso(pd.prescription_date),
                     "prescriptionExpire": dateutils.to_iso(pd.prescription_expire),
                     "schedule": self.schedule_to_array(pd[0].schedule),
+                    "orderNumber": pd[0].order_number,
                 }
             )
 

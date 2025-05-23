@@ -158,6 +158,7 @@ class PrescriptionDrug(db.Model):
     cpoe_group = db.Column("cpoe_grupo", db.BigInteger, nullable=True)
     form = db.Column("form", postgresql.JSON, nullable=True)
     schedule = db.Column("aprazamento", postgresql.ARRAY(db.DateTime), nullable=True)
+    order_number = db.Column("nr_ordem", db.Integer, nullable=True)
 
 
 class PrescriptionDrugAudit(db.Model):
