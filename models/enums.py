@@ -69,6 +69,7 @@ class PrescriptionAuditTypeEnum(Enum):
     UPSERT_CLINICAL_NOTES = 7
     CREATE_AGG = 8
     ERROR_INTEGRATION_PRESCRIPTION_RELEASE = 9
+    INTEGRATION_INTERVENTION = 10
 
 
 class PrescriptionDrugAuditTypeEnum(Enum):
