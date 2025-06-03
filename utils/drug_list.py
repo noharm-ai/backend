@@ -377,7 +377,7 @@ class DrugList:
                             and pd[2].id.lower() == pd[6].amountUnit.lower()
                         ):
                             result[key]["vol"] = pdDose = round(
-                                pd[0].dose / pd[6].amount, 3
+                                pd[0].dose / pd[6].amount, 5
                             )
 
                     if pd[6] and pd[6].amount and pd[6].amountUnit is None:
