@@ -181,27 +181,31 @@ class DrugList:
 
                 if pd[0].dose:
                     weight = numberutils.none2zero(self.exams["weight"])
-                    weight = weight if weight > 0 else 1
 
-                    doseWeightStr = (
-                        stringutils.strFormatBR(round(pd[0].dose / float(weight), 2))
-                        + " "
-                        + pdUnit
-                        + "/Kg"
-                    )
+                    if weight > 0:
+                        weight = weight if weight > 0 else 1
 
-                    if (
-                        pd[6].idMeasureUnit != None
-                        and pd[6].idMeasureUnit != pdUnit
-                        and pd[0].doseconv != None
-                    ):
-                        doseWeightStr += (
-                            " ou "
-                            + stringutils.strFormatBR(pd[0].doseconv)
+                        doseWeightStr = (
+                            stringutils.strFormatBR(
+                                round(pd[0].dose / float(weight), 2)
+                            )
                             + " "
-                            + str(pd[6].idMeasureUnit)
-                            + "/Kg (faixa arredondada)"
+                            + pdUnit
+                            + "/Kg"
                         )
+
+                        if (
+                            pd[6].idMeasureUnit != None
+                            and pd[6].idMeasureUnit != pdUnit
+                            and pd[0].doseconv != None
+                        ):
+                            doseWeightStr += (
+                                " ou "
+                                + stringutils.strFormatBR(pd[0].doseconv)
+                                + " "
+                                + str(pd[6].idMeasureUnit)
+                                + "/Kg (faixa arredondada)"
+                            )
 
                 if (
                     not bool(pd[0].suspendedDate)
