@@ -199,12 +199,18 @@ class DrugList:
                             and pd[6].idMeasureUnit != pdUnit
                             and pd[0].doseconv != None
                         ):
+                            calc_doseconv = (
+                                pd[0].doseconv
+                                if pd[6].useWeight
+                                else round(pd[0].doseconv / float(weight), 2)
+                            )
                             doseWeightStr += (
                                 " ou "
-                                + stringutils.strFormatBR(pd[0].doseconv)
+                                + stringutils.strFormatBR(calc_doseconv)
                                 + " "
                                 + str(pd[6].idMeasureUnit)
-                                + "/Kg (faixa arredondada)"
+                                + "/Kg"
+                                + (" (faixa arredondada)" if pd[6].useWeight else "")
                             )
 
                 if (
