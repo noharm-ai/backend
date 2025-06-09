@@ -159,17 +159,9 @@ class Culture(db.Model):
     prediction = db.Column("predict", db.String, nullable=True)
 
 
-class NifiStatus(db.Model):
-    __tablename__ = "nifi_status"
-
-    id = db.Column("idnifi_status", db.Integer, primary_key=True)
-    updatedAt = db.Column("updated_at", db.Date, nullable=False)
-    nifi_status = db.Column("nifi_status", postgresql.JSON, nullable=True)
-    nifi_template = db.Column("nifi_template", postgresql.JSON, nullable=True)
-    nifi_diagnostics = db.Column("nifi_diagnostics", postgresql.JSON, nullable=True)
-
-
 class NifiQueue(db.Model):
+    """SQLALCHEMY model for nifi_queue table"""
+
     __tablename__ = "nifi_queue"
 
     id = db.Column("idqueue", db.Integer, primary_key=True)
@@ -182,6 +174,7 @@ class NifiQueue(db.Model):
     response = db.Column("response", postgresql.JSONB, nullable=True)
     responseAt = db.Column("response_at", db.Date, nullable=True)
     createdAt = db.Column("create_at", db.Date, nullable=False)
+    createdBy = db.Column("created_by", db.Integer, nullable=True)
 
 
 class Tag(db.Model):
