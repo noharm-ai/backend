@@ -165,6 +165,7 @@ class Role(Enum):
         Permission.READ_REGULATION,
         Permission.WRITE_REGULATION,
         Permission.READ_BASIC_FEATURES,
+        Permission.READ_REPORTS,
     ]
 
     STATIC_USER = "STATIC_USER", [Permission.READ_STATIC, Permission.CHECK_STATIC]
