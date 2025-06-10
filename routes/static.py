@@ -1,6 +1,10 @@
+"""Route: prescalc and atend calc endpoints"""
+
+import logging
+from datetime import datetime
+
 from flask import Blueprint, request, g
 from markupsafe import escape as escape_html
-from datetime import datetime
 
 from models.main import db, User
 from services import (
@@ -40,9 +44,25 @@ def create_aggregated_by_prescription(schema, id_prescription):
         )
     except ValidationError as e:
         db.session.rollback()
+
+        logging.basicConfig()
+        logger = logging.getLogger("noharm.backend")
+        logger.warning("VALIDATION4xx: %s", str(e))
+        logger.warning(
+            "schema: %s", user_context.schema if user_context else "undefined"
+        )
+
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
-    except AuthorizationError as e:
+    except AuthorizationError:
         db.session.rollback()
+
+        logging.basicConfig()
+        logger = logging.getLogger("noharm.backend")
+        logger.warning("VALIDATION4xx: static usuário inválido")
+        logger.warning(
+            "schema: %s", user_context.schema if user_context else "undefined"
+        )
+
         return {
             "status": "error",
             "message": "Usuário inválido",
@@ -77,9 +97,25 @@ def create_aggregated_prescription_by_date(schema, admission_number):
         )
     except ValidationError as e:
         db.session.rollback()
+
+        logging.basicConfig()
+        logger = logging.getLogger("noharm.backend")
+        logger.warning("VALIDATION4xx: %s", str(e))
+        logger.warning(
+            "schema: %s", user_context.schema if user_context else "undefined"
+        )
+
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
-    except AuthorizationError as e:
+    except AuthorizationError:
         db.session.rollback()
+
+        logging.basicConfig()
+        logger = logging.getLogger("noharm.backend")
+        logger.warning("VALIDATION4xx: static usuário inválido")
+        logger.warning(
+            "schema: %s", user_context.schema if user_context else "undefined"
+        )
+
         return {
             "status": "error",
             "message": "Usuário inválido",
