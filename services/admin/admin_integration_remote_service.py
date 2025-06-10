@@ -211,6 +211,7 @@ def push_queue_request(
         ),
     }
     queue.createdAt = datetime.today()
+    queue.createdBy = user_context.id
 
     db.session.add(queue)
     db.session.flush()
