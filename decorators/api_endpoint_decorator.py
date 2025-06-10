@@ -48,16 +48,30 @@ def api_endpoint():
                 db.session.close()
                 db.session.remove()
 
+                logging.basicConfig()
+                logger = logging.getLogger("noharm.backend")
+                logger.warning("VALIDATION4xx: Login expirado")
+                logger.warning(
+                    "schema: %s", user_context.schema if user_context else "undefined"
+                )
+
                 return {
                     "status": "error",
                     "message": "Login expirado",
                     "code": "error.authorizationError",
                 }, status.HTTP_401_UNAUTHORIZED
 
-            except AuthorizationError as e:
+            except AuthorizationError:
                 db.session.rollback()
                 db.session.close()
                 db.session.remove()
+
+                logging.basicConfig()
+                logger = logging.getLogger("noharm.backend")
+                logger.warning("VALIDATION4xx: Usuário não autorizado no recurso")
+                logger.warning(
+                    "schema: %s", user_context.schema if user_context else "undefined"
+                )
 
                 return {
                     "status": "error",
@@ -70,6 +84,13 @@ def api_endpoint():
                 db.session.close()
                 db.session.remove()
 
+                logging.basicConfig()
+                logger = logging.getLogger("noharm.backend")
+                logger.warning("VALIDATION4xx: %s", str(e))
+                logger.warning(
+                    "schema: %s", user_context.schema if user_context else "undefined"
+                )
+
                 return {
                     "status": "error",
                     "message": str(e),
@@ -80,6 +101,13 @@ def api_endpoint():
                 db.session.rollback()
                 db.session.close()
                 db.session.remove()
+
+                logging.basicConfig()
+                logger = logging.getLogger("noharm.backend")
+                logger.warning("VALIDATION4xx: Parâmetros inválidos pydantic")
+                logger.warning(
+                    "schema: %s", user_context.schema if user_context else "undefined"
+                )
 
                 return {
                     "status": "error",
@@ -97,6 +125,9 @@ def api_endpoint():
                 logger = logging.getLogger("noharm.backend")
                 logger.exception(str(e))
                 logger.error("Request data: %s", request.get_data())
+                logger.error(
+                    "schema: %s", user_context.schema if user_context else "undefined"
+                )
 
                 return {
                     "status": "error",
