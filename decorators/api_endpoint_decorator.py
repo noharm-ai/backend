@@ -19,6 +19,7 @@ def api_endpoint():
     def wrapper(f):
         @wraps(f)
         def decorator_f(*args, **kwargs):
+            user_context = None
             try:
                 verify_jwt_in_request()
 
