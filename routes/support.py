@@ -24,3 +24,10 @@ def create_ticket():
 @api_endpoint()
 def list_tickets_v2():
     return support_service.list_tickets_v2()
+
+
+@app_support.route("/support/list-pending", methods=["GET"])
+@api_endpoint()
+def list_pending():
+    """List tickets with pending action"""
+    return support_service.list_pending_action()
