@@ -47,7 +47,11 @@ def create_aggregated_by_prescription(schema, id_prescription):
 
         logging.basicConfig()
         logger = logging.getLogger("noharm.backend")
-        logger.warning("VALIDATION4xx: %s", str(e))
+        logger.warning(
+            "(%s) VALIDATION4xx: %s",
+            user_context.schema if user_context else "undefined",
+            str(e),
+        )
         logger.warning(
             "schema: %s", user_context.schema if user_context else "undefined"
         )
@@ -58,7 +62,10 @@ def create_aggregated_by_prescription(schema, id_prescription):
 
         logging.basicConfig()
         logger = logging.getLogger("noharm.backend")
-        logger.warning("VALIDATION4xx: static usuário inválido")
+        logger.warning(
+            "(%s) VALIDATION4xx: static usuário inválido",
+            user_context.schema if user_context else "undefined",
+        )
         logger.warning(
             "schema: %s", user_context.schema if user_context else "undefined"
         )
@@ -100,7 +107,11 @@ def create_aggregated_prescription_by_date(schema, admission_number):
 
         logging.basicConfig()
         logger = logging.getLogger("noharm.backend")
-        logger.warning("VALIDATION4xx: %s", str(e))
+        logger.warning(
+            "(%s) VALIDATION4xx: %s",
+            user_context.schema if user_context else "undefined",
+            str(e),
+        )
         logger.warning(
             "schema: %s", user_context.schema if user_context else "undefined"
         )
@@ -111,7 +122,10 @@ def create_aggregated_prescription_by_date(schema, admission_number):
 
         logging.basicConfig()
         logger = logging.getLogger("noharm.backend")
-        logger.warning("VALIDATION4xx: static usuário inválido")
+        logger.warning(
+            "(%s) VALIDATION4xx: static usuário inválido",
+            user_context.schema if user_context else "undefined",
+        )
         logger.warning(
             "schema: %s", user_context.schema if user_context else "undefined"
         )
