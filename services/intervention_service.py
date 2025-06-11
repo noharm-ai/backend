@@ -291,6 +291,7 @@ def add_multiple_interventions(
     cost=None,
     observation=None,
     agg_id_prescription=None,
+    ram=None,
 ):
     """Create multiple interventions in one request"""
     id_intervention_list = []
@@ -350,6 +351,8 @@ def add_multiple_interventions(
             i.cost = cost
         if observation:
             i.notes = observation
+        if ram:
+            i.ram = ram
 
         # date base economy
         i.date_base_economy = _get_date_base_economy(
