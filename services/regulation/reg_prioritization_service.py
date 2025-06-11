@@ -37,6 +37,7 @@ def get_prioritization(request_data: RegulationPrioritizationRequest):
                     if patient and patient.birthdate
                     else None
                 ),
+                "globalScore": item.global_score,
             }
         )
 

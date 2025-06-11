@@ -51,7 +51,10 @@ def api_endpoint():
 
                 logging.basicConfig()
                 logger = logging.getLogger("noharm.backend")
-                logger.warning("VALIDATION4xx: Login expirado")
+                logger.warning(
+                    "(%s) VALIDATION4xx: Login expirado",
+                    user_context.schema if user_context else "undefined",
+                )
                 logger.warning(
                     "schema: %s", user_context.schema if user_context else "undefined"
                 )
@@ -69,7 +72,10 @@ def api_endpoint():
 
                 logging.basicConfig()
                 logger = logging.getLogger("noharm.backend")
-                logger.warning("VALIDATION4xx: Usuário não autorizado no recurso")
+                logger.warning(
+                    "(%s) VALIDATION4xx: Usuário não autorizado no recurso",
+                    user_context.schema if user_context else "undefined",
+                )
                 logger.warning(
                     "schema: %s", user_context.schema if user_context else "undefined"
                 )
@@ -87,7 +93,11 @@ def api_endpoint():
 
                 logging.basicConfig()
                 logger = logging.getLogger("noharm.backend")
-                logger.warning("VALIDATION4xx: %s", str(e))
+                logger.warning(
+                    "(%s) VALIDATION4xx: %s",
+                    user_context.schema if user_context else "undefined",
+                    str(e),
+                )
                 logger.warning(
                     "schema: %s", user_context.schema if user_context else "undefined"
                 )
@@ -105,7 +115,10 @@ def api_endpoint():
 
                 logging.basicConfig()
                 logger = logging.getLogger("noharm.backend")
-                logger.warning("VALIDATION4xx: Parâmetros inválidos pydantic")
+                logger.warning(
+                    "(%s) VALIDATION4xx: Parâmetros inválidos pydantic",
+                    user_context.schema if user_context else "undefined",
+                )
                 logger.warning(
                     "schema: %s", user_context.schema if user_context else "undefined"
                 )
@@ -127,7 +140,8 @@ def api_endpoint():
                 logger.exception(str(e))
                 logger.error("Request data: %s", request.get_data())
                 logger.error(
-                    "schema: %s", user_context.schema if user_context else "undefined"
+                    "error_schema: %s",
+                    user_context.schema if user_context else "undefined",
                 )
 
                 return {
