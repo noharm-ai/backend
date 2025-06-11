@@ -1,10 +1,10 @@
 """Repository for regulation prioritization related operations"""
 
 from datetime import timedelta
-from sqlalchemy import asc, desc, func, nullslast
+from sqlalchemy import asc, desc, func, nullslast, select, Integer
 
 from models.main import db, User
-from models.prescription import Patient
+from models.prescription import Patient, Prescription
 from models.appendix import Department
 from models.regulation import RegSolicitation, RegSolicitationType, RegMovement
 from models.requests.regulation_prioritization_request import (
@@ -14,6 +14,19 @@ from models.requests.regulation_prioritization_request import (
 
 def get_prioritization(request_data: RegulationPrioritizationRequest):
     """Get regulation prioritization data"""
+
+    gs_query = (
+        select(
+            func.coalesce(Prescription.features["globalScore"].astext.cast(Integer), 0)
+        )
+        .where(
+            Prescription.admissionNumber == RegSolicitation.admission_number,
+            Prescription.agg == True,
+        )
+        .order_by(desc(Prescription.date))
+        .limit(1)
+    )
+
     query = (
         db.session.query(
             RegSolicitation,
@@ -21,6 +34,7 @@ def get_prioritization(request_data: RegulationPrioritizationRequest):
             Patient,
             Department,
             func.count().over().label("total"),
+            gs_query.label("global_score"),
         )
         .outerjoin(
             RegSolicitationType,
@@ -100,6 +114,9 @@ def get_prioritization(request_data: RegulationPrioritizationRequest):
         if order.field in ["birthdate"]:
             direction = asc if order.direction == "desc" else desc
             query = query.order_by(nullslast(direction(getattr(Patient, order.field))))
+
+        if order.field in ["global_score"]:
+            query = query.order_by(nullslast(direction("global_score")))
 
     query = query.limit(request_data.limit).offset(request_data.offset)
 
