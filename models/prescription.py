@@ -213,3 +213,5 @@ class Intervention(db.Model):
     destiny = db.Column("destino", postgresql.JSONB, nullable=True)
 
     ram = db.Column("ram", postgresql.JSONB, nullable=True)
+    # count of days using the selected drug
+    period = db.Column("periodo_uso", db.Integer, nullable=True)

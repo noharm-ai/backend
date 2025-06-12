@@ -400,6 +400,7 @@ def save_intervention(
     agg_id_prescription=None,
     update_responsible=False,
     ram=None,
+    period=None,
 ):
     """Create/update intervention"""
     if id_intervention == None and id_intervention_reason == None:
@@ -503,6 +504,8 @@ def save_intervention(
         i.economy_days = economy_days
     if expended_dose != -1:
         i.expended_dose = expended_dose
+    if period:
+        i.period = period
 
     # get economy type and ram
     economy_type = None
