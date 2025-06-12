@@ -23,6 +23,7 @@ def save_intervention():
             cost=data.get("cost", None),
             observation=data.get("observation", None),
             agg_id_prescription=data.get("aggIdPrescription", None),
+            ram=data.get("ramData", None),
         )
     else:
         result = intervention_service.save_intervention(
@@ -46,6 +47,7 @@ def save_intervention():
             agg_id_prescription=data.get("aggIdPrescription", None),
             update_responsible=data.get("updateResponsible", False),
             ram=data.get("ramData", None),
+            period=data.get("period", None),
         )
 
     return result

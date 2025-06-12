@@ -153,6 +153,7 @@ def list_tickets_v2(user_context: User, user_permissions: list[Permission]):
             "description",
             "ticket_ref",
             "x_studio_tipo_de_chamado",
+            "tag_ids",
         ],
         "limit": 50,
         "order": "create_date desc",
@@ -225,3 +226,52 @@ def list_tickets_v2(user_context: User, user_permissions: list[Permission]):
         "following": following,
         "organization": organization,
     }
+
+
+@has_permission(Permission.READ_SUPPORT)
+def list_pending_action(user_context: User):
+    """List user tickets with pending actions"""
+
+    db_user = db.session.query(User).filter(User.id == user_context.id).first()
+
+    client = _get_client()
+
+    partner = client(
+        model="res.partner",
+        action="search_read",
+        payload=[[["email", "=", db_user.email]]],
+        options={"fields": ["id", "name", "parent_id"]},
+    )
+
+    options = {
+        "fields": [
+            "name",
+            "partner_name",
+            "access_token",
+        ],
+        "limit": 50,
+        "order": "create_date desc",
+    }
+
+    pending_tickets = []
+
+    if partner:
+        partner_ids = [item.get("id") for item in partner]
+
+        stage_waiting_response = 3
+        tag_no_response = 23
+
+        pending_tickets = client(
+            model="helpdesk.ticket",
+            action="search_read",
+            payload=[
+                [
+                    ["partner_id", "in", partner_ids],
+                    ["stage_id", "in", [stage_waiting_response]],
+                    ["tag_ids", "in", [tag_no_response]],
+                ]
+            ],
+            options=options,
+        )
+
+    return pending_tickets
