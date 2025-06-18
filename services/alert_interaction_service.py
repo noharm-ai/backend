@@ -1,16 +1,26 @@
+"""Service to analyze interactions between drugs in a prescription."""
+
 from datetime import datetime
-from sqlalchemy import text
 from typing import List
+
+from sqlalchemy import text
 
 from models.prescription import PrescriptionDrug
 from models.main import db, Drug, Substance, Allergy, DrugAttributes
 from models.enums import DrugTypeEnum, DrugAlertLevelEnum, FrequencyEnum
-from utils import examutils, stringutils
+from utils import examutils, stringutils, prescriptionutils
 
 
 # analyze interactions between drugs.
 # drug_list (PrescriptionDrug.findByPrescription)
 def find_relations(drug_list, id_patient: int, is_cpoe: bool):
+    """
+    Find interactions between drugs in a prescription.
+    :param drug_list: List of drugs in the prescription.
+    :param id_patient: ID of the patient.
+    :param is_cpoe: Boolean indicating if the prescription is CPOE.
+    :return: Dictionary with alerts, stats, and list of interactions."""
+
     filtered_list = _filter_drug_list(drug_list=drug_list)
     allergies = _get_allergies(id_patient=id_patient)
     overlap_drugs = []
@@ -64,6 +74,9 @@ def find_relations(drug_list, id_patient: int, is_cpoe: bool):
                         "expireDate": prescription_expire_date.isoformat(),
                         "frequency": prescription_drug.frequency,
                         "rx": False,
+                        "interval": prescriptionutils.timeValue(
+                            prescription_drug.interval
+                        ),
                     },
                     "to": {
                         "id": str(cp_prescription_drug.id),
@@ -80,6 +93,9 @@ def find_relations(drug_list, id_patient: int, is_cpoe: bool):
                         "expireDate": cp_prescription_expire_date.isoformat(),
                         "frequency": cp_prescription_drug.frequency,
                         "rx": False,
+                        "interval": prescriptionutils.timeValue(
+                            cp_prescription_drug.interval
+                        ),
                     },
                 }
             )
@@ -102,6 +118,9 @@ def find_relations(drug_list, id_patient: int, is_cpoe: bool):
                         "expireDate": prescription_expire_date.isoformat(),
                         "frequency": prescription_drug.frequency,
                         "rx": True,
+                        "interval": prescriptionutils.timeValue(
+                            prescription_drug.interval
+                        ),
                     },
                     "to": a,
                 }
@@ -178,14 +197,20 @@ def find_relations(drug_list, id_patient: int, is_cpoe: bool):
                     unique_relations[uniq_invert_key] = 1
 
                 alert_text = examutils.typeRelations[kind] + ": "
-                alert_text += (
-                    stringutils.strNone(active_relations[key]["text"])
-                    + " ("
-                    + stringutils.strNone(drug_from["drug"])
-                    + " e "
-                    + stringutils.strNone(drug_to["drug"])
-                    + ")"
-                )
+                alert_text += stringutils.strNone(active_relations[key]["text"])
+
+                if kind == "iy":
+                    alert_text += f"""- {drug_from["drug"]} (Horários: {drug_from['interval']}) 
+                        - {drug_to["drug"]} (Horários: {drug_to['interval']})
+                    """
+                else:
+                    alert_text += (
+                        " ("
+                        + stringutils.strNone(drug_from["drug"])
+                        + " e "
+                        + stringutils.strNone(drug_to["drug"])
+                        + ")"
+                    )
 
                 if kind == "dm":
                     # one way
@@ -288,6 +313,7 @@ def _get_allergies(id_patient: int):
                     "group": None,
                     "frequency": None,
                     "rx": True,
+                    "interval": "-",
                 }
             )
 
