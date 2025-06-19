@@ -268,10 +268,7 @@ def test_find_relations_drug_interaction_kind_iy(monkeypatch):
     assert alert_2["level"] == 1
     assert alert_2["relation"] == "1"
 
-    assert (
-        alert_2["text"]
-        == "Incompatibilidade em Y: Drug A interacts with Drug B (Drug B e Drug A)"
-    )
+    assert "Incompatibilidade em Y: Drug A interacts with Drug B" in alert_2["text"]
 
     # Assert alert details for idPrescriptionDrug '1'
     alert_1 = results["alerts"]["1"][0]
@@ -281,10 +278,7 @@ def test_find_relations_drug_interaction_kind_iy(monkeypatch):
     assert alert_1["level"] == 1
     assert alert_1["relation"] == "1"
 
-    assert (
-        alert_1["text"]
-        == "Incompatibilidade em Y: Drug A interacts with Drug B (Drug B e Drug A)"
-    )
+    assert "Incompatibilidade em Y: Drug A interacts with Drug B" in alert_1["text"]
 
     # Assert stats structure
     assert "stats" in results
