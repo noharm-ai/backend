@@ -200,8 +200,8 @@ def find_relations(drug_list, id_patient: int, is_cpoe: bool):
                 alert_text += stringutils.strNone(active_relations[key]["text"])
 
                 if kind == "iy":
-                    alert_text += f"""- {drug_from["drug"]} (Horários: {drug_from['interval']}) 
-                        - {drug_to["drug"]} (Horários: {drug_to['interval']})
+                    alert_text += f"""- {drug_from["drug"]} (Horários: {drug_from['interval'] if drug_from['interval'] else '--'})
+                        - {drug_to["drug"]} (Horários: {drug_to['interval'] if drug_to['interval'] else '--'})
                     """
                 else:
                     alert_text += (
