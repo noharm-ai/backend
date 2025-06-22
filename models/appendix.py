@@ -111,6 +111,7 @@ class SchemaConfig(db.Model):
     status = db.Column("status", db.Integer, nullable=False)
     nh_care = db.Column("tp_noharm_care", db.Integer, nullable=False)
     cpoe = db.Column("cpoe", db.Boolean, nullable=False)
+    return_integration = db.Column("integracao_retorno", db.Boolean, nullable=False)
 
     fl1 = db.Column("fl1_atualiza_indicadores_cpoe", db.Boolean, nullable=False)
     fl2 = db.Column("fl2_atualiza_indicadores_prescricao", db.Boolean, nullable=False)

@@ -27,6 +27,7 @@ from services import (
     exams_service,
     patient_service,
     clinical_notes_service,
+    user_service,
 )
 from decorators.has_permission_decorator import has_permission, Permission
 from utils import status, dateutils
@@ -385,7 +386,14 @@ def recalculate_prescription(id_prescription: int, user_context: User):
 
 
 @has_permission(Permission.WRITE_PRESCRIPTION)
-def update_prescription_data(id_prescription: int, data: dict, user_context: User):
+def update_prescription_data(
+    id_prescription: int,
+    data: dict,
+    user_context: User,
+    user_permissions: list[Permission],
+):
+    """Update prescription data"""
+
     p = (
         db.session.query(Prescription)
         .filter(Prescription.id == id_prescription)
@@ -427,6 +435,10 @@ def update_prescription_data(id_prescription: int, data: dict, user_context: Use
                 "errors.businessRules",
                 status.HTTP_400_BAD_REQUEST,
             )
+
+        user_service.validate_return_integration(
+            user_context=user_context, user_permissions=user_permissions
+        )
 
         audit = PrescriptionAudit()
         audit.auditType = PrescriptionAuditTypeEnum.UPSERT_CLINICAL_NOTES.value
