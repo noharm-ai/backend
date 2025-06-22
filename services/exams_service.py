@@ -202,6 +202,17 @@ def get_exams_by_admission(admission_number: int, id_segment: int):
         else:
             del results[e]
 
+    # remove exams not relevant for adults
+    age = dateutils.data2age(
+        patient.birthdate.isoformat() if patient.birthdate else date.today().isoformat()
+    )
+    if age > 17:
+        if "swrtz2" in results:
+            del results["swrtz2"]
+        if "swrtz1" in results:
+            del results["swrtz1"]
+
+    # add textual exams
     examsText = _get_textual_exams(id_patient=patient.idPatient)
     resultsText = {}
     for e in examsText:
