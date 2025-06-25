@@ -1,5 +1,8 @@
-from sqlalchemy import func, text
+"""Service: Prescription Check related operations"""
+
 from datetime import datetime, timedelta
+
+from sqlalchemy import func, text
 
 from decorators.has_permission_decorator import has_permission, Permission
 from models.main import db, User
@@ -21,6 +24,7 @@ from services import (
     memory_service,
     prescription_drug_service,
     feature_service,
+    user_service,
 )
 from security.role import Role
 
@@ -30,11 +34,16 @@ def check_prescription(
     idPrescription,
     p_status,
     user_context: User,
+    user_permissions: list[Permission],
     evaluation_time,
     alerts,
     service_user=False,
     fast_check=False,
 ):
+    """
+    Check or uncheck a prescription.
+    """
+
     p = db.session.query(Prescription).filter(Prescription.id == idPrescription).first()
     if p is None:
         raise ValidationError(
@@ -75,6 +84,10 @@ def check_prescription(
                 "errors.businessError",
                 status.HTTP_400_BAD_REQUEST,
             )
+
+    user_service.validate_return_integration(
+        user_context=user_context, user_permissions=user_permissions
+    )
 
     extra_info = {
         "main_prescription": str(p.id),
@@ -411,7 +424,11 @@ def review_prescription(
 
 @has_permission(Permission.RUN_AS)
 def static_check(
-    id_prescription: int, p_status: str, id_origin_user: int, user_context: User
+    id_prescription: int,
+    p_status: str,
+    id_origin_user: int,
+    user_context: User,
+    user_permissions: list[Permission] = [],
 ):
     origin_user = (
         db.session.query(User)
@@ -444,4 +461,5 @@ def static_check(
         evaluation_time=0,
         alerts=[],
         service_user=True,
+        user_permissions=user_permissions,
     )

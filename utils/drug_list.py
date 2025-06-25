@@ -298,6 +298,7 @@ class DrugList:
                     "period": period,
                     "periodFixed": pd[0].period,
                     "totalPeriod": total_period,
+                    "periodMax": pd[0].period_total,  # max period in days
                     "periodDates": [],
                     "route": pd[0].route,
                     "grp_solution": (

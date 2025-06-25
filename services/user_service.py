@@ -6,6 +6,7 @@ from sqlalchemy import desc, func, or_, asc
 from datetime import datetime, timedelta
 
 from models.main import User, UserAudit, db, mail
+from models.appendix import SchemaConfig
 from models.enums import UserAuditTypeEnum
 from repository import user_repository
 from config import Config
@@ -256,3 +257,32 @@ def search_users(user_context: User, term: str):
         results.append({"id": u.id, "name": u.name})
 
     return results
+
+
+def validate_return_integration(user_context: User, user_permissions: list[Permission]):
+    """
+    Check if the user has an external ID for integration purposes.
+    throws ValidationError if the user does not have an external ID
+    """
+
+    schema_config = (
+        db.session.query(SchemaConfig)
+        .filter(SchemaConfig.schemaName == user_context.schema)
+        .first()
+    )
+
+    if schema_config.return_integration:
+        current_user = db.session.query(User).filter(User.id == user_context.id).first()
+        if current_user is None or not current_user.external:
+            if Permission.WRITE_USERS in user_permissions:
+                raise ValidationError(
+                    "Usuário não possui ID externo para integração. Acesso o menu cadastro de usuários e insira o ID externo do seu usuário.",
+                    "errors.businessError",
+                    status.HTTP_400_BAD_REQUEST,
+                )
+
+            raise ValidationError(
+                "Usuário não possui ID externo para integração. Solicite ao usuário responsável pelo cadastro que insira o ID externo do seu usuário.",
+                "errors.businessError",
+                status.HTTP_400_BAD_REQUEST,
+            )

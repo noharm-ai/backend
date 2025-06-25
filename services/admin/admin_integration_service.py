@@ -117,7 +117,17 @@ def init_intervention_reason(user_context: User):
 
 @has_permission(Permission.INTEGRATION_UTILS)
 def update_integration_config(
-    schema, status, nh_care, fl1, fl2, fl3, fl4, config, user_context: User, cpoe: bool
+    schema,
+    status,
+    nh_care,
+    fl1,
+    fl2,
+    fl3,
+    fl4,
+    config,
+    user_context: User,
+    cpoe: bool,
+    return_integration: bool,
 ):
     schema_config = (
         db.session.query(SchemaConfig).filter(SchemaConfig.schemaName == schema).first()
@@ -141,6 +151,7 @@ def update_integration_config(
     schema_config.fl3 = bool(fl3) if fl3 != None else schema_config.fl3
     schema_config.fl4 = bool(fl4) if fl4 != None else schema_config.fl4
     schema_config.cpoe = cpoe
+    schema_config.return_integration = return_integration
 
     schema_config.updatedAt = datetime.today()
     schema_config.updatedBy = user_context.id
@@ -221,4 +232,5 @@ def _object_to_dto(schema_config: SchemaConfig):
         "fl3": schema_config.fl3,
         "fl4": schema_config.fl4,
         "cpoe": schema_config.cpoe,
+        "returnIntegration": schema_config.return_integration,
     }

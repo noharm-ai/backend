@@ -7,12 +7,12 @@ from password_generator import PasswordGenerator
 from flask import render_template
 
 from models.main import User, db, UserAuthorization
+from models.appendix import SchemaConfig
 from models.enums import FeatureEnum, UserAuditTypeEnum
 from repository import user_repository
 from services import memory_service, user_service
-from utils import status
+from utils import status, emailutils
 from config import Config
-from utils import emailutils
 from decorators.has_permission_decorator import has_permission, Permission
 from exception.validation_error import ValidationError
 from security.role import Role
@@ -86,6 +86,21 @@ def upsert_user(data: dict, user_context: User, user_permissions: List[Permissio
     id_user = data.get("id", None)
     id_segment_list = data.get("segments", [])
 
+    schema_config = (
+        db.session.query(SchemaConfig)
+        .filter(SchemaConfig.schemaName == user_context.schema)
+        .first()
+    )
+
+    external = data.get("external").strip() if data.get("external") else None
+
+    if schema_config.return_integration and not external:
+        raise ValidationError(
+            "O campo ID Externo é de preenchimento obrigatório",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
     if not id_user:
         # add new user
         user_email = data.get("email", None)
@@ -106,7 +121,7 @@ def upsert_user(data: dict, user_context: User, user_permissions: List[Permissio
         new_user = User()
         new_user.email = user_email
         new_user.name = user_name
-        new_user.external = data.get("external", None)
+        new_user.external = external
         new_user.active = bool(data.get("active", False))
         new_user.schema = user_context.schema
         pwo = PasswordGenerator()
@@ -203,7 +218,7 @@ def upsert_user(data: dict, user_context: User, user_permissions: List[Permissio
         current_features = updated_user.config.get("features", [])
 
     updated_user.name = data.get("name", None)
-    updated_user.external = data.get("external", None)
+    updated_user.external = external
     updated_user.active = bool(data.get("active", True))
     updated_user.reports_config = {"ignore": data.get("ignoreReports", [])}
 
