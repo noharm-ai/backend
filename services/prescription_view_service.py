@@ -70,7 +70,9 @@ def _internal_get_prescription(
     config_data = _get_configs(prescription=prescription, patient=patient)
 
     interventions = _get_interventions(
-        admission_number=prescription.admissionNumber, config_data=config_data
+        admission_number=prescription.admissionNumber,
+        config_data=config_data,
+        concilia=prescription.concilia,
     )
 
     cn_data = _get_clinical_notes_stats(
@@ -384,14 +386,22 @@ def _get_configs(prescription: Prescription, patient: Patient):
 
 
 @timed()
-def _get_interventions(admission_number: int, config_data: dict):
+def _get_interventions(admission_number: int, config_data: dict, concilia: str):
     if config_data["previous_admissions"]:
         # get interventions from current and previous admissions
-        return intervention_service.get_interventions(
+        interventions = intervention_service.get_interventions(
             admission_number_list=config_data["previous_admissions"]
         )
+    else:
+        interventions = intervention_service.get_interventions(
+            admissionNumber=admission_number
+        )
 
-    return intervention_service.get_interventions(admissionNumber=admission_number)
+    if not concilia:
+        return interventions
+
+    # if conciliation: show interventions for active itens only
+    return [i for i in interventions if i.get("suspendedDate") is None]
 
 
 @timed()

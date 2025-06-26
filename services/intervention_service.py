@@ -272,6 +272,11 @@ def get_interventions(
                 "ram": i[0].ram,
                 "economyDays": i[0].economy_days,
                 "expendedDose": i[0].expended_dose,
+                "suspendedDate": (
+                    i[1].suspendedDate.isoformat()
+                    if i[1] and i[1].suspendedDate
+                    else None
+                ),
             }
         )
 
