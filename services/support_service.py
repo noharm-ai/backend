@@ -47,7 +47,7 @@ def create_ticket(user_context: User, from_url, filelist, category, description,
     ticket = {
         "name": f"[{category or 'Geral'}] {title or db_user.name}",
         "description": description,
-        "x_studio_schema_1": db_user.schema,
+        "x_studio_schema_1": user_context.schema,
         "x_studio_fromurl": from_url,
         "x_studio_tipo_de_chamado": category,
         "team_id": 1,
