@@ -323,6 +323,10 @@ def _get_new_queue(id_processor: str, action_type: str, data: dict):
                     | data.get("config", {}),
                 }
             }
+
+            name_attr = data.get("config", {}).get("name", None)
+            if name_attr:
+                queue.body["component"]["name"] = name_attr
     elif NifiQueueActionTypeEnum.VIEW_PROVENANCE.value == action_type:
         queue.url = "nifi-api/provenance"
         queue.method = "POST"
