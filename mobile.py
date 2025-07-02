@@ -33,6 +33,7 @@ from routes.conciliation import app_conciliation
 from routes.tag import app_tag
 from routes.protocol import app_protocol
 from routes.exams import app_exams
+from routes.lists import app_lists
 from routes.admin.admin_frequency import app_admin_freq
 from routes.admin.admin_intervention_reason import app_admin_interv
 from routes.admin.admin_memory import app_admin_memory
@@ -105,6 +106,7 @@ app.register_blueprint(app_conciliation)
 app.register_blueprint(app_tag)
 app.register_blueprint(app_protocol)
 app.register_blueprint(app_exams)
+app.register_blueprint(app_lists)
 
 app.register_blueprint(app_user_admin)
 app.register_blueprint(app_pres_crud)

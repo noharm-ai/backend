@@ -5,6 +5,7 @@ from repository.regulation import reg_solicitation_repository
 from models.main import db, User
 from models.regulation import RegSolicitation, RegSolicitationType, RegMovement
 from models.prescription import Patient
+from models.appendix import ICDTable
 from models.requests.regulation_movement_request import RegulationMovementRequest
 from models.requests.regulation_solicitation_request import (
     RegulationSolicitationRequest,
@@ -28,6 +29,7 @@ def get_solicitation(id: int):
     solicitation: RegSolicitation = solicitation_object.RegSolicitation
     solicitation_type: RegSolicitationType = solicitation_object.RegSolicitationType
     patient: Patient = solicitation_object.Patient
+    icd: ICDTable = solicitation_object.ICDTable
     movements = _get_movements(solicitation=solicitation)
 
     return {
@@ -40,7 +42,7 @@ def get_solicitation(id: int):
         "risk": solicitation.risk,
         "attendant": solicitation.attendant,
         "attendantRecord": solicitation.attendant_record,
-        "cid": solicitation.cid,
+        "cid": f"{icd.id_str} - {icd.name}" if icd else None,
         "justification": solicitation.justification,
         "patient": {
             "id": str(solicitation.id_patient),
