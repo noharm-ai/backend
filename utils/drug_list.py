@@ -223,12 +223,12 @@ class DrugList:
 
             total_period = 0
             if self.is_cpoe:
-                period = str(round(pd[12])) + "D" if pd[12] else ""
+                period = "D" + str(round(pd[12])) if pd[12] else ""
                 total_period = numberutils.none2zero(pd[12]) + numberutils.none2zero(
                     pd[0].period
                 )
             else:
-                period = (str(pd[0].period) + "D" if pd[0].period else "",)
+                period = ("D" + str(pd[0].period) if pd[0].period else "",)
                 total_period = numberutils.none2zero(pd[0].period)
 
             prevNotes = None
