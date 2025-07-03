@@ -219,3 +219,4 @@ class ICDTable(db.Model):
     id_int = db.Column("co_cid10", db.Integer, primary_key=True)
     id_str = db.Column("nu_cid10", db.String, nullable=False)
     name = db.Column("no_cid10", db.String, nullable=False)
+    status = db.Column("st_ativo", db.Integer, nullable=False)

@@ -34,6 +34,7 @@ def get_prescription_history(id_prescription: int):
                     "idPrescription": str(prescription.id),
                     "createdAt": dateutils.to_iso(prescription.origin_created_at),
                     "responsible": "Sistema origem",
+                    "extra": None,
                 }
             )
 
@@ -54,6 +55,7 @@ def get_prescription_history(id_prescription: int):
                         prescription_audit_dates.get("arrival_date")
                     ),
                     "responsible": None,
+                    "extra": None,
                 }
             )
 
@@ -68,6 +70,7 @@ def get_prescription_history(id_prescription: int):
                         prescription_audit_dates.get("process_date")
                     ),
                     "responsible": None,
+                    "extra": None,
                 }
             )
 
@@ -87,6 +90,7 @@ def get_prescription_history(id_prescription: int):
                 "idPrescription": str(audit.idPrescription),
                 "createdAt": dateutils.to_iso(audit.createdAt),
                 "responsible": responsible.name if responsible else None,
+                "extra": audit.extra,
             }
         )
 

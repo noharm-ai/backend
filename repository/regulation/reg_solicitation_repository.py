@@ -5,11 +5,15 @@ from sqlalchemy import asc, desc, func, nullslast, select, Integer
 
 from models.main import db, User
 from models.prescription import Patient, Prescription
-from models.appendix import Department
+from models.appendix import Department, ICDTable
 from models.regulation import RegSolicitation, RegSolicitationType, RegMovement
 from models.requests.regulation_prioritization_request import (
     RegulationPrioritizationRequest,
 )
+
+ICD_GROUPS = {
+    "ONCO": [f"C{i:02}" for i in range(98)] + [f"D{i}" for i in range(37, 49)]
+}
 
 
 def get_prioritization(request_data: RegulationPrioritizationRequest):
@@ -101,6 +105,20 @@ def get_prioritization(request_data: RegulationPrioritizationRequest):
     if request_data.stageList:
         query = query.filter(RegSolicitation.stage.in_(request_data.stageList))
 
+    if request_data.idIcdList:
+        query = query.filter(Patient.id_icd.in_(request_data.idIcdList))
+
+    if request_data.idIcdGroupList:
+        query_icds = []
+        for group in request_data.idIcdGroupList:
+            icds = ICD_GROUPS.get(group, None)
+
+            if icds:
+                query_icds += icds
+
+        if query_icds:
+            query = query.filter(Patient.id_icd.in_(query_icds))
+
     for order in request_data.order:
         direction = desc if order.direction == "desc" else asc
         if order.field in ["date", "risk"]:
@@ -126,16 +144,13 @@ def get_prioritization(request_data: RegulationPrioritizationRequest):
 def get_solicitation(id: int):
     """Get regulation solicitation data"""
     query = (
-        db.session.query(
-            RegSolicitation,
-            RegSolicitationType,
-            Patient,
-        )
+        db.session.query(RegSolicitation, RegSolicitationType, Patient, ICDTable)
         .outerjoin(
             RegSolicitationType,
             RegSolicitation.id_reg_solicitation_type == RegSolicitationType.id,
         )
         .outerjoin(Patient, RegSolicitation.admission_number == Patient.admissionNumber)
+        .outerjoin(ICDTable, ICDTable.id_str == Patient.id_icd)
         .filter(RegSolicitation.id == id)
     )
 

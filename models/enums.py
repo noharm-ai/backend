@@ -23,6 +23,7 @@ class MemoryEnum(Enum):
     MAP_SCHEDULES_FASTING = "map-schedules-fasting"
     MAP_SCHEDULES = "map-schedules"
     CUSTOM_FORMS = "custom-forms"
+    TRANSCRIPTION_FIELDS = "transcription-fields"
 
 
 class GlobalMemoryEnum(Enum):

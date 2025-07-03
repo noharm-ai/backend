@@ -19,8 +19,9 @@ from models.enums import (
     DrugAttributesAuditTypeEnum,
     SubstanceTagEnum,
     SegmentTypeEnum,
+    MemoryEnum,
 )
-from services import data_authorization_service
+from services import data_authorization_service, memory_service
 from services.admin import admin_drug_service
 from exception.validation_error import ValidationError
 from decorators.has_permission_decorator import has_permission, Permission
@@ -103,12 +104,21 @@ def get_drug_summary(id_drug: int, id_segment: int, complete=False):
                 }
             )
 
+    transcription_fields = memory_service.get_memory(
+        MemoryEnum.TRANSCRIPTION_FIELDS.value
+    )
+    if transcription_fields:
+        extra_fields = transcription_fields.value
+    else:
+        extra_fields = []
+
     return {
         "drug": {"id": int(id_drug), "name": drug.name if drug else ""},
         "units": unitResults,
         "frequencies": frequencyResults,
         "routes": routeResults,
         "intervals": intervalResults,
+        "extraFields": extra_fields,
     }
 
 

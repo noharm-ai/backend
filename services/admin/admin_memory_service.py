@@ -21,6 +21,7 @@ KIND_ADMIN = [
     MemoryEnum.MAP_ORIGIN_PROCEDURE.value,
     MemoryEnum.MAP_ORIGIN_DIET.value,
     MemoryEnum.MAP_ORIGIN_CUSTOM.value,
+    MemoryEnum.TRANSCRIPTION_FIELDS.value,
 ]
 
 KIND_ROUTES = [
