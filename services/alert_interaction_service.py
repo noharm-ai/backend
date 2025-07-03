@@ -254,7 +254,18 @@ def _has_interval_intersection(interval1: str, interval2: str) -> bool:
     list2 = interval2.split()
 
     # Find the intersection of the two lists
-    return set(list1) & set(list2)
+    intersection = set(list1) & set(list2)
+
+    # check if the intersection elements have a valid number
+    for element in intersection:
+        try:
+            float(element.replace(":", ""))
+            return True
+        except ValueError:
+            continue
+
+    # no numeric intersection
+    return False
 
 
 def _filter_drug_list(drug_list):
