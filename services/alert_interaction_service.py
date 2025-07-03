@@ -74,9 +74,7 @@ def find_relations(drug_list, id_patient: int, is_cpoe: bool):
                         "expireDate": prescription_expire_date.isoformat(),
                         "frequency": prescription_drug.frequency,
                         "rx": False,
-                        "interval": prescriptionutils.timeValue(
-                            prescription_drug.interval
-                        ),
+                        "interval": prescription_drug.interval,
                     },
                     "to": {
                         "id": str(cp_prescription_drug.id),
@@ -93,9 +91,7 @@ def find_relations(drug_list, id_patient: int, is_cpoe: bool):
                         "expireDate": cp_prescription_expire_date.isoformat(),
                         "frequency": cp_prescription_drug.frequency,
                         "rx": False,
-                        "interval": prescriptionutils.timeValue(
-                            cp_prescription_drug.interval
-                        ),
+                        "interval": cp_prescription_drug.interval,
                     },
                 }
             )
@@ -118,9 +114,7 @@ def find_relations(drug_list, id_patient: int, is_cpoe: bool):
                         "expireDate": prescription_expire_date.isoformat(),
                         "frequency": prescription_drug.frequency,
                         "rx": True,
-                        "interval": prescriptionutils.timeValue(
-                            prescription_drug.interval
-                        ),
+                        "interval": prescription_drug.interval,
                     },
                     "to": a,
                 }
@@ -196,13 +190,24 @@ def find_relations(drug_list, id_patient: int, is_cpoe: bool):
                     unique_relations[uniq_key] = 1
                     unique_relations[uniq_invert_key] = 1
 
+                alert_level = (
+                    active_relations[key]["level"]
+                    if active_relations[key]["level"] != None
+                    else DrugAlertLevelEnum.LOW.value
+                )
+
                 alert_text = examutils.typeRelations[kind] + ": "
                 alert_text += stringutils.strNone(active_relations[key]["text"])
 
                 if kind == "iy":
-                    alert_text += f"""- {drug_from["drug"]} (Horários: {drug_from['interval'] if drug_from['interval'] else '--'})
-                        - {drug_to["drug"]} (Horários: {drug_to['interval'] if drug_to['interval'] else '--'})
+                    alert_text += f"""- {drug_from["drug"]} (Horários: {prescriptionutils.timeValue( drug_from['interval']) if drug_from['interval'] else '--'})
+                        - {drug_to["drug"]} (Horários: {prescriptionutils.timeValue(drug_to['interval']) if drug_to['interval'] else '--'})
                     """
+
+                    if _has_interval_intersection(
+                        interval1=drug_from["interval"], interval2=drug_to["interval"]
+                    ):
+                        alert_level = DrugAlertLevelEnum.MEDIUM.value
                 else:
                     alert_text += (
                         " ("
@@ -224,11 +229,7 @@ def find_relations(drug_list, id_patient: int, is_cpoe: bool):
                         "idPrescriptionDrug": id,
                         "key": key,
                         "type": kind,
-                        "level": (
-                            active_relations[key]["level"]
-                            if active_relations[key]["level"] != None
-                            else DrugAlertLevelEnum.LOW.value
-                        ),
+                        "level": alert_level,
                         "relation": drug_to["id"],
                         "text": alert_text,
                     }
@@ -242,6 +243,18 @@ def find_relations(drug_list, id_patient: int, is_cpoe: bool):
                         alerts[id] = [alert_obj]
 
     return {"alerts": alerts, "stats": stats}
+
+
+def _has_interval_intersection(interval1: str, interval2: str) -> bool:
+    """check if there is an intersection between intervals"""
+    if not interval1 or not interval2:
+        return False
+
+    list1 = interval1.split()
+    list2 = interval2.split()
+
+    # Find the intersection of the two lists
+    return set(list1) & set(list2)
 
 
 def _filter_drug_list(drug_list):
