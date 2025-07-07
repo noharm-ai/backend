@@ -95,11 +95,12 @@ def upsert_user(data: dict, user_context: User, user_permissions: List[Permissio
     external = data.get("external").strip() if data.get("external") else None
 
     if schema_config.return_integration and not external:
-        raise ValidationError(
-            "O campo ID Externo é de preenchimento obrigatório",
-            "errors.businessRules",
-            status.HTTP_400_BAD_REQUEST,
-        )
+        if Permission.MAINTAINER not in user_permissions:
+            raise ValidationError(
+                "O campo ID Externo é de preenchimento obrigatório",
+                "errors.businessRules",
+                status.HTTP_400_BAD_REQUEST,
+            )
 
     if not id_user:
         # add new user
