@@ -7,7 +7,7 @@ from decorators.has_permission_decorator import has_permission, Permission
 from repository import protocol_repository
 from models.main import User, db, Drug, DrugAttributes, Substance
 from models.appendix import Protocol, Frequency
-from models.prescription import Prescription, PrescriptionDrug
+from models.prescription import Prescription, PrescriptionDrug, Patient
 from models.requests.protocol_request import ProtocolListRequest, ProtocolUpsertRequest
 from models.enums import ProtocolStatusTypeEnum, ProtocolVariableFieldEnum
 from utils import dateutils, status
@@ -246,8 +246,11 @@ def _test_protocol(protocol: dict):
             "date": (datetime.today().date() - timedelta(days=3)).isoformat(),
         },
     }
+    patient = Patient()
+    patient.admissionDate = datetime.today() - timedelta(days=3)
+
     alert_protocol = AlertProtocol(
-        drugs=drug_list, exams=exams, prescription=prescription
+        drugs=drug_list, exams=exams, prescription=prescription, patient=patient
     )
     try:
         alert_protocol.get_protocol_alerts(protocol=protocol)

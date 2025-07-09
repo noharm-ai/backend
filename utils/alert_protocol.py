@@ -1,7 +1,7 @@
 """AlertProtocol class: test protocol rules against prescription data"""
 
 import re
-from datetime import date
+from datetime import date, datetime
 
 from models.enums import DrugTypeEnum
 from models.main import Substance
@@ -144,8 +144,13 @@ class AlertProtocol:
                 return False
 
             hours_diff = (
-                date.today() - self.patient.admissionDate
+                datetime.now() - self.patient.admissionDate
             ).total_seconds() / 3600
+
+            try:
+                value = float(value)
+            except ValueError:
+                return False
 
             return self._compare(op=operator, value1=hours_diff, value2=value)
 

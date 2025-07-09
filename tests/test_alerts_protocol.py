@@ -1,6 +1,6 @@
 """Test: module for protocol alerts"""
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 import pytest
 
@@ -673,7 +673,7 @@ def test_trigger(protocol, has_result):
     }
 
     patient = Patient()
-    patient.admissionDate = date.today() - timedelta(days=2)
+    patient.admissionDate = datetime.now() - timedelta(days=2)
 
     alert_protocol = AlertProtocol(
         drugs=drug_list, exams=exams, prescription=prescription, patient=patient
