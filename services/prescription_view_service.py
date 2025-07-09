@@ -422,6 +422,9 @@ def _get_clinical_notes_stats(
         cache=is_cache_active,
     )
 
+    if cn_stats and (config_data["age"] <= 9 or patient.gender == "M"):
+        cn_stats["pregnant"] = 0
+
     cn_count = 1
     if config_data["is_pmc"]:
         cn_count = clinical_notes_service.get_count(
