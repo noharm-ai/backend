@@ -154,6 +154,23 @@ class AlertProtocol:
 
             return self._compare(op=operator, value1=hours_diff, value2=value)
 
+        if field == "stConcilia":
+            if not self.patient:
+                return False
+
+            st_concilia = (
+                self.patient.st_conciliation
+                if self.patient.st_conciliation is not None
+                else 0
+            )
+
+            try:
+                value = int(value)
+            except ValueError:
+                return False
+
+            return self._compare(op=operator, value1=st_concilia, value2=value)
+
         if field == "age":
             age = self.exams.get("age", None)
             if not age:

@@ -517,6 +517,36 @@ from utils.alert_protocol import AlertProtocol
                 "variables": [
                     {
                         "name": "v1",
+                        "field": "stConcilia",
+                        "operator": "=",
+                        "value": 1,
+                    },
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            True,
+        ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
+                        "field": "stConcilia",
+                        "operator": "=",
+                        "value": 0,
+                    },
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            False,
+        ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
                         "field": "combination",
                         "substance": ["111111"],
                         "dose": 5,
@@ -674,6 +704,7 @@ def test_trigger(protocol, has_result):
 
     patient = Patient()
     patient.admissionDate = datetime.now() - timedelta(days=2)
+    patient.st_conciliation = 1
 
     alert_protocol = AlertProtocol(
         drugs=drug_list, exams=exams, prescription=prescription, patient=patient
