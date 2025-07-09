@@ -5,7 +5,7 @@ from datetime import date
 
 from models.enums import DrugTypeEnum
 from models.main import Substance
-from models.prescription import PrescriptionDrug, Prescription
+from models.prescription import PrescriptionDrug, Prescription, Patient
 
 SAFE_LOGICAL_EXPR_REGEX = r"^\s*(?:True|False|\(|\)|and|or|not|\s+)+\s*$"
 
@@ -14,6 +14,7 @@ class AlertProtocol:
     """AlertProtocol class: test protocol rules against prescription data"""
 
     prescription = None
+    patient = None
     drugs = None
     filtered_drugs = None
     substance_list = None
@@ -24,8 +25,11 @@ class AlertProtocol:
     protocol_variables = None
     protocol_msgs = None
 
-    def __init__(self, drugs: dict, exams: dict, prescription: Prescription):
+    def __init__(
+        self, drugs: dict, exams: dict, prescription: Prescription, patient: Patient
+    ):
         self.prescription = prescription
+        self.patient = patient
         self.drugs = drugs
         self.filtered_drugs = self._filter_drug_list()
         self.exams = exams
@@ -131,6 +135,19 @@ class AlertProtocol:
                 return False
 
             return self._compare(op=operator, value1=exam_value, value2=value)
+
+        if field == "admissionTime":
+            if not self.patient:
+                return False
+
+            if not self.patient.admissionDate:
+                return False
+
+            hours_diff = (
+                date.today() - self.patient.admissionDate
+            ).total_seconds() / 3600
+
+            return self._compare(op=operator, value1=hours_diff, value2=value)
 
         if field == "age":
             age = self.exams.get("age", None)

@@ -4,7 +4,7 @@ from datetime import date, timedelta
 
 import pytest
 
-from models.prescription import Prescription
+from models.prescription import Prescription, Patient
 from tests.utils import utils_test_prescription
 from utils.alert_protocol import AlertProtocol
 
@@ -487,6 +487,36 @@ from utils.alert_protocol import AlertProtocol
                 "variables": [
                     {
                         "name": "v1",
+                        "field": "admissionTime",
+                        "operator": ">=",
+                        "value": 48,
+                    },
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            True,
+        ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
+                        "field": "admissionTime",
+                        "operator": ">=",
+                        "value": 50,
+                    },
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            False,
+        ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
                         "field": "combination",
                         "substance": ["111111"],
                         "dose": 5,
@@ -641,8 +671,12 @@ def test_trigger(protocol, has_result):
             "date": (date.today() - timedelta(days=3)).isoformat(),
         },
     }
+
+    patient = Patient()
+    patient.admissionDate = date.today() - timedelta(days=2)
+
     alert_protocol = AlertProtocol(
-        drugs=drug_list, exams=exams, prescription=prescription
+        drugs=drug_list, exams=exams, prescription=prescription, patient=patient
     )
     results = alert_protocol.get_protocol_alerts(protocol=protocol)
 
@@ -761,7 +795,12 @@ def test_folfox():
 
     prescription = Prescription()
     prescription.idDepartment = 100
-    alert_protocol = AlertProtocol(drugs=drug_list, exams={}, prescription=prescription)
+
+    patient = Patient()
+
+    alert_protocol = AlertProtocol(
+        drugs=drug_list, exams={}, prescription=prescription, patient=patient
+    )
     result = alert_protocol.get_protocol_alerts(protocol=protocol)
 
     assert result is not None

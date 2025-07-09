@@ -571,6 +571,7 @@ def _get_alerts(
         drug_list=drug_list,
         exams=exam_data["exams"],
         prescription=prescription,
+        patient=patient,
         user_context=user_context,
     )
 
