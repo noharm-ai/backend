@@ -1,7 +1,7 @@
 """Service: prescription related operations"""
 
 from datetime import date, datetime
-from sqlalchemy import desc, nullsfirst, func, and_, or_, text
+from sqlalchemy import desc, nullsfirst, func, and_, or_, text, literal
 
 from models.main import db, User
 from models.prescription import (
@@ -93,9 +93,7 @@ def search(search_key: int, user_permissions: list[Permission]):
                 Patient.gender.label("gender"),
                 Department.name.label("department"),
                 Patient.admissionDate.label("admission_date"),
-                func.row_number()
-                .over(order_by=desc(Prescription.date))
-                .label("priority"),
+                literal(1).label("priority"),
             )
             .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)
             .outerjoin(

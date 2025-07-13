@@ -3,7 +3,7 @@
 from datetime import datetime
 
 from models.main import User
-from models.prescription import Prescription
+from models.prescription import Prescription, Patient
 from models.enums import ProtocolTypeEnum
 from services import feature_service
 from utils.alert_protocol import AlertProtocol
@@ -13,7 +13,11 @@ from repository import protocol_repository
 
 @has_permission(Permission.READ_PRESCRIPTION)
 def find_protocols(
-    drug_list: dict, exams: dict, prescription: Prescription, user_context: User = None
+    drug_list: dict,
+    exams: dict,
+    prescription: Prescription,
+    patient: Patient,
+    user_context: User = None,
 ):
     """Gets all prescription protocols and test against a prescription"""
 
@@ -41,7 +45,7 @@ def find_protocols(
     for expire_date, drugs in drugs_by_expire_date.items():
         results[expire_date] = []
         alert_protocol = AlertProtocol(
-            drugs=drugs, exams=exams, prescription=prescription
+            drugs=drugs, exams=exams, prescription=prescription, patient=patient
         )
 
         for protocol in protocols:

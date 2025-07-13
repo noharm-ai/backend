@@ -263,3 +263,5 @@ class ProtocolVariableFieldEnum(Enum):
     ID_DEPARTMENT = "idDepartment"
     ID_SEGMENT = "idSegment"
     COMBINATION = "combination"
+    ADMISSION_TIME = "admissionTime"
+    ST_CONCILIA = "stConcilia"
