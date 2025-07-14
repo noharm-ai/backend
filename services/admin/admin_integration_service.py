@@ -1,25 +1,35 @@
+"""Service: integration operations"""
+
 import json
-from utils import status
-from sqlalchemy import case, text
 from datetime import datetime
+
+import boto3
+from sqlalchemy import case, text
+from config import Config
 
 from models.main import db, User
 from models.appendix import SchemaConfig, InterventionReason
+from models.requests.admin.admin_integration_request import (
+    AdminIntegrationCreateSchemaRequest,
+)
 from decorators.has_permission_decorator import has_permission, Permission
+from utils import status
 
 from exception.validation_error import ValidationError
 
 
 def get_table_count(schema, table):
+    """get estimated amount of record in a table"""
+
     query = text(
-        f"""
+        """
         select 
             n_live_tup as total_rows
         from
             pg_stat_user_tables 
         where 
             schemaname = :schemaname and relname = :table
-    """
+        """
     )
 
     result = db.session.execute(query, {"schemaname": schema, "table": table})
@@ -28,6 +38,7 @@ def get_table_count(schema, table):
 
 
 def can_refresh_agg(schema):
+    """check if prescricaoagg can be recalculated"""
     max_table_count = 300000
 
     return get_table_count(schema, "prescricaoagg") <= max_table_count
@@ -35,6 +46,7 @@ def can_refresh_agg(schema):
 
 @has_permission(Permission.WRITE_SEGMENT_SCORE)
 def refresh_agg(user_context: User):
+    """Recalculate prescricaoagg"""
     schema = user_context.schema
 
     if not can_refresh_agg(user_context.schema):
@@ -56,6 +68,7 @@ def refresh_agg(user_context: User):
 
 @has_permission(Permission.INTEGRATION_UTILS)
 def refresh_prescriptions(user_context: User):
+    """Recalculate prescriptions"""
     schema = user_context.schema
     max_table_count = 100000
 
@@ -129,6 +142,7 @@ def update_integration_config(
     cpoe: bool,
     return_integration: bool,
 ):
+    """Update record in schema_config"""
     schema_config = (
         db.session.query(SchemaConfig).filter(SchemaConfig.schemaName == schema).first()
     )
@@ -203,6 +217,7 @@ def _set_new_config(old_config: dict, new_config: dict):
 
 @has_permission(Permission.INTEGRATION_UTILS)
 def list_integrations(user_context: User):
+    """list integrations config"""
     integrations = (
         db.session.query(
             SchemaConfig,
@@ -219,6 +234,44 @@ def list_integrations(user_context: User):
         results.append(_object_to_dto(i[0]))
 
     return results
+
+
+@has_permission(Permission.INTEGRATION_UTILS)
+def create_schema(
+    request_data: AdminIntegrationCreateSchemaRequest, user_context: User
+):
+    """Create a new schema"""
+
+    lambda_client = boto3.client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
+    response = lambda_client.invoke(
+        FunctionName=Config.SCORES_FUNCTION_NAME,
+        InvocationType="RequestResponse",
+        Payload=json.dumps(
+            {
+                "command": "lambda_create_schema.create_schema",
+                "schema": request_data.schema,
+                "is_cpoe": request_data.is_cpoe,
+                "is_pec": request_data.is_pec,
+                "create_user": request_data.create_user,
+                "db_user": request_data.db_user,
+                "created_by": user_context.id,
+            }
+        ),
+    )
+
+    response_json = json.loads(response["Payload"].read().decode("utf-8"))
+
+    if isinstance(response_json, str):
+        response_json = json.loads(response_json)
+
+    if response_json.get("error", False):
+        raise ValidationError(
+            response_json.get("message", "Erro inesperado. Consulte os logs"),
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    return response_json
 
 
 def _object_to_dto(schema_config: SchemaConfig):

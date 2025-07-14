@@ -1,9 +1,14 @@
+"""Route: admin integration related"""
+
 from flask import Blueprint, request
 
 from decorators.api_endpoint_decorator import api_endpoint
 from services.admin import (
     admin_integration_service,
     admin_integration_status_service,
+)
+from models.requests.admin.admin_integration_request import (
+    AdminIntegrationCreateSchemaRequest,
 )
 
 app_admin_integration = Blueprint("app_admin_integration", __name__)
@@ -66,3 +71,12 @@ def update_config():
 @api_endpoint()
 def list_integrations():
     return admin_integration_service.list_integrations()
+
+
+@app_admin_integration.route("/admin/integration/create-schema", methods=["POST"])
+@api_endpoint()
+def create_schema():
+    """create a new schema"""
+    return admin_integration_service.create_schema(
+        request_data=AdminIntegrationCreateSchemaRequest(**request.get_json())
+    )
