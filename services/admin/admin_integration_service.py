@@ -252,6 +252,8 @@ def create_schema(
                 "schema": request_data.schema,
                 "is_cpoe": request_data.is_cpoe,
                 "is_pec": request_data.is_pec,
+                "create_sqs": request_data.create_sqs,
+                "create_logstream": request_data.create_logstream,
                 "create_user": request_data.create_user,
                 "db_user": request_data.db_user,
                 "created_by": user_context.id,

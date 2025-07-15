@@ -12,4 +12,6 @@ class AdminIntegrationCreateSchemaRequest(BaseModel):
     is_cpoe: bool
     is_pec: bool
     create_user: bool
+    create_sqs: bool
+    create_logstream: bool
     db_user: Optional[str] = None
