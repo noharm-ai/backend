@@ -11,6 +11,7 @@ from models.main import db, User
 from models.appendix import SchemaConfig, InterventionReason
 from models.requests.admin.admin_integration_request import (
     AdminIntegrationCreateSchemaRequest,
+    AdminIntegrationUpsertGetnameRequest,
 )
 from decorators.has_permission_decorator import has_permission, Permission
 from utils import status
@@ -276,6 +277,76 @@ def create_schema(
     return response_json
 
 
+@has_permission(Permission.INTEGRATION_UTILS)
+def get_cloud_config(schema: str):
+    """Get cloud schema config"""
+
+    if not schema:
+        raise ValidationError(
+            "schema inválido",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    lambda_client = boto3.client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
+    response = lambda_client.invoke(
+        FunctionName=Config.SCORES_FUNCTION_NAME,
+        InvocationType="RequestResponse",
+        Payload=json.dumps(
+            {
+                "command": "lambda_create_schema.get_aws_config",
+                "schema": schema,
+            }
+        ),
+    )
+
+    response_json = json.loads(response["Payload"].read().decode("utf-8"))
+
+    if isinstance(response_json, str):
+        response_json = json.loads(response_json)
+
+    if response_json.get("error", False):
+        raise ValidationError(
+            response_json.get("message", "Erro inesperado. Consulte os logs"),
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    return response_json
+
+
+@has_permission(Permission.INTEGRATION_UTILS)
+def upsert_getname(request_data: AdminIntegrationUpsertGetnameRequest):
+    """Upsert schema getname config"""
+
+    lambda_client = boto3.client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
+    response = lambda_client.invoke(
+        FunctionName=Config.SCORES_FUNCTION_NAME,
+        InvocationType="RequestResponse",
+        Payload=json.dumps(
+            {
+                "command": "lambda_create_schema.create_getname_dns",
+                "schema": request_data.schema_name,
+                "ip": str(request_data.ip),
+            }
+        ),
+    )
+
+    response_json = json.loads(response["Payload"].read().decode("utf-8"))
+
+    if isinstance(response_json, str):
+        response_json = json.loads(response_json)
+
+    if response_json.get("error", False):
+        raise ValidationError(
+            response_json.get("message", "Erro inesperado. Consulte os logs"),
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    return response_json
+
+
 def _object_to_dto(schema_config: SchemaConfig):
     return {
         "schema": schema_config.schemaName,
@@ -288,4 +359,7 @@ def _object_to_dto(schema_config: SchemaConfig):
         "fl4": schema_config.fl4,
         "cpoe": schema_config.cpoe,
         "returnIntegration": schema_config.return_integration,
+        "createdAt": (
+            schema_config.createdAt.isoformat() if schema_config.createdAt else None
+        ),
     }

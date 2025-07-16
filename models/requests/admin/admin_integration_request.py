@@ -2,7 +2,7 @@
 
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, IPvAnyAddress
 
 
 class AdminIntegrationCreateSchemaRequest(BaseModel):
@@ -15,3 +15,10 @@ class AdminIntegrationCreateSchemaRequest(BaseModel):
     create_sqs: bool
     create_logstream: bool
     db_user: Optional[str] = None
+
+
+class AdminIntegrationUpsertGetnameRequest(BaseModel):
+    """Request: upsert getname"""
+
+    schema_name: str
+    ip: IPvAnyAddress

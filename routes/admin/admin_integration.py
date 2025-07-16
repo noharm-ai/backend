@@ -9,6 +9,7 @@ from services.admin import (
 )
 from models.requests.admin.admin_integration_request import (
     AdminIntegrationCreateSchemaRequest,
+    AdminIntegrationUpsertGetnameRequest,
 )
 
 app_admin_integration = Blueprint("app_admin_integration", __name__)
@@ -79,4 +80,23 @@ def create_schema():
     """create a new schema"""
     return admin_integration_service.create_schema(
         request_data=AdminIntegrationCreateSchemaRequest(**request.get_json())
+    )
+
+
+@app_admin_integration.route("/admin/integration/get-cloud-config", methods=["POST"])
+@api_endpoint()
+def get_cloud_config():
+    """get cloud config"""
+    request_data = request.get_json()
+    return admin_integration_service.get_cloud_config(
+        schema=request_data.get("schema", None)
+    )
+
+
+@app_admin_integration.route("/admin/integration/upsert-getname", methods=["POST"])
+@api_endpoint()
+def upsert_getname():
+    """upsert getname config"""
+    return admin_integration_service.upsert_getname(
+        request_data=AdminIntegrationUpsertGetnameRequest(**request.get_json())
     )
