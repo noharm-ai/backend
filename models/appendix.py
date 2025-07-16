@@ -122,6 +122,20 @@ class SchemaConfig(db.Model):
     fl4 = db.Column("fl4_cria_conciliacao", db.Boolean, nullable=False)
 
 
+class SchemaConfigAudit(db.Model):
+    """table schema_config_audit: audit record for schema_config changes"""
+
+    __tablename__ = "schema_config_audit"
+    __table_args__ = {"schema": "public"}
+
+    id = db.Column("idschema_config_audit", db.BigInteger, primary_key=True)
+    schemaName = db.Column("schema_name", db.String, nullable=False)
+    auditType = db.Column("tp_audit", db.Integer, nullable=False)
+    extra = db.Column("extra", postgresql.JSON, nullable=True)
+    createdAt = db.Column("created_at", db.DateTime, nullable=False)
+    createdBy = db.Column("created_by", db.BigInteger, nullable=False)
+
+
 class CultureHeader(db.Model):
     __tablename__ = "cultura_cabecalho"
 

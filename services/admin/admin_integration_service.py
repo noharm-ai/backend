@@ -8,11 +8,12 @@ from sqlalchemy import case, text
 from config import Config
 
 from models.main import db, User
-from models.appendix import SchemaConfig, InterventionReason
+from models.appendix import SchemaConfig, InterventionReason, SchemaConfigAudit
 from models.requests.admin.admin_integration_request import (
     AdminIntegrationCreateSchemaRequest,
     AdminIntegrationUpsertGetnameRequest,
 )
+from models.enums import SchemaConfigAuditTypeEnum
 from decorators.has_permission_decorator import has_permission, Permission
 from utils import status
 
@@ -177,7 +178,16 @@ def update_integration_config(
         db.session.query(SchemaConfig).filter(SchemaConfig.schemaName == schema).first()
     )
 
-    return _object_to_dto(schema_config_db)
+    response_obj = _object_to_dto(schema_config_db)
+
+    _create_audit(
+        schema=schema,
+        audit_type=SchemaConfigAuditTypeEnum.UPDATE,
+        extra=response_obj,
+        created_by=user_context.id,
+    )
+
+    return response_obj
 
 
 def _set_new_config(old_config: dict, new_config: dict):
@@ -243,23 +253,23 @@ def create_schema(
 ):
     """Create a new schema"""
 
+    payload = {
+        "command": "lambda_create_schema.create_schema",
+        "schema": request_data.schema,
+        "is_cpoe": request_data.is_cpoe,
+        "is_pec": request_data.is_pec,
+        "create_sqs": request_data.create_sqs,
+        "create_logstream": request_data.create_logstream,
+        "create_user": request_data.create_user,
+        "db_user": request_data.db_user,
+        "created_by": user_context.id,
+    }
+
     lambda_client = boto3.client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
     response = lambda_client.invoke(
         FunctionName=Config.SCORES_FUNCTION_NAME,
         InvocationType="RequestResponse",
-        Payload=json.dumps(
-            {
-                "command": "lambda_create_schema.create_schema",
-                "schema": request_data.schema,
-                "is_cpoe": request_data.is_cpoe,
-                "is_pec": request_data.is_pec,
-                "create_sqs": request_data.create_sqs,
-                "create_logstream": request_data.create_logstream,
-                "create_user": request_data.create_user,
-                "db_user": request_data.db_user,
-                "created_by": user_context.id,
-            }
-        ),
+        Payload=json.dumps(payload),
     )
 
     response_json = json.loads(response["Payload"].read().decode("utf-8"))
@@ -274,7 +284,27 @@ def create_schema(
             status.HTTP_400_BAD_REQUEST,
         )
 
+    _create_audit(
+        schema=request_data.schema,
+        audit_type=SchemaConfigAuditTypeEnum.CREATE,
+        extra=payload,
+        created_by=user_context.id,
+    )
+
     return response_json
+
+
+def _create_audit(
+    schema: str, audit_type: SchemaConfigAuditTypeEnum, extra: dict, created_by: int
+):
+    audit = SchemaConfigAudit()
+    audit.schemaName = schema
+    audit.auditType = audit_type.value
+    audit.extra = extra
+    audit.createdAt = datetime.today()
+    audit.createdBy = created_by
+    db.session.add(audit)
+    db.session.flush()
 
 
 @has_permission(Permission.INTEGRATION_UTILS)
@@ -316,7 +346,9 @@ def get_cloud_config(schema: str):
 
 
 @has_permission(Permission.INTEGRATION_UTILS)
-def upsert_getname(request_data: AdminIntegrationUpsertGetnameRequest):
+def upsert_getname(
+    request_data: AdminIntegrationUpsertGetnameRequest, user_context: User
+):
     """Upsert schema getname config"""
 
     lambda_client = boto3.client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
@@ -343,6 +375,13 @@ def upsert_getname(request_data: AdminIntegrationUpsertGetnameRequest):
             "errors.businessRules",
             status.HTTP_400_BAD_REQUEST,
         )
+
+    _create_audit(
+        schema=request_data.schema_name,
+        audit_type=SchemaConfigAuditTypeEnum.GETNAME_DNS,
+        extra={"new_ip": str(request_data.ip)},
+        created_by=user_context.id,
+    )
 
     return response_json
 
