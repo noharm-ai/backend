@@ -1,9 +1,11 @@
-import jwt
+"""Service for handling authentication and authorization in the NoHarm application."""
+
 import json
-import logging
+import urllib.parse
+
 import requests
+import jwt
 from flask import request
-from http.client import HTTPConnection
 from flask_jwt_extended import (
     create_access_token,
     create_refresh_token,
@@ -11,7 +13,7 @@ from flask_jwt_extended import (
 from cryptography.hazmat.primitives import serialization
 from flask_sqlalchemy.session import Session
 from markupsafe import escape as escape_html
-from sqlalchemy import asc
+from sqlalchemy import asc, text
 from sqlalchemy.orm import make_transient
 
 from models.main import db, dbSession, Notify, User, UserExtra
@@ -31,7 +33,7 @@ from config import Config
 from exception.validation_error import ValidationError
 from utils import status
 from security.role import Role
-from security.permission import Permission
+from decorators.has_permission_decorator import has_permission, Permission
 
 
 def _login(email: str, password: str) -> User:
@@ -43,6 +45,12 @@ def _login(email: str, password: str) -> User:
             "errors.unauthorizedUser",
             status.HTTP_400_BAD_REQUEST,
         )
+
+    return _prepare_user(user=user)
+
+
+def _prepare_user(user: User) -> User:
+    """add extra info to user config"""
 
     # detach from session
     make_transient(user)
@@ -91,13 +99,16 @@ def _has_force_schema_permission(user: User, force_schema: str = None):
 def _auth_user(
     user,
     force_schema=None,
-    extra_features=[],
+    extra_features=None,
 ):
+    """Authenticate user and return user data with access and refresh tokens."""
+
     permissions = Role.get_permissions_from_user(user=user)
     roles = user.config["roles"] if user.config and "roles" in user.config else []
     user_features = (
         user.config["features"] if user.config and "features" in user.config else []
     )
+    extra_features = [] if extra_features is None else extra_features
 
     if Config.ENV == NoHarmENV.STAGING.value:
         if FeatureEnum.STAGING_ACCESS.value not in user_features:
@@ -206,10 +217,13 @@ def _auth_user(
         )
 
     logout_url = None
+    is_oauth = False
     if features is not None and FeatureEnum.OAUTH.value in features.value:
-        oauth_config = get_oauth_config(schema=user_schema)
-
-        logout_url = oauth_config["logout_url"] if oauth_config is not None else None
+        is_oauth = True
+        if permissions is not None and Permission.MAINTAINER in permissions:
+            logout_url = Config.MAIL_HOST + "/login/noharm"
+        else:
+            logout_url = Config.MAIL_HOST + "/login/" + user_schema
 
     db_session.close()
 
@@ -272,9 +286,11 @@ def _auth_user(
         "integrationStatus": integration_status,
         "permissions": [p.name for p in permissions],
         "isCpoe": is_cpoe,
+        "oauth": is_oauth,
     }
 
 
+# deprecated
 def pre_auth(email, password):
     user = _login(email, password)
 
@@ -299,6 +315,47 @@ def pre_auth(email, password):
             return {"maintainer": False, "schemas": user.config.get("schemas", [])}
 
     return {"maintainer": False, "schemas": []}
+
+
+@has_permission(Permission.MULTI_SCHEMA)
+def get_switch_schema_data(user_permissions: list[Permission], user_context: User):
+    """Get list of schemas to choose from"""
+
+    if Permission.MAINTAINER in user_permissions:
+        schema_results = db.session.query(SchemaConfig).order_by(
+            SchemaConfig.schemaName
+        )
+
+        schemas = []
+        for s in schema_results:
+            schemas.append(
+                {
+                    "name": s.schemaName,
+                }
+            )
+
+        return {"maintainer": True, "schemas": schemas}
+
+    extra = (
+        db.session.query(UserExtra).filter(UserExtra.idUser == user_context.id).first()
+    )
+    schemas = []
+    if extra:
+        schemas = extra.config.get("schemas", [])
+
+    return {"maintainer": False, "schemas": schemas}
+
+
+@has_permission(Permission.MULTI_SCHEMA)
+def switch_schema(switch_to_schema: str, extra_features: list[str], user_context: User):
+    """Switch to other schema"""
+    user = db.session.query(User).filter(User.id == user_context.id).first()
+
+    user = _prepare_user(user=user)
+
+    return _auth_user(
+        user=user, force_schema=switch_to_schema, extra_features=extra_features
+    )
 
 
 def auth_local(
@@ -357,16 +414,7 @@ def auth_provider(code, schema):
         )
 
     # this one works because it's the first db interaction
-    dbSession.setSchema(schema)
-
-    if (
-        Config.ENV == NoHarmENV.DEVELOPMENT.value
-        or Config.ENV == NoHarmENV.STAGING.value
-    ):
-        HTTPConnection.debuglevel = 1
-        requests_log = logging.getLogger("requests.packages.urllib3")
-        requests_log.setLevel(logging.DEBUG)
-        requests_log.propagate = True
+    _set_schema(schema)
 
     oauth_config = get_oauth_config(schema=schema)
 
@@ -389,6 +437,7 @@ def auth_provider(code, schema):
             url=oauth_config["login_url"],
             data=params,
             auth=(oauth_config["client_id"], oauth_config["client_secret"]),
+            timeout=10,
         )
 
         if response.status_code != status.HTTP_200_OK:
@@ -401,56 +450,43 @@ def auth_provider(code, schema):
         token_data = response.json()
         code = token_data["id_token"]
 
-    if oauth_config["verify_signature"]:
-        oauth_keys = memory_service.get_memory(MemoryEnum.OAUTH_KEYS.value)
+    oauth_keys = memory_service.get_memory(MemoryEnum.OAUTH_KEYS.value)
 
-        if oauth_keys is None:
-            raise ValidationError(
-                "OAUTH KEYS não configurado",
-                "errors.unauthorizedUser",
-                status.HTTP_401_UNAUTHORIZED,
-            )
-        keys = oauth_keys.value["keys"]
-
-        token_headers = jwt.get_unverified_header(code)
-        token_alg = token_headers["alg"]
-        token_kid = token_headers["kid"]
-        public_key = None
-        for key in keys:
-            if key["kid"] == token_kid:
-                public_key = key
-
-        rsa_pem_key = jwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(public_key))
-        rsa_pem_key_bytes = rsa_pem_key.public_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    if oauth_keys is None:
+        raise ValidationError(
+            "OAUTH KEYS não configurado",
+            "errors.unauthorizedUser",
+            status.HTTP_401_UNAUTHORIZED,
         )
+    keys = oauth_keys.value["keys"]
 
-        try:
-            jwt_user = jwt.decode(
-                code,
-                key=rsa_pem_key_bytes,
-                algorithms=[token_alg],
-                audience=[oauth_config["client_id"]],
-            )
-        except Exception as error:
-            raise ValidationError(
-                "OAUTH provider error: decode error",
-                "errors.unauthorizedUser",
-                status.HTTP_401_UNAUTHORIZED,
-            )
-    else:
-        try:
-            jwt_user = jwt.decode(
-                code,
-                options={"verify_signature": False},
-            )
-        except Exception as error:
-            raise ValidationError(
-                "OAUTH provider error: decode error",
-                "errors.unauthorizedUser",
-                status.HTTP_401_UNAUTHORIZED,
-            )
+    token_headers = jwt.get_unverified_header(code)
+    token_alg = token_headers["alg"]
+    token_kid = token_headers["kid"]
+    public_key = None
+    for key in keys:
+        if key["kid"] == token_kid:
+            public_key = key
+
+    rsa_pem_key = jwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(public_key))
+    rsa_pem_key_bytes = rsa_pem_key.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+
+    try:
+        jwt_user = jwt.decode(
+            code,
+            key=rsa_pem_key_bytes,
+            algorithms=[token_alg],
+            audience=[oauth_config["client_id"]],
+        )
+    except Exception as error:
+        raise ValidationError(
+            "OAUTH provider error: decode error",
+            "errors.unauthorizedUser",
+            status.HTTP_401_UNAUTHORIZED,
+        ) from error
 
     email_attr = oauth_config["email_attr"]
     name_attr = oauth_config["name_attr"]
@@ -475,12 +511,12 @@ def auth_provider(code, schema):
         .first()
     )
 
-    if features is None or FeatureEnum.OAUTH.value not in features.value:
-        raise ValidationError(
-            "OAUTH bloqueado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
+    # if features is None or FeatureEnum.OAUTH.value not in features.value:
+    #     raise ValidationError(
+    #         "OAUTH bloqueado",
+    #         "errors.unauthorizedUser",
+    #         status.HTTP_401_UNAUTHORIZED,
+    #     )
 
     return _auth_user(nh_user)
 
@@ -499,12 +535,21 @@ def _get_oauth_user(email, name, schema, oauth_config):
 
 
 def get_oauth_config(schema: str):
+    """Get OAUTH configuration for the given schema"""
     schema_config = (
         db.session.query(SchemaConfig).filter(SchemaConfig.schemaName == schema).first()
     )
 
-    if schema_config.config != None:
-        return schema_config.config["oauth"]
+    if schema_config.config is not None and "oauth" in schema_config.config:
+        oauth_config = schema_config.config["oauth"]
+
+        oauth_config["redirect_uri"] = Config.MAIL_HOST + "/login-callback/" + schema
+        oauth_config["auth_url"] += "&redirect_uri=" + urllib.parse.quote(
+            oauth_config["redirect_uri"]
+        )
+        oauth_config["logout_url"] = Config.MAIL_HOST + "/login/" + schema
+
+        return oauth_config
 
     return None
 
@@ -556,3 +601,24 @@ def refresh_token(current_user, current_claims):
     access_token = create_access_token(identity=current_user, additional_claims=claims)
 
     return {"access_token": access_token}
+
+
+def _set_schema(schema):
+    db_session = Session(db)
+    result = db_session.execute(
+        text("SELECT schema_name FROM information_schema.schemata")
+    )
+
+    schema_exists = False
+    for r in result:
+        if r[0] == schema:
+            schema_exists = True
+
+    if not schema_exists:
+        raise ValidationError(
+            "Schema Inexistente", "errors.invalidSchema", status.HTTP_400_BAD_REQUEST
+        )
+
+    db_session.close()
+
+    dbSession.setSchema(schema)
