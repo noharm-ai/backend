@@ -220,10 +220,11 @@ def _auth_user(
     is_oauth = False
     if features is not None and FeatureEnum.OAUTH.value in features.value:
         is_oauth = True
-        if permissions is not None and Permission.MAINTAINER in permissions:
-            logout_url = Config.MAIL_HOST + "/login/noharm"
-        else:
-            logout_url = Config.MAIL_HOST + "/login/" + user_schema
+        logout_url = Config.MAIL_HOST + "/login/" + user_schema
+
+    if permissions is not None and Permission.MAINTAINER in permissions:
+        is_oauth = True
+        logout_url = Config.MAIL_HOST + "/login/noharm"
 
     db_session.close()
 
@@ -390,13 +391,22 @@ def auth_local(
     if features is not None and FeatureEnum.OAUTH.value in features.value:
         raise ValidationError(
             "Utilize o endereço {}/login/{} para fazer login na NoHarm".format(
-                Config.APP_URL, preCheckUser.schema
+                Config.MAIL_HOST, preCheckUser.schema
             ),
             "{}/login/{}".format(Config.APP_URL, preCheckUser.schema),
             status.HTTP_401_UNAUTHORIZED,
         )
 
     user = _login(email, password)
+
+    permissions = Role.get_permissions_from_user(user=user)
+
+    if Permission.MAINTAINER in permissions:
+        raise ValidationError(
+            f"Utilize o endereço {Config.MAIL_HOST}/login/noharm para fazer login na NoHarm",
+            f"{Config.MAIL_HOST}/login/noharm",
+            status.HTTP_401_UNAUTHORIZED,
+        )
 
     return _auth_user(
         user,
@@ -406,6 +416,8 @@ def auth_local(
 
 
 def auth_provider(code, schema):
+    """Authenticate user using OAUTH provider."""
+
     if schema is None:
         raise ValidationError(
             "schema invalido",
@@ -505,18 +517,21 @@ def auth_provider(code, schema):
         oauth_config,
     )
 
+    permissions = Role.get_permissions_from_user(user=nh_user)
     features = (
         db.session.query(Memory)
         .filter(Memory.kind == MemoryEnum.FEATURES.value)
         .first()
     )
 
-    # if features is None or FeatureEnum.OAUTH.value not in features.value:
-    #     raise ValidationError(
-    #         "OAUTH bloqueado",
-    #         "errors.unauthorizedUser",
-    #         status.HTTP_401_UNAUTHORIZED,
-    #     )
+    if (
+        features is None or FeatureEnum.OAUTH.value not in features.value
+    ) and Permission.MAINTAINER not in permissions:
+        raise ValidationError(
+            "OAUTH bloqueado",
+            "errors.unauthorizedUser",
+            status.HTTP_401_UNAUTHORIZED,
+        )
 
     return _auth_user(nh_user)
 
