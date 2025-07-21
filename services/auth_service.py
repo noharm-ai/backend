@@ -517,6 +517,8 @@ def auth_provider(code, schema):
         oauth_config,
     )
 
+    nh_user = _prepare_user(nh_user)
+
     permissions = Role.get_permissions_from_user(user=nh_user)
     features = (
         db.session.query(Memory)
