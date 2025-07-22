@@ -766,45 +766,50 @@ def _alert_kidney(
         )
         return alert
 
-    ckd_value = _get_ckd_value(exams=exams)
-    if ckd_value and drug_attributes.kidney > ckd_value and exams["age"] > 17:
-        alert[
-            "text"
-        ] = f"""
-            Avaliar se o medicamento já está com o ajuste adequado conforme a função renal ou suspenso no caso de contraindicação, já que a função renal do paciente (
-            {str(ckd_value)} mL/min) está abaixo de {str(drug_attributes.kidney)} mL/min.
-        """
-        return alert
+    if exams["age"] > 17:
+        ckd_value = _get_ckd_value(exams=exams)
+        if ckd_value and drug_attributes.kidney > ckd_value:
+            alert[
+                "text"
+            ] = f"""
+                Avaliar se o medicamento já está com o ajuste adequado conforme a função renal ou suspenso no caso de contraindicação, já que a função renal do paciente (
+                {str(ckd_value)} mL/min) está abaixo de {str(drug_attributes.kidney)} mL/min.
+            """
+            return alert
 
-    if (
-        "swrtz2" in exams
-        and exams["swrtz2"]["value"]
-        and drug_attributes.kidney > exams["swrtz2"]["value"]
-        and exams["age"] <= 17
-    ):
-        alert[
-            "text"
-        ] = f"""
-            Avaliar se o medicamento já está com o ajuste adequado conforme a função renal ou suspenso no caso de contraindicação, já que a função renal do paciente  
-            ({str(exams["swrtz2"]["value"])} mL/min/1.73m²) está abaixo de 
-            {str(drug_attributes.kidney)} mL/min. (Schwartz 2)
-        """
-        return alert
+        if not ckd_value:
+            alert["text"] = (
+                "Avaliar o monitoramento da função renal do paciente, pois trata-se de um medicamento que precisa ajuste conforme a função renal (sem registro de creatinina nos últimos 5 dias)."
+            )
+            return alert
+    else:
+        if (
+            "swrtz2" in exams
+            and exams["swrtz2"]["value"]
+            and drug_attributes.kidney > exams["swrtz2"]["value"]
+        ):
+            alert[
+                "text"
+            ] = f"""
+                Avaliar se o medicamento já está com o ajuste adequado conforme a função renal ou suspenso no caso de contraindicação, já que a função renal do paciente  
+                ({str(exams["swrtz2"]["value"])} mL/min/1.73m²) está abaixo de 
+                {str(drug_attributes.kidney)} mL/min. (Schwartz 2)
+            """
+            return alert
 
-    if (
-        "swrtz1" in exams
-        and exams["swrtz1"]["value"]
-        and drug_attributes.kidney > exams["swrtz1"]["value"]
-        and exams["age"] <= 17
-    ):
-        alert[
-            "text"
-        ] = f"""
-            Avaliar se o medicamento já está com o ajuste adequado conforme a função renal ou suspenso no caso de contraindicação, já que a função renal do paciente  
-            ({str(exams["swrtz1"]["value"])} mL/min/1.73m²) está abaixo de {str(drug_attributes.kidney)} 
-            mL/min. (Schwartz 1)
-        """
-        return alert
+        if (
+            "swrtz1" in exams
+            and exams["swrtz1"]["value"]
+            and drug_attributes.kidney > exams["swrtz1"]["value"]
+        ):
+            alert[
+                "text"
+            ] = f"""
+                Avaliar se o medicamento já está com o ajuste adequado conforme a função renal ou suspenso no caso de contraindicação, já que a função renal do paciente  
+                ({str(exams["swrtz1"]["value"])} mL/min/1.73m²) está abaixo de {str(drug_attributes.kidney)} 
+                mL/min. (Schwartz 1)
+            """
+            return alert
 
     return None
 
