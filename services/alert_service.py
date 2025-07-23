@@ -777,11 +777,12 @@ def _alert_kidney(
             """
             return alert
 
-        if not ckd_value:
-            alert["text"] = (
-                "Avaliar o monitoramento da função renal do paciente, pois trata-se de um medicamento que precisa ajuste conforme a função renal (sem registro de creatinina nos últimos 5 dias)."
-            )
-            return alert
+        # avaliando necessidade deste alerta
+        # if not ckd_value:
+        #     alert["text"] = (
+        #         "Avaliar o monitoramento da função renal do paciente, pois trata-se de um medicamento que precisa ajuste conforme a função renal (sem registro de creatinina nos últimos 5 dias)."
+        #     )
+        #     return alert
     else:
         if (
             "swrtz2" in exams
