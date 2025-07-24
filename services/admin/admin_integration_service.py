@@ -255,7 +255,7 @@ def create_schema(
 
     payload = {
         "command": "lambda_create_schema.create_schema",
-        "schema": request_data.schema,
+        "schema": request_data.schema_name,
         "is_cpoe": request_data.is_cpoe,
         "is_pec": request_data.is_pec,
         "create_sqs": request_data.create_sqs,

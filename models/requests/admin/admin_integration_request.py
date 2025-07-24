@@ -8,7 +8,7 @@ from pydantic import BaseModel, IPvAnyAddress
 class AdminIntegrationCreateSchemaRequest(BaseModel):
     """Request: create new schema"""
 
-    schema: str
+    schema_name: str
     is_cpoe: bool
     is_pec: bool
     create_user: bool
