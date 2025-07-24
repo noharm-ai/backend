@@ -265,3 +265,11 @@ class ProtocolVariableFieldEnum(Enum):
     COMBINATION = "combination"
     ADMISSION_TIME = "admissionTime"
     ST_CONCILIA = "stConcilia"
+
+
+class SchemaConfigAuditTypeEnum(Enum):
+    """Enum: schema_config audit records type"""
+
+    CREATE = 1
+    UPDATE = 2
+    GETNAME_DNS = 3

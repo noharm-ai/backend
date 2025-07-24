@@ -14,10 +14,12 @@ from models.main import db, dbSession
 from services import auth_service
 from exception.validation_error import ValidationError
 from utils import status, sessionutils
+from decorators.api_endpoint_decorator import api_endpoint
 
 app_auth = Blueprint("app_auth", __name__)
 
 
+# deprecated
 @app_auth.route("/pre-auth", methods=["POST"])
 def pre_auth():
     data = request.get_json()
@@ -31,6 +33,38 @@ def pre_auth():
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
     return auth_data, status.HTTP_200_OK
+
+
+@app_auth.route("/switch-schema", methods=["GET"])
+@api_endpoint()
+def get_switch_schema_data():
+    """get schema data"""
+
+    return auth_service.get_switch_schema_data()
+
+
+@app_auth.route("/switch-schema", methods=["POST"])
+@api_endpoint()
+def switch_schema():
+    """switch between schemas"""
+    data = request.get_json()
+
+    schema = data.get("schema", None)
+    extra_features = data.get("extraFeatures", None)
+
+    auth_data = auth_service.switch_schema(
+        switch_to_schema=schema, extra_features=extra_features
+    )
+
+    refresh_token = auth_data["refresh_token"]
+
+    @after_this_request
+    def after_auth(response):
+        set_refresh_cookies(response, refresh_token)
+
+        return response
+
+    return auth_data
 
 
 @app_auth.route("/authenticate", methods=["POST"])
@@ -84,7 +118,6 @@ def auth_provider():
     try:
         auth_data = auth_service.auth_provider(code=data["code"], schema=data["schema"])
 
-        auth_data["oauth"] = True
         refresh_token = auth_data["refresh_token"]
         # temp
         # auth_data.pop("refresh_token")
@@ -115,7 +148,6 @@ def get_auth_provider(schema):
             "loginUrl": oauth_config["login_url"],
             "redirectUri": oauth_config["redirect_uri"],
             "clientId": oauth_config["client_id"],
-            "clientSecret": oauth_config["client_secret"],
             "company": oauth_config["company"],
             "flow": (oauth_config["flow"] if "flow" in oauth_config else "implicit"),
             "codeChallengeMethod": (
