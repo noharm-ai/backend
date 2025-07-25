@@ -6,6 +6,9 @@ import base64
 from models.main import db, User
 from config import Config
 from decorators.has_permission_decorator import has_permission, Permission
+from agents import n0_agent
+from exception.validation_error import ValidationError
+from utils import status
 
 
 def _get_client():
@@ -27,6 +30,38 @@ def _get_client():
         )
 
     return execute
+
+
+@has_permission(Permission.WRITE_SUPPORT)
+def ask_n0(question: str, user_context: User = None):
+    """Ask a question to the n0 agent and return the response"""
+    if not question:
+        raise ValidationError(
+            "Pergunta inválida",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    user = db.session.query(User).filter(User.id == user_context.id).first()
+
+    response = n0_agent.run_n0(query=question, user=user)
+
+    return {"agent": str(response)}
+
+
+@has_permission(Permission.WRITE_SUPPORT)
+def ask_n0_form(question: str):
+    """Ask a question to the n0 form agent and return the response"""
+    if not question:
+        raise ValidationError(
+            "Pergunta inválida",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    response = n0_agent.run_n0_form(query=question)
+
+    return {"agent": response}
 
 
 @has_permission(Permission.WRITE_SUPPORT)

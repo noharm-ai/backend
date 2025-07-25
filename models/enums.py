@@ -27,8 +27,11 @@ class MemoryEnum(Enum):
 
 
 class GlobalMemoryEnum(Enum):
+    """Enum: global memory kinds"""
+
     SUMMARY_CONFIG = "summary-config"
     FEATURE_FLAGS = "feature-flags"
+    N0_AGENT = "n0-agent"
 
 
 class NoHarmENV(Enum):
