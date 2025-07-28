@@ -2,6 +2,7 @@
 
 import xmlrpc.client
 import base64
+import http.client
 
 from models.main import db, User
 from config import Config
@@ -11,12 +12,29 @@ from exception.validation_error import ValidationError
 from utils import status
 
 
+class TimeoutTransport(xmlrpc.client.Transport):
+    """ODOO integration transport class"""
+
+    def __init__(self, timeout, *args, **kwargs):
+        self.timeout = timeout
+        super().__init__(*args, **kwargs)
+
+    def make_connection(self, host):
+        return http.client.HTTPConnection(host, timeout=self.timeout)
+
+
 def _get_client():
-    common = xmlrpc.client.ServerProxy(Config.ODOO_API_URL + "common")
+    transport = TimeoutTransport(timeout=15)
+
+    common = xmlrpc.client.ServerProxy(
+        Config.ODOO_API_URL + "common", transport=transport
+    )
     uid = common.authenticate(
         Config.ODOO_API_DB, Config.ODOO_API_USER, Config.ODOO_API_KEY, {}
     )
-    models = xmlrpc.client.ServerProxy(Config.ODOO_API_URL + "object")
+    models = xmlrpc.client.ServerProxy(
+        Config.ODOO_API_URL + "object", transport=transport
+    )
 
     def execute(model, action, payload, options):
         return models.execute_kw(
