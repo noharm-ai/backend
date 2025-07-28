@@ -31,3 +31,21 @@ def list_tickets_v2():
 def list_pending():
     """List tickets with pending action"""
     return support_service.list_pending_action()
+
+
+@app_support.route("/support/ask-n0", methods=["POST"])
+@api_endpoint()
+def ask_n0():
+    """Ask a question to the n0 agent and return the response"""
+    data = request.get_json()
+
+    return support_service.ask_n0(question=data.get("question", None))
+
+
+@app_support.route("/support/ask-n0-form", methods=["POST"])
+@api_endpoint()
+def ask_n0_form():
+    """Ask a question to the n0 form agent and return the response"""
+    data = request.get_json()
+
+    return support_service.ask_n0_form(question=data.get("question", None))

@@ -2,18 +2,39 @@
 
 import xmlrpc.client
 import base64
+import http.client
 
 from models.main import db, User
 from config import Config
 from decorators.has_permission_decorator import has_permission, Permission
+from agents import n0_agent
+from exception.validation_error import ValidationError
+from utils import status
+
+
+class TimeoutTransport(xmlrpc.client.Transport):
+    """ODOO integration transport class"""
+
+    def __init__(self, timeout, *args, **kwargs):
+        self.timeout = timeout
+        super().__init__(*args, **kwargs)
+
+    def make_connection(self, host):
+        return http.client.HTTPConnection(host, timeout=self.timeout)
 
 
 def _get_client():
-    common = xmlrpc.client.ServerProxy(Config.ODOO_API_URL + "common")
+    transport = TimeoutTransport(timeout=15)
+
+    common = xmlrpc.client.ServerProxy(
+        Config.ODOO_API_URL + "common", transport=transport
+    )
     uid = common.authenticate(
         Config.ODOO_API_DB, Config.ODOO_API_USER, Config.ODOO_API_KEY, {}
     )
-    models = xmlrpc.client.ServerProxy(Config.ODOO_API_URL + "object")
+    models = xmlrpc.client.ServerProxy(
+        Config.ODOO_API_URL + "object", transport=transport
+    )
 
     def execute(model, action, payload, options):
         return models.execute_kw(
@@ -27,6 +48,38 @@ def _get_client():
         )
 
     return execute
+
+
+@has_permission(Permission.WRITE_SUPPORT)
+def ask_n0(question: str, user_context: User = None):
+    """Ask a question to the n0 agent and return the response"""
+    if not question:
+        raise ValidationError(
+            "Pergunta inválida",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    user = db.session.query(User).filter(User.id == user_context.id).first()
+
+    response = n0_agent.run_n0(query=question, user=user)
+
+    return {"agent": str(response)}
+
+
+@has_permission(Permission.WRITE_SUPPORT)
+def ask_n0_form(question: str):
+    """Ask a question to the n0 form agent and return the response"""
+    if not question:
+        raise ValidationError(
+            "Pergunta inválida",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    response = n0_agent.run_n0_form(query=question)
+
+    return {"agent": response}
 
 
 @has_permission(Permission.WRITE_SUPPORT)
