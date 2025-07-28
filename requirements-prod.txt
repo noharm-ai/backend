@@ -16,4 +16,4 @@ boto3==1.39.10
 openai==1.12.0
 redis==5.1.1
 pydantic==2.9.2
-strands-agents
+strands-agents==0.2.2
