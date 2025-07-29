@@ -177,6 +177,83 @@ def create_ticket(user_context: User, from_url, filelist, category, description,
     return ticket
 
 
+@has_permission(Permission.WRITE_SUPPORT)
+def add_attachment(id_ticket: int, files):
+    """Add attachment to ticket"""
+
+    if not id_ticket:
+        raise ValidationError(
+            "ID ticket inválido",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    if not files:
+        raise ValidationError(
+            "Nenhum arquivo selecionado",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    client = _get_client()
+
+    ticket = client(
+        model="helpdesk.ticket",
+        action="search_read",
+        payload=[[["id", "=", id_ticket]]],
+        options={
+            "fields": [
+                "id",
+                "access_token",
+                "ticket_ref",
+                "partner_id",
+            ],
+            "limit": 1,
+        },
+    )
+
+    for key in files:
+        attachments = []
+
+        for f in files.getlist(key):
+
+            att = client(
+                model="ir.attachment",
+                action="create",
+                payload=[
+                    {
+                        "name": f.filename,
+                        "res_model": "helpdesk.ticket",
+                        "res_id": int(id_ticket),
+                        "type": "binary",
+                        "datas": str(base64.b64encode(f.read()))[2:],
+                    }
+                ],
+                options={},
+            )
+
+            attachments.append(att)
+
+        client(
+            model="mail.message",
+            action="create",
+            payload=[
+                {
+                    "message_type": "email",
+                    "author_id": ticket[0]["partner_id"][0],
+                    "body": f"Anexo: {key.replace('[]', '')}",
+                    "model": "helpdesk.ticket",
+                    "res_id": int(id_ticket),
+                    "subtype_id": 1,
+                    "attachment_ids": attachments,
+                }
+            ],
+            options={},
+        )
+
+    return id_ticket
+
+
 @has_permission(Permission.READ_SUPPORT)
 def list_tickets_v2(user_context: User, user_permissions: list[Permission]):
     """List user tickets, following and organization tickets (when allowed)"""
