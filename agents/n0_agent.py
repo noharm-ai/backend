@@ -70,7 +70,6 @@ def run_n0_form(query: str) -> str:
     )
 
     agent = Agent(
-        tools=[_get_knowledge_base],
         system_prompt=config["n0formprompt"],
         model=bedrock_model,
         callback_handler=None,
