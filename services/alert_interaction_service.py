@@ -8,7 +8,7 @@ from sqlalchemy import text
 from models.prescription import PrescriptionDrug
 from models.main import db, Drug, Substance, Allergy, DrugAttributes
 from models.enums import DrugTypeEnum, DrugAlertLevelEnum, FrequencyEnum
-from utils import examutils, stringutils, prescriptionutils
+from utils import examutils, stringutils, prescriptionutils, dateutils
 
 
 # analyze interactions between drugs.
@@ -71,6 +71,7 @@ def find_relations(drug_list, id_patient: int, is_cpoe: bool):
                         "group": _get_solution_group_key(
                             pd=prescription_drug, is_cpoe=is_cpoe
                         ),
+                        "prescriptionDate": prescription_date.isoformat(),
                         "expireDate": prescription_expire_date.isoformat(),
                         "frequency": prescription_drug.frequency,
                         "rx": False,
@@ -88,6 +89,7 @@ def find_relations(drug_list, id_patient: int, is_cpoe: bool):
                         "group": _get_solution_group_key(
                             pd=cp_prescription_drug, is_cpoe=is_cpoe
                         ),
+                        "prescriptionDate": cp_prescription_date.isoformat(),
                         "expireDate": cp_prescription_expire_date.isoformat(),
                         "frequency": cp_prescription_drug.frequency,
                         "rx": False,
@@ -172,6 +174,19 @@ def find_relations(drug_list, id_patient: int, is_cpoe: bool):
                     continue
             else:
                 if drug_from["rx"]:
+                    continue
+
+            if kind in ["dm", "dt", "iy"]:
+                # this types must overlap considering the time too
+                start1 = datetime.fromisoformat(drug_from["prescriptionDate"])
+                end1 = datetime.fromisoformat(drug_from["expireDate"])
+
+                start2 = datetime.fromisoformat(drug_to["prescriptionDate"])
+                end2 = datetime.fromisoformat(drug_to["expireDate"])
+
+                if not dateutils.date_overlap(
+                    start1=start1, end1=end1, start2=start2, end2=end2
+                ):
                     continue
 
             if key in active_relations:
