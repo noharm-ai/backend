@@ -199,15 +199,17 @@ def find_relations(drug_list, id_patient: int, is_cpoe: bool):
                 alert_text = examutils.typeRelations[kind] + ": "
                 alert_text += stringutils.strNone(active_relations[key]["text"])
 
-                if kind == "iy":
+                if kind in ["iy", "it"]:
                     alert_text += f"""- {drug_from["drug"]} (Horários: {prescriptionutils.timeValue( drug_from['interval']) if drug_from['interval'] else '--'})
                         - {drug_to["drug"]} (Horários: {prescriptionutils.timeValue(drug_to['interval']) if drug_to['interval'] else '--'})
                     """
 
-                    if _has_interval_intersection(
-                        interval1=drug_from["interval"], interval2=drug_to["interval"]
-                    ):
-                        alert_level = DrugAlertLevelEnum.MEDIUM.value
+                    if kind == "iy":
+                        if _has_interval_intersection(
+                            interval1=drug_from["interval"],
+                            interval2=drug_to["interval"],
+                        ):
+                            alert_level = DrugAlertLevelEnum.MEDIUM.value
                 else:
                     alert_text += (
                         " ("
