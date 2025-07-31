@@ -405,3 +405,38 @@ def list_pending_action(user_context: User):
         )
 
     return pending_tickets
+
+
+@has_permission(Permission.WRITE_SUPPORT)
+def create_closed_ticket(user_context: User, description):
+    """Creates a closed ticket (answered by AI)"""
+
+    if not description:
+        raise ValidationError(
+            "Descricao de chamado inválida",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    client = _get_client()
+
+    ticket = {
+        "name": "Chamado encerrado pelo NZero",
+        "description": description,
+        "x_studio_schema_1": user_context.schema,
+        "x_studio_tipo_de_chamado": "Dúvida",
+        "team_id": 1,
+        "stage_id": 4,
+    }
+
+    result = client(
+        model="helpdesk.ticket",
+        action="web_save",
+        payload=[[], ticket],
+        options={"specification": {}},
+    )
+
+    if result:
+        return result[0]["id"]
+
+    return None

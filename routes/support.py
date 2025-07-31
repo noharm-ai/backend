@@ -22,6 +22,17 @@ def create_ticket():
     )
 
 
+@app_support.route("/support/create-closed-ticket", methods=["POST"])
+@api_endpoint()
+def create_closed_ticket():
+    """Create a closed ticket (answered by ai)"""
+    data = request.get_json()
+
+    return support_service.create_closed_ticket(
+        description=data.get("description", None)
+    )
+
+
 @app_support.route("/support/attachment", methods=["POST"])
 @api_endpoint()
 def add_attachment():
