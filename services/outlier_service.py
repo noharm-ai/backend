@@ -732,10 +732,10 @@ def get_outlier_drugs(
             .subquery()
         )
 
+        drugs = db.session.query(func.max(Drug.id).label("id"), Drug.name)
+
         if id_segment is not None:
-            drugs = Drug.query.filter(Drug.id.in_(segDrubs))
-        else:
-            drugs = db.session.query(Drug)
+            drugs = drugs.filter(Drug.id.in_(segDrubs))
 
         if term:
             drugs = drugs.filter(Drug.name.ilike("%" + str(term) + "%"))
@@ -743,7 +743,7 @@ def get_outlier_drugs(
         if id_drug is not None and len(id_drug) > 0:
             drugs = drugs.filter(Drug.id.in_(id_drug))
 
-        results = drugs.order_by(asc(Drug.name)).all()
+        results = drugs.group_by(Drug.name).order_by(asc(Drug.name)).all()
 
     items = []
     for d in results:
