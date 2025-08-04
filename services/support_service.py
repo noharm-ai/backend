@@ -24,7 +24,7 @@ class TimeoutTransport(xmlrpc.client.Transport):
 
 
 def _get_client():
-    transport = TimeoutTransport(timeout=15)
+    transport = TimeoutTransport(timeout=20)
 
     common = xmlrpc.client.ServerProxy(
         Config.ODOO_API_URL + "common", transport=transport
