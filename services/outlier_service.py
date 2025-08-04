@@ -701,6 +701,7 @@ def get_outlier_drugs(
     """
     Search for record in medicamento table.
     Add substances in the list when add_substance is True
+    Group results if not filtering by segment
     """
     if add_substance:
         query_drug = (
@@ -725,25 +726,37 @@ def get_outlier_drugs(
 
         results = query.order_by(literal_column("name")).all()
     else:
-        segDrubs = (
-            db.session.query(Outlier.idDrug.label("idDrug"))
-            .filter(Outlier.idSegment == id_segment)
-            .group_by(Outlier.idDrug)
-            .subquery()
-        )
-
-        drugs = db.session.query(func.max(Drug.id).label("id"), Drug.name)
-
         if id_segment is not None:
-            drugs = drugs.filter(Drug.id.in_(segDrubs))
+            # should not group results
+            seg_drugs = (
+                db.session.query(Outlier.idDrug.label("idDrug"))
+                .filter(Outlier.idSegment == id_segment)
+                .group_by(Outlier.idDrug)
+                .subquery()
+            )
 
-        if term:
-            drugs = drugs.filter(Drug.name.ilike("%" + str(term) + "%"))
+            drugs = db.session.query(Drug)
 
-        if id_drug is not None and len(id_drug) > 0:
-            drugs = drugs.filter(Drug.id.in_(id_drug))
+            if id_segment is not None:
+                drugs = drugs.filter(Drug.id.in_(seg_drugs))
 
-        results = drugs.group_by(Drug.name).order_by(asc(Drug.name)).all()
+            if term:
+                drugs = drugs.filter(Drug.name.ilike("%" + str(term) + "%"))
+
+            if id_drug is not None and len(id_drug) > 0:
+                drugs = drugs.filter(Drug.id.in_(id_drug))
+
+            results = drugs.order_by(asc(Drug.name)).all()
+        else:
+            drugs = db.session.query(func.max(Drug.id).label("id"), Drug.name)
+
+            if term:
+                drugs = drugs.filter(Drug.name.ilike("%" + str(term) + "%"))
+
+            if id_drug is not None and len(id_drug) > 0:
+                drugs = drugs.filter(Drug.id.in_(id_drug))
+
+            results = drugs.group_by(Drug.name).order_by(asc(Drug.name)).all()
 
     items = []
     for d in results:
