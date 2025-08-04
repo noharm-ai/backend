@@ -11,3 +11,10 @@ class ExamCreateRequest(BaseModel):
     examDate: datetime
     examType: str
     result: float
+
+
+class ExamDeleteRequest(BaseModel):
+    """Exam delete request model"""
+
+    admissionNumber: int
+    idExam: int

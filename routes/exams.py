@@ -2,7 +2,7 @@
 
 from flask import Blueprint, request
 
-from models.requests.exam_request import ExamCreateRequest
+from models.requests.exam_request import ExamCreateRequest, ExamDeleteRequest
 from services import exams_service
 from decorators.api_endpoint_decorator import api_endpoint
 
@@ -16,6 +16,16 @@ def create_exam():
 
     return exams_service.create_exam(
         request_data=ExamCreateRequest(**request.get_json())
+    )
+
+
+@app_exams.route("/exams/delete", methods=["POST"])
+@api_endpoint()
+def delete_exam():
+    """Deletes a manually inserted exam"""
+
+    return exams_service.delete_exam(
+        request_data=ExamDeleteRequest(**request.get_json())
     )
 
 

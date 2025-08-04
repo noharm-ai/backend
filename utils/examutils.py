@@ -61,6 +61,7 @@ def formatExam(value, typeExam, unit, date, segExam, prevValue=None):
         "name": ref.name,
         "prev": prevValue,
         "delta": delta,
+        "manual": False,
     }
 
 
