@@ -32,6 +32,7 @@ class GlobalMemoryEnum(Enum):
     SUMMARY_CONFIG = "summary-config"
     FEATURE_FLAGS = "feature-flags"
     N0_AGENT = "n0-agent"
+    USER_KB = "user-kb"
 
 
 class NoHarmENV(Enum):

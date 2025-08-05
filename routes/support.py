@@ -72,3 +72,12 @@ def ask_n0_form():
     data = request.get_json()
 
     return support_service.ask_n0_form(question=data.get("question", None))
+
+
+@app_support.route("/support/related-articles", methods=["POST"])
+@api_endpoint()
+def get_related_articles():
+    """Get related content from kb articles"""
+    data = request.get_json()
+
+    return support_service.get_related_kb(question=data.get("question", None))

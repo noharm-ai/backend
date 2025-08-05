@@ -5,11 +5,14 @@ import base64
 import http.client
 
 from models.main import db, User
+from models.appendix import GlobalMemory
+from models.enums import GlobalMemoryEnum
 from config import Config
 from decorators.has_permission_decorator import has_permission, Permission
 from agents import n0_agent
 from exception.validation_error import ValidationError
 from utils import status
+from services import vector_search_service
 
 
 class TimeoutTransport(xmlrpc.client.Transport):
@@ -65,6 +68,40 @@ def ask_n0(question: str, user_context: User = None):
     response = n0_agent.run_n0(query=question, user=user)
 
     return {"agent": str(response)}
+
+
+@has_permission(Permission.WRITE_SUPPORT)
+def get_related_kb(question: str):
+    """Get related articles from open kb"""
+    if not question:
+        raise ValidationError(
+            "Pergunta inválida",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    config_memory = (
+        db.session.query(GlobalMemory)
+        .filter(GlobalMemory.kind == GlobalMemoryEnum.USER_KB.value)
+        .first()
+    )
+
+    search_config = vector_search_service.SearchConfig(**config_memory.value)
+    search_config.max_results = 3
+
+    vectors = vector_search_service.search(query=question, config=search_config)
+
+    articles = {}
+    for v in vectors:
+        metadata = v.get("metadata", {})
+        if "article_id" in metadata:
+            articles[metadata.get("article_id")] = metadata.get("article_name")
+
+    results = []
+    for art_id, art_name in articles.items():
+        results.append({"id": art_id, "name": art_name})
+
+    return results
 
 
 @has_permission(Permission.WRITE_SUPPORT)
