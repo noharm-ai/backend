@@ -39,6 +39,8 @@ class Permission(Enum):
         "ADMIN_INTERVENTION_REASON"  # "admin intervention reason recordss"
     )
 
+    ADMIN_NZERO = "ADMIN_NZERO"  # admin nzero config
+
     WRITE_SEGMENT_SCORE = "WRITE_SEGMENT_SCORE"  # "grant permission to generate score to the entire segment"
 
     INTEGRATION_UTILS = "INTEGRATION_UTILS"  # "grants permission to actions to help integration process"
