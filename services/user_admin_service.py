@@ -10,7 +10,7 @@ from models.main import User, db, UserAuthorization
 from models.appendix import SchemaConfig
 from models.enums import FeatureEnum, UserAuditTypeEnum
 from repository import user_repository
-from services import memory_service, user_service
+from services import memory_service, user_service, feature_service
 from utils import status, emailutils
 from config import Config
 from decorators.has_permission_decorator import has_permission, Permission
@@ -328,6 +328,14 @@ def _has_valid_features(features):
 
 
 def _add_authorizations(id_segment_list, user: User, responsible: User):
+    permissions = Role.get_permissions_from_user(user=responsible)
+    has_auth_segment_feature = feature_service.has_feature(
+        FeatureEnum.AUTHORIZATION_SEGMENT
+    )
+
+    if not has_auth_segment_feature and Permission.MAINTAINER not in permissions:
+        return False
+
     # remove old authorizations
     db.session.query(UserAuthorization).filter(
         UserAuthorization.idUser == user.id
@@ -342,8 +350,6 @@ def _add_authorizations(id_segment_list, user: User, responsible: User):
     valid_id_segment_list = {}
     for a in responsible_auth_list:
         valid_id_segment_list[str(a.idSegment)] = True
-
-    permissions = Role.get_permissions_from_user(user=responsible)
 
     for id_segment in id_segment_list:
         if (

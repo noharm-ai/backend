@@ -5,13 +5,13 @@ SQLAlchemy==2.0.29
 Flask-SQLAlchemy==3.1.1
 troposphere
 zappa
-flask-cors==5.0.0
+flask-cors==6.0.0
 psycopg2-binary
 flask-mail
 random-password-generator
 PyJWT==2.9.0
 pyjwt[crypto]
-cryptography==43.0.1
+cryptography==44.0.1
 boto3==1.39.10
 openai==1.12.0
 redis==5.1.1

@@ -11,6 +11,8 @@ app_support = Blueprint("app_support", __name__)
 @app_support.route("/support/create-ticket", methods=["POST"])
 @api_endpoint()
 def create_ticket():
+    """Create a new ticket"""
+
     return support_service.create_ticket(
         from_url=request.form.get("fromUrl", None),
         category=request.form.get("category", None),
@@ -20,9 +22,30 @@ def create_ticket():
     )
 
 
+@app_support.route("/support/create-closed-ticket", methods=["POST"])
+@api_endpoint()
+def create_closed_ticket():
+    """Create a closed ticket (answered by ai)"""
+    data = request.get_json()
+
+    return support_service.create_closed_ticket(
+        description=data.get("description", None)
+    )
+
+
+@app_support.route("/support/attachment", methods=["POST"])
+@api_endpoint()
+def add_attachment():
+    """add attachment to a ticket"""
+    return support_service.add_attachment(
+        files=request.files, id_ticket=request.form.get("id_ticket", None)
+    )
+
+
 @app_support.route("/support/list-tickets/v2", methods=["GET"])
 @api_endpoint()
 def list_tickets_v2():
+    """List tickets"""
     return support_service.list_tickets_v2()
 
 
@@ -49,3 +72,12 @@ def ask_n0_form():
     data = request.get_json()
 
     return support_service.ask_n0_form(question=data.get("question", None))
+
+
+@app_support.route("/support/related-articles", methods=["POST"])
+@api_endpoint()
+def get_related_articles():
+    """Get related content from kb articles"""
+    data = request.get_json()
+
+    return support_service.get_related_kb(question=data.get("question", None))

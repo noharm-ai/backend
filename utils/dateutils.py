@@ -27,3 +27,19 @@ def data2age(birthdate):
     birthdate = datetime.strptime(birthdate, "%Y-%m-%d")
     age = int((datetime.today() - birthdate).days / days_in_year)
     return age
+
+
+def date_overlap(start1: datetime, end1: datetime, start2: datetime, end2: datetime):
+    """
+    Checks if two datetime ranges overlap.
+
+    Args:
+      start1: Datetime object for the start of the first period.
+      end1: Datetime object for the end of the first period.
+      start2: Datetime object for the start of the second period.
+      end2: Datetime object for the end of the second period.
+
+    Returns:
+      True if the ranges overlap, False otherwise.
+    """
+    return start1 < end2 and start2 < end1

@@ -48,6 +48,7 @@ from routes.admin.admin_relation import app_admin_relation
 from routes.admin.admin_unit import app_admin_unit
 from routes.admin.admin_tag import app_admin_tag
 from routes.admin.admin_protocol import app_admin_protocol
+from routes.admin.admin_global_memory import app_admin_global_memory
 from routes.reports.reports_general import app_rpt_general
 from routes.reports.reports_config_rpt import app_rpt_config
 from routes.reports.reports_culture import app_rpt_culture
@@ -125,6 +126,7 @@ app.register_blueprint(app_admin_relation)
 app.register_blueprint(app_admin_unit)
 app.register_blueprint(app_admin_tag)
 app.register_blueprint(app_admin_protocol)
+app.register_blueprint(app_admin_global_memory)
 
 app.register_blueprint(app_rpt_general)
 app.register_blueprint(app_rpt_culture)

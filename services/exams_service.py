@@ -10,12 +10,46 @@ from models.main import db, redis_client, User
 from models.prescription import Patient
 from models.segment import Exams, SegmentExam
 from models.notes import ClinicalNotes
-from models.requests.exam_request import ExamCreateRequest
+from models.requests.exam_request import ExamCreateRequest, ExamDeleteRequest
 from repository import exams_repository
 from services import cache_service
 from decorators.has_permission_decorator import has_permission, Permission
 from exception.validation_error import ValidationError
 from utils import status, examutils, stringutils, dateutils, numberutils
+
+
+@has_permission(Permission.WRITE_PRESCRIPTION)
+def delete_exam(request_data: ExamDeleteRequest, user_context: User):
+    """Delete manually inserted exam"""
+
+    exam = (
+        db.session.query(Exams)
+        .filter(
+            Exams.idExame == request_data.idExam,
+            Exams.admissionNumber == request_data.admissionNumber,
+        )
+        .first()
+    )
+
+    if not exam:
+        raise ValidationError(
+            "Registro inexistente",
+            "errors.invalidRecord",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    if exam.created_by is None:
+        raise ValidationError(
+            "Este registro não pode ser removido, pois não foi inserido manualmente",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    raise ValidationError(
+        "Não implementado",
+        "errors.businessRules",
+        status.HTTP_400_BAD_REQUEST,
+    )
 
 
 @has_permission(Permission.WRITE_PRESCRIPTION)
@@ -250,6 +284,10 @@ def _history_exam(typeExam, examsList, segExam):
             )
             if "ref" in item:
                 del item["ref"]
+
+            item["manual"] = bool(e.created_by)
+            item["idExam"] = e.idExame
+            item["admissionNumber"] = e.admissionNumber
             results.append(item)
     return results
 

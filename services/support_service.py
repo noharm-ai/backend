@@ -5,11 +5,14 @@ import base64
 import http.client
 
 from models.main import db, User
+from models.appendix import GlobalMemory
+from models.enums import GlobalMemoryEnum
 from config import Config
 from decorators.has_permission_decorator import has_permission, Permission
 from agents import n0_agent
 from exception.validation_error import ValidationError
 from utils import status
+from services import vector_search_service
 
 
 class TimeoutTransport(xmlrpc.client.Transport):
@@ -24,7 +27,7 @@ class TimeoutTransport(xmlrpc.client.Transport):
 
 
 def _get_client():
-    transport = TimeoutTransport(timeout=15)
+    transport = TimeoutTransport(timeout=20)
 
     common = xmlrpc.client.ServerProxy(
         Config.ODOO_API_URL + "common", transport=transport
@@ -65,6 +68,40 @@ def ask_n0(question: str, user_context: User = None):
     response = n0_agent.run_n0(query=question, user=user)
 
     return {"agent": str(response)}
+
+
+@has_permission(Permission.WRITE_SUPPORT)
+def get_related_kb(question: str):
+    """Get related articles from open kb"""
+    if not question:
+        raise ValidationError(
+            "Pergunta inválida",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    config_memory = (
+        db.session.query(GlobalMemory)
+        .filter(GlobalMemory.kind == GlobalMemoryEnum.USER_KB.value)
+        .first()
+    )
+
+    search_config = vector_search_service.SearchConfig(**config_memory.value)
+    search_config.max_results = 3
+
+    vectors = vector_search_service.search(query=question, config=search_config)
+
+    articles = {}
+    for v in vectors:
+        metadata = v.get("metadata", {})
+        if "article_id" in metadata:
+            articles[metadata.get("article_id")] = metadata.get("article_name")
+
+    results = []
+    for art_id, art_name in articles.items():
+        results.append({"id": art_id, "name": art_name})
+
+    return results
 
 
 @has_permission(Permission.WRITE_SUPPORT)
@@ -175,6 +212,83 @@ def create_ticket(user_context: User, from_url, filelist, category, description,
         )
 
     return ticket
+
+
+@has_permission(Permission.WRITE_SUPPORT)
+def add_attachment(id_ticket: int, files):
+    """Add attachment to ticket"""
+
+    if not id_ticket:
+        raise ValidationError(
+            "ID ticket inválido",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    if not files:
+        raise ValidationError(
+            "Nenhum arquivo selecionado",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    client = _get_client()
+
+    ticket = client(
+        model="helpdesk.ticket",
+        action="search_read",
+        payload=[[["id", "=", id_ticket]]],
+        options={
+            "fields": [
+                "id",
+                "access_token",
+                "ticket_ref",
+                "partner_id",
+            ],
+            "limit": 1,
+        },
+    )
+
+    for key in files:
+        attachments = []
+
+        for f in files.getlist(key):
+
+            att = client(
+                model="ir.attachment",
+                action="create",
+                payload=[
+                    {
+                        "name": f.filename,
+                        "res_model": "helpdesk.ticket",
+                        "res_id": int(id_ticket),
+                        "type": "binary",
+                        "datas": str(base64.b64encode(f.read()))[2:],
+                    }
+                ],
+                options={},
+            )
+
+            attachments.append(att)
+
+        client(
+            model="mail.message",
+            action="create",
+            payload=[
+                {
+                    "message_type": "email",
+                    "author_id": ticket[0]["partner_id"][0],
+                    "body": f"Anexo: {key.replace('[]', '')}",
+                    "model": "helpdesk.ticket",
+                    "res_id": int(id_ticket),
+                    "subtype_id": 1,
+                    "attachment_ids": attachments,
+                }
+            ],
+            options={},
+        )
+
+    return id_ticket
 
 
 @has_permission(Permission.READ_SUPPORT)
@@ -328,3 +442,38 @@ def list_pending_action(user_context: User):
         )
 
     return pending_tickets
+
+
+@has_permission(Permission.WRITE_SUPPORT)
+def create_closed_ticket(user_context: User, description):
+    """Creates a closed ticket (answered by AI)"""
+
+    if not description:
+        raise ValidationError(
+            "Descricao de chamado inválida",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    client = _get_client()
+
+    ticket = {
+        "name": "Chamado encerrado pelo NZero",
+        "description": description,
+        "x_studio_schema_1": user_context.schema,
+        "x_studio_tipo_de_chamado": "Dúvida",
+        "team_id": 1,
+        "stage_id": 4,
+    }
+
+    result = client(
+        model="helpdesk.ticket",
+        action="web_save",
+        payload=[[], ticket],
+        options={"specification": {}},
+    )
+
+    if result:
+        return result[0]["id"]
+
+    return None
