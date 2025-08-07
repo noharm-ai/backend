@@ -285,7 +285,7 @@ def create_schema(
         )
 
     _create_audit(
-        schema=request_data.schema,
+        schema=request_data.schema_name,
         audit_type=SchemaConfigAuditTypeEnum.CREATE,
         extra=payload,
         created_by=user_context.id,
