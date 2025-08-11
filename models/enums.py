@@ -49,6 +49,8 @@ class IntegrationStatusEnum(Enum):
 
 
 class FeatureEnum(Enum):
+    """System features"""
+
     PRIMARY_CARE = "PRIMARYCARE"
     OAUTH = "OAUTH"
     LOCK_CHECKED_PRESCRIPTION = "LOCK_CHECKED_PRESCRIPTION"
@@ -62,6 +64,7 @@ class FeatureEnum(Enum):
     STAGING_ACCESS = "STAGING_ACCESS"
     AUTOMATIC_CHECK_IF_NOT_VALIDATED_ITENS = "AUTOMATIC_CHECK_IF_NOT_VALIDATED_ITENS"
     REGULATION = "REGULATION"
+    PATIENT_DAY_OUTPATIENT_FLOW = "PATIENT_DAY_OUTPATIENT_FLOW"
 
 
 class PrescriptionAuditTypeEnum(Enum):

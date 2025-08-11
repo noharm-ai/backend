@@ -30,3 +30,11 @@ def update_frequency():
     )
 
     return admin_frequency_service.list_to_dto([freq])
+
+
+@app_admin_freq.route("/admin/frequency/infer", methods=["POST"])
+@api_endpoint()
+def infer_frequency():
+    """Try to infer frequenciadia based on history"""
+
+    return admin_frequency_service.infer_frequency()
