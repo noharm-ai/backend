@@ -1,6 +1,9 @@
-from sqlalchemy import desc, text, select, func, and_
-from flask_sqlalchemy.session import Session
+"""Service: prescription-day related operations"""
+
 from datetime import date, datetime, timedelta
+
+from sqlalchemy import desc, text, select, func, and_, any_
+from flask_sqlalchemy.session import Session
 
 from models.main import db, User, dbSession
 from models.prescription import (
@@ -24,6 +27,7 @@ from services import (
     prescription_view_service,
     feature_service,
 )
+from repository import prescription_view_repository
 from exception.validation_error import ValidationError
 from decorators.has_permission_decorator import has_permission, Permission
 from utils import status, prescriptionutils
@@ -33,6 +37,8 @@ from utils import status, prescriptionutils
 def create_agg_prescription_by_prescription(
     schema, id_prescription, out_patient, user_context: User, force=False
 ):
+    """Creates a new prescription-day based on an individual prescription"""
+
     _set_schema(schema)
 
     if feature_service.is_cpoe():
@@ -57,7 +63,7 @@ def create_agg_prescription_by_prescription(
     if p.idSegment is None:
         return
 
-    processed_status = _get_processed_status(id_prescription=id_prescription)
+    processed_status = _get_processed_status(id_prescription_list=[id_prescription])
 
     if not force and processed_status == "PROCESSED":
         return
@@ -178,6 +184,7 @@ def create_agg_prescription_by_prescription(
 def create_agg_prescription_by_date(
     schema, admission_number, p_date, user_context: User
 ):
+    """Creates a new prescription-day based on admission number and date (most used for CPOE)"""
     _set_schema(schema)
 
     schema_config = (
@@ -189,11 +196,24 @@ def create_agg_prescription_by_date(
             "ignoreSegments", []
         )
 
+    if feature_service.has_feature(FeatureEnum.PATIENT_DAY_OUTPATIENT_FLOW):
+        # skip processed patients
+        processed_status = _get_cpoe_processed_status(
+            admission_number=admission_number, agg_date=p_date, schema=schema
+        )
+
+        if processed_status == "PROCESSED":
+            raise ValidationError(
+                "Prescrição não teve alterações (Fluxo ambulatório)",
+                "errors.businessRules",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
     last_prescription = get_last_prescription(
         admission_number, ignore_segments=ignore_segments
     )
 
-    if last_prescription == None or last_prescription.idSegment == None:
+    if last_prescription is None or last_prescription.idSegment is None:
         raise ValidationError(
             "Não foi possível encontrar o segmento deste atendimento",
             "errors.invalidSegment",
@@ -334,7 +354,26 @@ def get_last_agg_prescription(admission_number) -> Prescription:
     )
 
 
-def _get_processed_status(id_prescription: int):
+def _get_cpoe_processed_status(admission_number: int, agg_date: datetime, schema: str):
+    """check if admission has pending prescriptions to process"""
+
+    active_prescriptions = prescription_view_repository.get_headers(
+        admissionNumber=admission_number,
+        aggDate=agg_date,
+        idSegment=None,
+        schema=schema,
+        is_pmc=False,
+        is_cpoe=True,
+    )
+
+    prescriptions = []
+    for key in list(active_prescriptions.keys()):
+        prescriptions.append(key)
+
+    return _get_processed_status(id_prescription_list=prescriptions)
+
+
+def _get_processed_status(id_prescription_list: list[int]):
     query = (
         select(
             PrescriptionDrug.id, func.count(PrescriptionDrugAudit.id).label("p_count")
@@ -348,7 +387,7 @@ def _get_processed_status(id_prescription: int):
                 == PrescriptionDrugAuditTypeEnum.PROCESSED.value,
             ),
         )
-        .where(PrescriptionDrug.idPrescription == id_prescription)
+        .where(PrescriptionDrug.idPrescription == any_(id_prescription_list))
         .group_by(PrescriptionDrug.id)
     )
 
