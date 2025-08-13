@@ -1,5 +1,6 @@
 """Service: prescription-day related operations"""
 
+import logging
 from datetime import date, datetime, timedelta
 
 from sqlalchemy import desc, text, select, func, and_, any_
@@ -27,7 +28,6 @@ from services import (
     prescription_view_service,
     feature_service,
 )
-from repository import prescription_view_repository
 from exception.validation_error import ValidationError
 from decorators.has_permission_decorator import has_permission, Permission
 from utils import status, prescriptionutils
@@ -196,19 +196,6 @@ def create_agg_prescription_by_date(
             "ignoreSegments", []
         )
 
-    if feature_service.has_feature(FeatureEnum.PATIENT_DAY_OUTPATIENT_FLOW):
-        # skip processed patients
-        processed_status = _get_cpoe_processed_status(
-            admission_number=admission_number, agg_date=p_date, schema=schema
-        )
-
-        if processed_status == "PROCESSED":
-            raise ValidationError(
-                "Prescrição não teve alterações (Fluxo ambulatório)",
-                "errors.businessRules",
-                status.HTTP_400_BAD_REQUEST,
-            )
-
     last_prescription = get_last_prescription(
         admission_number, ignore_segments=ignore_segments
     )
@@ -249,6 +236,25 @@ def create_agg_prescription_by_date(
     agg_data = prescription_view_service.static_get_prescription(
         id_prescription=agg_p.id, user_context=user_context
     )
+    internal_prescription_ids = prescriptionutils.get_internal_prescription_ids(
+        result=agg_data
+    )
+
+    if feature_service.has_feature(FeatureEnum.PATIENT_DAY_OUTPATIENT_FLOW):
+        # skip processed patients when feature active
+        processed_status = _get_processed_status(
+            id_prescription_list=internal_prescription_ids
+        )
+
+        if processed_status == "PROCESSED":
+            db.session.rollback()
+            logging.basicConfig()
+            logger = logging.getLogger("noharm.backend")
+            logger.warning(
+                "(%s) VALIDATION4xx: Prescrição já foi processada (fluxo ambulatorial)",
+                schema,
+            )
+            return
 
     # force reload prescription to get updated data from trigger
     db.session.expire(agg_p)
@@ -269,10 +275,6 @@ def create_agg_prescription_by_date(
     agg_p.aggDeps = agg_p.features["departmentList"]
     agg_p.update = datetime.today()
     db.session.flush()
-
-    internal_prescription_ids = internal_prescription_ids = (
-        prescriptionutils.get_internal_prescription_ids(result=agg_data)
-    )
 
     _log_processed_date(id_prescription_array=internal_prescription_ids, schema=schema)
     _automatic_check(prescription=agg_p, features=features, user_context=user_context)
@@ -352,25 +354,6 @@ def get_last_agg_prescription(admission_number) -> Prescription:
         .order_by(desc(Prescription.date))
         .first()
     )
-
-
-def _get_cpoe_processed_status(admission_number: int, agg_date: datetime, schema: str):
-    """check if admission has pending prescriptions to process"""
-
-    active_prescriptions = prescription_view_repository.get_headers(
-        admissionNumber=admission_number,
-        aggDate=agg_date,
-        idSegment=None,
-        schema=schema,
-        is_pmc=False,
-        is_cpoe=True,
-    )
-
-    prescriptions = []
-    for key in list(active_prescriptions.keys()):
-        prescriptions.append(key)
-
-    return _get_processed_status(id_prescription_list=prescriptions)
 
 
 def _get_processed_status(id_prescription_list: list[int]):
