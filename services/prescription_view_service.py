@@ -249,12 +249,14 @@ def _build_headers(
     return headers
 
 
-def _get_prev_intervention(interventions, dtPrescription):
+def _get_prev_intervention(interventions, dtPrescription, admission_number: int):
+    """check if patient has previous pending intervention"""
     result = False
     for i in interventions:
         if (
             int(i["id"]) == 0
             and i["status"] == "s"
+            and i["admissionNumber"] == admission_number
             and datetime.fromisoformat(i["date"])
             < datetime(
                 dtPrescription.year, dtPrescription.month, dtPrescription.day, 0, 0
@@ -264,11 +266,18 @@ def _get_prev_intervention(interventions, dtPrescription):
     return result
 
 
-def _get_exist_intervention(interventions, dtPrescription):
+def _get_exist_intervention(interventions, dtPrescription, admission_number: int):
+    """check if patient has previous intervention"""
+
     result = False
     for i in interventions:
-        if int(i["id"]) == 0 and datetime.fromisoformat(i["date"]) < datetime(
-            dtPrescription.year, dtPrescription.month, dtPrescription.day, 0, 0
+        if (
+            int(i["id"]) == 0
+            and i["admissionNumber"] == admission_number
+            and datetime.fromisoformat(i["date"])
+            < datetime(
+                dtPrescription.year, dtPrescription.month, dtPrescription.day, 0, 0
+            )
         ):
             result = True
     return result
@@ -602,6 +611,7 @@ def _get_drug_data(
         dialysis=patient.dialysis,
         alerts=alerts_data["alerts"],
         is_cpoe=config_data["is_cpoe"],
+        admission_number=prescription.admissionNumber,
     )
 
     if config_data["disable_solution_tab"]:
@@ -787,8 +797,12 @@ def _format(
         "conciliaList": drug_data["concilia_list"],
         # interventions
         "interventions": interventions,
-        "prevIntervention": _get_prev_intervention(interventions, prescription.date),
-        "existIntervention": _get_exist_intervention(interventions, prescription.date),
+        "prevIntervention": _get_prev_intervention(
+            interventions, prescription.date, prescription.admissionNumber
+        ),
+        "existIntervention": _get_exist_intervention(
+            interventions, prescription.date, prescription.admissionNumber
+        ),
         # exams
         "alertExams": exams_data["alerts"],
         "exams": exams_data["exams_card"],

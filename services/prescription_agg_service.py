@@ -4,6 +4,7 @@ import logging
 from datetime import date, datetime, timedelta
 
 from sqlalchemy import desc, text, select, func, and_, any_
+from sqlalchemy.orm import aliased
 from flask_sqlalchemy.session import Session
 
 from models.main import db, User, dbSession
@@ -242,8 +243,8 @@ def create_agg_prescription_by_date(
 
     if feature_service.has_feature(FeatureEnum.PATIENT_DAY_OUTPATIENT_FLOW):
         # skip processed patients when feature active
-        processed_status = _get_processed_status(
-            id_prescription_list=internal_prescription_ids
+        processed_status = _get_processed_outpatient_status(
+            id_prescription_list=internal_prescription_ids, agg_date=agg_p.date
         )
 
         if processed_status == "PROCESSED":
@@ -386,6 +387,58 @@ def _get_processed_status(id_prescription_list: list[int]):
 
     if not_processed_count > 0:
         return "NEW_ITENS"
+
+    return "PROCESSED"
+
+
+def _get_processed_outpatient_status(
+    id_prescription_list: list[int], agg_date: datetime
+):
+    """
+    Check if patient has new itens at agg_date. Useful for outpatient cpoe.
+
+    PROCESSED no new itens at agg_date or all new itens at agg_date are processed
+    PENDING new itens not processed
+    """
+    PrescriptionDrugAuditProcessed = aliased(PrescriptionDrugAudit)
+
+    query = (
+        select(
+            PrescriptionDrug.id,
+            func.count(PrescriptionDrugAuditProcessed.id).label("p_count"),
+        )
+        .select_from(PrescriptionDrug)
+        .join(
+            PrescriptionDrugAudit,
+            and_(
+                PrescriptionDrug.id == PrescriptionDrugAudit.idPrescriptionDrug,
+                PrescriptionDrugAudit.auditType
+                == PrescriptionDrugAuditTypeEnum.UPSERT.value,
+                func.date(PrescriptionDrugAudit.createdAt) == func.date(agg_date),
+            ),
+        )
+        .outerjoin(
+            PrescriptionDrugAuditProcessed,
+            and_(
+                PrescriptionDrug.id
+                == PrescriptionDrugAuditProcessed.idPrescriptionDrug,
+                PrescriptionDrugAuditProcessed.auditType
+                == PrescriptionDrugAuditTypeEnum.PROCESSED.value,
+            ),
+        )
+        .where(PrescriptionDrug.idPrescription == any_(id_prescription_list))
+        .group_by(PrescriptionDrug.id)
+    )
+
+    results = db.session.execute(query).all()
+
+    not_processed_count = 0
+    for r in results:
+        if r.p_count == 0:
+            not_processed_count += 1
+
+    if not_processed_count > 0:
+        return "PENDING"
 
     return "PROCESSED"
 
