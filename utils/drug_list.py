@@ -30,6 +30,7 @@ class DrugList:
         agg,
         dialysis,
         alerts,
+        admission_number,
         is_cpoe=False,
     ):
         self.drugList = drugList
@@ -40,6 +41,7 @@ class DrugList:
         self.agg = agg
         self.dialysis = dialysis
         self.is_cpoe = is_cpoe
+        self.admission_number = admission_number
         self.maxDoseAgg = {}
         self.alertStats = {
             "dup": 0,
@@ -120,10 +122,12 @@ class DrugList:
     def getPrevIntervention(self, idDrug, idPrescription):
         result = {}
         for i in self.interventions:
+
             if (
                 i["idDrug"] == idDrug
                 and i["status"] == "s"
                 and int(i["idPrescription"]) < idPrescription
+                and i["admissionNumber"] == self.admission_number
             ):
                 if "id" in result.keys() and int(result["id"]) > int(i["id"]):
                     continue
@@ -131,11 +135,15 @@ class DrugList:
         return result
 
     def getExistIntervention(self, idDrug, idPrescription):
-        result = False
         for i in self.interventions:
-            if i["idDrug"] == idDrug and int(i["idPrescription"]) < idPrescription:
-                result = True
-        return result
+            if (
+                i["idDrug"] == idDrug
+                and int(i["idPrescription"]) < idPrescription
+                and i["admissionNumber"] == self.admission_number
+            ):
+                return True
+
+        return False
 
     def getIntervention(self, idPrescriptionDrug):
         result = {}
