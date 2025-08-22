@@ -55,6 +55,7 @@ from routes.reports.reports_culture import app_rpt_culture
 from routes.reports.reports_antimicrobial import app_rpt_antimicrobial
 from routes.reports.reports_exams import app_rpt_exams
 from routes.reports.reports_prescription_history import app_rpt_prescription_history
+from routes.reports.reports_integration import app_rpt_integration
 from routes.regulation.regulation import app_regulation
 
 os.environ["TZ"] = "America/Sao_Paulo"
@@ -134,6 +135,7 @@ app.register_blueprint(app_rpt_antimicrobial)
 app.register_blueprint(app_rpt_config)
 app.register_blueprint(app_rpt_prescription_history)
 app.register_blueprint(app_rpt_exams)
+app.register_blueprint(app_rpt_integration)
 
 app.register_blueprint(app_regulation)
 
