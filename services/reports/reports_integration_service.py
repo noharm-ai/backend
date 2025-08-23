@@ -18,7 +18,7 @@ def get_nifilint():
         InvocationType="RequestResponse",
         Payload=json.dumps(
             {
-                "command": "lambda_nifi_checklist.get_checklist_url",
+                "command": "lambda_nifilint.get_url",
             }
         ),
     )
