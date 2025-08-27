@@ -17,6 +17,7 @@ def find_protocols(
     exams: dict,
     prescription: Prescription,
     patient: Patient,
+    cn_stats: dict,
     user_context: User = None,
 ):
     """Gets all prescription protocols and test against a prescription"""
@@ -45,7 +46,11 @@ def find_protocols(
     for expire_date, drugs in drugs_by_expire_date.items():
         results[expire_date] = []
         alert_protocol = AlertProtocol(
-            drugs=drugs, exams=exams, prescription=prescription, patient=patient
+            drugs=drugs,
+            exams=exams,
+            prescription=prescription,
+            patient=patient,
+            cn_stats=cn_stats,
         )
 
         for protocol in protocols:

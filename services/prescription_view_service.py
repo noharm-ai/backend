@@ -585,6 +585,7 @@ def _get_alerts(
         prescription=prescription,
         patient=patient,
         user_context=user_context,
+        cn_stats=cn_data["cn_stats"],
     )
 
     return {"relations": relations, "alerts": alerts, "protocols": protocols}

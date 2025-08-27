@@ -118,6 +118,7 @@ def _validate_variables(variables: list[dict]):
         operator = var.get("operator", None)
         exam_type = var.get("examType", None)
         exam_period = var.get("examPeriod", None)
+        stats_type = var.get("statsType", None)
         value = var.get("value", None)
 
         if not name:
@@ -150,6 +151,13 @@ def _validate_variables(variables: list[dict]):
 
         if "examPeriod" in var and (exam_period is None or exam_period == ""):
             var.pop("examPeriod")
+
+        if field == ProtocolVariableFieldEnum.CN_STATS.value and not stats_type:
+            raise ValidationError(
+                f"Variável {name}: Indicador NoHarm Care inválido",
+                "errors.businessRules",
+                status.HTTP_400_BAD_REQUEST,
+            )
 
         if field == ProtocolVariableFieldEnum.COMBINATION.value:
             combo_fields = [
@@ -246,11 +254,16 @@ def _test_protocol(protocol: dict):
             "date": (datetime.today().date() - timedelta(days=3)).isoformat(),
         },
     }
+    cn_stats = {"diliexc": 1, "complication": 0}
     patient = Patient()
     patient.admissionDate = datetime.today() - timedelta(days=3)
 
     alert_protocol = AlertProtocol(
-        drugs=drug_list, exams=exams, prescription=prescription, patient=patient
+        drugs=drug_list,
+        exams=exams,
+        prescription=prescription,
+        patient=patient,
+        cn_stats=cn_stats,
     )
     try:
         alert_protocol.get_protocol_alerts(protocol=protocol)
