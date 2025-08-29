@@ -29,11 +29,17 @@ from utils import status, prescriptionutils
 
 
 @has_permission(Permission.READ_PRESCRIPTION)
-def get_drug_summary(id_drug: int, id_segment: int, complete=False):
+def get_drug_summary(
+    id_drug: int,
+    id_segment: int,
+    complete=False,
+    add_all_units=True,
+    add_all_frequencies=True,
+):
     drug = Drug.query.get(id_drug)
 
     prescribedUnits = getPreviouslyPrescribedUnits(id_drug, id_segment)
-    allUnits = getUnits()
+    allUnits = getUnits() if add_all_units else []
 
     unitResults = []
     for u in prescribedUnits:
@@ -44,7 +50,7 @@ def get_drug_summary(id_drug: int, id_segment: int, complete=False):
         unitResults.append({"id": u.id, "description": u.description, "amount": 0})
 
     prescribedFrequencies = getPreviouslyPrescribedFrequencies(id_drug, id_segment)
-    allFrequencies = getFrequencies()
+    allFrequencies = getFrequencies() if add_all_frequencies else []
 
     frequencyResults = []
     for f in prescribedFrequencies:

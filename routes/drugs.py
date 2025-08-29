@@ -13,7 +13,12 @@ app_drugs = Blueprint("app_drugs", __name__)
 @app_drugs.route("/drugs/resources/<int:idDrug>/<int:idSegment>", methods=["GET"])
 @api_endpoint()
 def getDrugSummary(idDrug, idSegment, idHospital=None):
-    return drug_service.get_drug_summary(id_drug=idDrug, id_segment=idSegment)
+    return drug_service.get_drug_summary(
+        id_drug=idDrug,
+        id_segment=idSegment,
+        add_all_frequencies=True,
+        add_all_units=True,
+    )
 
 
 @app_drugs.route("/drugs/frequencies", methods=["GET"])
