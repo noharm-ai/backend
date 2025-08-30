@@ -1,3 +1,5 @@
+"""Service to manage and retrieve integration status information for the admin interface."""
+
 from sqlalchemy import func, text, distinct, and_
 
 from models.main import db, User, PrescriptionAgg, Outlier, Drug, DrugAttributes

@@ -67,5 +67,9 @@ def setDrugUnit(idSegment, idDrug):
 @api_endpoint()
 def getDrugSummary(idDrug, idSegment):
     return drug_service.get_drug_summary(
-        id_drug=idDrug, id_segment=idSegment, complete=True
+        id_drug=idDrug,
+        id_segment=idSegment,
+        complete=True,
+        add_all_frequencies=False,
+        add_all_units=False,
     )

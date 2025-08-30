@@ -655,6 +655,38 @@ from utils.alert_protocol import AlertProtocol
             },
             True,
         ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
+                        "field": "cn_stats",
+                        "statsType": "diliexc",
+                        "operator": "=",
+                        "value": 0,
+                    },
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            False,
+        ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
+                        "field": "cn_stats",
+                        "statsType": "diliexc",
+                        "operator": ">",
+                        "value": 0,
+                    },
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            True,
+        ),
     ],
 )
 def test_trigger(protocol, has_result):
@@ -701,13 +733,18 @@ def test_trigger(protocol, has_result):
             "date": (date.today() - timedelta(days=3)).isoformat(),
         },
     }
+    cn_stats = {"diliexc": 1, "complication": 0}
 
     patient = Patient()
     patient.admissionDate = datetime.now() - timedelta(days=2)
     patient.st_conciliation = 1
 
     alert_protocol = AlertProtocol(
-        drugs=drug_list, exams=exams, prescription=prescription, patient=patient
+        drugs=drug_list,
+        exams=exams,
+        prescription=prescription,
+        patient=patient,
+        cn_stats=cn_stats,
     )
     results = alert_protocol.get_protocol_alerts(protocol=protocol)
 
@@ -829,8 +866,14 @@ def test_folfox():
 
     patient = Patient()
 
+    cn_stats = {"diliexc": 1, "complication": 0}
+
     alert_protocol = AlertProtocol(
-        drugs=drug_list, exams={}, prescription=prescription, patient=patient
+        drugs=drug_list,
+        exams={},
+        prescription=prescription,
+        patient=patient,
+        cn_stats=cn_stats,
     )
     result = alert_protocol.get_protocol_alerts(protocol=protocol)
 

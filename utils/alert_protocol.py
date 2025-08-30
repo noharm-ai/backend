@@ -22,17 +22,24 @@ class AlertProtocol:
     id_drug_list = None
     route_list = None
     exams = None
+    cn_stats = None
     protocol_variables = None
     protocol_msgs = None
 
     def __init__(
-        self, drugs: dict, exams: dict, prescription: Prescription, patient: Patient
+        self,
+        drugs: dict,
+        exams: dict,
+        prescription: Prescription,
+        patient: Patient,
+        cn_stats: dict,
     ):
         self.prescription = prescription
         self.patient = patient
         self.drugs = drugs
         self.filtered_drugs = self._filter_drug_list()
         self.exams = exams
+        self.cn_stats = cn_stats
 
         self.substance_list = []
         self.class_list = []
@@ -105,6 +112,22 @@ class AlertProtocol:
 
         if field == "route":
             return self._compare(op=operator, value1=self.route_list, value2=value)
+
+        if field == "cn_stats":
+            stats_type = variable.get("statsType")
+            if stats_type not in self.cn_stats:
+                return False
+
+            if self.cn_stats.get(stats_type, None) is None:
+                return False
+
+            try:
+                stats_value = int(self.cn_stats.get(stats_type))
+                value = int(value)
+            except ValueError:
+                return False
+
+            return self._compare(op=operator, value1=stats_value, value2=value)
 
         if field == "exam":
             exam_type = variable.get("examType")
