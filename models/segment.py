@@ -10,6 +10,7 @@ class Segment(db.Model):
     description = db.Column("nome", db.String, nullable=False)
     status = db.Column("status", db.Integer, nullable=False)
     type = db.Column("tp_segmento", db.Integer, nullable=True)
+    cpoe = db.Column("cpoe", db.Boolean, nullable=False)
 
 
 class SegmentExam(db.Model):

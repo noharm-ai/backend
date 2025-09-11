@@ -14,10 +14,7 @@ from models.enums import (
     InterventionEconomyTypeEnum,
     InterventionStatusEnum,
 )
-from services import (
-    data_authorization_service,
-    feature_service,
-)
+from services import data_authorization_service, feature_service, segment_service
 from repository import intervention_outcome_repository, patient_repository
 from decorators.has_permission_decorator import has_permission, Permission
 from exception.validation_error import ValidationError
@@ -379,7 +376,14 @@ def get_outcome_data(id_intervention, user_context: User, edit=False):
             .all()
         )
 
-        if not destiny_list and feature_service.is_cpoe():
+        id_segment = (
+            prescription_drug.idSegment
+            if prescription_drug and prescription_drug.idSegment
+            else DEFAULT_SEGMENT
+        )
+        is_cpoe = segment_service.is_cpoe(id_segment=id_segment)
+
+        if not destiny_list and is_cpoe:
             # if no destiny is found, try to get the next 10 prescriptions based on id order
             # useful for cpoe only
             # (substitute drug gets a new prescription before the current one ends)
@@ -560,7 +564,14 @@ def _calc_economy(origin, destiny):
 
 def _get_price_kit(id_prescription, prescription_drug: PrescriptionDrug, user: User):
     group = None
-    if feature_service.is_cpoe():
+    id_segment = (
+        prescription_drug.idSegment
+        if prescription_drug and prescription_drug.idSegment
+        else DEFAULT_SEGMENT
+    )
+    is_cpoe = segment_service.is_cpoe(id_segment=id_segment)
+
+    if is_cpoe:
         group = prescription_drug.cpoe_group
     else:
         group = prescription_drug.solutionGroup

@@ -148,24 +148,8 @@ def _auth_user(
         .filter(SchemaConfig.schemaName == user_schema)
         .first()
     )
-    if (
-        FeatureEnum.DISABLE_CPOE.value in user_features
-        or FeatureEnum.DISABLE_CPOE.value in extra_features
-    ):
-        is_cpoe = False
-    else:
-        is_cpoe = schema_config.cpoe
 
-    # keep compatibility (remove after transition)
-    if is_cpoe:
-        user_config = dict(
-            user_config,
-            **{
-                "roles": roles + ["cpoe"],
-            },
-        )
-
-    claims = {"schema": user_schema, "config": user_config, "cpoe": is_cpoe}
+    claims = {"schema": user_schema, "config": user_config}
     access_token = create_access_token(identity=user.id, additional_claims=claims)
     refresh_token = create_refresh_token(identity=user.id, additional_claims=claims)
 
@@ -286,7 +270,6 @@ def _auth_user(
         "logoutUrl": logout_url,
         "integrationStatus": integration_status,
         "permissions": [p.name for p in permissions],
-        "isCpoe": is_cpoe,
         "oauth": is_oauth,
     }
 

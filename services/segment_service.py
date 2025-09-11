@@ -47,3 +47,18 @@ def get_segment_departments():
         )
 
     return departments
+
+
+@has_permission(Permission.READ_BASIC_FEATURES)
+def is_cpoe(id_segment: int):
+    """Check if segment is cpoe or not"""
+
+    if not id_segment:
+        return False
+
+    segment = db.session.query(Segment).filter(Segment.id == id_segment).first()
+
+    if not segment:
+        return False
+
+    return segment.cpoe

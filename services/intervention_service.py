@@ -15,7 +15,7 @@ from models.enums import (
 from services import (
     memory_service,
     data_authorization_service,
-    feature_service,
+    segment_service,
 )
 from decorators.has_permission_decorator import has_permission, Permission
 from exception.validation_error import ValidationError
@@ -605,7 +605,23 @@ def _get_date_base_economy(
 ):
     # date base economy
     if economy_type != None and i.date_base_economy == None:
-        if feature_service.is_cpoe():
+        id_segment = None
+        if id_prescription != 0:
+            presc = (
+                db.session.query(Prescription)
+                .filter(Prescription.id == agg_id_prescription)
+                .first()
+            )
+            id_segment = presc.idSegment if presc else None
+        else:
+            pd = (
+                db.session.query(PrescriptionDrug)
+                .filter(PrescriptionDrug.id == id_prescription_drug)
+                .first()
+            )
+            id_segment = pd.idSegment if pd else None
+
+        if segment_service.is_cpoe(id_segment=id_segment):
             if agg_id_prescription == None:
                 return i.date
             else:

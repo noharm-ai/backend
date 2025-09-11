@@ -6,6 +6,7 @@ from models.enums import MemoryEnum, FeatureEnum, AppFeatureFlagEnum, GlobalMemo
 
 
 def is_cpoe():
+    # TODO: CPOE REMOVE
     return g.get("is_cpoe", False)
 
 

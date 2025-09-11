@@ -68,6 +68,7 @@ def find_protocols(
 def _split_drugs_by_date(drug_list: dict, prescription: Prescription):
     expire_dates = {}
 
+    # TODO: CPOE REMOVE
     if feature_service.is_cpoe() or not prescription.agg:
         expire_dates[prescription.date.isoformat()[:10]] = drug_list
 
