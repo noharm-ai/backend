@@ -197,6 +197,7 @@ def _auth_user(
                 "description": s.description,
                 "status": s.status,
                 "type": s.type,
+                "cpoe": s.cpoe,
             }
         )
 
