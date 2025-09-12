@@ -5,7 +5,7 @@ from datetime import datetime
 from models.main import User
 from models.prescription import Prescription, Patient
 from models.enums import ProtocolTypeEnum
-from services import feature_service
+from services import segment_service
 from utils.alert_protocol import AlertProtocol
 from decorators.has_permission_decorator import has_permission, Permission
 from repository import protocol_repository
@@ -67,9 +67,9 @@ def find_protocols(
 
 def _split_drugs_by_date(drug_list: dict, prescription: Prescription):
     expire_dates = {}
+    is_cpoe = segment_service.is_cpoe(id_segment=prescription.idSegment)
 
-    # TODO: CPOE REMOVE
-    if feature_service.is_cpoe() or not prescription.agg:
+    if is_cpoe or not prescription.agg:
         expire_dates[prescription.date.isoformat()[:10]] = drug_list
 
         return expire_dates

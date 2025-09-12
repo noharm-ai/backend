@@ -10,7 +10,7 @@ from models.prescription import Prescription, Patient
 from models.appendix import Department
 from decorators.has_permission_decorator import has_permission, Permission
 from utils import dateutils, numberutils, prescriptionutils, status
-from services import prescription_service, feature_service
+from services import prescription_service
 from exception.validation_error import ValidationError
 
 
@@ -50,7 +50,6 @@ def get_prioritization_list(
     age_min=None,
     age_max=None,
 ):
-    is_cpoe = feature_service.is_cpoe()
 
     q = (
         db.session.query(
@@ -136,11 +135,13 @@ def get_prioritization_list(
     if bool(int(numberutils.none2zero(agg))):
         q = q.filter(Prescription.agg == True)
 
-        if is_cpoe:
-            q = q.filter(
-                Prescription.date
-                <= func.coalesce(Patient.dischargeDate, Prescription.date)
-            )
+        # TODO: CPOE
+
+        # if is_cpoe:
+        #     q = q.filter(
+        #         Prescription.date
+        #         <= func.coalesce(Patient.dischargeDate, Prescription.date)
+        #     )
     else:
         q = q.filter(Prescription.agg == None)
 

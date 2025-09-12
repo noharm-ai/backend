@@ -14,7 +14,7 @@ from models.enums import (
     InterventionEconomyTypeEnum,
     InterventionStatusEnum,
 )
-from services import data_authorization_service, feature_service, segment_service
+from services import data_authorization_service, segment_service
 from repository import intervention_outcome_repository, patient_repository
 from decorators.has_permission_decorator import has_permission, Permission
 from exception.validation_error import ValidationError
@@ -259,6 +259,12 @@ def get_outcome_data(id_intervention, user_context: User, edit=False):
     readonly = intervention.status != InterventionStatusEnum.PENDING.value and not edit
     economy_type = intervention.economy_type
     outcome_user: User = record[3]
+    id_segment = (
+        prescription_drug.idSegment
+        if prescription_drug and prescription_drug.idSegment
+        else DEFAULT_SEGMENT
+    )
+    is_cpoe = segment_service.is_cpoe(id_segment=id_segment)
 
     if intervention.id and not prescription_drug:
         return {
@@ -277,6 +283,7 @@ def get_outcome_data(id_intervention, user_context: User, edit=False):
                 ),
                 "outcomeUser": (outcome_user.name if outcome_user != None else None),
                 "notes": intervention.notes,
+                "isCpoe": is_cpoe,
             },
         }
 
@@ -289,6 +296,7 @@ def get_outcome_data(id_intervention, user_context: User, edit=False):
             original=None,
             origin=None,
             destiny=None,
+            is_cpoe=is_cpoe,
         )
 
     # origin
@@ -313,6 +321,7 @@ def get_outcome_data(id_intervention, user_context: User, edit=False):
                 ),
                 "outcomeUser": (outcome_user.name if outcome_user != None else None),
                 "notes": intervention.notes,
+                "isCpoe": is_cpoe,
             },
         }
 
@@ -419,6 +428,7 @@ def get_outcome_data(id_intervention, user_context: User, edit=False):
         original={"origin": base_origin[0], "destiny": base_destiny},
         origin=origin,
         destiny=destiny,
+        is_cpoe=is_cpoe,
     )
 
 
@@ -429,6 +439,7 @@ def _get_outcome_dict(
     original: dict,
     origin: dict,
     destiny: dict,
+    is_cpoe: bool,
 ):
     intervention: Intervention = outcome_data[0]
     prescription_drug: PrescriptionDrug = outcome_data[1]
@@ -479,6 +490,7 @@ def _get_outcome_dict(
             ),
             "interventionReason": outcome_data.reason,
             "notes": intervention.notes,
+            "isCpoe": is_cpoe,
         },
     }
 

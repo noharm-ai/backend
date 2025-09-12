@@ -28,6 +28,7 @@ from services import (
     prescription_check_service,
     prescription_view_service,
     feature_service,
+    segment_service,
 )
 from exception.validation_error import ValidationError
 from decorators.has_permission_decorator import has_permission, Permission
@@ -41,13 +42,6 @@ def create_agg_prescription_by_prescription(
     """Creates a new prescription-day based on an individual prescription"""
 
     _set_schema(schema)
-
-    if feature_service.is_cpoe():
-        raise ValidationError(
-            "CPOE deve acionar o fluxo por atendimento",
-            "errors.businessRules",
-            status.HTTP_400_BAD_REQUEST,
-        )
 
     p = (
         db.session.query(Prescription)
@@ -63,6 +57,13 @@ def create_agg_prescription_by_prescription(
 
     if p.idSegment is None:
         return
+
+    if segment_service.is_cpoe(id_segment=p.idSegment):
+        raise ValidationError(
+            "CPOE deve acionar o fluxo por atendimento",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
 
     processed_status = _get_processed_status(id_prescription_list=[id_prescription])
 
