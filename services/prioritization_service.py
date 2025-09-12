@@ -8,6 +8,7 @@ from models.main import db
 from models.enums import PrescriptionReviewTypeEnum, PatientConciliationStatusEnum
 from models.prescription import Prescription, Patient
 from models.appendix import Department
+from models.segment import Segment
 from decorators.has_permission_decorator import has_permission, Permission
 from utils import dateutils, numberutils, prescriptionutils, status
 from services import prescription_service
@@ -69,6 +70,7 @@ def get_prioritization_list(
                 Department.idHospital == Prescription.idHospital,
             ),
         )
+        .outerjoin(Segment, Prescription.idSegment == Segment.id)
     )
 
     currentDepartment = bool(int(numberutils.none2zero(currentDepartment))) and (
@@ -135,15 +137,14 @@ def get_prioritization_list(
     if bool(int(numberutils.none2zero(agg))):
         q = q.filter(Prescription.agg == True)
 
-        # TODO: CPOE
-
-        # if is_cpoe:
-        #     q = q.filter(
-        #         Prescription.date
-        #         <= func.coalesce(Patient.dischargeDate, Prescription.date)
-        #     )
+        q = q.filter(
+            Prescription.date <= func.coalesce(Patient.dischargeDate, Prescription.date)
+        )
     else:
         q = q.filter(Prescription.agg == None)
+
+        if not bool(int(numberutils.none2zero(concilia))):
+            q = q.filter(Segment.cpoe == False)
 
     if bool(int(numberutils.none2zero(concilia))):
         q = q.filter(Prescription.concilia != None)
