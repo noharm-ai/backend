@@ -50,6 +50,22 @@ def _handle_authorization_error(user_context: User):
     }, status.HTTP_401_UNAUTHORIZED
 
 
+def _handle_exception(e: Exception, user_context: User):
+    """Handle Exception with consistent logging and response format."""
+    db.session.rollback()
+
+    logging.basicConfig()
+    logger = logging.getLogger("noharm.backend")
+    logger.error(str(e))
+    logger.warning("schema: %s", user_context.schema if user_context else "undefined")
+
+    return {
+        "status": "error",
+        "message": "Erro inesperado",
+        "code": "errors.unexpectedError",
+    }, status.HTTP_500_INTERNAL_SERVER_ERROR
+
+
 @contextmanager
 def static_user_context(schema: str):
     """
@@ -100,7 +116,7 @@ def execute_with_static_context(schema: str, operation_func, params: dict):
     Args:
         schema (str): The database schema to use for the static user
         operation_func: The function to execute with the static context
-        *args, **kwargs: Arguments to pass to the operation function
+        params: Arguments to pass to the operation function
 
     Returns:
         The result of the operation function, or error response tuple if exception occurred
@@ -120,3 +136,5 @@ def execute_with_static_context(schema: str, operation_func, params: dict):
             return _handle_validation_error(e, user_context)
         except AuthorizationError:
             return _handle_authorization_error(user_context)
+        except Exception as e:
+            return _handle_exception(e, user_context)
