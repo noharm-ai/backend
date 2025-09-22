@@ -28,8 +28,8 @@ def _handle_validation_error(e: ValidationError, user_context: User):
     return {
         "status": "error",
         "message": str(e),
-        "code": e.code,
-    }, e.httpStatus
+        "httpCode": e.httpStatus,
+    }
 
 
 def _handle_authorization_error(user_context: User):
@@ -47,8 +47,8 @@ def _handle_authorization_error(user_context: User):
     return {
         "status": "error",
         "message": "Usuário inválido",
-        "code": "errors.unauthorized",
-    }, status.HTTP_401_UNAUTHORIZED
+        "httpCode": status.HTTP_401_UNAUTHORIZED,
+    }
 
 
 def _handle_exception(e: Exception, user_context: User):
@@ -63,8 +63,8 @@ def _handle_exception(e: Exception, user_context: User):
     return {
         "status": "error",
         "message": "Erro inesperado",
-        "code": "errors.unexpectedError",
-    }, status.HTTP_500_INTERNAL_SERVER_ERROR
+        "httpCode": status.HTTP_500_INTERNAL_SERVER_ERROR,
+    }
 
 
 @contextmanager
@@ -132,7 +132,9 @@ def execute_with_static_context(schema: str, operation_func, params: dict):
             db.session.close()
             db.session.remove()
 
-            return json.dumps({"status": "success", "data": result})
+            return json.dumps(
+                {"status": "success", "data": result, "httpCode": status.HTTP_200_OK}
+            )
         except ValidationError as e:
             return json.dumps(_handle_validation_error(e, user_context))
         except AuthorizationError:
