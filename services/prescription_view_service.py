@@ -39,6 +39,7 @@ from services import (
     alert_service,
     feature_service,
     exams_service,
+    segment_service,
 )
 from utils.drug_list import DrugList
 from utils import prescriptionutils, dateutils, status
@@ -358,7 +359,7 @@ def _get_configs(prescription: Prescription, patient: Patient):
         in memory_itens.get(MemoryEnum.FEATURES.value, [])
     )
 
-    data["is_cpoe"] = feature_service.is_cpoe()
+    data["is_cpoe"] = segment_service.is_cpoe(id_segment=prescription.idSegment)
 
     # patient data
     data["weight"] = patient.weight if patient.weight else None

@@ -23,7 +23,6 @@ app_stc = Blueprint("app_stc", __name__)
     "/static/<string:schema>/prescription/<int:id_prescription>", methods=["GET"]
 )
 def create_aggregated_by_prescription(schema, id_prescription):
-    is_cpoe = request.args.get("cpoe", False)
     out_patient = request.args.get("outpatient", None)
     force = request.args.get("force", False)
 
@@ -32,7 +31,6 @@ def create_aggregated_by_prescription(schema, id_prescription):
     user_context.schema = schema
     user_context.config = {"roles": ["STATIC_USER"]}
     g.user_context = user_context
-    g.is_cpoe = bool(is_cpoe)
 
     try:
         prescription_agg_service.create_agg_prescription_by_prescription(
@@ -83,7 +81,6 @@ def create_aggregated_by_prescription(schema, id_prescription):
     "/static/<string:schema>/aggregate/<int:admission_number>", methods=["GET"]
 )
 def create_aggregated_prescription_by_date(schema, admission_number):
-    is_cpoe = request.args.get("cpoe", False)
     str_date = request.args.get("p_date", None)
     p_date = (
         datetime.strptime(str_date, "%Y-%m-%d").date()
@@ -96,7 +93,6 @@ def create_aggregated_prescription_by_date(schema, admission_number):
     user_context.schema = schema
     user_context.config = {"roles": ["STATIC_USER"]}
     g.user_context = user_context
-    g.is_cpoe = bool(is_cpoe)
 
     try:
         prescription_agg_service.create_agg_prescription_by_date(

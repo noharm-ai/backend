@@ -11,7 +11,9 @@ from utils import status
 
 
 @has_permission(Permission.ADMIN_SEGMENTS)
-def upsert_segment(id_segment, description, active, user_context: User, type: int):
+def upsert_segment(
+    id_segment, description, active, user_context: User, type: int, cpoe: bool
+):
 
     if id_segment:
         segment = db.session.query(Segment).filter(Segment.id == id_segment).first()
@@ -37,6 +39,7 @@ def upsert_segment(id_segment, description, active, user_context: User, type: in
     segment.description = description
     segment.status = 1 if active else 0
     segment.type = type
+    segment.cpoe = cpoe
 
     db.session.add(segment)
 

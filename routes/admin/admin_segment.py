@@ -18,6 +18,7 @@ def upsert_segment():
         description=data.get("description", None),
         active=data.get("active", None),
         type=data.get("type", None),
+        cpoe=data.get("cpoe", None),
     )
 
     return escape_html(data.get("idSegment"))

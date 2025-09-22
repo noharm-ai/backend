@@ -19,6 +19,7 @@ def getSegments():
                 "description": i.description,
                 "status": i.status,
                 "type": i.type,
+                "cpoe": i.cpoe,
             }
         )
 

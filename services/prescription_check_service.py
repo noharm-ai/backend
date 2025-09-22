@@ -23,8 +23,8 @@ from services import (
     data_authorization_service,
     memory_service,
     prescription_drug_service,
-    feature_service,
     user_service,
+    segment_service,
 )
 from security.role import Role
 
@@ -149,7 +149,7 @@ def _update_agg_status(prescription: Prescription, user: User, extra={}):
     unchecked_prescriptions = (
         prescription_view_repository.get_query_prescriptions_by_agg(
             agg_prescription=prescription,
-            is_cpoe=feature_service.is_cpoe(),
+            is_cpoe=segment_service.is_cpoe(id_segment=prescription.idSegment),
             is_pmc=is_pmc,
             schema=user.schema,
         )
@@ -180,7 +180,7 @@ def _check_agg_internal_prescriptions(
     q_internal_prescription = (
         prescription_view_repository.get_query_prescriptions_by_agg(
             agg_prescription=prescription,
-            is_cpoe=feature_service.is_cpoe(),
+            is_cpoe=segment_service.is_cpoe(id_segment=prescription.idSegment),
             is_pmc=is_pmc,
             schema=user.schema,
         )

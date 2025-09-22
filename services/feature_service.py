@@ -5,10 +5,6 @@ from models.appendix import Memory, GlobalMemory
 from models.enums import MemoryEnum, FeatureEnum, AppFeatureFlagEnum, GlobalMemoryEnum
 
 
-def is_cpoe():
-    return g.get("is_cpoe", False)
-
-
 def has_feature(user_feature: FeatureEnum):
     """
     Tenant features

@@ -28,6 +28,7 @@ from services import (
     patient_service,
     clinical_notes_service,
     user_service,
+    segment_service,
 )
 from decorators.has_permission_decorator import has_permission, Permission
 from utils import status, dateutils
@@ -245,13 +246,15 @@ def recalculate_prescription(id_prescription: int, user_context: User):
         admission_number=p.admissionNumber, user_context=user_context
     )
 
+    is_cpoe = segment_service.is_cpoe(id_segment=p.idSegment)
+
     if p.agg:
-        if feature_service.is_cpoe():
+        if is_cpoe:
             is_pmc = memory_service.has_feature_nouser(FeatureEnum.PRIMARY_CARE.value)
             prescription_results = (
                 prescription_view_repository.get_query_prescriptions_by_agg(
                     agg_prescription=p,
-                    is_cpoe=feature_service.is_cpoe(),
+                    is_cpoe=is_cpoe,
                     only_id=True,
                     is_pmc=is_pmc,
                     schema=user_context.schema,

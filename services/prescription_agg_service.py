@@ -22,12 +22,13 @@ from models.enums import (
     PatientConciliationStatusEnum,
     FeatureEnum,
 )
-from models.appendix import SchemaConfig
+from models.segment import Segment
 from services import (
     prescription_drug_service,
     prescription_check_service,
     prescription_view_service,
     feature_service,
+    segment_service,
 )
 from exception.validation_error import ValidationError
 from decorators.has_permission_decorator import has_permission, Permission
@@ -41,13 +42,6 @@ def create_agg_prescription_by_prescription(
     """Creates a new prescription-day based on an individual prescription"""
 
     _set_schema(schema)
-
-    if feature_service.is_cpoe():
-        raise ValidationError(
-            "CPOE deve acionar o fluxo por atendimento",
-            "errors.businessRules",
-            status.HTTP_400_BAD_REQUEST,
-        )
 
     p = (
         db.session.query(Prescription)
@@ -63,6 +57,13 @@ def create_agg_prescription_by_prescription(
 
     if p.idSegment is None:
         return
+
+    if segment_service.is_cpoe(id_segment=p.idSegment):
+        raise ValidationError(
+            "CPOE deve acionar o fluxo por atendimento",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
 
     processed_status = _get_processed_status(id_prescription_list=[id_prescription])
 
@@ -188,18 +189,7 @@ def create_agg_prescription_by_date(
     """Creates a new prescription-day based on admission number and date (most used for CPOE)"""
     _set_schema(schema)
 
-    schema_config = (
-        db.session.query(SchemaConfig).filter(SchemaConfig.schemaName == schema).first()
-    )
-    ignore_segments = []
-    if schema_config.config:
-        ignore_segments = schema_config.config.get("admissionCalc", {}).get(
-            "ignoreSegments", []
-        )
-
-    last_prescription = get_last_prescription(
-        admission_number, ignore_segments=ignore_segments
-    )
+    last_prescription = get_last_prescription(admission_number, cpoe=True)
 
     if last_prescription is None or last_prescription.idSegment is None:
         raise ValidationError(
@@ -330,17 +320,18 @@ def _set_schema(schema):
     dbSession.setSchema(schema)
 
 
-def get_last_prescription(admission_number, ignore_segments=None):
+def get_last_prescription(admission_number, cpoe=False):
     query = (
         db.session.query(Prescription)
+        .outerjoin(Segment, Prescription.idSegment == Segment.id)
         .filter(Prescription.admissionNumber == admission_number)
         .filter(Prescription.agg == None)
         .filter(Prescription.concilia == None)
         .filter(Prescription.idSegment != None)
     )
 
-    if ignore_segments:
-        query = query.filter(~Prescription.idSegment.in_(ignore_segments))
+    if cpoe:
+        query = query.filter(Segment.cpoe == True)
 
     return query.order_by(desc(Prescription.date)).first()
 
