@@ -1,5 +1,6 @@
 """INTERNAL FUNCTIONS"""
 
+import logging
 from datetime import datetime
 
 from services import (
@@ -8,11 +9,21 @@ from services import (
 from utils.static_context import execute_with_static_context
 
 
-def prescalc(schema: str, id_prescription: int, out_patient: bool, force: bool):
+def prescalc(event: dict, context: any):
     """
     Prescalc: calculates prescription indicators and generate a
     prescription-day prescription record
     """
+
+    logging.basicConfig()
+    logger = logging.getLogger("noharm.backend")
+
+    schema: str = event.get("schema", None)
+    id_prescription: int = event.get("id_prescription", None)
+    out_patient: bool = event.get("out_patient", False)
+    force: bool = event.get("force", False)
+
+    logger.warning("schema: %s | id_prescription: %s", schema, id_prescription)
 
     def _prescalc_operation(user_context, schema, id_prescription, out_patient, force):
         """Internal operation function for prescalc with automatic exception handling."""
@@ -31,6 +42,8 @@ def prescalc(schema: str, id_prescription: int, out_patient: bool, force: bool):
         "out_patient": out_patient,
         "force": force,
     }
+
+    logger.warning("params: %s", str(params))
 
     return execute_with_static_context(
         schema=schema, operation_func=_prescalc_operation, params=params
