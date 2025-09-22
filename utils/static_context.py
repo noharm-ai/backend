@@ -1,6 +1,7 @@
 """Utility module for creating static user contexts with JWT authentication."""
 
 import logging
+import json
 from contextlib import contextmanager
 from flask_jwt_extended import create_access_token, verify_jwt_in_request
 
@@ -131,10 +132,10 @@ def execute_with_static_context(schema: str, operation_func, params: dict):
             db.session.close()
             db.session.remove()
 
-            return {"status": "success", "data": result}, status.HTTP_200_OK
+            return json.dumps({"status": "success", "data": result})
         except ValidationError as e:
-            return _handle_validation_error(e, user_context)
+            return json.dumps(_handle_validation_error(e, user_context))
         except AuthorizationError:
-            return _handle_authorization_error(user_context)
+            return json.dumps(_handle_authorization_error(user_context))
         except Exception as e:
-            return _handle_exception(e, user_context)
+            return json.dumps(_handle_exception(e, user_context))
