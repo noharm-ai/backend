@@ -64,11 +64,3 @@ def atendcalc(schema: str, admission_number: int, str_date: str):
     return execute_with_static_context(
         schema=schema, operation_func=_atendcalc_operation, params=params
     )
-
-
-if __name__ == "__main__":
-    print("start")
-    result = prescalc("hsc_test", 250913018971000, False, True)
-    # result = atendcalc(schema="corrientes", admission_number=489944012, str_date=None)
-    print("result", result)
-    print("end")
