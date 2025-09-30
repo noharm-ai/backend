@@ -20,17 +20,15 @@ def prescalc(event: dict, context: any):
 
     schema: str = event.get("schema", None)
     id_prescription: int = event.get("id_prescription", None)
-    out_patient: bool = event.get("out_patient", False)
     force: bool = event.get("force", False)
 
     logger.warning("schema: %s | id_prescription: %s", schema, id_prescription)
 
-    def _prescalc_operation(user_context, schema, id_prescription, out_patient, force):
+    def _prescalc_operation(user_context, schema, id_prescription, force):
         """Internal operation function for prescalc with automatic exception handling."""
         prescription_agg_service.create_agg_prescription_by_prescription(
             schema=schema,
             id_prescription=id_prescription,
-            out_patient=out_patient,
             force=force,
             user_context=user_context,
         )
@@ -39,7 +37,6 @@ def prescalc(event: dict, context: any):
     params = {
         "schema": schema,
         "id_prescription": id_prescription,
-        "out_patient": out_patient,
         "force": force,
     }
 

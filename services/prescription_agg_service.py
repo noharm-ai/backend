@@ -29,6 +29,7 @@ from services import (
     prescription_view_service,
     feature_service,
     segment_service,
+    memory_service,
 )
 from exception.validation_error import ValidationError
 from decorators.has_permission_decorator import has_permission, Permission
@@ -37,7 +38,7 @@ from utils import status, prescriptionutils
 
 @has_permission(Permission.READ_STATIC)
 def create_agg_prescription_by_prescription(
-    schema, id_prescription, out_patient, user_context: User, force=False
+    schema, id_prescription, user_context: User, force=False
 ):
     """Creates a new prescription-day based on an individual prescription"""
 
@@ -91,6 +92,8 @@ def create_agg_prescription_by_prescription(
         if days_between <= 1:
             # updates on last day prescriptions should affect current agg prescription
             pdate = datetime.today().date()
+
+    out_patient = memory_service.has_feature_nouser(FeatureEnum.PRIMARY_CARE.value)
 
     if out_patient:
         PrescAggID = p.admissionNumber
