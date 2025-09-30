@@ -166,6 +166,7 @@ class Role(Enum):
         Permission.READ_REGULATION,
         Permission.WRITE_REGULATION,
         Permission.READ_BASIC_FEATURES,
+        Permission.WRITE_BASIC_FEATURES,
         Permission.READ_REPORTS,
         Permission.READ_SUPPORT,
         Permission.WRITE_SUPPORT,
