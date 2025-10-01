@@ -1,7 +1,7 @@
 name: Build
 on:
   pull_request:
-    branches: [master, develop, feature/acceptance_tests_lanceiros]
+    branches: [master, develop]
 permissions:
   contents: read
   pull-requests: write
@@ -44,16 +44,11 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: sa-east-1
-      - name: Run Coverage Report
+      - name: Run Tests
         env:
           CACHE_BUCKET_NAME: ${{ secrets.CACHE_BUCKET_NAME }}
           ENV: test
         run: python -m pytest --cov-report xml --cov=.
-      - name: Submit Coverage Report
-        if: ${{ env.CC_TEST_REPORTER_ID != '' }}
-        uses: paambaati/codeclimate-action@v9.0.0
-        env:
-          CC_TEST_REPORTER_ID: ${{secrets.CC_TEST_REPORTER_ID}}
   build-prod:
     runs-on: ubuntu-latest
     services:

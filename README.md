@@ -3,8 +3,6 @@
 ![Build](https://github.com/noharm-ai/backend/workflows/Build/badge.svg)
 [![Issues](https://img.shields.io/github/issues-raw/noharm-ai/backend.svg?maxAge=25000)](https://github.com/noharm-ai/backend/issues)  
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Maintainability](https://api.codeclimate.com/v1/badges/a2baa2e03c1661cd70cd/maintainability)](https://codeclimate.com/github/noharm-ai/backend/maintainability)
-[![Test Coverage](https://api.codeclimate.com/v1/badges/a2baa2e03c1661cd70cd/test_coverage)](https://codeclimate.com/github/noharm-ai/backend/test_coverage)
 
 Api for Mobile App
 
