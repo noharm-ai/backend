@@ -23,6 +23,7 @@ from models.enums import (
     FeatureEnum,
 )
 from models.segment import Segment
+from models.appendix import SchemaConfig
 from services import (
     prescription_drug_service,
     prescription_check_service,
@@ -38,11 +39,21 @@ from utils import status, prescriptionutils
 
 @has_permission(Permission.READ_STATIC)
 def create_agg_prescription_by_prescription(
-    schema, id_prescription, user_context: User, force=False
+    schema, id_prescription, user_context: User, force=False, public=False
 ):
     """Creates a new prescription-day based on an individual prescription"""
 
     _set_schema(schema)
+
+    if public:
+        schema_config = (
+            db.session.query(SchemaConfig)
+            .filter(SchemaConfig.schemaName == schema)
+            .first()
+        )
+        if schema_config.tp_prescalc != 0:
+            # using central prescalc service
+            return
 
     p = (
         db.session.query(Prescription)
@@ -187,10 +198,20 @@ def create_agg_prescription_by_prescription(
 
 @has_permission(Permission.READ_STATIC)
 def create_agg_prescription_by_date(
-    schema, admission_number, p_date, user_context: User
+    schema, admission_number, p_date, user_context: User, public=False
 ):
     """Creates a new prescription-day based on admission number and date (most used for CPOE)"""
     _set_schema(schema)
+
+    if public:
+        schema_config = (
+            db.session.query(SchemaConfig)
+            .filter(SchemaConfig.schemaName == schema)
+            .first()
+        )
+        if schema_config.tp_prescalc != 0:
+            # using central prescalc service
+            return
 
     last_prescription = get_last_prescription(admission_number, cpoe=True)
 

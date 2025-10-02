@@ -31,6 +31,7 @@ def prescalc(event: dict, context: any):
             id_prescription=id_prescription,
             force=force,
             user_context=user_context,
+            public=False,
         )
         return id_prescription
 
@@ -60,7 +61,7 @@ def atendcalc(schema: str, admission_number: int, str_date: str):
             else datetime.today().date()
         )
         prescription_agg_service.create_agg_prescription_by_date(
-            schema, admission_number, p_date, user_context=user_context
+            schema, admission_number, p_date, user_context=user_context, public=False
         )
 
         return admission_number
