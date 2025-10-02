@@ -49,7 +49,6 @@ def get_segment_departments():
     return departments
 
 
-@has_permission(Permission.READ_BASIC_FEATURES)
 def is_cpoe(id_segment: int):
     """Check if segment is cpoe or not"""
 
