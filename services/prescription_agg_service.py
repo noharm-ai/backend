@@ -70,7 +70,7 @@ def create_agg_prescription_by_prescription(
     if p.idSegment is None:
         return
 
-    if segment_service.is_cpoe(id_segment=p.idSegment):
+    if segment_service.is_cpoe(id_segment=p.idSegment) and p.concilia is None:
         raise ValidationError(
             "CPOE deve acionar o fluxo por atendimento",
             "errors.businessRules",
