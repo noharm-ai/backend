@@ -111,8 +111,6 @@ def create_agg_prescription_by_prescription(
     else:
         PrescAggID = prescriptionutils.gen_agg_id(p.admissionNumber, p.idSegment, pdate)
 
-    print("PRESCAGG", PrescAggID)
-
     is_new_prescription = False
     pAgg = Prescription.query.get(PrescAggID)
     if pAgg is None:
