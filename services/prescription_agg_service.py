@@ -70,7 +70,7 @@ def create_agg_prescription_by_prescription(
     if p.idSegment is None:
         return
 
-    if segment_service.is_cpoe(id_segment=p.idSegment):
+    if segment_service.is_cpoe(id_segment=p.idSegment) and p.concilia is None:
         raise ValidationError(
             "CPOE deve acionar o fluxo por atendimento",
             "errors.businessRules",
@@ -110,6 +110,8 @@ def create_agg_prescription_by_prescription(
         PrescAggID = p.admissionNumber
     else:
         PrescAggID = prescriptionutils.gen_agg_id(p.admissionNumber, p.idSegment, pdate)
+
+    print("PRESCAGG", PrescAggID)
 
     is_new_prescription = False
     pAgg = Prescription.query.get(PrescAggID)
