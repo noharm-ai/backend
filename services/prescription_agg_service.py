@@ -216,11 +216,18 @@ def create_agg_prescription_by_date(
     last_prescription = get_last_prescription(admission_number, cpoe=True)
 
     if last_prescription is None or last_prescription.idSegment is None:
-        raise ValidationError(
-            "Não foi possível encontrar o segmento deste atendimento",
-            "errors.invalidSegment",
-            status.HTTP_400_BAD_REQUEST,
+        logging.basicConfig()
+        logger = logging.getLogger("noharm.backend")
+        logger.warning(
+            "(%s) VALIDATION4xx: Não foi possível encontrar o segmento deste atendimento",
+            schema,
         )
+        return
+        # raise ValidationError(
+        #     "Não foi possível encontrar o segmento deste atendimento",
+        #     "errors.invalidSegment",
+        #     status.HTTP_400_BAD_REQUEST,
+        # )
 
     p_id = prescriptionutils.gen_agg_id(
         admission_number, last_prescription.idSegment, p_date
