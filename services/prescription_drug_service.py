@@ -9,7 +9,11 @@ from models.prescription import Prescription, PrescriptionDrug
 from models.appendix import Notes, MeasureUnit, Frequency
 from models.enums import FeatureEnum
 from repository import prescription_view_repository
-from services import data_authorization_service, feature_service, memory_service
+from services import (
+    data_authorization_service,
+    memory_service,
+    segment_service,
+)
 from services.admin import admin_ai_service
 from exception.validation_error import ValidationError
 from decorators.has_permission_decorator import has_permission, Permission
@@ -66,12 +70,14 @@ def getPrescriptionDrug(idPrescriptionDrug):
 def count_drugs_by_prescription(
     prescription: Prescription, drug_types, user: User, parent_agg_date=None
 ):
+    is_cpoe = segment_service.is_cpoe(id_segment=prescription.idSegment)
+
     if prescription.agg:
         is_pmc = memory_service.has_feature_nouser(FeatureEnum.PRIMARY_CARE.value)
         prescription_query = (
             prescription_view_repository.get_query_prescriptions_by_agg(
                 agg_prescription=prescription,
-                is_cpoe=feature_service.is_cpoe(),
+                is_cpoe=is_cpoe,
                 only_id=True,
                 is_pmc=is_pmc,
                 schema=user.schema,
@@ -84,7 +90,7 @@ def count_drugs_by_prescription(
             .filter(PrescriptionDrug.source.in_(drug_types))
         )
 
-        if feature_service.is_cpoe():
+        if is_cpoe:
             q = q.filter(
                 or_(
                     PrescriptionDrug.suspendedDate == None,
@@ -101,7 +107,7 @@ def count_drugs_by_prescription(
             .filter(PrescriptionDrug.source.in_(drug_types))
         )
 
-        if feature_service.is_cpoe():
+        if is_cpoe:
             q = q.filter(
                 or_(
                     PrescriptionDrug.suspendedDate == None,
@@ -236,10 +242,18 @@ def update_prescription_drug_data(
 @has_permission(Permission.READ_PRESCRIPTION)
 def get_drug_period(id_prescription_drug: int, future: bool, user_context: User):
     results = [{1: []}]
+    pd = (
+        db.session.query(PrescriptionDrug)
+        .filter(PrescriptionDrug.id == id_prescription_drug)
+        .first()
+    )
+    is_cpoe = segment_service.is_cpoe(id_segment=pd.idSegment if pd else None)
 
     if id_prescription_drug != 0:
         results, admissionHistory = _drug_period_query(
-            id_prescription_drug, future, is_cpoe=feature_service.is_cpoe()
+            id_prescription_drug,
+            future,
+            is_cpoe=is_cpoe,
         )
     else:
         results[0][1].append(
@@ -252,7 +266,7 @@ def get_drug_period(id_prescription_drug: int, future: bool, user_context: User)
         else:
             results[0][1].append("Não há prescrição posterior para esse Paciente")
 
-    if feature_service.is_cpoe() and not future:
+    if is_cpoe and not future:
         periodList = []
 
         for i, p in enumerate(results):

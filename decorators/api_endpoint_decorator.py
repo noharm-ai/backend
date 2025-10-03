@@ -2,7 +2,7 @@ import os
 import logging
 import inspect
 from flask import g, request
-from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request, get_jwt
+from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
 from flask_jwt_extended.exceptions import JWTExtendedException
 from jwt.exceptions import PyJWTError
 from functools import wraps
@@ -29,8 +29,6 @@ def api_endpoint():
 
                 dbSession.setSchema(user_context.schema)
                 os.environ["TZ"] = "America/Sao_Paulo"
-
-                g.is_cpoe = _is_cpoe()
 
                 result = f(*args, **kwargs)
 
@@ -152,19 +150,3 @@ def api_endpoint():
         return decorator_f
 
     return wrapper
-
-
-def _is_cpoe():
-    claims = get_jwt()
-    is_cpoe = claims.get("cpoe", None)
-
-    if is_cpoe != None:
-        return is_cpoe
-
-    # keep compatibility (remove after transition)
-    config = claims.get("config", None)
-    roles = []
-    if config != None:
-        roles = config.get("roles", [])
-
-    return "cpoe" in roles

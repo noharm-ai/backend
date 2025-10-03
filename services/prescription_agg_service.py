@@ -22,12 +22,15 @@ from models.enums import (
     PatientConciliationStatusEnum,
     FeatureEnum,
 )
+from models.segment import Segment
 from models.appendix import SchemaConfig
 from services import (
     prescription_drug_service,
     prescription_check_service,
     prescription_view_service,
     feature_service,
+    segment_service,
+    memory_service,
 )
 from exception.validation_error import ValidationError
 from decorators.has_permission_decorator import has_permission, Permission
@@ -36,18 +39,21 @@ from utils import status, prescriptionutils
 
 @has_permission(Permission.READ_STATIC)
 def create_agg_prescription_by_prescription(
-    schema, id_prescription, out_patient, user_context: User, force=False
+    schema, id_prescription, user_context: User, force=False, public=False
 ):
     """Creates a new prescription-day based on an individual prescription"""
 
     _set_schema(schema)
 
-    if feature_service.is_cpoe():
-        raise ValidationError(
-            "CPOE deve acionar o fluxo por atendimento",
-            "errors.businessRules",
-            status.HTTP_400_BAD_REQUEST,
+    if public:
+        schema_config = (
+            db.session.query(SchemaConfig)
+            .filter(SchemaConfig.schemaName == schema)
+            .first()
         )
+        if schema_config.tp_prescalc != 0:
+            # using central prescalc service
+            return
 
     p = (
         db.session.query(Prescription)
@@ -63,6 +69,13 @@ def create_agg_prescription_by_prescription(
 
     if p.idSegment is None:
         return
+
+    if segment_service.is_cpoe(id_segment=p.idSegment):
+        raise ValidationError(
+            "CPOE deve acionar o fluxo por atendimento",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
 
     processed_status = _get_processed_status(id_prescription_list=[id_prescription])
 
@@ -90,6 +103,8 @@ def create_agg_prescription_by_prescription(
         if days_between <= 1:
             # updates on last day prescriptions should affect current agg prescription
             pdate = datetime.today().date()
+
+    out_patient = memory_service.has_feature_nouser(FeatureEnum.PRIMARY_CARE.value)
 
     if out_patient:
         PrescAggID = p.admissionNumber
@@ -183,23 +198,22 @@ def create_agg_prescription_by_prescription(
 
 @has_permission(Permission.READ_STATIC)
 def create_agg_prescription_by_date(
-    schema, admission_number, p_date, user_context: User
+    schema, admission_number, p_date, user_context: User, public=False
 ):
     """Creates a new prescription-day based on admission number and date (most used for CPOE)"""
     _set_schema(schema)
 
-    schema_config = (
-        db.session.query(SchemaConfig).filter(SchemaConfig.schemaName == schema).first()
-    )
-    ignore_segments = []
-    if schema_config.config:
-        ignore_segments = schema_config.config.get("admissionCalc", {}).get(
-            "ignoreSegments", []
+    if public:
+        schema_config = (
+            db.session.query(SchemaConfig)
+            .filter(SchemaConfig.schemaName == schema)
+            .first()
         )
+        if schema_config.tp_prescalc != 0:
+            # using central prescalc service
+            return
 
-    last_prescription = get_last_prescription(
-        admission_number, ignore_segments=ignore_segments
-    )
+    last_prescription = get_last_prescription(admission_number, cpoe=True)
 
     if last_prescription is None or last_prescription.idSegment is None:
         raise ValidationError(
@@ -330,17 +344,18 @@ def _set_schema(schema):
     dbSession.setSchema(schema)
 
 
-def get_last_prescription(admission_number, ignore_segments=None):
+def get_last_prescription(admission_number, cpoe=False):
     query = (
         db.session.query(Prescription)
+        .outerjoin(Segment, Prescription.idSegment == Segment.id)
         .filter(Prescription.admissionNumber == admission_number)
         .filter(Prescription.agg == None)
         .filter(Prescription.concilia == None)
         .filter(Prescription.idSegment != None)
     )
 
-    if ignore_segments:
-        query = query.filter(~Prescription.idSegment.in_(ignore_segments))
+    if cpoe:
+        query = query.filter(Segment.cpoe == True)
 
     return query.order_by(desc(Prescription.date)).first()
 

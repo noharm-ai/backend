@@ -143,6 +143,7 @@ def update_integration_config(
     user_context: User,
     cpoe: bool,
     return_integration: bool,
+    tp_prescalc: int,
 ):
     """Update record in schema_config"""
     schema_config = (
@@ -168,6 +169,9 @@ def update_integration_config(
     schema_config.fl4 = bool(fl4) if fl4 != None else schema_config.fl4
     schema_config.cpoe = cpoe
     schema_config.return_integration = return_integration
+    schema_config.tp_prescalc = (
+        tp_prescalc if tp_prescalc in [0, 1, 2] else schema_config.tp_prescalc
+    )
 
     schema_config.updatedAt = datetime.today()
     schema_config.updatedBy = user_context.id
@@ -398,6 +402,7 @@ def _object_to_dto(schema_config: SchemaConfig):
         "fl4": schema_config.fl4,
         "cpoe": schema_config.cpoe,
         "returnIntegration": schema_config.return_integration,
+        "tpPrescalc": schema_config.tp_prescalc,
         "createdAt": (
             schema_config.createdAt.isoformat() if schema_config.createdAt else None
         ),

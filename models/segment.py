@@ -4,15 +4,21 @@ from .main import db
 
 
 class Segment(db.Model):
+    """Table segmento"""
+
     __tablename__ = "segmento"
 
     id = db.Column("idsegmento", db.BigInteger, primary_key=True)
     description = db.Column("nome", db.String, nullable=False)
     status = db.Column("status", db.Integer, nullable=False)
     type = db.Column("tp_segmento", db.Integer, nullable=True)
+    cpoe = db.Column("cpoe", db.Boolean, nullable=False)
+    cpoe_outpatient_clinic = db.Column("cpoe_ambulatorio", db.Boolean, nullable=False)
 
 
 class SegmentExam(db.Model):
+    """Table segmentoexame"""
+
     __tablename__ = "segmentoexame"
 
     idSegment = db.Column("idsegmento", db.BigInteger, primary_key=True)

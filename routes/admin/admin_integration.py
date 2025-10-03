@@ -65,6 +65,7 @@ def update_config():
         fl4=request_data.get("fl4", None),
         cpoe=request_data.get("cpoe", False),
         return_integration=request_data.get("returnIntegration", False),
+        tp_prescalc=request_data.get("tpPrescalc", None),
     )
 
 

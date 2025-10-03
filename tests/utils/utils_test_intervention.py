@@ -54,6 +54,7 @@ dict_expected_before_outcome = {
             "status": "s",
             "updatedAt": "2024-10-20T10:18:12.925873",
             "notes": "teste",
+            "isCpoe": False,
         },
         "idIntervention": 15,
         "origin": {
@@ -266,6 +267,7 @@ dict_expected_after_outcome = {
             "status": "s",
             "updatedAt": "2024-10-21T09:14:02.677830",
             "notes": "teste",
+            "isCpoe": False,
         },
         "idIntervention": 21,
         "origin": {
