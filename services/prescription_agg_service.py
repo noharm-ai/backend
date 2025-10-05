@@ -53,6 +53,12 @@ def create_agg_prescription_by_prescription(
         )
         if schema_config.tp_prescalc != 0:
             # using central prescalc service
+            logging.basicConfig()
+            logger = logging.getLogger("noharm.backend")
+            logger.warning(
+                "(%s) VALIDATION4xx: prescalc central ligado, abortando",
+                schema,
+            )
             return
 
     p = (
@@ -211,6 +217,12 @@ def create_agg_prescription_by_date(
         )
         if schema_config.tp_prescalc != 0:
             # using central prescalc service
+            logging.basicConfig()
+            logger = logging.getLogger("noharm.backend")
+            logger.warning(
+                "(%s) VALIDATION4xx: Usando prescalc central, abortando",
+                schema,
+            )
             return
 
     last_prescription = get_last_prescription(admission_number, cpoe=True)
