@@ -120,7 +120,16 @@ def ask_n0_form(question: str):
 
 
 @has_permission(Permission.WRITE_SUPPORT)
-def create_ticket(user_context: User, from_url, filelist, category, description, title):
+def create_ticket(
+    user_context: User,
+    from_url,
+    filelist,
+    category,
+    description,
+    title,
+    nzero_response: str,
+    nzero_summary: str,
+):
     """Creates a new ticket"""
 
     db_user = db.session.query(User).filter(User.id == user_context.id).first()
@@ -206,6 +215,40 @@ def create_ticket(user_context: User, from_url, filelist, category, description,
                     "res_id": result[0]["id"],
                     "subtype_id": 1,
                     "attachment_ids": attachments,
+                }
+            ],
+            options={},
+        )
+
+    if nzero_response:
+        # add nzero response message
+        client(
+            model="mail.message",
+            action="create",
+            payload=[
+                {
+                    "message_type": "comment",
+                    "body": nzero_response,
+                    "model": "helpdesk.ticket",
+                    "res_id": result[0]["id"],
+                    "subtype_id": 2,
+                }
+            ],
+            options={},
+        )
+
+    if nzero_summary:
+        # add nzero question summary
+        client(
+            model="mail.message",
+            action="create",
+            payload=[
+                {
+                    "message_type": "comment",
+                    "body": nzero_summary,
+                    "model": "helpdesk.ticket",
+                    "res_id": result[0]["id"],
+                    "subtype_id": 2,
                 }
             ],
             options={},

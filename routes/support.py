@@ -19,6 +19,8 @@ def create_ticket():
         title=request.form.get("title", None),
         description=request.form.get("description", None),
         filelist=request.files.getlist("fileList[]"),
+        nzero_response=request.form.get("nzero_response", None),
+        nzero_summary=request.form.get("nzero_summary", None),
     )
 
 
