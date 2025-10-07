@@ -1,6 +1,5 @@
 """Service: prescription-day related operations"""
 
-import logging
 from datetime import date, datetime, timedelta
 
 from sqlalchemy import desc, text, select, func, and_, any_
@@ -34,7 +33,7 @@ from services import (
 )
 from exception.validation_error import ValidationError
 from decorators.has_permission_decorator import has_permission, Permission
-from utils import status, prescriptionutils
+from utils import status, prescriptionutils, logger
 
 
 @has_permission(Permission.READ_STATIC)
@@ -53,9 +52,7 @@ def create_agg_prescription_by_prescription(
         )
         if schema_config.tp_prescalc != 0:
             # using central prescalc service
-            logging.basicConfig()
-            logger = logging.getLogger("noharm.backend")
-            logger.warning(
+            logger.backend_logger.warning(
                 "(%s) VALIDATION4xx: prescalc central ligado, abortando",
                 schema,
             )
@@ -85,7 +82,11 @@ def create_agg_prescription_by_prescription(
 
     processed_status = _get_processed_status(id_prescription_list=[id_prescription])
 
-    if not force and processed_status == "PROCESSED":
+    if not force and processed_status == "PROCESSED" and p.features is not None:
+        logger.backend_logger.warning(
+            "(%s) VALIDATION4xx: Prescrição já foi processada",
+            schema,
+        )
         return
 
     _update_patient_conciliation_status(prescription=p)
@@ -217,9 +218,7 @@ def create_agg_prescription_by_date(
         )
         if schema_config.tp_prescalc != 0:
             # using central prescalc service
-            logging.basicConfig()
-            logger = logging.getLogger("noharm.backend")
-            logger.warning(
+            logger.backend_logger.warning(
                 "(%s) VALIDATION4xx: Usando prescalc central, abortando",
                 schema,
             )
@@ -228,18 +227,11 @@ def create_agg_prescription_by_date(
     last_prescription = get_last_prescription(admission_number, cpoe=True)
 
     if last_prescription is None or last_prescription.idSegment is None:
-        logging.basicConfig()
-        logger = logging.getLogger("noharm.backend")
-        logger.warning(
+        logger.backend_logger.warning(
             "(%s) VALIDATION4xx: Não foi possível encontrar o segmento deste atendimento",
             schema,
         )
         return
-        # raise ValidationError(
-        #     "Não foi possível encontrar o segmento deste atendimento",
-        #     "errors.invalidSegment",
-        #     status.HTTP_400_BAD_REQUEST,
-        # )
 
     p_id = prescriptionutils.gen_agg_id(
         admission_number, last_prescription.idSegment, p_date
@@ -282,9 +274,7 @@ def create_agg_prescription_by_date(
 
         if processed_status == "PROCESSED":
             db.session.rollback()
-            logging.basicConfig()
-            logger = logging.getLogger("noharm.backend")
-            logger.warning(
+            logger.backend_logger.warning(
                 "(%s) VALIDATION4xx: Prescrição já foi processada (fluxo ambulatorial)",
                 schema,
             )
