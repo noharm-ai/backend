@@ -65,6 +65,8 @@ class FeatureEnum(Enum):
     AUTOMATIC_CHECK_IF_NOT_VALIDATED_ITENS = "AUTOMATIC_CHECK_IF_NOT_VALIDATED_ITENS"
     REGULATION = "REGULATION"
     PATIENT_DAY_OUTPATIENT_FLOW = "PATIENT_DAY_OUTPATIENT_FLOW"
+    # when schema is mixed (cpoe and non-cpoe segments), ignore non-cpoe segments in CPOE view
+    IGNORE_NON_CPOE_SEGMENTS = "IGNORE_NON_CPOE_SEGMENTS"
 
 
 class PrescriptionAuditTypeEnum(Enum):

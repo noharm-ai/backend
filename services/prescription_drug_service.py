@@ -80,7 +80,9 @@ def count_drugs_by_prescription(
                 is_cpoe=is_cpoe,
                 only_id=True,
                 is_pmc=is_pmc,
-                schema=user.schema,
+                ignore_segments=segment_service.get_ignored_segments(
+                    is_cpoe_flag=is_cpoe
+                ),
             )
         )
 

@@ -189,7 +189,6 @@ def _build_headers(
     pDrugs: dict,
     pSolution: dict,
     pProcedures: dict,
-    user_context: User,
 ):
     headers = prescription_view_repository.get_headers(
         admissionNumber=prescription.admissionNumber,
@@ -197,7 +196,7 @@ def _build_headers(
         idSegment=prescription.idSegment,
         is_pmc=config_data["is_pmc"],
         is_cpoe=config_data["is_cpoe"],
-        schema=user_context.schema,
+        ignore_segments=config_data["ignore_segments"],
     )
 
     for pid in headers.keys():
@@ -360,6 +359,9 @@ def _get_configs(prescription: Prescription, patient: Patient):
     )
 
     data["is_cpoe"] = segment_service.is_cpoe(id_segment=prescription.idSegment)
+    data["ignore_segments"] = segment_service.get_ignored_segments(
+        is_cpoe_flag=data["is_cpoe"]
+    )
 
     # patient data
     data["weight"] = patient.weight if patient.weight else None
@@ -546,11 +548,11 @@ def _get_drug_list(
     return prescription_view_repository.find_drugs_by_prescription(
         idPrescription=prescription.id,
         admissionNumber=patient.admissionNumber,
-        schema=user_context.schema,
         aggDate=prescription.date if prescription.agg else None,
         idSegment=prescription.idSegment,
         is_cpoe=config_data.get("is_cpoe"),
         is_pmc=config_data.get("is_pmc"),
+        ignore_segments=config_data.get("ignore_segments"),
     )
 
 
@@ -637,7 +639,6 @@ def _get_drug_data(
             pDrugs=p_drugs,
             pSolution=p_solution,
             pProcedures=p_procedures,
-            user_context=user_context,
         )
 
         if config_data["is_cpoe"]:
@@ -655,10 +656,10 @@ def _get_drug_data(
             concilia_drugs = prescription_view_repository.find_drugs_by_prescription(
                 idPrescription=last_agg_prescription.id,
                 admissionNumber=patient.admissionNumber,
-                schema=user_context.schema,
                 aggDate=last_agg_prescription.date,
                 idSegment=None,
                 is_cpoe=config_data["is_cpoe"],
+                ignore_segments=config_data.get("ignore_segments"),
             )
             concilia_list = drug_list.conciliaList(concilia_drugs, [])
 

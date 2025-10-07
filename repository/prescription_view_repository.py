@@ -12,12 +12,11 @@ from models.appendix import (
     MeasureUnit,
     Frequency,
     MeasureUnitConvert,
-    SchemaConfig,
     Department,
 )
 
 
-def _get_period_filter(query, model, agg_date, is_pmc, is_cpoe, schema):
+def _get_period_filter(query, model, agg_date, is_pmc, is_cpoe, ignore_segments=None):
     """
     adds default prescription period search
     """
@@ -32,20 +31,10 @@ def _get_period_filter(query, model, agg_date, is_pmc, is_cpoe, schema):
                 )
             )
 
-            schema_config = (
-                db.session.query(SchemaConfig)
-                .filter(SchemaConfig.schemaName == schema)
-                .first()
-            )
-            ignore_segments = []
-            if schema_config.config:
-                ignore_segments = schema_config.config.get("admissionCalc", {}).get(
-                    "ignoreSegments", []
+            if ignore_segments is not None:
+                query = query.filter(
+                    or_(~model.idSegment.in_(ignore_segments), model.idSegment == None)
                 )
-
-            query = query.filter(
-                or_(~model.idSegment.in_(ignore_segments), model.idSegment == None)
-            )
         else:
             query = query.filter(
                 between(
@@ -61,11 +50,11 @@ def _get_period_filter(query, model, agg_date, is_pmc, is_cpoe, schema):
 def find_drugs_by_prescription(
     idPrescription,
     admissionNumber,
-    schema,
     aggDate=None,
     idSegment=None,
     is_cpoe=False,
     is_pmc=False,
+    ignore_segments=None,
 ):
     """
     find drugs related to the prescription
@@ -174,7 +163,7 @@ def find_drugs_by_prescription(
             agg_date=aggDate,
             is_pmc=is_pmc,
             is_cpoe=is_cpoe,
-            schema=schema,
+            ignore_segments=ignore_segments,
         )
 
         if is_cpoe:
@@ -224,7 +213,12 @@ def _get_prev_notes(admissionNumber):
 
 
 def get_headers(
-    admissionNumber, aggDate, idSegment, schema, is_pmc=False, is_cpoe=False
+    admissionNumber,
+    aggDate,
+    idSegment,
+    is_pmc=False,
+    is_cpoe=False,
+    ignore_segments=None,
 ):
     """
     list individual prescriptions for the agg prescription
@@ -251,7 +245,7 @@ def get_headers(
         agg_date=aggDate,
         is_pmc=is_pmc,
         is_cpoe=is_cpoe,
-        schema=schema,
+        ignore_segments=ignore_segments,
     )
 
     if not is_cpoe:
@@ -297,10 +291,10 @@ def get_headers(
 
 def get_query_prescriptions_by_agg(
     agg_prescription: Prescription,
-    schema: str,
     is_cpoe=False,
     is_pmc=False,
     only_id=False,
+    ignore_segments=None,
 ):
     """
     Base query to find prescriptions inside agg
@@ -319,7 +313,7 @@ def get_query_prescriptions_by_agg(
         agg_date=agg_prescription.date,
         is_pmc=is_pmc,
         is_cpoe=is_cpoe,
-        schema=schema,
+        ignore_segments=ignore_segments,
     )
 
     if not is_cpoe:
