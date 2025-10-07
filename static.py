@@ -48,11 +48,20 @@ def prescalc(event: dict, context: any):
     )
 
 
-def atendcalc(schema: str, admission_number: int, str_date: str):
+def atendcalc(event: dict, context: any):
+    # def atendcalc(schema: str, admission_number: int, str_date: str):
     """
     Atendcalc: creates a prescription-day based on the admission number
     Used for CPOE
     """
+
+    logging.basicConfig()
+    logger = logging.getLogger("noharm.backend")
+
+    schema: str = event.get("schema", None)
+    admission_number: int = event.get("admission_number", None)
+
+    logger.warning("schema: %s | admission_number: %s", schema, admission_number)
 
     def _atendcalc_operation(user_context, schema, admission_number, str_date):
         p_date = (
@@ -69,7 +78,7 @@ def atendcalc(schema: str, admission_number: int, str_date: str):
     params = {
         "schema": schema,
         "admission_number": admission_number,
-        "str_date": str_date,
+        "str_date": None,
     }
 
     return execute_with_static_context(
