@@ -3,6 +3,8 @@
 import xmlrpc.client
 import base64
 import http.client
+import socket
+
 
 from models.main import db, User
 from models.appendix import GlobalMemory
@@ -11,7 +13,7 @@ from config import Config
 from decorators.has_permission_decorator import has_permission, Permission
 from agents import n0_agent
 from exception.validation_error import ValidationError
-from utils import status
+from utils import status, logger
 from services import vector_search_service
 
 
@@ -27,28 +29,42 @@ class TimeoutTransport(xmlrpc.client.Transport):
 
 
 def _get_client():
-    transport = TimeoutTransport(timeout=20)
+    transport = TimeoutTransport(timeout=15)
 
     common = xmlrpc.client.ServerProxy(
         Config.ODOO_API_URL + "common", transport=transport
     )
-    uid = common.authenticate(
-        Config.ODOO_API_DB, Config.ODOO_API_USER, Config.ODOO_API_KEY, {}
-    )
+    try:
+        uid = common.authenticate(
+            Config.ODOO_API_DB, Config.ODOO_API_USER, Config.ODOO_API_KEY, {}
+        )
+    except socket.timeout:
+        logger.backend_logger.warning(
+            "ODOO: Timeout connecting to ODOO API (support service)"
+        )
+
+        return None
+
     models = xmlrpc.client.ServerProxy(
         Config.ODOO_API_URL + "object", transport=transport
     )
 
     def execute(model, action, payload, options):
-        return models.execute_kw(
-            Config.ODOO_API_DB,
-            uid,
-            Config.ODOO_API_KEY,
-            model,
-            action,
-            payload,
-            options,
-        )
+        try:
+            return models.execute_kw(
+                Config.ODOO_API_DB,
+                uid,
+                Config.ODOO_API_KEY,
+                model,
+                action,
+                payload,
+                options,
+            )
+        except socket.timeout:
+            logger.backend_logger.warning(
+                "ODOO: Timeout connecting to ODOO API (support service)"
+            )
+            return None
 
     return execute
 
@@ -136,6 +152,13 @@ def create_ticket(
 
     client = _get_client()
 
+    if client is None:
+        raise ValidationError(
+            "Não foi possível conectar ao serviço de suporte.",
+            "errors.connectionTimeout",
+            status.HTTP_504_GATEWAY_TIMEOUT,
+        )
+
     partner = client(
         model="res.partner",
         action="search_read",
@@ -164,6 +187,13 @@ def create_ticket(
         payload=[[], ticket],
         options={"specification": {}},
     )
+
+    if result is None:
+        raise ValidationError(
+            "Não foi possível conectar ao serviço de suporte.",
+            "errors.connectionTimeout",
+            status.HTTP_504_GATEWAY_TIMEOUT,
+        )
 
     attachments = []
 
@@ -277,6 +307,13 @@ def add_attachment(id_ticket: int, files):
 
     client = _get_client()
 
+    if client is None:
+        raise ValidationError(
+            "Não foi possível conectar ao serviço de suporte para enviar o anexo.",
+            "errors.connectionTimeout",
+            status.HTTP_504_GATEWAY_TIMEOUT,
+        )
+
     ticket = client(
         model="helpdesk.ticket",
         action="search_read",
@@ -341,6 +378,14 @@ def list_tickets_v2(user_context: User, user_permissions: list[Permission]):
     db_user = db.session.query(User).filter(User.id == user_context.id).first()
 
     client = _get_client()
+
+    if client is None:
+        # fail silently, return empty lists
+        return {
+            "myTickets": [],
+            "following": [],
+            "organization": [],
+        }
 
     partner = client(
         model="res.partner",
@@ -432,9 +477,9 @@ def list_tickets_v2(user_context: User, user_permissions: list[Permission]):
         )
 
     return {
-        "myTickets": my_tickets,
-        "following": following,
-        "organization": organization,
+        "myTickets": my_tickets if my_tickets else [],
+        "following": following if following else [],
+        "organization": organization if organization else [],
     }
 
 
@@ -445,6 +490,10 @@ def list_pending_action(user_context: User):
     db_user = db.session.query(User).filter(User.id == user_context.id).first()
 
     client = _get_client()
+
+    if client is None:
+        # fail silently, return empty list
+        return []
 
     partner = client(
         model="res.partner",
@@ -499,6 +548,13 @@ def create_closed_ticket(user_context: User, description):
         )
 
     client = _get_client()
+
+    if client is None:
+        raise ValidationError(
+            "Não foi possível conectar ao serviço de suporte.",
+            "errors.connectionTimeout",
+            status.HTTP_504_GATEWAY_TIMEOUT,
+        )
 
     ticket = {
         "name": "Chamado encerrado pelo NZero",
