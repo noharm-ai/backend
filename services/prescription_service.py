@@ -257,7 +257,9 @@ def recalculate_prescription(id_prescription: int, user_context: User):
                     is_cpoe=is_cpoe,
                     only_id=True,
                     is_pmc=is_pmc,
-                    schema=user_context.schema,
+                    ignore_segments=segment_service.get_ignored_segments(
+                        is_cpoe_flag=is_cpoe
+                    ),
                 ).all()
             )
 

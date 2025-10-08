@@ -146,12 +146,14 @@ def check_prescription(
 
 def _update_agg_status(prescription: Prescription, user: User, extra={}):
     is_pmc = memory_service.has_feature_nouser(FeatureEnum.PRIMARY_CARE.value)
+    is_cpoe = segment_service.is_cpoe(id_segment=prescription.idSegment)
+
     unchecked_prescriptions = (
         prescription_view_repository.get_query_prescriptions_by_agg(
             agg_prescription=prescription,
-            is_cpoe=segment_service.is_cpoe(id_segment=prescription.idSegment),
+            is_cpoe=is_cpoe,
             is_pmc=is_pmc,
-            schema=user.schema,
+            ignore_segments=segment_service.get_ignored_segments(is_cpoe_flag=is_cpoe),
         )
     )
     unchecked_prescriptions = unchecked_prescriptions.filter(Prescription.status != "s")
@@ -177,12 +179,14 @@ def _check_agg_internal_prescriptions(
     prescription, p_status, user, has_lock_feature=False, extra={}
 ):
     is_pmc = memory_service.has_feature_nouser(FeatureEnum.PRIMARY_CARE.value)
+    is_cpoe = segment_service.is_cpoe(id_segment=prescription.idSegment)
+
     q_internal_prescription = (
         prescription_view_repository.get_query_prescriptions_by_agg(
             agg_prescription=prescription,
-            is_cpoe=segment_service.is_cpoe(id_segment=prescription.idSegment),
+            is_cpoe=is_cpoe,
             is_pmc=is_pmc,
-            schema=user.schema,
+            ignore_segments=segment_service.get_ignored_segments(is_cpoe_flag=is_cpoe),
         )
     )
     q_internal_prescription = q_internal_prescription.filter(

@@ -5,6 +5,8 @@ from sqlalchemy import asc, and_
 from models.main import db
 from models.segment import Segment
 from models.appendix import SegmentDepartment, Department
+from models.enums import FeatureEnum
+from services import feature_service
 from decorators.has_permission_decorator import has_permission, Permission
 
 
@@ -61,3 +63,26 @@ def is_cpoe(id_segment: int):
         return False
 
     return segment.cpoe
+
+
+def get_ignored_segments(is_cpoe_flag: bool):
+    """When the system is in CPOE mode, we can  ignore non-CPOE segments when the feature IGNORE_NON_CPOE_SEGMENTS is enabled"""
+    if not is_cpoe_flag:
+        return None
+
+    # ignore non cpoe segments when the feature is enabled
+    ignore_non_cpoe_segments = feature_service.has_feature(
+        FeatureEnum.IGNORE_NON_CPOE_SEGMENTS
+    )
+
+    if ignore_non_cpoe_segments:
+        # ignore non cpoe segments
+        ignore_segments = []
+        segments = get_segments()
+        for s in segments:
+            if not s.cpoe:
+                ignore_segments.append(s.id)
+
+        return ignore_segments
+
+    return None
