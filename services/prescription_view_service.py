@@ -170,10 +170,19 @@ def _get_last_dept(prescription: Prescription, is_complete: bool):
 
 
 @timed()
-def _get_last_agg_prescription(admission_number) -> Prescription:
+def _get_current_agg_prescription(id_patient: int) -> Prescription:
+    """get current agg prescription for patient"""
+
+    latest_admission_number = patient_repository.get_latest_admission_by_id_patient(
+        id_patient=id_patient
+    )
+
+    if latest_admission_number is None:
+        return None
+
     return (
         db.session.query(Prescription)
-        .filter(Prescription.admissionNumber == admission_number)
+        .filter(Prescription.admissionNumber == latest_admission_number)
         .filter(Prescription.agg == True)
         .filter(Prescription.concilia == None)
         .filter(Prescription.idSegment != None)
@@ -649,10 +658,10 @@ def _get_drug_data(
 
     # concilia data
     concilia_list = []
-    if prescription.concilia:
+    if prescription.concilia and is_complete:
         p_drugs = drug_list.changeDrugName(p_drugs)
-        last_agg_prescription = _get_last_agg_prescription(patient.admissionNumber)
-        if last_agg_prescription != None:
+        last_agg_prescription = _get_current_agg_prescription(patient.idPatient)
+        if last_agg_prescription is not None:
             concilia_drugs = prescription_view_repository.find_drugs_by_prescription(
                 idPrescription=last_agg_prescription.id,
                 admissionNumber=patient.admissionNumber,
@@ -663,7 +672,7 @@ def _get_drug_data(
             )
             concilia_list = drug_list.conciliaList(concilia_drugs, [])
 
-        if is_complete and concilia_list:
+        if concilia_list:
             p_drugs = drug_list.infer_substance(pDrugs=p_drugs)
 
     return {
