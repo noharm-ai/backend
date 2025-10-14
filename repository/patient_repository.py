@@ -6,6 +6,24 @@ from models.main import db
 from models.prescription import Patient
 
 
+def get_latest_admission_by_id_patient(id_patient: int):
+    """
+    Search for latest admission number by id_patient
+    """
+    admissions_query = (
+        select(Patient.admissionNumber)
+        .select_from(Patient)
+        .where(Patient.idPatient == id_patient)
+        .order_by(desc(Patient.admissionDate))
+    )
+
+    result = db.session.execute(admissions_query).first()
+    if result is not None:
+        return result.admissionNumber
+
+    return None
+
+
 def get_next_admissions(admission_number: int, limit: int = 2):
     """
     Search for next admission numbers
