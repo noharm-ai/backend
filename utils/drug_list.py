@@ -450,6 +450,9 @@ class DrugList:
                     for d in result
                     if d["idDrug"] == pd[0].idDrug
                     and d["recommendation"] == pd[0].notes
+                    and d["dose"] == pd[0].dose
+                    and d["frequencyday"] == pd[0].frequency
+                    and d["timeRaw"] == pd[0].interval
                 ),
                 False,
             )
@@ -484,7 +487,9 @@ class DrugList:
                             if pd[3]
                             else ""
                         ),
+                        "frequencyday": pd[0].frequency,
                         "time": prescriptionutils.timeValue(pd[0].interval),
+                        "timeRaw": pd[0].interval,
                         "recommendation": pd[0].notes,
                         "sctid": str(pd.Substance.id) if pd.Substance else None,
                     }
