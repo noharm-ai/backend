@@ -135,6 +135,7 @@ def _getname_multiple_iteration(config: dict, ids_list: list, token: str, schema
                     "Content-Type": "application/json",
                 },
                 json=params,
+                verify=False,
                 timeout=TIMEOUT,
             )
         else:
