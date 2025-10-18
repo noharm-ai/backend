@@ -170,19 +170,20 @@ def _get_last_dept(prescription: Prescription, is_complete: bool):
 
 
 @timed()
-def _get_current_agg_prescription(id_patient: int) -> Prescription:
+def _get_current_agg_prescription(
+    id_patient: int, admission_number: int
+) -> Prescription:
     """get current agg prescription for patient"""
 
-    latest_admission_number = patient_repository.get_latest_admission_by_id_patient(
+    admission_number_list = patient_repository.get_latest_admissions_by_id_patient(
         id_patient=id_patient
     )
 
-    if latest_admission_number is None:
-        return None
+    admission_number_list.append(admission_number)
 
     return (
         db.session.query(Prescription)
-        .filter(Prescription.admissionNumber == latest_admission_number)
+        .filter(Prescription.admissionNumber.in_(admission_number_list))
         .filter(Prescription.agg == True)
         .filter(Prescription.concilia == None)
         .filter(Prescription.idSegment != None)
@@ -660,7 +661,9 @@ def _get_drug_data(
     concilia_list = []
     if prescription.concilia and is_complete:
         p_drugs = drug_list.changeDrugName(p_drugs)
-        last_agg_prescription = _get_current_agg_prescription(patient.idPatient)
+        last_agg_prescription = _get_current_agg_prescription(
+            patient.idPatient, patient.admissionNumber
+        )
         if last_agg_prescription is not None:
             concilia_drugs = prescription_view_repository.find_drugs_by_prescription(
                 idPrescription=last_agg_prescription.id,
