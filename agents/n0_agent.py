@@ -53,6 +53,8 @@ def run_n0(query: str, user: User) -> str:
     bedrock_model = BedrockModel(
         model_id=config["bedrock_model"]["model_id"],
         region_name=config["bedrock_model"]["region_name"],
+        guardrail_id=config["bedrock_model"]["guardrail_id"],
+        guardrail_version=config["bedrock_model"]["guardrail_version"],
         boto_client_config=_get_model_config(),
     )
 
@@ -66,12 +68,21 @@ def run_n0(query: str, user: User) -> str:
     )
 
     try:
-        return agent(
+        response = agent(
             prompt=f"<nome_do_usuario>{user.name}</nome_do_usuario><pergunta_usuario>{query}</pergunta_usuario>"
         )
+
+        if response.stop_reason == "guardrail_intervened":
+            logger.warning(
+                "VALIDATION: NZERO Guardrail interveio na resposta: %s",
+                str(response),
+            )
+            return "SKIP_ANSWER DUE_TO_GUARDRAIL"
+
+        return response
     except ReadTimeoutError:
         logger.warning(
-            "VALIDATION4xx: NZERO Timeout ao processar a consulta do usuário: %s", query
+            "VALIDATION: NZERO Timeout ao processar a consulta do usuário: %s", query
         )
         return "SKIP_ANSWER DUE_TO_TIMEOUT"
 
