@@ -50,6 +50,7 @@ def get_prioritization_list(
     protocols=None,
     age_min=None,
     age_max=None,
+    id_patient_by_name_list=None,
 ):
 
     q = (
@@ -227,6 +228,14 @@ def get_prioritization_list(
             q = q.filter(Prescription.idPatient.in_([int(i) for i in idPatient]))
         except ValueError:
             q = q.filter(Prescription.idPatient == None)
+
+    if id_patient_by_name_list and len(id_patient_by_name_list) > 0:
+        try:
+            q = q.filter(
+                Prescription.idPatient.in_([int(i) for i in id_patient_by_name_list])
+            )
+        except ValueError:
+            pass
 
     if len(intervals) > 0:
         q = q.filter(
