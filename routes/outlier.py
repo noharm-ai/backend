@@ -37,6 +37,7 @@ def getDrugs(idSegment=None):
         term=request.args.get("q", None),
         id_drug=request.args.getlist("idDrug[]"),
         add_substance=bool(int(request.args.get("addSubstance", 0))),
+        group=bool(int(request.args.get("group", 1))),
     )
 
 
