@@ -81,6 +81,7 @@ def get_prescriptions():
         protocols=request.args.getlist("protocols[]"),
         age_min=request.args.get("ageMin", None),
         age_max=request.args.get("ageMax", None),
+        id_patient_by_name_list=request.args.getlist("idPatientByNameList[]"),
     )
 
 

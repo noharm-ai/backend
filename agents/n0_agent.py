@@ -4,6 +4,8 @@ import json
 import logging
 
 import boto3
+from botocore.config import Config
+from botocore.exceptions import ReadTimeoutError
 from strands import Agent, tool
 from strands.models import BedrockModel
 
@@ -35,6 +37,14 @@ def _get_config():
     return config.value
 
 
+def _get_model_config():
+    """Get the model configuration for the n0 agent."""
+
+    return Config(
+        read_timeout=20,
+    )
+
+
 def run_n0(query: str, user: User) -> str:
     """Process a user query with the n0 agent."""
 
@@ -43,6 +53,9 @@ def run_n0(query: str, user: User) -> str:
     bedrock_model = BedrockModel(
         model_id=config["bedrock_model"]["model_id"],
         region_name=config["bedrock_model"]["region_name"],
+        guardrail_id=config["bedrock_model"]["guardrail_id"],
+        guardrail_version=config["bedrock_model"]["guardrail_version"],
+        boto_client_config=_get_model_config(),
     )
 
     get_kb = wrap_kb(config)
@@ -54,9 +67,24 @@ def run_n0(query: str, user: User) -> str:
         callback_handler=None,
     )
 
-    return agent(
-        prompt=f"<nome_do_usuario>{user.name}</nome_do_usuario><pergunta_usuario>{query}</pergunta_usuario>"
-    )
+    try:
+        response = agent(
+            prompt=f"<nome_do_usuario>{user.name}</nome_do_usuario><pergunta_usuario>{query}</pergunta_usuario>"
+        )
+
+        if response.stop_reason == "guardrail_intervened":
+            logger.warning(
+                "VALIDATION: NZERO Guardrail interveio na resposta: %s",
+                str(response),
+            )
+            return "SKIP_ANSWER DUE_TO_GUARDRAIL"
+
+        return response
+    except ReadTimeoutError:
+        logger.warning(
+            "VALIDATION: NZERO Timeout ao processar a consulta do usuário: %s", query
+        )
+        return "SKIP_ANSWER DUE_TO_TIMEOUT"
 
 
 def run_n0_form(query: str) -> str:

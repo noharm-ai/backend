@@ -696,12 +696,16 @@ def update_outlier(id_outlier: int, data: dict, user_context: User):
 
 @has_permission(Permission.READ_PRESCRIPTION)
 def get_outlier_drugs(
-    id_segment: int, term: str = None, id_drug: List[int] = None, add_substance=False
+    id_segment: int,
+    term: str = None,
+    id_drug: List[int] = None,
+    add_substance=False,
+    group=True,
 ):
     """
     Search for record in medicamento table.
     Add substances in the list when add_substance is True
-    Group results if not filtering by segment
+    Group results if not filtering by segment and group is True
     """
     if add_substance:
         query_drug = (
@@ -727,6 +731,9 @@ def get_outlier_drugs(
         results = query.order_by(literal_column("name")).all()
     else:
         if id_segment is not None:
+            group = False
+
+        if group is False:
             # should not group results
             seg_drugs = (
                 db.session.query(Outlier.idDrug.label("idDrug"))

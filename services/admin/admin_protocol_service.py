@@ -73,13 +73,6 @@ def upsert_protocol(request_data: ProtocolUpsertRequest, user_context: User):
         protocol.created_by = user_context.id
         db.session.add(protocol)
 
-    if request_data.statusType == ProtocolStatusTypeEnum.ACTIVE.value:
-        raise ValidationError(
-            "Protocolo não pode ser ativado pela interface",
-            "errors.businessRules",
-            status.HTTP_400_BAD_REQUEST,
-        )
-
     _validate_variables(variables=request_data.config.variables)
     _test_protocol(protocol=request_data.config.model_dump())
 
