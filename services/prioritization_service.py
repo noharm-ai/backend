@@ -443,8 +443,10 @@ def get_prioritization_list(
                     "dischargeReason": patient.dischargeReason,
                     "date": p[0].date.isoformat(),
                     "department": str(p[2]),
-                    "insurance": p[0].insurance,
-                    "bed": p[0].bed,
+                    # "insurance": p[0].insurance,
+                    "insurance": "Teste",
+                    # "bed": p[0].bed,
+                    "bed": "teste",
                     "status": p[0].status,
                     "isBeingEvaluated": prescription_service.is_being_evaluated(
                         p[0].features
