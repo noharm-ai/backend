@@ -367,26 +367,70 @@ class DrugList:
 
         return str(pd[0].idPrescription) + str(pd[0].solutionGroup)
 
+    def get_solution_dose(self, pd):
+        """Get solution dose for infusion calculations (always in ml)"""
+
+        solution_unit = "ml"
+
+        prescribed_unit = pd.MeasureUnit.measureunit_nh if pd.MeasureUnit else None
+        default_unit = pd.default_measure_unit_nh
+        dose = pd[0].dose
+        dose_conv = pd[0].doseconv
+        has_dose_ranges = pd[6].division if pd[6] else False
+        measure_unit_default_convert_factor = pd.measure_unit_convert_factor
+        measure_unit_solution_convert_factor = pd.measure_unit_solution_convert_factor
+
+        if has_dose_ranges:
+            # cant use doseconv when there are dose ranges
+
+            if measure_unit_default_convert_factor and dose:
+                # need to convert dose to ml (without ranges)
+                dose_conv = dose * measure_unit_default_convert_factor
+            else:
+                dose_conv = 0
+
+        if prescribed_unit == solution_unit:
+            # dose is already in ml
+            return dose
+
+        if default_unit == solution_unit:
+            # doseconv is in ml
+            return dose_conv
+
+        if measure_unit_solution_convert_factor and dose_conv:
+            # need to convert dose to ml
+            return dose_conv / measure_unit_solution_convert_factor
+
+        return 0
+
     def getInfusionList(self):
+        """Infusion info for total volume calculation. Keyed by solution group. Used in Solution Calculator"""
         result = {}
+
         for pd in self.drugList:
-            if (pd[0].solutionGroup or pd[0].cpoe_group) and pd[0].source == "Soluções":
+            if pd[0].solutionGroup or pd[0].cpoe_group:
                 key = self.getInfusionKey(pd)
 
-                if not key in result:
+                if key not in result:
                     result[key] = {
                         "totalVol": 0,
                         "amount": 0,
                         "vol": 0,
                         "speed": 0,
+                        "speedUnit": None,
                         "unit": "ml",
+                        "disableTotal": False,
                     }
 
-                pdDose = pd[0].dose
+                pd_dose = self.get_solution_dose(pd)
+
+                if pd_dose == 0:
+                    # unable to calculate total volume due to dose unit conversion
+                    result[key]["disableTotal"] = True
 
                 if not bool(pd[0].suspendedDate):
                     if pd[6] and pd[6].amount and pd[6].amountUnit:
-                        result[key]["vol"] = pdDose
+                        result[key]["vol"] = pd_dose
                         result[key]["amount"] = pd[6].amount
                         result[key]["unit"] = pd[6].amountUnit
 
@@ -395,16 +439,20 @@ class DrugList:
                             and pd[2].id.lower() != "ml"
                             and pd[2].id.lower() == pd[6].amountUnit.lower()
                         ):
-                            result[key]["vol"] = pdDose = round(
+                            result[key]["vol"] = pd_dose = round(
                                 pd[0].dose / pd[6].amount, 5
                             )
 
                     if pd[6] and pd[6].amount and pd[6].amountUnit is None:
-                        result[key]["vol"] = pdDose = pd[6].amount
+                        result[key]["vol"] = pd_dose = pd[6].amount
 
-                    result[key]["speed"] = pd[0].solutionDose
+                    if pd[0].solutionDose:
+                        result[key]["speed"] = pd[0].solutionDose
 
-                    result[key]["totalVol"] += pdDose if pdDose else 0
+                    if pd[0].solutionUnit:
+                        result[key]["speedUnit"] = pd[0].solutionUnit
+
+                    result[key]["totalVol"] += pd_dose if pd_dose else 0
                     result[key]["totalVol"] = round(result[key]["totalVol"], 3)
 
         return result

@@ -89,6 +89,12 @@ def find_drugs_by_prescription(
         .as_scalar()
     )
 
+    MeasureUnitSolutionConvert = db.aliased(MeasureUnitConvert)
+    MeasureUnitDefault = db.aliased(MeasureUnit)
+    m_unit = (
+        db.session.query(MeasureUnit).filter(MeasureUnit.measureunit_nh == "ml").first()
+    )
+
     q = (
         db.session.query(
             PrescriptionDrug,
@@ -111,6 +117,10 @@ def find_drugs_by_prescription(
             MeasureUnitConvert.factor.label("measure_unit_convert_factor"),
             func.array(substance_handling).label("substance_handling_types"),
             Prescription.idDepartment.label("idDepartment"),
+            MeasureUnitSolutionConvert.factor.label(
+                "measure_unit_solution_convert_factor"
+            ),
+            MeasureUnitDefault.measureunit_nh.label("default_measure_unit_nh"),
         )
         .outerjoin(Outlier, Outlier.id == PrescriptionDrug.idOutlier)
         .outerjoin(Drug, Drug.id == PrescriptionDrug.idDrug)
@@ -132,6 +142,18 @@ def find_drugs_by_prescription(
             ),
         )
         .outerjoin(
+            MeasureUnitSolutionConvert,
+            and_(
+                MeasureUnitSolutionConvert.idSegment == PrescriptionDrug.idSegment,
+                MeasureUnitSolutionConvert.idDrug == PrescriptionDrug.idDrug,
+                (
+                    MeasureUnitSolutionConvert.idMeasureUnit == m_unit.id
+                    if m_unit
+                    else None
+                ),
+            ),
+        )
+        .outerjoin(
             Frequency,
             and_(
                 Frequency.id == PrescriptionDrug.idFrequency,
@@ -143,6 +165,13 @@ def find_drugs_by_prescription(
             and_(
                 DrugAttributes.idDrug == PrescriptionDrug.idDrug,
                 DrugAttributes.idSegment == PrescriptionDrug.idSegment,
+            ),
+        )
+        .outerjoin(
+            MeasureUnitDefault,
+            and_(
+                MeasureUnitDefault.id == DrugAttributes.idMeasureUnit,
+                MeasureUnitDefault.idHospital == Prescription.idHospital,
             ),
         )
         .outerjoin(Substance, Drug.sctid == Substance.id)
