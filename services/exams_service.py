@@ -361,7 +361,7 @@ def get_exams_default_refs():
             hsc_test.segmentoexame se
             inner join hsc_test.segmento s on (se.idsegmento = s.idsegmento)
         where 
-            se.idsegmento in (1, 3)
+            se.idsegmento in (1, 7)
         order by 
             s.idsegmento, se.nome 
     """

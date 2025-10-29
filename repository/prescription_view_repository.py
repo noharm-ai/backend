@@ -89,6 +89,23 @@ def find_drugs_by_prescription(
         .as_scalar()
     )
 
+    MeasureUnitSolutionConvert = db.aliased(MeasureUnitConvert)
+    MeasureUnitSolution = db.aliased(MeasureUnit)
+    MeasureUnitDefault = db.aliased(MeasureUnit)
+
+    ml_conversion_factor_subquery = (
+        db.session.query(MeasureUnitSolutionConvert.factor)
+        .join(
+            MeasureUnitSolution,
+            MeasureUnitSolution.id == MeasureUnitSolutionConvert.idMeasureUnit,
+        )
+        .filter(MeasureUnitSolution.measureunit_nh == "ml")
+        .filter(MeasureUnitSolutionConvert.idSegment == PrescriptionDrug.idSegment)
+        .filter(MeasureUnitSolutionConvert.idDrug == PrescriptionDrug.idDrug)
+        .limit(1)
+        .as_scalar()
+    )
+
     q = (
         db.session.query(
             PrescriptionDrug,
@@ -111,6 +128,8 @@ def find_drugs_by_prescription(
             MeasureUnitConvert.factor.label("measure_unit_convert_factor"),
             func.array(substance_handling).label("substance_handling_types"),
             Prescription.idDepartment.label("idDepartment"),
+            ml_conversion_factor_subquery.label("measure_unit_solution_convert_factor"),
+            MeasureUnitDefault.measureunit_nh.label("default_measure_unit_nh"),
         )
         .outerjoin(Outlier, Outlier.id == PrescriptionDrug.idOutlier)
         .outerjoin(Drug, Drug.id == PrescriptionDrug.idDrug)
@@ -143,6 +162,13 @@ def find_drugs_by_prescription(
             and_(
                 DrugAttributes.idDrug == PrescriptionDrug.idDrug,
                 DrugAttributes.idSegment == PrescriptionDrug.idSegment,
+            ),
+        )
+        .outerjoin(
+            MeasureUnitDefault,
+            and_(
+                MeasureUnitDefault.id == DrugAttributes.idMeasureUnit,
+                MeasureUnitDefault.idHospital == Prescription.idHospital,
             ),
         )
         .outerjoin(Substance, Drug.sctid == Substance.id)
