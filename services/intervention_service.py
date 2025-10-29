@@ -308,6 +308,7 @@ def add_multiple_interventions(
         .filter(InterventionReason.id.in_(id_intervention_reason))
         .all()
     )
+    has_ram = False
     for r in reasons:
         if r.suspension:
             economy_type = InterventionEconomyTypeEnum.SUSPENSION.value
@@ -315,6 +316,9 @@ def add_multiple_interventions(
             economy_type = InterventionEconomyTypeEnum.SUBSTITUTION.value
         elif r.customEconomy:
             economy_type = InterventionEconomyTypeEnum.CUSTOM.value
+
+        if r.ram:
+            has_ram = True
 
     currentDepartment = (
         db.session.query(Prescription.idDepartment)
@@ -356,7 +360,7 @@ def add_multiple_interventions(
             i.cost = cost
         if observation:
             i.notes = observation
-        if ram:
+        if has_ram:
             i.ram = ram
 
         # date base economy
