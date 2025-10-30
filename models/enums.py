@@ -287,3 +287,4 @@ class SchemaConfigAuditTypeEnum(Enum):
     CREATE = 1
     UPDATE = 2
     GETNAME_DNS = 3
+    SECURITY_GROUP = 4

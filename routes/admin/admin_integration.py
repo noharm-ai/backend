@@ -10,6 +10,7 @@ from services.admin import (
 from models.requests.admin.admin_integration_request import (
     AdminIntegrationCreateSchemaRequest,
     AdminIntegrationUpsertGetnameRequest,
+    AdminIntegrationUpsertSecurityGroupRequest,
 )
 
 app_admin_integration = Blueprint("app_admin_integration", __name__)
@@ -100,4 +101,15 @@ def upsert_getname():
     """upsert getname config"""
     return admin_integration_service.upsert_getname(
         request_data=AdminIntegrationUpsertGetnameRequest(**request.get_json())
+    )
+
+
+@app_admin_integration.route(
+    "/admin/integration/upsert-security-group", methods=["POST"]
+)
+@api_endpoint()
+def upsert_security_group():
+    """upsert sg config"""
+    return admin_integration_service.upsert_security_group(
+        request_data=AdminIntegrationUpsertSecurityGroupRequest(**request.get_json())
     )

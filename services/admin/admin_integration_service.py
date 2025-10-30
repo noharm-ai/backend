@@ -12,6 +12,7 @@ from models.appendix import SchemaConfig, InterventionReason, SchemaConfigAudit
 from models.requests.admin.admin_integration_request import (
     AdminIntegrationCreateSchemaRequest,
     AdminIntegrationUpsertGetnameRequest,
+    AdminIntegrationUpsertSecurityGroupRequest,
 )
 from models.enums import SchemaConfigAuditTypeEnum
 from decorators.has_permission_decorator import has_permission, Permission
@@ -384,6 +385,53 @@ def upsert_getname(
         schema=request_data.schema_name,
         audit_type=SchemaConfigAuditTypeEnum.GETNAME_DNS,
         extra={"new_ip": str(request_data.ip)},
+        created_by=user_context.id,
+    )
+
+    return response_json
+
+
+@has_permission(Permission.INTEGRATION_UTILS)
+def upsert_security_group(
+    request_data: AdminIntegrationUpsertSecurityGroupRequest, user_context: User
+):
+    """Upsert schema security group config"""
+
+    payload = {
+        "command": "lambda_create_schema.upsert_security_group_rule",
+        "schema": request_data.schema_name,
+        "new_cidr": str(request_data.new_cidr),
+    }
+
+    if request_data.rule_id:
+        payload["rule_id"] = request_data.rule_id
+
+    if request_data.sg_id:
+        payload["sg_id"] = request_data.sg_id
+
+    lambda_client = boto3.client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
+    response = lambda_client.invoke(
+        FunctionName=Config.SCORES_FUNCTION_NAME,
+        InvocationType="RequestResponse",
+        Payload=json.dumps(payload),
+    )
+
+    response_json = json.loads(response["Payload"].read().decode("utf-8"))
+
+    if isinstance(response_json, str):
+        response_json = json.loads(response_json)
+
+    if response_json.get("error", False):
+        raise ValidationError(
+            response_json.get("message", "Erro inesperado. Consulte os logs"),
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    _create_audit(
+        schema=request_data.schema_name,
+        audit_type=SchemaConfigAuditTypeEnum.SECURITY_GROUP,
+        extra={"new_ip": str(request_data.new_cidr)},
         created_by=user_context.id,
     )
 
