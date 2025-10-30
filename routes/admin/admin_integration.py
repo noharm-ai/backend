@@ -113,3 +113,14 @@ def upsert_security_group():
     return admin_integration_service.upsert_security_group(
         request_data=AdminIntegrationUpsertSecurityGroupRequest(**request.get_json())
     )
+
+
+@app_admin_integration.route(
+    "/admin/integration/update-user-security-group", methods=["POST"]
+)
+@api_endpoint()
+def update_user_security_group():
+    """update user sg rules"""
+    return admin_integration_service.update_user_security_group(
+        remote_addr=request.remote_addr
+    )

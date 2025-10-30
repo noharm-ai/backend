@@ -421,7 +421,7 @@ def upsert_security_group(
     if isinstance(response_json, str):
         response_json = json.loads(response_json)
 
-    if response_json.get("error", False):
+    if isinstance(response_json, dict) and response_json.get("error", False):
         raise ValidationError(
             response_json.get("message", "Erro inesperado. Consulte os logs"),
             "errors.businessRules",
@@ -432,6 +432,47 @@ def upsert_security_group(
         schema=request_data.schema_name,
         audit_type=SchemaConfigAuditTypeEnum.SECURITY_GROUP,
         extra={"new_ip": str(request_data.new_cidr)},
+        created_by=user_context.id,
+    )
+
+    return response_json
+
+
+@has_permission(Permission.INTEGRATION_UTILS)
+def update_user_security_group(remote_addr: str, user_context: User):
+    """Update user sg rules"""
+
+    user = db.session.query(User).filter(User.id == user_context.id).first()
+
+    payload = {
+        "command": "lambda_create_schema.update_user_sec_group_rules",
+        "user": user.email,
+        "new_cidr": remote_addr + "/32",
+    }
+
+    lambda_client = boto3.client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
+    response = lambda_client.invoke(
+        FunctionName=Config.SCORES_FUNCTION_NAME,
+        InvocationType="RequestResponse",
+        Payload=json.dumps(payload),
+    )
+
+    response_json = json.loads(response["Payload"].read().decode("utf-8"))
+
+    if isinstance(response_json, str):
+        response_json = json.loads(response_json)
+
+    if isinstance(response_json, dict) and response_json.get("error", False):
+        raise ValidationError(
+            response_json.get("message", "Erro inesperado. Consulte os logs"),
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    _create_audit(
+        schema=user_context.schema,
+        audit_type=SchemaConfigAuditTypeEnum.USER_SECURITY_GROUP,
+        extra={"new_user_ip": remote_addr},
         created_by=user_context.id,
     )
 

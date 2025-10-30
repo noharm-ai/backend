@@ -288,3 +288,4 @@ class SchemaConfigAuditTypeEnum(Enum):
     UPDATE = 2
     GETNAME_DNS = 3
     SECURITY_GROUP = 4
+    USER_SECURITY_GROUP = 5
