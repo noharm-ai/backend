@@ -229,6 +229,7 @@ def auth_token():
 @jwt_required()
 def search_name(term):
     """inverted name search"""
+    max_search_results = 150
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
 
@@ -247,7 +248,7 @@ def search_name(term):
         if response.status_code == status.HTTP_200_OK:
             data = response.json()
             results = []
-            for p in data["results"]:
+            for p in data["results"][:max_search_results]:
                 results.append(
                     {
                         "name": p["name"],
