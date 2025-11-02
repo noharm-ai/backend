@@ -16,7 +16,7 @@ from models.requests.admin.admin_integration_request import (
 )
 from models.enums import SchemaConfigAuditTypeEnum
 from decorators.has_permission_decorator import has_permission, Permission
-from utils import status
+from utils import status, network_utils
 
 from exception.validation_error import ValidationError
 
@@ -439,10 +439,12 @@ def upsert_security_group(
 
 
 @has_permission(Permission.INTEGRATION_UTILS)
-def update_user_security_group(remote_addr: str, user_context: User):
+def update_user_security_group(user_context: User):
     """Update user sg rules"""
 
     user = db.session.query(User).filter(User.id == user_context.id).first()
+
+    remote_addr = network_utils.get_client_ip_with_validation()
 
     payload = {
         "command": "lambda_create_schema.update_user_sec_group_rules",

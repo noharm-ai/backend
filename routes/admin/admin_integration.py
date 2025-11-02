@@ -121,6 +121,5 @@ def upsert_security_group():
 @api_endpoint()
 def update_user_security_group():
     """update user sg rules"""
-    return admin_integration_service.update_user_security_group(
-        remote_addr=request.remote_addr
-    )
+
+    return admin_integration_service.update_user_security_group()
