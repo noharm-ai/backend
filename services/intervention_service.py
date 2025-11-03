@@ -1,17 +1,19 @@
+"""Service: Intervention related operations"""
+
+from datetime import timedelta, datetime
+
 from sqlalchemy import case, and_, func, or_, desc
 from sqlalchemy.dialects import postgresql
-from datetime import timedelta, datetime
 
 from models.main import db, User, Drug
 from models.prescription import (
     Intervention,
+    InterventionAudit,
     Prescription,
     PrescriptionDrug,
 )
 from models.appendix import InterventionReason, MeasureUnit, Frequency, Department
-from models.enums import (
-    InterventionEconomyTypeEnum,
-)
+from models.enums import InterventionEconomyTypeEnum, InterventionAuditEnum
 from services import (
     memory_service,
     data_authorization_service,
@@ -380,6 +382,19 @@ def add_multiple_interventions(
         db.session.add(i)
         db.session.flush()
 
+        audit = InterventionAudit()
+        audit.auditType = InterventionAuditEnum.CREATE.value
+        audit.idIntervention = i.idIntervention
+        audit.extra = {
+            "status": i.status,
+            "update_responsible": False,
+            "economy_type": economy_type,
+        }
+        audit.createdBy = user_context.id
+        audit.createdAt = datetime.now()
+        db.session.add(audit)
+        db.session.flush()
+
         id_intervention_list.append(i.idIntervention)
 
     if len(id_intervention_list) > 0:
@@ -593,6 +608,23 @@ def save_intervention(
     if new_intv:
         db.session.add(i)
         db.session.flush()
+
+    audit = InterventionAudit()
+    audit.auditType = (
+        InterventionAuditEnum.CREATE.value
+        if new_intv
+        else InterventionAuditEnum.UPDATE.value
+    )
+    audit.idIntervention = i.idIntervention
+    audit.extra = {
+        "status": new_status,
+        "update_responsible": update_responsible,
+        "economy_type": economy_type,
+    }
+    audit.createdBy = user_context.id
+    audit.createdAt = datetime.now()
+    db.session.add(audit)
+    db.session.flush()
 
     return get_interventions(
         admissionNumber=i.admissionNumber, idIntervention=i.idIntervention
