@@ -8,7 +8,7 @@ from models.prescription import (
     PrescriptionDrugAudit,
     PrescriptionDrug,
 )
-from models.enums import PrescriptionDrugAuditTypeEnum
+from models.enums import PrescriptionDrugAuditTypeEnum, DrugTypeEnum
 
 
 def get_audit_report(id_prescription: int):
@@ -32,10 +32,24 @@ def get_prescription_audit_dates(id_prescription: int):
     query = (
         select(func.min(PrescriptionDrugAudit.createdAt).label("arrival_date"))
         .select_from(PrescriptionDrugAudit)
+        .join(
+            PrescriptionDrug,
+            PrescriptionDrug.id == PrescriptionDrugAudit.idPrescriptionDrug,
+        )
         .where(PrescriptionDrugAudit.idPrescriptionDrug.in_(prescription_query))
         .where(
             PrescriptionDrugAudit.auditType
             == PrescriptionDrugAuditTypeEnum.UPSERT.value
+        )
+        .where(
+            PrescriptionDrug.source.in_(
+                [
+                    DrugTypeEnum.DIET.value,
+                    DrugTypeEnum.DRUG.value,
+                    DrugTypeEnum.PROCEDURE.value,
+                    DrugTypeEnum.SOLUTION.value,
+                ]
+            )
         )
     )
 

@@ -287,3 +287,12 @@ class SchemaConfigAuditTypeEnum(Enum):
     CREATE = 1
     UPDATE = 2
     GETNAME_DNS = 3
+    SECURITY_GROUP = 4
+    USER_SECURITY_GROUP = 5
+
+
+class InterventionAuditEnum(Enum):
+    """Enum: intervencao_audit records type"""
+
+    UPDATE = 1
+    CREATE = 2

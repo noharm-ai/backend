@@ -216,3 +216,18 @@ class Intervention(db.Model):
     ram = db.Column("ram", postgresql.JSONB, nullable=True)
     # count of days using the selected drug
     period = db.Column("periodo_uso", db.Integer, nullable=True)
+
+
+class InterventionAudit(db.Model):
+    """Audit table to log modifications in intervetion records"""
+
+    __tablename__ = "intervencao_audit"
+
+    id = db.Column(
+        "idintervencao_audit", db.BigInteger, nullable=False, primary_key=True
+    )
+    auditType = db.Column("tp_audit", db.Integer, nullable=False)
+    idIntervention = db.Column("idintervencao", db.BigInteger, nullable=False)
+    extra = db.Column("extra", postgresql.JSON, nullable=True)
+    createdAt = db.Column("created_at", db.DateTime, nullable=False)
+    createdBy = db.Column("created_by", db.BigInteger, nullable=False)
