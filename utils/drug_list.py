@@ -1,3 +1,5 @@
+"""Repository: queries related to prescription visualization"""
+
 import re
 import math
 
@@ -232,9 +234,14 @@ class DrugList:
             total_period = 0
             if self.is_cpoe:
                 period = "D" + str(round(pd[12])) if pd[12] else ""
-                total_period = numberutils.none2zero(pd[12]) + numberutils.none2zero(
-                    pd[0].period
-                )
+                previous_period = pd[0].period if pd[0].period else 0
+
+                if previous_period > 0:
+                    total_period = numberutils.none2zero(
+                        pd[12]
+                    ) + numberutils.none2zero(pd[0].period)
+                else:
+                    total_period = numberutils.none2zero(pd[12]) + 1
             else:
                 period = ("D" + str(pd[0].period) if pd[0].period else "",)
                 total_period = numberutils.none2zero(pd[0].period)
@@ -306,6 +313,8 @@ class DrugList:
                     "period": period,
                     "periodFixed": pd[0].period,
                     "totalPeriod": total_period,
+                    "periodType": pd[0].tp_period,
+                    "periodDayInterval": pd[12],
                     "periodMax": pd[0].period_total,  # max period in days
                     "periodDates": [],
                     "route": pd[0].route,

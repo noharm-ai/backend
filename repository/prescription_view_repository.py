@@ -62,19 +62,11 @@ def find_drugs_by_prescription(
 
     prevNotes = _get_prev_notes(admissionNumber)
 
-    if aggDate != None and is_cpoe:
-        agg_date_with_time = cast(
-            func.concat(func.date(aggDate), " ", "23:59:59"), postgresql.TIMESTAMP
-        )
-
-        period_calc = func.ceil(
-            func.extract("epoch", agg_date_with_time - Prescription.date) / 86400
-        )
-        max_period = func.ceil(
-            func.extract("epoch", Prescription.expire - Prescription.date) / 86400
-        )
+    if aggDate is not None and is_cpoe:
+        period_calc = func.date(aggDate) - func.date(Prescription.date)
+        max_period = func.date(Prescription.expire) - func.date(Prescription.date)
         period_cpoe = case(
-            (agg_date_with_time > Prescription.expire, max_period),
+            (func.date(aggDate) > func.date(Prescription.expire), max_period),
             else_=period_calc,
         )
 

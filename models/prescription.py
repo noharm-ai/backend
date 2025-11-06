@@ -160,6 +160,7 @@ class PrescriptionDrug(db.Model):
     form = db.Column("form", postgresql.JSON, nullable=True)
     schedule = db.Column("aprazamento", postgresql.ARRAY(db.DateTime), nullable=True)
     order_number = db.Column("nr_ordem", db.Integer, nullable=True)
+    tp_period = db.Column("tp_periodo", db.Integer, nullable=True)
 
 
 class PrescriptionDrugAudit(db.Model):
