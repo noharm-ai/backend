@@ -296,3 +296,10 @@ class InterventionAuditEnum(Enum):
 
     UPDATE = 1
     CREATE = 2
+
+
+class PrescriptionDrugPeriodTypeEnum(Enum):
+    """Enum: PrescriptionDrug.tp_period"""
+
+    CALCULATED = 1
+    FROM_ORIGIN = 2
