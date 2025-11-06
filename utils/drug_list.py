@@ -235,6 +235,7 @@ class DrugList:
             if self.is_cpoe:
                 period = "D" + str(round(pd[12])) if pd[12] else ""
                 previous_period = pd[0].period if pd[0].period else 0
+
                 if previous_period > 0:
                     total_period = numberutils.none2zero(
                         pd[12]
