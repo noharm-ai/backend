@@ -366,29 +366,24 @@ def get_queue_status(id_queue_list, user_context: User):
     queue_results = []
 
     if id_queue_list:
-        engine = db.engines["report"]
-        with Session(engine) as session:
-            session.connection(
-                execution_options={"schema_translate_map": {None: user_context.schema}}
-            )
-            queue_list = (
-                session.query(NifiQueue).filter(NifiQueue.id.in_(id_queue_list)).all()
-            )
+        queue_list = (
+            db.session.query(NifiQueue).filter(NifiQueue.id.in_(id_queue_list)).all()
+        )
 
-            for q in queue_list:
-                queue_results.append(
-                    {
-                        "id": q.id,
-                        "url": q.url,
-                        "body": q.body,
-                        "method": q.method,
-                        "extra": q.extra,
-                        "responseCode": q.responseCode,
-                        "response": q.response,
-                        "responseAt": dateutils.to_iso(q.responseAt),
-                        "createdAt": dateutils.to_iso(q.createdAt),
-                    }
-                )
+        for q in queue_list:
+            queue_results.append(
+                {
+                    "id": q.id,
+                    "url": q.url,
+                    "body": q.body,
+                    "method": q.method,
+                    "extra": q.extra,
+                    "responseCode": q.responseCode,
+                    "response": q.response,
+                    "responseAt": dateutils.to_iso(q.responseAt),
+                    "createdAt": dateutils.to_iso(q.createdAt),
+                }
+            )
 
     status_url, status_updated_at = get_file_url(
         schema=user_context.schema, filename="status"
