@@ -8,7 +8,6 @@ import boto3
 import dateutil as pydateutil
 from markupsafe import escape
 from sqlalchemy import desc
-from sqlalchemy.orm import Session
 from botocore.exceptions import ClientError
 from botocore.config import Config as BotoConfig
 
