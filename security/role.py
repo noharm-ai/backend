@@ -172,6 +172,17 @@ class Role(Enum):
         Permission.WRITE_SUPPORT,
     ]
 
+    SUPPORT_REQUESTER = (
+        "SUPPORT_REQUESTER",
+        [Permission.READ_SUPPORT, Permission.WRITE_SUPPORT],
+    )
+
+    SUPPORT_MANAGER = "SUPPORT_MANAGER", [
+        Permission.READ_SUPPORT,
+        Permission.WRITE_SUPPORT,
+        Permission.ADMIN_SUPPORT,
+    ]
+
     STATIC_USER = "STATIC_USER", [Permission.READ_STATIC, Permission.CHECK_STATIC]
 
     ORGANIZATION_MANAGER = "ORGANIZATION_MANAGER", [Permission.MULTI_SCHEMA]

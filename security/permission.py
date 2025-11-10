@@ -70,6 +70,7 @@ class Permission(Enum):
 
     READ_SUPPORT = "READ_SUPPORT"  # "permission to view support tickets"
     WRITE_SUPPORT = "WRITE_SUPPORT"  # "permission to create support tickets"
+    ADMIN_SUPPORT = "ADMIN_SUPPORT"  # permission to manage organization support tickets
 
     READ_USERS = "READ_USERS"  # "permission to view users list"
     WRITE_USERS = "WRITE_USERS"  # "permission to create and edit users"

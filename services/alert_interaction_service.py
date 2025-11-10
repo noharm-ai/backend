@@ -1,6 +1,6 @@
 """Service to analyze interactions between drugs in a prescription."""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List
 
 from sqlalchemy import text
@@ -181,8 +181,14 @@ def find_relations(drug_list, id_patient: int, is_cpoe: bool):
                 start1 = datetime.fromisoformat(drug_from["prescriptionDate"])
                 end1 = datetime.fromisoformat(drug_from["expireDate"])
 
+                if end1 < start1:
+                    end1 = start1 + timedelta(minutes=1)
+
                 start2 = datetime.fromisoformat(drug_to["prescriptionDate"])
                 end2 = datetime.fromisoformat(drug_to["expireDate"])
+
+                if end2 < start2:
+                    end2 = start2 + timedelta(minutes=1)
 
                 if not dateutils.date_overlap(
                     start1=start1, end1=end1, start2=start2, end2=end2
