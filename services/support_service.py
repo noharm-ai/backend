@@ -452,7 +452,7 @@ def list_tickets_v2(user_context: User, user_permissions: list[Permission]):
                 following.append(f)
 
         if (
-            Permission.WRITE_USERS in user_permissions
+            Permission.ADMIN_SUPPORT in user_permissions
             and partner[0]
             and partner[0].get("parent_id", None)
         ):
