@@ -1,5 +1,6 @@
 """Repository: User related operations"""
 
+from typing import Union, List
 from sqlalchemy import func, or_, desc, asc
 
 from models.main import db, User, UserAuthorization, UserExtra
@@ -22,6 +23,22 @@ def get_user_by_email(email: str) -> User:
     return (
         db.session.query(User).filter(func.lower(User.email) == email.lower()).first()
     )
+
+
+def get_users_by_role(schema: str, role: Union[Role, List[Role]]):
+    """List users by role"""
+    query = db.session.query(User).filter(User.schema == schema)
+
+    # Handle single role or list of roles
+    if isinstance(role, Role):
+        # Single role - use existing logic
+        query = query.filter(User.config["roles"].astext.contains(role.value))
+    else:
+        # Multiple roles - use OR logic to match ANY role
+        role_conditions = [User.config["roles"].astext.contains(r.value) for r in role]
+        query = query.filter(or_(*role_conditions))
+
+    return query.filter(User.active == True).order_by(User.name).all()
 
 
 def get_admin_users_list(schema: str):
