@@ -105,7 +105,6 @@ class Role(Enum):
         Permission.WRITE_BASIC_FEATURES,
         Permission.READ_BASIC_FEATURES,
         Permission.READ_SUPPORT,
-        Permission.WRITE_SUPPORT,
     ]
 
     DISPENSING_MANAGER = "DISPENSING_MANAGER", [
@@ -117,7 +116,6 @@ class Role(Enum):
         Permission.WRITE_BASIC_FEATURES,
         Permission.READ_BASIC_FEATURES,
         Permission.READ_SUPPORT,
-        Permission.WRITE_SUPPORT,
         Permission.READ_USERS,
         Permission.WRITE_USERS,
     ]
@@ -129,7 +127,6 @@ class Role(Enum):
         Permission.READ_BASIC_FEATURES,
         Permission.WRITE_DRUG_SCORE,
         Permission.READ_SUPPORT,
-        Permission.WRITE_SUPPORT,
         Permission.WRITE_TAGS,
     ]
 
@@ -138,7 +135,6 @@ class Role(Enum):
         Permission.READ_PRESCRIPTION,
         Permission.READ_BASIC_FEATURES,
         Permission.READ_SUPPORT,
-        Permission.WRITE_SUPPORT,
     ]
 
     RESEARCHER = "RESEARCHER", [
@@ -147,7 +143,6 @@ class Role(Enum):
         Permission.READ_BASIC_FEATURES,
         Permission.READ_DISCHARGE_SUMMARY,
         Permission.READ_SUPPORT,
-        Permission.WRITE_SUPPORT,
     ]
 
     DISCHARGE_MANAGER = (
@@ -158,7 +153,6 @@ class Role(Enum):
             Permission.READ_DISCHARGE_SUMMARY,
             Permission.WRITE_DISCHARGE_SUMMARY,
             Permission.READ_SUPPORT,
-            Permission.WRITE_SUPPORT,
         ],
     )
 
@@ -169,7 +163,6 @@ class Role(Enum):
         Permission.WRITE_BASIC_FEATURES,
         Permission.READ_REPORTS,
         Permission.READ_SUPPORT,
-        Permission.WRITE_SUPPORT,
     ]
 
     SUPPORT_REQUESTER = (

@@ -83,3 +83,10 @@ def get_related_articles():
     data = request.get_json()
 
     return support_service.get_related_kb(question=data.get("question", None))
+
+
+@app_support.route("/support/list-requesters", methods=["GET"])
+@api_endpoint()
+def list_requesters():
+    """List users with request permission"""
+    return support_service.list_requesters()

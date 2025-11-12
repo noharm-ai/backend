@@ -15,6 +15,8 @@ from agents import n0_agent
 from exception.validation_error import ValidationError
 from utils import status, logger
 from services import vector_search_service
+from repository import user_repository
+from security.role import Role
 
 
 class TimeoutTransport(xmlrpc.client.Transport):
@@ -69,7 +71,7 @@ def _get_client():
     return execute
 
 
-@has_permission(Permission.WRITE_SUPPORT)
+@has_permission(Permission.READ_SUPPORT)
 def ask_n0(question: str, user_context: User = None):
     """Ask a question to the n0 agent and return the response"""
     if not question:
@@ -86,7 +88,7 @@ def ask_n0(question: str, user_context: User = None):
     return {"agent": str(response)}
 
 
-@has_permission(Permission.WRITE_SUPPORT)
+@has_permission(Permission.READ_SUPPORT)
 def get_related_kb(question: str):
     """Get related articles from open kb"""
     if not question:
@@ -120,7 +122,7 @@ def get_related_kb(question: str):
     return results
 
 
-@has_permission(Permission.WRITE_SUPPORT)
+@has_permission(Permission.READ_SUPPORT)
 def ask_n0_form(question: str):
     """Ask a question to the n0 form agent and return the response"""
     if not question:
@@ -450,7 +452,7 @@ def list_tickets_v2(user_context: User, user_permissions: list[Permission]):
                 following.append(f)
 
         if (
-            Permission.WRITE_USERS in user_permissions
+            Permission.ADMIN_SUPPORT in user_permissions
             and partner[0]
             and partner[0].get("parent_id", None)
         ):
@@ -576,3 +578,17 @@ def create_closed_ticket(user_context: User, description):
         return result[0]["id"]
 
     return None
+
+
+@has_permission(Permission.READ_SUPPORT)
+def list_requesters(user_context: User):
+    """List users that can create tickets"""
+    users = user_repository.get_users_by_role(
+        schema=user_context.schema, role=[Role.SUPPORT_REQUESTER, Role.SUPPORT_MANAGER]
+    )
+
+    results = []
+    for user in users:
+        results.append({"name": user.name, "email": user.email})
+
+    return {"requesters": results}
