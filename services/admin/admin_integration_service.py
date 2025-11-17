@@ -266,13 +266,14 @@ def create_schema(
         "create_sqs": request_data.create_sqs,
         "create_logstream": request_data.create_logstream,
         "create_user": request_data.create_user,
+        "create_iam": True,
         "db_user": request_data.db_user,
         "created_by": user_context.id,
     }
 
     lambda_client = boto3.client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
     response = lambda_client.invoke(
-        FunctionName=Config.SCORES_FUNCTION_NAME,
+        FunctionName=Config.BACKEND_FUNCTION_NAME,
         InvocationType="RequestResponse",
         Payload=json.dumps(payload),
     )
@@ -325,7 +326,7 @@ def get_cloud_config(schema: str):
 
     lambda_client = boto3.client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
     response = lambda_client.invoke(
-        FunctionName=Config.SCORES_FUNCTION_NAME,
+        FunctionName=Config.BACKEND_FUNCTION_NAME,
         InvocationType="RequestResponse",
         Payload=json.dumps(
             {
@@ -358,7 +359,7 @@ def upsert_getname(
 
     lambda_client = boto3.client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
     response = lambda_client.invoke(
-        FunctionName=Config.SCORES_FUNCTION_NAME,
+        FunctionName=Config.BACKEND_FUNCTION_NAME,
         InvocationType="RequestResponse",
         Payload=json.dumps(
             {
@@ -411,7 +412,7 @@ def upsert_security_group(
 
     lambda_client = boto3.client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
     response = lambda_client.invoke(
-        FunctionName=Config.SCORES_FUNCTION_NAME,
+        FunctionName=Config.BACKEND_FUNCTION_NAME,
         InvocationType="RequestResponse",
         Payload=json.dumps(payload),
     )
@@ -454,7 +455,7 @@ def update_user_security_group(user_context: User):
 
     lambda_client = boto3.client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
     response = lambda_client.invoke(
-        FunctionName=Config.SCORES_FUNCTION_NAME,
+        FunctionName=Config.BACKEND_FUNCTION_NAME,
         InvocationType="RequestResponse",
         Payload=json.dumps(payload),
     )

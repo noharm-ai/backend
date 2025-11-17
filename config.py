@@ -59,3 +59,4 @@ class Config:
     REDIS_PORT = getenv("REDIS_PORT") or ""
 
     SCORES_FUNCTION_NAME = getenv("SCORES_FUNCTION_NAME", "")
+    BACKEND_FUNCTION_NAME = getenv("BACKEND_FUNCTION_NAME", "")
