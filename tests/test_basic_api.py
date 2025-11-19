@@ -91,16 +91,20 @@ def test_getPrescriptionsDrug(client):
     assert response.status_code == 200
 
 
-# def test_getStaticPrescription(client):
-#     """Teste get /static/demo/prescription/idPrescription - Valida o status_code 200."""
+def test_getStaticPrescription(client):
+    """Teste get /static/demo/prescription/idPrescription - Valida o status_code 200."""
 
-#     url = f"/static/demo/prescription/{PRESCRIPTION}"
+    response = prescalc(
+        {
+            "schema": "demo",
+            "id_prescription": int(PRESCRIPTION),
+            "force": True,
+        },
+        None,
+    )
+    response_obj = json.loads(response)
 
-#     access_token = get_access(client)
-
-#     response = client.get(url, headers=make_headers(access_token))
-
-#     assert response.status_code == 200
+    assert response_obj.get("status", None) == "success"
 
 
 def test_getExams(client):
@@ -227,74 +231,74 @@ def test_putPrescriprionsUncheck(client):
     assert prescriptionaudit
 
 
-# def test_putAggregatePrescriprionsCheckStaging(client):
-#     """Teste put /prescriptions/idPrescription - Verifica o status "s" e a existência de um resgistro na tabela prescricao_audit
-#     referente a uma prescrição agregada e todas as dentro dela."""
+def test_putAggregatePrescriprionsCheckStaging(client):
+    """Teste put /prescriptions/idPrescription - Verifica o status "s" e a existência de um resgistro na tabela prescricao_audit
+    referente a uma prescrição agregada e todas as dentro dela."""
 
-#     id = 2012301000000003
-#     admissionNumber = 3
-#     prescriptionid1 = 4
-#     prescriptionid2 = 7
+    id = 2012301000000003
+    admissionNumber = 3
+    prescriptionid1 = 4
+    prescriptionid2 = 7
 
-#     access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
+    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
 
-#     utils_test_prescription.prepare_test_aggregate(
-#         id, admissionNumber, prescriptionid1, prescriptionid2
-#     )
+    utils_test_prescription.prepare_test_aggregate(
+        id, admissionNumber, prescriptionid1, prescriptionid2
+    )
 
-#     """Criando novamente a prescrição agregada."""
+    """Criando novamente a prescrição agregada."""
 
-#     prescalc(
-#         {
-#             "schema": "demo",
-#             "id_prescription": id,
-#             "force": True,
-#         },
-#         None,
-#     )
+    prescalc(
+        {
+            "schema": "demo",
+            "id_prescription": prescriptionid1,
+            "force": True,
+        },
+        None,
+    )
 
-#     """Checagem da prescrição agregada."""
+    """Checagem da prescrição agregada."""
 
-#     checkagurl = f"/prescriptions/status"
+    checkagurl = f"/prescriptions/status"
 
-#     datachk = {"status": "s", "idPrescription": id}
+    datachk = {"status": "s", "idPrescription": id}
 
-#     client.post(
-#         checkagurl, data=json.dumps(datachk), headers=make_headers(access_token)
-#     )
+    client.post(
+        checkagurl, data=json.dumps(datachk), headers=make_headers(access_token)
+    )
 
-#     """Verificação do status esperado em cada prescrição e existência dos
-#     respectivos registros."""
+    """Verificação do status esperado em cada prescrição e existência dos
+    respectivos registros."""
 
-#     pInAg = (
-#         session.query(Prescription)
-#         .filter(Prescription.id.in_([prescriptionid1, id]))
-#         .filter(Prescription.status == "s")
-#         .all()
-#     )
-#     pOutAg = (
-#         session.query(Prescription)
-#         .filter(Prescription.id == prescriptionid2)
-#         .filter(Prescription.status == "0")
-#         .first()
-#     )
-#     pInAgaudit = (
-#         session.query(PrescriptionAudit)
-#         .filter(PrescriptionAudit.idPrescription.in_([prescriptionid1, id]))
-#         .filter(PrescriptionAudit.auditType == 1)
-#         .all()
-#     )
-#     pOutAgaudit = (
-#         session.query(PrescriptionAudit)
-#         .filter(PrescriptionAudit.idPrescription == prescriptionid2)
-#         .filter(PrescriptionAudit.auditType == 1)
-#         .first()
-#     )
+    pInAg = (
+        session.query(Prescription)
+        .filter(Prescription.id.in_([prescriptionid1, id]))
+        .filter(Prescription.status == "s")
+        .all()
+    )
+    pOutAg = (
+        session.query(Prescription)
+        .filter(Prescription.id == prescriptionid2)
+        .filter(Prescription.status == "0")
+        .first()
+    )
+    pInAgaudit = (
+        session.query(PrescriptionAudit)
+        .filter(PrescriptionAudit.idPrescription.in_([prescriptionid1, id]))
+        .filter(PrescriptionAudit.auditType == 1)
+        .all()
+    )
+    pOutAgaudit = (
+        session.query(PrescriptionAudit)
+        .filter(PrescriptionAudit.idPrescription == prescriptionid2)
+        .filter(PrescriptionAudit.auditType == 1)
+        .first()
+    )
 
-#     assert pOutAg
-#     assert len(pInAg) == 2
-#     assert len(pInAgaudit) == 2
-#     assert not pOutAgaudit
+    assert pOutAg
+    assert len(pInAg) == 2
+    assert len(pInAgaudit) == 2
+    assert not pOutAgaudit
 
 
 # def test_putAggregatePrescriprionsCheckCpoe(client):
