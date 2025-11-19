@@ -27,6 +27,7 @@ from repository import (
     prescription_view_repository,
     patient_repository,
     clinical_notes_repository,
+    clinical_notes_type_repository,
 )
 from services import (
     prescription_service,
@@ -68,7 +69,9 @@ def _internal_get_prescription(
         _get_prescription_data(id_prescription=id_prescription)
     )
 
-    config_data = _get_configs(prescription=prescription, patient=patient)
+    config_data = _get_configs(
+        prescription=prescription, patient=patient, is_complete=is_complete
+    )
 
     interventions = _get_interventions(
         admission_number=prescription.admissionNumber,
@@ -337,7 +340,7 @@ def _get_prescription_data(
 
 
 @timed()
-def _get_configs(prescription: Prescription, patient: Patient):
+def _get_configs(prescription: Prescription, patient: Patient, is_complete: bool):
     data = {}
 
     # memory
@@ -403,6 +406,12 @@ def _get_configs(prescription: Prescription, patient: Patient):
         id_patient=patient.idPatient,
         limit=2,
     )
+
+    # clinical notes types
+    data["cn_types"] = []
+    if is_complete:
+        cn_types = clinical_notes_type_repository.list_clinical_notes_types(active=True)
+        data["cn_types"] = [{"id": ct.id, "name": ct.name} for ct in cn_types]
 
     return data
 
@@ -757,6 +766,7 @@ def _format(
         "concilia": prescription.concilia,
         "admissionNumber": prescription.admissionNumber,
         "notes": prescription.notes,
+        "notesType": prescription.id_clinical_notes_type,
         "bed": prescription.bed,
         "record": prescription.record,
         "skinColor": patient.skinColor,
@@ -824,6 +834,7 @@ def _format(
         # clinical notes
         "clinicalNotes": cn_data["cn_count"],
         "clinicalNotesStats": cn_data["cn_stats"],
+        "clinicalNotesTypes": config_data["cn_types"],
         "complication": cn_data["cn_stats"].get("complication", 0),
         "notesSigns": cn_data["notes"]["signs"].get("data", ""),
         "notesSignsId": cn_data["notes"]["signs"].get("id", None),
