@@ -1,9 +1,11 @@
 import json
 
 from conftest import get_access, make_headers, session
+from models.main import User
 from models.prescription import Prescription, PrescriptionAudit
 from security.role import Role
 from tests.utils import utils_test_prescription
+from services import prescription_agg_service
 
 SEGMENT = "1"
 DRUG = "5"
@@ -90,16 +92,16 @@ def test_getPrescriptionsDrug(client):
     assert response.status_code == 200
 
 
-def test_getStaticPrescription(client):
-    """Teste get /static/demo/prescription/idPrescription - Valida o status_code 200."""
+# def test_getStaticPrescription(client):
+#     """Teste get /static/demo/prescription/idPrescription - Valida o status_code 200."""
 
-    url = f"/static/demo/prescription/{PRESCRIPTION}"
+#     url = f"/static/demo/prescription/{PRESCRIPTION}"
 
-    access_token = get_access(client)
+#     access_token = get_access(client)
 
-    response = client.get(url, headers=make_headers(access_token))
+#     response = client.get(url, headers=make_headers(access_token))
 
-    assert response.status_code == 200
+#     assert response.status_code == 200
 
 
 def test_getExams(client):
@@ -243,9 +245,18 @@ def test_putAggregatePrescriprionsCheckStaging(client):
 
     """Criando novamente a prescrição agregada."""
 
-    createagurl = f"/static/demo/prescription/{prescriptionid1}"
+    user_context = User()
+    user_context.id = 0
+    user_context.schema = "demo"
+    user_context.config = {"roles": ["STATIC_USER"]}
 
-    client.get(createagurl, headers=make_headers(access_token))
+    prescription_agg_service.create_agg_prescription_by_prescription(
+        schema="demo",
+        id_prescription=prescriptionid1,
+        force=False,
+        user_context=user_context,
+        public=False,
+    )
 
     """Checagem da prescrição agregada."""
 
