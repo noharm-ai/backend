@@ -1,11 +1,10 @@
 import json
 
 from conftest import get_access, make_headers, session
-from models.main import User
 from models.prescription import Prescription, PrescriptionAudit
 from security.role import Role
 from tests.utils import utils_test_prescription
-from services import prescription_agg_service
+from static import prescalc
 
 SEGMENT = "1"
 DRUG = "5"
@@ -245,17 +244,13 @@ def test_putAggregatePrescriprionsCheckStaging(client):
 
     """Criando novamente a prescrição agregada."""
 
-    user_context = User()
-    user_context.id = 0
-    user_context.schema = "demo"
-    user_context.config = {"roles": ["STATIC_USER"]}
-
-    prescription_agg_service.create_agg_prescription_by_prescription(
-        schema="demo",
-        id_prescription=prescriptionid1,
-        force=False,
-        user_context=user_context,
-        public=False,
+    prescalc(
+        {
+            "schema": "demo",
+            "id_prescription": id,
+            "force": True,
+        },
+        None,
     )
 
     """Checagem da prescrição agregada."""
