@@ -4,7 +4,7 @@ SQLAlchemy==2.0.29
 Flask-SQLAlchemy==3.1.1
 lambda-packages
 troposphere
-zappa==0.61.0
+zappa==0.60.2
 flask-cors==6.0.0
 psycopg2-binary
 pytest==8.3.5
