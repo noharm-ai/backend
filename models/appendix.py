@@ -243,7 +243,7 @@ class ClinicalNotesType(db.Model):
     __tablename__ = "tipoevolucao"
 
     id = db.Column("idtipoevolucao", db.String, primary_key=True)
-    name = db.Column("nome", db.String, primary_key=True)
+    name = db.Column("nome", db.String, nullable=False)
     active = db.Column("ativo", db.Boolean, nullable=False)
     updated_at = db.Column("updated_at", db.DateTime, nullable=False)
     updated_by = db.Column("updated_by", db.BigInteger, nullable=False)
