@@ -4,6 +4,7 @@ from conftest import get_access, make_headers, session
 from models.prescription import Prescription, PrescriptionAudit
 from security.role import Role
 from tests.utils import utils_test_prescription
+from static import prescalc
 
 SEGMENT = "1"
 DRUG = "5"
@@ -93,13 +94,17 @@ def test_getPrescriptionsDrug(client):
 def test_getStaticPrescription(client):
     """Teste get /static/demo/prescription/idPrescription - Valida o status_code 200."""
 
-    url = f"/static/demo/prescription/{PRESCRIPTION}"
+    response = prescalc(
+        {
+            "schema": "demo",
+            "id_prescription": int(PRESCRIPTION),
+            "force": True,
+        },
+        None,
+    )
+    response_obj = json.loads(response)
 
-    access_token = get_access(client)
-
-    response = client.get(url, headers=make_headers(access_token))
-
-    assert response.status_code == 200
+    assert response_obj.get("status", None) == "success"
 
 
 def test_getExams(client):
@@ -243,9 +248,14 @@ def test_putAggregatePrescriprionsCheckStaging(client):
 
     """Criando novamente a prescrição agregada."""
 
-    createagurl = f"/static/demo/prescription/{prescriptionid1}"
-
-    client.get(createagurl, headers=make_headers(access_token))
+    prescalc(
+        {
+            "schema": "demo",
+            "id_prescription": prescriptionid1,
+            "force": True,
+        },
+        None,
+    )
 
     """Checagem da prescrição agregada."""
 

@@ -235,3 +235,17 @@ class ICDTable(db.Model):
     id_str = db.Column("nu_cid10", db.String, nullable=False)
     name = db.Column("no_cid10", db.String, nullable=False)
     status = db.Column("st_ativo", db.Integer, nullable=False)
+
+
+class ClinicalNotesType(db.Model):
+    """SQLALCHEMY model for tipoevolucao table"""
+
+    __tablename__ = "tipoevolucao"
+
+    id = db.Column("idtipoevolucao", db.String, primary_key=True)
+    name = db.Column("nome", db.String, nullable=False)
+    active = db.Column("ativo", db.Boolean, nullable=False)
+    updated_at = db.Column("updated_at", db.DateTime, nullable=False)
+    updated_by = db.Column("updated_by", db.BigInteger, nullable=False)
+    created_at = db.Column("created_at", db.DateTime, nullable=False)
+    created_by = db.Column("created_by", db.BigInteger, nullable=False)

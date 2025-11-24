@@ -420,6 +420,7 @@ def update_prescription_data(
 
     if "notes" in data.keys():
         p.notes = data.get("notes", None)
+        p.id_clinical_notes_type = data.get("notesType", None)
         p.notes_at = datetime.today()
 
         has_integration_event = (
@@ -454,7 +455,10 @@ def update_prescription_data(
         audit.agg = p.agg
         audit.concilia = p.concilia
         audit.bed = p.bed
-        audit.extra = {"text": data.get("notes", None)}
+        audit.extra = {
+            "text": data.get("notes", None),
+            "clinicalNotesType": p.id_clinical_notes_type,
+        }
         audit.createdAt = datetime.today()
         audit.createdBy = user_context.id
         db.session.add(audit)
