@@ -279,6 +279,8 @@ class ProtocolVariableFieldEnum(Enum):
     ADMISSION_TIME = "admissionTime"
     ST_CONCILIA = "stConcilia"
     CN_STATS = "cn_stats"
+    ID_ICD = "idIcd"
+    DISCHARGE_REASON = "dischargeReason"
 
 
 class SchemaConfigAuditTypeEnum(Enum):

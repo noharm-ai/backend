@@ -228,6 +228,20 @@ class AlertProtocol:
 
             return self._compare(op=operator, value1=department, value2=value)
 
+        if field == "idIcd":
+            if operator in ["IN", "NOT IN"]:
+                id_icd = [str(self.patient.id_icd).lower()]
+                value = [str(v).lower() for v in value]
+            else:
+                return False
+
+            return self._compare(op=operator, value1=id_icd, value2=value)
+
+        if field == "dischargeReason":
+            return self._compare(
+                op="CONTAINS", value1=self.patient.dischargeReason, value2=value
+            )
+
         if field == "idSegment":
             if operator in ["IN", "NOT IN"]:
                 segment = [str(self.prescription.idSegment)]
@@ -252,6 +266,8 @@ class AlertProtocol:
             v_period_op = variable.get("periodOperator", "=")
 
             v_route = variable.get("route", None)
+
+            v_observation = variable.get("observation", None)
 
             found = False
             for d in self.filtered_drugs:
@@ -332,6 +348,15 @@ class AlertProtocol:
                         )
                     )
 
+                if v_observation is not None:
+                    exp_result = exp_result and (
+                        self._compare(
+                            op="CONTAINS",
+                            value1=prescription_drug.notes,
+                            value2=v_observation,
+                        )
+                    )
+
                 if exp_result:
                     found = True
                     break
@@ -357,6 +382,11 @@ class AlertProtocol:
             return len(set.intersection(set(value1), set(value2))) > 0
         if op == "NOTIN":
             return len(set.intersection(set(value1), set(value2))) == 0
+        if op == "CONTAINS":
+            if value1 is None or value2 is None:
+                return False
+
+            return str(value2).lower() in str(value1).lower()
 
         raise NotImplementedError(f"operator not supported: {op}")
 

@@ -638,6 +638,34 @@ from utils.alert_protocol import AlertProtocol
                     {
                         "name": "v1",
                         "field": "combination",
+                        "observation": "Take with food",
+                    },
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            True,
+        ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
+                        "field": "combination",
+                        "observation": "other observation",
+                    },
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            False,
+        ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
+                        "field": "combination",
                         "substance": ["111111"],
                         "drug": ["1"],
                         "class": ["J1"],
@@ -687,6 +715,64 @@ from utils.alert_protocol import AlertProtocol
             },
             True,
         ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
+                        "field": "idIcd",
+                        "operator": "IN",
+                        "value": ["a00"],
+                    },
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            True,
+        ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
+                        "field": "idIcd",
+                        "operator": "IN",
+                        "value": ["a01", "a02"],
+                    },
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            False,
+        ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
+                        "field": "dischargeReason",
+                        "value": "melhorado",
+                    },
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            True,
+        ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
+                        "field": "dischargeReason",
+                        "value": "transferido",
+                    },
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            False,
+        ),
     ],
 )
 def test_trigger(protocol, has_result):
@@ -701,6 +787,7 @@ def test_trigger(protocol, has_result):
             route="IV",
             frequency=2,
             period=5,
+            notes="Take with food",
         ),
         utils_test_prescription.get_prescription_drug_mock_row(
             id_prescription_drug=2,
@@ -738,6 +825,8 @@ def test_trigger(protocol, has_result):
     patient = Patient()
     patient.admissionDate = datetime.now() - timedelta(days=2)
     patient.st_conciliation = 1
+    patient.id_icd = "A00"
+    patient.dischargeReason = "Alta melhorado"
 
     alert_protocol = AlertProtocol(
         drugs=drug_list,

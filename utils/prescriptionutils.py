@@ -1,6 +1,10 @@
+"""Prescription utils functions."""
+
 from datetime import datetime
 
-from . import numberutils, stringutils, dateutils
+from utils import numberutils
+from utils import stringutils
+from utils import dateutils
 
 
 def lenghStay(admissionDate):

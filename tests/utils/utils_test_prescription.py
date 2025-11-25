@@ -58,6 +58,7 @@ def get_prescription_drug_mock_row(
     sctid: str = None,
     route: str = None,
     period: int = None,
+    notes: str = None,
 ):
     MockRow = namedtuple(
         "Mockrow",
@@ -87,6 +88,7 @@ def get_prescription_drug_mock_row(
     pd.idPrescription = idPrescription
     pd.route = route
     pd.period = period
+    pd.notes = notes
 
     da = DrugAttributes()
     da.idDrug = id_prescription_drug
