@@ -523,6 +523,10 @@ class DrugList:
                 and not bool(pd[0].suspendedDate)
                 and pd[0].source in valid_sources
             ):
+
+                idmeasureunit = pd[0].idMeasureUnit if pd[0].idMeasureUnit else ""
+                idfrequency = pd[0].idFrequency if pd[0].idFrequency else ""
+
                 result.append(
                     {
                         "idPrescription": str(pd[0].idPrescription),
@@ -537,12 +541,12 @@ class DrugList:
                         "measureUnit": (
                             {"value": pd[2].id, "label": pd[2].description}
                             if pd[2]
-                            else ""
+                            else {"value": idmeasureunit, "label": idmeasureunit}
                         ),
                         "frequency": (
                             {"value": pd[3].id, "label": pd[3].description}
                             if pd[3]
-                            else ""
+                            else {"value": idfrequency, "label": idfrequency}
                         ),
                         "frequencyday": pd[0].frequency,
                         "time": prescriptionutils.timeValue(pd[0].interval),
