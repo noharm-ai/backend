@@ -1,13 +1,347 @@
-<p>Olá, {{user}}</p>
-<p>Você pediu para redefinir sua senha?</p>
-<p> </p>
-<p>Para redefinir sua senha
-    <a href="{{host}}/reset/{{token}}">
-        clique aqui
-    </a>.
-</p>
-<p>Se você não pediu para redefinir sua senha, ignore essa mensagem.</p>
-<p>Qualquer dúvida, entre em contato.</p>
-<p>Abraços,</p>
-<p>Suporte NoHarm</p>
-<p><img src="https://noharm.ai/assets/images/hero-brand.png" width="100" alt="NoHarm Logo"></p>
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Redefinição de Senha - NoHarm</title>
+  </head>
+  <body
+    style="
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f5f7fa;
+    "
+  >
+    <table
+      style="
+        width: 100%;
+        max-width: 600px;
+        margin: 0 auto;
+        background-color: #ffffff;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+      "
+    >
+      <!-- Header with Logo -->
+      <tr>
+        <td
+          style="
+            background: linear-gradient(135deg, #073763 0%, #0b5394 100%);
+            padding: 40px 30px;
+            text-align: center;
+          "
+        >
+          <img
+            src="https://noharm.ai/assets/images/noharm-wide.png"
+            alt="NoHarm Logo"
+            style="height: 60px; margin-bottom: 20px; filter: brightness(1.1)"
+          />
+          <h1
+            style="
+              color: #ffffff;
+              font-size: 28px;
+              font-weight: 600;
+              margin: 0;
+              letter-spacing: 0.5px;
+              text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            "
+          >
+            Redefinição de Senha
+          </h1>
+          <p
+            style="
+              color: #e6f2ff;
+              font-size: 16px;
+              margin: 15px 0 0 0;
+              opacity: 0.9;
+            "
+          >
+            Solicitação de nova senha para sua conta
+          </p>
+        </td>
+      </tr>
+
+      <!-- Main Message -->
+      <tr>
+        <td style="padding: 40px 30px 30px 30px">
+          <div
+            style="
+              background: linear-gradient(135deg, #f8fbff 0%, #e8f4fd 100%);
+              border-radius: 8px;
+              padding: 25px;
+              border-left: 4px solid #4a86e8;
+              margin-bottom: 30px;
+            "
+          >
+            <h2
+              style="
+                color: #073763;
+                font-size: 22px;
+                font-weight: 600;
+                margin: 0 0 15px 0;
+              "
+            >
+              Olá, {{user}}! 🔐
+            </h2>
+            <p
+              style="color: #555; font-size: 16px; line-height: 1.6; margin: 0"
+            >
+              Você solicitou a redefinição da sua senha na plataforma
+              <strong>NoHarm.ai</strong>? Se sim, clique no botão abaixo para
+              criar uma nova senha.
+            </p>
+          </div>
+        </td>
+      </tr>
+
+      <!-- Reset Password Section -->
+      <tr>
+        <td style="padding: 0 30px 30px 30px">
+          <div
+            style="
+              background-color: #fff;
+              border: 2px solid #e1e8ed;
+              border-radius: 10px;
+              padding: 25px;
+              text-align: center;
+            "
+          >
+            <h3
+              style="
+                color: #4a86e8;
+                font-size: 20px;
+                font-weight: 600;
+                margin: 0 0 20px 0;
+              "
+            >
+              🔑 Redefinir Senha
+            </h3>
+
+            <div
+              style="
+                background-color: #f8fbff;
+                border-radius: 6px;
+                padding: 25px;
+                margin-bottom: 20px;
+              "
+            >
+              <p
+                style="
+                  color: #555;
+                  font-size: 15px;
+                  line-height: 1.5;
+                  margin: 0 0 20px 0;
+                "
+              >
+                Clique no botão abaixo para acessar a página de redefinição de
+                senha:
+              </p>
+
+              <a
+                href="{{host}}/reset/{{token}}"
+                style="
+                  display: inline-block;
+                  background: linear-gradient(135deg, #4a86e8 0%, #073763 100%);
+                  color: #ffffff;
+                  text-decoration: none;
+                  font-weight: 600;
+                  font-size: 16px;
+                  padding: 15px 30px;
+                  border-radius: 8px;
+                  box-shadow: 0 3px 10px rgba(74, 134, 232, 0.3);
+                  transition: all 0.3s ease;
+                "
+                target="_blank"
+              >
+                🔗 Redefinir Minha Senha
+              </a>
+
+              <div
+                style="
+                  margin-top: 20px;
+                  padding-top: 15px;
+                  border-top: 1px solid #e1e8ed;
+                "
+              >
+                <p
+                  style="
+                    color: #666;
+                    font-size: 13px;
+                    line-height: 1.4;
+                    margin: 0;
+                  "
+                >
+                  Se o botão não funcionar, copie e cole este link no seu
+                  navegador:<br />
+                  <a
+                    href="{{host}}/reset/{{token}}"
+                    style="
+                      color: #4a86e8;
+                      text-decoration: none;
+                      word-break: break-all;
+                      font-size: 12px;
+                    "
+                    target="_blank"
+                  >
+                    {{host}}/reset/{{token}}
+                  </a>
+                </p>
+              </div>
+            </div>
+
+            <div
+              style="
+                background-color: #fff3cd;
+                border: 1px solid #ffeaa7;
+                border-radius: 6px;
+                padding: 15px;
+                margin-top: 15px;
+              "
+            >
+              <p
+                style="
+                  margin: 0;
+                  color: #856404;
+                  font-size: 14px;
+                  line-height: 1.5;
+                "
+              >
+                <strong>⚠️ Importante:</strong> Se você não solicitou esta
+                redefinição de senha, ignore este e-mail. Sua senha permanecerá
+                inalterada.
+              </p>
+            </div>
+          </div>
+        </td>
+      </tr>
+
+      <!-- Security Tips -->
+      <tr>
+        <td style="padding: 0 30px 30px 30px">
+          <div
+            style="
+              background: linear-gradient(135deg, #e8f5e8 0%, #f0fff4 100%);
+              border-radius: 8px;
+              padding: 25px;
+              border-left: 4px solid #28a745;
+            "
+          >
+            <h3
+              style="
+                color: #155724;
+                font-size: 18px;
+                font-weight: 600;
+                margin: 0 0 15px 0;
+              "
+            >
+              🛡️ Dicas de Segurança
+            </h3>
+            <ul
+              style="
+                color: #155724;
+                font-size: 15px;
+                line-height: 1.6;
+                margin: 0;
+                padding-left: 20px;
+              "
+            >
+              <li style="margin-bottom: 8px">
+                Use uma senha forte com letras, números e símbolos
+              </li>
+              <li style="margin-bottom: 8px">
+                Não compartilhe sua senha com outras pessoas
+              </li>
+              <li style="margin-bottom: 8px">
+                Altere sua senha regularmente para maior segurança
+              </li>
+              <li>
+                Entre em contato conosco se suspeitar de atividade não
+                autorizada
+              </li>
+            </ul>
+          </div>
+        </td>
+      </tr>
+
+      <!-- Support Section -->
+      <tr>
+        <td style="padding: 0 30px 40px 30px">
+          <div style="text-align: center">
+            <p
+              style="
+                color: #666;
+                font-size: 15px;
+                line-height: 1.5;
+                margin: 0 0 15px 0;
+              "
+            >
+              Precisa de ajuda? Nossa equipe está sempre disponível para
+              auxiliá-lo.
+            </p>
+            <p
+              style="
+                color: #073763;
+                font-size: 16px;
+                font-weight: 500;
+                margin: 0;
+              "
+            >
+              Atenciosamente,<br />
+              <strong>Equipe de Suporte NoHarm</strong> 💙
+            </p>
+          </div>
+        </td>
+      </tr>
+
+      <!-- Footer -->
+      <tr>
+        <td
+          style="
+            background: linear-gradient(135deg, #073763 0%, #0b5394 100%);
+            padding: 25px 30px;
+            text-align: center;
+          "
+        >
+          <div>
+            <p style="color: #b8d4f0; font-size: 13px; margin: 0">
+              © 2025 NoHarm.ai
+            </p>
+          </div>
+        </td>
+      </tr>
+    </table>
+
+    <!-- Responsive adjustments for mobile -->
+    <style>
+      @media only screen and (max-width: 600px) {
+        table {
+          width: 100% !important;
+          margin: 10px !important;
+        }
+
+        td[style*="padding: 40px"] {
+          padding: 20px !important;
+        }
+
+        h1 {
+          font-size: 24px !important;
+        }
+
+        h2 {
+          font-size: 20px !important;
+        }
+
+        h3 {
+          font-size: 18px !important;
+        }
+
+        a[style*="padding: 15px 30px"] {
+          padding: 12px 20px !important;
+          font-size: 14px !important;
+        }
+      }
+    </style>
+  </body>
+</html>
