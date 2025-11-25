@@ -14,6 +14,10 @@ from utils import dateutils, numberutils, prescriptionutils, status
 from services import prescription_service
 from exception.validation_error import ValidationError
 
+ICD_GROUPS = {
+    "ONCO": [f"C{i:02}" for i in range(98)] + [f"D{i}" for i in range(37, 49)]
+}
+
 
 @has_permission(Permission.READ_PRESCRIPTION)
 def get_prioritization_list(
@@ -51,6 +55,8 @@ def get_prioritization_list(
     age_min=None,
     age_max=None,
     id_patient_by_name_list=None,
+    id_icd_list=None,
+    id_icd_group_list=None,
 ):
 
     q = (
@@ -236,6 +242,20 @@ def get_prioritization_list(
             )
         except ValueError:
             pass
+
+    if id_icd_list and len(id_icd_list) > 0:
+        q = q.filter(Patient.id_icd.in_(id_icd_list))
+
+    if id_icd_group_list and len(id_icd_group_list) > 0:
+        query_icds = []
+        for group in id_icd_group_list:
+            icds = ICD_GROUPS.get(group, None)
+
+            if icds:
+                query_icds += icds
+
+        if query_icds:
+            q = q.filter(Patient.id_icd.in_(query_icds))
 
     if len(intervals) > 0:
         q = q.filter(
