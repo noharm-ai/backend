@@ -13,6 +13,21 @@ class ExamCreateRequest(BaseModel):
     result: float
 
 
+class ExamCreateItemRequest(BaseModel):
+    """Exam create item request model"""
+
+    examDate: datetime
+    examType: str
+    result: float
+
+
+class ExamCreateMultipleRequest(BaseModel):
+    """Exam create multiple request model"""
+
+    admissionNumber: int
+    exams: list[ExamCreateItemRequest]
+
+
 class ExamDeleteRequest(BaseModel):
     """Exam delete request model"""
 
