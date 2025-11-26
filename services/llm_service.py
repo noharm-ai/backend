@@ -1,13 +1,14 @@
-import boto3
 import json
+
+import boto3
 from openai import AzureOpenAI
 
 from config import Config
-from models.main import db
+from decorators.has_permission_decorator import Permission, has_permission
+from exception.validation_error import ValidationError
 from models.appendix import GlobalMemory
 from models.enums import GlobalMemoryEnum
-from exception.validation_error import ValidationError
-from decorators.has_permission_decorator import has_permission, Permission
+from models.main import db
 from utils import status
 
 
@@ -83,7 +84,7 @@ def _prompt_claude(messages):
         }
     )
 
-    modelId = "anthropic.claude-3-5-sonnet-20240620-v1:0"
+    modelId = "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
     accept = "application/json"
     contentType = "application/json"
 
