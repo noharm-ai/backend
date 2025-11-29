@@ -1,28 +1,74 @@
-from sqlalchemy.sql import distinct
-from sqlalchemy import func, and_, text
-from markupsafe import escape as escape_html
+import json
 from datetime import datetime
 
+import boto3
+from markupsafe import escape as escape_html
+from sqlalchemy import and_, func, text
+from sqlalchemy.sql import distinct
+
+from config import Config
+from decorators.has_permission_decorator import Permission, has_permission
+from exception.validation_error import ValidationError
+from models.appendix import MeasureUnit, MeasureUnitConvert
+from models.enums import DefaultMeasureUnitEnum, SegmentTypeEnum
 from models.main import (
-    db,
-    User,
-    PrescriptionAgg,
-    Outlier,
     Drug,
     DrugAttributes,
+    Outlier,
+    PrescriptionAgg,
     Substance,
+    User,
+    db,
 )
-from models.appendix import MeasureUnit, MeasureUnitConvert
+from models.requests.admin.admin_unit_conversion_request import SetFactorRequest
 from models.segment import Segment
-from models.enums import SegmentTypeEnum, DefaultMeasureUnitEnum
 from services import drug_service as main_drug_service
 from services.admin import (
     admin_drug_service,
 )
-from decorators.has_permission_decorator import has_permission, Permission
-from exception.validation_error import ValidationError
 from utils import status
-from models.requests.admin.admin_unit_conversion_request import SetFactorRequest
+
+
+@has_permission(Permission.ADMIN_UNIT_CONVERSION)
+def get_conversion_predictions(conversion_list: list) -> list:
+    to_infer = []
+    for index, conversion_item in enumerate(conversion_list):
+        destiny_unit = (
+            conversion_item.get("substanceMeasureUnit", DefaultMeasureUnitEnum.MG.value)
+            if conversion_item.get("substanceMeasureUnit", None)
+            else DefaultMeasureUnitEnum.MG.value
+        )
+
+        if conversion_item.get("prediction", None) is None:
+            to_infer.append(
+                {
+                    "id": index,
+                    "nome": conversion_item.get("name"),
+                    "unidade_noharm": destiny_unit,
+                    "fkunidademedida": conversion_item.get("idMeasureUnit"),
+                    "sctid": str(conversion_item.get("sctid")),
+                }
+            )
+
+    if to_infer:
+        lambda_client = boto3.client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
+        response = lambda_client.invoke(
+            FunctionName=Config.BACKEND_FUNCTION_NAME,
+            InvocationType="RequestResponse",
+            Payload=json.dumps(
+                {
+                    "command": "lambda_conversion_units.get_conversion_unit_factor",
+                    "conversion_unit_list": to_infer,
+                }
+            ),
+        )
+
+        response_object = json.loads(response["Payload"].read().decode("utf-8"))
+        for item in response_object:
+            conversion_list[item.get("id")]["prediction"] = item.get("prediction")
+            conversion_list[item.get("id")]["probability"] = item.get("probability")
+
+    return conversion_list
 
 
 @has_permission(Permission.ADMIN_UNIT_CONVERSION)
@@ -123,11 +169,18 @@ def get_conversion_list(id_segment):
     result = []
     drug_defaultunit = set()
     for i in conversion_list:
+        prediction = None
+        probability = None
         if i.default_measureunit == i.measureunit_nh:
             drug_defaultunit.add(i.id)
 
+            if i.measureunit_nh:
+                prediction = 1
+                probability = 100
+
         result.append(
             {
+                "id": f"{i.id}-{i.idMeasureUnit}",
                 "idDrug": i[1],
                 "name": i[2],
                 "idMeasureUnit": i[3],
@@ -135,6 +188,10 @@ def get_conversion_list(id_segment):
                 "idSegment": escape_html(id_segment),
                 "measureUnit": i[5],
                 "sctid": i.sctid,
+                "substanceMeasureUnit": i.default_measureunit,
+                "drugMeasureUnitNh": i.measureunit_nh,
+                "prediction": prediction,
+                "probability": probability,
             }
         )
 
@@ -147,6 +204,7 @@ def get_conversion_list(id_segment):
             if d_unit:
                 result.append(
                     {
+                        "id": f"{i.id}-{d_unit.get('idMeasureUnit')}",
                         "idDrug": i.id,
                         "name": i.name,
                         "idMeasureUnit": d_unit.get("idMeasureUnit"),
@@ -154,6 +212,10 @@ def get_conversion_list(id_segment):
                         "idSegment": escape_html(id_segment),
                         "measureUnit": d_unit.get("description"),
                         "sctid": i.sctid,
+                        "substanceMeasureUnit": i.default_measureunit,
+                        "drugMeasureUnitNh": i.measureunit_nh,
+                        "prediction": 1,
+                        "probability": 100,
                     }
                 )
 
@@ -164,15 +226,6 @@ def get_conversion_list(id_segment):
 def save_conversions(
     id_drug, id_segment, id_measure_unit_default, conversion_list, user_context: User
 ):
-
-    # overwrite = False
-    # if (
-    #     admin_integration_status_service.get_integration_status(user_context.schema)
-    #     != IntegrationStatusEnum.PRODUCTION.value
-    # ):
-    # test always overwrite
-    overwrite = True
-
     if (
         id_drug == None
         or id_segment == None
@@ -194,47 +247,12 @@ def save_conversions(
                 status.HTTP_400_BAD_REQUEST,
             )
 
-    da = (
-        db.session.query(DrugAttributes)
-        .filter(DrugAttributes.idDrug == id_drug)
-        .filter(DrugAttributes.idSegment == id_segment)
-        .first()
-    )
-    if da == None:
-        da = main_drug_service.create_attributes_from_reference(
-            id_drug=id_drug, id_segment=id_segment, user=user_context
-        )
-    else:
-        if not overwrite and da.idMeasureUnit != id_measure_unit_default:
-            raise ValidationError(
-                "A alteração de Unidade Padrão deve ser executada através do Assistente para Geração de Escores.",
-                "errors.businessRule",
-                status.HTTP_400_BAD_REQUEST,
-            )
-
-    da.idMeasureUnit = id_measure_unit_default
-    da.update = datetime.today()
-    da.user = user_context.id
-
-    db.session.flush()
-
-    # set conversions
-    _update_conversion_list(
-        conversion_list=conversion_list,
-        id_drug=id_drug,
-        id_segment=id_segment,
-        user=user_context,
-    )
-
-    # update other segments
-    rejected_segments = []
+    # update all segments
     updated_segments = []
     segments = db.session.query(Segment).all()
 
     for s in segments:
-        if s.id == id_segment:
-            updated_segments.append(s.description)
-            continue
+        updated_segments.append(s.description)
 
         # set drug attributes
         da = (
@@ -243,19 +261,8 @@ def save_conversions(
             .filter(DrugAttributes.idSegment == s.id)
             .first()
         )
-        if (
-            not overwrite
-            and da != None
-            and da.idMeasureUnit != None
-            and da.idMeasureUnit != id_measure_unit_default
-        ):
-            # do not update
-            rejected_segments.append(s.description)
-            continue
-        else:
-            updated_segments.append(s.description)
 
-        if da == None:
+        if da is None:
             da = main_drug_service.create_attributes_from_reference(
                 id_drug=id_drug, id_segment=s.id, user=user_context
             )
@@ -274,7 +281,9 @@ def save_conversions(
             user=user_context,
         )
 
-    return {"updated": updated_segments, "rejected": rejected_segments}
+        admin_drug_service.calculate_dosemax_uniq(id_drug=id_drug, id_segment=s.id)
+
+    return {"updated": updated_segments}
 
 
 def _update_conversion_list(conversion_list, id_drug, id_segment, user):
@@ -283,7 +292,7 @@ def _update_conversion_list(conversion_list, id_drug, id_segment, user):
             f"""
             insert into {user.schema}.unidadeconverte
                 (idsegmento, fkmedicamento, fkunidademedida, fator)
-            values 
+            values
                 (:id_segment, :id_drug, :id_measure_unit, :factor)
             on conflict (idsegmento, fkmedicamento, fkunidademedida)
             do update set fator = :factor
@@ -312,30 +321,30 @@ def add_default_units(user_context: User):
         with unidades as (
             select
                 fkmedicamento, min(fkunidademedida) as fkunidademedida
-            from ( 
-                select 
-                    fkmedicamento, fkunidademedida  
-                from {schema}.prescricaoagg p 
-                where 
-                    p.fkunidademedida is not null 
+            from (
+                select
+                    fkmedicamento, fkunidademedida
+                from {schema}.prescricaoagg p
+                where
+                    p.fkunidademedida is not null
                     and p.fkunidademedida <> ''
                     and p.fkmedicamento in (
                         select fkmedicamento from {schema}.medatributos m where m.fkunidademedida is null
                     )
                 group by fkmedicamento, fkunidademedida
             ) a
-            group by fkmedicamento 
+            group by fkmedicamento
             having count(*) = 1
         ), unidades_segmento as (
             select fkmedicamento, fkunidademedida, s.idsegmento  from unidades, {schema}.segmento s
         )
-        update 
+        update
             {schema}.medatributos ma
-        set 
+        set
             fkunidademedida = unidades_segmento.fkunidademedida
-        from 
+        from
             unidades_segmento
-        where 
+        where
             ma.fkmedicamento = unidades_segmento.fkmedicamento
             and ma.idsegmento = unidades_segmento.idsegmento
             and ma.fkunidademedida is null
@@ -346,12 +355,12 @@ def add_default_units(user_context: User):
         f"""
         insert into {schema}.unidadeconverte
             (idsegmento, fkmedicamento, fkunidademedida, fator)
-        select 
+        select
             m.idsegmento, m.fkmedicamento, m.fkunidademedida, 1
-        from 
-            {schema}.medatributos m 
-        where 
-            m.fkunidademedida is not null 
+        from
+            {schema}.medatributos m
+        where
+            m.fkunidademedida is not null
             and m.fkunidademedida != ''
         on conflict (idsegmento, fkmedicamento, fkunidademedida)
         do nothing
@@ -384,20 +393,20 @@ def copy_unit_conversion(id_segment_origin, id_segment_destiny, user_context: Us
     query = text(
         f"""
         with conversao_origem as (
-            select 
+            select
                 ma.fkmedicamento, ma.idsegmento, ma.fkunidademedida
             from
                 {schema}.medatributos ma
                 inner join {schema}.medatributos madestino on (
                     ma.fkmedicamento = madestino.fkmedicamento
                     and madestino.idsegmento  = :idSegmentDestiny
-                    and ma.fkunidademedida = madestino.fkunidademedida 
+                    and ma.fkunidademedida = madestino.fkunidademedida
                 )
-            where 
+            where
                 ma.idsegmento = :idSegmentOrigin
         )
         insert into {schema}.unidadeconverte (idsegmento, fkunidademedida, fator, fkmedicamento) (
-            select 
+            select
                 :idSegmentDestiny as idsegmento,
                 u.fkunidademedida,
                 u.fator,
@@ -405,7 +414,7 @@ def copy_unit_conversion(id_segment_origin, id_segment_destiny, user_context: Us
             from
                 {schema}.unidadeconverte u
                 inner join conversao_origem on (
-                    u.fkmedicamento = conversao_origem.fkmedicamento 
+                    u.fkmedicamento = conversao_origem.fkmedicamento
                     and u.idsegmento = conversao_origem.idsegmento
                 )
         )
