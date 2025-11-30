@@ -1,49 +1,50 @@
 """Service: dedicated to prescription view data"""
 
-from datetime import datetime, date
-from sqlalchemy import desc, and_, func
+from datetime import date, datetime
+
+from sqlalchemy import and_, desc, func
 from sqlalchemy.dialects.postgresql import INTERVAL
 
-from decorators.has_permission_decorator import has_permission, Permission
+from decorators.has_permission_decorator import Permission, has_permission
 from decorators.timed_decorator import timed
 from exception.validation_error import ValidationError
-from models.main import db, User
-from models.prescription import (
-    Prescription,
-    Patient,
-    PrescriptionAudit,
-)
 from models.appendix import Department, ICDTable
-from models.segment import Segment
 from models.enums import (
-    MemoryEnum,
-    FeatureEnum,
-    PrescriptionReviewTypeEnum,
-    PrescriptionAuditTypeEnum,
     AppFeatureFlagEnum,
     DrugTypeEnum,
+    FeatureEnum,
+    MemoryEnum,
+    PrescriptionAuditTypeEnum,
+    PrescriptionReviewTypeEnum,
 )
+from models.main import User, db
+from models.prescription import (
+    Patient,
+    Prescription,
+    PrescriptionAudit,
+)
+from models.segment import Segment
 from repository import (
-    prescription_view_repository,
-    patient_repository,
     clinical_notes_repository,
     clinical_notes_type_repository,
+    patient_repository,
+    prescription_view_repository,
 )
 from services import (
-    prescription_service,
-    memory_service,
-    patient_service,
-    intervention_service,
-    clinical_notes_service,
     alert_interaction_service,
     alert_protocol_service,
     alert_service,
-    feature_service,
+    clinical_notes_service,
     exams_service,
+    feature_service,
+    intervention_service,
+    memory_service,
+    patient_service,
+    prescription_service,
     segment_service,
 )
+from utils import dateutils, prescriptionutils, status
 from utils.drug_list import DrugList
-from utils import prescriptionutils, dateutils, status
 
 
 @has_permission(Permission.READ_PRESCRIPTION)
@@ -638,14 +639,16 @@ def _get_drug_data(
     )
 
     if config_data["disable_solution_tab"]:
-        p_drugs = drug_list.getDrugType([], ["Medicamentos", "Soluções"])
+        p_drugs = drug_list.get_drugs_by_source(
+            [DrugTypeEnum.DRUG.value, DrugTypeEnum.SOLUTION.value]
+        )
         p_solution = []
     else:
-        p_drugs = drug_list.getDrugType([], ["Medicamentos"])
-        p_solution = drug_list.getDrugType([], ["Soluções"])
+        p_drugs = drug_list.get_drugs_by_source([DrugTypeEnum.DRUG.value])
+        p_solution = drug_list.get_drugs_by_source([DrugTypeEnum.SOLUTION.value])
 
-    p_procedures = drug_list.getDrugType([], ["Proced/Exames"])
-    p_diet = drug_list.getDrugType([], ["Dietas"])
+    p_procedures = drug_list.get_drugs_by_source([DrugTypeEnum.PROCEDURE.value])
+    p_diet = drug_list.get_drugs_by_source([DrugTypeEnum.DIET.value])
     p_infusion = drug_list.getInfusionList()
 
     drug_list.sumAlerts()
