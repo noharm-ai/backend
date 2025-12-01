@@ -536,9 +536,18 @@ def _alert_lactating(
 
     if lactating and drug_attributes != None and drug_attributes.lactating == "3":
         alert["text"] = (
-            f"""Paciente amamentando com medicamento classificado como Alto risco prescrito.
+            """Paciente amamentando com medicamento classificado como Alto risco prescrito.
             Avaliar manutenção deste medicamento com a equipe médica ou cessação da amamentação."""
         )
+
+        return alert
+
+    if lactating and drug_attributes != None and drug_attributes.lactating == "2":
+        alert["text"] = (
+            """Paciente amamentando com medicamento classificado como Médio Risco prescrito.
+            Avaliar manutenção deste medicamento com a equipe médica ou cessação da amamentação."""
+        )
+        alert["level"] = DrugAlertLevelEnum.LOW.value
 
         return alert
 

@@ -1,37 +1,38 @@
 """Service: prescription related operations"""
 
 from datetime import date, datetime
-from sqlalchemy import desc, nullsfirst, func, and_, or_, text, literal
 
-from models.main import db, User
-from models.prescription import (
-    Prescription,
-    Patient,
-    PrescriptionAudit,
-    PatientAudit,
-)
-from models.appendix import Department, SchemaConfig
-from models.regulation import RegSolicitation
-from models.enums import (
-    FeatureEnum,
-    PrescriptionAuditTypeEnum,
-    AppFeatureFlagEnum,
-    PatientAuditTypeEnum,
-)
-from repository import prescription_view_repository
+from sqlalchemy import and_, desc, func, literal, nullsfirst, or_, text
+
+from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
+from models.appendix import Department, SchemaConfig
+from models.enums import (
+    AppFeatureFlagEnum,
+    FeatureEnum,
+    PatientAuditTypeEnum,
+    PrescriptionAuditTypeEnum,
+)
+from models.main import User, db
+from models.prescription import (
+    Patient,
+    PatientAudit,
+    Prescription,
+    PrescriptionAudit,
+)
+from models.regulation import RegSolicitation
+from repository import prescription_view_repository
 from services import (
-    memory_service,
-    feature_service,
+    clinical_notes_service,
     data_authorization_service,
     exams_service,
+    feature_service,
+    memory_service,
     patient_service,
-    clinical_notes_service,
-    user_service,
     segment_service,
+    user_service,
 )
-from decorators.has_permission_decorator import has_permission, Permission
-from utils import status, dateutils
+from utils import dateutils, status
 
 
 @has_permission(
@@ -304,15 +305,15 @@ def recalculate_prescription(id_prescription: int, user_context: User):
             db.session.execute(query, {"prescriptionIds": prescription_ids})
         else:
             subquery = f"""
-                SELECT 
+                SELECT
                     fkprescricao
                 FROM
                     {user_context.schema}.prescricao p
-                WHERE 
+                WHERE
                     p.nratendimento = :admissionNumber
                     AND p.idsegmento IS NOT NULL
                     AND (
-                        p.dtprescricao::date = date(:prescDate) 
+                        p.dtprescricao::date = date(:prescDate)
                         OR p.dtvigencia::date = date(:prescDate)
                     )
             """
@@ -323,7 +324,7 @@ def recalculate_prescription(id_prescription: int, user_context: User):
                     UPDATE {user_context.schema}.presmed
                     SET
                         idoutlier = 99999
-                    WHERE 
+                    WHERE
                         fkprescricao IN ({subquery})
                 """
             )
@@ -334,11 +335,11 @@ def recalculate_prescription(id_prescription: int, user_context: User):
             query = text(
                 f"""
                     INSERT INTO {user_context.schema}.presmed
-                    SELECT 
+                    SELECT
                         pm.*
-                    FROM 
+                    FROM
                         {user_context.schema}.presmed pm
-                    WHERE 
+                    WHERE
                         fkprescricao IN ({subquery})
                 """
             )
@@ -352,7 +353,7 @@ def recalculate_prescription(id_prescription: int, user_context: User):
                 UPDATE {user_context.schema}.presmed
                 SET
                     idoutlier = 99999
-                WHERE 
+                WHERE
                     fkprescricao = :idPrescription
             """
         )

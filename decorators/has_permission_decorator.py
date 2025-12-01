@@ -1,17 +1,16 @@
 import inspect
-from typing import List
 from functools import wraps
+
 from flask import g
 from flask_jwt_extended import get_jwt_identity
 
+from exception.authorization_error import AuthorizationError
 from models.main import User
 from security.permission import Permission
 from security.role import Role
-from exception.authorization_error import AuthorizationError
 
 
-def has_permission(*permissions: List[Permission]):
-
+def has_permission(*permissions: Permission):
     def wrapper(f):
         @wraps(f)
         def decorator_f(*args, **kwargs):

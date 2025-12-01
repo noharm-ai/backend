@@ -87,16 +87,7 @@ def upsert_protocol(request_data: ProtocolUpsertRequest, user_context: User):
 
 
 def _validate_variables(variables: list[dict]):
-    valid_operators = [
-        ">",
-        "<",
-        ">=",
-        "<=",
-        "=",
-        "!=",
-        "IN",
-        "NOTIN",
-    ]
+    valid_operators = [">", "<", ">=", "<=", "=", "!=", "IN", "NOTIN", "CONTAINS"]
 
     if not variables:
         raise ValidationError(

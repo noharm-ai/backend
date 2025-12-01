@@ -1,7 +1,7 @@
 """Configuration module for the application."""
 
-from os import getenv
 from datetime import timedelta
+from os import getenv
 
 from models.enums import NoHarmENV
 
@@ -9,7 +9,7 @@ from models.enums import NoHarmENV
 class Config:
     """Configuration class for the application."""
 
-    VERSION = "v4.96-beta"
+    VERSION = "v4.97-beta"
     FRONTEND_VERSION = "5.1.6"
     ENV = getenv("ENV") or NoHarmENV.DEVELOPMENT.value
     SECRET_KEY = getenv("SECRET_KEY") or "secret_key"

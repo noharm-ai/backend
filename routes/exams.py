@@ -2,13 +2,18 @@
 
 from flask import Blueprint, request
 
-from models.requests.exam_request import ExamCreateRequest, ExamDeleteRequest
+from models.requests.exam_request import (
+    ExamCreateRequest,
+    ExamDeleteRequest,
+    ExamCreateMultipleRequest,
+)
 from services import exams_service
 from decorators.api_endpoint_decorator import api_endpoint
 
 app_exams = Blueprint("app_exams", __name__)
 
 
+# deprecated
 @app_exams.route("/exams/create", methods=["POST"])
 @api_endpoint()
 def create_exam():
@@ -16,6 +21,16 @@ def create_exam():
 
     return exams_service.create_exam(
         request_data=ExamCreateRequest(**request.get_json())
+    )
+
+
+@app_exams.route("/exams/create-multiple", methods=["POST"])
+@api_endpoint()
+def create_exam_multiple():
+    """Creates a new exam (multiple entries)"""
+
+    return exams_service.create_exam_multiple(
+        request_data=ExamCreateMultipleRequest(**request.get_json())
     )
 
 

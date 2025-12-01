@@ -1,8 +1,8 @@
 from flask import Blueprint, request
 
 from decorators.api_endpoint_decorator import api_endpoint
-from services.admin import admin_unit_conversion_service
 from models.requests.admin.admin_unit_conversion_request import SetFactorRequest
+from services.admin import admin_unit_conversion_service
 
 app_admin_unit_conversion = Blueprint("app_admin_unit_conversion", __name__)
 
@@ -14,6 +14,16 @@ def get_unit_conversion_list():
 
     return admin_unit_conversion_service.get_conversion_list(
         id_segment=request_data.get("idSegment")
+    )
+
+
+@app_admin_unit_conversion.route("/admin/unit-conversion/predictions", methods=["POST"])
+@api_endpoint()
+def get_unit_conversion_predictions():
+    request_data = request.get_json()
+
+    return admin_unit_conversion_service.get_conversion_predictions(
+        conversion_list=request_data.get("conversionList")
     )
 
 

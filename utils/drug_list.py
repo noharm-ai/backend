@@ -1,12 +1,12 @@
 """Repository: queries related to prescription visualization"""
 
-import re
 import math
+import re
 
+from models.enums import DrugTypeEnum
 from services import drug_service
 from services.admin import admin_ai_service
-from models.enums import DrugTypeEnum
-from utils import stringutils, numberutils, prescriptionutils, dateutils
+from utils import dateutils, numberutils, prescriptionutils, stringutils
 
 
 def _get_legacy_alert(kind):
@@ -64,6 +64,9 @@ class DrugList:
             "total": 0,
             "level": "low",
         }
+        self.drug_results = []
+
+        self._process_drugs()
 
     def sumAlerts(self):
         # relations stats
@@ -124,7 +127,6 @@ class DrugList:
     def getPrevIntervention(self, idDrug, idPrescription):
         result = {}
         for i in self.interventions:
-
             if (
                 i["idDrug"] == idDrug
                 and i["status"] == "s"
@@ -154,11 +156,26 @@ class DrugList:
                 result = i
         return result
 
-    def getDrugType(self, pDrugs, source):
+    def get_drugs_by_source(self, source_list: list[str]):
+        items = []
+        for pd in self.drug_results:
+            if pd.get("source") in source_list:
+                items.append(pd)
+
+        return items
+
+    def _process_drugs(self):
+        """Process drugList and add source information. Save result in drug_results"""
+
         for pd in self.drugList:
             if pd[0].source is None:
                 pd[0].source = "Medicamentos"
-            if pd[0].source not in source:
+            if pd[0].source not in [
+                DrugTypeEnum.DRUG.value,
+                DrugTypeEnum.SOLUTION.value,
+                DrugTypeEnum.PROCEDURE.value,
+                DrugTypeEnum.DIET.value,
+            ]:
                 continue
 
             pdUnit = stringutils.strNone(pd[2].id) if pd[2] else ""
@@ -262,7 +279,7 @@ class DrugList:
                 # dialyzable drug and dialysis patient
                 dialyzable = True
 
-            pDrugs.append(
+            self.drug_results.append(
                 {
                     "idPrescription": str(pd[0].idPrescription),
                     "idPrescriptionDrug": str(pd[0].id),
@@ -335,7 +352,9 @@ class DrugList:
                     + " "
                     + stringutils.strNone(pd[0].solutionUnit),
                     "score": (
-                        str(pd[5]) if not pdWhiteList and source != "Dietas" else "0"
+                        str(pd[5])
+                        if not pdWhiteList and pd[0].source != DrugTypeEnum.DIET.value
+                        else "0"
                     ),
                     "source": pd[0].source,
                     "checked": bool(pd[0].checked or pd[9] == "s"),
@@ -368,7 +387,35 @@ class DrugList:
                 }
             )
 
-        return pDrugs
+        # Normalize source for records with same idPrescription and grp_solution
+        # Group drugs by (idPrescription, grp_solution) with their indices
+        groups = {}
+        for idx, drug in enumerate(self.drug_results):
+            # Skip records where grp_solution is null
+            if drug["grp_solution"] is None:
+                continue
+            key = (drug["idPrescription"], drug["grp_solution"])
+            if key not in groups:
+                groups[key] = []
+            groups[key].append(idx)
+
+        # Check each group for different sources and normalize
+        for key, indices in groups.items():
+            if len(indices) > 1:
+                sources = set(self.drug_results[idx]["source"] for idx in indices)
+
+                # Only normalize if there are different sources
+                if len(sources) > 1:
+                    # Priority: "Soluções" > Medicamentos
+                    if DrugTypeEnum.SOLUTION.value in sources:
+                        normalized_source = DrugTypeEnum.SOLUTION.value
+                    else:
+                        # Keep first source if no priority matches
+                        normalized_source = DrugTypeEnum.DRUG.value
+
+                    # Apply normalized source to all drugs in group in self.drug_results list
+                    for idx in indices:
+                        self.drug_results[idx]["source"] = normalized_source
 
     def getInfusionKey(self, pd):
         if self.is_cpoe:
@@ -523,6 +570,9 @@ class DrugList:
                 and not bool(pd[0].suspendedDate)
                 and pd[0].source in valid_sources
             ):
+                idmeasureunit = pd[0].idMeasureUnit if pd[0].idMeasureUnit else ""
+                idfrequency = pd[0].idFrequency if pd[0].idFrequency else ""
+
                 result.append(
                     {
                         "idPrescription": str(pd[0].idPrescription),
@@ -537,12 +587,12 @@ class DrugList:
                         "measureUnit": (
                             {"value": pd[2].id, "label": pd[2].description}
                             if pd[2]
-                            else ""
+                            else {"value": idmeasureunit, "label": idmeasureunit}
                         ),
                         "frequency": (
                             {"value": pd[3].id, "label": pd[3].description}
                             if pd[3]
-                            else ""
+                            else {"value": idfrequency, "label": idfrequency}
                         ),
                         "frequencyday": pd[0].frequency,
                         "time": prescriptionutils.timeValue(pd[0].interval),

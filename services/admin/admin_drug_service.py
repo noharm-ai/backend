@@ -1,19 +1,20 @@
-from sqlalchemy import and_, func, text, distinct
-from sqlalchemy.orm import undefer
-from typing import List
 from datetime import datetime
+from typing import List
 
-from models.main import db, User, Outlier, Drug, DrugAttributes, Substance
-from models.appendix import MeasureUnit, MeasureUnitConvert
-from models.segment import Segment
-from models.enums import SegmentTypeEnum
-from repository.admin import admin_drug_repository
-from services.admin import admin_ai_service
-from services import drug_service as main_drug_service
-from repository import drugs_repository, drug_attributes_repository
-from decorators.has_permission_decorator import has_permission, Permission
-from utils import status, dateutils
+from sqlalchemy import and_, distinct, func, text
+from sqlalchemy.orm import undefer
+
+from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
+from models.appendix import MeasureUnit, MeasureUnitConvert
+from models.enums import SegmentTypeEnum
+from models.main import Drug, DrugAttributes, Outlier, Substance, User, db
+from models.segment import Segment
+from repository import drug_attributes_repository, drugs_repository
+from repository.admin import admin_drug_repository
+from services import drug_service as main_drug_service
+from services.admin import admin_ai_service
+from utils import dateutils, status
 
 
 @has_permission(Permission.ADMIN_DRUGS)
@@ -175,11 +176,11 @@ def fix_inconsistency(user_context: User):
     # normalize medatributos
     query_normalize = text(
         f"""
-        update 
-            {schema}.medatributos 
-        set 
-            fkunidademedida = null 
-        where 
+        update
+            {schema}.medatributos
+        set
+            fkunidademedida = null
+        where
             fkunidademedida = ''
     """
     )
@@ -306,11 +307,11 @@ def predict_substance(id_drugs: List[int], user_context: User):
 def add_new_drugs_to_outlier(user_context: User):
     query = text(
         f"""
-            insert into {user_context.schema}.outlier 
+            insert into {user_context.schema}.outlier
                 (fkmedicamento, idsegmento, contagem, doseconv, frequenciadia, escore, update_at, update_by)
-            select 
-                pm.fkmedicamento, p.idsegmento, 0, 0, 0, 4, :updateAt, :updateBy 
-            from 
+            select
+                pm.fkmedicamento, p.idsegmento, 0, 0, 0, 4, :updateAt, :updateBy
+            from
 	            {user_context.schema}.presmed pm
 	            inner join {user_context.schema}.prescricao p on (pm.fkprescricao = p.fkprescricao)
             where
@@ -319,10 +320,10 @@ def add_new_drugs_to_outlier(user_context: User):
                 and p.idsegmento is not null
                 and not exists (
                     select 1
-                    from {user_context.schema}.outlier o 
+                    from {user_context.schema}.outlier o
                     where o.fkmedicamento = pm.fkmedicamento and o.idsegmento = p.idsegmento
                 )
-            group by 
+            group by
 	            pm.fkmedicamento, p.idsegmento
         """
     )

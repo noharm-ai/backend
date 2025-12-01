@@ -10,7 +10,11 @@ from models.main import db, redis_client, User
 from models.prescription import Patient
 from models.segment import Exams, SegmentExam
 from models.notes import ClinicalNotes
-from models.requests.exam_request import ExamCreateRequest, ExamDeleteRequest
+from models.requests.exam_request import (
+    ExamCreateRequest,
+    ExamDeleteRequest,
+    ExamCreateMultipleRequest,
+)
 from repository import exams_repository
 from services import cache_service
 from decorators.has_permission_decorator import has_permission, Permission
@@ -52,6 +56,42 @@ def delete_exam(request_data: ExamDeleteRequest, user_context: User):
     )
 
 
+@has_permission(Permission.WRITE_PRESCRIPTION)
+def create_exam_multiple(request_data: ExamCreateMultipleRequest, user_context: User):
+    """Create a new exam - multiple entries (enabled by feature)"""
+
+    admission = (
+        db.session.query(Patient)
+        .filter(Patient.admissionNumber == request_data.admissionNumber)
+        .first()
+    )
+    if admission is None:
+        raise ValidationError(
+            "Registro inexistente",
+            "errors.invalidRecord",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    for exam_item in request_data.exams:
+        exam = Exams()
+        exam.idExame = exams_repository.get_next_exam_id(id_patient=admission.idPatient)
+        exam.idPatient = admission.idPatient
+        exam.admissionNumber = request_data.admissionNumber
+        exam.date = exam_item.examDate
+        exam.typeExam = exam_item.examType.upper()
+        exam.value = exam_item.result
+        exam.created_by = user_context.id
+
+        db.session.add(exam)
+        db.session.flush()
+
+    # refresh cache
+    refresh_exams_cache(id_patient=admission.idPatient, user_context=user_context)
+
+    return True
+
+
+# deprecated
 @has_permission(Permission.WRITE_PRESCRIPTION)
 def create_exam(request_data: ExamCreateRequest, user_context: User):
     """Create a new exam (enabled by feature)"""

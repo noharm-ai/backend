@@ -1,18 +1,23 @@
 import re
 from datetime import date, timedelta
-from sqlalchemy import func, Integer, and_, cast, BigInteger, or_, desc
-from sqlalchemy.orm import undefer
-from sqlalchemy.dialects import postgresql
 
-from models.main import db
-from models.enums import PrescriptionReviewTypeEnum, PatientConciliationStatusEnum
-from models.prescription import Prescription, Patient
-from models.appendix import Department
-from models.segment import Segment
-from decorators.has_permission_decorator import has_permission, Permission
-from utils import dateutils, numberutils, prescriptionutils, status
-from services import prescription_service
+from sqlalchemy import BigInteger, Integer, and_, cast, desc, func, or_
+from sqlalchemy.dialects import postgresql
+from sqlalchemy.orm import undefer
+
+from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
+from models.appendix import Department
+from models.enums import PatientConciliationStatusEnum, PrescriptionReviewTypeEnum
+from models.main import db
+from models.prescription import Patient, Prescription
+from models.segment import Segment
+from services import prescription_service
+from utils import dateutils, numberutils, prescriptionutils, status
+
+ICD_GROUPS = {
+    "ONCO": [f"C{i:02}" for i in range(98)] + [f"D{i}" for i in range(37, 49)]
+}
 
 
 @has_permission(Permission.READ_PRESCRIPTION)
@@ -51,8 +56,9 @@ def get_prioritization_list(
     age_min=None,
     age_max=None,
     id_patient_by_name_list=None,
+    id_icd_list=None,
+    id_icd_group_list=None,
 ):
-
     q = (
         db.session.query(
             Prescription,
@@ -236,6 +242,20 @@ def get_prioritization_list(
             )
         except ValueError:
             pass
+
+    if id_icd_list and len(id_icd_list) > 0:
+        q = q.filter(Patient.id_icd.in_(id_icd_list))
+
+    if id_icd_group_list and len(id_icd_group_list) > 0:
+        query_icds = []
+        for group in id_icd_group_list:
+            icds = ICD_GROUPS.get(group, None)
+
+            if icds:
+                query_icds += icds
+
+        if query_icds:
+            q = q.filter(Patient.id_icd.in_(query_icds))
 
     if len(intervals) > 0:
         q = q.filter(
