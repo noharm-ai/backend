@@ -402,7 +402,6 @@ class DrugList:
         # Check each group for different sources and normalize
         for key, indices in groups.items():
             if len(indices) > 1:
-                # sources = set(self.drug_results[idx]["source"] for idx in indices)
                 sources = set()
 
                 for idx in indices:
