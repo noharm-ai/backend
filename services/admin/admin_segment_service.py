@@ -39,7 +39,7 @@ def upsert_segment(
     segment.description = description
     segment.status = 1 if active else 0
     segment.type = type
-    segment.cpoe = cpoe
+    segment.cpoe = cpoe if cpoe is not None else False
 
     db.session.add(segment)
 
