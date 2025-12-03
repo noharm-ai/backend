@@ -402,7 +402,22 @@ class DrugList:
         # Check each group for different sources and normalize
         for key, indices in groups.items():
             if len(indices) > 1:
-                sources = set(self.drug_results[idx]["source"] for idx in indices)
+                # sources = set(self.drug_results[idx]["source"] for idx in indices)
+                sources = set()
+
+                for idx in indices:
+                    drug_item = self.drug_results[idx]
+                    drug_item_source = drug_item["source"]
+                    drug_item_whitelist = drug_item["whiteList"]
+
+                    if (
+                        drug_item_whitelist
+                        and drug_item_source == DrugTypeEnum.SOLUTION.value
+                    ):
+                        # should not be a Solution to avoid the entire group to became a solution too
+                        sources.add(DrugTypeEnum.DRUG.value)
+                    else:
+                        sources.add(drug_item_source)
 
                 # Only normalize if there are different sources
                 if len(sources) > 1:
