@@ -62,8 +62,6 @@ def find_drugs_by_prescription(
     find drugs related to the prescription
     """
 
-    db.session.execute(text("SET timezone TO 'America/Sao_Paulo'"))
-
     prevNotes = _get_prev_notes(admissionNumber)
 
     if aggDate is not None and is_cpoe:
