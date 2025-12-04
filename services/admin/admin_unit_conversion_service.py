@@ -283,6 +283,21 @@ def save_conversions(
 
         admin_drug_service.calculate_dosemax_uniq(id_drug=id_drug, id_segment=s.id)
 
+    # call lambda to generate scores (do not wait for response)
+    lambda_client = boto3.client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
+    lambda_client.invoke(
+        FunctionName=Config.BACKEND_FUNCTION_NAME,
+        InvocationType="Event",
+        Payload=json.dumps(
+            {
+                "command": "lambda_scores.process_drug_scores",
+                "schema": user_context.schema,
+                "id_user": user_context.id,
+                "id_drug": id_drug,
+            }
+        ),
+    )
+
     return {"updated": updated_segments}
 
 
