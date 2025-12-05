@@ -357,6 +357,7 @@ class DrugList:
                         else "0"
                     ),
                     "source": pd[0].source,
+                    "originalSource": pd[0].source,
                     "checked": bool(pd[0].checked or pd[9] == "s"),
                     "suspended": bool(pd[0].suspendedDate),
                     "suspensionDate": dateutils.to_iso(pd[0].suspendedDate),

@@ -1,19 +1,21 @@
 """Repository: prescription view related operations"""
 
-from sqlalchemy import between, func, case, cast, literal, and_, desc, asc, or_
+from datetime import datetime
+
+from sqlalchemy import and_, asc, between, case, cast, desc, func, literal, or_, text
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.dialects.postgresql import INTERVAL
 from sqlalchemy.sql.expression import literal_column
-from sqlalchemy.dialects import postgresql
 
-from models.main import db, User, DrugAttributes, Outlier, Substance, Drug
-from models.prescription import Prescription, PrescriptionDrug
 from models.appendix import (
-    Notes,
-    MeasureUnit,
-    Frequency,
-    MeasureUnitConvert,
     Department,
+    Frequency,
+    MeasureUnit,
+    MeasureUnitConvert,
+    Notes,
 )
+from models.main import Drug, DrugAttributes, Outlier, Substance, User, db
+from models.prescription import Prescription, PrescriptionDrug
 
 
 def _get_period_filter(query, model, agg_date, is_pmc, is_cpoe, ignore_segments=None):
@@ -63,10 +65,39 @@ def find_drugs_by_prescription(
     prevNotes = _get_prev_notes(admissionNumber)
 
     if aggDate is not None and is_cpoe:
-        period_calc = func.date(aggDate) - func.date(Prescription.date)
-        max_period = func.date(Prescription.expire) - func.date(Prescription.date)
+        # Use current time if aggDate is today, last minute of day if before today, or keep original if future
+        aggDate_adjusted = case(
+            (
+                func.date(aggDate) < datetime.now().date(),
+                func.date_trunc("day", aggDate)
+                + func.cast("1 day", INTERVAL)
+                - func.cast("1 second", INTERVAL),
+            ),
+            (func.date(aggDate) == datetime.now().date(), datetime.now()),
+            else_=aggDate,
+        )
+
+        # Extract epoch (seconds) and divide by seconds per day to get fractional days
+        period_calc = func.floor(
+            func.extract("epoch", aggDate_adjusted - Prescription.date) / 86400.0
+        )
+        max_period = func.floor(
+            func.extract("epoch", Prescription.expire - Prescription.date) / 86400.0
+        )
+        max_period_suspended = func.floor(
+            func.extract("epoch", PrescriptionDrug.suspendedDate - Prescription.date)
+            / 86400.0
+        )
         period_cpoe = case(
-            (func.date(aggDate) > func.date(Prescription.expire), max_period),
+            (
+                func.extract("epoch", aggDate_adjusted - Prescription.date) < 0,
+                0,
+            ),  # before starts
+            (
+                aggDate_adjusted > PrescriptionDrug.suspendedDate,
+                max_period_suspended,
+            ),  # when suspended
+            (aggDate_adjusted > Prescription.expire, max_period),  # when expired
             else_=period_calc,
         )
 

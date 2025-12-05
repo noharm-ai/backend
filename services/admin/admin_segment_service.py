@@ -1,12 +1,12 @@
-from sqlalchemy import func, and_, asc
+from sqlalchemy import and_, asc, func
 
-from models.main import db, User
-from models.appendix import SegmentDepartment, Department
-from models.segment import Hospital, Segment
-from models.enums import IntegrationStatusEnum
-from services.admin import admin_integration_status_service
-from decorators.has_permission_decorator import has_permission, Permission
+from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
+from models.appendix import Department, SegmentDepartment
+from models.enums import IntegrationStatusEnum
+from models.main import User, db
+from models.segment import Hospital, Segment
+from services.admin import admin_integration_status_service
 from utils import status
 
 
@@ -14,7 +14,6 @@ from utils import status
 def upsert_segment(
     id_segment, description, active, user_context: User, type: int, cpoe: bool
 ):
-
     if id_segment:
         segment = db.session.query(Segment).filter(Segment.id == id_segment).first()
         if segment == None:
@@ -35,11 +34,12 @@ def upsert_segment(
             )
 
         segment = Segment()
+        segment.cpoe_outpatient_clinic = False
 
     segment.description = description
     segment.status = 1 if active else 0
     segment.type = type
-    segment.cpoe = cpoe
+    segment.cpoe = cpoe if cpoe is not None else False
 
     db.session.add(segment)
 
