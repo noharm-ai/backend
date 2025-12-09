@@ -75,3 +75,41 @@ class RegMovement(db.Model):
 
     created_at = db.Column("created_at", db.DateTime, nullable=False)
     created_by = db.Column("created_by", db.BigInteger, nullable=True)
+
+
+class RegIndicatorsPanelReport(db.Model):
+    __tablename__ = "rel_painel_juntos"
+
+    id = db.Column("co_unico_ficha", db.BigInteger, primary_key=True)
+
+    id_citizen = db.Column("co_seq_cidadao", db.String, nullable=True)
+    admission_number = db.Column("nratendimento", db.BigInteger, nullable=True)
+    name = db.Column("nome", db.String, nullable=True)
+    birthdate = db.Column("dtnascimento", db.Date, nullable=True)
+    age = db.Column("idade", db.Integer, nullable=True)
+    address = db.Column("endereco", db.String, nullable=True)
+    gender = db.Column("sexo", db.String, nullable=True)
+    gestational_age = db.Column("idadegestacional", db.String, nullable=True)
+    cpf = db.Column("cpf", db.String, nullable=True)
+    cns = db.Column("cns", db.String, nullable=True)
+    health_unit = db.Column("unidadedesaude", db.String, nullable=True)
+    health_agent = db.Column("agentesaude", db.String, nullable=True)
+    responsible_team = db.Column("equiperesponsavel", db.String, nullable=True)
+    ciap = db.Column("desc_ciap", db.String, nullable=True)
+    icd = db.Column("desc_cid", db.String, nullable=True)
+    mammogram_appointment_date = db.Column("dtatendimento_mamo", db.Date, nullable=True)
+    hpv_appointment_date = db.Column("dtatendimento_hpv", db.Date, nullable=True)
+    hpv_vaccine_date = db.Column("dt_ultima_vacina_hpv", db.Date, nullable=True)
+    gestational_appointment_date = db.Column("dtconsulta_gest", db.Date, nullable=True)
+    sexattention_appointment_date = db.Column(
+        "dtatendimento_sex", db.Date, nullable=True
+    )
+    has_mammogram = db.Column("fez_mamografia", db.Boolean, nullable=True)
+    has_hpv = db.Column("fez_hpv", db.Boolean, nullable=True)
+    has_vaccine = db.Column("fez_vacina", db.Boolean, nullable=True)
+    has_sexattention_appointment = db.Column(
+        "fez_consulta_sex", db.Boolean, nullable=True
+    )
+    has_gestational_appointment = db.Column(
+        "fez_consulta_gest", db.Boolean, nullable=True
+    )

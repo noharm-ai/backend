@@ -2,8 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import and_, asc, between, case, cast, desc, func, literal, or_, text
-from sqlalchemy.dialects import postgresql
+from sqlalchemy import and_, asc, between, case, desc, func, literal, or_
 from sqlalchemy.dialects.postgresql import INTERVAL
 from sqlalchemy.sql.expression import literal_column
 
