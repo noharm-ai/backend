@@ -7,8 +7,10 @@ from datetime import date, datetime, timedelta
 
 from sqlalchemy import and_, desc, text
 
+from config import Config
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
+from models.enums import NoHarmENV
 from models.main import User, db, redis_client
 from models.notes import ClinicalNotes
 from models.prescription import Patient
@@ -21,8 +23,6 @@ from models.segment import Exams, SegmentExam
 from repository import exams_repository
 from services import cache_service
 from utils import dateutils, examutils, logger, numberutils, status, stringutils
-from config import Config
-from models.enums import NoHarmENV
 
 
 @has_permission(Permission.WRITE_PRESCRIPTION)
@@ -178,11 +178,13 @@ def get_exams_by_admission(admission_number: int, id_segment: int, user_context:
             status.HTTP_400_BAD_REQUEST,
         )
 
-    if Config.ENV != NoHarmENV.TEST.value
+    if Config.ENV != NoHarmENV.TEST.value:
         dynamodbexams = exams_repository.get_exams_by_patient_from_dynamodb(
             schema=user_context.schema, id_patient=patient.idPatient
         )
-        logger.backend_logger.info(f"Retrieved {len(dynamodbexams)} exams from DynamoDB")
+        logger.backend_logger.info(
+            f"Retrieved {len(dynamodbexams)} exams from DynamoDB"
+        )
 
     examsList = exams_repository.get_exams_by_patient(patient.idPatient, days=90)
     logger.backend_logger.info(f"Retrieved {len(examsList)} exams from RDS")
