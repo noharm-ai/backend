@@ -18,6 +18,20 @@ def get_indicators_panel():
     )
 
 
+@app_rpt_regulation.route("/reports/regulation/indicators-panel-csv", methods=["POST"])
+@api_endpoint(
+    download_headers={
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": "attachment; filename=indicadores.csv",
+    }
+)
+def get_indicators_panel_csv():
+    """Gets indicator panel report data as CSV"""
+    return reports_regulation_service.get_indicators_panel_report_csv(
+        request_data=RegIndicatorsPanelReportRequest(**request.get_json())
+    )
+
+
 @app_rpt_regulation.route("/reports/regulation/indicators-summary", methods=["GET"])
 @api_endpoint()
 def get_indicators_summary():

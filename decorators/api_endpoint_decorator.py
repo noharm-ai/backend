@@ -1,21 +1,21 @@
-import os
-import logging
 import inspect
-from flask import g, request
+import logging
+import os
+from functools import wraps
+
+from flask import g, make_response, request
 from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
 from flask_jwt_extended.exceptions import JWTExtendedException
 from jwt.exceptions import PyJWTError
-from functools import wraps
 from pydantic import ValidationError as PydanticValidationError
 
-from models.main import db, dbSession, User
-from utils import status
-from exception.validation_error import ValidationError
 from exception.authorization_error import AuthorizationError
+from exception.validation_error import ValidationError
+from models.main import User, db, dbSession
+from utils import status
 
 
-def api_endpoint():
-
+def api_endpoint(download_headers=None):
     def wrapper(f):
         @wraps(f)
         def decorator_f(*args, **kwargs):
@@ -39,6 +39,13 @@ def api_endpoint():
                 db.session.commit()
                 db.session.close()
                 db.session.remove()
+
+                # Handle download response with custom headers
+                if download_headers:
+                    response = make_response(result)
+                    for header_name, header_value in download_headers.items():
+                        response.headers[header_name] = header_value
+                    return response
 
                 return {"status": "success", "data": result}, status.HTTP_200_OK
 
