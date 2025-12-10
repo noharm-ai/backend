@@ -1,24 +1,25 @@
 from datetime import datetime
-from sqlalchemy import desc, func, text, asc
-from sqlalchemy.orm import undefer
-from sqlalchemy.dialects.postgresql import INTERVAL
 from typing import List
 
-from models.main import db, User, Allergy, Substance, Drug
+from sqlalchemy import asc, desc, func, text
+from sqlalchemy.dialects.postgresql import INTERVAL
+from sqlalchemy.orm import undefer
+
+from decorators.has_permission_decorator import Permission, has_permission
+from exception.validation_error import ValidationError
+from models.appendix import Tag
+from models.enums import FeatureEnum, PatientAuditTypeEnum, TagTypeEnum
+from models.main import Allergy, Drug, Substance, User, db
+from models.notes import ClinicalNotes
 from models.prescription import (
-    Prescription,
     Patient,
     PatientAudit,
+    Prescription,
 )
-from models.notes import ClinicalNotes
-from models.appendix import Tag
-from models.enums import PatientAuditTypeEnum, FeatureEnum, TagTypeEnum
-from utils.dateutils import to_iso
 from services import memory_service
 from services.admin import admin_tag_service
-from decorators.has_permission_decorator import has_permission, Permission
-from exception.validation_error import ValidationError
 from utils import status
+from utils.dateutils import to_iso
 
 
 @has_permission(Permission.READ_PRESCRIPTION)
@@ -142,8 +143,12 @@ def save_patient(
     user_context: User,
     user_permissions: List[Permission],
 ):
-    # TODO: refactor
-    p = Patient.findByAdmission(admission_number)
+    p = (
+        db.session.query(Patient)
+        .filter(Patient.admissionNumber == admission_number)
+        .first()
+    )
+
     if p is None:
         first_prescription = (
             db.session.query(Prescription)

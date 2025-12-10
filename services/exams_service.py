@@ -3,23 +3,24 @@
 import copy
 import json
 import logging
-from datetime import datetime, timedelta, date
-from sqlalchemy import text, desc, and_
+from datetime import date, datetime, timedelta
 
-from models.main import db, redis_client, User
-from models.prescription import Patient
-from models.segment import Exams, SegmentExam
+from sqlalchemy import and_, desc, text
+
+from decorators.has_permission_decorator import Permission, has_permission
+from exception.validation_error import ValidationError
+from models.main import User, db, redis_client
 from models.notes import ClinicalNotes
+from models.prescription import Patient
 from models.requests.exam_request import (
+    ExamCreateMultipleRequest,
     ExamCreateRequest,
     ExamDeleteRequest,
-    ExamCreateMultipleRequest,
 )
+from models.segment import Exams, SegmentExam
 from repository import exams_repository
 from services import cache_service
-from decorators.has_permission_decorator import has_permission, Permission
-from exception.validation_error import ValidationError
-from utils import status, examutils, stringutils, dateutils, numberutils
+from utils import dateutils, examutils, logger, numberutils, status, stringutils
 
 
 @has_permission(Permission.WRITE_PRESCRIPTION)
@@ -159,10 +160,15 @@ def _get_textual_exams(admission_number: int = None, id_patient: int = None):
 
 
 @has_permission(Permission.READ_PRESCRIPTION, Permission.READ_REGULATION)
-def get_exams_by_admission(admission_number: int, id_segment: int):
+def get_exams_by_admission(admission_number: int, id_segment: int, user_context: User):
     """Get exams by admission number"""
-    # TODO: refactor
-    patient = Patient.findByAdmission(admissionNumber=admission_number)
+
+    patient = (
+        db.session.query(Patient)
+        .filter(Patient.admissionNumber == admission_number)
+        .first()
+    )
+
     if patient is None:
         raise ValidationError(
             "Registro inexistente",
@@ -170,8 +176,14 @@ def get_exams_by_admission(admission_number: int, id_segment: int):
             status.HTTP_400_BAD_REQUEST,
         )
 
-    # TODO: refactor
+    dynamodbexams = exams_repository.get_exams_by_patient_from_dynamodb(
+        schema=user_context.schema, id_patient=patient.idPatient
+    )
+    logger.backend_logger.info(f"Retrieved {len(dynamodbexams)} exams from DynamoDB")
+
     examsList = exams_repository.get_exams_by_patient(patient.idPatient, days=90)
+    logger.backend_logger.info(f"Retrieved {len(examsList)} exams from RDS")
+    # TODO: refactor
     segExam = SegmentExam.refDict(idSegment=id_segment)
 
     perc = {
@@ -388,7 +400,7 @@ def _history_calc(typeExam, examsList, patient, segExam):
 def get_exams_default_refs():
     query = text(
         """
-        select 
+        select
             s.nome as segment,
             se.tpexame as type_exam,
             se.nome as name,
@@ -397,13 +409,13 @@ def get_exams_default_refs():
             se.min,
             se.max,
             se.posicao as order
-        from 
+        from
             hsc_test.segmentoexame se
             inner join hsc_test.segmento s on (se.idsegmento = s.idsegmento)
-        where 
+        where
             se.idsegmento in (1, 7)
-        order by 
-            s.idsegmento, se.nome 
+        order by
+            s.idsegmento, se.nome
     """
     )
 
