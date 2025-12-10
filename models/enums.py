@@ -305,3 +305,13 @@ class PrescriptionDrugPeriodTypeEnum(Enum):
 
     CALCULATED = 1
     FROM_ORIGIN = 2
+
+
+class RegulationIndicatorReportEnum(Enum):
+    """Enum: RegulationIndicatorReport"""
+
+    HPV_VACCINE = "HPV_VACCINE"
+    HPV_EXAM = "HPV_EXAM"
+    SEXUAL_ATTENTION_APPOINTMENT = "SEXUAL_ATTENTION_APPOINTMENT"
+    MAMMOGRAM_EXAM = "MAMMOGRAM_EXAM"
+    GESTATIONAL_APPOINTMENT = "GESTATIONAL_APPOINTMENT"

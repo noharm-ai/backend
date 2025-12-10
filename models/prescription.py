@@ -1,5 +1,5 @@
-from sqlalchemy.orm import deferred
 from sqlalchemy.dialects import postgresql
+from sqlalchemy.orm import deferred
 
 from .main import db
 
@@ -97,13 +97,6 @@ class Patient(db.Model):
     responsiblePhysician = db.Column("medico_responsavel", db.String, nullable=True)
     id_icd = db.Column("idcid", db.String, nullable=True)
     dischargeDateForecast = db.Column("dt_alta_prevista", db.DateTime, nullable=True)
-
-    def findByAdmission(admissionNumber):
-        return (
-            db.session.query(Patient)
-            .filter(Patient.admissionNumber == admissionNumber)
-            .first()
-        )
 
 
 class PatientAudit(db.Model):

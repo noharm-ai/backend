@@ -1,7 +1,10 @@
 """Repository: exams related operations"""
 
 from datetime import date, timedelta
-from sqlalchemy import desc, asc, func
+
+import boto3
+from boto3.dynamodb.conditions import Key
+from sqlalchemy import asc, desc, func
 
 from models.main import db
 from models.segment import Exams, SegmentExam
@@ -9,6 +12,7 @@ from models.segment import Exams, SegmentExam
 
 def get_exams_by_patient(idPatient: int, days: int):
     """Get exams by patient"""
+
     return (
         db.session.query(Exams)
         .filter(Exams.idPatient == idPatient)
@@ -16,6 +20,23 @@ def get_exams_by_patient(idPatient: int, days: int):
         .order_by(asc(Exams.typeExam), desc(Exams.date))
         .all()
     )
+
+
+def get_exams_by_patient_from_dynamodb(schema: str, id_patient: int):
+    """Get exams by patient from DynamoDB"""
+
+    dynamodb = boto3.resource("dynamodb", region_name="sa-east-1")
+    table = dynamodb.Table("noharm_exame")
+
+    PARTITION_KEY_VALUE = f"{schema}:{id_patient}"
+
+    response = table.query(
+        KeyConditionExpression=Key("schema_fkpessoa").eq(PARTITION_KEY_VALUE),
+    )
+
+    items = response.get("Items", [])
+
+    return items
 
 
 def get_next_exam_id(id_patient: int):

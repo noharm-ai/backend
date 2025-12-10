@@ -1,62 +1,63 @@
 """application entrypoint"""
 
-import os
 import logging
+import os
+
 from flask import Flask
-from flask_jwt_extended import JWTManager
 from flask_cors import CORS
+from flask_jwt_extended import JWTManager
 
-from models.main import db, mail
-from models.enums import NoHarmENV
 from config import Config
-from utils import status
-
-from routes.authentication import app_auth
-from routes.outlier import app_out
-from routes.prescription import app_pres
-from routes.segment import app_seg
-from routes.outlier_generate import app_gen
-from routes.intervention import app_itrv
-from routes.static import app_stc
-from routes.substance import app_sub
-from routes.memory import app_mem
-from routes.patient import app_pat
-from routes.user import app_usr
-from routes.notes import app_note
-from routes.user_admin import app_user_admin
-from routes.prescription_crud import app_pres_crud
-from routes.drugs import app_drugs
-from routes.names import app_names
-from routes.summary import app_summary
-from routes.support import app_support
-from routes.conciliation import app_conciliation
-from routes.tag import app_tag
-from routes.protocol import app_protocol
-from routes.exams import app_exams
-from routes.lists import app_lists
-from routes.admin.admin_frequency import app_admin_freq
-from routes.admin.admin_intervention_reason import app_admin_interv
-from routes.admin.admin_memory import app_admin_memory
+from models.enums import NoHarmENV
+from models.main import db, mail
 from routes.admin.admin_drug import app_admin_drug
+from routes.admin.admin_exam import app_admin_exam
+from routes.admin.admin_frequency import app_admin_freq
+from routes.admin.admin_global_memory import app_admin_global_memory
 from routes.admin.admin_integration import app_admin_integration
 from routes.admin.admin_integration_remote import app_admin_integration_remote
-from routes.admin.admin_segment import app_admin_segment
-from routes.admin.admin_exam import app_admin_exam
-from routes.admin.admin_unit_conversion import app_admin_unit_conversion
-from routes.admin.admin_substance import app_admin_subs
-from routes.admin.admin_relation import app_admin_relation
-from routes.admin.admin_unit import app_admin_unit
-from routes.admin.admin_tag import app_admin_tag
+from routes.admin.admin_intervention_reason import app_admin_interv
+from routes.admin.admin_memory import app_admin_memory
 from routes.admin.admin_protocol import app_admin_protocol
-from routes.admin.admin_global_memory import app_admin_global_memory
-from routes.reports.reports_general import app_rpt_general
+from routes.admin.admin_relation import app_admin_relation
+from routes.admin.admin_segment import app_admin_segment
+from routes.admin.admin_substance import app_admin_subs
+from routes.admin.admin_tag import app_admin_tag
+from routes.admin.admin_unit import app_admin_unit
+from routes.admin.admin_unit_conversion import app_admin_unit_conversion
+from routes.authentication import app_auth
+from routes.conciliation import app_conciliation
+from routes.drugs import app_drugs
+from routes.exams import app_exams
+from routes.intervention import app_itrv
+from routes.lists import app_lists
+from routes.memory import app_mem
+from routes.names import app_names
+from routes.notes import app_note
+from routes.outlier import app_out
+from routes.outlier_generate import app_gen
+from routes.patient import app_pat
+from routes.prescription import app_pres
+from routes.prescription_crud import app_pres_crud
+from routes.protocol import app_protocol
+from routes.regulation.regulation import app_regulation
+from routes.reports.reports_antimicrobial import app_rpt_antimicrobial
 from routes.reports.reports_config_rpt import app_rpt_config
 from routes.reports.reports_culture import app_rpt_culture
-from routes.reports.reports_antimicrobial import app_rpt_antimicrobial
 from routes.reports.reports_exams import app_rpt_exams
-from routes.reports.reports_prescription_history import app_rpt_prescription_history
+from routes.reports.reports_general import app_rpt_general
 from routes.reports.reports_integration import app_rpt_integration
-from routes.regulation.regulation import app_regulation
+from routes.reports.reports_prescription_history import app_rpt_prescription_history
+from routes.reports.reports_regulation import app_rpt_regulation
+from routes.segment import app_seg
+from routes.static import app_stc
+from routes.substance import app_sub
+from routes.summary import app_summary
+from routes.support import app_support
+from routes.tag import app_tag
+from routes.user import app_usr
+from routes.user_admin import app_user_admin
+from utils import status
 
 os.environ["TZ"] = "America/Sao_Paulo"
 
@@ -136,6 +137,7 @@ app.register_blueprint(app_rpt_config)
 app.register_blueprint(app_rpt_prescription_history)
 app.register_blueprint(app_rpt_exams)
 app.register_blueprint(app_rpt_integration)
+app.register_blueprint(app_rpt_regulation)
 
 app.register_blueprint(app_regulation)
 
