@@ -149,17 +149,10 @@ if Config.ENV == NoHarmENV.PRODUCTION.value:
     logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
     logging.getLogger("noharm.backend").setLevel(logging.WARNING)
     logging.getLogger("noharm.performance").setLevel(logging.WARNING)
-elif Config.ENV == NoHarmENV.STAGING.value:
-    logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
-    logging.getLogger("noharm.backend").setLevel(logging.WARNING)
-    logging.getLogger("noharm.performance").setLevel(logging.WARNING)
 else:
-    logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)
+    logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
     logging.getLogger("noharm.backend").setLevel(logging.DEBUG)
     logging.getLogger("noharm.performance").setLevel(logging.DEBUG)
-
-    if Config.ENV == NoHarmENV.DEVELOPMENT.value:
-        logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
 
 
 @app.route("/version", methods=["GET"])
