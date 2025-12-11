@@ -143,14 +143,16 @@ app.register_blueprint(app_regulation)
 
 CORS(app, origins=[Config.MAIL_HOST], supports_credentials=True)
 
-if Config.ENV != NoHarmENV.PRODUCTION.value:
-    logging.basicConfig()
-    logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)
+logging.basicConfig()
+
+if Config.ENV == NoHarmENV.PRODUCTION.value:
+    logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
+    logging.getLogger("noharm.backend").setLevel(logging.WARNING)
+    logging.getLogger("noharm.performance").setLevel(logging.WARNING)
+else:
+    logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
     logging.getLogger("noharm.backend").setLevel(logging.DEBUG)
     logging.getLogger("noharm.performance").setLevel(logging.DEBUG)
-
-    if Config.ENV == NoHarmENV.DEVELOPMENT.value:
-        logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
 
 
 @app.route("/version", methods=["GET"])
