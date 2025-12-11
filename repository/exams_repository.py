@@ -48,13 +48,17 @@ def get_next_exam_id(id_patient: int):
     exam_id = "9" + patient_str + "0" * (12 - len(patient_str))
     mask = int(exam_id)
 
-    count = (
-        db.session.query(Exams)
+    total = (
+        db.session.query(func.coalesce(func.max(Exams.idExame), mask).label("max"))
         .filter(Exams.idPatient == id_patient)
         .filter(Exams.idExame >= mask)
-        .count()
+        .filter(Exams.created_by != None)
+        .first()
     )
-    return mask + count + 1
+    if total:
+        return total.max + 1
+
+    return mask + 1
 
 
 def get_exam_types():
