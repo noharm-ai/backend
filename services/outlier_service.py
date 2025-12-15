@@ -4,29 +4,29 @@ import io
 import json
 import logging
 from datetime import datetime
+from decimal import ROUND_HALF_UP, Decimal
 from math import ceil
 from typing import List
-from decimal import Decimal, ROUND_HALF_UP
 
 import boto3
-from sqlalchemy import text, func, distinct, and_, or_, asc, literal, literal_column
+from sqlalchemy import and_, asc, distinct, func, literal, literal_column, or_, text
 
-from models.main import (
-    db,
-    User,
-    PrescriptionAgg,
-    Outlier,
-    Drug,
-    Substance,
-    DrugAttributes,
-)
-from models.appendix import Notes, MeasureUnit, MeasureUnitConvert
-from exception.validation_error import ValidationError
-from services.admin import admin_drug_service, admin_integration_status_service
-from services import data_authorization_service, substance_service
-from decorators.has_permission_decorator import has_permission, Permission
-from utils import prescriptionutils, numberutils, stringutils, examutils, status
 from config import Config
+from decorators.has_permission_decorator import Permission, has_permission
+from exception.validation_error import ValidationError
+from models.appendix import MeasureUnit, MeasureUnitConvert, Notes
+from models.main import (
+    Drug,
+    DrugAttributes,
+    Outlier,
+    PrescriptionAgg,
+    Substance,
+    User,
+    db,
+)
+from services import data_authorization_service, substance_service
+from services.admin import admin_drug_service, admin_integration_status_service
+from utils import examutils, numberutils, prescriptionutils, status, stringutils
 
 FOLD_SIZE = 10
 
@@ -166,7 +166,7 @@ def generate(
         return next(
             sc
             for sc in drug_scores
-            if sc["dose"] == dose and sc["frequency"] == frequency
+            if sc["dose"] == dose and round(sc["frequency"], 2) == round(frequency, 2)
         )
 
     for o in outliers:
@@ -190,14 +190,14 @@ def generate(
                 select * from (values {",".join(updates)}) AS t (idoutlier, score, countnum, update_at, update_by)
             )
             update {user_context.schema}.outlier o
-            set 
+            set
                 contagem = s.countnum,
                 escore = s.score,
                 update_at = s.update_at,
                 update_by = s.update_by
             from
                 scores s
-            where 
+            where
                 s.idoutlier = o.idoutlier
         """
 
@@ -221,16 +221,16 @@ def refresh_outliers(id_segment, user, id_drug=None):
         "currentDate": datetime.today(),
     }
     query = f"""
-        INSERT INTO {user.schema}.outlier 
+        INSERT INTO {user.schema}.outlier
             (idsegmento, fkmedicamento, doseconv, frequenciadia, contagem, update_at, update_by)
-        SELECT 
+        SELECT
             idsegmento, fkmedicamento, ROUND(doseconv::numeric,2) as doseconv, frequenciadia, SUM(contagem), :currentDate, :idUser
         FROM
             {user.schema}.prescricaoagg
-        WHERE 
+        WHERE
             idsegmento = :idSegment
             and frequenciadia is not null and doseconv is not null and dose > 0
-        
+
     """
 
     if id_drug != None:
@@ -238,7 +238,7 @@ def refresh_outliers(id_segment, user, id_drug=None):
         query += " and fkmedicamento = :idDrug "
 
     query += f"""
-        GROUP BY 
+        GROUP BY
             idsegmento, fkmedicamento, ROUND(doseconv::numeric,2), frequenciadia
         ON CONFLICT DO nothing
     """
@@ -249,11 +249,11 @@ def refresh_outliers(id_segment, user, id_drug=None):
 def _get_csv_buffer(id_segment, schema, id_drug=None, fold=None):
     params = [id_segment]
     query = f"""
-        SELECT 
+        SELECT
             fkmedicamento as medication, doseconv as dose, frequenciadia as frequency, contagem as count
         FROM
             {schema}.outlier
-        WHERE 
+        WHERE
             idsegmento = %s
     """
 
@@ -264,11 +264,11 @@ def _get_csv_buffer(id_segment, schema, id_drug=None, fold=None):
         params.append(id_segment)
         params.append(FOLD_SIZE)
         params.append((fold - 1) * FOLD_SIZE)
-        query += f""" 
+        query += f"""
             and fkmedicamento IN (
-                SELECT fkmedicamento 
+                SELECT fkmedicamento
                 FROM {schema}.outlier
-                WHERE 
+                WHERE
                     idsegmento = %s
                 GROUP BY fkmedicamento
                 ORDER BY fkmedicamento ASC
@@ -295,7 +295,7 @@ def _log_perf(start_date, section):
     logging.basicConfig()
     logger = logging.getLogger("noharm.backend")
 
-    logger.debug(f"PERF {section}: {(end_date-start_date).total_seconds()}")
+    logger.debug(f"PERF {section}: {(end_date - start_date).total_seconds()}")
 
 
 def _clean_outliers(id_drug, id_segment):
@@ -320,37 +320,37 @@ def add_prescription_history(
 
     query = text(
         f"""
-        INSERT INTO 
-            {schema}.prescricaoagg 
+        INSERT INTO
+            {schema}.prescricaoagg
             (
-                fkhospital,fksetor, idsegmento, fkmedicamento, 
-                fkunidademedida, fkfrequencia, dose, doseconv, 
+                fkhospital,fksetor, idsegmento, fkmedicamento,
+                fkunidademedida, fkfrequencia, dose, doseconv,
                 frequenciadia, peso, contagem
-            ) 
-        SELECT 
-            p.fkhospital, 
-            p.fksetor, 
-            p.idsegmento, 
-            fkmedicamento, 
-            fkunidademedida, 
-            f.fkfrequencia, 
-            dose, 
-            dose, 
-            coalesce(f.frequenciadia , pm.frequenciadia), 
-            coalesce(ps.peso, 999), 
+            )
+        SELECT
+            p.fkhospital,
+            p.fksetor,
+            p.idsegmento,
+            fkmedicamento,
+            fkunidademedida,
+            f.fkfrequencia,
+            dose,
+            dose,
+            coalesce(f.frequenciadia , pm.frequenciadia),
+            coalesce(ps.peso, 999),
             count(*)
-        FROM 
+        FROM
             {schema}.presmed pm
             inner join {schema}.prescricao p on pm.fkprescricao = p.fkprescricao
             left join {schema}.frequencia f on f.fkfrequencia = pm.fkfrequencia
             left join {schema}.pessoa ps on (p.nratendimento = ps.nratendimento and p.fkpessoa = ps.fkpessoa)
-        where 
+        where
             p.dtprescricao > now() - interval '1 year'
             and p.idsegmento = :idSegment
             and pm.fkmedicamento = :idDrug
             and pm.dose is not null
-            and pm.frequenciadia is not null 
-        group by 
+            and pm.frequenciadia is not null
+        group by
             1,2,3,4,5,6,7,8,9,10
     """
     )
