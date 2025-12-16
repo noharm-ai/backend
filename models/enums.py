@@ -324,3 +324,9 @@ class ReportStatusEnum(Enum):
     PROCESSED = 1
     PROCESSING = 2
     ERROR = 3
+
+
+class ReportTypeEnum(Enum):
+    """Enum: Report.tp_relatorio"""
+
+    CUSTOM = 1

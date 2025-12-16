@@ -20,6 +20,7 @@ from routes.admin.admin_intervention_reason import app_admin_interv
 from routes.admin.admin_memory import app_admin_memory
 from routes.admin.admin_protocol import app_admin_protocol
 from routes.admin.admin_relation import app_admin_relation
+from routes.admin.admin_report import app_admin_report
 from routes.admin.admin_segment import app_admin_segment
 from routes.admin.admin_substance import app_admin_subs
 from routes.admin.admin_tag import app_admin_tag
@@ -130,6 +131,7 @@ app.register_blueprint(app_admin_unit)
 app.register_blueprint(app_admin_tag)
 app.register_blueprint(app_admin_protocol)
 app.register_blueprint(app_admin_global_memory)
+app.register_blueprint(app_admin_report)
 
 app.register_blueprint(app_rpt_general)
 app.register_blueprint(app_rpt_culture)
