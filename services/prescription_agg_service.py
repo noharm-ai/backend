@@ -2,38 +2,36 @@
 
 from datetime import date, datetime, timedelta
 
-from sqlalchemy import desc, text, select, func, and_, any_
-from sqlalchemy.orm import aliased
 from flask_sqlalchemy.session import Session
+from sqlalchemy import desc, text
 
-from models.main import db, User, dbSession
-from models.prescription import (
-    Prescription,
-    PrescriptionDrug,
-    PrescriptionDrugAudit,
-    Patient,
-    PrescriptionAudit,
-)
+from decorators.has_permission_decorator import Permission, has_permission
+from exception.validation_error import ValidationError
+from models.appendix import SchemaConfig
 from models.enums import (
+    DrugTypeEnum,
+    FeatureEnum,
+    PatientConciliationStatusEnum,
     PrescriptionAuditTypeEnum,
     PrescriptionDrugAuditTypeEnum,
-    DrugTypeEnum,
-    PatientConciliationStatusEnum,
-    FeatureEnum,
+)
+from models.main import User, db, dbSession
+from models.prescription import (
+    Patient,
+    Prescription,
+    PrescriptionAudit,
 )
 from models.segment import Segment
-from models.appendix import SchemaConfig
+from repository import prescalc_repository
 from services import (
-    prescription_drug_service,
-    prescription_check_service,
-    prescription_view_service,
     feature_service,
-    segment_service,
     memory_service,
+    prescription_check_service,
+    prescription_drug_service,
+    prescription_view_service,
+    segment_service,
 )
-from exception.validation_error import ValidationError
-from decorators.has_permission_decorator import has_permission, Permission
-from utils import status, prescriptionutils, logger
+from utils import logger, prescriptionutils, status
 
 
 @has_permission(Permission.READ_STATIC)
@@ -80,7 +78,9 @@ def create_agg_prescription_by_prescription(
             status.HTTP_400_BAD_REQUEST,
         )
 
-    processed_status = _get_processed_status(id_prescription_list=[id_prescription])
+    processed_status = prescalc_repository.get_processed_status(
+        id_prescription_list=[id_prescription]
+    )
 
     if not force and processed_status == "PROCESSED" and p.features is not None:
         logger.backend_logger.warning(
@@ -175,27 +175,36 @@ def create_agg_prescription_by_prescription(
             user=prescalc_user,
         )
 
-        if drug_count > 0:
-            if pAgg.status == "s":
-                remove_agg_check = True
+        if drug_count > 0 and p.status == "s":
+            remove_check = True
+            last_check_data = prescalc_repository.get_last_check_data(
+                id_prescription=p.id
+            )
 
-                # if it was checked before this process, keep it
-                if p.status == "s" and processed_status == "NEW_PRESCRIPTION":
-                    remove_agg_check = False
+            if (
+                last_check_data is not None
+                and last_check_data.PrescriptionAudit.totalItens == drug_count
+            ):
+                # if it has the same item count, do not remove current check
+                remove_check = False
 
-                if remove_agg_check:
-                    pAgg.status = 0
+                logger.backend_logger.warning(
+                    "(%s) Prescrição manteve a mesma quantidade de itens, portanto não será deschecada: %s",
+                    schema,
+                    p.id,
+                )
 
-                    prescription_check_service.audit_check(
-                        prescription=pAgg, user=prescalc_user, extra={"prescalc": True}
-                    )
+            if remove_check:
+                # remove prescription agg check
+                pAgg.status = 0
+                prescription_check_service.audit_check(
+                    prescription=pAgg, user=prescalc_user, extra={"prescalc": True}
+                )
 
-            # if it was checked before this process, keep it
-            if p.status == "s" and processed_status == "NEW_ITENS":
+                # remove individual prescription check
                 p.update = datetime.today()
                 p.user = None
                 p.status = 0
-
                 prescription_check_service.audit_check(
                     prescription=p, user=prescalc_user, extra={"prescalc": True}
                 )
@@ -268,7 +277,7 @@ def create_agg_prescription_by_date(
 
     if feature_service.has_feature(FeatureEnum.PATIENT_DAY_OUTPATIENT_FLOW):
         # skip processed patients when feature active
-        processed_status = _get_processed_outpatient_status(
+        processed_status = prescalc_repository.get_processed_outpatient_status(
             id_prescription_list=internal_prescription_ids, agg_date=agg_p.date
         )
 
@@ -379,92 +388,6 @@ def get_last_agg_prescription(admission_number) -> Prescription:
         .order_by(desc(Prescription.date))
         .first()
     )
-
-
-def _get_processed_status(id_prescription_list: list[int]):
-    query = (
-        select(
-            PrescriptionDrug.id, func.count(PrescriptionDrugAudit.id).label("p_count")
-        )
-        .select_from(PrescriptionDrug)
-        .outerjoin(
-            PrescriptionDrugAudit,
-            and_(
-                PrescriptionDrug.id == PrescriptionDrugAudit.idPrescriptionDrug,
-                PrescriptionDrugAudit.auditType
-                == PrescriptionDrugAuditTypeEnum.PROCESSED.value,
-            ),
-        )
-        .where(PrescriptionDrug.idPrescription == any_(id_prescription_list))
-        .group_by(PrescriptionDrug.id)
-    )
-
-    results = db.session.execute(query).all()
-
-    not_processed_count = 0
-    for r in results:
-        if r.p_count == 0:
-            not_processed_count += 1
-
-    if not_processed_count == len(results):
-        return "NEW_PRESCRIPTION"
-
-    if not_processed_count > 0:
-        return "NEW_ITENS"
-
-    return "PROCESSED"
-
-
-def _get_processed_outpatient_status(
-    id_prescription_list: list[int], agg_date: datetime
-):
-    """
-    Check if patient has new itens at agg_date. Useful for outpatient cpoe.
-
-    PROCESSED no new itens at agg_date or all new itens at agg_date are processed
-    PENDING new itens not processed
-    """
-    PrescriptionDrugAuditProcessed = aliased(PrescriptionDrugAudit)
-
-    query = (
-        select(
-            PrescriptionDrug.id,
-            func.count(PrescriptionDrugAuditProcessed.id).label("p_count"),
-        )
-        .select_from(PrescriptionDrug)
-        .join(
-            PrescriptionDrugAudit,
-            and_(
-                PrescriptionDrug.id == PrescriptionDrugAudit.idPrescriptionDrug,
-                PrescriptionDrugAudit.auditType
-                == PrescriptionDrugAuditTypeEnum.UPSERT.value,
-                func.date(PrescriptionDrugAudit.createdAt) == func.date(agg_date),
-            ),
-        )
-        .outerjoin(
-            PrescriptionDrugAuditProcessed,
-            and_(
-                PrescriptionDrug.id
-                == PrescriptionDrugAuditProcessed.idPrescriptionDrug,
-                PrescriptionDrugAuditProcessed.auditType
-                == PrescriptionDrugAuditTypeEnum.PROCESSED.value,
-            ),
-        )
-        .where(PrescriptionDrug.idPrescription == any_(id_prescription_list))
-        .group_by(PrescriptionDrug.id)
-    )
-
-    results = db.session.execute(query).all()
-
-    not_processed_count = 0
-    for r in results:
-        if r.p_count == 0:
-            not_processed_count += 1
-
-    if not_processed_count > 0:
-        return "PENDING"
-
-    return "PROCESSED"
 
 
 def _update_patient_conciliation_status(prescription: Prescription):
