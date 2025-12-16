@@ -1,7 +1,5 @@
 """Service: get internal reports"""
 
-from boto3.docs import resource
-
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
 from models.enums import MemoryEnum, ReportEnum
