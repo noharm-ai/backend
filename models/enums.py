@@ -315,3 +315,12 @@ class RegulationIndicatorReportEnum(Enum):
     SEXUAL_ATTENTION_APPOINTMENT = "SEXUAL_ATTENTION_APPOINTMENT"
     MAMMOGRAM_EXAM = "MAMMOGRAM_EXAM"
     GESTATIONAL_APPOINTMENT = "GESTATIONAL_APPOINTMENT"
+
+
+class ReportStatusEnum(Enum):
+    """Enum: Report.tp_status"""
+
+    NOT_PROCESSED = 0
+    PROCESSED = 1
+    PROCESSING = 2
+    ERROR = 3

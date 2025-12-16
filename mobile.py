@@ -44,6 +44,7 @@ from routes.regulation.regulation import app_regulation
 from routes.reports.reports_antimicrobial import app_rpt_antimicrobial
 from routes.reports.reports_config_rpt import app_rpt_config
 from routes.reports.reports_culture import app_rpt_culture
+from routes.reports.reports_custom import app_rpt_custom
 from routes.reports.reports_exams import app_rpt_exams
 from routes.reports.reports_general import app_rpt_general
 from routes.reports.reports_integration import app_rpt_integration
@@ -138,6 +139,7 @@ app.register_blueprint(app_rpt_prescription_history)
 app.register_blueprint(app_rpt_exams)
 app.register_blueprint(app_rpt_integration)
 app.register_blueprint(app_rpt_regulation)
+app.register_blueprint(app_rpt_custom)
 
 app.register_blueprint(app_regulation)
 

@@ -3,8 +3,8 @@
 from enum import Enum
 from typing import List
 
-from security.permission import Permission
 from models.main import User
+from security.permission import Permission
 
 
 class Role(Enum):
@@ -19,133 +19,161 @@ class Role(Enum):
         self.id = id
         self.permissions = permissions
 
-    ADMIN = "ADMIN", [
-        Permission.ADMIN_DRUGS,
-        Permission.ADMIN_DRUGS__OVERWRITE_ATTRIBUTES,
-        Permission.ADMIN_EXAMS,
-        Permission.ADMIN_EXAMS__COPY,
-        Permission.ADMIN_EXAMS__MOST_FREQUENT,
-        Permission.ADMIN_FREQUENCIES,
-        Permission.ADMIN_INTEGRATION_REMOTE,
-        Permission.WRITE_SEGMENT_SCORE,
-        Permission.INTEGRATION_UTILS,
-        Permission.ADMIN_INTERVENTION_REASON,
-        Permission.INTEGRATION_STATUS,
-        Permission.ADMIN_ROUTES,
-        Permission.ADMIN_SUBSTANCE_RELATIONS,
-        Permission.ADMIN_SUBSTANCES,
-        Permission.ADMIN_UNIT_CONVERSION,
-        Permission.ADMIN_SEGMENTS,
-        Permission.ADMIN_PATIENT,
-        Permission.READ_REPORTS,
-        Permission.READ_PRESCRIPTION,
-        Permission.WRITE_DRUG_ATTRIBUTES,
-        Permission.WRITE_BASIC_FEATURES,
-        Permission.READ_BASIC_FEATURES,
-        Permission.WRITE_DRUG_SCORE,
-        Permission.READ_DISCHARGE_SUMMARY,
-        Permission.READ_SUPPORT,
-        Permission.WRITE_SUPPORT,
-        Permission.ADMIN_SUPPORT,
-        Permission.ADMIN_USERS,
-        Permission.READ_USERS,
-        Permission.WRITE_USERS,
-        Permission.MULTI_SCHEMA,
-        Permission.MAINTAINER,
-        Permission.READ_DISPENSATION,
-        Permission.READ_REGULATION,
-        Permission.ADMIN_UNIT,
-        Permission.WRITE_TAGS,
-        Permission.READ_PROTOCOLS,
-        Permission.WRITE_PROTOCOLS,
-        Permission.ADMIN_NZERO,
-    ]
+    ADMIN = (
+        "ADMIN",
+        [
+            Permission.ADMIN_DRUGS,
+            Permission.ADMIN_DRUGS__OVERWRITE_ATTRIBUTES,
+            Permission.ADMIN_EXAMS,
+            Permission.ADMIN_EXAMS__COPY,
+            Permission.ADMIN_EXAMS__MOST_FREQUENT,
+            Permission.ADMIN_FREQUENCIES,
+            Permission.ADMIN_INTEGRATION_REMOTE,
+            Permission.WRITE_SEGMENT_SCORE,
+            Permission.INTEGRATION_UTILS,
+            Permission.ADMIN_INTERVENTION_REASON,
+            Permission.INTEGRATION_STATUS,
+            Permission.ADMIN_ROUTES,
+            Permission.ADMIN_SUBSTANCE_RELATIONS,
+            Permission.ADMIN_SUBSTANCES,
+            Permission.ADMIN_UNIT_CONVERSION,
+            Permission.ADMIN_SEGMENTS,
+            Permission.ADMIN_PATIENT,
+            Permission.READ_REPORTS,
+            Permission.ADMIN_REPORTS,
+            Permission.READ_PRESCRIPTION,
+            Permission.WRITE_DRUG_ATTRIBUTES,
+            Permission.WRITE_BASIC_FEATURES,
+            Permission.READ_BASIC_FEATURES,
+            Permission.WRITE_DRUG_SCORE,
+            Permission.READ_DISCHARGE_SUMMARY,
+            Permission.READ_SUPPORT,
+            Permission.WRITE_SUPPORT,
+            Permission.ADMIN_SUPPORT,
+            Permission.ADMIN_USERS,
+            Permission.READ_USERS,
+            Permission.WRITE_USERS,
+            Permission.MULTI_SCHEMA,
+            Permission.MAINTAINER,
+            Permission.READ_DISPENSATION,
+            Permission.READ_REGULATION,
+            Permission.ADMIN_UNIT,
+            Permission.WRITE_TAGS,
+            Permission.READ_PROTOCOLS,
+            Permission.WRITE_PROTOCOLS,
+            Permission.ADMIN_NZERO,
+        ],
+    )
 
-    CURATOR = "CURATOR", [
-        Permission.ADMIN_DRUGS,
-        Permission.ADMIN_EXAMS,
-        Permission.ADMIN_EXAMS__COPY,
-        Permission.ADMIN_EXAMS__MOST_FREQUENT,
-        Permission.ADMIN_FREQUENCIES,
-        Permission.WRITE_SEGMENT_SCORE,
-        Permission.ADMIN_INTERVENTION_REASON,
-        Permission.INTEGRATION_STATUS,
-        Permission.ADMIN_ROUTES,
-        Permission.ADMIN_SUBSTANCE_RELATIONS,
-        Permission.ADMIN_SUBSTANCES,
-        Permission.ADMIN_UNIT_CONVERSION,
-        Permission.ADMIN_SEGMENTS,
-        Permission.ADMIN_PATIENT,
-        Permission.READ_REPORTS,
-        Permission.READ_PRESCRIPTION,
-        Permission.WRITE_DRUG_ATTRIBUTES,
-        Permission.WRITE_BASIC_FEATURES,
-        Permission.READ_BASIC_FEATURES,
-        Permission.WRITE_DRUG_SCORE,
-        Permission.READ_DISCHARGE_SUMMARY,
-        Permission.READ_SUPPORT,
-        Permission.WRITE_SUPPORT,
-        Permission.ADMIN_SUPPORT,
-        Permission.READ_USERS,
-        Permission.WRITE_USERS,
-        Permission.MULTI_SCHEMA,
-        Permission.MAINTAINER,
-        Permission.READ_DISPENSATION,
-        Permission.ADMIN_UNIT,
-        Permission.WRITE_TAGS,
-        Permission.READ_REGULATION,
-    ]
+    CURATOR = (
+        "CURATOR",
+        [
+            Permission.ADMIN_DRUGS,
+            Permission.ADMIN_EXAMS,
+            Permission.ADMIN_EXAMS__COPY,
+            Permission.ADMIN_EXAMS__MOST_FREQUENT,
+            Permission.ADMIN_FREQUENCIES,
+            Permission.WRITE_SEGMENT_SCORE,
+            Permission.ADMIN_INTERVENTION_REASON,
+            Permission.INTEGRATION_STATUS,
+            Permission.ADMIN_ROUTES,
+            Permission.ADMIN_SUBSTANCE_RELATIONS,
+            Permission.ADMIN_SUBSTANCES,
+            Permission.ADMIN_UNIT_CONVERSION,
+            Permission.ADMIN_SEGMENTS,
+            Permission.ADMIN_PATIENT,
+            Permission.READ_REPORTS,
+            Permission.READ_PRESCRIPTION,
+            Permission.WRITE_DRUG_ATTRIBUTES,
+            Permission.WRITE_BASIC_FEATURES,
+            Permission.READ_BASIC_FEATURES,
+            Permission.WRITE_DRUG_SCORE,
+            Permission.READ_DISCHARGE_SUMMARY,
+            Permission.READ_SUPPORT,
+            Permission.WRITE_SUPPORT,
+            Permission.ADMIN_SUPPORT,
+            Permission.READ_USERS,
+            Permission.WRITE_USERS,
+            Permission.MULTI_SCHEMA,
+            Permission.MAINTAINER,
+            Permission.READ_DISPENSATION,
+            Permission.ADMIN_UNIT,
+            Permission.WRITE_TAGS,
+            Permission.READ_REGULATION,
+        ],
+    )
 
-    SERVICE_INTEGRATOR = "SERVICE_INTEGRATOR", [
-        Permission.RUN_AS,
-    ]
+    SERVICE_INTEGRATOR = (
+        "SERVICE_INTEGRATOR",
+        [
+            Permission.RUN_AS,
+        ],
+    )
 
-    PRESCRIPTION_ANALYST = "PRESCRIPTION_ANALYST", [
-        Permission.READ_PRESCRIPTION,
-        Permission.WRITE_PRESCRIPTION,
-        Permission.READ_REPORTS,
-        Permission.WRITE_BASIC_FEATURES,
-        Permission.READ_BASIC_FEATURES,
-        Permission.READ_SUPPORT,
-    ]
+    PRESCRIPTION_ANALYST = (
+        "PRESCRIPTION_ANALYST",
+        [
+            Permission.READ_PRESCRIPTION,
+            Permission.WRITE_PRESCRIPTION,
+            Permission.READ_REPORTS,
+            Permission.WRITE_BASIC_FEATURES,
+            Permission.READ_BASIC_FEATURES,
+            Permission.READ_SUPPORT,
+        ],
+    )
 
-    DISPENSING_MANAGER = "DISPENSING_MANAGER", [
-        Permission.READ_DISPENSATION,
-        Permission.WRITE_DISPENSATION,
-    ]
+    DISPENSING_MANAGER = (
+        "DISPENSING_MANAGER",
+        [
+            Permission.READ_DISPENSATION,
+            Permission.WRITE_DISPENSATION,
+        ],
+    )
 
-    USER_MANAGER = "USER_MANAGER", [
-        Permission.WRITE_BASIC_FEATURES,
-        Permission.READ_BASIC_FEATURES,
-        Permission.READ_SUPPORT,
-        Permission.READ_USERS,
-        Permission.WRITE_USERS,
-    ]
+    USER_MANAGER = (
+        "USER_MANAGER",
+        [
+            Permission.WRITE_BASIC_FEATURES,
+            Permission.READ_BASIC_FEATURES,
+            Permission.READ_SUPPORT,
+            Permission.READ_USERS,
+            Permission.WRITE_USERS,
+        ],
+    )
 
-    CONFIG_MANAGER = "CONFIG_MANAGER", [
-        Permission.ADMIN_EXAMS,
-        Permission.WRITE_DRUG_ATTRIBUTES,
-        Permission.WRITE_BASIC_FEATURES,
-        Permission.READ_BASIC_FEATURES,
-        Permission.WRITE_DRUG_SCORE,
-        Permission.READ_SUPPORT,
-        Permission.WRITE_TAGS,
-    ]
+    CONFIG_MANAGER = (
+        "CONFIG_MANAGER",
+        [
+            Permission.ADMIN_EXAMS,
+            Permission.WRITE_DRUG_ATTRIBUTES,
+            Permission.WRITE_BASIC_FEATURES,
+            Permission.READ_BASIC_FEATURES,
+            Permission.WRITE_DRUG_SCORE,
+            Permission.READ_SUPPORT,
+            Permission.WRITE_TAGS,
+        ],
+    )
 
-    VIEWER = "VIEWER", [
-        Permission.READ_REPORTS,
-        Permission.READ_PRESCRIPTION,
-        Permission.READ_BASIC_FEATURES,
-        Permission.READ_SUPPORT,
-    ]
+    VIEWER = (
+        "VIEWER",
+        [
+            Permission.READ_REPORTS,
+            Permission.READ_PRESCRIPTION,
+            Permission.READ_BASIC_FEATURES,
+            Permission.READ_SUPPORT,
+        ],
+    )
 
-    RESEARCHER = "RESEARCHER", [
-        Permission.READ_REPORTS,
-        Permission.READ_PRESCRIPTION,
-        Permission.READ_BASIC_FEATURES,
-        Permission.READ_DISCHARGE_SUMMARY,
-        Permission.READ_SUPPORT,
-    ]
+    RESEARCHER = (
+        "RESEARCHER",
+        [
+            Permission.READ_REPORTS,
+            Permission.READ_PRESCRIPTION,
+            Permission.READ_BASIC_FEATURES,
+            Permission.READ_DISCHARGE_SUMMARY,
+            Permission.READ_SUPPORT,
+        ],
+    )
 
     DISCHARGE_MANAGER = (
         "DISCHARGE_MANAGER",
@@ -158,25 +186,31 @@ class Role(Enum):
         ],
     )
 
-    REGULATOR = "REGULATOR", [
-        Permission.READ_REGULATION,
-        Permission.WRITE_REGULATION,
-        Permission.READ_BASIC_FEATURES,
-        Permission.WRITE_BASIC_FEATURES,
-        Permission.READ_REPORTS,
-        Permission.READ_SUPPORT,
-    ]
+    REGULATOR = (
+        "REGULATOR",
+        [
+            Permission.READ_REGULATION,
+            Permission.WRITE_REGULATION,
+            Permission.READ_BASIC_FEATURES,
+            Permission.WRITE_BASIC_FEATURES,
+            Permission.READ_REPORTS,
+            Permission.READ_SUPPORT,
+        ],
+    )
 
     SUPPORT_REQUESTER = (
         "SUPPORT_REQUESTER",
         [Permission.READ_SUPPORT, Permission.WRITE_SUPPORT],
     )
 
-    SUPPORT_MANAGER = "SUPPORT_MANAGER", [
-        Permission.READ_SUPPORT,
-        Permission.WRITE_SUPPORT,
-        Permission.ADMIN_SUPPORT,
-    ]
+    SUPPORT_MANAGER = (
+        "SUPPORT_MANAGER",
+        [
+            Permission.READ_SUPPORT,
+            Permission.WRITE_SUPPORT,
+            Permission.ADMIN_SUPPORT,
+        ],
+    )
 
     STATIC_USER = "STATIC_USER", [Permission.READ_STATIC, Permission.CHECK_STATIC]
 

@@ -1,11 +1,12 @@
 """Service: get internal reports"""
 
-from models.enums import ReportEnum
-from models.main import db, User
-from services.reports import reports_cache_service
-from utils import status
+from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
-from decorators.has_permission_decorator import has_permission, Permission
+from models.enums import MemoryEnum, ReportEnum
+from models.main import User, db
+from services import memory_service
+from services.reports import reports_cache_service, reports_custom_service
+from utils import status
 
 
 @has_permission(Permission.READ_REPORTS)
@@ -31,7 +32,9 @@ def get_report(report, user_context: User, filename="current"):
         )
 
     cached_link = reports_cache_service.generate_link(
-        report=report, schema=user_context.schema, filename=filename
+        resource_path=_get_resource_path(
+            report=report, schema=user_context.schema, filename=filename
+        )
     )
 
     if not cached_link:
@@ -44,3 +47,40 @@ def get_report(report, user_context: User, filename="current"):
         ),
         "url": cached_link,
     }
+
+
+@has_permission(Permission.READ_REPORTS)
+def get_report_list(
+    user_context: User,
+    user_permissions: list[Permission],
+):
+    """Get reports configuration. Consider ignored reports from user configuration."""
+    user = db.session.query(User).filter(User.id == user_context.id).first()
+    ignored_reports = (
+        user.reports_config.get("ignore", []) if user.reports_config else []
+    )
+
+    external = memory_service.get_memory(MemoryEnum.REPORTS.value)
+    internal = memory_service.get_memory(MemoryEnum.REPORTS_INTERNAL.value)
+
+    internal_reports = filter(
+        lambda i: i not in ignored_reports, (internal.value if internal else [])
+    )
+    external_reports = filter(
+        lambda i: i.get("title") not in ignored_reports,
+        (external.value if external else []),
+    )
+
+    if "CUSTOM" in ignored_reports:
+        external_reports = []
+
+    return {
+        "external": list(external_reports),
+        "internal": list(internal_reports),
+        "custom": reports_custom_service.get_report_list(),
+    }
+
+
+def _get_resource_path(report, schema, filename="current"):
+    """Get resource path for report."""
+    return f"reports/{schema}/{report}/{filename}.gz"
