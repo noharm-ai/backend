@@ -249,3 +249,24 @@ class ClinicalNotesType(db.Model):
     updated_by = db.Column("updated_by", db.BigInteger, nullable=False)
     created_at = db.Column("created_at", db.DateTime, nullable=False)
     created_by = db.Column("created_by", db.BigInteger, nullable=False)
+
+
+class Report(db.Model):
+    """SQLALCHEMY model for relatorio table"""
+
+    __tablename__ = "relatorio"
+
+    id = db.Column("idrelatorio", db.Integer, primary_key=True)
+    name = db.Column("nome", db.String, nullable=False)
+    description = db.Column("descricao", db.String, nullable=False)
+    report_type = db.Column("tp_relatorio", db.Integer, nullable=False)
+    sql = db.Column("sql", db.String, nullable=False)
+    active = db.Column("ativo", db.Boolean, nullable=False)
+    status = db.Column("tp_status", db.Integer, nullable=False)
+    error = db.Column("erro", db.String, nullable=True)
+    processed_at = db.Column("processed_at", db.DateTime, nullable=True)
+    processed_by = db.Column("processed_by", db.BigInteger, nullable=True)
+    updated_at = db.Column("updated_at", db.DateTime, nullable=True)
+    updated_by = db.Column("updated_by", db.BigInteger, nullable=True)
+    created_at = db.Column("created_at", db.DateTime, nullable=False)
+    created_by = db.Column("created_by", db.BigInteger, nullable=False)

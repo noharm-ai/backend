@@ -23,16 +23,6 @@ def upsert_segment(
                 status.HTTP_400_BAD_REQUEST,
             )
     else:
-        if (
-            admin_integration_status_service.get_integration_status(user_context.schema)
-            == IntegrationStatusEnum.PRODUCTION.value
-        ):
-            raise ValidationError(
-                "O processo de criação de segmentos foi desativado para integrações em Produção. Solicite criação manual.",
-                "errors.businessRules",
-                status.HTTP_400_BAD_REQUEST,
-            )
-
         segment = Segment()
         segment.cpoe_outpatient_clinic = False
 

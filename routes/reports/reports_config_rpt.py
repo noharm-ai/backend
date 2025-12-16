@@ -3,7 +3,7 @@
 from flask import Blueprint
 
 from decorators.api_endpoint_decorator import api_endpoint
-from services import memory_service
+from services.reports import reports_general_service
 
 app_rpt_config = Blueprint("app_rpt_config", __name__)
 
@@ -12,4 +12,4 @@ app_rpt_config = Blueprint("app_rpt_config", __name__)
 @api_endpoint()
 def get_config():
     """Get reports configuration."""
-    return memory_service.get_reports()
+    return reports_general_service.get_report_list()

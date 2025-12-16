@@ -20,6 +20,7 @@ from routes.admin.admin_intervention_reason import app_admin_interv
 from routes.admin.admin_memory import app_admin_memory
 from routes.admin.admin_protocol import app_admin_protocol
 from routes.admin.admin_relation import app_admin_relation
+from routes.admin.admin_report import app_admin_report
 from routes.admin.admin_segment import app_admin_segment
 from routes.admin.admin_substance import app_admin_subs
 from routes.admin.admin_tag import app_admin_tag
@@ -44,6 +45,7 @@ from routes.regulation.regulation import app_regulation
 from routes.reports.reports_antimicrobial import app_rpt_antimicrobial
 from routes.reports.reports_config_rpt import app_rpt_config
 from routes.reports.reports_culture import app_rpt_culture
+from routes.reports.reports_custom import app_rpt_custom
 from routes.reports.reports_exams import app_rpt_exams
 from routes.reports.reports_general import app_rpt_general
 from routes.reports.reports_integration import app_rpt_integration
@@ -129,6 +131,7 @@ app.register_blueprint(app_admin_unit)
 app.register_blueprint(app_admin_tag)
 app.register_blueprint(app_admin_protocol)
 app.register_blueprint(app_admin_global_memory)
+app.register_blueprint(app_admin_report)
 
 app.register_blueprint(app_rpt_general)
 app.register_blueprint(app_rpt_culture)
@@ -138,6 +141,7 @@ app.register_blueprint(app_rpt_prescription_history)
 app.register_blueprint(app_rpt_exams)
 app.register_blueprint(app_rpt_integration)
 app.register_blueprint(app_rpt_regulation)
+app.register_blueprint(app_rpt_custom)
 
 app.register_blueprint(app_regulation)
 
@@ -149,10 +153,14 @@ if Config.ENV == NoHarmENV.PRODUCTION.value:
     logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
     logging.getLogger("noharm.backend").setLevel(logging.WARNING)
     logging.getLogger("noharm.performance").setLevel(logging.WARNING)
+    logging.getLogger("boto3").setLevel(logging.WARNING)
+    logging.getLogger("botocore").setLevel(logging.WARNING)
 else:
     logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
     logging.getLogger("noharm.backend").setLevel(logging.DEBUG)
     logging.getLogger("noharm.performance").setLevel(logging.DEBUG)
+    logging.getLogger("boto3").setLevel(logging.INFO)
+    logging.getLogger("botocore").setLevel(logging.INFO)
 
 
 @app.route("/version", methods=["GET"])

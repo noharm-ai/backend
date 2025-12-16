@@ -1,5 +1,8 @@
+import os
 import re
 import unicodedata
+from typing import Union
+from urllib.parse import unquote
 
 
 def strNone(s):
@@ -81,3 +84,60 @@ def prepare_drug_name(name):
         return cleaned_name.strip()
 
     return " ".join(words).upper()
+
+
+def is_valid_filename(
+    resource_path: str,
+    valid_extensions: Union[set[str], None] = None,
+):
+    if not resource_path:
+        return False
+
+    # Decode URL encoding to prevent encoded path traversal attacks
+    # Decode multiple times to catch double-encoding
+    decoded_path = resource_path
+    max_iterations = 3
+    for _ in range(max_iterations):
+        new_decoded = unquote(decoded_path)
+        if new_decoded == decoded_path:
+            break
+        decoded_path = new_decoded
+
+    # Check for path traversal attempts in both original and decoded
+    for path_to_check in [resource_path, decoded_path]:
+        if ".." in path_to_check or "\\" in path_to_check:
+            return False
+
+    # Prevent null byte injection (check both encoded and decoded)
+    if "\x00" in resource_path or "\x00" in decoded_path:
+        return False
+
+    # Check for URL-encoded path traversal patterns
+    dangerous_patterns = [
+        r"%2e%2e",  # ..
+        r"%2f",  # /
+        r"%5c",  # \
+        r"%00",  # null byte
+    ]
+    lower_path = resource_path.lower()
+    for pattern in dangerous_patterns:
+        if pattern in lower_path:
+            return False
+
+    # Validate full path with directories
+    # Allow alphanumeric, dash, underscore, dot, and forward slash for paths
+    if not re.match(r"^[\w\-\./]+$", resource_path):
+        return False
+
+    # Check each path component
+    parts = resource_path.split("/")
+    for part in parts:
+        if part and not re.match(r"^[\w\-\.]+$", part):
+            return False
+
+    # Ensure resource_path has valid extension
+    if valid_extensions:
+        if not any(resource_path.endswith(ext) for ext in valid_extensions):
+            return False
+
+    return True
