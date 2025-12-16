@@ -1,12 +1,14 @@
 """Service: get internal reports"""
 
+from boto3.docs import resource
+
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
 from models.enums import MemoryEnum, ReportEnum
 from models.main import User, db
 from services import memory_service
 from services.reports import reports_cache_service, reports_custom_service
-from utils import status
+from utils import status, stringutils
 
 
 @has_permission(Permission.READ_REPORTS)
@@ -83,4 +85,14 @@ def get_report_list(
 
 def _get_resource_path(report, schema, filename="current"):
     """Get resource path for report."""
-    return f"reports/{schema}/{report}/{filename}.gz"
+    resource_path = f"reports/{schema}/{report}/{filename}.gz"
+    if not stringutils.is_valid_filename(
+        resource_path=resource_path, valid_extensions={".gz"}
+    ):
+        raise ValidationError(
+            "Nome de arquivo inválido",
+            "errors.invalidFilename",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    return resource_path

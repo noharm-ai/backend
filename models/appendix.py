@@ -265,7 +265,7 @@ class Report(db.Model):
     status = db.Column("tp_status", db.Integer, nullable=False)
     error = db.Column("erro", db.String, nullable=True)
     processed_at = db.Column("processed_at", db.DateTime, nullable=True)
-    processed_by = db.Column("processed_by", db.Integer, nullable=True)
+    processed_by = db.Column("processed_by", db.BigInteger, nullable=True)
     updated_at = db.Column("updated_at", db.DateTime, nullable=True)
     updated_by = db.Column("updated_by", db.BigInteger, nullable=True)
     created_at = db.Column("created_at", db.DateTime, nullable=False)

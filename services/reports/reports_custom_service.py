@@ -14,7 +14,7 @@ from models.enums import ReportStatusEnum
 from models.main import User
 from repository.reports import reports_repository
 from services.reports import reports_cache_service
-from utils import dateutils, status
+from utils import dateutils, status, stringutils
 
 
 @has_permission(Permission.READ_REPORTS)
@@ -174,4 +174,16 @@ def _validate_report(
 
 def _get_resource_path(id_report: int, schema: str, filename: str):
     """Get resource path for custom report."""
-    return f"reports/{schema}/CUSTOM/{id_report}/{filename}"
+
+    resource_path = f"reports/{schema}/CUSTOM/{id_report}/{filename}"
+
+    if not stringutils.is_valid_filename(
+        resource_path=resource_path, valid_extensions={".csv", ".xlsx"}
+    ):
+        raise ValidationError(
+            "Nome de arquivo inválido",
+            "errors.invalidFilename",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    return resource_path

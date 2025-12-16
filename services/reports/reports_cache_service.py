@@ -5,6 +5,8 @@ import dateutil
 from botocore.exceptions import ClientError
 
 from config import Config
+from exception.validation_error import ValidationError
+from utils import logger, status, stringutils
 from utils.dateutils import to_iso
 
 
@@ -23,6 +25,8 @@ def generate_link(resource_path: str):
     Returns:
         str: The presigned URL for the resource.
     """
+    _validate_resource_path(resource_path=resource_path)
+
     client = _get_client()
 
     cache_data = get_cache_data(resource_path=resource_path)
@@ -42,6 +46,8 @@ def generate_link(resource_path: str):
 
 def get_cache_data(resource_path: str):
     client = _get_client()
+
+    _validate_resource_path(resource_path=resource_path)
 
     try:
         resource_info = client.head_object(
@@ -71,6 +77,8 @@ def list_available_reports(schema: str, report: str):
     Returns:
         list: A list of available reports.
     """
+
+    _validate_resource_path(resource_path=report)
 
     client = _get_client()
     files = client.list_objects_v2(
@@ -114,10 +122,14 @@ def list_available_custom_reports(schema: str, id_report: int):
         list: A list of available reports.
     """
 
+    resource_path = f"reports/{schema}/CUSTOM/{id_report}/"
+
+    _validate_resource_path(resource_path=resource_path)
+
     client = _get_client()
     files = client.list_objects_v2(
         Bucket=Config.CACHE_BUCKET_NAME,
-        Prefix=f"reports/{schema}/CUSTOM/{id_report}/",
+        Prefix=resource_path,
     )
 
     current_report = (
@@ -167,3 +179,13 @@ def list_available_custom_reports(schema: str, id_report: int):
         reports.insert(0, current_report)
 
     return reports
+
+
+def _validate_resource_path(resource_path: str):
+    if not stringutils.is_valid_filename(resource_path=resource_path):
+        logger.backend_logger.warning("invalid filename: %s", resource_path)
+        raise ValidationError(
+            "Nome de arquivo inválido",
+            "errors.invalidFilename",
+            status.HTTP_400_BAD_REQUEST,
+        )
