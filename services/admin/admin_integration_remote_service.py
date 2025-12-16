@@ -1,23 +1,23 @@
 """Service: remote integration related operations"""
 
-import re
 import json
+import re
 from datetime import datetime, timedelta, timezone
 
 import boto3
 import dateutil as pydateutil
+from botocore.config import Config as BotoConfig
+from botocore.exceptions import ClientError
 from markupsafe import escape
 from sqlalchemy import desc
-from botocore.exceptions import ClientError
-from botocore.config import Config as BotoConfig
 
-from models.main import db, User
+from config import Config
+from decorators.has_permission_decorator import Permission, has_permission
+from exception.validation_error import ValidationError
 from models.appendix import NifiQueue, SchemaConfig
 from models.enums import NifiQueueActionTypeEnum
-from utils import dateutils, status
-from exception.validation_error import ValidationError
-from decorators.has_permission_decorator import has_permission, Permission
-from config import Config
+from models.main import User, db
+from utils import dateutils, status, stringutils
 
 
 @has_permission(Permission.ADMIN_INTEGRATION_REMOTE)
@@ -43,7 +43,18 @@ def get_file_url(schema: str, filename="template") -> tuple[str, str]:
 
 
 def _get_resource_name(schema, filename="current"):
-    return f"{schema}/{filename}.json"
+    resource_path = f"{schema}/{filename}.json"
+
+    if not stringutils.is_valid_filename(
+        resource_path=resource_path, valid_extensions={".json"}
+    ):
+        raise ValidationError(
+            "Nome de arquivo inválido",
+            "errors.invalidFilename",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    return resource_path
 
 
 def _get_cache_data(client, schema, filename="current"):

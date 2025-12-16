@@ -2,6 +2,7 @@ import os
 import re
 import unicodedata
 from typing import Union
+from urllib.parse import unquote
 
 
 def strNone(s):
@@ -92,13 +93,36 @@ def is_valid_filename(
     if not resource_path:
         return False
 
-    # Check for path traversal attempts
-    if ".." in resource_path or "\\" in resource_path:
+    # Decode URL encoding to prevent encoded path traversal attacks
+    # Decode multiple times to catch double-encoding
+    decoded_path = resource_path
+    max_iterations = 3
+    for _ in range(max_iterations):
+        new_decoded = unquote(decoded_path)
+        if new_decoded == decoded_path:
+            break
+        decoded_path = new_decoded
+
+    # Check for path traversal attempts in both original and decoded
+    for path_to_check in [resource_path, decoded_path]:
+        if ".." in path_to_check or "\\" in path_to_check:
+            return False
+
+    # Prevent null byte injection (check both encoded and decoded)
+    if "\x00" in resource_path or "\x00" in decoded_path:
         return False
 
-    # Prevent null byte injection
-    if "\x00" in resource_path:
-        return False
+    # Check for URL-encoded path traversal patterns
+    dangerous_patterns = [
+        r"%2e%2e",  # ..
+        r"%2f",  # /
+        r"%5c",  # \
+        r"%00",  # null byte
+    ]
+    lower_path = resource_path.lower()
+    for pattern in dangerous_patterns:
+        if pattern in lower_path:
+            return False
 
     # Validate full path with directories
     # Allow alphanumeric, dash, underscore, dot, and forward slash for paths
