@@ -24,6 +24,7 @@ class MemoryEnum(Enum):
     MAP_SCHEDULES = "map-schedules"
     CUSTOM_FORMS = "custom-forms"
     TRANSCRIPTION_FIELDS = "transcription-fields"
+    TRANSCRIPTION_REMOVE_FIELDS = "transcription-remove-fields"
 
 
 class GlobalMemoryEnum(Enum):

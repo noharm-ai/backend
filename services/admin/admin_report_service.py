@@ -72,7 +72,7 @@ def upsert_report(request_data: UpsertReportRequest, user_context: User):
 
 
 @has_permission(Permission.ADMIN_REPORTS)
-def get_report_list():
+def get_report_list(user_context: User):
     """Get list of custom reports."""
     custom_reports_query_result = reports_repository.get_custom_reports(all=True)
     custom_reports = []
@@ -87,10 +87,16 @@ def get_report_list():
                 "updated_at": dateutils.to_iso(report.updated_at),
                 "created_at": dateutils.to_iso(report.created_at),
                 "error_message": report.error,
+                "sql": report.sql,
             }
         )
 
-    return custom_reports
+    return {
+        "custom_reports": custom_reports,
+        "saved_queries": reports_repository.get_saved_queries(
+            schema=user_context.schema
+        ),
+    }
 
 
 def _validate_sql_query(sql: str):

@@ -1,31 +1,32 @@
-from sqlalchemy import asc, distinct, func, and_
-from sqlalchemy.orm import undefer
-from typing import List
 from datetime import datetime
+from typing import List
 
-from models.main import (
-    db,
-    User,
-    PrescriptionAgg,
-    DrugAttributesAudit,
-    DrugAttributes,
-    Drug,
-    Substance,
-)
-from models.prescription import PrescriptionDrug, Prescription
-from models.appendix import MeasureUnit, Frequency, MeasureUnitConvert
-from models.segment import Segment
+from sqlalchemy import and_, asc, distinct, func
+from sqlalchemy.orm import undefer
+
+from decorators.has_permission_decorator import Permission, has_permission
+from exception.validation_error import ValidationError
+from models.appendix import Frequency, MeasureUnit, MeasureUnitConvert
 from models.enums import (
     DrugAttributesAuditTypeEnum,
-    SubstanceTagEnum,
-    SegmentTypeEnum,
     MemoryEnum,
+    SegmentTypeEnum,
+    SubstanceTagEnum,
 )
+from models.main import (
+    Drug,
+    DrugAttributes,
+    DrugAttributesAudit,
+    PrescriptionAgg,
+    Substance,
+    User,
+    db,
+)
+from models.prescription import Prescription, PrescriptionDrug
+from models.segment import Segment
 from services import data_authorization_service, memory_service
 from services.admin import admin_drug_service
-from exception.validation_error import ValidationError
-from decorators.has_permission_decorator import has_permission, Permission
-from utils import status, prescriptionutils
+from utils import prescriptionutils, status
 
 
 @has_permission(Permission.READ_PRESCRIPTION)
@@ -110,13 +111,12 @@ def get_drug_summary(
                 }
             )
 
+    remove_fields = memory_service.get_memory(
+        MemoryEnum.TRANSCRIPTION_REMOVE_FIELDS.value
+    )
     transcription_fields = memory_service.get_memory(
         MemoryEnum.TRANSCRIPTION_FIELDS.value
     )
-    if transcription_fields:
-        extra_fields = transcription_fields.value
-    else:
-        extra_fields = []
 
     return {
         "drug": {"id": int(id_drug), "name": drug.name if drug else ""},
@@ -124,7 +124,8 @@ def get_drug_summary(
         "frequencies": frequencyResults,
         "routes": routeResults,
         "intervals": intervalResults,
-        "extraFields": extra_fields,
+        "extraFields": transcription_fields.value if transcription_fields else [],
+        "removeFields": remove_fields.value if remove_fields else [],
     }
 
 

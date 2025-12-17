@@ -175,38 +175,51 @@ def create_agg_prescription_by_prescription(
             user=prescalc_user,
         )
 
-        if drug_count > 0 and p.status == "s":
-            remove_check = True
-            last_check_data = prescalc_repository.get_last_check_data(
-                id_prescription=p.id
-            )
-
-            if (
-                last_check_data is not None
-                and last_check_data.PrescriptionAudit.totalItens == drug_count
-            ):
-                # if it has the same item count, do not remove current check
-                remove_check = False
-
-                logger.backend_logger.warning(
-                    "(%s) Prescrição manteve a mesma quantidade de itens, portanto não será deschecada: %s",
-                    schema,
-                    p.id,
+        if drug_count > 0:
+            if p.status == "s":
+                remove_check = True
+                last_check_data = prescalc_repository.get_last_check_data(
+                    id_prescription=p.id
                 )
 
-            if remove_check:
+                if (
+                    last_check_data is not None
+                    and last_check_data.PrescriptionAudit.totalItens == drug_count
+                ):
+                    # if it has the same item count, do not remove current check
+                    remove_check = False
+
+                    logger.backend_logger.warning(
+                        "(%s) Prescrição manteve a mesma quantidade de itens, portanto não será deschecada: %s",
+                        schema,
+                        p.id,
+                    )
+
+                if remove_check:
+                    # remove prescription agg check
+                    pAgg.status = 0
+                    prescription_check_service.audit_check(
+                        prescription=pAgg,
+                        user=prescalc_user,
+                        extra={"prescalc": True, "processed_status": processed_status},
+                    )
+
+                    # remove individual prescription check
+                    p.update = datetime.today()
+                    p.user = None
+                    p.status = 0
+                    prescription_check_service.audit_check(
+                        prescription=p,
+                        user=prescalc_user,
+                        extra={"prescalc": True, "processed_status": processed_status},
+                    )
+            elif pAgg.status == "s" and processed_status != "PROCESSED":
                 # remove prescription agg check
                 pAgg.status = 0
                 prescription_check_service.audit_check(
-                    prescription=pAgg, user=prescalc_user, extra={"prescalc": True}
-                )
-
-                # remove individual prescription check
-                p.update = datetime.today()
-                p.user = None
-                p.status = 0
-                prescription_check_service.audit_check(
-                    prescription=p, user=prescalc_user, extra={"prescalc": True}
+                    prescription=pAgg,
+                    user=prescalc_user,
+                    extra={"prescalc": True, "processed_status": processed_status},
                 )
 
     _log_processed_date(id_prescription_array=[id_prescription], schema=schema)

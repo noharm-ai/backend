@@ -1,8 +1,9 @@
-from flask import Blueprint, request
-from markupsafe import escape as escape_html
+"""Routes for drugs related operations"""
 
-from services import drug_service
+from flask import Blueprint, request
+
 from decorators.api_endpoint_decorator import api_endpoint
+from services import drug_service
 
 app_drugs = Blueprint("app_drugs", __name__)
 
