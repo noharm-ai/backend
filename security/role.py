@@ -62,6 +62,7 @@ class Role(Enum):
             Permission.READ_PROTOCOLS,
             Permission.WRITE_PROTOCOLS,
             Permission.ADMIN_NZERO,
+            Permission.UPDATE_USER_SG,
         ],
     )
 
@@ -100,6 +101,7 @@ class Role(Enum):
             Permission.ADMIN_UNIT,
             Permission.WRITE_TAGS,
             Permission.READ_REGULATION,
+            Permission.UPDATE_USER_SG,
         ],
     )
 
