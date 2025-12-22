@@ -5,20 +5,19 @@ from datetime import datetime
 
 import boto3
 from sqlalchemy import case, text
-from config import Config
 
-from models.main import db, User
-from models.appendix import SchemaConfig, InterventionReason, SchemaConfigAudit
+from config import Config
+from decorators.has_permission_decorator import Permission, has_permission
+from exception.validation_error import ValidationError
+from models.appendix import InterventionReason, SchemaConfig, SchemaConfigAudit
+from models.enums import SchemaConfigAuditTypeEnum
+from models.main import User, db
 from models.requests.admin.admin_integration_request import (
     AdminIntegrationCreateSchemaRequest,
     AdminIntegrationUpsertGetnameRequest,
     AdminIntegrationUpsertSecurityGroupRequest,
 )
-from models.enums import SchemaConfigAuditTypeEnum
-from decorators.has_permission_decorator import has_permission, Permission
-from utils import status, network_utils
-
-from exception.validation_error import ValidationError
+from utils import network_utils, status
 
 
 def get_table_count(schema, table):
@@ -26,11 +25,11 @@ def get_table_count(schema, table):
 
     query = text(
         """
-        select 
+        select
             n_live_tup as total_rows
         from
-            pg_stat_user_tables 
-        where 
+            pg_stat_user_tables
+        where
             schemaname = :schemaname and relname = :table
         """
     )
@@ -439,7 +438,7 @@ def upsert_security_group(
     return response_json
 
 
-@has_permission(Permission.INTEGRATION_UTILS)
+@has_permission(Permission.UPDATE_USER_SG)
 def update_user_security_group(user_context: User):
     """Update user sg rules"""
 

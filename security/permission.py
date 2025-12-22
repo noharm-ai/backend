@@ -96,3 +96,5 @@ class Permission(Enum):
 
     READ_PROTOCOLS = "READ_PROTOCOLS"  # permission to view protocols
     WRITE_PROTOCOLS = "WRITE_PROTOCOLS"  # permission to create and edit protocols
+
+    UPDATE_USER_SG = "UPDATE_USER_SG"  # permission to update user's security group

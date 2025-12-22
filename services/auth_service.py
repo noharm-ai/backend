@@ -3,37 +3,37 @@
 import json
 import urllib.parse
 
-import requests
 import jwt
+import requests
+from cryptography.hazmat.primitives import serialization
 from flask import request
 from flask_jwt_extended import (
     create_access_token,
     create_refresh_token,
 )
-from cryptography.hazmat.primitives import serialization
 from flask_sqlalchemy.session import Session
 from markupsafe import escape as escape_html
 from sqlalchemy import asc, text
 from sqlalchemy.orm import make_transient
 
-from models.main import db, dbSession, Notify, User, UserExtra
+from config import Config
+from decorators.has_permission_decorator import Permission, has_permission
+from exception.validation_error import ValidationError
 from models.appendix import Memory, SchemaConfig
-from models.segment import Hospital, Segment
 from models.enums import (
-    NoHarmENV,
-    MemoryEnum,
     FeatureEnum,
     IntegrationStatusEnum,
+    MemoryEnum,
+    NoHarmENV,
     UserAuditTypeEnum,
 )
+from models.main import Notify, User, UserExtra, db, dbSession
+from models.segment import Hospital, Segment
 from repository import user_repository
+from security.role import Role
 from services import memory_service, user_service
 from services.admin import admin_integration_status_service
-from config import Config
-from exception.validation_error import ValidationError
 from utils import status
-from security.role import Role
-from decorators.has_permission_decorator import has_permission, Permission
 
 
 def _login(email: str, password: str) -> User:

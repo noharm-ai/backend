@@ -5,10 +5,10 @@ from typing import List
 
 from sqlalchemy import text
 
+from models.enums import DrugAlertLevelEnum, DrugTypeEnum, FrequencyEnum
+from models.main import Allergy, Drug, DrugAttributes, Substance, db
 from models.prescription import PrescriptionDrug
-from models.main import db, Drug, Substance, Allergy, DrugAttributes
-from models.enums import DrugTypeEnum, DrugAlertLevelEnum, FrequencyEnum
-from utils import examutils, stringutils, prescriptionutils, dateutils
+from utils import dateutils, examutils, prescriptionutils, stringutils
 
 
 # analyze interactions between drugs.
@@ -29,15 +29,27 @@ def find_relations(drug_list, id_patient: int, is_cpoe: bool):
         prescription_drug: PrescriptionDrug = item[0]
         drug: Drug = item[1]
         prescription_date = item[13]
-        prescription_expire_date = item[10] if item[10] != None else datetime.today()
+        prescription_expire_date = item[10]
+
+        if prescription_expire_date is None:
+            if prescription_date.date() >= datetime.now().date():
+                prescription_expire_date = prescription_date + timedelta(hours=24)
+            else:
+                prescription_expire_date = datetime.today()
 
         for compare_item in filtered_list:
             cp_prescription_drug: PrescriptionDrug = compare_item[0]
             cp_drug: Drug = compare_item[1]
             cp_prescription_date = compare_item[13]
-            cp_prescription_expire_date = (
-                compare_item[10] if compare_item[10] != None else datetime.today()
-            )
+            cp_prescription_expire_date = compare_item[10]
+
+            if cp_prescription_expire_date is None:
+                if cp_prescription_date.date() >= datetime.now().date():
+                    cp_prescription_expire_date = cp_prescription_date + timedelta(
+                        hours=24
+                    )
+                else:
+                    cp_prescription_expire_date = datetime.today()
 
             if prescription_drug.id == cp_prescription_drug.id:
                 continue
@@ -221,8 +233,8 @@ def find_relations(drug_list, id_patient: int, is_cpoe: bool):
                 alert_text += stringutils.strNone(active_relations[key]["text"])
 
                 if kind in ["iy", "it"]:
-                    alert_text += f"""- {drug_from["drug"]} (Horários: {prescriptionutils.timeValue( drug_from['interval']) if drug_from['interval'] else '--'})
-                        - {drug_to["drug"]} (Horários: {prescriptionutils.timeValue(drug_to['interval']) if drug_to['interval'] else '--'})
+                    alert_text += f"""- {drug_from["drug"]} (Horários: {prescriptionutils.timeValue(drug_from["interval"]) if drug_from["interval"] else "--"})
+                        - {drug_to["drug"]} (Horários: {prescriptionutils.timeValue(drug_to["interval"]) if drug_to["interval"] else "--"})
                     """
 
                     if kind == "iy":
@@ -379,10 +391,10 @@ def _get_active_relations(uniq_overlap_keys: List[str]):
             r.tprelacao as "kind",
             r.texto as "text",
             r.nivel as "level"
-        from 
-            public.relacao r 
+        from
+            public.relacao r
             inner join cruzamento c on (r.sctida = c.sctida and r.sctidb = c.sctidb)
-        where 
+        where
 	        r.ativo = true
     """
     )
