@@ -41,6 +41,7 @@ from routes.patient import app_pat
 from routes.prescription import app_pres
 from routes.prescription_crud import app_pres_crud
 from routes.protocol import app_protocol
+from routes.queue import app_queue
 from routes.regulation.regulation import app_regulation
 from routes.reports.reports_antimicrobial import app_rpt_antimicrobial
 from routes.reports.reports_config_rpt import app_rpt_config
@@ -112,6 +113,7 @@ app.register_blueprint(app_tag)
 app.register_blueprint(app_protocol)
 app.register_blueprint(app_exams)
 app.register_blueprint(app_lists)
+app.register_blueprint(app_queue)
 
 app.register_blueprint(app_user_admin)
 app.register_blueprint(app_pres_crud)
