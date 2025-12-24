@@ -1,8 +1,9 @@
-import pytest
 from datetime import datetime
 
+import pytest
+
 from models.appendix import Frequency
-from models.enums import DrugAlertTypeEnum, DrugAlertLevelEnum
+from models.enums import DrugAlertLevelEnum, DrugAlertTypeEnum
 from services import alert_service
 from tests.utils import utils_test_prescription
 
@@ -33,6 +34,7 @@ def test_dosemaxplus():
         lactating=None,
         schedules_fasting=None,
         cn_data=None,
+        protocols=None,
     )
 
     stats = alerts.get("stats")
@@ -118,6 +120,7 @@ def test_max_dose_total_additional(
         lactating=None,
         schedules_fasting=None,
         cn_data=None,
+        protocols=None,
     )
     max_dose_total_alerts = [
         alert
@@ -162,6 +165,7 @@ def test_dosemax():
         lactating=None,
         schedules_fasting=None,
         cn_data=None,
+        protocols=None,
     )
 
     stats = alerts.get("stats")
@@ -209,6 +213,7 @@ def test_max_dose_additional(
         lactating=None,
         schedules_fasting=None,
         cn_data=None,
+        protocols=None,
     )
 
     max_dose_alerts = alerts.get("alerts", {}).get("61", [])
@@ -252,6 +257,7 @@ def test_kidney_dialysis():
         lactating=None,
         schedules_fasting=None,
         cn_data=None,
+        protocols=None,
     )
     stats = alerts.get("stats")
 
@@ -291,6 +297,7 @@ def test_kidney_ckd():
         lactating=None,
         schedules_fasting=None,
         cn_data=None,
+        protocols=None,
     )
     stats = alerts.get("stats")
 
@@ -326,6 +333,7 @@ def test_kidney_swrtz2():
         lactating=None,
         schedules_fasting=None,
         cn_data=None,
+        protocols=None,
     )
     stats = alerts.get("stats")
 
@@ -361,6 +369,7 @@ def test_kidney_swrtz1():
         lactating=None,
         schedules_fasting=None,
         cn_data=None,
+        protocols=None,
     )
     stats = alerts.get("stats")
 
@@ -389,7 +398,6 @@ def test_kidney_swrtz1():
 def test_kidney_alert_multiple(
     kidney_threshold, ckd_value, age, dialysis, expected_alert
 ):
-
     drugs = [
         utils_test_prescription.get_prescription_drug_mock_row(
             id_prescription_drug=1, dose=ckd_value, kidney=kidney_threshold
@@ -408,6 +416,7 @@ def test_kidney_alert_multiple(
         lactating=None,
         schedules_fasting=None,
         cn_data=None,
+        protocols=None,
     )
     kidney_alerts = alerts.get("alerts", {}).get("1", [])
     kidney_alert_count = alerts.get("stats", {}).get(DrugAlertTypeEnum.KIDNEY.value, 0)
@@ -448,6 +457,7 @@ def test_liver():
         lactating=None,
         schedules_fasting=None,
         cn_data=None,
+        protocols=None,
     )
     stats = alerts.get("stats")
 
@@ -492,6 +502,7 @@ def test_platelets():
         lactating=None,
         schedules_fasting=None,
         cn_data=None,
+        protocols=None,
     )
     stats = alerts.get("stats")
 
@@ -535,6 +546,7 @@ def test_elderly():
         lactating=None,
         schedules_fasting=None,
         cn_data=None,
+        protocols=None,
     )
 
     stats = alerts.get("stats")
@@ -579,6 +591,7 @@ def test_tube():
         lactating=None,
         schedules_fasting=None,
         cn_data=None,
+        protocols=None,
     )
 
     stats = alerts.get("stats")
@@ -623,6 +636,7 @@ def test_allergy():
         lactating=None,
         schedules_fasting=None,
         cn_data=None,
+        protocols=None,
     )
 
     stats = alerts.get("stats")
@@ -663,6 +677,7 @@ def test_ira():
         lactating=None,
         schedules_fasting=None,
         cn_data=None,
+        protocols=None,
     )
 
     stats = alerts.get("stats")
@@ -737,29 +752,30 @@ def test_ira_alert_conditions(test_input, expected_alert):
         lactating=None,
         schedules_fasting=None,
         cn_data=cn_data,
+        protocols=None,
     )
 
     alert1 = alerts.get("alerts", {}).get("61", [])
 
     if expected_alert:
         assert len(alert1) == 1, f"Expected 1 alert, but got {len(alert1)}"
-        assert (
-            alert1[0].get("type") == "ira"
-        ), f"Expected alert type 'ira', but got {alert1[0].get('type')}"
-        assert (
-            alert1[0].get("level") == "high"
-        ), f"Expected alert level 'high', but got {alert1[0].get('level')}"
-        assert (
-            alerts.get("stats", {}).get("ira", 0) == 1
-        ), f"Expected 1 IRA alert in stats, but got {alerts.get('stats', {}).get('ira', 0)}"
+        assert alert1[0].get("type") == "ira", (
+            f"Expected alert type 'ira', but got {alert1[0].get('type')}"
+        )
+        assert alert1[0].get("level") == "high", (
+            f"Expected alert level 'high', but got {alert1[0].get('level')}"
+        )
+        assert alerts.get("stats", {}).get("ira", 0) == 1, (
+            f"Expected 1 IRA alert in stats, but got {alerts.get('stats', {}).get('ira', 0)}"
+        )
         assert "Risco de desenvolvimento de Insuficiência Renal Aguda (IRA)" in alert1[
             0
         ].get("text", ""), "Expected IRA risk message in alert text"
     else:
         assert len(alert1) == 0, f"Expected no alerts, but got {len(alert1)}"
-        assert (
-            alerts.get("stats", {}).get("ira", 0) == 0
-        ), f"Expected 0 IRA alerts in stats, but got {alerts.get('stats', {}).get('ira', 0)}"
+        assert alerts.get("stats", {}).get("ira", 0) == 0, (
+            f"Expected 0 IRA alerts in stats, but got {alerts.get('stats', {}).get('ira', 0)}"
+        )
 
 
 def test_pregnant():
@@ -788,6 +804,7 @@ def test_pregnant():
         lactating=None,
         schedules_fasting=None,
         cn_data=None,
+        protocols=None,
     )
 
     stats = alerts.get("stats")
@@ -833,6 +850,7 @@ def test_lactating():
         lactating=True,
         schedules_fasting=None,
         cn_data=None,
+        protocols=None,
     )
 
     stats = alerts.get("stats")
@@ -877,6 +895,7 @@ def test_fasting():
         lactating=None,
         schedules_fasting=["8", "24"],
         cn_data=None,
+        protocols=None,
     )
 
     stats = alerts.get("stats")

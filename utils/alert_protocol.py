@@ -5,7 +5,7 @@ from datetime import date, datetime
 
 from models.enums import DrugTypeEnum
 from models.main import Substance
-from models.prescription import PrescriptionDrug, Prescription, Patient
+from models.prescription import Patient, Prescription, PrescriptionDrug
 
 SAFE_LOGICAL_EXPR_REGEX = r"^\s*(?:True|False|\(|\)|and|or|not|\s+)+\s*$"
 
@@ -25,6 +25,7 @@ class AlertProtocol:
     cn_stats = None
     protocol_variables = None
     protocol_msgs = None
+    related_items = None  # list of prescriptions items who were related to the protocol being active
 
     def __init__(
         self,
@@ -47,6 +48,7 @@ class AlertProtocol:
         self.route_list = []
         self.protocol_variables = {}
         self.protocol_msgs = []
+        self.related_items = []
 
         # fill lists
         for d in self.filtered_drugs:
@@ -70,6 +72,7 @@ class AlertProtocol:
 
         self.protocol_variables = {}
         self.protocol_msgs = []
+        self.related_items = []
 
         for v in protocol.get("variables", []):
             self.protocol_variables[v.get("name")] = self._fill_variable(variable=v)
@@ -88,8 +91,9 @@ class AlertProtocol:
         safe_locals = {}
 
         if eval(trigger, safe_globals, safe_locals):  # pylint: disable=eval-used
-            result = protocol.get("result", {})
+            result = protocol.get("result", {}).copy()
             result["variableMessages"] = self.protocol_msgs
+            result["related_items"] = self.related_items
             return result
 
         return None
@@ -359,7 +363,7 @@ class AlertProtocol:
 
                 if exp_result:
                     found = True
-                    break
+                    self.related_items.append(prescription_drug.id)
 
             return found
 

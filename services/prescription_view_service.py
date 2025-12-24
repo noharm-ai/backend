@@ -592,6 +592,15 @@ def _get_alerts(
         id_patient=patient.idPatient,
     )
 
+    protocols = alert_protocol_service.find_protocols(
+        drug_list=drug_list,
+        exams=exam_data["exams"],
+        prescription=prescription,
+        patient=patient,
+        user_context=user_context,
+        cn_stats=cn_data["cn_stats"],
+    )
+
     alerts = alert_service.find_alerts(
         drug_list=drug_list,
         exams=exam_data["exams"],
@@ -600,15 +609,7 @@ def _get_alerts(
         lactating=patient.lactating,
         schedules_fasting=config_data["schedules_fasting"],
         cn_data=cn_data,
-    )
-
-    protocols = alert_protocol_service.find_protocols(
-        drug_list=drug_list,
-        exams=exam_data["exams"],
-        prescription=prescription,
-        patient=patient,
-        user_context=user_context,
-        cn_stats=cn_data["cn_stats"],
+        protocols=protocols.get("items", None) if protocols else None,
     )
 
     return {"relations": relations, "alerts": alerts, "protocols": protocols}

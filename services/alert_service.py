@@ -1,12 +1,12 @@
 """Service: module for drug alerts"""
 
 import re
-from typing import List
+from typing import List, Union
 
-from models.enums import DrugTypeEnum, DrugAlertTypeEnum, DrugAlertLevelEnum
+from models.appendix import Frequency
+from models.enums import DrugAlertLevelEnum, DrugAlertTypeEnum, DrugTypeEnum
 from models.main import Drug, DrugAttributes
 from models.prescription import PrescriptionDrug
-from models.appendix import Frequency
 from utils import numberutils, stringutils
 
 
@@ -18,6 +18,7 @@ def find_alerts(
     lactating: bool,
     schedules_fasting: List[str],
     cn_data: dict,
+    protocols: Union[List[dict], None],
 ):
     """
     Find alerts for a list of drugs
@@ -53,6 +54,13 @@ def find_alerts(
         prescription_expire_date = item[10]
         frequency = item[3]
         handling_types = item.substance_handling_types
+
+        if protocols:
+            add_alert(
+                _alert_protocol(
+                    prescription_drug=prescription_drug, protocols=protocols
+                )
+            )
 
         # kidney alert
         add_alert(
@@ -323,11 +331,9 @@ def _alert_ira(
             maxira = 0.6219
 
             if ira > maxira and dialysis is None and dialysis_ia_count == 0:
-                alert[
-                    "text"
-                ] = f"""
-                    Risco de desenvolvimento de Insuficiência Renal Aguda (IRA), já que o resultado do cálculo 
-                    [dose diária de VANCOMICINA/TFG/peso] é superior a 0,6219. Caso o paciente esteja em diálise, 
+                alert["text"] = f"""
+                    Risco de desenvolvimento de Insuficiência Renal Aguda (IRA), já que o resultado do cálculo
+                    [dose diária de VANCOMICINA/TFG/peso] é superior a 0,6219. Caso o paciente esteja em diálise,
                     desconsiderar. <a href="https://revista.ghc.com.br/index.php/cadernosdeensinoepesquisa/issue/view/3" target="_blank">Referência: CaEPS</a>
                 """
 
@@ -368,12 +374,10 @@ def _alert_max_dose(
                     "A dose máxima registrada é por kg, mas o peso do paciente não está disponível. Favor preencher manualmente o peso."
                 )
             else:
-                alert[
-                    "text"
-                ] = f"""
-                    Dose diária prescrita ({stringutils.strFormatBR(doseWeight)} {str(drug_attributes.idMeasureUnit)}/Kg) 
-                    maior que a dose de alerta 
-                    ({stringutils.strFormatBR(drug_attributes.maxDose)} {str(drug_attributes.idMeasureUnit)}/Kg) 
+                alert["text"] = f"""
+                    Dose diária prescrita ({stringutils.strFormatBR(doseWeight)} {str(drug_attributes.idMeasureUnit)}/Kg)
+                    maior que a dose de alerta
+                    ({stringutils.strFormatBR(drug_attributes.maxDose)} {str(drug_attributes.idMeasureUnit)}/Kg)
                     usualmente recomendada (considerada a dose diária independente da indicação).
                 """
 
@@ -381,11 +385,9 @@ def _alert_max_dose(
 
     else:
         if drug_attributes.maxDose and drug_attributes.maxDose < pd_dose_conv:
-            alert[
-                "text"
-            ] = f"""
-                Dose diária prescrita ({str(pd_dose_conv)} {str(drug_attributes.idMeasureUnit)}) 
-                maior que a dose de alerta ({str(drug_attributes.maxDose)} {str(drug_attributes.idMeasureUnit)}) 
+            alert["text"] = f"""
+                Dose diária prescrita ({str(pd_dose_conv)} {str(drug_attributes.idMeasureUnit)})
+                maior que a dose de alerta ({str(drug_attributes.maxDose)} {str(drug_attributes.idMeasureUnit)})
                 usualmente recomendada (considerada a dose diária independente da indicação).
             """
 
@@ -431,13 +433,11 @@ def _alert_max_dose_total(
                     "A dose máxima registrada é por kg, mas o peso do paciente não está disponível. Favor preencher manualmente o peso."
                 )
             else:
-                alert[
-                    "text"
-                ] = f"""
+                alert["text"] = f"""
                     Dose diária prescrita SOMADA (
-                    {str(dose_total[idDrugAggWeight]["value"])} {str(drug_attributes.idMeasureUnit)}/Kg) maior 
+                    {str(dose_total[idDrugAggWeight]["value"])} {str(drug_attributes.idMeasureUnit)}/Kg) maior
                     que a dose de alerta (
-                    {str(drug_attributes.maxDose)} {str(drug_attributes.idMeasureUnit)}/Kg) 
+                    {str(drug_attributes.maxDose)} {str(drug_attributes.idMeasureUnit)}/Kg)
                     usualmente recomendada (Frequência "AGORA" não é considerada no cálculo)."
                 """
 
@@ -451,12 +451,10 @@ def _alert_max_dose_total(
             and drug_attributes.maxDose
             < numberutils.none2zero(dose_total[idDrugAgg]["value"])
         ):
-            alert[
-                "text"
-            ] = f"""
+            alert["text"] = f"""
                 Dose diária prescrita SOMADA (
-                {str(dose_total[idDrugAgg]["value"])} {str(drug_attributes.idMeasureUnit)}) maior que a 
-                dose de alerta ({str(drug_attributes.maxDose)} {str(drug_attributes.idMeasureUnit)}) 
+                {str(dose_total[idDrugAgg]["value"])} {str(drug_attributes.idMeasureUnit)}) maior que a
+                dose de alerta ({str(drug_attributes.maxDose)} {str(drug_attributes.idMeasureUnit)})
                 usualmente recomendada (Frequência "AGORA" não é considerada no cálculo).
             """
 
@@ -482,10 +480,8 @@ def _alert_max_time(
         and prescription_drug.period
         and prescription_drug.period > drug_attributes.maxTime
     ):
-        alert[
-            "text"
-        ] = f"""
-          Tempo de tratamento atual ({str(prescription_drug.period)} dias) maior que o tempo máximo de tratamento ( 
+        alert["text"] = f"""
+          Tempo de tratamento atual ({str(prescription_drug.period)} dias) maior que o tempo máximo de tratamento (
           {str(drug_attributes.maxTime)} dias) usualmente recomendado.
         """
 
@@ -535,18 +531,18 @@ def _alert_lactating(
     )
 
     if lactating and drug_attributes != None and drug_attributes.lactating == "3":
-        alert["text"] = (
-            """Paciente amamentando com medicamento classificado como Alto risco prescrito.
+        alert[
+            "text"
+        ] = """Paciente amamentando com medicamento classificado como Alto risco prescrito.
             Avaliar manutenção deste medicamento com a equipe médica ou cessação da amamentação."""
-        )
 
         return alert
 
     if lactating and drug_attributes != None and drug_attributes.lactating == "2":
-        alert["text"] = (
-            """Paciente amamentando com medicamento classificado como Médio Risco prescrito.
+        alert[
+            "text"
+        ] = """Paciente amamentando com medicamento classificado como Médio Risco prescrito.
             Avaliar manutenção deste medicamento com a equipe médica ou cessação da amamentação."""
-        )
         alert["level"] = DrugAlertLevelEnum.LOW.value
 
         return alert
@@ -605,9 +601,7 @@ def _alert_elderly(
     )
 
     if drug_attributes.elderly and exams["age"] > 60:
-        alert[
-            "text"
-        ] = f"""
+        alert["text"] = f"""
             Medicamento potencialmente inapropriado para idosos, independente das comorbidades do paciente.
         """
 
@@ -645,9 +639,7 @@ def _alert_fasting(
         ):
             return None
 
-        alert[
-            "text"
-        ] = f"""
+        alert["text"] = f"""
             O medicamento deve ser administrado em jejum, verificar horários de administração.
         """
 
@@ -678,9 +670,7 @@ def _alert_platelets(
         and exams["plqt"]["value"]
         and drug_attributes.platelets > exams["plqt"]["value"]
     ):
-        alert[
-            "text"
-        ] = f"""
+        alert["text"] = f"""
             Medicamento contraindicado para paciente com plaquetas ({str(exams["plqt"]["value"])} plaquetas/µL)
             abaixo de {str(drug_attributes.platelets)} plaquetas/µL.
         """
@@ -718,9 +708,7 @@ def _alert_liver(
         exam_name = "TGP" if tgp > tgo else "TGO"
         exam_value = tgp if tgp > tgo else tgo
 
-        alert[
-            "text"
-        ] = f"""
+        alert["text"] = f"""
             Avaliar se o medicamento já está com o ajuste adequado conforme a função hepática ou suspenso no caso de contraindicação, já que o paciente apresenta transaminase alterada. <br/>
             ({exam_name} {stringutils.strFormatBR(exam_value)} U/L).
         """
@@ -778,9 +766,7 @@ def _alert_kidney(
     if exams["age"] > 17:
         ckd_value = _get_ckd_value(exams=exams)
         if ckd_value and drug_attributes.kidney > ckd_value:
-            alert[
-                "text"
-            ] = f"""
+            alert["text"] = f"""
                 Avaliar se o medicamento já está com o ajuste adequado conforme a função renal ou suspenso no caso de contraindicação, já que a função renal do paciente (
                 {str(ckd_value)} mL/min) está abaixo de {str(drug_attributes.kidney)} mL/min.
             """
@@ -798,11 +784,9 @@ def _alert_kidney(
             and exams["swrtz2"]["value"]
             and drug_attributes.kidney > exams["swrtz2"]["value"]
         ):
-            alert[
-                "text"
-            ] = f"""
-                Avaliar se o medicamento já está com o ajuste adequado conforme a função renal ou suspenso no caso de contraindicação, já que a função renal do paciente  
-                ({str(exams["swrtz2"]["value"])} mL/min/1.73m²) está abaixo de 
+            alert["text"] = f"""
+                Avaliar se o medicamento já está com o ajuste adequado conforme a função renal ou suspenso no caso de contraindicação, já que a função renal do paciente
+                ({str(exams["swrtz2"]["value"])} mL/min/1.73m²) está abaixo de
                 {str(drug_attributes.kidney)} mL/min. (Schwartz 2)
             """
             return alert
@@ -812,11 +796,9 @@ def _alert_kidney(
             and exams["swrtz1"]["value"]
             and drug_attributes.kidney > exams["swrtz1"]["value"]
         ):
-            alert[
-                "text"
-            ] = f"""
-                Avaliar se o medicamento já está com o ajuste adequado conforme a função renal ou suspenso no caso de contraindicação, já que a função renal do paciente  
-                ({str(exams["swrtz1"]["value"])} mL/min/1.73m²) está abaixo de {str(drug_attributes.kidney)} 
+            alert["text"] = f"""
+                Avaliar se o medicamento já está com o ajuste adequado conforme a função renal ou suspenso no caso de contraindicação, já que a função renal do paciente
+                ({str(exams["swrtz1"]["value"])} mL/min/1.73m²) está abaixo de {str(drug_attributes.kidney)}
                 mL/min. (Schwartz 1)
             """
             return alert
@@ -852,5 +834,25 @@ def _get_ckd_value(exams: dict):
 
     if "ckd" in exams and exams["ckd"]["value"]:
         return exams["ckd"]["value"]
+
+    return None
+
+
+def _alert_protocol(prescription_drug: PrescriptionDrug, protocols: List[dict]):
+    alert = _create_alert(
+        id_prescription_drug=str(prescription_drug.id),
+        key="",
+        alert_type=DrugAlertTypeEnum.PROTOCOL,
+        alert_level=DrugAlertLevelEnum.HIGH,
+        text="",
+    )
+
+    for p in protocols:
+        related_items = p.get("related_items", [])
+        if prescription_drug.id in related_items:
+            alert["text"] = f"{p.get('message')}. {p.get('description')}"
+            alert["level"] = p.get("level")
+
+            return alert
 
     return None

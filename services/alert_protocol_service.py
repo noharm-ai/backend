@@ -2,13 +2,13 @@
 
 from datetime import datetime
 
-from models.main import User
-from models.prescription import Prescription, Patient
+from decorators.has_permission_decorator import Permission, has_permission
 from models.enums import ProtocolTypeEnum
+from models.main import User
+from models.prescription import Patient, Prescription
+from repository import protocol_repository
 from services import segment_service
 from utils.alert_protocol import AlertProtocol
-from decorators.has_permission_decorator import has_permission, Permission
-from repository import protocol_repository
 
 
 @has_permission(Permission.READ_PRESCRIPTION)
@@ -22,7 +22,10 @@ def find_protocols(
 ):
     """Gets all prescription protocols and test against a prescription"""
 
-    protocol_types: list[ProtocolTypeEnum] = [ProtocolTypeEnum.PRESCRIPTION_ALL]
+    protocol_types: list[ProtocolTypeEnum] = [
+        ProtocolTypeEnum.PRESCRIPTION_ALL,
+        ProtocolTypeEnum.PRESCRIPTION_ITEM,
+    ]
     if prescription.agg:
         protocol_types.append(ProtocolTypeEnum.PRESCRIPTION_AGG)
     else:
@@ -35,7 +38,7 @@ def find_protocols(
     if not protocols:
         return {}
 
-    results = {}
+    results = {"items": []}
     summary = set()
 
     drugs_by_expire_date = _split_drugs_by_date(
@@ -57,7 +60,10 @@ def find_protocols(
             alert = alert_protocol.get_protocol_alerts(protocol=protocol.config)
             if alert:
                 alert["id"] = protocol.id
-                results[expire_date].append(alert)
+                if protocol.protocol_type == ProtocolTypeEnum.PRESCRIPTION_ITEM.value:
+                    results["items"].append(alert)
+                else:
+                    results[expire_date].append(alert)
                 summary.add(protocol.id)
 
     results["summary"] = list(summary)
