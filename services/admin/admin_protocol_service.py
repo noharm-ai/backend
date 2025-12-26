@@ -1,18 +1,22 @@
 """Service: admin protocol operations"""
 
-from datetime import datetime, timedelta
 from collections import namedtuple
+from datetime import datetime, timedelta
 
-from decorators.has_permission_decorator import has_permission, Permission
-from repository import protocol_repository
-from models.main import User, db, Drug, DrugAttributes, Substance
-from models.appendix import Protocol, Frequency
-from models.prescription import Prescription, PrescriptionDrug, Patient
+from decorators.has_permission_decorator import Permission, has_permission
+from exception.validation_error import ValidationError
+from models.appendix import Frequency, Protocol
+from models.enums import (
+    ProtocolStatusTypeEnum,
+    ProtocolTypeEnum,
+    ProtocolVariableFieldEnum,
+)
+from models.main import Drug, DrugAttributes, Substance, User, db
+from models.prescription import Patient, Prescription, PrescriptionDrug
 from models.requests.protocol_request import ProtocolListRequest, ProtocolUpsertRequest
-from models.enums import ProtocolStatusTypeEnum, ProtocolVariableFieldEnum
+from repository import protocol_repository
 from utils import dateutils, status
 from utils.alert_protocol import AlertProtocol
-from exception.validation_error import ValidationError
 
 
 @has_permission(Permission.READ_PROTOCOLS)
@@ -73,7 +77,9 @@ def upsert_protocol(request_data: ProtocolUpsertRequest, user_context: User):
         protocol.created_by = user_context.id
         db.session.add(protocol)
 
-    _validate_variables(variables=request_data.config.variables)
+    _validate_variables(
+        variables=request_data.config.variables, protocol_type=request_data.protocolType
+    )
     _test_protocol(protocol=request_data.config.model_dump())
 
     protocol.name = request_data.name
@@ -86,7 +92,7 @@ def upsert_protocol(request_data: ProtocolUpsertRequest, user_context: User):
     return protocol.id
 
 
-def _validate_variables(variables: list[dict]):
+def _validate_variables(variables: list[dict], protocol_type: int):
     valid_operators = [">", "<", ">=", "<=", "=", "!=", "IN", "NOTIN", "CONTAINS"]
 
     if not variables:
@@ -95,6 +101,19 @@ def _validate_variables(variables: list[dict]):
             "errors.businessRules",
             status.HTTP_400_BAD_REQUEST,
         )
+
+    if protocol_type == ProtocolTypeEnum.PRESCRIPTION_ITEM.value:
+        has_combination_field = False
+        for var in variables:
+            if var.get("field") == "combination":
+                has_combination_field = True
+                break
+        if not has_combination_field:
+            raise ValidationError(
+                "Protocolo tipo ITEM PRESCRITO deve ter uma variável do tipo COMBO",
+                "errors.businessRules",
+                status.HTTP_400_BAD_REQUEST,
+            )
 
     for var in variables:
         name = var.get("name", None)
