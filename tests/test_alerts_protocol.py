@@ -6,7 +6,7 @@ import pytest
 
 from models.prescription import Patient, Prescription
 from tests.utils import utils_test_prescription
-from utils.alert_protocol import AlertProtocol
+from utils.alert_protocol import AlertProtocol, ProtocolExtraInfo
 
 
 @pytest.mark.parametrize(
@@ -688,6 +688,98 @@ from utils.alert_protocol import AlertProtocol
                 "variables": [
                     {
                         "name": "v1",
+                        "field": "combination",
+                        "substance": ["111111"],
+                        "intravenous": True,
+                    },
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            True,
+        ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
+                        "field": "combination",
+                        "substance": ["111111"],
+                        "intravenous": False,
+                    },
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            False,
+        ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
+                        "field": "combination",
+                        "substance": ["211111"],
+                        "feedingTube": True,
+                    },
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            True,
+        ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
+                        "field": "combination",
+                        "substance": ["211111"],
+                        "feedingTube": False,
+                    },
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            False,
+        ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
+                        "field": "combination",
+                        "substance": ["111111"],
+                        "intravenous": True,
+                        "defaultMeasureUnit": "mg",
+                    },
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            True,
+        ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
+                        "field": "combination",
+                        "substance": ["111111"],
+                        "intravenous": True,
+                        "defaultMeasureUnit": "ml",
+                    },
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            False,
+        ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
                         "field": "cn_stats",
                         "statsType": "diliexc",
                         "operator": "=",
@@ -773,6 +865,66 @@ from utils.alert_protocol import AlertProtocol
             },
             False,
         ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
+                        "field": "segmentType",
+                        "operator": "IN",
+                        "value": ["1"],
+                    },
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            True,
+        ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
+                        "field": "segmentType",
+                        "operator": "IN",
+                        "value": ["2"],
+                    },
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            False,
+        ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
+                        "field": "insurance",
+                        "operator": "CONTAINS",
+                        "value": "AB",
+                    },
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            True,
+        ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
+                        "field": "insurance",
+                        "operator": "CONTAINS",
+                        "value": "ZXY",
+                    },
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            False,
+        ),
     ],
 )
 def test_trigger(protocol, has_result):
@@ -788,6 +940,8 @@ def test_trigger(protocol, has_result):
             frequency=2,
             period=5,
             notes="Take with food",
+            intravenous=True,
+            measure_unit_nh="mg",
         ),
         utils_test_prescription.get_prescription_drug_mock_row(
             id_prescription_drug=2,
@@ -797,6 +951,8 @@ def test_trigger(protocol, has_result):
             route="IV",
             frequency=1,
             period=1,
+            tube=True,
+            measure_unit_nh="ml",
         ),
         utils_test_prescription.get_prescription_drug_mock_row(
             id_prescription_drug=3,
@@ -812,6 +968,7 @@ def test_trigger(protocol, has_result):
     prescription = Prescription()
     prescription.idDepartment = 100
     prescription.idSegment = 1
+    prescription.insurance = "ABCD"
     exams = {
         "age": 50,
         "weight": 80,
@@ -828,12 +985,16 @@ def test_trigger(protocol, has_result):
     patient.id_icd = "A00"
     patient.dischargeReason = "Alta melhorado"
 
+    protocol_extra_info = ProtocolExtraInfo()
+    protocol_extra_info.segment_type = 1
+
     alert_protocol = AlertProtocol(
         drugs=drug_list,
         exams=exams,
         prescription=prescription,
         patient=patient,
         cn_stats=cn_stats,
+        protocol_extra_info=protocol_extra_info,
     )
     results = alert_protocol.get_protocol_alerts(protocol=protocol)
 
@@ -978,6 +1139,7 @@ def test_item_protocol(protocol, related_items):
             frequency=2,
             period=5,
             notes="Take with food",
+            measure_unit_nh="mg",
         ),
         utils_test_prescription.get_prescription_drug_mock_row(
             id_prescription_drug=2,
@@ -987,6 +1149,7 @@ def test_item_protocol(protocol, related_items):
             route="IV",
             frequency=1,
             period=1,
+            measure_unit_nh="ml",
         ),
         utils_test_prescription.get_prescription_drug_mock_row(
             id_prescription_drug=3,

@@ -284,6 +284,8 @@ class ProtocolVariableFieldEnum(Enum):
     CN_STATS = "cn_stats"
     ID_ICD = "idIcd"
     DISCHARGE_REASON = "dischargeReason"
+    SEGMENT_TYPE = "segmentType"
+    INSURANCE = "insurance"
 
 
 class SchemaConfigAuditTypeEnum(Enum):

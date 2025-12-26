@@ -44,6 +44,7 @@ from services import (
     segment_service,
 )
 from utils import dateutils, prescriptionutils, status
+from utils.alert_protocol import ProtocolExtraInfo
 from utils.drug_list import DrugList
 
 
@@ -113,6 +114,7 @@ def _internal_get_prescription(
         exam_data=exam_data,
         cn_data=cn_data,
         user_context=user_context,
+        segment=segment,
     )
 
     drug_data = _get_drug_data(
@@ -585,12 +587,17 @@ def _get_alerts(
     exam_data: dict,
     cn_data: dict,
     user_context: User,
+    segment: Segment,
 ):
     relations = alert_interaction_service.find_relations(
         drug_list=drug_list,
         is_cpoe=config_data["is_cpoe"],
         id_patient=patient.idPatient,
     )
+
+    protocol_extra_info = ProtocolExtraInfo()
+    if segment:
+        protocol_extra_info.segment_type = segment.type
 
     protocols = alert_protocol_service.find_protocols(
         drug_list=drug_list,
@@ -599,6 +606,7 @@ def _get_alerts(
         patient=patient,
         user_context=user_context,
         cn_stats=cn_data["cn_stats"],
+        protocol_extra_info=protocol_extra_info,
     )
 
     alerts = alert_service.find_alerts(

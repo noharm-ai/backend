@@ -8,7 +8,7 @@ from models.main import User
 from models.prescription import Patient, Prescription
 from repository import protocol_repository
 from services import segment_service
-from utils.alert_protocol import AlertProtocol
+from utils.alert_protocol import AlertProtocol, ProtocolExtraInfo
 
 
 @has_permission(Permission.READ_PRESCRIPTION)
@@ -18,6 +18,7 @@ def find_protocols(
     prescription: Prescription,
     patient: Patient,
     cn_stats: dict,
+    protocol_extra_info: ProtocolExtraInfo,
     user_context: User = None,
 ):
     """Gets all prescription protocols and test against a prescription"""
@@ -48,12 +49,14 @@ def find_protocols(
     # protocols must be applied inside each date group
     for expire_date, drugs in drugs_by_expire_date.items():
         results[expire_date] = []
+
         alert_protocol = AlertProtocol(
             drugs=drugs,
             exams=exams,
             prescription=prescription,
             patient=patient,
             cn_stats=cn_stats,
+            protocol_extra_info=protocol_extra_info,
         )
 
         for protocol in protocols:

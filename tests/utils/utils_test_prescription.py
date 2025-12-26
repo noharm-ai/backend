@@ -1,14 +1,14 @@
 from collections import namedtuple
 from datetime import datetime, timedelta
 
-from tests.conftest import session, session_commit
+from models.appendix import Frequency, MeasureUnit
+from models.main import Drug, DrugAttributes, Substance
 from models.prescription import (
     Prescription,
-    PrescriptionDrug,
     PrescriptionAudit,
+    PrescriptionDrug,
 )
-from models.main import Drug, DrugAttributes, Substance
-from models.appendix import Frequency
+from tests.conftest import session, session_commit
 
 
 def prepare_test_aggregate(id, admissionNumber, prescriptionid1, prescriptionid2):
@@ -59,6 +59,7 @@ def get_prescription_drug_mock_row(
     route: str = None,
     period: int = None,
     notes: str = None,
+    measure_unit_nh: str = None,
 ):
     MockRow = namedtuple(
         "Mockrow",
@@ -108,10 +109,14 @@ def get_prescription_drug_mock_row(
     substance.id = sctid
     substance.idclass = drug_class
 
+    measure_unit = MeasureUnit()
+    measure_unit.id = 1
+    measure_unit.measureunit_nh = measure_unit_nh
+
     return MockRow(
         pd,
         d,
-        None,
+        measure_unit,
         freq_obj,
         None,
         None,
