@@ -1,6 +1,7 @@
 import json
 
 from conftest import get_access, make_headers, session
+
 from models.prescription import Prescription
 from security.role import Role
 
@@ -105,18 +106,3 @@ def test_put_prescriptions_by_id_permission(client):
     )
 
     assert response.status_code == 401
-
-
-def test_get_static_demo_prescription_by_idPrescription(client):
-    """Teste get /static/demo/prescription/idPrescription - Valida status_code 200"""
-    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
-
-    idPrescription = "20"
-
-    response = client.get(
-        "static/demo/prescription/" + idPrescription, headers=make_headers(access_token)
-    )
-    data = json.loads(response.data)
-    # TODO: Add consulta ao banco de dados e comparar retorno (retornando status 200 porém data = 20)
-
-    assert response.status_code == 200

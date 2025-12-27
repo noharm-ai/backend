@@ -131,3 +131,107 @@ def get_prescription_drug_mock_row(
         1,
         [],
     )
+
+
+def create_prescription(
+    id: int,
+    admissionNumber: int,
+    idPatient: int,
+    idHospital: int = 1,
+    idDepartment: int = 1,
+    idSegment: int = 1,
+    date: datetime = None,
+    expire: datetime = None,
+    status: str = "0",
+    bed: str = "101",
+    record: str = None,
+    prescriber: str = "Dr. Test",
+    insurance: str = None,
+    agg: bool = None,
+    concilia: str = None,
+    user: int = 1,
+):
+    """Create a Prescription record for testing."""
+    prescription = Prescription()
+    prescription.id = id
+    prescription.admissionNumber = admissionNumber
+    prescription.idHospital = idHospital
+    prescription.idDepartment = idDepartment
+    prescription.idSegment = idSegment
+    prescription.idPatient = idPatient
+    prescription.date = date or datetime.now()
+    prescription.expire = expire or (datetime.now() + timedelta(days=1))
+    prescription.status = status
+    prescription.bed = bed
+    prescription.record = record
+    prescription.prescriber = prescriber
+    prescription.insurance = insurance
+    prescription.agg = agg
+    prescription.concilia = concilia
+    prescription.user = user
+
+    session.add(prescription)
+    session_commit()
+
+    return prescription
+
+
+def create_prescription_drug(
+    id: int,
+    idPrescription: int,
+    idDrug: int,
+    idMeasureUnit: str = "mg",
+    idFrequency: str = "1x",
+    dose: float = 100.0,
+    doseconv: float = None,
+    frequency: float = 1.0,
+    route: str = "VO",
+    interval: str = None,
+    source: str = "Medicamentos",
+    idSegment: int = 1,
+    tube: bool = False,
+    allergy: str = None,
+    intravenous: bool = False,
+    solutionGroup: int = None,
+    cpoe_group: str = None,
+    period: int = None,
+    notes: str = None,
+    checked: bool = False,
+    suspendedDate: datetime = None,
+    status: str = "0",
+    near: bool = False,
+    schedule: str = None,
+    order_number: int = None,
+):
+    """Create a PrescriptionDrug record for testing."""
+    prescription_drug = PrescriptionDrug()
+    prescription_drug.id = id
+    prescription_drug.idPrescription = idPrescription
+    prescription_drug.idDrug = idDrug
+    prescription_drug.idMeasureUnit = idMeasureUnit
+    prescription_drug.idFrequency = idFrequency
+    prescription_drug.dose = dose
+    prescription_drug.doseconv = doseconv or dose
+    prescription_drug.frequency = frequency
+    prescription_drug.route = route
+    prescription_drug.interval = interval
+    prescription_drug.source = source
+    prescription_drug.idSegment = idSegment
+    prescription_drug.tube = tube
+    prescription_drug.allergy = allergy
+    prescription_drug.intravenous = intravenous
+    prescription_drug.solutionGroup = solutionGroup
+    prescription_drug.cpoe_group = cpoe_group
+    prescription_drug.period = period
+    prescription_drug.notes = notes
+    prescription_drug.checked = checked
+    prescription_drug.suspendedDate = suspendedDate
+    prescription_drug.status = status
+    prescription_drug.near = near
+    prescription_drug.schedule = schedule
+    prescription_drug.order_number = order_number
+
+    session.add(prescription_drug)
+    session_commit()
+
+    return prescription_drug
