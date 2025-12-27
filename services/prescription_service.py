@@ -8,7 +8,6 @@ from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
 from models.appendix import Department, SchemaConfig
 from models.enums import (
-    AppFeatureFlagEnum,
     FeatureEnum,
     PatientAuditTypeEnum,
     PrescriptionAuditTypeEnum,
@@ -23,9 +22,7 @@ from models.prescription import (
 from models.regulation import RegSolicitation
 from repository import prescription_view_repository
 from services import (
-    clinical_notes_service,
     data_authorization_service,
-    exams_service,
     feature_service,
     memory_service,
     patient_service,
@@ -371,22 +368,6 @@ def recalculate_prescription(id_prescription: int, user_context: User):
             """
         )
         db.session.execute(query, {"idPrescription": p.id})
-
-    # refresh cache
-    if feature_service.has_feature_flag(flag=AppFeatureFlagEnum.REDIS_CACHE):
-        clinical_notes_service.refresh_clinical_notes_stats_cache(
-            admission_number=p.admissionNumber, user_context=user_context
-        )
-
-        clinical_notes_service.refresh_dialysis_cache(
-            admission_number=p.admissionNumber, user_context=user_context
-        )
-        clinical_notes_service.refresh_allergies_cache(
-            admission_number=p.admissionNumber, user_context=user_context
-        )
-        exams_service.refresh_exams_cache(
-            id_patient=p.idPatient, user_context=user_context
-        )
 
 
 @has_permission(Permission.WRITE_PRESCRIPTION)
