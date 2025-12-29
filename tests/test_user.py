@@ -1,6 +1,7 @@
 import json
 
-from conftest import session, session_commit, get_access, make_headers
+from conftest import get_access, make_headers, session, session_commit
+
 from models.main import User
 from security.role import Role
 
@@ -249,7 +250,7 @@ def test_create_user_invalid_authorization(client):
         "external": "test",
         "active": "true",
         "roles": [Role.PRESCRIPTION_ANALYST.value],
-        "segments": [2],
+        "segments": [3],
     }
 
     response = client.post(
@@ -288,7 +289,7 @@ def test_update_user_authorization(client):
         "external": "updateTest",
         "active": False,
         "roles": [Role.PRESCRIPTION_ANALYST.value],
-        "segments": [2],
+        "segments": [3],
     }
 
     # invalida authorization
