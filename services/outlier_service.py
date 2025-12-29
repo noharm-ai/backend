@@ -124,7 +124,7 @@ def generate(
 
     lambda_client = boto3.client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
     response = lambda_client.invoke(
-        FunctionName=Config.SCORES_FUNCTION_NAME,
+        FunctionName=Config.BACKEND_FUNCTION_NAME,
         InvocationType="RequestResponse",
         Payload=json.dumps(
             {
