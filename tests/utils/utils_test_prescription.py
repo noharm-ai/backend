@@ -1,5 +1,6 @@
 from collections import namedtuple
 from datetime import datetime, timedelta
+from typing import Union
 
 from models.appendix import Frequency, MeasureUnit
 from models.main import Drug, DrugAttributes, Substance
@@ -9,6 +10,9 @@ from models.prescription import (
     PrescriptionDrug,
 )
 from tests.conftest import session, session_commit
+
+# Use mutable object to track counters across function calls
+test_counters = {"id_prescription": 100000, "admission_number": 100000}
 
 
 def prepare_test_aggregate(id, admissionNumber, prescriptionid1, prescriptionid2):
@@ -235,3 +239,39 @@ def create_prescription_drug(
     session_commit()
 
     return prescription_drug
+
+
+def create_basic_prescription(
+    admission_number: Union[int, None] = None, cpoe=False
+) -> Prescription:
+    """Creates a basic prescription with two drugs"""
+
+    prescription = create_prescription(
+        id=test_counters["id_prescription"],
+        admissionNumber=admission_number
+        if admission_number is not None
+        else test_counters["admission_number"],
+        idPatient=1,
+        date=datetime.now(),
+        expire=datetime.now() + timedelta(days=1),
+        idDepartment=1 if not cpoe else 3,
+    )
+
+    id_prescription_drug = int(f"{test_counters['id_prescription']}001")
+
+    create_prescription_drug(
+        id=id_prescription_drug,
+        idPrescription=test_counters["id_prescription"],
+        idDrug=3,
+    )
+
+    create_prescription_drug(
+        id=id_prescription_drug + 1,
+        idPrescription=test_counters["id_prescription"],
+        idDrug=4,
+    )
+
+    test_counters["id_prescription"] += 1
+    test_counters["admission_number"] += 1
+
+    return prescription

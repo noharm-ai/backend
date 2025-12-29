@@ -1,8 +1,6 @@
 """Test: prescalc related tests"""
 
 import json
-from datetime import datetime, timedelta
-from typing import Union
 
 from conftest import get_access, make_headers, session, session_commit
 
@@ -10,44 +8,6 @@ from models.prescription import Prescription
 from security.role import Role
 from static import prescalc
 from tests.utils import utils_test_prescription
-
-# Use mutable object to track counters across function calls
-test_counters = {"id_prescription": 100000, "admission_number": 100000}
-
-
-def _insert_basic_prescription(
-    admission_number: Union[int, None] = None,
-) -> Prescription:
-    """Creates a basic prescription with two drugs"""
-
-    prescription = utils_test_prescription.create_prescription(
-        id=test_counters["id_prescription"],
-        admissionNumber=admission_number
-        if admission_number is not None
-        else test_counters["admission_number"],
-        idPatient=1,
-        date=datetime.now(),
-        expire=datetime.now() + timedelta(days=1),
-    )
-
-    id_prescription_drug = int(f"{test_counters['id_prescription']}001")
-
-    utils_test_prescription.create_prescription_drug(
-        id=id_prescription_drug,
-        idPrescription=test_counters["id_prescription"],
-        idDrug=3,
-    )
-
-    utils_test_prescription.create_prescription_drug(
-        id=id_prescription_drug + 1,
-        idPrescription=test_counters["id_prescription"],
-        idDrug=4,
-    )
-
-    test_counters["id_prescription"] += 1
-    test_counters["admission_number"] += 1
-
-    return prescription
 
 
 def test_prescalc_flow(client):
@@ -61,7 +21,7 @@ def test_prescalc_flow(client):
     7) check if individual prescription status is rolled back
     """
 
-    prescription = _insert_basic_prescription()
+    prescription = utils_test_prescription.create_basic_prescription()
 
     # 1) execute prescalc
     prescalc(
@@ -149,7 +109,7 @@ def test_prescalc_flow2(client):
     4) check individual prescriptions status, must be 's'because it was checked before prescalc
     """
 
-    prescription = _insert_basic_prescription()
+    prescription = utils_test_prescription.create_basic_prescription()
 
     # 1) start checking individual prescription
     access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
@@ -209,7 +169,7 @@ def test_prescalc_flow3(client):
     6) check if individual kept its status
     """
 
-    prescription = _insert_basic_prescription()
+    prescription = utils_test_prescription.create_basic_prescription()
 
     # 1) execute prescalc
     prescalc(
@@ -292,7 +252,7 @@ def test_prescalc_flow4(client):
     7) check if first individual kept its status
     """
 
-    prescription = _insert_basic_prescription()
+    prescription = utils_test_prescription.create_basic_prescription()
 
     # 1) execute prescalc
     prescalc(
@@ -336,7 +296,7 @@ def test_prescalc_flow4(client):
     assert patient_day.status == "s"
 
     # 4) add new prescription
-    new_prescription = _insert_basic_prescription(
+    new_prescription = utils_test_prescription.create_basic_prescription(
         admission_number=patient_day.admissionNumber
     )
 
