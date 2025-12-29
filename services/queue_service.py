@@ -95,5 +95,4 @@ def check_sqs_message(request_id: str, user_context: User):
     return {
         "found": False,
         "checked_messages": len(messages),
-        "request_id": request_id,
     }
