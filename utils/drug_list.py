@@ -385,6 +385,8 @@ class DrugList:
                     "prescriptionExpire": dateutils.to_iso(pd.prescription_expire),
                     "schedule": self.schedule_to_array(pd[0].schedule),
                     "orderNumber": pd[0].order_number,
+                    "intravenous": pd[0].intravenous,
+                    "feedingTube": pd[0].tube,
                 }
             )
 

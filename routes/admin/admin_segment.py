@@ -2,8 +2,8 @@ from flask import Blueprint, request
 from markupsafe import escape as escape_html
 
 from decorators.api_endpoint_decorator import api_endpoint
-from services.admin import admin_segment_service
 from services import outlier_service
+from services.admin import admin_segment_service
 
 app_admin_segment = Blueprint("app_admin_segment", __name__)
 
@@ -43,13 +43,3 @@ def upsert_department():
     )
 
     return escape_html(data.get("idSegment"))
-
-
-@app_admin_segment.route("/admin/segments/outliers/process-list", methods=["POST"])
-@api_endpoint()
-def get_outliers_process_list():
-    data = request.get_json()
-
-    return outlier_service.get_outliers_process_list(
-        id_segment=data.get("idSegment", None),
-    )

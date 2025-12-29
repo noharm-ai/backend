@@ -1,13 +1,21 @@
 """AlertProtocol class: test protocol rules against prescription data"""
 
 import re
+from dataclasses import dataclass
 from datetime import date, datetime
+from typing import Optional, Union
 
+from models.appendix import MeasureUnit
 from models.enums import DrugTypeEnum
 from models.main import Substance
-from models.prescription import PrescriptionDrug, Prescription, Patient
+from models.prescription import Patient, Prescription, PrescriptionDrug
 
 SAFE_LOGICAL_EXPR_REGEX = r"^\s*(?:True|False|\(|\)|and|or|not|\s+)+\s*$"
+
+
+@dataclass
+class ProtocolExtraInfo:
+    segment_type: Optional[int] = None
 
 
 class AlertProtocol:
@@ -25,6 +33,8 @@ class AlertProtocol:
     cn_stats = None
     protocol_variables = None
     protocol_msgs = None
+    related_items = None  # list of prescriptions items who were related to the protocol being active
+    protocol_extra_info: Union[ProtocolExtraInfo, None] = None
 
     def __init__(
         self,
@@ -33,6 +43,7 @@ class AlertProtocol:
         prescription: Prescription,
         patient: Patient,
         cn_stats: dict,
+        protocol_extra_info: Union[ProtocolExtraInfo, None] = None,
     ):
         self.prescription = prescription
         self.patient = patient
@@ -47,6 +58,8 @@ class AlertProtocol:
         self.route_list = []
         self.protocol_variables = {}
         self.protocol_msgs = []
+        self.related_items = []
+        self.protocol_extra_info = protocol_extra_info if protocol_extra_info else None
 
         # fill lists
         for d in self.filtered_drugs:
@@ -70,6 +83,7 @@ class AlertProtocol:
 
         self.protocol_variables = {}
         self.protocol_msgs = []
+        self.related_items = []
 
         for v in protocol.get("variables", []):
             self.protocol_variables[v.get("name")] = self._fill_variable(variable=v)
@@ -88,8 +102,9 @@ class AlertProtocol:
         safe_locals = {}
 
         if eval(trigger, safe_globals, safe_locals):  # pylint: disable=eval-used
-            result = protocol.get("result", {})
+            result = protocol.get("result", {}).copy()
             result["variableMessages"] = self.protocol_msgs
+            result["related_items"] = self.related_items
             return result
 
         return None
@@ -219,6 +234,21 @@ class AlertProtocol:
 
             return self._compare(op=operator, value1=weight, value2=value)
 
+        if field == "segmentType":
+            if (
+                self.protocol_extra_info is None
+                or self.protocol_extra_info.segment_type is None
+            ):
+                return False
+
+            if operator in ["IN", "NOT IN"]:
+                segment_type = [self.protocol_extra_info.segment_type]
+                value = [int(v) for v in value]
+            else:
+                segment_type = self.protocol_extra_info.segment_type
+
+            return self._compare(op=operator, value1=segment_type, value2=value)
+
         if field == "idDepartment":
             if operator in ["IN", "NOT IN"]:
                 department = [str(self.prescription.idDepartment)]
@@ -240,6 +270,14 @@ class AlertProtocol:
         if field == "dischargeReason":
             return self._compare(
                 op="CONTAINS", value1=self.patient.dischargeReason, value2=value
+            )
+
+        if field == "insurance":
+            if self.prescription is None or self.prescription.insurance is None:
+                return False
+
+            return self._compare(
+                op="CONTAINS", value1=self.prescription.insurance, value2=value
             )
 
         if field == "idSegment":
@@ -269,10 +307,16 @@ class AlertProtocol:
 
             v_observation = variable.get("observation", None)
 
+            v_intravenous = variable.get("intravenous", None)
+            v_feeding_tube = variable.get("feedingTube", None)
+
+            v_default_measure_unit = variable.get("defaultMeasureUnit", None)
+
             found = False
             for d in self.filtered_drugs:
                 prescription_drug: PrescriptionDrug = d[0]
                 substance: Substance = d[11]
+                measure_unit: MeasureUnit = d[2]
 
                 exp_result = True
 
@@ -325,6 +369,48 @@ class AlertProtocol:
                         )
                     )
 
+                if v_intravenous is not None:
+                    intravenous_value = (
+                        prescription_drug.intravenous
+                        if prescription_drug.intravenous is not None
+                        else False
+                    )
+
+                    exp_result = exp_result and (
+                        self._compare(
+                            op="=",
+                            value1=intravenous_value,
+                            value2=bool(v_intravenous),
+                        )
+                    )
+
+                if v_feeding_tube is not None:
+                    feeding_tube_value = (
+                        prescription_drug.tube
+                        if prescription_drug.tube is not None
+                        else False
+                    )
+
+                    exp_result = exp_result and (
+                        self._compare(
+                            op="=",
+                            value1=feeding_tube_value,
+                            value2=bool(v_feeding_tube),
+                        )
+                    )
+
+                if v_default_measure_unit is not None:
+                    if measure_unit is None:
+                        return False
+
+                    exp_result = exp_result and (
+                        self._compare(
+                            op="=",
+                            value1=measure_unit.measureunit_nh,
+                            value2=v_default_measure_unit,
+                        )
+                    )
+
                 if v_period is not None:
                     try:
                         v_period = int(v_period)
@@ -359,7 +445,7 @@ class AlertProtocol:
 
                 if exp_result:
                     found = True
-                    break
+                    self.related_items.append(prescription_drug.id)
 
             return found
 

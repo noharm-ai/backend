@@ -1,4 +1,6 @@
-import os
+"""Utils: string related functions"""
+
+import html
 import re
 import unicodedata
 from typing import Union
@@ -141,3 +143,48 @@ def is_valid_filename(
             return False
 
     return True
+
+
+def text_to_html(text: str, preserve_whitespace: bool = True) -> str:
+    """
+    Convert plain text to HTML with proper escaping and formatting.
+
+    Args:
+        text: Plain text string to convert
+        preserve_whitespace: If True, preserves line breaks and multiple spaces
+
+    Returns:
+        HTML-formatted string with escaped special characters
+
+    Examples:
+        >>> text_to_html("Hello & goodbye")
+        'Hello &amp; goodbye'
+
+        >>> text_to_html("Line 1\\nLine 2")
+        'Line 1<br>Line 2'
+
+        >>> text_to_html("<script>alert('xss')</script>")
+        '&lt;script&gt;alert(&#x27;xss&#x27;)&lt;/script&gt;'
+    """
+    if not text:
+        return ""
+
+    # Escape HTML special characters
+    escaped_text = html.escape(text, quote=True)
+
+    if preserve_whitespace:
+        # Replace newlines with <br> tags
+        escaped_text = escaped_text.replace("\n", "<br>")
+        escaped_text = escaped_text.replace("\r\n", "<br>")
+        escaped_text = escaped_text.replace("\r", "<br>")
+
+        # Replace multiple spaces with non-breaking spaces
+        # Keep first space as regular space, convert rest to &nbsp;
+        escaped_text = re.sub(
+            r" {2,}", lambda m: " " + "&nbsp;" * (len(m.group()) - 1), escaped_text
+        )
+
+        # Replace tabs with spaces
+        escaped_text = escaped_text.replace("\t", "&nbsp;&nbsp;&nbsp;&nbsp;")
+
+    return escaped_text

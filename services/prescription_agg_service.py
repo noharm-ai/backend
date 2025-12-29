@@ -119,7 +119,7 @@ def create_agg_prescription_by_prescription(
         PrescAggID = prescriptionutils.gen_agg_id(p.admissionNumber, p.idSegment, pdate)
 
     is_new_prescription = False
-    pAgg = Prescription.query.get(PrescAggID)
+    pAgg = db.session.query(Prescription).filter(Prescription.id == PrescAggID).first()
     if pAgg is None:
         pAgg = Prescription()
         pAgg.id = PrescAggID

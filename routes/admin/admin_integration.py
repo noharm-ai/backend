@@ -3,25 +3,17 @@
 from flask import Blueprint, request
 
 from decorators.api_endpoint_decorator import api_endpoint
-from services.admin import (
-    admin_integration_service,
-    admin_integration_status_service,
-)
 from models.requests.admin.admin_integration_request import (
     AdminIntegrationCreateSchemaRequest,
     AdminIntegrationUpsertGetnameRequest,
     AdminIntegrationUpsertSecurityGroupRequest,
 )
+from services.admin import (
+    admin_integration_service,
+    admin_integration_status_service,
+)
 
 app_admin_integration = Blueprint("app_admin_integration", __name__)
-
-
-@app_admin_integration.route("/admin/integration/refresh-agg", methods=["POST"])
-@api_endpoint()
-def refresh_agg():
-    result = admin_integration_service.refresh_agg()
-
-    return result.rowcount
 
 
 @app_admin_integration.route(

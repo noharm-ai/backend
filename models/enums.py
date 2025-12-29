@@ -166,6 +166,7 @@ class DrugAlertTypeEnum(Enum):
     PREGNANT = "pregnant"
     LACTATING = "lactating"
     FASTING = "fasting"
+    PROTOCOL = "protocol"
 
 
 class DrugAlertLevelEnum(Enum):
@@ -254,6 +255,7 @@ class ProtocolTypeEnum(Enum):
     PRESCRIPTION_AGG = 1
     PRESCRIPTION_INDIVIDUAL = 2
     PRESCRIPTION_ALL = 3
+    PRESCRIPTION_ITEM = 4
 
 
 class ProtocolStatusTypeEnum(Enum):
@@ -282,6 +284,8 @@ class ProtocolVariableFieldEnum(Enum):
     CN_STATS = "cn_stats"
     ID_ICD = "idIcd"
     DISCHARGE_REASON = "dischargeReason"
+    SEGMENT_TYPE = "segmentType"
+    INSURANCE = "insurance"
 
 
 class SchemaConfigAuditTypeEnum(Enum):

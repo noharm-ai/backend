@@ -9,7 +9,7 @@ from math import ceil
 from typing import List
 
 import boto3
-from sqlalchemy import and_, asc, distinct, func, literal, literal_column, or_, text
+from sqlalchemy import and_, asc, func, literal, literal_column, or_, text
 
 from config import Config
 from decorators.has_permission_decorator import Permission, has_permission
@@ -26,7 +26,7 @@ from models.main import (
 )
 from services import data_authorization_service, substance_service
 from services.admin import admin_drug_service, admin_integration_status_service
-from utils import examutils, numberutils, prescriptionutils, status, stringutils
+from utils import examutils, logger, numberutils, prescriptionutils, status, stringutils
 
 FOLD_SIZE = 10
 
@@ -93,13 +93,12 @@ def generate(
     # call prepare before generate score (only for wizard)
     start_date = datetime.now()
 
-    if fold != None:
-        if Permission.WRITE_SEGMENT_SCORE not in user_permissions:
-            raise ValidationError(
-                "Usuário não autorizado",
-                "errors.unauthorizedUser",
-                status.HTTP_401_UNAUTHORIZED,
-            )
+    if fold is not None:
+        raise ValidationError(
+            "Formato descontinuado",
+            "errors.unauthorizedUser",
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
 
     if not data_authorization_service.has_segment_authorization(
         id_segment=id_segment, user=user_context
@@ -125,7 +124,7 @@ def generate(
 
     lambda_client = boto3.client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
     response = lambda_client.invoke(
-        FunctionName=Config.SCORES_FUNCTION_NAME,
+        FunctionName=Config.BACKEND_FUNCTION_NAME,
         InvocationType="RequestResponse",
         Payload=json.dumps(
             {
@@ -386,44 +385,54 @@ def _refresh_agg(id_drug, id_segment, schema):
 
 
 @has_permission(Permission.WRITE_SEGMENT_SCORE)
-def get_outliers_process_list(id_segment, user_context: User):
-    pending_frequencies = admin_integration_status_service._get_pending_frequencies()
-    if pending_frequencies > 0:
+def generate_segment_scores(id_segment: int, user_context: User):
+    logger.backend_logger.info(
+        "%s - Generating segment scores: %s", user_context.schema, id_segment
+    )
+
+    history_count = (
+        db.session.query(PrescriptionAgg)
+        .filter(PrescriptionAgg.idSegment == id_segment)
+        .filter(PrescriptionAgg.frequency != None)
+        .filter(PrescriptionAgg.doseconv != None)
+        .filter(PrescriptionAgg.dose > 0)
+        .count()
+    )
+
+    if history_count == 0:
         raise ValidationError(
-            "Existem frequências pendentes de conversão. Configure todas as frequências antes de gerar os escores.",
-            "errors.business",
+            "Não é possível gerar escores, pois o segmento não possui histórico de prescrição.",
+            "errors.businessRules",
             status.HTTP_400_BAD_REQUEST,
         )
 
-    print("Init Schema:", user_context.schema, "Segment:", id_segment)
-
     result = refresh_outliers(id_segment=id_segment, user=user_context)
-    print("RowCount", result.rowcount)
+    logger.backend_logger.info(
+        "%s - RowCount: %s", user_context.schema, result.rowcount
+    )
 
     # fix inconsistencies after outlier insert
     admin_drug_service.fix_inconsistency()
 
-    totalCount = (
-        db.session.query(func.count(distinct(Outlier.idDrug)))
-        .select_from(Outlier)
-        .filter(Outlier.idSegment == id_segment)
-        .scalar()
+    # invoke function to generate score async
+    payload = {
+        "command": "lambda_scores.process_segment_scores",
+        "schema": user_context.schema,
+        "id_user": user_context.id,
+        "id_segment": id_segment,
+    }
+    lambda_client = boto3.client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
+    response = lambda_client.invoke(
+        FunctionName=Config.BACKEND_FUNCTION_NAME,
+        InvocationType="Event",
+        Payload=json.dumps(payload),
     )
-    folds = ceil(totalCount / FOLD_SIZE)
-    print("Total Count:", totalCount, folds)
 
-    processesUrl = []
-
-    for fold in range(1, folds + 1):
-        processesUrl.append(
-            {
-                "url": f"/outliers/generate/fold/{str(int(id_segment))}/{str(fold)}",
-                "method": "POST",
-                "params": {},
-            }
-        )
-
-    return processesUrl
+    # Return Lambda request ID for tracking
+    return {
+        "request_id": response.get("ResponseMetadata", {}).get("RequestId"),
+        "status_code": response.get("StatusCode"),
+    }
 
 
 @has_permission(Permission.WRITE_SEGMENT_SCORE)
@@ -775,3 +784,33 @@ def get_outlier_drugs(
         )
 
     return items
+
+
+@has_permission(Permission.WRITE_SEGMENT_SCORE)
+def refresh_agg(user_context: User):
+    pending_frequencies = admin_integration_status_service._get_pending_frequencies()
+    if pending_frequencies > 0:
+        raise ValidationError(
+            "Existem frequências pendentes de conversão. Configure todas as frequências antes de gerar os escores.",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    """Recalculate prescricaoagg"""
+    payload = {
+        "command": "lambda_scores.recalculate_agg",
+        "schema": user_context.schema,
+    }
+
+    lambda_client = boto3.client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
+    response = lambda_client.invoke(
+        FunctionName=Config.BACKEND_FUNCTION_NAME,
+        InvocationType="Event",
+        Payload=json.dumps(payload),
+    )
+
+    # Return Lambda request ID for tracking
+    return {
+        "request_id": response.get("ResponseMetadata", {}).get("RequestId"),
+        "status_code": response.get("StatusCode"),
+    }

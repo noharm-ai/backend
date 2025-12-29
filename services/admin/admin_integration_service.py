@@ -39,35 +39,6 @@ def get_table_count(schema, table):
     return ([row[0] for row in result])[0]
 
 
-def can_refresh_agg(schema):
-    """check if prescricaoagg can be recalculated"""
-    max_table_count = 300000
-
-    return get_table_count(schema, "prescricaoagg") <= max_table_count
-
-
-@has_permission(Permission.WRITE_SEGMENT_SCORE)
-def refresh_agg(user_context: User):
-    """Recalculate prescricaoagg"""
-    schema = user_context.schema
-
-    if not can_refresh_agg(user_context.schema):
-        raise ValidationError(
-            "A tabela possui muitos registros. A operação deve ser feita manualmente, fora do horário comercial.",
-            "errors.notSupported",
-            status.HTTP_400_BAD_REQUEST,
-        )
-
-    query = text(
-        f"""
-            insert into {schema}.prescricaoagg
-            select * from {schema}.prescricaoagg
-        """
-    )
-
-    return db.session.execute(query)
-
-
 @has_permission(Permission.INTEGRATION_UTILS)
 def refresh_prescriptions(user_context: User):
     """Recalculate prescriptions"""

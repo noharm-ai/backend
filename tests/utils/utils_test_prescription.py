@@ -1,14 +1,18 @@
 from collections import namedtuple
 from datetime import datetime, timedelta
+from typing import Union
 
-from tests.conftest import session, session_commit
+from models.appendix import Frequency, MeasureUnit
+from models.main import Drug, DrugAttributes, Substance
 from models.prescription import (
     Prescription,
-    PrescriptionDrug,
     PrescriptionAudit,
+    PrescriptionDrug,
 )
-from models.main import Drug, DrugAttributes, Substance
-from models.appendix import Frequency
+from tests.conftest import session, session_commit
+
+# Use mutable object to track counters across function calls
+test_counters = {"id_prescription": 100000, "admission_number": 100000}
 
 
 def prepare_test_aggregate(id, admissionNumber, prescriptionid1, prescriptionid2):
@@ -59,6 +63,7 @@ def get_prescription_drug_mock_row(
     route: str = None,
     period: int = None,
     notes: str = None,
+    measure_unit_nh: str = None,
 ):
     MockRow = namedtuple(
         "Mockrow",
@@ -108,10 +113,14 @@ def get_prescription_drug_mock_row(
     substance.id = sctid
     substance.idclass = drug_class
 
+    measure_unit = MeasureUnit()
+    measure_unit.id = 1
+    measure_unit.measureunit_nh = measure_unit_nh
+
     return MockRow(
         pd,
         d,
-        None,
+        measure_unit,
         freq_obj,
         None,
         None,
@@ -126,3 +135,143 @@ def get_prescription_drug_mock_row(
         1,
         [],
     )
+
+
+def create_prescription(
+    id: int,
+    admissionNumber: int,
+    idPatient: int,
+    idHospital: int = 1,
+    idDepartment: int = 1,
+    idSegment: int = 1,
+    date: datetime = None,
+    expire: datetime = None,
+    status: str = "0",
+    bed: str = "101",
+    record: str = None,
+    prescriber: str = "Dr. Test",
+    insurance: str = None,
+    agg: bool = None,
+    concilia: str = None,
+    user: int = 1,
+):
+    """Create a Prescription record for testing."""
+    prescription = Prescription()
+    prescription.id = id
+    prescription.admissionNumber = admissionNumber
+    prescription.idHospital = idHospital
+    prescription.idDepartment = idDepartment
+    prescription.idSegment = idSegment
+    prescription.idPatient = idPatient
+    prescription.date = date or datetime.now()
+    prescription.expire = expire or (datetime.now() + timedelta(days=1))
+    prescription.status = status
+    prescription.bed = bed
+    prescription.record = record
+    prescription.prescriber = prescriber
+    prescription.insurance = insurance
+    prescription.agg = agg
+    prescription.concilia = concilia
+    prescription.user = user
+
+    session.add(prescription)
+    session_commit()
+
+    return prescription
+
+
+def create_prescription_drug(
+    id: int,
+    idPrescription: int,
+    idDrug: int,
+    idMeasureUnit: str = "mg",
+    idFrequency: str = "1x",
+    dose: float = 100.0,
+    doseconv: float = None,
+    frequency: float = 1.0,
+    route: str = "VO",
+    interval: str = None,
+    source: str = "Medicamentos",
+    idSegment: int = 1,
+    tube: bool = False,
+    allergy: str = None,
+    intravenous: bool = False,
+    solutionGroup: int = None,
+    cpoe_group: str = None,
+    period: int = None,
+    notes: str = None,
+    checked: bool = False,
+    suspendedDate: datetime = None,
+    status: str = "0",
+    near: bool = False,
+    schedule: str = None,
+    order_number: int = None,
+):
+    """Create a PrescriptionDrug record for testing."""
+    prescription_drug = PrescriptionDrug()
+    prescription_drug.id = id
+    prescription_drug.idPrescription = idPrescription
+    prescription_drug.idDrug = idDrug
+    prescription_drug.idMeasureUnit = idMeasureUnit
+    prescription_drug.idFrequency = idFrequency
+    prescription_drug.dose = dose
+    prescription_drug.doseconv = doseconv or dose
+    prescription_drug.frequency = frequency
+    prescription_drug.route = route
+    prescription_drug.interval = interval
+    prescription_drug.source = source
+    prescription_drug.idSegment = idSegment
+    prescription_drug.tube = tube
+    prescription_drug.allergy = allergy
+    prescription_drug.intravenous = intravenous
+    prescription_drug.solutionGroup = solutionGroup
+    prescription_drug.cpoe_group = cpoe_group
+    prescription_drug.period = period
+    prescription_drug.notes = notes
+    prescription_drug.checked = checked
+    prescription_drug.suspendedDate = suspendedDate
+    prescription_drug.status = status
+    prescription_drug.near = near
+    prescription_drug.schedule = schedule
+    prescription_drug.order_number = order_number
+
+    session.add(prescription_drug)
+    session_commit()
+
+    return prescription_drug
+
+
+def create_basic_prescription(
+    admission_number: Union[int, None] = None, cpoe=False
+) -> Prescription:
+    """Creates a basic prescription with two drugs"""
+
+    prescription = create_prescription(
+        id=test_counters["id_prescription"],
+        admissionNumber=admission_number
+        if admission_number is not None
+        else test_counters["admission_number"],
+        idPatient=1,
+        date=datetime.now(),
+        expire=datetime.now() + timedelta(days=1),
+        idDepartment=1 if not cpoe else 3,
+    )
+
+    id_prescription_drug = int(f"{test_counters['id_prescription']}001")
+
+    create_prescription_drug(
+        id=id_prescription_drug,
+        idPrescription=test_counters["id_prescription"],
+        idDrug=3,
+    )
+
+    create_prescription_drug(
+        id=id_prescription_drug + 1,
+        idPrescription=test_counters["id_prescription"],
+        idDrug=4,
+    )
+
+    test_counters["id_prescription"] += 1
+    test_counters["admission_number"] += 1
+
+    return prescription

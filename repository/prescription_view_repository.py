@@ -108,7 +108,7 @@ def find_drugs_by_prescription(
         .select_from(func.jsonb_object_keys(Substance.handling))
         .filter(Substance.handling != None)
         .filter(Substance.handling != "null")
-        .as_scalar()
+        .scalar_subquery()
     )
 
     MeasureUnitSolutionConvert = db.aliased(MeasureUnitConvert)
@@ -125,7 +125,7 @@ def find_drugs_by_prescription(
         .filter(MeasureUnitSolutionConvert.idSegment == PrescriptionDrug.idSegment)
         .filter(MeasureUnitSolutionConvert.idDrug == PrescriptionDrug.idDrug)
         .limit(1)
-        .as_scalar()
+        .scalar_subquery()
     )
 
     q = (
@@ -256,7 +256,7 @@ def _get_prev_notes(admissionNumber):
         .filter(prevNotes.idPrescriptionDrug < PrescriptionDrug.id)
         .order_by(desc(prevNotes.update))
         .limit(1)
-        .as_scalar()
+        .scalar_subquery()
     )
 
 
@@ -309,7 +309,7 @@ def get_headers(
                     func.date(PrescriptionDrug.suspendedDate) >= aggDate,
                 )
             )
-            .as_scalar()
+            .scalar_subquery()
         )
         q = q.filter(active_count > 0)
 
@@ -377,7 +377,7 @@ def get_query_prescriptions_by_agg(
                     func.date(PrescriptionDrug.suspendedDate) >= agg_prescription.date,
                 )
             )
-            .as_scalar()
+            .scalar_subquery()
         )
         q = q.filter(active_count > 0)
 
