@@ -850,8 +850,8 @@ def _alert_protocol(prescription_drug: PrescriptionDrug, protocols: List[dict]):
     for p in protocols:
         related_items = p.get("related_items", [])
         if prescription_drug.id in related_items:
-            alert["text"] = f"{p.get('message')}. {p.get('description')}"
-            alert["level"] = p.get("level")
+            alert["text"] = stringutils.text_to_html(p.get("message", ""))
+            alert["level"] = p.get("level", "low")
 
             return alert
 
