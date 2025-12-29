@@ -6,8 +6,8 @@ import boto3
 
 from config import Config
 from exception.validation_error import ValidationError
-from models.main import Drug
 from models.enums import NoHarmENV
+from models.main import Drug
 from utils import status
 
 
@@ -29,7 +29,7 @@ def get_substance(drugs: list[Drug]):
 
     lambda_client = boto3.client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
     response = lambda_client.invoke(
-        FunctionName=Config.SCORES_FUNCTION_NAME,
+        FunctionName=Config.BACKEND_FUNCTION_NAME,
         InvocationType="RequestResponse",
         Payload=json.dumps(
             {
@@ -52,7 +52,7 @@ def get_substance_by_drug_name(drug_names: list[str]):
 
     lambda_client = boto3.client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
     response = lambda_client.invoke(
-        FunctionName=Config.SCORES_FUNCTION_NAME,
+        FunctionName=Config.BACKEND_FUNCTION_NAME,
         InvocationType="RequestResponse",
         Payload=json.dumps(
             {
