@@ -1,18 +1,23 @@
 """Prescription utils functions."""
 
 from datetime import datetime
+from typing import Union
 
-from utils import numberutils
-from utils import stringutils
-from utils import dateutils
+from utils import dateutils, numberutils, stringutils
 
 
-def lenghStay(admissionDate):
+def lenghStay(
+    admissionDate: Union[datetime, None], dischargeDate: Union[datetime, None]
+):
     if admissionDate is None:
         return ""
 
-    days = int((datetime.today() - admissionDate).days)
-    return days
+    if dischargeDate is None:
+        days = int((datetime.today() - admissionDate).days)
+    else:
+        days = int((dischargeDate - admissionDate).days)
+
+    return 0 if days < 0 else days
 
 
 def timeValue(time):

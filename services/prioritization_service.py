@@ -454,7 +454,9 @@ def get_prioritization_list(
                     "gender": patient.gender,
                     "weight": patient.weight,
                     "skinColor": patient.skinColor,
-                    "lengthStay": prescriptionutils.lenghStay(patient.admissionDate),
+                    "lengthStay": prescriptionutils.lenghStay(
+                        patient.admissionDate, patient.dischargeDate
+                    ),
                     "dischargeDate": (
                         patient.dischargeDate.isoformat()
                         if patient.dischargeDate
