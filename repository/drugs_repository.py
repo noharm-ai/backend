@@ -1,17 +1,16 @@
 """Repository: drugs related operations"""
 
-from sqlalchemy import and_, or_, func
+from sqlalchemy import and_, func, or_
 
+from models.appendix import MeasureUnit, MeasureUnitConvert
 from models.main import (
-    db,
-    PrescriptionAgg,
-    User,
-    Outlier,
     Drug,
     DrugAttributes,
+    Outlier,
     Substance,
+    User,
+    db,
 )
-from models.appendix import MeasureUnit, MeasureUnitConvert
 from models.segment import Segment
 
 
@@ -21,7 +20,6 @@ def get_admin_drug_list(
     has_default_unit=None,
     has_price_unit=None,
     has_inconsistency=None,
-    has_missing_conversion=None,
     attribute_list=[],
     term=None,
     substance=None,
@@ -31,47 +29,22 @@ def get_admin_drug_list(
     has_ai_substance=None,
     ai_accuracy_range=None,
     has_max_dose=None,
-    source_list=None,
     tp_ref_max_dose=None,
     substance_list=[],
     tp_substance_list=None,
     id_drug_list=[],
+    min_drug_count=None,
 ):
     """Gets list of drugs with attributes and conversions for management"""
     SegmentOutlier = db.aliased(Segment)
-    ConversionsAgg = db.aliased(MeasureUnitConvert)
-    MeasureUnitAgg = db.aliased(MeasureUnit)
 
     presc_query = (
         db.session.query(
-            Outlier.idDrug.label("idDrug"), Outlier.idSegment.label("idSegment")
+            Outlier.idDrug.label("idDrug"),
+            Outlier.idSegment.label("idSegment"),
+            func.sum(Outlier.countNum).label("count"),
         )
         .group_by(Outlier.idDrug, Outlier.idSegment)
-        .subquery()
-    )
-
-    conversions_query = (
-        db.session.query(
-            PrescriptionAgg.idDrug.label("idDrug"),
-            PrescriptionAgg.idSegment.label("idSegment"),
-        )
-        .select_from(PrescriptionAgg)
-        .join(
-            MeasureUnitAgg,
-            PrescriptionAgg.idMeasureUnit == MeasureUnitAgg.id,
-        )
-        .outerjoin(
-            ConversionsAgg,
-            and_(
-                ConversionsAgg.idSegment == PrescriptionAgg.idSegment,
-                ConversionsAgg.idDrug == PrescriptionAgg.idDrug,
-                ConversionsAgg.idMeasureUnit == PrescriptionAgg.idMeasureUnit,
-            ),
-        )
-        .filter(PrescriptionAgg.idSegment != None)
-        .filter(PrescriptionAgg.idMeasureUnit != None)
-        .filter(ConversionsAgg.factor == None)
-        .group_by(PrescriptionAgg.idDrug, PrescriptionAgg.idSegment)
         .subquery()
     )
 
@@ -104,6 +77,7 @@ def get_admin_drug_list(
             MeasureUnit.measureunit_nh,
             User.name.label("responsible"),
             DrugAttributes.update,
+            presc_query.c.count.label("drug_count"),
         )
         .select_from(presc_query)
         .join(Drug, presc_query.c.idDrug == Drug.id)
@@ -129,15 +103,6 @@ def get_admin_drug_list(
         .outerjoin(User, User.id == DrugAttributes.user)
     )
 
-    if has_missing_conversion:
-        q = q.outerjoin(
-            conversions_query,
-            and_(
-                conversions_query.c.idDrug == presc_query.c.idDrug,
-                conversions_query.c.idSegment == presc_query.c.idSegment,
-            ),
-        ).filter(conversions_query.c.idDrug != None)
-
     if has_substance != None:
         if has_substance:
             q = q.filter(Substance.id != None)
@@ -149,6 +114,9 @@ def get_admin_drug_list(
             q = q.filter(DrugAttributes.idMeasureUnit != None)
         else:
             q = q.filter(DrugAttributes.idMeasureUnit == None)
+
+    if min_drug_count is not None:
+        q = q.filter(presc_query.c.count >= min_drug_count)
 
     if has_price_unit != None:
         if has_price_unit:
@@ -283,9 +251,6 @@ def get_admin_drug_list(
 
     if id_segment_list and len(id_segment_list) > 0:
         q = q.filter(DrugAttributes.idSegment.in_(id_segment_list))
-
-    if source_list and len(source_list) > 0:
-        q = q.filter(Drug.source.in_(source_list))
 
     if substance_list:
         if tp_substance_list == "in":

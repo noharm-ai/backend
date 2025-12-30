@@ -24,7 +24,6 @@ def get_drug_list(
     has_default_unit=None,
     has_price_unit=None,
     has_inconsistency=None,
-    has_missing_conversion=None,
     attribute_list=[],
     term=None,
     substance=None,
@@ -34,11 +33,11 @@ def get_drug_list(
     has_ai_substance=None,
     ai_accuracy_range=None,
     has_max_dose=None,
-    source_list=None,
     tp_ref_max_dose=None,
     substance_list=[],
     tp_substance_list=None,
     id_drug_list=[],
+    min_drug_count=None,
 ):
     results = drugs_repository.get_admin_drug_list(
         has_substance=has_substance,
@@ -46,7 +45,6 @@ def get_drug_list(
         has_default_unit=has_default_unit,
         has_price_unit=has_price_unit,
         has_inconsistency=has_inconsistency,
-        has_missing_conversion=has_missing_conversion,
         attribute_list=attribute_list,
         term=term,
         substance=substance,
@@ -56,11 +54,11 @@ def get_drug_list(
         has_ai_substance=has_ai_substance,
         ai_accuracy_range=ai_accuracy_range,
         has_max_dose=has_max_dose,
-        source_list=source_list,
         tp_ref_max_dose=tp_ref_max_dose,
         substance_list=substance_list,
         tp_substance_list=tp_substance_list,
         id_drug_list=id_drug_list,
+        min_drug_count=min_drug_count,
     )
 
     items = []
@@ -101,6 +99,7 @@ def get_drug_list(
                 "measureUnitNH": i.measureunit_nh,
                 "responsible": i.responsible,
                 "updateAt": dateutils.to_iso(i.update),
+                "drugCount": i.drug_count,
             }
         )
 
