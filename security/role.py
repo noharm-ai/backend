@@ -188,6 +188,18 @@ class Role(Enum):
         ],
     )
 
+    NAVIGATOR = (
+        "NAVIGATOR",
+        [
+            Permission.WRITE_BASIC_FEATURES,
+            Permission.READ_BASIC_FEATURES,
+            Permission.READ_DISCHARGE_SUMMARY,
+            Permission.WRITE_DISCHARGE_SUMMARY,
+            Permission.READ_SUPPORT,
+            Permission.NAV_COPY_PATIENT,
+        ],
+    )
+
     REGULATOR = (
         "REGULATOR",
         [
