@@ -7,11 +7,11 @@ import boto3
 from config import Config
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
-from models.main import User
+from models.main import User, db
 from models.requests.navigation_request import NavCopyPatientRequest
 from repository import prescription_view_repository
 from services import prescription_agg_service, segment_service
-from utils import status
+from utils import lambdautils, logger, status
 
 
 @has_permission(Permission.NAV_COPY_PATIENT)
@@ -23,6 +23,15 @@ def copy_patient(request_data: NavCopyPatientRequest, user_context: User):
     if not agg_prescription:
         raise ValidationError(
             "Não há prescrição para este atendimento",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    user = db.session.query(User).filter(User.id == user_context.id).first()
+
+    if not user:
+        raise ValidationError(
+            "Usuário inválido",
             "errors.businessRules",
             status.HTTP_400_BAD_REQUEST,
         )
@@ -66,19 +75,32 @@ def copy_patient(request_data: NavCopyPatientRequest, user_context: User):
             for drug in expire_dates[last_group_key]:
                 copy_drug_list.append(drug.PrescriptionDrug.id)
 
+    payload = {
+        "command": "lambda_navigation.copy_patient_prescription",
+        "from_schema": user_context.schema,
+        "to_schema": user.schema,
+        "from_admission_number": agg_prescription.admissionNumber,
+        "drug_list": copy_drug_list,
+    }
+
     lambda_client = boto3.client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
     response = lambda_client.invoke(
         FunctionName=Config.BACKEND_FUNCTION_NAME,
         InvocationType="RequestResponse",
-        Payload=json.dumps(
-            {
-                "command": "lambda_navigation.copy_patient_prescription",
-                "from_schema": user_context.schema,
-                "to_schema": "--",
-                "from_admission_number": agg_prescription.admissionNumber,
-                "drug_list": copy_drug_list,
-            }
-        ),
+        Payload=json.dumps(payload),
     )
 
-    return json.loads(response["Payload"].read().decode("utf-8"))
+    response_json = lambdautils.response_to_json(response)
+
+    if "error" in response_json:
+        logger.backend_logger.error(
+            "Error copying patient prescription: %s", response_json["message"]
+        )
+
+        raise ValidationError(
+            "Ocorreu um erro ao copiar a prescrição do paciente. Consulte o administrador do sistema.",
+            "errors.businessRules",
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+    return response_json

@@ -197,6 +197,7 @@ class Role(Enum):
             Permission.WRITE_DISCHARGE_SUMMARY,
             Permission.READ_SUPPORT,
             Permission.NAV_COPY_PATIENT,
+            Permission.MULTI_SCHEMA,
         ],
     )
 
@@ -253,4 +254,5 @@ class Role(Enum):
             Role.ORGANIZATION_MANAGER.value,
             Role.STATIC_USER.value,
             Role.SERVICE_INTEGRATOR.value,
+            Role.NAVIGATOR.value,
         ]
