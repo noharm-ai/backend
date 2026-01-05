@@ -155,8 +155,8 @@ def _validate_sql_query(sql: str):
                 status.HTTP_400_BAD_REQUEST,
             )
 
-    # Ensure query starts with SELECT
-    if not re.match(r"^\s*select\b", sql_clean):
+    # Ensure query starts with SELECT or WITH
+    if not re.match(r"^\s*(select|with)\b", sql_clean):
         raise ValidationError(
             "Query SQL deve começar com SELECT",
             "errors.invalidSQL",
