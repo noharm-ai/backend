@@ -1,17 +1,18 @@
 import json
 import time
 from datetime import datetime, timedelta
-from sqlalchemy import text, Integer, func, desc, or_
+
+from sqlalchemy import Integer, desc, func, or_, text
 from sqlalchemy.orm import undefer
 
-from models.main import db, User, redis_client
-from models.notes import ClinicalNotes
-from models.prescription import Prescription, Patient
-from models.enums import UserAuditTypeEnum
-from services import memory_service, exams_service, user_service
-from repository import clinical_notes_repository
-from decorators.has_permission_decorator import has_permission, Permission
+from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
+from models.enums import UserAuditTypeEnum
+from models.main import User, db, redis_client
+from models.notes import ClinicalNotes
+from models.prescription import Patient, Prescription
+from repository import clinical_notes_repository
+from services import memory_service, user_service
 from utils import status
 
 

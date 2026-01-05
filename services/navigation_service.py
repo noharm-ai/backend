@@ -81,6 +81,7 @@ def copy_patient(request_data: NavCopyPatientRequest, user_context: User):
         "to_schema": user.schema,
         "from_admission_number": agg_prescription.admissionNumber,
         "drug_list": copy_drug_list,
+        "clinical_notes": request_data.clinical_notes,
     }
 
     lambda_client = boto3.client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
