@@ -1,18 +1,19 @@
 """Route: names proxy"""
 
-from datetime import datetime, timedelta, timezone
 import logging
+from datetime import datetime, timedelta, timezone
+
 import requests
 from flask import Blueprint, request
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import get_jwt_identity, jwt_required
 from jwt import encode
 
-
-from models.main import User, dbSession, db
+from config import Config
+from exception.validation_error import ValidationError
 from models.appendix import SchemaConfig
 from models.enums import NoHarmENV
-from exception.validation_error import ValidationError
-from config import Config
+from models.main import User, db, dbSession
+from services import name_service
 from utils import status
 
 # TODO: refactor
@@ -33,6 +34,17 @@ def proxy_name(idPatient):
     dbSession.setSchema(user.schema)
 
     config = _get_config(user)
+
+    if config["getname"]["token"]["url"].startswith("dy"):
+        # internal query
+        response = name_service.get_name_from_dynamo(
+            id_patient=idPatient, config=config
+        )
+
+        return response, status.HTTP_200_OK if response.get(
+            "status"
+        ) == "success" else status.HTTP_400_BAD_REQUEST
+
     token = _get_token(config)
     is_internal = config["getname"].get("internal", False)
     auth_prefix = config["getname"].get("authPrefix", "")
