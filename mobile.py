@@ -34,6 +34,7 @@ from routes.intervention import app_itrv
 from routes.lists import app_lists
 from routes.memory import app_mem
 from routes.names import app_names
+from routes.navigation import app_navigation
 from routes.notes import app_note
 from routes.outlier import app_out
 from routes.outlier_generate import app_gen
@@ -114,6 +115,7 @@ app.register_blueprint(app_protocol)
 app.register_blueprint(app_exams)
 app.register_blueprint(app_lists)
 app.register_blueprint(app_queue)
+app.register_blueprint(app_navigation)
 
 app.register_blueprint(app_user_admin)
 app.register_blueprint(app_pres_crud)

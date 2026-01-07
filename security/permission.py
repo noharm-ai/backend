@@ -98,3 +98,5 @@ class Permission(Enum):
     WRITE_PROTOCOLS = "WRITE_PROTOCOLS"  # permission to create and edit protocols
 
     UPDATE_USER_SG = "UPDATE_USER_SG"  # permission to update user's security group
+
+    NAV_COPY_PATIENT = "NAV_COPY_PATIENT"  # permission to copy patient data

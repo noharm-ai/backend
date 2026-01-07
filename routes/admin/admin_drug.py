@@ -18,7 +18,6 @@ def get_drug_list():
         has_default_unit=request_data.get("hasDefaultUnit", None),
         has_price_unit=request_data.get("hasPriceUnit", None),
         has_inconsistency=request_data.get("hasInconsistency", None),
-        has_missing_conversion=request_data.get("hasMissingConversion", None),
         has_ai_substance=request_data.get("hasAISubstance", None),
         ai_accuracy_range=request_data.get("aiAccuracyRange", None),
         attribute_list=request_data.get("attributeList", []),
@@ -26,12 +25,12 @@ def get_drug_list():
         substance=request_data.get("substance", None),
         id_segment_list=request_data.get("idSegmentList", None),
         has_max_dose=request_data.get("hasMaxDose", None),
-        source_list=request_data.get("sourceList", []),
         limit=request_data.get("limit", 10),
         offset=request_data.get("offset", 0),
         tp_ref_max_dose=request_data.get("tpRefMaxDose", None),
         substance_list=request_data.get("substanceList", []),
         tp_substance_list=request_data.get("tpSubstanceList", "in"),
+        min_drug_count=request_data.get("minDrugCount", None),
     )
 
 

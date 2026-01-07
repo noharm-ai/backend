@@ -86,10 +86,10 @@ def _prepare_user(user: User) -> User:
 def _has_force_schema_permission(user: User, force_schema: str = None):
     permissions = Role.get_permissions_from_user(user=user)
 
-    if not Permission.MULTI_SCHEMA in permissions:
+    if Permission.MULTI_SCHEMA not in permissions:
         return False
 
-    if not Permission.MAINTAINER in permissions and force_schema != None:
+    if Permission.MAINTAINER not in permissions and force_schema != None:
         valid_schemas = [schema["name"] for schema in user.config.get("schemas", [])]
         return force_schema in valid_schemas
 
@@ -134,6 +134,15 @@ def _auth_user(
     if force_schema and _has_force_schema_permission(
         user=user, force_schema=force_schema
     ):
+        if Role.NAVIGATOR.value in roles and user_schema != force_schema:
+            # if NAVIGATOR in a external schema, add fixed roles
+            user_config = dict(
+                user.config,
+                **{
+                    "roles": [Role.NAVIGATOR.value, Role.VIEWER.value],
+                },
+            )
+
         user_schema = force_schema
         if Permission.MAINTAINER in permissions:
             user_config = dict(
