@@ -10,7 +10,9 @@ from models.enums import DrugTypeEnum
 from models.main import Substance
 from models.prescription import Patient, Prescription, PrescriptionDrug
 
-SAFE_LOGICAL_EXPR_REGEX = r"^[\s()]*(?:True|False|and|or|not)[\s()]*(?:[\s()]+(?:True|False|and|or|not)[\s()]*)*$"
+# Simpler regex that avoids ReDoS by using alternation without nested quantifiers
+# Matches any combination of: keywords (True, False, and, or, not) OR structural chars (whitespace, parens)
+SAFE_LOGICAL_EXPR_REGEX = r"^(?:True|False|and|or|not|[()\s])+$"
 
 
 @dataclass
@@ -498,4 +500,16 @@ class AlertProtocol:
     def _is_safe_logical_expression(self, expr: str) -> bool:
         """Validates if the expression contains only safe logical operators and values"""
 
-        return len(expr) < 500 and bool(re.fullmatch(SAFE_LOGICAL_EXPR_REGEX, expr))
+        # Additional checks: non-empty, length limit, and regex validation
+        if not expr or len(expr) >= 500:
+            return False
+
+        # Verify expression contains only safe tokens
+        if not re.fullmatch(SAFE_LOGICAL_EXPR_REGEX, expr):
+            return False
+
+        # Ensure at least one keyword is present (not just whitespace/parens)
+        if not re.search(r"\b(?:True|False|and|or|not)\b", expr):
+            return False
+
+        return True
