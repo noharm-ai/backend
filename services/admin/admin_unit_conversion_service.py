@@ -102,8 +102,13 @@ def get_conversion_list(id_segment):
             "description": du.description,
         }
 
-    active_drugs = db.session.query(distinct(Outlier.idDrug).label("idDrug")).cte(
-        "active_drugs"
+    active_drugs = (
+        db.session.query(
+            Outlier.idDrug.label("idDrug"),
+            func.sum(Outlier.countNum).label("prescribed_quantity"),
+        )
+        .group_by(Outlier.idDrug)
+        .cte("active_drugs")
     )
 
     prescribed_units = (
@@ -149,6 +154,7 @@ def get_conversion_list(id_segment):
             Drug.sctid,
             Substance.default_measureunit,
             MeasureUnit.measureunit_nh,
+            active_drugs.c.prescribed_quantity,
         )
         .join(active_drugs, Drug.id == active_drugs.c.idDrug)
         .join(units, Drug.id == units.c.idDrug)
@@ -192,6 +198,7 @@ def get_conversion_list(id_segment):
                 "drugMeasureUnitNh": i.measureunit_nh,
                 "prediction": prediction,
                 "probability": probability,
+                "prescribedQuantity": i.prescribed_quantity,
             }
         )
 
@@ -216,6 +223,7 @@ def get_conversion_list(id_segment):
                         "drugMeasureUnitNh": i.measureunit_nh,
                         "prediction": 1,
                         "probability": 100,
+                        "prescribed_quantity": i.prescribed_quantity,
                     }
                 )
 
