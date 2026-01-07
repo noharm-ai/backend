@@ -10,7 +10,7 @@ from models.enums import DrugTypeEnum
 from models.main import Substance
 from models.prescription import Patient, Prescription, PrescriptionDrug
 
-SAFE_LOGICAL_EXPR_REGEX = r"^\s*(?:True|False|\(|\)|and|or|not|\s+)+\s*$"
+SAFE_LOGICAL_EXPR_REGEX = r"^[\s()]*(?:True|False|and|or|not)[\s()]*(?:[\s()]+(?:True|False|and|or|not)[\s()]*)*$"
 
 
 @dataclass
