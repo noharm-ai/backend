@@ -22,13 +22,13 @@ def get_name_from_dynamo(id_patient: int, config: dict):
     if item:
         return {
             "status": "success",
-            "idPatient": id_patient,
+            "idPatient": int(id_patient),
             "name": item["nome"],
             "data": None,
         }
 
     return {
         "status": "error",
-        "idPatient": id_patient,
+        "idPatient": int(id_patient),
         "name": f"Paciente {str(int(id_patient))}",
     }
