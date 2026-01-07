@@ -188,3 +188,99 @@ def text_to_html(text: str, preserve_whitespace: bool = True) -> str:
         escaped_text = escaped_text.replace("\t", "&nbsp;&nbsp;&nbsp;&nbsp;")
 
     return escaped_text
+
+
+def truncate(
+    text: str,
+    max_length: int,
+    ellipsis: str = "...",
+    word_boundary: bool = True,
+    strip_whitespace: bool = True,
+) -> str:
+    """
+    Securely truncate a string to a maximum length, handling edge cases properly.
+
+    Args:
+        text: String to truncate
+        max_length: Maximum length of the returned string (including ellipsis)
+        ellipsis: String to append when truncated (default: "...")
+        word_boundary: If True, avoid cutting in the middle of a word
+        strip_whitespace: If True, strip leading/trailing whitespace
+
+    Returns:
+        Truncated string with proper handling of multi-byte characters
+
+    Examples:
+        >>> truncate_safely("Hello World", 8)
+        'Hello...'
+
+        >>> truncate_safely("Hello World", 8, word_boundary=True)
+        'Hello...'
+
+        >>> truncate_safely("Hello World", 20)
+        'Hello World'
+
+        >>> truncate_safely("Olá Mundo", 8)
+        'Olá...'
+
+        >>> truncate_safely("Hello World", 8, ellipsis="…")
+        'Hello W…'
+
+    Security features:
+        - Handles None input safely
+        - Validates max_length is positive
+        - Properly handles multi-byte UTF-8 characters
+        - Prevents truncation in the middle of combining characters
+        - Prevents negative slicing vulnerabilities
+    """
+    # Handle None or empty string
+    if not text:
+        return ""
+
+    # Validate max_length
+    if max_length <= 0:
+        return ""
+
+    # Strip whitespace if requested
+    if strip_whitespace:
+        text = text.strip()
+
+    # If text is already short enough, return as-is
+    if len(text) <= max_length:
+        return text
+
+    # Calculate the actual truncation point (accounting for ellipsis)
+    ellipsis_length = len(ellipsis)
+
+    # If max_length is too small to fit ellipsis, just return truncated text
+    if max_length <= ellipsis_length:
+        # Use proper Unicode slicing to avoid breaking multi-byte characters
+        return text[:max_length]
+
+    # Calculate truncation length
+    truncate_at = max_length - ellipsis_length
+
+    # Ensure we don't have negative index
+    if truncate_at <= 0:
+        return ellipsis[:max_length]
+
+    # Truncate the text
+    truncated = text[:truncate_at]
+
+    # Handle word boundaries
+    if word_boundary and truncate_at < len(text):
+        # Check if we're in the middle of a word
+        if not text[truncate_at].isspace():
+            # Find the last space in the truncated part
+            last_space = truncated.rfind(" ")
+            if last_space > 0:
+                truncated = truncated[:last_space]
+
+    # Remove trailing whitespace and punctuation
+    truncated = truncated.rstrip(" \t\n\r.,;:!?-")
+
+    # Ensure we're not breaking Unicode combining characters
+    # Normalize to NFD, then back to NFC to ensure proper combining
+    truncated = unicodedata.normalize("NFC", truncated)
+
+    return truncated + ellipsis

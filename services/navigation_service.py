@@ -11,7 +11,7 @@ from models.main import User, db
 from models.requests.navigation_request import NavCopyPatientRequest
 from repository import prescription_view_repository
 from services import prescription_agg_service, segment_service
-from utils import lambdautils, logger, status
+from utils import cryptutils, lambdautils, logger, status, stringutils
 
 
 @has_permission(Permission.NAV_COPY_PATIENT)
@@ -75,15 +75,24 @@ def copy_patient(request_data: NavCopyPatientRequest, user_context: User):
             for drug in expire_dates[last_group_key]:
                 copy_drug_list.append(drug.PrescriptionDrug.id)
 
+    encrypted_patient_name = cryptutils.encrypt_data(
+        stringutils.truncate(request_data.name, 250)
+    )
+    encrypted_patient_phone = cryptutils.encrypt_data(
+        stringutils.truncate(request_data.phone, 250)
+    )
+    encrypted_clinical_notes = _encrypt_clinical_notes(request_data.clinical_notes)
+
     payload = {
         "command": "lambda_navigation.copy_patient_prescription",
         "from_schema": user_context.schema,
         "to_schema": user.schema,
         "from_admission_number": agg_prescription.admissionNumber,
         "drug_list": copy_drug_list,
-        "clinical_notes": request_data.clinical_notes,
-        "patient_name": request_data.name[:250] if request_data.name else None,
-        "patient_phone": request_data.phone[:20] if request_data.phone else None,
+        "clinical_notes": encrypted_clinical_notes,
+        "patient_name": encrypted_patient_name if encrypted_patient_name else None,
+        "patient_phone": encrypted_patient_phone if encrypted_patient_phone else None,
+        "encrypted": True,
     }
 
     lambda_client = boto3.client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
@@ -107,3 +116,34 @@ def copy_patient(request_data: NavCopyPatientRequest, user_context: User):
         )
 
     return response_json
+
+
+def _encrypt_clinical_notes(clinical_notes: dict) -> dict:
+    """
+    Process clinical notes dictionary: truncate and encrypt each text value.
+
+    Args:
+        clinical_notes: Dictionary with clinical notes where each key has a text value
+
+    Returns:
+        Dictionary with truncated and encrypted text values
+    """
+    if not clinical_notes or not isinstance(clinical_notes, dict):
+        return {}
+
+    processed_notes = {}
+
+    for key, value in clinical_notes.items():
+        if value and isinstance(value, str):
+            # Truncate to 5000 characters
+            truncated_text = stringutils.truncate(
+                value, 5000, ellipsis="... [truncado]", word_boundary=True
+            )
+            # Encrypt the truncated text
+            encrypted_text = cryptutils.encrypt_data(truncated_text)
+            processed_notes[key] = encrypted_text if encrypted_text else None
+        else:
+            # Keep non-string values as-is (or set to None)
+            processed_notes[key] = None
+
+    return processed_notes if processed_notes else {}
