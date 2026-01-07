@@ -2,7 +2,6 @@
 
 import logging
 from datetime import datetime, timedelta, timezone
-from urllib.parse import quote
 
 import requests
 from flask import Blueprint, request
@@ -250,9 +249,7 @@ def search_name(term):
     token = _get_token(config)
     url = _get_url(config=config)
 
-    # Sanitize and URL-encode the search term to prevent injection attacks
-    sanitized_term = quote(term, safe="")
-    url += f"search-name/{sanitized_term}"
+    url += f"search-name/{term}"
     params = dict(config["getname"]["params"])
 
     try:
