@@ -57,11 +57,16 @@ def api_endpoint(download_headers=None):
                 db.session.remove()
 
                 logger.backend_logger.warning(
-                    "(%s) VALIDATION4xx: Login expirado",
-                    user_context.schema if user_context else "undefined",
-                )
-                logger.backend_logger.warning(
-                    "schema: %s", user_context.schema if user_context else "undefined"
+                    json.dumps(
+                        {
+                            "event": "validation_error",
+                            "path": request.path,
+                            "schema": user_context.schema
+                            if user_context
+                            else "undefined",
+                            "message": "Login expirado",
+                        }
+                    )
                 )
 
                 return {
@@ -76,11 +81,16 @@ def api_endpoint(download_headers=None):
                 db.session.remove()
 
                 logger.backend_logger.warning(
-                    "(%s) VALIDATION4xx: Usuário não autorizado no recurso",
-                    user_context.schema if user_context else "undefined",
-                )
-                logger.backend_logger.warning(
-                    "schema: %s", user_context.schema if user_context else "undefined"
+                    json.dumps(
+                        {
+                            "event": "validation_error",
+                            "path": request.path,
+                            "schema": user_context.schema
+                            if user_context
+                            else "undefined",
+                            "message": "Usuário não autorizado no recurso",
+                        }
+                    )
                 )
 
                 return {
@@ -95,12 +105,16 @@ def api_endpoint(download_headers=None):
                 db.session.remove()
 
                 logger.backend_logger.warning(
-                    "(%s) VALIDATION4xx: %s",
-                    user_context.schema if user_context else "undefined",
-                    str(e),
-                )
-                logger.backend_logger.warning(
-                    "schema: %s", user_context.schema if user_context else "undefined"
+                    json.dumps(
+                        {
+                            "event": "validation_error",
+                            "path": request.path,
+                            "schema": user_context.schema
+                            if user_context
+                            else "undefined",
+                            "message": str(e),
+                        }
+                    )
                 )
 
                 return {
@@ -115,11 +129,16 @@ def api_endpoint(download_headers=None):
                 db.session.remove()
 
                 logger.backend_logger.warning(
-                    "(%s) VALIDATION4xx: Parâmetros inválidos pydantic",
-                    user_context.schema if user_context else "undefined",
-                )
-                logger.backend_logger.warning(
-                    "schema: %s", user_context.schema if user_context else "undefined"
+                    json.dumps(
+                        {
+                            "event": "validation_error",
+                            "path": request.path,
+                            "schema": user_context.schema
+                            if user_context
+                            else "undefined",
+                            "message": "Parâmetros inválidos pydantic",
+                        }
+                    )
                 )
 
                 return {
