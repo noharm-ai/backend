@@ -61,9 +61,11 @@ def api_endpoint(download_headers=None):
                         {
                             "event": "validation_error",
                             "path": request.path,
+                            "method": request.method,
                             "schema": user_context.schema
                             if user_context
                             else "undefined",
+                            "user": user_context.id if user_context else "undefined",
                             "message": "Login expirado",
                         }
                     )
@@ -85,9 +87,11 @@ def api_endpoint(download_headers=None):
                         {
                             "event": "validation_error",
                             "path": request.path,
+                            "method": request.method,
                             "schema": user_context.schema
                             if user_context
                             else "undefined",
+                            "user": user_context.id if user_context else "undefined",
                             "message": "Usuário não autorizado no recurso",
                         }
                     )
@@ -109,9 +113,11 @@ def api_endpoint(download_headers=None):
                         {
                             "event": "validation_error",
                             "path": request.path,
+                            "method": request.method,
                             "schema": user_context.schema
                             if user_context
                             else "undefined",
+                            "user": user_context.id if user_context else "undefined",
                             "message": str(e),
                         }
                     )
@@ -133,9 +139,11 @@ def api_endpoint(download_headers=None):
                         {
                             "event": "validation_error",
                             "path": request.path,
+                            "method": request.method,
                             "schema": user_context.schema
                             if user_context
                             else "undefined",
+                            "user": user_context.id if user_context else "undefined",
                             "message": "Parâmetros inválidos pydantic",
                         }
                     )
@@ -155,9 +163,21 @@ def api_endpoint(download_headers=None):
 
                 logger.backend_logger.exception(str(e))
                 logger.backend_logger.error("Request data: %s", request.get_data())
-                logger.backend_logger.error(
-                    "error_schema: %s",
-                    user_context.schema if user_context else "undefined",
+
+                logger.backend_logger.warning(
+                    json.dumps(
+                        {
+                            "event": "backend_exception",
+                            "path": request.path,
+                            "method": request.method,
+                            "duration_ms": 0,
+                            "schema": user_context.schema
+                            if user_context
+                            else "undefined",
+                            "user": user_context.id if user_context else "undefined",
+                            "message": str(e),
+                        }
+                    )
                 )
 
                 return {
@@ -174,10 +194,12 @@ def api_endpoint(download_headers=None):
                         {
                             "event": "request_complete",
                             "path": request.path,
+                            "method": request.method,
                             "duration_ms": elapsed_time,
                             "schema": user_context.schema
                             if user_context
                             else "undefined",
+                            "user": user_context.id if user_context else "undefined",
                         }
                     )
                 )
