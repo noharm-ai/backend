@@ -1,22 +1,21 @@
 """Service: support related operations"""
 
-import xmlrpc.client
 import base64
 import http.client
 import socket
+import xmlrpc.client
 
-
-from models.main import db, User
+from agents import n0_agent
+from config import Config
+from decorators.has_permission_decorator import Permission, has_permission
+from exception.validation_error import ValidationError
 from models.appendix import GlobalMemory
 from models.enums import GlobalMemoryEnum
-from config import Config
-from decorators.has_permission_decorator import has_permission, Permission
-from agents import n0_agent
-from exception.validation_error import ValidationError
-from utils import status, logger
-from services import vector_search_service
+from models.main import User, db
 from repository import user_repository
 from security.role import Role
+from services import vector_search_service
+from utils import logger, status
 
 
 class TimeoutTransport(xmlrpc.client.Transport):
@@ -335,7 +334,6 @@ def add_attachment(id_ticket: int, files):
         attachments = []
 
         for f in files.getlist(key):
-
             att = client(
                 model="ir.attachment",
                 action="create",
@@ -370,7 +368,7 @@ def add_attachment(id_ticket: int, files):
             options={},
         )
 
-    return id_ticket
+    return int(id_ticket)
 
 
 @has_permission(Permission.READ_SUPPORT)

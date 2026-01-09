@@ -1,6 +1,5 @@
 """Service for admin reports."""
 
-import re
 from datetime import datetime
 
 from decorators.has_permission_decorator import Permission, has_permission
@@ -10,15 +9,18 @@ from models.enums import ReportStatusEnum, ReportTypeEnum
 from models.main import User, db
 from models.requests.admin.admin_report_request import UpsertReportRequest
 from repository.reports import reports_repository
-from utils import dateutils, status
+from utils import dateutils, sqlutils, status
 
 
 @has_permission(Permission.ADMIN_REPORTS)
 def upsert_report(request_data: UpsertReportRequest, user_context: User):
     """Create or update a report."""
 
-    # Validate SQL query to prevent destructive operations
-    _validate_sql_query(request_data.sql)
+    # Validate SQL query to prevent destructive operations and unauthorized schema access
+    sqlutils.validate_sql_query(request_data.sql)
+    sqlutils.validate_schema_access(
+        sql=request_data.sql, user_schema=user_context.schema
+    )
 
     # Check if it's an update (id provided) or create (no id)
     if request_data.id:
@@ -97,78 +99,3 @@ def get_report_list(user_context: User):
             schema=user_context.schema
         ),
     }
-
-
-def _validate_sql_query(sql: str):
-    """
-    Validate SQL query to prevent destructive operations.
-    Only SELECT queries are allowed.
-    """
-    if not sql or not sql.strip():
-        raise ValidationError(
-            "Query SQL não pode estar vazia",
-            "errors.invalidSQL",
-            status.HTTP_400_BAD_REQUEST,
-        )
-
-    # Remove comments and normalize whitespace
-    sql_clean = re.sub(r"--[^\n]*", "", sql)  # Remove single-line comments
-    sql_clean = re.sub(
-        r"/\*.*?\*/", "", sql_clean, flags=re.DOTALL
-    )  # Remove multi-line comments
-    sql_clean = sql_clean.lower().strip()
-
-    # List of forbidden SQL keywords/operations
-    forbidden_keywords = [
-        r"\bdelete\b",
-        r"\bdrop\b",
-        r"\btruncate\b",
-        r"\binsert\b",
-        r"\bupdate\b",
-        r"\balter\b",
-        r"\bcreate\b",
-        r"\breplace\b",
-        r"\bmerge\b",
-        r"\bgrant\b",
-        r"\brevoke\b",
-        r"\bexec\b",
-        r"\bexecute\b",
-        r"\bcall\b",
-        r"\binto\s+outfile\b",
-        r"\bload\s+data\b",
-        r"\bload_file\b",
-        r"\bcopy\b",
-        r"\bimport\b",
-        r"\bset\s+"
-        r"\bdeclare\b",
-        r"\bprepare\b",
-        r"\bshutdown\b",
-        r"\bkill\b",
-    ]
-
-    # Check for forbidden keywords
-    for keyword_pattern in forbidden_keywords:
-        if re.search(keyword_pattern, sql_clean):
-            raise ValidationError(
-                "Query SQL contém operação não permitida. Apenas SELECT é permitido.",
-                "errors.invalidSQL",
-                status.HTTP_400_BAD_REQUEST,
-            )
-
-    # Ensure query starts with SELECT or WITH
-    if not re.match(r"^\s*(select|with)\b", sql_clean):
-        raise ValidationError(
-            "Query SQL deve começar com SELECT",
-            "errors.invalidSQL",
-            status.HTTP_400_BAD_REQUEST,
-        )
-
-    # Check for semicolons (potential SQL injection with multiple statements)
-    if ";" in sql_clean.rstrip(";"):  # Allow trailing semicolon
-        raise ValidationError(
-            "Query SQL não pode conter múltiplos comandos (;)",
-            "errors.invalidSQL",
-            status.HTTP_400_BAD_REQUEST,
-        )
-
-    return True

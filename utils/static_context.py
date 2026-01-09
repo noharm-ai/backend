@@ -1,29 +1,31 @@
 """Utility module for creating static user contexts with JWT authentication."""
 
-import logging
 import json
 from contextlib import contextmanager
+
 from flask_jwt_extended import create_access_token, verify_jwt_in_request
 
-from mobile import app
-from models.main import db, User
-from exception.validation_error import ValidationError
 from exception.authorization_error import AuthorizationError
-from utils import status
+from exception.validation_error import ValidationError
+from mobile import app
+from models.main import User, db
+from utils import logger, status
 
 
 def _handle_validation_error(e: ValidationError, user_context: User):
     """Handle ValidationError with consistent logging and response format."""
     db.session.rollback()
 
-    logging.basicConfig()
-    logger = logging.getLogger("noharm.backend")
-    logger.warning(
-        "(%s) VALIDATION4xx: %s",
-        user_context.schema if user_context else "undefined",
-        str(e),
+    logger.backend_logger.warning(
+        json.dumps(
+            {
+                "event": "validation_error",
+                "path": "static",
+                "schema": user_context.schema if user_context else "undefined",
+                "message": str(e),
+            }
+        )
     )
-    logger.warning("schema: %s", user_context.schema if user_context else "undefined")
 
     return {
         "status": "error",
@@ -36,13 +38,16 @@ def _handle_authorization_error(user_context: User):
     """Handle AuthorizationError with consistent logging and response format."""
     db.session.rollback()
 
-    logging.basicConfig()
-    logger = logging.getLogger("noharm.backend")
-    logger.warning(
-        "(%s) VALIDATION4xx: static usuário inválido",
-        user_context.schema if user_context else "undefined",
+    logger.backend_logger.warning(
+        json.dumps(
+            {
+                "event": "validation_error",
+                "path": "static",
+                "schema": user_context.schema if user_context else "undefined",
+                "message": "static usuário inválido",
+            }
+        )
     )
-    logger.warning("schema: %s", user_context.schema if user_context else "undefined")
 
     return {
         "status": "error",
@@ -55,10 +60,16 @@ def _handle_exception(e: Exception, user_context: User):
     """Handle Exception with consistent logging and response format."""
     db.session.rollback()
 
-    logging.basicConfig()
-    logger = logging.getLogger("noharm.backend")
-    logger.error(str(e))
-    logger.warning("schema: %s", user_context.schema if user_context else "undefined")
+    logger.backend_logger.error(
+        json.dumps(
+            {
+                "event": "backend_exception",
+                "path": "static",
+                "schema": user_context.schema if user_context else "undefined",
+                "message": str(e),
+            }
+        )
+    )
 
     return {
         "status": "error",

@@ -1,5 +1,6 @@
 """Service: prescription-day related operations"""
 
+import json
 from datetime import date, datetime, timedelta
 
 from flask_sqlalchemy.session import Session
@@ -7,7 +8,6 @@ from sqlalchemy import desc, text
 
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
-from models.appendix import SchemaConfig
 from models.enums import (
     DrugTypeEnum,
     FeatureEnum,
@@ -36,25 +36,11 @@ from utils import logger, prescriptionutils, status
 
 @has_permission(Permission.READ_STATIC)
 def create_agg_prescription_by_prescription(
-    schema, id_prescription, user_context: User, force=False, public=False
+    schema, id_prescription, user_context: User, force=False
 ):
     """Creates a new prescription-day based on an individual prescription"""
 
     _set_schema(schema)
-
-    if public:
-        schema_config = (
-            db.session.query(SchemaConfig)
-            .filter(SchemaConfig.schemaName == schema)
-            .first()
-        )
-        if schema_config.tp_prescalc != 0:
-            # using central prescalc service
-            logger.backend_logger.warning(
-                "(%s) VALIDATION4xx: prescalc central ligado, abortando",
-                schema,
-            )
-            return
 
     p = (
         db.session.query(Prescription)
@@ -84,8 +70,14 @@ def create_agg_prescription_by_prescription(
 
     if not force and processed_status == "PROCESSED" and p.features is not None:
         logger.backend_logger.warning(
-            "(%s) VALIDATION4xx: Prescrição já foi processada",
-            schema,
+            json.dumps(
+                {
+                    "event": "validation_error",
+                    "path": "prescription_agg_service.create_agg_prescription_by_prescription",
+                    "schema": schema,
+                    "message": "Prescrição já foi processada",
+                }
+            )
         )
         return
 
@@ -227,31 +219,23 @@ def create_agg_prescription_by_prescription(
 
 @has_permission(Permission.READ_STATIC)
 def create_agg_prescription_by_date(
-    schema, admission_number, p_date, user_context: User, public=False
+    schema, admission_number, p_date, user_context: User
 ):
     """Creates a new prescription-day based on admission number and date (most used for CPOE)"""
     _set_schema(schema)
-
-    if public:
-        schema_config = (
-            db.session.query(SchemaConfig)
-            .filter(SchemaConfig.schemaName == schema)
-            .first()
-        )
-        if schema_config.tp_prescalc != 0:
-            # using central prescalc service
-            logger.backend_logger.warning(
-                "(%s) VALIDATION4xx: Usando prescalc central, abortando",
-                schema,
-            )
-            return
 
     last_prescription = get_last_prescription(admission_number, cpoe=True)
 
     if last_prescription is None or last_prescription.idSegment is None:
         logger.backend_logger.warning(
-            "(%s) VALIDATION4xx: Não foi possível encontrar o segmento deste atendimento",
-            schema,
+            json.dumps(
+                {
+                    "event": "validation_error",
+                    "path": "prescription_agg_service.create_agg_prescription_by_date",
+                    "schema": schema,
+                    "message": "Não foi possível encontrar o segmento deste atendimento",
+                }
+            )
         )
         return
 
@@ -297,8 +281,14 @@ def create_agg_prescription_by_date(
         if processed_status == "PROCESSED":
             db.session.rollback()
             logger.backend_logger.warning(
-                "(%s) VALIDATION4xx: Prescrição já foi processada (fluxo ambulatorial)",
-                schema,
+                json.dumps(
+                    {
+                        "event": "validation_error",
+                        "path": "prescription_agg_service.create_agg_prescription_by_date",
+                        "schema": schema,
+                        "message": "Prescrição já foi processada (fluxo ambulatorial)",
+                    }
+                )
             )
             return
 

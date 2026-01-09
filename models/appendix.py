@@ -114,13 +114,7 @@ class SchemaConfig(db.Model):
     return_integration = db.Column("integracao_retorno", db.Boolean, nullable=False)
     tp_prescalc = db.Column("tp_prescalc", db.Integer, nullable=False)
 
-    fl1 = db.Column("fl1_atualiza_indicadores_cpoe", db.Boolean, nullable=False)
-    fl2 = db.Column("fl2_atualiza_indicadores_prescricao", db.Boolean, nullable=False)
     fl3 = db.Column("fl3_atualiza_prescricaoagg", db.Boolean, nullable=False)
-    fl3_segments = db.Column(
-        "fl3_segmentos", postgresql.ARRAY(db.BigInteger), nullable=True
-    )
-    fl4 = db.Column("fl4_cria_conciliacao", db.Boolean, nullable=False)
 
 
 class SchemaConfigAudit(db.Model):
