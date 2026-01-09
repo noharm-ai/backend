@@ -109,7 +109,6 @@ def update_integration_config(
     fl3,
     config,
     user_context: User,
-    cpoe: bool,
     return_integration: bool,
     tp_prescalc: int,
 ):
@@ -132,7 +131,6 @@ def update_integration_config(
         new_config=config,
     )
     schema_config.fl3 = bool(fl3) if fl3 != None else schema_config.fl3
-    schema_config.cpoe = cpoe
     schema_config.return_integration = return_integration
     schema_config.tp_prescalc = (
         tp_prescalc if tp_prescalc in [0, 1, 2] else schema_config.tp_prescalc
@@ -453,7 +451,6 @@ def _object_to_dto(schema_config: SchemaConfig):
         "nhCare": schema_config.nh_care,
         "config": schema_config.config,
         "fl3": schema_config.fl3,
-        "cpoe": schema_config.cpoe,
         "returnIntegration": schema_config.return_integration,
         "tpPrescalc": schema_config.tp_prescalc,
         "createdAt": (

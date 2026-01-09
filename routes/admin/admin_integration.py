@@ -53,7 +53,6 @@ def update_config():
         nh_care=request_data.get("nhCare", None),
         config=request_data.get("config", None),
         fl3=request_data.get("fl3", None),
-        cpoe=request_data.get("cpoe", False),
         return_integration=request_data.get("returnIntegration", False),
         tp_prescalc=request_data.get("tpPrescalc", None),
     )
