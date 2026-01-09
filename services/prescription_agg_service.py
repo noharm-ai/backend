@@ -36,7 +36,7 @@ from utils import logger, prescriptionutils, status
 
 @has_permission(Permission.READ_STATIC)
 def create_agg_prescription_by_prescription(
-    schema, id_prescription, user_context: User, force=False, public=False
+    schema, id_prescription, user_context: User, force=False
 ):
     """Creates a new prescription-day based on an individual prescription"""
 
@@ -219,7 +219,7 @@ def create_agg_prescription_by_prescription(
 
 @has_permission(Permission.READ_STATIC)
 def create_agg_prescription_by_date(
-    schema, admission_number, p_date, user_context: User, public=False
+    schema, admission_number, p_date, user_context: User
 ):
     """Creates a new prescription-day based on admission number and date (most used for CPOE)"""
     _set_schema(schema)
