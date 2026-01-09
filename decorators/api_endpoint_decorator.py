@@ -1,6 +1,7 @@
 import inspect
-import logging
+import json
 import os
+import time
 from functools import wraps
 
 from flask import g, make_response, request
@@ -12,7 +13,7 @@ from pydantic import ValidationError as PydanticValidationError
 from exception.authorization_error import AuthorizationError
 from exception.validation_error import ValidationError
 from models.main import User, db, dbSession
-from utils import status
+from utils import logger, status
 
 
 def api_endpoint(download_headers=None):
@@ -20,6 +21,7 @@ def api_endpoint(download_headers=None):
         @wraps(f)
         def decorator_f(*args, **kwargs):
             user_context = None
+            start_time = time.time()
             try:
                 verify_jwt_in_request()
 
@@ -54,13 +56,11 @@ def api_endpoint(download_headers=None):
                 db.session.close()
                 db.session.remove()
 
-                logging.basicConfig()
-                logger = logging.getLogger("noharm.backend")
-                logger.warning(
+                logger.backend_logger.warning(
                     "(%s) VALIDATION4xx: Login expirado",
                     user_context.schema if user_context else "undefined",
                 )
-                logger.warning(
+                logger.backend_logger.warning(
                     "schema: %s", user_context.schema if user_context else "undefined"
                 )
 
@@ -75,13 +75,11 @@ def api_endpoint(download_headers=None):
                 db.session.close()
                 db.session.remove()
 
-                logging.basicConfig()
-                logger = logging.getLogger("noharm.backend")
-                logger.warning(
+                logger.backend_logger.warning(
                     "(%s) VALIDATION4xx: Usuário não autorizado no recurso",
                     user_context.schema if user_context else "undefined",
                 )
-                logger.warning(
+                logger.backend_logger.warning(
                     "schema: %s", user_context.schema if user_context else "undefined"
                 )
 
@@ -96,14 +94,12 @@ def api_endpoint(download_headers=None):
                 db.session.close()
                 db.session.remove()
 
-                logging.basicConfig()
-                logger = logging.getLogger("noharm.backend")
-                logger.warning(
+                logger.backend_logger.warning(
                     "(%s) VALIDATION4xx: %s",
                     user_context.schema if user_context else "undefined",
                     str(e),
                 )
-                logger.warning(
+                logger.backend_logger.warning(
                     "schema: %s", user_context.schema if user_context else "undefined"
                 )
 
@@ -118,13 +114,11 @@ def api_endpoint(download_headers=None):
                 db.session.close()
                 db.session.remove()
 
-                logging.basicConfig()
-                logger = logging.getLogger("noharm.backend")
-                logger.warning(
+                logger.backend_logger.warning(
                     "(%s) VALIDATION4xx: Parâmetros inválidos pydantic",
                     user_context.schema if user_context else "undefined",
                 )
-                logger.warning(
+                logger.backend_logger.warning(
                     "schema: %s", user_context.schema if user_context else "undefined"
                 )
 
@@ -140,11 +134,9 @@ def api_endpoint(download_headers=None):
                 db.session.close()
                 db.session.remove()
 
-                logging.basicConfig()
-                logger = logging.getLogger("noharm.backend")
-                logger.exception(str(e))
-                logger.error("Request data: %s", request.get_data())
-                logger.error(
+                logger.backend_logger.exception(str(e))
+                logger.backend_logger.error("Request data: %s", request.get_data())
+                logger.backend_logger.error(
                     "error_schema: %s",
                     user_context.schema if user_context else "undefined",
                 )
@@ -153,6 +145,23 @@ def api_endpoint(download_headers=None):
                     "status": "error",
                     "message": "Ocorreu um erro inesperado",
                 }, status.HTTP_500_INTERNAL_SERVER_ERROR
+
+            finally:
+                end_time = time.time()
+                elapsed_time = round((end_time - start_time) * 1000, 3)
+
+                logger.backend_logger.warning(
+                    json.dumps(
+                        {
+                            "event": "request_complete",
+                            "path": request.path,
+                            "duration_ms": elapsed_time,
+                            "schema": user_context.schema
+                            if user_context
+                            else "undefined",
+                        }
+                    )
+                )
 
         return decorator_f
 
