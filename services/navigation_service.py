@@ -75,11 +75,15 @@ def copy_patient(request_data: NavCopyPatientRequest, user_context: User):
             for drug in expire_dates[last_group_key]:
                 copy_drug_list.append(drug.PrescriptionDrug.id)
 
-    encrypted_patient_name = cryptutils.encrypt_data(
-        stringutils.truncate(request_data.name, 250)
+    encrypted_patient_name = (
+        cryptutils.encrypt_data(stringutils.truncate(request_data.name, 250))
+        if request_data.name
+        else None
     )
-    encrypted_patient_phone = cryptutils.encrypt_data(
-        stringutils.truncate(request_data.phone, 250)
+    encrypted_patient_phone = (
+        cryptutils.encrypt_data(stringutils.truncate(request_data.phone, 100))
+        if request_data.phone
+        else None
     )
     encrypted_clinical_notes = _encrypt_clinical_notes(request_data.clinical_notes)
 
@@ -90,8 +94,8 @@ def copy_patient(request_data: NavCopyPatientRequest, user_context: User):
         "from_admission_number": agg_prescription.admissionNumber,
         "drug_list": copy_drug_list,
         "clinical_notes": encrypted_clinical_notes,
-        "patient_name": encrypted_patient_name if encrypted_patient_name else None,
-        "patient_phone": encrypted_patient_phone if encrypted_patient_phone else None,
+        "patient_name": encrypted_patient_name,
+        "patient_phone": encrypted_patient_phone,
         "encrypted": True,
     }
 

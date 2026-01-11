@@ -46,7 +46,7 @@ def validate_sql_query(sql: str):
         r"\bload_file\b",
         r"\bcopy\b",
         r"\bimport\b",
-        r"\bset\s+"
+        r"\bset\s+",
         r"\bdeclare\b",
         r"\bprepare\b",
         r"\bshutdown\b",

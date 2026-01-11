@@ -211,19 +211,19 @@ def truncate(
         Truncated string with proper handling of multi-byte characters
 
     Examples:
-        >>> truncate_safely("Hello World", 8)
+        >>> truncate("Hello World", 8)
         'Hello...'
 
-        >>> truncate_safely("Hello World", 8, word_boundary=True)
+        >>> truncate("Hello World", 8, word_boundary=True)
         'Hello...'
 
-        >>> truncate_safely("Hello World", 20)
+        >>> truncate("Hello World", 20)
         'Hello World'
 
-        >>> truncate_safely("Olá Mundo", 8)
+        >>> truncate("Olá Mundo", 8)
         'Olá...'
 
-        >>> truncate_safely("Hello World", 8, ellipsis="…")
+        >>> truncate("Hello World", 8, ellipsis="…")
         'Hello W…'
 
     Security features:

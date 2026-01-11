@@ -14,6 +14,9 @@ def encrypt_data(plaintext: str) -> Union[str, None]:
     if not plaintext:
         return None
 
+    if not Config.ENCRYPTION_KEY:
+        raise ValueError("ENCRYPTION_KEY not set")
+
     try:
         fernet = Fernet(Config.ENCRYPTION_KEY.encode())
         encrypted = fernet.encrypt(plaintext.encode("utf-8"))
