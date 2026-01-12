@@ -1,8 +1,7 @@
 from flask import Blueprint, request
-from markupsafe import escape as escape_html
 
-from services import patient_service, exams_service
 from decorators.api_endpoint_decorator import api_endpoint
+from services import exams_service, patient_service
 
 app_pat = Blueprint("app_pat", __name__)
 

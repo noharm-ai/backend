@@ -11,7 +11,7 @@ app_admin_integration_remote = Blueprint("app_admin_integration_remote", __name_
 @app_admin_integration_remote.route(
     "/admin/integration-remote/template", methods=["GET"]
 )
-@api_endpoint()
+@api_endpoint(is_admin=True)
 def get_template():
     return admin_integration_remote_service.get_template()
 
@@ -19,7 +19,7 @@ def get_template():
 @app_admin_integration_remote.route(
     "/admin/integration-remote/queue-status", methods=["GET"]
 )
-@api_endpoint()
+@api_endpoint(is_admin=True)
 def queue_status():
     return admin_integration_remote_service.get_queue_status(
         id_queue_list=request.args.getlist("idQueueList[]"),
@@ -29,7 +29,7 @@ def queue_status():
 @app_admin_integration_remote.route(
     "/admin/integration-remote/push-queue-request", methods=["POST"]
 )
-@api_endpoint()
+@api_endpoint(is_admin=True)
 def push_queue_request():
     request_data = request.get_json()
 
@@ -43,6 +43,6 @@ def push_queue_request():
 @app_admin_integration_remote.route(
     "/admin/integration-remote/get-errors", methods=["GET"]
 )
-@api_endpoint()
+@api_endpoint(is_admin=True)
 def get_errors():
     return admin_integration_remote_service.get_errors()

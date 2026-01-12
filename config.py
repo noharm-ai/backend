@@ -9,10 +9,11 @@ from models.enums import NoHarmENV
 class Config:
     """Configuration class for the application."""
 
-    VERSION = "v5.06-beta"
+    VERSION = "v5.07-beta"
     FRONTEND_VERSION = "5.1.6"
     ENV = getenv("ENV") or NoHarmENV.DEVELOPMENT.value
     SECRET_KEY = getenv("SECRET_KEY") or "secret_key"
+    ENCRYPTION_KEY = getenv("ENCRYPTION_KEY") or None
     API_KEY = getenv("API_KEY") or ""
     SELF_API_URL = getenv("SELF_API_URL") or ""
     APP_URL = getenv("APP_URL")

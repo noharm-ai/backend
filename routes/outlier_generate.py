@@ -26,7 +26,7 @@ def generate_segment_scores():
 @app_gen.route(
     "/outliers/generate/add-history/<int:id_segment>/<int:id_drug>", methods=["POST"]
 )
-@api_endpoint()
+@api_endpoint(is_admin=True)
 def add_history(id_segment, id_drug):
     return outlier_service.add_prescription_history(
         id_drug=id_drug,
@@ -78,7 +78,7 @@ def generate(id_segment, id_drug=None, fold=None):
 @app_gen.route(
     "/outliers/generate/remove-outlier/<int:id_segment>/<int:id_drug>", methods=["POST"]
 )
-@api_endpoint()
+@api_endpoint(is_admin=True)
 def remove_outlier(id_segment, id_drug):
     outlier_service.remove_outlier(id_drug=id_drug, id_segment=id_segment)
 

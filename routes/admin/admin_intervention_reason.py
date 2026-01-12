@@ -7,7 +7,7 @@ app_admin_interv = Blueprint("app_admin_interv", __name__)
 
 
 @app_admin_interv.route("/admin/intervention-reason", methods=["GET"])
-@api_endpoint()
+@api_endpoint(is_admin=True)
 def get_records():
     list = admin_intervention_reason_service.get_reasons()
 
@@ -15,7 +15,7 @@ def get_records():
 
 
 @app_admin_interv.route("/admin/intervention-reason", methods=["POST"])
-@api_endpoint()
+@api_endpoint(is_admin=True)
 def upsert_record():
     data = request.get_json()
 

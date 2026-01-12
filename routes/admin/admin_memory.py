@@ -8,7 +8,7 @@ app_admin_memory = Blueprint("app_admin_memory", __name__)
 
 
 @app_admin_memory.route("/admin/memory/list", methods=["POST"])
-@api_endpoint()
+@api_endpoint(is_admin=True)
 def get_admin_memory_itens():
     data = request.get_json()
 
@@ -16,7 +16,7 @@ def get_admin_memory_itens():
 
 
 @app_admin_memory.route("/admin/memory", methods=["PUT"])
-@api_endpoint()
+@api_endpoint(is_admin=True)
 def update_memory_item():
     data = request.get_json()
 

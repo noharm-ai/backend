@@ -1,17 +1,18 @@
 import re
-from flask import request, render_template
-from flask_jwt_extended import decode_token, create_access_token
-from flask_mail import Message
-from sqlalchemy import desc, func, or_, asc
 from datetime import datetime, timedelta
 
-from models.main import User, UserAudit, db, mail
+from flask import render_template, request
+from flask_jwt_extended import create_access_token, decode_token
+from flask_mail import Message
+from sqlalchemy import asc, desc, func, or_
+
+from config import Config
+from decorators.has_permission_decorator import Permission, has_permission
+from exception.validation_error import ValidationError
 from models.appendix import SchemaConfig
 from models.enums import UserAuditTypeEnum
+from models.main import User, UserAudit, db, mail
 from repository import user_repository
-from config import Config
-from decorators.has_permission_decorator import has_permission, Permission
-from exception.validation_error import ValidationError
 from utils import status
 
 

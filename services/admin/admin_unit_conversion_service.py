@@ -40,13 +40,17 @@ def get_conversion_predictions(conversion_list: list) -> list:
         )
 
         if conversion_item.get("prediction", None) is None:
+            # Sanitize user input to prevent XSS
+            name = conversion_item.get("name")
+            sctid = conversion_item.get("sctid")
+
             to_infer.append(
                 {
                     "id": index,
-                    "nome": conversion_item.get("name"),
+                    "nome": escape_html(str(name)) if name is not None else None,
                     "unidade_noharm": destiny_unit,
                     "fkunidademedida": conversion_item.get("idMeasureUnit"),
-                    "sctid": str(conversion_item.get("sctid")),
+                    "sctid": escape_html(str(sctid)) if sctid is not None else None,
                 }
             )
 
@@ -102,8 +106,13 @@ def get_conversion_list(id_segment):
             "description": du.description,
         }
 
-    active_drugs = db.session.query(distinct(Outlier.idDrug).label("idDrug")).cte(
-        "active_drugs"
+    active_drugs = (
+        db.session.query(
+            Outlier.idDrug.label("idDrug"),
+            func.sum(Outlier.countNum).label("prescribed_quantity"),
+        )
+        .group_by(Outlier.idDrug)
+        .cte("active_drugs")
     )
 
     prescribed_units = (
@@ -149,6 +158,8 @@ def get_conversion_list(id_segment):
             Drug.sctid,
             Substance.default_measureunit,
             MeasureUnit.measureunit_nh,
+            active_drugs.c.prescribed_quantity,
+            Substance.tags,
         )
         .join(active_drugs, Drug.id == active_drugs.c.idDrug)
         .join(units, Drug.id == units.c.idDrug)
@@ -182,16 +193,18 @@ def get_conversion_list(id_segment):
             {
                 "id": f"{i.id}-{i.idMeasureUnit}",
                 "idDrug": i[1],
-                "name": i[2],
+                "name": escape_html(str(i[2])) if i[2] is not None else None,
                 "idMeasureUnit": i[3],
                 "factor": i[4],
-                "idSegment": escape_html(id_segment),
-                "measureUnit": i[5],
-                "sctid": i.sctid,
+                "idSegment": escape_html(str(id_segment)),
+                "measureUnit": escape_html(str(i[5])) if i[5] is not None else None,
+                "sctid": escape_html(str(i.sctid)) if i.sctid is not None else None,
                 "substanceMeasureUnit": i.default_measureunit,
                 "drugMeasureUnitNh": i.measureunit_nh,
                 "prediction": prediction,
                 "probability": probability,
+                "prescribedQuantity": i.prescribed_quantity,
+                "substanceTags": i.tags,
             }
         )
 
@@ -206,16 +219,24 @@ def get_conversion_list(id_segment):
                     {
                         "id": f"{i.id}-{d_unit.get('idMeasureUnit')}",
                         "idDrug": i.id,
-                        "name": i.name,
+                        "name": escape_html(str(i.name))
+                        if i.name is not None
+                        else None,
                         "idMeasureUnit": d_unit.get("idMeasureUnit"),
                         "factor": None,
-                        "idSegment": escape_html(id_segment),
-                        "measureUnit": d_unit.get("description"),
-                        "sctid": i.sctid,
+                        "idSegment": escape_html(str(id_segment)),
+                        "measureUnit": escape_html(str(d_unit.get("description")))
+                        if d_unit.get("description") is not None
+                        else None,
+                        "sctid": escape_html(str(i.sctid))
+                        if i.sctid is not None
+                        else None,
                         "substanceMeasureUnit": i.default_measureunit,
                         "drugMeasureUnitNh": i.measureunit_nh,
                         "prediction": 1,
                         "probability": 100,
+                        "prescribed_quantity": i.prescribed_quantity,
+                        "substanceTags": i.tags,
                     }
                 )
 
