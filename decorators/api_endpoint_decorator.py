@@ -10,19 +10,24 @@ from flask_jwt_extended.exceptions import JWTExtendedException
 from jwt.exceptions import PyJWTError
 from pydantic import ValidationError as PydanticValidationError
 
+from config import Config
 from exception.authorization_error import AuthorizationError
 from exception.validation_error import ValidationError
+from models.enums import NoHarmENV
 from models.main import User, db, dbSession
 from utils import logger, status
 
 
-def api_endpoint(download_headers=None):
+def api_endpoint(download_headers=None, is_admin=False):
     def wrapper(f):
         @wraps(f)
         def decorator_f(*args, **kwargs):
             user_context = None
             start_time = time.time()
             try:
+                if is_admin and Config.ENV == NoHarmENV.PRODUCTION.value:
+                    raise AuthorizationError()
+
                 verify_jwt_in_request()
 
                 user_context = User.find(get_jwt_identity())

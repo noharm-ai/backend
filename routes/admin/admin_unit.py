@@ -7,7 +7,7 @@ app_admin_unit = Blueprint("app_admin_unit", __name__)
 
 
 @app_admin_unit.route("/admin/unit/list", methods=["POST"])
-@api_endpoint()
+@api_endpoint(is_admin=True)
 def get_units():
     request_data = request.get_json()
 
@@ -19,7 +19,7 @@ def get_units():
 
 
 @app_admin_unit.route("/admin/unit", methods=["PUT"])
-@api_endpoint()
+@api_endpoint(is_admin=True)
 def update_unit():
     data = request.get_json()
 

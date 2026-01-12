@@ -7,7 +7,7 @@ app_admin_exam = Blueprint("app_admin_exam", __name__)
 
 
 @app_admin_exam.route("/admin/exam/copy", methods=["POST"])
-@api_endpoint()
+@api_endpoint(is_admin=True)
 def copy_exams():
     data = request.get_json()
 
@@ -20,7 +20,7 @@ def copy_exams():
 
 
 @app_admin_exam.route("/admin/exam/most-frequent", methods=["GET"])
-@api_endpoint()
+@api_endpoint(is_admin=True)
 def get_most_frequent():
     return admin_exam_service.get_most_frequent()
 
@@ -40,7 +40,7 @@ def list_exam_types():
 
 
 @app_admin_exam.route("/admin/exam/most-frequent/add", methods=["POST"])
-@api_endpoint()
+@api_endpoint(is_admin=True)
 def add_most_frequent():
     data = request.get_json()
 

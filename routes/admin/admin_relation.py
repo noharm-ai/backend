@@ -7,7 +7,7 @@ app_admin_relation = Blueprint("app_admin_relation", __name__)
 
 
 @app_admin_relation.route("/admin/relation/list", methods=["POST"])
-@api_endpoint()
+@api_endpoint(is_admin=True)
 def get_relations():
     data = request.get_json()
 
@@ -23,7 +23,7 @@ def get_relations():
 
 
 @app_admin_relation.route("/admin/relation", methods=["POST"])
-@api_endpoint()
+@api_endpoint(is_admin=True)
 def upsert_relation():
     return admin_relation_service.upsert_relation(
         data=request.get_json(),

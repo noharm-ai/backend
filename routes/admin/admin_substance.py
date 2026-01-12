@@ -1,14 +1,14 @@
 from flask import Blueprint, request
 
-from services.admin import admin_substance_service
 from decorators.api_endpoint_decorator import api_endpoint
 from models.requests.admin.admin_substance import AdminSubstanceRequest
+from services.admin import admin_substance_service
 
 app_admin_subs = Blueprint("app_admin_subs", __name__)
 
 
 @app_admin_subs.route("/admin/substance/list", methods=["POST"])
-@api_endpoint()
+@api_endpoint(is_admin=True)
 def get_substances():
     data = request.get_json()
 
@@ -35,7 +35,7 @@ def get_substances():
 
 
 @app_admin_subs.route("/admin/substance", methods=["POST"])
-@api_endpoint()
+@api_endpoint(is_admin=True)
 def update_substance():
     subs = admin_substance_service.upsert_substance(
         request_data=AdminSubstanceRequest(**request.get_json()),

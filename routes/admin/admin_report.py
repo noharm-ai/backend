@@ -10,7 +10,7 @@ app_admin_report = Blueprint("app_admin_report", __name__)
 
 
 @app_admin_report.route("/admin/report", methods=["POST"])
-@api_endpoint()
+@api_endpoint(is_admin=True)
 def upsert_report():
     return admin_report_service.upsert_report(
         request_data=UpsertReportRequest(**request.get_json())
@@ -18,7 +18,7 @@ def upsert_report():
 
 
 @app_admin_report.route("/admin/report/list", methods=["GET"])
-@api_endpoint()
+@api_endpoint(is_admin=True)
 def get_list():
     """List custom reports."""
     return admin_report_service.get_report_list()

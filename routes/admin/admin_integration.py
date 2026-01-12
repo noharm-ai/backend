@@ -19,7 +19,7 @@ app_admin_integration = Blueprint("app_admin_integration", __name__)
 @app_admin_integration.route(
     "/admin/integration/refresh-prescription", methods=["POST"]
 )
-@api_endpoint()
+@api_endpoint(is_admin=True)
 def refresh_prescriptions():
     result = admin_integration_service.refresh_prescriptions()
 
@@ -29,7 +29,7 @@ def refresh_prescriptions():
 @app_admin_integration.route(
     "/admin/integration/init-intervention-reason", methods=["POST"]
 )
-@api_endpoint()
+@api_endpoint(is_admin=True)
 def init_intervention_reason():
     result = admin_integration_service.init_intervention_reason()
 
@@ -37,13 +37,13 @@ def init_intervention_reason():
 
 
 @app_admin_integration.route("/admin/integration/status", methods=["GET"])
-@api_endpoint()
+@api_endpoint(is_admin=True)
 def get_status():
     return admin_integration_status_service.get_status()
 
 
 @app_admin_integration.route("/admin/integration/update", methods=["POST"])
-@api_endpoint()
+@api_endpoint(is_admin=True)
 def update_config():
     request_data = request.get_json()
 
@@ -59,13 +59,13 @@ def update_config():
 
 
 @app_admin_integration.route("/admin/integration/list", methods=["GET"])
-@api_endpoint()
+@api_endpoint(is_admin=True)
 def list_integrations():
     return admin_integration_service.list_integrations()
 
 
 @app_admin_integration.route("/admin/integration/create-schema", methods=["POST"])
-@api_endpoint()
+@api_endpoint(is_admin=True)
 def create_schema():
     """create a new schema"""
     return admin_integration_service.create_schema(
@@ -74,7 +74,7 @@ def create_schema():
 
 
 @app_admin_integration.route("/admin/integration/get-cloud-config", methods=["POST"])
-@api_endpoint()
+@api_endpoint(is_admin=True)
 def get_cloud_config():
     """get cloud config"""
     request_data = request.get_json()
@@ -84,7 +84,7 @@ def get_cloud_config():
 
 
 @app_admin_integration.route("/admin/integration/upsert-getname", methods=["POST"])
-@api_endpoint()
+@api_endpoint(is_admin=True)
 def upsert_getname():
     """upsert getname config"""
     return admin_integration_service.upsert_getname(
@@ -95,7 +95,7 @@ def upsert_getname():
 @app_admin_integration.route(
     "/admin/integration/upsert-security-group", methods=["POST"]
 )
-@api_endpoint()
+@api_endpoint(is_admin=True)
 def upsert_security_group():
     """upsert sg config"""
     return admin_integration_service.upsert_security_group(
@@ -106,7 +106,7 @@ def upsert_security_group():
 @app_admin_integration.route(
     "/admin/integration/update-user-security-group", methods=["POST"]
 )
-@api_endpoint()
+@api_endpoint(is_admin=True)
 def update_user_security_group():
     """update user sg rules"""
 

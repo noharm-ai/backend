@@ -4,17 +4,17 @@ from flask import Blueprint, request
 from markupsafe import escape as escape_html
 
 from decorators.api_endpoint_decorator import api_endpoint
-from services.admin import admin_global_memory_service
 from models.requests.admin.admin_global_memory_request import (
     GlobalMemoryItensRequest,
     UpdateGlobalMemoryRequest,
 )
+from services.admin import admin_global_memory_service
 
 app_admin_global_memory = Blueprint("app_admin_global_memory", __name__)
 
 
 @app_admin_global_memory.route("/admin/global-memory/list", methods=["POST"])
-@api_endpoint()
+@api_endpoint(is_admin=True)
 def get_admin_memory_itens():
     """Get memory record"""
 
@@ -24,7 +24,7 @@ def get_admin_memory_itens():
 
 
 @app_admin_global_memory.route("/admin/global-memory/update", methods=["POST"])
-@api_endpoint()
+@api_endpoint(is_admin=True)
 def update_memory_item():
     """Update global memory record"""
 

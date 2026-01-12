@@ -8,7 +8,7 @@ app_admin_drug = Blueprint("app_admin_drug", __name__)
 
 
 @app_admin_drug.route("/admin/drug/attributes-list", methods=["POST"])
-@api_endpoint()
+@api_endpoint(is_admin=True)
 def get_drug_list():
     request_data = request.get_json()
 
@@ -35,7 +35,7 @@ def get_drug_list():
 
 
 @app_admin_drug.route("/admin/drug/price-factor", methods=["POST"])
-@api_endpoint()
+@api_endpoint(is_admin=True)
 def update_price_factor():
     data = request.get_json()
 
@@ -57,7 +57,7 @@ def update_price_factor():
 
 
 @app_admin_drug.route("/admin/drug/ref", methods=["GET"])
-@api_endpoint()
+@api_endpoint(is_admin=True)
 def get_drug_ref():
     sctid = request.args.get("sctid", None)
 
@@ -65,7 +65,7 @@ def get_drug_ref():
 
 
 @app_admin_drug.route("/admin/drug/copy-attributes", methods=["POST"])
-@api_endpoint()
+@api_endpoint(is_admin=True)
 def copy_attributes():
     data = request.get_json()
 
@@ -81,7 +81,7 @@ def copy_attributes():
 
 
 @app_admin_drug.route("/admin/drug/predict-substance", methods=["POST"])
-@api_endpoint()
+@api_endpoint(is_admin=True)
 def predict_substance():
     data = request.get_json()
 
@@ -89,7 +89,7 @@ def predict_substance():
 
 
 @app_admin_drug.route("/admin/drug/get-missing-substance", methods=["GET"])
-@api_endpoint()
+@api_endpoint(is_admin=True)
 def get_drugs_missing_substance():
     result = admin_drug_service.get_drugs_missing_substance()
 
@@ -97,7 +97,7 @@ def get_drugs_missing_substance():
 
 
 @app_admin_drug.route("/admin/drug/add-new-outlier", methods=["POST"])
-@api_endpoint()
+@api_endpoint(is_admin=True)
 def add_new_outlier():
     result = admin_drug_service.add_new_drugs_to_outlier()
 
@@ -105,6 +105,6 @@ def add_new_outlier():
 
 
 @app_admin_drug.route("/admin/drug/calculate-dosemax", methods=["POST"])
-@api_endpoint()
+@api_endpoint(is_admin=True)
 def calculate_dosemax_bulk():
     return admin_drug_service.calculate_dosemax_bulk()

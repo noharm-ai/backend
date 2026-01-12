@@ -7,7 +7,7 @@ app_admin_freq = Blueprint("app_admin_freq", __name__)
 
 
 @app_admin_freq.route("/admin/frequency/list", methods=["POST"])
-@api_endpoint()
+@api_endpoint(is_admin=True)
 def get_frequencies():
     request_data = request.get_json()
 
@@ -19,7 +19,7 @@ def get_frequencies():
 
 
 @app_admin_freq.route("/admin/frequency", methods=["PUT"])
-@api_endpoint()
+@api_endpoint(is_admin=True)
 def update_frequency():
     data = request.get_json()
 
@@ -33,7 +33,7 @@ def update_frequency():
 
 
 @app_admin_freq.route("/admin/frequency/infer", methods=["POST"])
-@api_endpoint()
+@api_endpoint(is_admin=True)
 def infer_frequency():
     """Try to infer frequenciadia based on history"""
 
