@@ -329,6 +329,7 @@ class ReportStatusEnum(Enum):
     PROCESSED = 1
     PROCESSING = 2
     ERROR = 3
+    EMPTY = 4
 
 
 class ReportTypeEnum(Enum):
