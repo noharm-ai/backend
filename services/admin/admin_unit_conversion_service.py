@@ -159,6 +159,7 @@ def get_conversion_list(id_segment):
             Substance.default_measureunit,
             MeasureUnit.measureunit_nh,
             active_drugs.c.prescribed_quantity,
+            Substance.tags,
         )
         .join(active_drugs, Drug.id == active_drugs.c.idDrug)
         .join(units, Drug.id == units.c.idDrug)
@@ -203,6 +204,7 @@ def get_conversion_list(id_segment):
                 "prediction": prediction,
                 "probability": probability,
                 "prescribedQuantity": i.prescribed_quantity,
+                "substanceTags": i.tags,
             }
         )
 
@@ -234,6 +236,7 @@ def get_conversion_list(id_segment):
                         "prediction": 1,
                         "probability": 100,
                         "prescribed_quantity": i.prescribed_quantity,
+                        "substanceTags": i.tags,
                     }
                 )
 
