@@ -114,8 +114,6 @@ class SchemaConfig(db.Model):
     return_integration = db.Column("integracao_retorno", db.Boolean, nullable=False)
     tp_prescalc = db.Column("tp_prescalc", db.Integer, nullable=False)
 
-    fl3 = db.Column("fl3_atualiza_prescricaoagg", db.Boolean, nullable=False)
-
 
 class SchemaConfigAudit(db.Model):
     """table schema_config_audit: audit record for schema_config changes"""

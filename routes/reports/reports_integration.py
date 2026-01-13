@@ -9,7 +9,7 @@ app_rpt_integration = Blueprint("app_rpt_integration", __name__)
 
 
 @app_rpt_integration.route("/reports/integration/nifilint", methods=["GET"])
-@api_endpoint()
+@api_endpoint(is_admin=True)
 def get_nifilint():
     """Retrieve the nifilint archive presigned url from S3."""
     return reports_integration_service.get_nifilint()
