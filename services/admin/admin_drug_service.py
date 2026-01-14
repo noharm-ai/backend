@@ -1,9 +1,14 @@
+"""Service: admin drug related operations"""
+
+import json
 from datetime import datetime
 from typing import List
 
+import boto3
 from sqlalchemy import and_, distinct, func, text
 from sqlalchemy.orm import undefer
 
+from config import Config
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
 from models.appendix import MeasureUnit, MeasureUnitConvert
@@ -266,40 +271,24 @@ def copy_drug_attributes(
 
 
 @has_permission(Permission.ADMIN_DRUGS)
-def predict_substance(id_drugs: List[int], user_context: User):
-    if len(id_drugs) == 0 or len(id_drugs) > 200:
-        raise ValidationError(
-            "Parâmetro inválido (min=1; max=200)",
-            "errors.invalidParams",
-            status.HTTP_400_BAD_REQUEST,
-        )
+def predict_substance(user_context: User):
+    lambda_client = boto3.client("lambda", region_name="sa-east-1")
 
-    drugs = (
-        db.session.query(Drug)
-        .filter(Drug.sctid == None)
-        .filter(Drug.id.in_(id_drugs))
-        .order_by(Drug.id)
-        .all()
+    response = lambda_client.invoke(
+        FunctionName=Config.BACKEND_FUNCTION_NAME,
+        InvocationType="Event",
+        Payload=json.dumps(
+            {
+                "command": "lambda_substances.infer_schema_substances",
+                "schema": user_context.schema,
+            }
+        ),
     )
 
-    ia_results = admin_ai_service.get_substance(drugs)
-
-    for i in ia_results:
-        db.session.query(Drug).filter(Drug.id == i["idDrug"]).update(
-            {
-                "sctid": i["sctid"],
-                "ai_accuracy": i["accuracy"],
-                "updated_at": datetime.today(),
-                "updated_by": user_context.id,
-            },
-            synchronize_session="fetch",
-        )
-
-        main_drug_service.copy_substance_default_attributes(
-            i["idDrug"], i["sctid"], user_context, calc_dose_max=False
-        )
-
-    return ia_results
+    return {
+        "request_id": response.get("ResponseMetadata", {}).get("RequestId"),
+        "status_code": response.get("StatusCode"),
+    }
 
 
 @has_permission(Permission.ADMIN_DRUGS)
