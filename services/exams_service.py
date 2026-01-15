@@ -4,15 +4,12 @@ import copy
 import json
 import logging
 from datetime import date, datetime, timedelta
-from linecache import cache
 
 from dateutil import parser
 from sqlalchemy import and_, desc, text
 
-from config import Config
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
-from models.enums import NoHarmENV
 from models.main import User, db, redis_client
 from models.notes import ClinicalNotes
 from models.prescription import Patient
@@ -21,7 +18,7 @@ from models.requests.exam_request import (
     ExamCreateRequest,
     ExamDeleteRequest,
 )
-from models.segment import Exams, SegmentExam
+from models.segment import Exams
 from repository import exams_repository
 from services import cache_service
 from utils import dateutils, examutils, logger, numberutils, status, stringutils
