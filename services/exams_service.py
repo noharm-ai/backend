@@ -34,7 +34,9 @@ class DynamoExam:
         self.admissionNumber = data.get("nratendimento", 0)
 
         self.typeExam = data.get("tpexame")
-        self.value = data.get("resultado")
+        self.value = (
+            float(data.get("resultado", None)) if data.get("resultado", None) else None
+        )
         self.unit = data.get("unidade")
         self.created_by = None
 
