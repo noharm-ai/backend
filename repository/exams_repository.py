@@ -70,3 +70,21 @@ def get_exam_types():
         .order_by("name")
         .all()
     )
+
+
+def get_exams_reference(id_segment: int):
+    """List all exams reference by segment"""
+    exams = (
+        SegmentExam.query.filter(SegmentExam.idSegment == id_segment)
+        .filter(SegmentExam.active == True)
+        .order_by(asc(SegmentExam.order))
+        .all()
+    )
+
+    results = {}
+    for e in exams:
+        results[e.typeExam.lower()] = e
+        if e.initials.lower().strip() == "creatinina":
+            results["cr"] = e
+
+    return results

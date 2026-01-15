@@ -1,5 +1,3 @@
-from sqlalchemy import asc
-
 from .main import db
 
 
@@ -32,22 +30,6 @@ class SegmentExam(db.Model):
     active = db.Column("ativo", db.Boolean, nullable=False)
     update = db.Column("update_at", db.DateTime, nullable=False)
     user = db.Column("update_by", db.BigInteger, nullable=False)
-
-    def refDict(idSegment):
-        exams = (
-            SegmentExam.query.filter(SegmentExam.idSegment == idSegment)
-            .filter(SegmentExam.active == True)
-            .order_by(asc(SegmentExam.order))
-            .all()
-        )
-
-        results = {}
-        for e in exams:
-            results[e.typeExam.lower()] = e
-            if e.initials.lower().strip() == "creatinina":
-                results["cr"] = e
-
-        return results
 
 
 class Hospital(db.Model):

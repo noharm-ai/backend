@@ -4,7 +4,9 @@ import copy
 import json
 import logging
 from datetime import date, datetime, timedelta
+from linecache import cache
 
+from dateutil import parser
 from sqlalchemy import and_, desc, text
 
 from config import Config
@@ -23,6 +25,27 @@ from models.segment import Exams, SegmentExam
 from repository import exams_repository
 from services import cache_service
 from utils import dateutils, examutils, logger, numberutils, status, stringutils
+
+
+class DynamoExam:
+    """Helper class to merge DynamoDB and SQLAlchemy data"""
+
+    def __init__(self, data):
+        self.idExame = data.get("fkexame")
+        self.idPatient = data.get("fkpessoa")
+        self.idPrescription = data.get("fkprescricao", 0)
+        self.admissionNumber = data.get("nratendimento", 0)
+
+        self.typeExam = data.get("tpexame")
+        self.value = data.get("resultado")
+        self.unit = data.get("unidade")
+        self.created_by = None
+
+        try:
+            dtexame = data.get("dtexame")
+            self.date = parser.parse(dtexame) if isinstance(dtexame, str) else dtexame
+        except Exception:
+            pass
 
 
 @has_permission(Permission.WRITE_PRESCRIPTION)
@@ -178,18 +201,86 @@ def get_exams_by_admission(admission_number: int, id_segment: int, user_context:
             status.HTTP_400_BAD_REQUEST,
         )
 
-    if Config.ENV != NoHarmENV.TEST.value:
-        dynamodbexams = exams_repository.get_exams_by_patient_from_dynamodb(
-            schema=user_context.schema, id_patient=patient.idPatient
-        )
-        logger.backend_logger.info(
-            f"Retrieved {len(dynamodbexams)} exams from DynamoDB"
-        )
+    # get exams configuration to this segment
+    segExam = exams_repository.get_exams_reference(id_segment=id_segment)
+
+    dynamodbexams = exams_repository.get_exams_by_patient_from_dynamodb(
+        schema=user_context.schema, id_patient=patient.idPatient
+    )
+    logger.backend_logger.info(f"Retrieved {len(dynamodbexams)} exams from DynamoDB")
 
     examsList = exams_repository.get_exams_by_patient(patient.idPatient, days=90)
     logger.backend_logger.info(f"Retrieved {len(examsList)} exams from RDS")
-    # TODO: refactor
-    segExam = SegmentExam.refDict(idSegment=id_segment)
+
+    # Merge PostgreSQL and DynamoDB exams
+    # Keep the most recent record by (fkexame, tpexame)
+    exams_dict = {}
+
+    # Add DynamoDB exams
+    for dynamo_exam in dynamodbexams:
+        fkexame = dynamo_exam.get("fkexame")
+        tpexame = dynamo_exam.get("tpexame")
+        dtexame = dynamo_exam.get("dtexame")
+
+        if fkexame and tpexame and dtexame:
+            key = (fkexame, tpexame)
+
+            # Create a mock exam object from DynamoDB data
+            exam = DynamoExam(dynamo_exam)
+
+            if not exam.date:
+                continue
+
+            exams_dict[key] = {
+                "source": "dynamodb",
+                "exam": exam,
+                "date": exam.date,
+                "idExame": fkexame,
+                "typeExam": tpexame,
+            }
+
+    # Add PostgreSQL exams to dict
+    cache_hit_count = 0
+    cache_miss_count = 0
+    for exam in examsList:
+        key = (exam.idExame, exam.typeExam)
+
+        if key not in exams_dict and exam.typeExam.lower() in segExam:
+            cache_miss_count += 1
+            logger.backend_logger.warning(
+                json.dumps(
+                    {
+                        "event": "dynamodb_exam_miss",
+                        "fkpessoa": patient.idPatient,
+                        "tpexame": exam.typeExam,
+                        "idExame": exam.idExame,
+                        "dtexame": dateutils.to_iso(exam.date),
+                        "schema": user_context.schema,
+                    }
+                )
+            )
+
+        if key not in exams_dict or exam.date > exams_dict[key]["date"]:
+            exams_dict[key] = {
+                "source": "postgres",
+                "exam": exam,
+                "date": exam.date,
+                "idExame": exam.idExame,
+                "typeExam": exam.typeExam,
+            }
+        else:
+            cache_hit_count += 1
+
+    # Convert back to list, sorted by typeExam (asc) and date (desc)
+    examsList = [
+        item["exam"]
+        for item in sorted(
+            exams_dict.values(), key=lambda x: (x["typeExam"], -x["date"].timestamp())
+        )
+    ]
+
+    logger.backend_logger.info(f"dynamo hits: {cache_hit_count}")
+    logger.backend_logger.info(f"dynamo misses: {cache_miss_count}")
 
     perc = {
         "h_conleuc": {
@@ -207,7 +298,7 @@ def get_exams_by_admission(admission_number: int, id_segment: int, user_context:
     bufferList = {}
     typeExams = []
     for e in examsList:
-        if not e.typeExam.lower() in typeExams and e.typeExam.lower() in segExam:
+        if e.typeExam.lower() not in typeExams and e.typeExam.lower() in segExam:
             key = e.typeExam.lower()
             item = examutils.formatExam(
                 value=e.value,
@@ -578,7 +669,7 @@ def find_latest_exams(
             schema=schema,
         )
 
-    segExam = SegmentExam.refDict(idSegment)
+    segExam = exams_repository.get_exams_reference(id_segment=idSegment)
     age = dateutils.data2age(
         patient.birthdate.isoformat() if patient.birthdate else date.today().isoformat()
     )
