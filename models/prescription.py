@@ -97,6 +97,7 @@ class Patient(db.Model):
     responsiblePhysician = db.Column("medico_responsavel", db.String, nullable=True)
     id_icd = db.Column("idcid", db.String, nullable=True)
     dischargeDateForecast = db.Column("dt_alta_prevista", db.DateTime, nullable=True)
+    city = db.Column("cidade", db.String, nullable=True)
 
 
 class PatientAudit(db.Model):

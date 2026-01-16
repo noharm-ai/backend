@@ -1,17 +1,19 @@
 """Route: prescription related endpoints"""
 
-from datetime import date
+from datetime import date, datetime
+
 from flask import Blueprint, request
 from markupsafe import escape as escape_html
 
-from services import (
-    prescription_service,
-    prescription_drug_service,
-    prioritization_service,
-    prescription_view_service,
-    prescription_check_service,
-)
 from decorators.api_endpoint_decorator import api_endpoint
+from models.requests.prioritization_request import PrioritizationRequest
+from services import (
+    prescription_check_service,
+    prescription_drug_service,
+    prescription_service,
+    prescription_view_service,
+    prioritization_service,
+)
 
 app_pres = Blueprint("app_pres", __name__)
 
@@ -20,71 +22,96 @@ app_pres = Blueprint("app_pres", __name__)
 @api_endpoint()
 def get_prescriptions():
     """Prioritize prescriptions"""
-    idSegment = request.args.get("idSegment", None)
-    idSegmentList = request.args.getlist("idSegment[]")
-    idDept = request.args.getlist("idDept[]")
-    idDrug = request.args.getlist("idDrug[]")
-    idPatient = request.args.getlist("idPatient[]")
-    intervals = request.args.getlist("intervals[]")
-    allDrugs = request.args.get("allDrugs", 0)
-    startDate = request.args.get("startDate", str(date.today()))
-    endDate = request.args.get("endDate", None)
-    pending = request.args.get("pending", 0)
-    currentDepartment = request.args.get("currentDepartment", 0)
-    agg = request.args.get("agg", 0)
-    concilia = request.args.get("concilia", 0)
-    insurance = request.args.get("insurance", None)
-    indicators = request.args.getlist("indicators[]")
-    drugAttributes = request.args.getlist("drugAttributes[]")
-    frequencies = request.args.getlist("frequencies[]")
-    substances = request.args.getlist("substances[]")
-    substanceClasses = request.args.getlist("substanceClasses[]")
-    patientStatus = request.args.get("patientStatus", None)
-    patientReviewType = request.args.get("patientReviewType", None)
-    prescriber = request.args.get("prescriber", None)
-    diff = request.args.get("diff", None)
-    pending_interventions = request.args.get("pendingInterventions", None)
-    global_score_min = request.args.get("globalScoreMin", None)
-    global_score_max = request.args.get("globalScoreMax", None)
 
-    return prioritization_service.get_prioritization_list(
-        idSegment=idSegment,
-        idSegmentList=idSegmentList,
-        idDept=idDept,
-        idDrug=idDrug,
-        startDate=startDate,
-        endDate=endDate,
-        pending=pending,
-        agg=agg,
-        currentDepartment=currentDepartment,
-        concilia=concilia,
-        allDrugs=allDrugs,
-        insurance=insurance,
-        indicators=indicators,
-        frequencies=frequencies,
-        patientStatus=patientStatus,
-        substances=substances,
-        substanceClasses=substanceClasses,
-        patientReviewType=patientReviewType,
-        drugAttributes=drugAttributes,
-        idPatient=idPatient,
-        intervals=intervals,
-        prescriber=prescriber,
-        diff=diff,
-        global_score_min=global_score_min,
-        global_score_max=global_score_max,
-        pending_interventions=pending_interventions,
-        has_conciliation=request.args.get("hasConciliation", None),
+    # Helper function to convert string to bool (for non-None defaults)
+    def to_bool(value, default=False):
+        if value is None:
+            return default
+        if isinstance(value, bool):
+            return value
+        return value not in ("0", "false", "False", "")
+
+    # Helper function to convert string to optional bool
+    def to_optional_bool(value):
+        if value is None:
+            return None
+        if isinstance(value, bool):
+            return value
+        return value not in ("0", "false", "False", "")
+
+    # Helper function to convert string list to int list
+    def to_int_list(value_list):
+        try:
+            return [int(v) for v in value_list if v]
+        except (ValueError, TypeError):
+            return []
+
+    # Helper function to convert string to optional int
+    def to_optional_int(value):
+        if value is None:
+            return None
+        try:
+            return int(value)
+        except (ValueError, TypeError):
+            return None
+
+    # Parse dates
+    def parse_date(date_str):
+        if date_str is None:
+            return None
+        if isinstance(date_str, date):
+            return date_str
+        try:
+            return datetime.fromisoformat(date_str).date()
+        except (ValueError, AttributeError):
+            return None
+
+    prioritization_request = PrioritizationRequest(
+        idSegment=to_optional_int(request.args.get("idSegment")),
+        idSegmentList=to_int_list(request.args.getlist("idSegment[]")),
+        idDept=to_int_list(request.args.getlist("idDept[]")),
+        idDrug=to_int_list(request.args.getlist("idDrug[]")),
+        idPatient=to_int_list(request.args.getlist("idPatient[]")),
+        intervals=request.args.getlist("intervals[]"),
+        allDrugs=to_bool(request.args.get("allDrugs"), default=False),
+        startDate=parse_date(request.args.get("startDate")) or date.today(),
+        endDate=parse_date(request.args.get("endDate")),
+        pending=to_bool(request.args.get("pending"), default=False),
+        currentDepartment=to_bool(request.args.get("currentDepartment"), default=False),
+        agg=to_bool(request.args.get("agg"), default=False),
+        concilia=to_bool(request.args.get("concilia"), default=False),
+        insurance=request.args.get("insurance", None),
+        indicators=request.args.getlist("indicators[]"),
+        drugAttributes=request.args.getlist("drugAttributes[]"),
+        frequencies=request.args.getlist("frequencies[]"),
+        substances=to_int_list(request.args.getlist("substances[]")),
+        substanceClasses=request.args.getlist("substanceClasses[]"),
+        patientStatus=request.args.get("patientStatus", None),
+        patientReviewType=to_optional_int(request.args.get("patientReviewType")),
+        prescriber=request.args.get("prescriber", None),
+        diff=to_optional_bool(request.args.get("diff")),
+        pending_interventions=to_optional_bool(
+            request.args.get("pendingInterventions")
+        ),
+        global_score_min=to_optional_int(request.args.get("globalScoreMin")),
+        global_score_max=to_optional_int(request.args.get("globalScoreMax")),
+        has_conciliation=to_optional_bool(request.args.get("hasConciliation")),
         alert_level=request.args.get("alertLevel", None),
-        tags=request.args.getlist("tags[]"),
-        has_clinical_notes=request.args.get("hasClinicalNotes", None),
-        protocols=request.args.getlist("protocols[]"),
-        age_min=request.args.get("ageMin", None),
-        age_max=request.args.get("ageMax", None),
-        id_patient_by_name_list=request.args.getlist("idPatientByNameList[]"),
-        id_icd_list=request.args.getlist("idIcdList[]"),
-        id_icd_group_list=request.args.getlist("idIcdGroupList[]"),
+        tags=request.args.getlist("tags[]") or None,
+        has_clinical_notes=to_optional_bool(request.args.get("hasClinicalNotes")),
+        protocols=to_int_list(request.args.getlist("protocols[]")) or None,
+        age_min=to_optional_int(request.args.get("ageMin")),
+        age_max=to_optional_int(request.args.get("ageMax")),
+        id_patient_by_name_list=to_int_list(
+            request.args.getlist("idPatientByNameList[]")
+        )
+        or None,
+        id_icd_list=request.args.getlist("idIcdList[]") or None,
+        id_icd_group_list=request.args.getlist("idIcdGroupList[]") or None,
+        city=request.args.get("city", None),
     )
+
+    return prioritization_service.get_prioritization_list(prioritization_request)
 
 
 @app_pres.route("/prescriptions/<int:idPrescription>", methods=["GET"])
