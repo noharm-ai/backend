@@ -4,29 +4,30 @@ from datetime import datetime, timedelta
 
 from sqlalchemy import func, text
 
-from decorators.has_permission_decorator import has_permission, Permission
-from models.main import db, User
+from decorators.has_permission_decorator import Permission, has_permission
+from decorators.timed_decorator import timed
+from exception.validation_error import ValidationError
+from models.enums import (
+    DrugTypeEnum,
+    FeatureEnum,
+    PrescriptionAuditTypeEnum,
+    PrescriptionReviewTypeEnum,
+)
+from models.main import User, db
 from models.prescription import (
     Prescription,
     PrescriptionAudit,
 )
-from models.enums import (
-    FeatureEnum,
-    PrescriptionAuditTypeEnum,
-    DrugTypeEnum,
-    PrescriptionReviewTypeEnum,
-)
 from repository import prescription_view_repository
-from exception.validation_error import ValidationError
-from utils import status
+from security.role import Role
 from services import (
     data_authorization_service,
     memory_service,
     prescription_drug_service,
-    user_service,
     segment_service,
+    user_service,
 )
-from security.role import Role
+from utils import status
 
 
 @has_permission(Permission.WRITE_PRESCRIPTION)
@@ -141,7 +142,21 @@ def check_prescription(
         if single:
             results.append(single)
 
+    _clean_checkedindex(user_context=user_context)
+
     return results
+
+
+@timed()
+def _clean_checkedindex(user_context: User):
+    """delete old checked index records to force revalidation"""
+
+    db.session.execute(
+        text(
+            f"""DELETE FROM {user_context.schema}.checkedindex WHERE created_at < :maxDate"""
+        ),
+        {"maxDate": (datetime.today() - timedelta(days=15))},
+    )
 
 
 def _update_agg_status(prescription: Prescription, user: User, extra={}):
@@ -175,6 +190,7 @@ def _update_agg_status(prescription: Prescription, user: User, extra={}):
         )
 
 
+@timed()
 def _check_agg_internal_prescriptions(
     prescription, p_status, user, has_lock_feature=False, extra={}
 ):
@@ -213,6 +229,7 @@ def _check_agg_internal_prescriptions(
     return results
 
 
+@timed()
 def _check_single_prescription(
     prescription, p_status, user, parent_agg_date=None, has_lock_feature=False, extra={}
 ):
@@ -239,6 +256,7 @@ def _check_single_prescription(
     return {"idPrescription": str(prescription.id), "status": p_status}
 
 
+@timed()
 def _add_checkedindex(prescription: Prescription, user: User):
     if prescription.status != "s" or prescription.agg or prescription.concilia != None:
         return
@@ -248,30 +266,30 @@ def _add_checkedindex(prescription: Prescription, user: User):
         INSERT INTO {user.schema}.checkedindex
         (
             nratendimento, fkmedicamento, doseconv, frequenciadia, sletapas, slhorafase,
-            sltempoaplicacao, sldosagem, dtprescricao, via, horario, dose, complemento, fkprescricao, 
+            sltempoaplicacao, sldosagem, dtprescricao, via, horario, dose, complemento, fkprescricao,
             created_at, created_by
         )
-        SELECT 
+        SELECT
             p.nratendimento,
-            pm.fkmedicamento, 
-            pm.doseconv, 
-            pm.frequenciadia, 
-            COALESCE(pm.sletapas, 0), 
-            COALESCE(pm.slhorafase, 0), 
-            COALESCE(pm.sltempoaplicacao, 0), 
+            pm.fkmedicamento,
+            pm.doseconv,
+            pm.frequenciadia,
+            COALESCE(pm.sletapas, 0),
+            COALESCE(pm.slhorafase, 0),
+            COALESCE(pm.sltempoaplicacao, 0),
             COALESCE(pm.sldosagem, 0),
-            p.dtprescricao, 
-            COALESCE(pm.via, ''), 
+            p.dtprescricao,
+            COALESCE(pm.via, ''),
             COALESCE(left(pm.horario ,50), ''),
-            pm.dose, 
+            pm.dose,
             MD5(pm.complemento),
             p.fkprescricao,
             :createdAt,
             :idUser
-        FROM 
+        FROM
             {user.schema}.prescricao p
-            INNER JOIN {user.schema}.presmed pm ON pm.fkprescricao = p.fkprescricao 
-        WHERE 
+            INNER JOIN {user.schema}.presmed pm ON pm.fkprescricao = p.fkprescricao
+        WHERE
             p.fkprescricao = :idPrescription
             AND pm.dtsuspensao is null
     """
@@ -286,13 +304,8 @@ def _add_checkedindex(prescription: Prescription, user: User):
         },
     )
 
-    # delete old records to force revalidation
-    db.session.execute(
-        text(f"""DELETE FROM {user.schema}.checkedindex WHERE created_at < :maxDate"""),
-        {"maxDate": (datetime.today() - timedelta(days=15))},
-    )
 
-
+@timed()
 def audit_check(prescription: Prescription, user: User, parent_agg_date=None, extra={}):
     a = PrescriptionAudit()
     a.auditType = (
@@ -333,7 +346,6 @@ def audit_check(prescription: Prescription, user: User, parent_agg_date=None, ex
 def review_prescription(
     idPrescription, user_context: User, review_type, evaluation_time
 ):
-
     prescription = Prescription.query.get(idPrescription)
     prescription = (
         db.session.query(Prescription).filter(Prescription.id == idPrescription).first()
