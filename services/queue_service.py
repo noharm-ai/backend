@@ -53,7 +53,7 @@ def check_sqs_message(request_id: str, user_context: User, max_iterations: int =
                 WaitTimeSeconds=0,
                 MessageAttributeNames=["All"],
                 AttributeNames=["All"],
-                VisibilityTimeout=30,  # Keep messages invisible for 30s while processing
+                VisibilityTimeout=10,  # Keep messages invisible for 10s while processing
             )
         except Exception as e:
             raise ValidationError(

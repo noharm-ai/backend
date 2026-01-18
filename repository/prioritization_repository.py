@@ -54,7 +54,7 @@ def get_prioritization_list(request: PrioritizationRequest):
                 segments.append(s)
 
         if len(segments) > 0:
-            q = q.filter(Prescription.idSegment.in_(request.idSegmentList))
+            q = q.filter(Prescription.idSegment.in_(segments))
     else:
         q = q.filter(Prescription.idSegment != None)
 

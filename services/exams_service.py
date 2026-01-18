@@ -44,6 +44,7 @@ class DynamoExam:
             dtexame = data.get("dtexame")
             self.date = parser.parse(dtexame) if isinstance(dtexame, str) else dtexame
         except Exception:
+            self.date = None
             pass
 
 
