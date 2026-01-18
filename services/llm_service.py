@@ -27,6 +27,7 @@ def prompt(messages, options={}):
         and summary_config.value["provider"] != "claude"
         and summary_config.value["provider"] != "maritaca"
         and summary_config.value["provider"] != "llama"
+        and summary_config.value["provider"] != "gpt_oss"
     ):
         raise ValidationError(
             "Configuração inválida",

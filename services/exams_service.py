@@ -2,7 +2,6 @@
 
 import copy
 import json
-import logging
 from datetime import date, datetime, timedelta
 
 from dateutil import parser
@@ -575,8 +574,6 @@ def _get_exams_previous_results(id_patient: int):
 
 def _get_exams_current_results_hybrid(id_patient: int, schema: str):
     MIN_DATE = date.today() - timedelta(days=5)
-    logging.basicConfig()
-    logger = logging.getLogger("noharm.backend")
 
     results = (
         Exams.query.distinct(Exams.typeExam)
@@ -599,7 +596,9 @@ def _get_exams_current_results_hybrid(id_patient: int, schema: str):
         prev_value = cache_exams.get(e.typeExam.lower())
 
         if not prev_value:
-            logger.warning(f"CACHE_MISS: {cache_key} - type: {e.typeExam.lower()}")
+            logger.backend_logger.warning(
+                f"CACHE_MISS: {cache_key} - type: {e.typeExam.lower()}"
+            )
 
         exams[e.typeExam.lower()] = {
             "value": e.value,
