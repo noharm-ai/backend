@@ -344,6 +344,19 @@ def recalculate_prescription(id_prescription: int, user_context: User):
                 query, {"admissionNumber": p.admissionNumber, "prescDate": p.date}
             )
     else:
+        query = text(
+            f"""
+                INSERT INTO {user_context.schema}.prescricao
+                SELECT
+                    p.*
+                FROM
+                    {user_context.schema}.prescricao p
+                WHERE
+                    fkprescricao = :idPrescription
+            """
+        )
+        db.session.execute(query, {"idPrescription": p.id})
+
         # first update idoutlier to force recalculation
         updt_stmt = text(
             f"""

@@ -1,9 +1,8 @@
 import json
+import re
 
 import boto3
-from openai import AzureOpenAI
 
-from config import Config
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
 from models.appendix import GlobalMemory
@@ -28,6 +27,7 @@ def prompt(messages, options={}):
         and summary_config.value["provider"] != "claude"
         and summary_config.value["provider"] != "maritaca"
         and summary_config.value["provider"] != "llama"
+        and summary_config.value["provider"] != "gpt_oss"
     ):
         raise ValidationError(
             "Configuração inválida",
@@ -37,6 +37,9 @@ def prompt(messages, options={}):
 
     if summary_config.value["provider"] == "openai_azure":
         return _prompt_openai(messages=messages)
+
+    if summary_config.value["provider"] == "gpt_oss":
+        return _prompt_gpt_oss(messages=messages)
 
     if summary_config.value["provider"] == "maritaca":
         return _prompt_maritaca(messages=messages, options=options)
@@ -49,19 +52,11 @@ def prompt(messages, options={}):
 
 
 def _prompt_openai(messages):
-    client = AzureOpenAI(
-        api_key=Config.OPEN_AI_API_KEY,
-        api_version=Config.OPEN_AI_API_VERSION,
-        azure_endpoint=Config.OPEN_AI_API_ENDPOINT,
-        timeout=25,
+    raise ValidationError(
+        "OpenAi not implemented",
+        "errors.invalidModule",
+        status.HTTP_400_BAD_REQUEST,
     )
-
-    chat_completion = client.chat.completions.create(
-        messages=messages,
-        model=Config.OPEN_AI_API_MODEL,
-    )
-
-    return {"answer": chat_completion.choices[0].message.content}
 
 
 def _prompt_maritaca(messages, options={}):
@@ -95,6 +90,35 @@ def _prompt_claude(messages):
     response_body = json.loads(response.get("body").read())
 
     return {"answer": response_body["content"][0]["text"]}
+
+
+def _prompt_gpt_oss(messages):
+    session = boto3.session.Session()
+    client = session.client("bedrock-runtime", region_name="us-east-1")
+
+    body = json.dumps(
+        {
+            "max_tokens": 1024,
+            "messages": messages,
+        }
+    )
+
+    modelId = "openai.gpt-oss-120b-1:0"
+    accept = "application/json"
+    contentType = "application/json"
+
+    response = client.invoke_model(
+        body=body, modelId=modelId, accept=accept, contentType=contentType
+    )
+
+    response_body = json.loads(response.get("body").read())
+
+    response_message = response_body["choices"][0]["message"]["content"]
+    response_message = re.sub(
+        r"<reasoning>.*?</reasoning>", "", response_message, flags=re.DOTALL
+    )
+
+    return {"answer": response_message}
 
 
 def _prompt_llama(messages):

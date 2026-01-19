@@ -6,6 +6,8 @@ import boto3
 from boto3.dynamodb.conditions import Key
 from sqlalchemy import asc, desc, func
 
+from config import Config
+from models.enums import NoHarmENV
 from models.main import db
 from models.segment import Exams, SegmentExam
 
@@ -24,6 +26,9 @@ def get_exams_by_patient(idPatient: int, days: int):
 
 def get_exams_by_patient_from_dynamodb(schema: str, id_patient: int):
     """Get exams by patient from DynamoDB"""
+
+    if Config.ENV == NoHarmENV.TEST.value:
+        return []
 
     dynamodb = boto3.resource("dynamodb", region_name="sa-east-1")
     table = dynamodb.Table("noharm_exame")
@@ -70,3 +75,21 @@ def get_exam_types():
         .order_by("name")
         .all()
     )
+
+
+def get_exams_reference(id_segment: int):
+    """List all exams reference by segment"""
+    exams = (
+        SegmentExam.query.filter(SegmentExam.idSegment == id_segment)
+        .filter(SegmentExam.active == True)
+        .order_by(asc(SegmentExam.order))
+        .all()
+    )
+
+    results = {}
+    for e in exams:
+        results[e.typeExam.lower()] = e
+        if e.initials.lower().strip() == "creatinina":
+            results["cr"] = e
+
+    return results

@@ -63,6 +63,7 @@ class Role(Enum):
             Permission.WRITE_PROTOCOLS,
             Permission.ADMIN_NZERO,
             Permission.UPDATE_USER_SG,
+            Permission.READ_NAV,
         ],
     )
 
@@ -102,6 +103,7 @@ class Role(Enum):
             Permission.WRITE_TAGS,
             Permission.READ_REGULATION,
             Permission.UPDATE_USER_SG,
+            Permission.READ_NAV,
         ],
     )
 
@@ -198,6 +200,7 @@ class Role(Enum):
             Permission.READ_SUPPORT,
             Permission.NAV_COPY_PATIENT,
             Permission.MULTI_SCHEMA,
+            Permission.READ_NAV,
         ],
     )
 

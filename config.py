@@ -9,7 +9,7 @@ from models.enums import NoHarmENV
 class Config:
     """Configuration class for the application."""
 
-    VERSION = "v5.07-beta"
+    VERSION = "v5.08-beta"
     FRONTEND_VERSION = "5.1.6"
     ENV = getenv("ENV") or NoHarmENV.DEVELOPMENT.value
     SECRET_KEY = getenv("SECRET_KEY") or "secret_key"
@@ -61,3 +61,5 @@ class Config:
 
     SCORES_FUNCTION_NAME = getenv("SCORES_FUNCTION_NAME", "")
     BACKEND_FUNCTION_NAME = getenv("BACKEND_FUNCTION_NAME", "")
+
+    FEATURE_CONCILIATION_ALGORITHM = getenv("FEATURE_CONCILIATION_ALGORITHM", "FUZZY")

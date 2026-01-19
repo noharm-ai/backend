@@ -5,6 +5,7 @@ from datetime import date, datetime
 from sqlalchemy import and_, desc, func
 from sqlalchemy.dialects.postgresql import INTERVAL
 
+from config import Config
 from decorators.has_permission_decorator import Permission, has_permission
 from decorators.timed_decorator import timed
 from exception.validation_error import ValidationError
@@ -302,7 +303,7 @@ def _get_exist_intervention(interventions, dtPrescription, admission_number: int
 @timed()
 def _get_prescription_data(
     id_prescription: int,
-) -> tuple[Prescription, Patient, Department, Segment, User]:
+) -> tuple[Prescription, Patient, Department, Segment, User, ICDTable]:
     data = (
         db.session.query(Prescription, Patient, Department, Segment, User, ICDTable)
         .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)
@@ -697,7 +698,14 @@ def _get_drug_data(
             concilia_list = drug_list.conciliaList(concilia_drugs, [])
 
         if concilia_list:
-            p_drugs = drug_list.infer_substance(pDrugs=p_drugs)
+            if Config.FEATURE_CONCILIATION_ALGORITHM == "FUZZY":
+                p_drugs = drug_list.infer_substance_fuzzy(
+                    concilia_drugs=p_drugs,
+                    prescription_drugs=concilia_list,
+                    min_similarity_threshold=0.7,
+                )
+            else:
+                p_drugs = drug_list.infer_substance_ml(pDrugs=p_drugs)
 
     return {
         "drug_list": drug_list,

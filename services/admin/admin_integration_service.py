@@ -106,7 +106,6 @@ def update_integration_config(
     schema,
     status,
     nh_care,
-    fl3,
     config,
     user_context: User,
     return_integration: bool,
@@ -130,7 +129,6 @@ def update_integration_config(
         old_config=schema_config.config if schema_config.config else {},
         new_config=config,
     )
-    schema_config.fl3 = bool(fl3) if fl3 != None else schema_config.fl3
     schema_config.return_integration = return_integration
     schema_config.tp_prescalc = (
         tp_prescalc if tp_prescalc in [0, 1, 2] else schema_config.tp_prescalc
@@ -337,7 +335,7 @@ def upsert_getname(
     if isinstance(response_json, str):
         response_json = json.loads(response_json)
 
-    if response_json.get("error", False):
+    if isinstance(response_json, dict) and response_json.get("error", False):
         raise ValidationError(
             response_json.get("message", "Erro inesperado. Consulte os logs"),
             "errors.businessRules",
@@ -450,7 +448,6 @@ def _object_to_dto(schema_config: SchemaConfig):
         "status": schema_config.status,
         "nhCare": schema_config.nh_care,
         "config": schema_config.config,
-        "fl3": schema_config.fl3,
         "returnIntegration": schema_config.return_integration,
         "tpPrescalc": schema_config.tp_prescalc,
         "createdAt": (

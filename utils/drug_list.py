@@ -2,6 +2,7 @@
 
 import math
 import re
+from difflib import SequenceMatcher
 
 from models.enums import DrugTypeEnum
 from services import drug_service
@@ -542,7 +543,7 @@ class DrugList:
         return result
 
     @staticmethod
-    def infer_substance(pDrugs):
+    def infer_substance_ml(pDrugs):
         names = []
         for p in pDrugs:
             if p["idDrug"] == 0:
@@ -561,6 +562,75 @@ class DrugList:
                 result.append(p)
 
         return result
+
+    @staticmethod
+    def infer_substance_fuzzy(
+        concilia_drugs, prescription_drugs, min_similarity_threshold=0.7
+    ):
+        """
+        Match each drug in concilia_drugs with the best matching drug in prescription_drugs by name.
+        Uses fuzzy string matching to find the most similar drug name.
+
+        Args:
+            concilia_drugs: List of dictionaries from conciliaList (pDrugs parameter)
+            prescription_drugs: List of dictionaries from current prescription (current_prescription_drugs parameter)
+
+        Returns:
+            Updated concilia_drugs list with matched sctid from prescription_drugs
+        """
+
+        def get_similarity(name1, name2):
+            """Calculate similarity ratio between two drug names (case-insensitive)"""
+            if not name1 or not name2:
+                return 0.0
+
+            # Normalize strings: lowercase and strip whitespace
+            name1_norm = stringutils.prepare_drug_name(name1)
+            name2_norm = stringutils.prepare_drug_name(name2)
+
+            return SequenceMatcher(None, name1_norm, name2_norm).ratio()
+
+        # For each drug in concilia_drugs, find the best match in prescription_drugs
+        for concilia_drug in concilia_drugs:
+            if not concilia_drug.get("drug"):
+                continue
+
+            if concilia_drug.get("idDrug") != 0:
+                concilia_drug["sctid_infer"] = concilia_drug["idSubstance"]
+                continue
+
+            best_match = None
+            best_similarity = 0.0
+
+            # Find the best matching prescription drug by name
+            for prescription_drug in prescription_drugs:
+                if not prescription_drug.get("drug"):
+                    continue
+
+                similarity = get_similarity(
+                    concilia_drug["drug"], prescription_drug["drug"]
+                )
+
+                if similarity > best_similarity:
+                    best_similarity = similarity
+                    best_match = prescription_drug
+
+                similarity = get_similarity(
+                    concilia_drug["drug"], prescription_drug["substance"]
+                )
+
+                if similarity > best_similarity:
+                    best_similarity = similarity
+                    best_match = prescription_drug
+
+            # If a good match is found, copy the sctid (substance identifier)
+            if best_match and best_similarity >= min_similarity_threshold:
+                if best_match.get("sctid"):
+                    concilia_drug["sctid_infer"] = best_match["sctid"]
+                    concilia_drug["matched_drug"] = best_match["drug"]
+                    concilia_drug["match_score"] = round(best_similarity, 2)
+
+        return concilia_drugs
 
     @staticmethod
     def conciliaList(pDrugs, result=[]):
@@ -616,6 +686,7 @@ class DrugList:
                         "timeRaw": pd[0].interval,
                         "recommendation": pd[0].notes,
                         "sctid": str(pd.Substance.id) if pd.Substance else None,
+                        "substance": pd.Substance.name if pd.Substance else None,
                     }
                 )
 

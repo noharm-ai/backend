@@ -83,9 +83,7 @@ def copy_attributes():
 @app_admin_drug.route("/admin/drug/predict-substance", methods=["POST"])
 @api_endpoint(is_admin=True)
 def predict_substance():
-    data = request.get_json()
-
-    return admin_drug_service.predict_substance(id_drugs=data.get("idDrugs", []))
+    return admin_drug_service.predict_substance()
 
 
 @app_admin_drug.route("/admin/drug/get-missing-substance", methods=["GET"])

@@ -99,4 +99,5 @@ class Permission(Enum):
 
     UPDATE_USER_SG = "UPDATE_USER_SG"  # permission to update user's security group
 
+    READ_NAV = "READ_NAV"  # permission to navigation data
     NAV_COPY_PATIENT = "NAV_COPY_PATIENT"  # permission to copy patient data
