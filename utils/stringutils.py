@@ -90,7 +90,7 @@ def prepare_drug_name(name):
         cleaned_name = time_pattern.sub(" ", cleaned_name)  # Remove time patterns
         cleaned_name = dosage_pattern.sub(" ", cleaned_name)  # Remove dosage patterns
         cleaned_name = medication_dosage_pattern.sub(
-            " ", cleaned_name
+            "", cleaned_name
         )  # Remove medication dosage (e.g., "20mg")
         return cleaned_name.strip()
 

@@ -700,7 +700,9 @@ def _get_drug_data(
         if concilia_list:
             if Config.FEATURE_CONCILIATION_ALGORITHM == "FUZZY":
                 p_drugs = drug_list.infer_substance_fuzzy(
-                    concilia_drugs=p_drugs, prescription_drugs=concilia_list
+                    concilia_drugs=p_drugs,
+                    prescription_drugs=concilia_list,
+                    min_similarity_threshold=0.7,
                 )
             else:
                 p_drugs = drug_list.infer_substance_ml(pDrugs=p_drugs)
