@@ -335,7 +335,7 @@ def upsert_getname(
     if isinstance(response_json, str):
         response_json = json.loads(response_json)
 
-    if response_json.get("error", False):
+    if isinstance(response_json, dict) and response_json.get("error", False):
         raise ValidationError(
             response_json.get("message", "Erro inesperado. Consulte os logs"),
             "errors.businessRules",

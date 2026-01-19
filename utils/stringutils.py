@@ -63,6 +63,8 @@ def prepare_drug_name(name):
             "as",
             "às",
             "tardinha",
+            "MTP:",
+            "NP:",
         ]
     ]
 
@@ -71,6 +73,10 @@ def prepare_drug_name(name):
     dosage_pattern = re.compile(
         r"\d{1,2}[a-zA-Z]{1,3}\/?(dia|hora|semana)", flags=re.IGNORECASE
     )  # Matches patterns like 3x/dia
+    # Remove dosage from drug name (e.g., "20mg", "500mcg", "2.5g", "100UI")
+    medication_dosage_pattern = re.compile(
+        r"\b\d+([.,]\d+)?\s?(mg|mcg|g|ml|ui|%|u)\b", flags=re.IGNORECASE
+    )
 
     words = name.split()
     filtered_words = [
@@ -83,6 +89,9 @@ def prepare_drug_name(name):
         cleaned_name = " ".join(filtered_words)
         cleaned_name = time_pattern.sub(" ", cleaned_name)  # Remove time patterns
         cleaned_name = dosage_pattern.sub(" ", cleaned_name)  # Remove dosage patterns
+        cleaned_name = medication_dosage_pattern.sub(
+            " ", cleaned_name
+        )  # Remove medication dosage (e.g., "20mg")
         return cleaned_name.strip()
 
     return " ".join(words).upper()
