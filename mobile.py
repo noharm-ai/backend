@@ -13,6 +13,7 @@ from models.main import db, mail
 from routes.admin.admin_drug import app_admin_drug
 from routes.admin.admin_exam import app_admin_exam
 from routes.admin.admin_frequency import app_admin_freq
+from routes.admin.admin_global_exam import app_admin_global_exam
 from routes.admin.admin_global_memory import app_admin_global_memory
 from routes.admin.admin_integration import app_admin_integration
 from routes.admin.admin_integration_remote import app_admin_integration_remote
@@ -134,6 +135,7 @@ app.register_blueprint(app_admin_relation)
 app.register_blueprint(app_admin_unit)
 app.register_blueprint(app_admin_tag)
 app.register_blueprint(app_admin_protocol)
+app.register_blueprint(app_admin_global_exam)
 app.register_blueprint(app_admin_global_memory)
 app.register_blueprint(app_admin_report)
 
