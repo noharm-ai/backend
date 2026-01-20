@@ -53,8 +53,11 @@ def upsert_global_exam(request_data: GlobalExamUpsertRequest, user_context: User
             status.HTTP_400_BAD_REQUEST,
         )
 
+    # Normalize tp_exam to lowercase
+    tp_exam_normalized = request_data.tp_exam.strip().lower()
+
     exam = admin_global_exam_repository.get_global_exam_by_id(
-        tp_exam=request_data.tp_exam
+        tp_exam=tp_exam_normalized
     )
 
     if exam:
@@ -62,7 +65,7 @@ def upsert_global_exam(request_data: GlobalExamUpsertRequest, user_context: User
         exam.updated_by = user_context.id
     else:
         exam = GlobalExam()
-        exam.tp_exam = request_data.tp_exam
+        exam.tp_exam = tp_exam_normalized
         exam.created_at = datetime.today()
         exam.created_by = user_context.id
         db.session.add(exam)
