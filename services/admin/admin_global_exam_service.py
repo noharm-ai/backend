@@ -14,7 +14,7 @@ from repository.admin import admin_global_exam_repository
 from utils import dateutils, status
 
 
-@has_permission(Permission.ADMIN_EXAMS)
+@has_permission(Permission.ADMIN_GLOBAL_EXAMS)
 def list_global_exams(request_data: GlobalExamListRequest, user_context: User):
     """List global exams"""
     results = admin_global_exam_repository.list_global_exams(request_data=request_data)
@@ -23,26 +23,26 @@ def list_global_exams(request_data: GlobalExamListRequest, user_context: User):
     for item in results:
         exams.append(
             {
-                "tpExam": item.tp_exam,
+                "tp_exam": item.tp_exam,
                 "name": item.name,
                 "initials": item.initials,
                 "measureunit": item.measureunit,
                 "active": item.active,
-                "minAdult": item.min_adult,
-                "maxAdult": item.max_adult,
-                "refAdult": item.ref_adult,
-                "minPediatric": item.min_pediatric,
-                "maxPediatric": item.max_pediatric,
-                "refPediatric": item.ref_pediatric,
-                "createdAt": dateutils.to_iso(item.created_at),
-                "updatedAt": dateutils.to_iso(item.updated_at),
+                "min_adult": item.min_adult,
+                "max_adult": item.max_adult,
+                "ref_adult": item.ref_adult,
+                "min_pediatric": item.min_pediatric,
+                "max_pediatric": item.max_pediatric,
+                "ref_pediatric": item.ref_pediatric,
+                "created_at": dateutils.to_iso(item.created_at),
+                "updated_at": dateutils.to_iso(item.updated_at),
             }
         )
 
     return exams
 
 
-@has_permission(Permission.ADMIN_EXAMS)
+@has_permission(Permission.ADMIN_GLOBAL_EXAMS)
 def upsert_global_exam(request_data: GlobalExamUpsertRequest, user_context: User):
     """Upsert global exam records"""
 
