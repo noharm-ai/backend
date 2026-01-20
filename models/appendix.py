@@ -262,3 +262,29 @@ class Report(db.Model):
     updated_by = db.Column("updated_by", db.BigInteger, nullable=True)
     created_at = db.Column("created_at", db.DateTime, nullable=False)
     created_by = db.Column("created_by", db.BigInteger, nullable=False)
+
+
+class GlobalExam(db.Model):
+    """SQLALCHEMY model for exam table"""
+
+    __tablename__ = "exame"
+    __table_args__ = {"schema": "public"}
+
+    tp_exam = db.Column("tpexame", db.String(100), primary_key=True)
+    name = db.Column("nome", db.String(250), nullable=False)
+    initials = db.Column("abrev", db.String(50), nullable=False)
+    measureunit = db.Column("unidade", db.String(100), nullable=False)
+    active = db.Column("ativo", db.Boolean, nullable=False)
+
+    min_adult = db.Column("min_adulto", db.Float, nullable=False)
+    max_adult = db.Column("max_adulto", db.Float, nullable=False)
+    ref_adult = db.Column("referencia_adulto", db.String(250), nullable=False)
+
+    min_pediatric = db.Column("min_pediatrico", db.Float, nullable=False)
+    max_pediatric = db.Column("max_pediatrico", db.Float, nullable=False)
+    ref_pediatric = db.Column("referencia_pediatrico", db.String(250), nullable=False)
+
+    updated_at = db.Column("updated_at", db.DateTime, nullable=True)
+    updated_by = db.Column("updated_by", db.BigInteger, nullable=True)
+    created_at = db.Column("created_at", db.DateTime, nullable=False)
+    created_by = db.Column("created_by", db.BigInteger, nullable=False)

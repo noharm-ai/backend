@@ -500,49 +500,6 @@ def _history_calc(typeExam, examsList, patient, segExam):
     return results
 
 
-@has_permission(Permission.ADMIN_EXAMS)
-def get_exams_default_refs():
-    query = text(
-        """
-        select
-            s.nome as segment,
-            se.tpexame as type_exam,
-            se.nome as name,
-            se.abrev as initials,
-            se.referencia as ref,
-            se.min,
-            se.max,
-            se.posicao as order
-        from
-            hsc_test.segmentoexame se
-            inner join hsc_test.segmento s on (se.idsegmento = s.idsegmento)
-        where
-            se.idsegmento in (1, 7)
-        order by
-            s.idsegmento, se.nome
-    """
-    )
-
-    refs = db.session.execute(query).all()
-
-    results = []
-    for r in refs:
-        results.append(
-            {
-                "segment": r.segment,
-                "type": r.type_exam,
-                "name": r.name,
-                "initials": r.initials,
-                "ref": r.ref,
-                "min": r.min,
-                "max": r.max,
-                "order": r.order,
-            }
-        )
-
-    return results
-
-
 def _get_exams_previous_results(id_patient: int):
     examLatest = (
         db.session.query(Exams.typeExam.label("typeExam"), Exams.date.label("date"))
