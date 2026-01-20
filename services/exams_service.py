@@ -654,6 +654,7 @@ def find_latest_exams(
         examEmpty["max"] = segExam[e].max
         examEmpty["name"] = segExam[e].name
         examEmpty["initials"] = segExam[e].initials
+        examEmpty["tp_exam_ref"] = segExam[e].tp_exam_ref
         if segExam[e].initials.lower().strip() == "creatinina":
             exams["cr"] = examEmpty
         else:
@@ -781,6 +782,7 @@ def _fill_custom_exams(exam_type: str, custom_exam: dict, seg_exam: dict):
             "max": ref.max,
             "name": ref.name,
             "alert": alert,
+            "tp_exam_ref": ref.tp_exam_ref,
         }
 
     return custom_exam

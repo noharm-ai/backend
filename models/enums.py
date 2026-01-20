@@ -274,6 +274,7 @@ class ProtocolVariableFieldEnum(Enum):
     DRUG_CLASS = "class"
     ROUTE = "route"
     EXAM = "exam"
+    EXAM_REF = "exam_ref"
     AGE = "age"
     WEIGHT = "weight"
     ID_DEPARTMENT = "idDepartment"

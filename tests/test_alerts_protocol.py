@@ -925,6 +925,72 @@ from utils.alert_protocol import AlertProtocol, ProtocolExtraInfo
             },
             False,
         ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
+                        "field": "exam_ref",
+                        "examRefType": "ckd21_nh",
+                        "operator": ">",
+                        "value": 4,
+                    }
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            False,
+        ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
+                        "field": "exam_ref",
+                        "examRefType": "ckd21_nh",
+                        "operator": "<",
+                        "value": 4,
+                    }
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            True,
+        ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
+                        "field": "exam_ref",
+                        "examRefType": "ckd21_nh",
+                        "examRefPeriod": 4,
+                        "operator": "<",
+                        "value": 4,
+                    }
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            True,
+        ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
+                        "field": "exam_ref",
+                        "examRefType": "ckd21_nh",
+                        "examRefPeriod": 2,  # not ok
+                        "operator": "<",
+                        "value": 4,  # ok
+                    }
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            False,
+        ),
     ],
 )
 def test_trigger(protocol, has_result):
@@ -975,6 +1041,7 @@ def test_trigger(protocol, has_result):
         "ckd21": {
             "value": 3.2,
             "date": (date.today() - timedelta(days=3)).isoformat(),
+            "tp_exam_ref": "ckd21_nh",
         },
     }
     cn_stats = {"diliexc": 1, "complication": 0}

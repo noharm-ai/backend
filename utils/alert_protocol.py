@@ -32,6 +32,7 @@ class AlertProtocol:
     id_drug_list = None
     route_list = None
     exams = None
+    exams_by_ref = None
     cn_stats = None
     protocol_variables = None
     protocol_msgs = None
@@ -52,6 +53,14 @@ class AlertProtocol:
         self.drugs = drugs
         self.filtered_drugs = self._filter_drug_list()
         self.exams = exams
+        self.exams_by_ref = {
+            exam_data["tp_exam_ref"]: exam_data
+            for exam_data in exams.values()
+            if exam_data
+            and isinstance(exam_data, dict)
+            and exam_data.get("tp_exam_ref") is not None
+        }
+
         self.cn_stats = cn_stats
 
         self.substance_list = []
@@ -170,6 +179,39 @@ class AlertProtocol:
 
             try:
                 exam_value = float(self.exams[exam_type]["value"])
+                value = float(value)
+            except ValueError:
+                return False
+
+            return self._compare(op=operator, value1=exam_value, value2=value)
+
+        if field == "exam_ref":
+            exam_type = variable.get("examRefType")
+            exam_period = variable.get("examRefPeriod", None)
+
+            if not self.exams_by_ref:
+                return False
+
+            if exam_type not in self.exams_by_ref:
+                return False
+
+            if self.exams_by_ref[exam_type]["value"] is None:
+                return False
+
+            if exam_period is not None:
+                try:
+                    exam_date = date.fromisoformat(
+                        self.exams_by_ref[exam_type]["date"].split("T")[0]
+                    )
+                    days_diff = (date.today() - exam_date).days
+
+                    if int(days_diff) > int(exam_period):
+                        return False
+                except (ValueError, KeyError):
+                    return False
+
+            try:
+                exam_value = float(self.exams_by_ref[exam_type]["value"])
                 value = float(value)
             except ValueError:
                 return False
