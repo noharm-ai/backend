@@ -9,8 +9,8 @@ import os
 from flask import Flask
 
 from .blueprints import register_blueprints
-from .config import get_config
 from .extensions import cors, db, jwt, mail
+from .flask_config import get_config
 from .handlers import register_handlers
 from .logging_config import configure_logging
 from .security import configure_security_headers
