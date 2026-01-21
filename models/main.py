@@ -1,16 +1,14 @@
-import redis
-from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import or_, asc
 from datetime import date
+
+import redis
+from flask_jwt_extended import get_jwt
+from sqlalchemy import asc, or_
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import deferred
-from flask_mail import Mail
-from flask_jwt_extended import get_jwt
 
+from app.extensions import db
 from config import Config
 
-db = SQLAlchemy()
-mail = Mail()
 redis_client = redis.StrictRedis(
     host=Config.REDIS_HOST,
     port=Config.REDIS_PORT,
