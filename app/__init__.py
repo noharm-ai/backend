@@ -8,12 +8,9 @@ import os
 
 from flask import Flask
 
-from .blueprints import register_blueprints
+# Import only extensions and config at module level to avoid circular imports
 from .extensions import cors, db, jwt, mail
 from .flask_config import get_config
-from .handlers import register_handlers
-from .logging_config import configure_logging
-from .security import configure_security_headers
 
 # Set timezone
 os.environ["TZ"] = "America/Sao_Paulo"
@@ -29,6 +26,13 @@ def create_app(config_name=None):
     Returns:
         Configured Flask application instance
     """
+    # Import these inside the function to avoid circular imports
+    # (blueprints import routes, routes import decorators, decorators import models)
+    from .blueprints import register_blueprints
+    from .handlers import register_handlers
+    from .logging_config import configure_logging
+    from .security import configure_security_headers
+
     # Create Flask app
     app = Flask(__name__)
 

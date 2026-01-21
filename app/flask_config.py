@@ -62,7 +62,7 @@ class TestConfig(BaseConfig):
     TESTING = True
     DEBUG = True
     # Override with test database if needed
-    # SQLALCHEMY_DATABASE_URI = "postgresql://test_connection_string"
+    SQLALCHEMY_DATABASE_URI = "postgresql://postgres@localhost/noharm"
 
 
 def get_config(config_name=None):
