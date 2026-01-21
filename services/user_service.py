@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 
 from flask import render_template, request
 from flask_jwt_extended import create_access_token, decode_token
-from flask_mail import Message
+from flask_mail import Mail, Message
 from sqlalchemy import asc, desc, func, or_
 
 from config import Config
@@ -11,7 +11,7 @@ from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
 from models.appendix import SchemaConfig
 from models.enums import UserAuditTypeEnum
-from models.main import User, UserAudit, db, mail
+from models.main import User, UserAudit, db
 from repository import user_repository
 from utils import status
 
@@ -192,6 +192,7 @@ def get_reset_token(email: str, send_email=True, responsible: User = None):
             host=Config.MAIL_HOST,
         )
 
+        mail = Mail()
         mail.send(msg)
 
     return reset_token
