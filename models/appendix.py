@@ -110,7 +110,7 @@ class SchemaConfig(db.Model):
     config = db.Column("configuracao", postgresql.JSONB, nullable=True)
     status = db.Column("status", db.Integer, nullable=False)
     nh_care = db.Column("tp_noharm_care", db.Integer, nullable=False)
-    cpoe = db.Column("cpoe", db.Boolean, nullable=False)
+    tp_pep = db.Column("tp_pep", db.String, nullable=False)
     return_integration = db.Column("integracao_retorno", db.Boolean, nullable=False)
     tp_prescalc = db.Column("tp_prescalc", db.Integer, nullable=False)
 
@@ -124,6 +124,7 @@ class SchemaConfigAudit(db.Model):
     id = db.Column("idschema_config_audit", db.BigInteger, primary_key=True)
     schemaName = db.Column("schema_name", db.String, nullable=False)
     auditType = db.Column("tp_audit", db.Integer, nullable=False)
+
     extra = db.Column("extra", postgresql.JSON, nullable=True)
     createdAt = db.Column("created_at", db.DateTime, nullable=False)
     createdBy = db.Column("created_by", db.BigInteger, nullable=False)

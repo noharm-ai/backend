@@ -54,6 +54,7 @@ def update_config():
         config=request_data.get("config", None),
         return_integration=request_data.get("returnIntegration", False),
         tp_prescalc=request_data.get("tpPrescalc", None),
+        tp_pep=request_data.get("tp_pep", None),
     )
 
 

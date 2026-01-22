@@ -10,7 +10,7 @@ from config import Config
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
 from models.appendix import InterventionReason, SchemaConfig, SchemaConfigAudit
-from models.enums import SchemaConfigAuditTypeEnum
+from models.enums import SchemaConfigAuditTypeEnum, TpPepEnum
 from models.main import User, db
 from models.requests.admin.admin_integration_request import (
     AdminIntegrationCreateSchemaRequest,
@@ -110,16 +110,26 @@ def update_integration_config(
     user_context: User,
     return_integration: bool,
     tp_prescalc: int,
+    tp_pep: str,
 ):
     """Update record in schema_config"""
     schema_config = (
         db.session.query(SchemaConfig).filter(SchemaConfig.schemaName == schema).first()
     )
 
-    if schema_config == None:
+    if schema_config is None:
         raise ValidationError(
             "Schema inválido",
             "errors.unauthorizedUser",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    if tp_pep is not None and tp_pep not in [
+        tppep.value for tppep in TpPepEnum.__members__.values()
+    ]:
+        raise ValidationError(
+            "PEP inválido",
+            "errors.businessRules",
             status.HTTP_400_BAD_REQUEST,
         )
 
@@ -133,6 +143,7 @@ def update_integration_config(
     schema_config.tp_prescalc = (
         tp_prescalc if tp_prescalc in [0, 1, 2] else schema_config.tp_prescalc
     )
+    schema_config.tp_pep = tp_pep
 
     schema_config.updatedAt = datetime.today()
     schema_config.updatedBy = user_context.id
@@ -450,6 +461,7 @@ def _object_to_dto(schema_config: SchemaConfig):
         "config": schema_config.config,
         "returnIntegration": schema_config.return_integration,
         "tpPrescalc": schema_config.tp_prescalc,
+        "tp_pep": schema_config.tp_pep,
         "createdAt": (
             schema_config.createdAt.isoformat() if schema_config.createdAt else None
         ),
