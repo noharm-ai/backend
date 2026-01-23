@@ -1,7 +1,5 @@
-name: Deploy Development
-on:
-  push:
-    branches: [develop]
+name: Deploy Dev (Manual)
+on: workflow_dispatch
 permissions:
   contents: read
   pull-requests: write
@@ -9,41 +7,15 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:11.6
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_DB: noharm
-        ports:
-          - 5432:5432
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2
         with:
-          python-version: 3.9
+          python-version: 3.11
       - name: Setup Python
         run: |
           python -m pip install --upgrade pip
-          pip install -q -r requirements.txt
-      - name: Setup PostgreSQL
-        run: |
-          git clone https://github.com/noharm-ai/database
-          psql -h localhost -U postgres -d noharm -a -f database/noharm-public.sql -v ON_ERROR_STOP=1
-          psql -h localhost -U postgres -d noharm -a -f database/noharm-create.sql -v ON_ERROR_STOP=1
-          psql -h localhost -U postgres -d noharm -a -f database/noharm-newuser.sql -v ON_ERROR_STOP=1
-          psql -h localhost -U postgres -d noharm -a -f database/noharm-triggers.sql -v ON_ERROR_STOP=1
-          psql -h localhost -U postgres -d noharm -a -f database/noharm-insert.sql -v ON_ERROR_STOP=1
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: sa-east-1
-      - name: Run Python Tests
-        env:
-          CACHE_BUCKET_NAME: ${{ secrets.CACHE_BUCKET_NAME  }}
-        run: python -m pytest -v
+          pip install -r requirements.txt
   deploy:
     needs: [build]
     runs-on: [ubuntu-latest]
@@ -51,11 +23,11 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2
         with:
-          python-version: 3.9
+          python-version: 3.11
       - name: Config Zappa
         run: |
-          echo '${{ secrets.ZAPPA_DEV_SETTINGS }}' > zappa_settings.json 
-          mkdir ~/.aws/ 
+          echo '${{ secrets.ZAPPA_DEV_SETTINGS }}' > zappa_settings.json
+          mkdir ~/.aws/
           echo "[default]
           aws_access_key_id = ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_access_key = ${{ secrets.AWS_SECRET_ACCESS_KEY }}
