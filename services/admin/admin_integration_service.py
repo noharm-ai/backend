@@ -1,9 +1,11 @@
 """Service: integration operations"""
 
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import boto3
+import dateutil
+from botocore.exceptions import ClientError
 from sqlalchemy import case, text
 
 from config import Config
@@ -17,6 +19,7 @@ from models.requests.admin.admin_integration_request import (
     AdminIntegrationUpsertGetnameRequest,
     AdminIntegrationUpsertSecurityGroupRequest,
 )
+from services import storage_service
 from utils import network_utils, status
 
 
@@ -232,13 +235,10 @@ def create_schema(
     payload = {
         "command": "lambda_create_schema.create_schema",
         "schema": request_data.schema_name,
-        "is_cpoe": request_data.is_cpoe,
-        "is_pec": request_data.is_pec,
-        "create_sqs": request_data.create_sqs,
-        "create_logstream": request_data.create_logstream,
+        "tp_pep": request_data.tp_pep,
         "create_user": request_data.create_user,
-        "create_iam": True,
         "db_user": request_data.db_user,
+        "template_id": request_data.template_id,
         "created_by": user_context.id,
     }
 
@@ -466,3 +466,43 @@ def _object_to_dto(schema_config: SchemaConfig):
             schema_config.createdAt.isoformat() if schema_config.createdAt else None
         ),
     }
+
+
+@has_permission(Permission.INTEGRATION_UTILS)
+def get_template_list():
+    """Get template list with dates"""
+
+    s3_client = boto3.client("s3", region_name=Config.NIFI_SQS_QUEUE_REGION)
+    folders = storage_service.list_folders(
+        s3_client=s3_client, bucket_name=Config.NIFI_BUCKET_NAME
+    )
+    results = {}
+
+    for folder in folders:
+        keys_to_check = [
+            f"{folder}/backup/conf/flow.json.gz",
+            f"{folder}/backup/latest/conf.tar.gz",
+        ]
+        resource_info = None
+
+        for key in keys_to_check:
+            try:
+                resource_info = s3_client.head_object(
+                    Bucket="noharm-nifi",
+                    Key=key,
+                )
+
+                break
+            except ClientError:
+                continue
+
+        if not resource_info:
+            continue
+
+        resource_date = dateutil.parser.parse(
+            resource_info["ResponseMetadata"]["HTTPHeaders"]["last-modified"],
+        ) - timedelta(hours=3)
+
+        results[folder] = {"backup_date": resource_date.isoformat()}
+
+    return results

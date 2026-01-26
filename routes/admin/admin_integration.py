@@ -73,6 +73,13 @@ def create_schema():
     )
 
 
+@app_admin_integration.route("/admin/integration/template-list", methods=["GET"])
+@api_endpoint(is_admin=True)
+def get_template_list():
+    """get template list with dates"""
+    return admin_integration_service.get_template_list()
+
+
 @app_admin_integration.route("/admin/integration/get-cloud-config", methods=["POST"])
 @api_endpoint(is_admin=True)
 def get_cloud_config():
