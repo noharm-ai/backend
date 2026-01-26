@@ -113,6 +113,7 @@ class SchemaConfig(db.Model):
     tp_pep = db.Column("tp_pep", db.String, nullable=False)
     return_integration = db.Column("integracao_retorno", db.Boolean, nullable=False)
     tp_prescalc = db.Column("tp_prescalc", db.Integer, nullable=False)
+    crm_data = db.Column("crm", postgresql.JSONB, nullable=True)
 
 
 class SchemaConfigAudit(db.Model):

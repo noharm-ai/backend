@@ -459,6 +459,7 @@ def _object_to_dto(schema_config: SchemaConfig):
         "status": schema_config.status,
         "nhCare": schema_config.nh_care,
         "config": schema_config.config,
+        "crm_data": schema_config.crm_data,
         "returnIntegration": schema_config.return_integration,
         "tpPrescalc": schema_config.tp_prescalc,
         "tp_pep": schema_config.tp_pep,
