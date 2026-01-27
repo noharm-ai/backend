@@ -278,17 +278,16 @@ def get_exams_by_admission(admission_number: int, id_segment: int, user_context:
         )
     ]
 
-    logger.backend_logger.info(f"dynamo hits: {cache_hit_count}")
-    if cache_miss_count:
-        logger.backend_logger.warning(
-            json.dumps(
-                {
-                    "event": "dynamodb_miss",
-                    "count": cache_miss_count,
-                    "schema": user_context.schema,
-                }
-            )
+    logger.backend_logger.warning(
+        json.dumps(
+            {
+                "event": "dynamodb_stats",
+                "miss": cache_miss_count,
+                "hit": cache_hit_count,
+                "schema": user_context.schema,
+            }
         )
+    )
 
     perc = {
         "h_conleuc": {
