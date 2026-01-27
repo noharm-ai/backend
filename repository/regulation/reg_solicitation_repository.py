@@ -1,12 +1,13 @@
 """Repository for regulation prioritization related operations"""
 
 from datetime import timedelta
-from sqlalchemy import asc, desc, func, nullslast, select, Integer
 
-from models.main import db, User
-from models.prescription import Patient, Prescription
+from sqlalchemy import Integer, asc, desc, func, nullslast, select
+
 from models.appendix import Department, ICDTable
-from models.regulation import RegSolicitation, RegSolicitationType, RegMovement
+from models.main import User, db
+from models.prescription import Patient, Prescription
+from models.regulation import RegMovement, RegSolicitation, RegSolicitationType
 from models.requests.regulation_prioritization_request import (
     RegulationPrioritizationRequest,
 )
@@ -144,13 +145,14 @@ def get_prioritization(request_data: RegulationPrioritizationRequest):
 def get_solicitation(id: int):
     """Get regulation solicitation data"""
     query = (
-        db.session.query(RegSolicitation, RegSolicitationType, Patient, ICDTable)
+        db.session.query(RegSolicitation, RegSolicitationType, Patient, ICDTable, User)
         .outerjoin(
             RegSolicitationType,
             RegSolicitation.id_reg_solicitation_type == RegSolicitationType.id,
         )
         .outerjoin(Patient, RegSolicitation.admission_number == Patient.admissionNumber)
         .outerjoin(ICDTable, ICDTable.id_str == Patient.id_icd)
+        .outerjoin(User, User.id == RegSolicitation.created_by)
         .filter(RegSolicitation.id == id)
     )
 
