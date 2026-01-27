@@ -5,7 +5,7 @@ import json
 from datetime import date, datetime, timedelta
 
 from dateutil import parser
-from sqlalchemy import and_, desc, text
+from sqlalchemy import and_, desc
 
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
