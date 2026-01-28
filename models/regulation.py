@@ -113,3 +113,5 @@ class RegIndicatorsPanelReport(db.Model):
     has_gestational_appointment = db.Column(
         "fez_consulta_gest", db.Boolean, nullable=True
     )
+
+    current_version = db.Column("v_atual_ficha", db.Boolean, nullable=True)
