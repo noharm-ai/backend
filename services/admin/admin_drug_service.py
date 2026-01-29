@@ -41,6 +41,7 @@ def get_drug_list(
     tp_ref_max_dose=None,
     substance_list=[],
     tp_substance_list=None,
+    tp_attribute_list=None,
     id_drug_list=[],
     min_drug_count=None,
 ):
@@ -64,6 +65,7 @@ def get_drug_list(
         tp_substance_list=tp_substance_list,
         id_drug_list=id_drug_list,
         min_drug_count=min_drug_count,
+        tp_attribute_list=tp_attribute_list,
     )
 
     items = []

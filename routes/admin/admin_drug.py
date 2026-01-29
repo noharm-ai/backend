@@ -31,6 +31,7 @@ def get_drug_list():
         substance_list=request_data.get("substanceList", []),
         tp_substance_list=request_data.get("tpSubstanceList", "in"),
         min_drug_count=request_data.get("minDrugCount", None),
+        tp_attribute_list=request_data.get("tpAttributeList", "in"),
     )
 
 
