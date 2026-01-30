@@ -351,6 +351,7 @@ class TpPepEnum(Enum):
     G_HOSP = "G_HOSP"
     IW = "IW"
     JME = "JME"
+    NAVEGACAO = "NAVEGACAO"
     MICROMED = "MICROMED"
     MV = "MV"
     PEC = "PEC"
