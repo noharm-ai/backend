@@ -2,7 +2,6 @@
   "dev": {
     "app_function": "mobile.app",
     "aws_region": "sa-east-1",
-    "profile_name": "default",
     "project_name": "noharm-mobile",
     "runtime": "python3.11",
     "s3_bucket": "noharm-api-mobile",
@@ -29,7 +28,6 @@
   "homolog": {
     "app_function": "mobile.app",
     "aws_region": "sa-east-1",
-    "profile_name": "default",
     "project_name": "noharm-mobile",
     "runtime": "python3.11",
     "s3_bucket": "noharm-api-mobile",

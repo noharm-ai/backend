@@ -32,14 +32,12 @@ jobs:
       - uses: actions/setup-python@v2
         with:
           python-version: 3.11
-      - name: Config Zappa
-        run: |
-          echo '${{ secrets.ZAPPA_TEST_SETTINGS }}' > zappa_settings.json 
-          mkdir ~/.aws/ 
-          echo "[default]
-          aws_access_key_id = ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key = ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          region = sa-east-1" > ~/.aws/credentials
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: sa-east-1
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       - name: Deploy Zappa
         run: |
           python -m venv venv
