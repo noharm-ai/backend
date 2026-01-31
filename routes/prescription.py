@@ -109,6 +109,8 @@ def get_prescriptions():
         id_icd_list=request.args.getlist("idIcdList[]") or None,
         id_icd_group_list=request.args.getlist("idIcdGroupList[]") or None,
         city=request.args.get("city", None),
+        medical_record=request.args.get("medical_record", None),
+        bed=request.args.get("bed", None),
     )
 
     return prioritization_service.get_prioritization_list(prioritization_request)
