@@ -41,6 +41,7 @@ def get_drug_list(
     tp_ref_max_dose=None,
     substance_list=[],
     tp_substance_list=None,
+    tp_attribute_list=None,
     id_drug_list=[],
     min_drug_count=None,
 ):
@@ -64,6 +65,7 @@ def get_drug_list(
         tp_substance_list=tp_substance_list,
         id_drug_list=id_drug_list,
         min_drug_count=min_drug_count,
+        tp_attribute_list=tp_attribute_list,
     )
 
     items = []
@@ -81,7 +83,7 @@ def get_drug_list(
 
         items.append(
             {
-                "idDrug": i[0],
+                "idDrug": str(i[0]),
                 "name": i[1],
                 "idSegment": i[2],
                 "segment": i[3],
@@ -89,7 +91,7 @@ def get_drug_list(
                 "idMeasureUnitPrice": i[5],
                 "measureUnitPriceFactor": i[8],
                 "price": i[6],
-                "sctid": i[7],
+                "sctid": str(i[7]),
                 "substance": i[10],
                 "segmentOutlier": i[11],
                 "substanceAccuracy": i[12],

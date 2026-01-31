@@ -2,9 +2,9 @@ import json
 from datetime import datetime
 
 import boto3
+import requests
 from markupsafe import escape as escape_html
 from sqlalchemy import and_, func, text
-from sqlalchemy.sql import distinct
 
 from config import Config
 from decorators.has_permission_decorator import Permission, has_permission
@@ -55,21 +55,28 @@ def get_conversion_predictions(conversion_list: list) -> list:
             )
 
     if to_infer:
-        lambda_client = boto3.client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
-        response = lambda_client.invoke(
-            FunctionName=Config.BACKEND_FUNCTION_NAME,
-            InvocationType="RequestResponse",
-            Payload=json.dumps(
-                {
-                    "command": "lambda_conversion_units.get_conversion_unit_factor",
-                    "conversion_unit_list": to_infer,
-                }
-            ),
-        )
+        if not Config.SERVICE_INFERENCE:
+            raise ValueError("SERVICE_INFERENCE not set")
 
-        response_object = json.loads(response["Payload"].read().decode("utf-8"))
+        response = requests.post(
+            f"{Config.SERVICE_INFERENCE}conversion-units/infer",
+            json={"conversion_unit_list": to_infer},
+            timeout=30,
+        )
+        response.raise_for_status()
+
+        response_object = response.json()
         for item in response_object:
-            conversion_list[item.get("id")]["prediction"] = item.get("prediction")
+            try:
+                if item.get("probability", 0) < 80:
+                    conversion_list[item.get("id")]["prediction"] = "Curadoria"
+                else:
+                    conversion_list[item.get("id")]["prediction"] = float(
+                        item.get("prediction")
+                    )
+            except ValueError:
+                conversion_list[item.get("id")]["prediction"] = "Curadoria"
+
             conversion_list[item.get("id")]["probability"] = item.get("probability")
 
     return conversion_list
@@ -261,7 +268,17 @@ def save_conversions(
         )
 
     for uc in conversion_list:
-        if uc["factor"] == None or uc["factor"] == 0:
+        try:
+            factor = float(uc["factor"]) if uc["factor"] is not None else None
+            uc["factor"] = factor
+        except (ValueError, TypeError):
+            raise ValidationError(
+                "Fator de conversão deve ser um número válido",
+                "errors.invalidParams",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+        if uc["factor"] is None or uc["factor"] == 0:
             raise ValidationError(
                 "Fator de conversão inválido",
                 "errors.invalidParams",

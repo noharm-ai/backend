@@ -34,6 +34,7 @@ def get_admin_drug_list(
     tp_substance_list=None,
     id_drug_list=[],
     min_drug_count=None,
+    tp_attribute_list=None,
 ):
     """Gets list of drugs with attributes and conversions for management"""
     SegmentOutlier = db.aliased(Segment)
@@ -238,10 +239,16 @@ def get_admin_drug_list(
 
         for a in bool_attributes:
             if a[0] in attribute_list:
-                if str(a[1].type) == "BOOLEAN":
-                    q = q.filter(a[1] == True)
+                if tp_attribute_list == "notin":
+                    if str(a[1].type) == "BOOLEAN":
+                        q = q.filter(or_(a[1] == False, a[1] == None))
+                    else:
+                        q = q.filter(a[1] == None)
                 else:
-                    q = q.filter(a[1] != None)
+                    if str(a[1].type) == "BOOLEAN":
+                        q = q.filter(a[1] == True)
+                    else:
+                        q = q.filter(a[1] != None)
 
     if term:
         q = q.filter(Drug.name.ilike(term))

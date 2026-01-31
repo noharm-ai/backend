@@ -315,6 +315,12 @@ def get_prioritization_list(request: PrioritizationRequest):
     if request.city is not None and len(request.city.strip()) > 0:
         q = q.filter(Patient.city.ilike(f"%{request.city}%"))
 
+    if request.medical_record is not None and len(request.medical_record.strip()) > 0:
+        q = q.filter(Prescription.record == request.medical_record)
+
+    if request.bed is not None and len(request.bed.strip()) > 0:
+        q = q.filter(Prescription.bed.ilike(f"%{request.bed}%"))
+
     if request.endDate is None:
         endDate = request.startDate
     else:

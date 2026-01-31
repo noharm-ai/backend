@@ -1,14 +1,16 @@
-from sqlalchemy import desc, asc, text, func
-from datetime import datetime, date, timedelta
-from markupsafe import escape as escape_html
+from datetime import date, datetime, timedelta
 
-from models.main import db, User
-from models.segment import Segment, SegmentExam, Exams
-from services.admin import admin_integration_service
-from services import data_authorization_service
-from decorators.has_permission_decorator import has_permission, Permission
-from utils import status, dateutils
+from markupsafe import escape as escape_html
+from sqlalchemy import asc, desc, func, text
+
+from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
+from models.main import User, db
+from models.segment import Exams, Segment, SegmentExam
+from repository import exams_repository
+from services import data_authorization_service
+from services.admin import admin_integration_service
+from utils import dateutils, status
 
 
 @has_permission(Permission.ADMIN_EXAMS)
@@ -39,6 +41,7 @@ def get_segment_exams(id_segment: int):
                 "order": se.order,
                 "active": se.active,
                 "updatedAt": dateutils.to_iso(se.update),
+                "tpExamRef": se.tp_exam_ref,
             }
         )
 
@@ -63,22 +66,22 @@ def copy_exams(id_segment_origin, id_segment_destiny, user_context: User):
 
     query = text(
         f"""
-            insert into {user_context.schema}.segmentoexame 
+            insert into {user_context.schema}.segmentoexame
             (idsegmento, tpexame, abrev, nome, min, max, referencia, posicao, ativo, update_at, update_by)
             select
                 :idSegmentDestiny,
-                tpexame, 
-                abrev, 
-                nome, 
-                min, 
-                max, 
-                referencia, 
-                posicao, 
-                ativo, 
-                now(), 
+                tpexame,
+                abrev,
+                nome,
+                min,
+                max,
+                referencia,
+                posicao,
+                ativo,
+                now(),
                 :idUser
             from
-                {user_context.schema}.segmentoexame 
+                {user_context.schema}.segmentoexame
             where
                 idsegmento = :idSegmentOrigin
             on conflict (idsegmento, tpexame)
@@ -131,7 +134,6 @@ def get_most_frequent(user_context: User):
 
 @has_permission(Permission.ADMIN_EXAMS__MOST_FREQUENT)
 def add_most_frequent(exam_types, id_segment, user_context: User):
-
     exams_result = (
         db.session.query(SegmentExam)
         .filter(SegmentExam.idSegment == id_segment)
@@ -169,6 +171,31 @@ def get_exam_types():
     results = ["mdrd", "ckd", "ckd21", "cg", "swrtz2", "swrtz1"]
     for t in typesExam:
         results.append(t[0].lower())
+
+    return results
+
+
+@has_permission(Permission.ADMIN_EXAMS)
+def get_global_exams():
+    """List actives global exams"""
+    exams = exams_repository.get_global_exams()
+
+    results = []
+    for e in exams:
+        results.append(
+            {
+                "tpexam": e.tp_exam,
+                "name": e.name,
+                "initials": e.initials,
+                "measureUnit": e.measureunit,
+                "min_adult": e.min_adult,
+                "max_adult": e.max_adult,
+                "ref_adult": e.ref_adult,
+                "min_pediatric": e.min_pediatric,
+                "max_pediatric": e.max_pediatric,
+                "ref_pediatric": e.ref_pediatric,
+            }
+        )
 
     return results
 
@@ -230,6 +257,8 @@ def upsert_seg_exam(data: dict, user_context: User):
     if "active" in data.keys():
         segExam.active = bool(data.get("active", False))
 
+    segExam.tp_exam_ref = data.get("tpExamRef", None)
+
     segExam.update = datetime.today()
     segExam.user = user_context.id
 
@@ -250,6 +279,7 @@ def upsert_seg_exam(data: dict, user_context: User):
         "order": segExam.order,
         "active": segExam.active,
         "updatedAt": dateutils.to_iso(segExam.update),
+        "tpExamRef": segExam.tp_exam_ref,
     }
 
 

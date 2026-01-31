@@ -30,6 +30,7 @@ class SegmentExam(db.Model):
     active = db.Column("ativo", db.Boolean, nullable=False)
     update = db.Column("update_at", db.DateTime, nullable=False)
     user = db.Column("update_by", db.BigInteger, nullable=False)
+    tp_exam_ref = db.Column("tpexame_ref", db.String(100), nullable=True)
 
 
 class Hospital(db.Model):

@@ -1,16 +1,41 @@
 {
-    "dev": {
-        "app_function": "mobile.app",
-        "aws_region": "sa-east-1",
-        "profile_name": "default",
-        "project_name": "project_name",
-        "runtime": "python3.6",
-        "s3_bucket": "lambda",
-        "certificate_arn": "arn:aws:acm:us-east-1",
-        "domain": "api.example.ai",
-        "route53_enabled": true,
-        "keep_warm": true,
-        "keep_warm_expression": "rate(4 minutes)",
-        "cors" : true
-    }
+  "dev": {
+    "app_function": "mobile.app",
+    "aws_region": "sa-east-1",
+    "project_name": "noharm-mobile",
+    "runtime": "python3.11",
+    "s3_bucket": "noharm-api-mobile",
+    "keep_warm": true,
+    "keep_warm_expression": "rate(4 minutes)",
+    "cors": true,
+    "memory_size": 1024,
+    "num_retained_versions": 5,
+    "api_key_required": true
+  },
+  "test": {
+    "app_function": "mobile.app",
+    "aws_region": "sa-east-1",
+    "project_name": "noharm-mobile",
+    "runtime": "python3.11",
+    "s3_bucket": "noharm-api-mobile",
+    "keep_warm": true,
+    "keep_warm_expression": "rate(2 minutes)",
+    "cors": true,
+    "memory_size": 1024,
+    "num_retained_versions": 5,
+    "api_key_required": true
+  },
+  "homolog": {
+    "app_function": "mobile.app",
+    "aws_region": "sa-east-1",
+    "project_name": "noharm-mobile",
+    "runtime": "python3.11",
+    "s3_bucket": "noharm-api-mobile",
+    "keep_warm": true,
+    "keep_warm_expression": "rate(2 minutes)",
+    "cors": true,
+    "memory_size": 1024,
+    "num_retained_versions": 5,
+    "api_key_required": true
+  }
 }

@@ -1,5 +1,9 @@
 name: Deploy Dev (Manual)
-on: workflow_dispatch
+on:
+  push:
+    branches:
+      - develop
+  workflow_dispatch:
 permissions:
   contents: read
   pull-requests: write

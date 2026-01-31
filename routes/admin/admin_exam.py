@@ -39,6 +39,12 @@ def list_exam_types():
     return admin_exam_service.get_exam_types()
 
 
+@app_admin_exam.route("/admin/exam/list-global", methods=["GET"])
+@api_endpoint()
+def list_global_exams():
+    return admin_exam_service.get_global_exams()
+
+
 @app_admin_exam.route("/admin/exam/most-frequent/add", methods=["POST"])
 @api_endpoint(is_admin=True)
 def add_most_frequent():

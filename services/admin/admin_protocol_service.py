@@ -7,7 +7,6 @@ from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
 from models.appendix import Frequency, Protocol
 from models.enums import (
-    ProtocolStatusTypeEnum,
     ProtocolTypeEnum,
     ProtocolVariableFieldEnum,
 )

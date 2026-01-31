@@ -1,22 +1,25 @@
 """Service: integration operations"""
 
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import boto3
+import dateutil
+from botocore.exceptions import ClientError
 from sqlalchemy import case, text
 
 from config import Config
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
 from models.appendix import InterventionReason, SchemaConfig, SchemaConfigAudit
-from models.enums import SchemaConfigAuditTypeEnum
+from models.enums import SchemaConfigAuditTypeEnum, TpPepEnum
 from models.main import User, db
 from models.requests.admin.admin_integration_request import (
     AdminIntegrationCreateSchemaRequest,
     AdminIntegrationUpsertGetnameRequest,
     AdminIntegrationUpsertSecurityGroupRequest,
 )
+from services import storage_service
 from utils import network_utils, status
 
 
@@ -110,16 +113,26 @@ def update_integration_config(
     user_context: User,
     return_integration: bool,
     tp_prescalc: int,
+    tp_pep: str,
 ):
     """Update record in schema_config"""
     schema_config = (
         db.session.query(SchemaConfig).filter(SchemaConfig.schemaName == schema).first()
     )
 
-    if schema_config == None:
+    if schema_config is None:
         raise ValidationError(
             "Schema inválido",
             "errors.unauthorizedUser",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    if tp_pep is not None and tp_pep not in [
+        tppep.value for tppep in TpPepEnum.__members__.values()
+    ]:
+        raise ValidationError(
+            "PEP inválido",
+            "errors.businessRules",
             status.HTTP_400_BAD_REQUEST,
         )
 
@@ -133,6 +146,7 @@ def update_integration_config(
     schema_config.tp_prescalc = (
         tp_prescalc if tp_prescalc in [0, 1, 2] else schema_config.tp_prescalc
     )
+    schema_config.tp_pep = tp_pep
 
     schema_config.updatedAt = datetime.today()
     schema_config.updatedBy = user_context.id
@@ -221,13 +235,10 @@ def create_schema(
     payload = {
         "command": "lambda_create_schema.create_schema",
         "schema": request_data.schema_name,
-        "is_cpoe": request_data.is_cpoe,
-        "is_pec": request_data.is_pec,
-        "create_sqs": request_data.create_sqs,
-        "create_logstream": request_data.create_logstream,
+        "tp_pep": request_data.tp_pep,
         "create_user": request_data.create_user,
-        "create_iam": True,
         "db_user": request_data.db_user,
+        "template_id": request_data.template_id,
         "created_by": user_context.id,
     }
 
@@ -448,9 +459,51 @@ def _object_to_dto(schema_config: SchemaConfig):
         "status": schema_config.status,
         "nhCare": schema_config.nh_care,
         "config": schema_config.config,
+        "crm_data": schema_config.crm_data,
         "returnIntegration": schema_config.return_integration,
         "tpPrescalc": schema_config.tp_prescalc,
+        "tp_pep": schema_config.tp_pep,
         "createdAt": (
             schema_config.createdAt.isoformat() if schema_config.createdAt else None
         ),
     }
+
+
+@has_permission(Permission.INTEGRATION_UTILS)
+def get_template_list():
+    """Get template list with dates"""
+
+    s3_client = boto3.client("s3", region_name=Config.NIFI_SQS_QUEUE_REGION)
+    folders = storage_service.list_folders(
+        s3_client=s3_client, bucket_name=Config.NIFI_BUCKET_NAME
+    )
+    results = {}
+
+    for folder in folders:
+        keys_to_check = [
+            f"{folder}/backup/conf/flow.json.gz",
+            f"{folder}/backup/latest/conf.tar.gz",
+        ]
+        resource_info = None
+
+        for key in keys_to_check:
+            try:
+                resource_info = s3_client.head_object(
+                    Bucket="noharm-nifi",
+                    Key=key,
+                )
+
+                break
+            except ClientError:
+                continue
+
+        if not resource_info:
+            continue
+
+        resource_date = dateutil.parser.parse(
+            resource_info["ResponseMetadata"]["HTTPHeaders"]["last-modified"],
+        ) - timedelta(hours=3)
+
+        results[folder] = {"backup_date": resource_date.isoformat()}
+
+    return results

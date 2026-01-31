@@ -1,18 +1,18 @@
 from datetime import datetime
 
-from decorators.has_permission_decorator import has_permission, Permission
-from repository.regulation import reg_solicitation_repository
-from models.main import db, User
-from models.regulation import RegSolicitation, RegSolicitationType, RegMovement
-from models.prescription import Patient
+from decorators.has_permission_decorator import Permission, has_permission
+from exception.validation_error import ValidationError
 from models.appendix import ICDTable
+from models.enums import RegulationAction
+from models.main import User, db
+from models.prescription import Patient
+from models.regulation import RegMovement, RegSolicitation, RegSolicitationType
 from models.requests.regulation_movement_request import RegulationMovementRequest
 from models.requests.regulation_solicitation_request import (
     RegulationSolicitationRequest,
 )
-from models.enums import RegulationAction
+from repository.regulation import reg_solicitation_repository
 from utils import dateutils, status
-from exception.validation_error import ValidationError
 
 
 @has_permission(Permission.READ_REGULATION)
@@ -30,7 +30,9 @@ def get_solicitation(id: int):
     solicitation_type: RegSolicitationType = solicitation_object.RegSolicitationType
     patient: Patient = solicitation_object.Patient
     icd: ICDTable = solicitation_object.ICDTable
-    movements = _get_movements(solicitation=solicitation)
+    movements = _get_movements(
+        solicitation=solicitation, solicitation_responsible=solicitation_object.User
+    )
 
     return {
         "id": str(solicitation.id),
@@ -57,7 +59,7 @@ def get_solicitation(id: int):
     }
 
 
-def _get_movements(solicitation: RegSolicitation):
+def _get_movements(solicitation: RegSolicitation, solicitation_responsible: User):
     movements = []
     records = reg_solicitation_repository.get_solicitation_movement(
         id_reg_solicitation=solicitation.id
@@ -81,6 +83,7 @@ def _get_movements(solicitation: RegSolicitation):
         )
 
     # initial event
+
     movements.append(
         {
             "id": "0",
@@ -89,7 +92,9 @@ def _get_movements(solicitation: RegSolicitation):
             "action": -1,
             "data": None,
             "createdAt": dateutils.to_iso(solicitation.date),
-            "createdBy": None,
+            "createdBy": solicitation_responsible.name
+            if solicitation_responsible
+            else None,
         }
     )
 

@@ -21,8 +21,7 @@ from models.prescription import (
     Prescription,
     PrescriptionAudit,
 )
-from models.segment import Segment
-from repository import prescalc_repository
+from repository import prescalc_repository, prescription_repository
 from services import (
     feature_service,
     memory_service,
@@ -224,7 +223,16 @@ def create_agg_prescription_by_date(
     """Creates a new prescription-day based on admission number and date (most used for CPOE)"""
     _set_schema(schema)
 
-    last_prescription = get_last_prescription(admission_number, cpoe=True)
+    # first look for an agg prescription
+    last_prescription = prescription_repository.get_last_prescription(
+        admission_number=admission_number, cpoe=True, agg=True
+    )
+
+    if not last_prescription:
+        # if cant find an agg prescription, search for an individual prescription
+        last_prescription = prescription_repository.get_last_prescription(
+            admission_number=admission_number, cpoe=True, agg=False
+        )
 
     if last_prescription is None or last_prescription.idSegment is None:
         logger.backend_logger.warning(
@@ -363,22 +371,6 @@ def _set_schema(schema):
     db_session.close()
 
     dbSession.setSchema(schema)
-
-
-def get_last_prescription(admission_number, cpoe=False):
-    query = (
-        db.session.query(Prescription)
-        .outerjoin(Segment, Prescription.idSegment == Segment.id)
-        .filter(Prescription.admissionNumber == admission_number)
-        .filter(Prescription.agg == None)
-        .filter(Prescription.concilia == None)
-        .filter(Prescription.idSegment != None)
-    )
-
-    if cpoe:
-        query = query.filter(Segment.cpoe == True)
-
-    return query.order_by(desc(Prescription.date)).first()
 
 
 def get_last_agg_prescription(admission_number) -> Prescription:

@@ -1,7 +1,7 @@
 from flask import Blueprint
 
-from services import segment_service, exams_service
 from decorators.api_endpoint_decorator import api_endpoint
+from services import segment_service
 
 app_seg = Blueprint("app_seg", __name__)
 
@@ -30,9 +30,3 @@ def getSegments():
 @api_endpoint()
 def get_segment_departments():
     return segment_service.get_segment_departments()
-
-
-@app_seg.route("/segments/exams/refs", methods=["GET"])
-@api_endpoint()
-def getRefs():
-    return exams_service.get_exams_default_refs()
