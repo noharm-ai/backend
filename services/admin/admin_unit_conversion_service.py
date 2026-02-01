@@ -58,14 +58,22 @@ def get_conversion_predictions(conversion_list: list) -> list:
         if not Config.SERVICE_INFERENCE:
             raise ValueError("SERVICE_INFERENCE not set")
 
-        response = requests.post(
-            f"{Config.SERVICE_INFERENCE}conversion-units/infer",
-            json={"conversion_unit_list": to_infer},
-            timeout=30,
-        )
-        response.raise_for_status()
+        try:
+            response = requests.post(
+                f"{Config.SERVICE_INFERENCE}conversion-units/infer",
+                json={"conversion_unit_list": to_infer},
+                timeout=25,
+            )
+            response.raise_for_status()
+        except requests.exceptions.RequestException:
+            raise ValidationError(
+                "Serviço de inferência indisponível",
+                "errors.serviceUnavailable",
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
 
         response_object = response.json()
+
         for item in response_object:
             try:
                 if item.get("probability", 0) < 80:
