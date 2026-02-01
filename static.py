@@ -84,4 +84,4 @@ def atendcalc(event: dict, context: any):
 
 
 # if __name__ == "__main__":
-#     prescalc({"schema": "hsc_test", "id_prescription": 260121018971000}, None)
+#     prescalc({"schema": "--", "id_prescription": 0}, None)

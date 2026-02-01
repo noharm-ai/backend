@@ -1,6 +1,7 @@
 """Utility module for creating static user contexts with JWT authentication."""
 
 import json
+import time
 from contextlib import contextmanager
 
 from flask_jwt_extended import create_access_token, verify_jwt_in_request
@@ -134,6 +135,7 @@ def execute_with_static_context(schema: str, operation_func, params: dict):
         The result of the operation function, or error response tuple if exception occurred
     """
     with static_user_context(schema) as user_context:
+        start_time = time.time()
         params["user_context"] = user_context
 
         try:
@@ -152,3 +154,19 @@ def execute_with_static_context(schema: str, operation_func, params: dict):
             return json.dumps(_handle_authorization_error(user_context))
         except Exception as e:
             return json.dumps(_handle_exception(e, user_context))
+        finally:
+            end_time = time.time()
+            elapsed_time = round((end_time - start_time) * 1000, 3)
+
+            logger.backend_logger.warning(
+                json.dumps(
+                    {
+                        "event": "request_complete",
+                        "path": operation_func.__name__,
+                        "method": "event",
+                        "duration_ms": elapsed_time,
+                        "schema": user_context.schema if user_context else "undefined",
+                        "user": user_context.id if user_context else "undefined",
+                    }
+                )
+            )
