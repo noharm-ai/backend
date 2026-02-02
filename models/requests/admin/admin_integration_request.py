@@ -9,12 +9,10 @@ class AdminIntegrationCreateSchemaRequest(BaseModel):
     """Request: create new schema"""
 
     schema_name: str
-    is_cpoe: bool
-    is_pec: bool
+    tp_pep: str
     create_user: bool
-    create_sqs: bool
-    create_logstream: bool
     db_user: Optional[str] = None
+    template_id: Optional[str] = None
 
 
 class AdminIntegrationUpsertGetnameRequest(BaseModel):

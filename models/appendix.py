@@ -110,9 +110,10 @@ class SchemaConfig(db.Model):
     config = db.Column("configuracao", postgresql.JSONB, nullable=True)
     status = db.Column("status", db.Integer, nullable=False)
     nh_care = db.Column("tp_noharm_care", db.Integer, nullable=False)
-    cpoe = db.Column("cpoe", db.Boolean, nullable=False)
+    tp_pep = db.Column("tp_pep", db.String, nullable=False)
     return_integration = db.Column("integracao_retorno", db.Boolean, nullable=False)
     tp_prescalc = db.Column("tp_prescalc", db.Integer, nullable=False)
+    crm_data = db.Column("crm", postgresql.JSONB, nullable=True)
 
 
 class SchemaConfigAudit(db.Model):
@@ -124,6 +125,7 @@ class SchemaConfigAudit(db.Model):
     id = db.Column("idschema_config_audit", db.BigInteger, primary_key=True)
     schemaName = db.Column("schema_name", db.String, nullable=False)
     auditType = db.Column("tp_audit", db.Integer, nullable=False)
+
     extra = db.Column("extra", postgresql.JSON, nullable=True)
     createdAt = db.Column("created_at", db.DateTime, nullable=False)
     createdBy = db.Column("created_by", db.BigInteger, nullable=False)
@@ -258,6 +260,32 @@ class Report(db.Model):
     error = db.Column("erro", db.String, nullable=True)
     processed_at = db.Column("processed_at", db.DateTime, nullable=True)
     processed_by = db.Column("processed_by", db.BigInteger, nullable=True)
+    updated_at = db.Column("updated_at", db.DateTime, nullable=True)
+    updated_by = db.Column("updated_by", db.BigInteger, nullable=True)
+    created_at = db.Column("created_at", db.DateTime, nullable=False)
+    created_by = db.Column("created_by", db.BigInteger, nullable=False)
+
+
+class GlobalExam(db.Model):
+    """SQLALCHEMY model for exam table"""
+
+    __tablename__ = "exame"
+    __table_args__ = {"schema": "public"}
+
+    tp_exam = db.Column("tpexame", db.String(100), primary_key=True)
+    name = db.Column("nome", db.String(250), nullable=False)
+    initials = db.Column("abrev", db.String(50), nullable=False)
+    measureunit = db.Column("unidade", db.String(100), nullable=False)
+    active = db.Column("ativo", db.Boolean, nullable=False)
+
+    min_adult = db.Column("min_adulto", db.Float, nullable=False)
+    max_adult = db.Column("max_adulto", db.Float, nullable=False)
+    ref_adult = db.Column("referencia_adulto", db.String(250), nullable=False)
+
+    min_pediatric = db.Column("min_pediatrico", db.Float, nullable=False)
+    max_pediatric = db.Column("max_pediatrico", db.Float, nullable=False)
+    ref_pediatric = db.Column("referencia_pediatrico", db.String(250), nullable=False)
+
     updated_at = db.Column("updated_at", db.DateTime, nullable=True)
     updated_by = db.Column("updated_by", db.BigInteger, nullable=True)
     created_at = db.Column("created_at", db.DateTime, nullable=False)

@@ -1,16 +1,17 @@
 import json
-from utils import status
-from sqlalchemy import asc, desc, func, between, text
+
+from sqlalchemy import asc, between, desc, func, text
 from sqlalchemy.dialects.postgresql import INTERVAL
 
-from models.main import db, User
-from models.prescription import Patient
-from models.appendix import GlobalMemory
-from models.notes import ClinicalNotes
-from models.enums import GlobalMemoryEnum
-from services import memory_service, prescription_agg_service
+from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
-from decorators.has_permission_decorator import has_permission, Permission
+from models.appendix import GlobalMemory
+from models.enums import GlobalMemoryEnum
+from models.main import User, db
+from models.notes import ClinicalNotes
+from models.prescription import Patient
+from services import memory_service, prescription_agg_service
+from utils import status
 
 
 @has_permission(Permission.READ_DISCHARGE_SUMMARY)
@@ -314,18 +315,19 @@ def _get_exams(id_patient, schema, report_connection):
             pe.fkpessoa = e.fkpessoa
         inner join {schema}.segmentoexame s on
             s.tpexame = lower(e.tpexame)
-        where 
+        where
             e.fkpessoa = :id_patient
             and (resultado < s.min or resultado > s.max)
+            and e.dtexame > current_date - interval '7 days'
         order by
             fkpessoa,
             abrev,
             dtexame desc
     ) e
-    where 
+    where
         posicao <= 30
     order by
-        abrev    
+        abrev
     """
     )
 
@@ -384,20 +386,20 @@ def _get_all_drugs_used(admission_number, schema, report_connection):
         idclasse,
         classe,
         fkmedicamento,
-        case 
+        case
             when idclasse = 'J1' then (
-                select 
+                select
                     string_agg(concat(to_char(coalesce(p.dtvigencia, p.dtprescricao) , 'DD/MM'), ' (', pm.fkfrequencia, ' x ', pm.dose, pm.fkunidademedida, ')'), ', ')
-                from 
+                from
                     {schema}.presmed pm
                     inner join {schema}.prescricao p on (pm.fkprescricao = p.fkprescricao)
-                where 
+                where
                     p.nratendimento = :admission_number
                     and pm.fkmedicamento = meds_classes.fkmedicamento
             )
             else null
         end as periodo,
-        case 
+        case
             when idclasse = 'J1' then 0
             else 1
         end prioridade
@@ -408,7 +410,7 @@ def _get_all_drugs_used(admission_number, schema, report_connection):
             classe,
             max(fkmedicamento) as fkmedicamento
         from (
-            select 
+            select
                 coalesce(s.nome, m.nome) as nome,
                 coalesce (cm.idclasse, c.idclasse) as idclasse,
                 coalesce (cm.nome, c.nome) as classe,
@@ -420,7 +422,7 @@ def _get_all_drugs_used(admission_number, schema, report_connection):
                 left join public.substancia s on (m.sctid = s.sctid)
                 left join public.classe c on (s.idclasse = c.idclasse)
                 left join public.classe cm on (c.idclassemae  = cm.idclasse)
-            where 
+            where
                 p.nratendimento = :admission_number
                 and pm.origem <> 'Dietas'
         ) meds
@@ -448,26 +450,26 @@ def _get_all_drugs_suspended(admission_number, schema, report_connection):
 
     query = text(
         f"""
-    select 
+    select
         distinct(coalesce(s.nome, m.nome)) as nome
     from
         {schema}.presmed pm
         inner join {schema}.prescricao p on (pm.fkprescricao = p.fkprescricao)
         inner join {schema}.medicamento m on (pm.fkmedicamento = m.fkmedicamento)
         left join public.substancia s on (m.sctid = s.sctid)
-    where 
+    where
         p.nratendimento = :admission_number
         and pm.origem <> 'Dietas'
-        and pm.dtsuspensao is not null 
+        and pm.dtsuspensao is not null
         and (
             select count(*)
             from {schema}.presmed pm2
                 inner join {schema}.prescricao p2 on (pm2.fkprescricao = p2.fkprescricao)
-            where 
-                p2.nratendimento = p.nratendimento 
+            where
+                p2.nratendimento = p.nratendimento
                 and pm2.fkprescricao > pm.fkprescricao
                 and pm2.fkmedicamento = pm.fkmedicamento
-                and pm2.dtsuspensao is null 
+                and pm2.dtsuspensao is null
         ) = 0
     order by
         nome
@@ -496,17 +498,17 @@ def _get_receipt(admission_number, schema, report_connection):
     query = text(
         f"""
     select distinct on (nome_med, frequencia, dose, fkunidademedida, via) * from (
-        select 
+        select
             m.nome as nome_med, p.dtprescricao, f.nome as frequencia , pm.dose, pm.fkunidademedida, pm.via
         from
             {schema}.presmed pm
             inner join {schema}.prescricao p on (pm.fkprescricao = p.fkprescricao)
             inner join {schema}.medicamento m on (pm.fkmedicamento = m.fkmedicamento)
             left join {schema}.frequencia f on (pm.fkfrequencia = f.fkfrequencia)
-        where 
+        where
             p.nratendimento = :admission_number
             and pm.origem <> 'Dietas'
-            and date(:date) between p.dtprescricao::date and p.dtvigencia 
+            and date(:date) between p.dtprescricao::date and p.dtvigencia
             and pm.dtsuspensao is null
         order by
             nome_med, p.dtprescricao desc

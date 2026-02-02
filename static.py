@@ -81,3 +81,7 @@ def atendcalc(event: dict, context: any):
     return execute_with_static_context(
         schema=schema, operation_func=_atendcalc_operation, params=params
     )
+
+
+# if __name__ == "__main__":
+#     prescalc({"schema": "--", "id_prescription": 0}, None)

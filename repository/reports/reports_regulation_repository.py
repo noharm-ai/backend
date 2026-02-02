@@ -13,7 +13,7 @@ def get_indicators_panel_report(request_data: RegIndicatorsPanelReportRequest):
     query = db.session.query(
         RegIndicatorsPanelReport,
         func.count().over().label("total"),
-    )
+    ).filter(RegIndicatorsPanelReport.current_version == True)
 
     if request_data.indicator == RegulationIndicatorReportEnum.HPV_VACCINE.value:
         query = query.filter(RegIndicatorsPanelReport.has_vaccine != None)

@@ -274,6 +274,7 @@ class ProtocolVariableFieldEnum(Enum):
     DRUG_CLASS = "class"
     ROUTE = "route"
     EXAM = "exam"
+    EXAM_REF = "exam_ref"
     AGE = "age"
     WEIGHT = "weight"
     ID_DEPARTMENT = "idDepartment"
@@ -336,3 +337,29 @@ class ReportTypeEnum(Enum):
     """Enum: Report.tp_relatorio"""
 
     CUSTOM = 1
+
+
+class TpPepEnum(Enum):
+    """Enum: PEP types"""
+
+    AGHU = "AGHU"
+    AGHUSE = "AGHUSE"
+    ARS_VITAE = "ARS_VITAE"
+    DGS = "DGS"
+    ERP_SMART_HEALTH = "ERP_SMART_HEALTH"
+    GESTHOS = "GESTHOS"
+    G_HOSP = "G_HOSP"
+    IW = "IW"
+    JME = "JME"
+    NAVEGACAO = "NAVEGACAO"
+    MICROMED = "MICROMED"
+    MV = "MV"
+    PEC = "PEC"
+    PROPRIO = "PROPRIO"
+    SALUX = "SALUX"
+    SIHO = "SIHO"
+    SYSTEMA = "SYSTEMA"
+    TASY = "TASY"
+    TASY_CPOE = "TASY_CPOE"
+    VITAI = "VITAI"
+    WARELINE = "WARELINE"

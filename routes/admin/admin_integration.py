@@ -54,6 +54,7 @@ def update_config():
         config=request_data.get("config", None),
         return_integration=request_data.get("returnIntegration", False),
         tp_prescalc=request_data.get("tpPrescalc", None),
+        tp_pep=request_data.get("tp_pep", None),
     )
 
 
@@ -70,6 +71,13 @@ def create_schema():
     return admin_integration_service.create_schema(
         request_data=AdminIntegrationCreateSchemaRequest(**request.get_json())
     )
+
+
+@app_admin_integration.route("/admin/integration/template-list", methods=["GET"])
+@api_endpoint(is_admin=True)
+def get_template_list():
+    """get template list with dates"""
+    return admin_integration_service.get_template_list()
 
 
 @app_admin_integration.route("/admin/integration/get-cloud-config", methods=["POST"])

@@ -1,6 +1,7 @@
-import math
 import copy
-from . import numberutils, stringutils, dateutils
+import math
+
+from . import dateutils, numberutils, stringutils
 
 typeRelations = {}
 typeRelations["dm"] = "Duplicidade Medicamentosa"
@@ -26,6 +27,7 @@ CUSTOM_EXAMS = ["mdrd", "ckd", "ckd21", "cg", "swrtz2", "swrtz1"]
 
 class refEmpty:
     ref = initials = min = max = name = ""
+    tp_exam_ref = None
 
 
 def formatExam(value, typeExam, unit, date, segExam, prevValue=None):
@@ -62,6 +64,7 @@ def formatExam(value, typeExam, unit, date, segExam, prevValue=None):
         "prev": prevValue,
         "delta": delta,
         "manual": False,
+        "tp_exam_ref": ref.tp_exam_ref,
     }
 
 

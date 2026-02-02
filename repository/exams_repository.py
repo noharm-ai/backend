@@ -7,6 +7,7 @@ from boto3.dynamodb.conditions import Key
 from sqlalchemy import asc, desc, func
 
 from config import Config
+from models.appendix import GlobalExam
 from models.enums import NoHarmENV
 from models.main import db
 from models.segment import Exams, SegmentExam
@@ -93,3 +94,13 @@ def get_exams_reference(id_segment: int):
             results["cr"] = e
 
     return results
+
+
+def get_global_exams():
+    """Get active global exams"""
+    return (
+        db.session.query(GlobalExam)
+        .filter(GlobalExam.active)
+        .order_by(GlobalExam.name.asc())
+        .all()
+    )

@@ -5,7 +5,7 @@ import json
 from datetime import date, datetime, timedelta
 
 from dateutil import parser
-from sqlalchemy import and_, desc, text
+from sqlalchemy import and_, desc
 
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
@@ -278,17 +278,16 @@ def get_exams_by_admission(admission_number: int, id_segment: int, user_context:
         )
     ]
 
-    logger.backend_logger.info(f"dynamo hits: {cache_hit_count}")
-    if cache_miss_count:
-        logger.backend_logger.warning(
-            json.dumps(
-                {
-                    "event": "dynamodb_miss",
-                    "count": cache_miss_count,
-                    "schema": user_context.schema,
-                }
-            )
+    logger.backend_logger.warning(
+        json.dumps(
+            {
+                "event": "dynamodb_stats",
+                "miss": cache_miss_count,
+                "hit": cache_hit_count,
+                "schema": user_context.schema,
+            }
         )
+    )
 
     perc = {
         "h_conleuc": {
@@ -500,49 +499,6 @@ def _history_calc(typeExam, examsList, patient, segExam):
     return results
 
 
-@has_permission(Permission.ADMIN_EXAMS)
-def get_exams_default_refs():
-    query = text(
-        """
-        select
-            s.nome as segment,
-            se.tpexame as type_exam,
-            se.nome as name,
-            se.abrev as initials,
-            se.referencia as ref,
-            se.min,
-            se.max,
-            se.posicao as order
-        from
-            hsc_test.segmentoexame se
-            inner join hsc_test.segmento s on (se.idsegmento = s.idsegmento)
-        where
-            se.idsegmento in (1, 7)
-        order by
-            s.idsegmento, se.nome
-    """
-    )
-
-    refs = db.session.execute(query).all()
-
-    results = []
-    for r in refs:
-        results.append(
-            {
-                "segment": r.segment,
-                "type": r.type_exam,
-                "name": r.name,
-                "initials": r.initials,
-                "ref": r.ref,
-                "min": r.min,
-                "max": r.max,
-                "order": r.order,
-            }
-        )
-
-    return results
-
-
 def _get_exams_previous_results(id_patient: int):
     examLatest = (
         db.session.query(Exams.typeExam.label("typeExam"), Exams.date.label("date"))
@@ -697,6 +653,7 @@ def find_latest_exams(
         examEmpty["max"] = segExam[e].max
         examEmpty["name"] = segExam[e].name
         examEmpty["initials"] = segExam[e].initials
+        examEmpty["tp_exam_ref"] = segExam[e].tp_exam_ref
         if segExam[e].initials.lower().strip() == "creatinina":
             exams["cr"] = examEmpty
         else:
@@ -824,6 +781,7 @@ def _fill_custom_exams(exam_type: str, custom_exam: dict, seg_exam: dict):
             "max": ref.max,
             "name": ref.name,
             "alert": alert,
+            "tp_exam_ref": ref.tp_exam_ref,
         }
 
     return custom_exam

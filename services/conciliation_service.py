@@ -1,17 +1,18 @@
 from datetime import datetime
+
 from sqlalchemy import desc
 
-from models.main import db, User
-from models.prescription import Prescription, Patient, PrescriptionDrug
+from decorators.has_permission_decorator import Permission, has_permission
+from exception.validation_error import ValidationError
 from models.enums import FeatureEnum, PatientConciliationStatusEnum
-from utils import status, prescriptionutils
+from models.main import User, db
+from models.prescription import Patient, Prescription, PrescriptionDrug
+from repository import prescription_repository
 from services import (
     memory_service,
-    prescription_agg_service,
     prescription_drug_edit_service,
 )
-from exception.validation_error import ValidationError
-from decorators.has_permission_decorator import has_permission, Permission
+from utils import prescriptionutils, status
 
 
 @has_permission(Permission.WRITE_PRESCRIPTION)
@@ -23,11 +24,11 @@ def create_conciliation(admission_number: int, user_context: User):
             status.HTTP_401_UNAUTHORIZED,
         )
 
-    ref = prescription_agg_service.get_last_prescription(
-        admission_number=admission_number
+    ref = prescription_repository.get_last_prescription(
+        admission_number=admission_number, cpoe=None, agg=False
     )
 
-    if ref == None:
+    if ref is None:
         raise ValidationError(
             "Atendimento inválido", "errors.businessRules", status.HTTP_400_BAD_REQUEST
         )
