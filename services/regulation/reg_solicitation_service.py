@@ -197,7 +197,9 @@ def move(request_data: RegulationMovementRequest, user_context: User):
                     },
                 },
                 "movements": (
-                    _get_movements(solicitation=solicitation)
+                    _get_movements(
+                        solicitation=solicitation, solicitation_responsible=None
+                    )
                     if len(solicitation_ids) == 1
                     else []
                 ),
