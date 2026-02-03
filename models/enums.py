@@ -185,6 +185,7 @@ class DrugAttributesAuditTypeEnum(Enum):
 
 class PatientAuditTypeEnum(Enum):
     UPSERT = 1
+    OBSERVATION_RECORD = 2
 
 
 class PatientConciliationStatusEnum(Enum):

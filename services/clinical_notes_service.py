@@ -1,6 +1,7 @@
 import json
 import time
 from datetime import datetime, timedelta
+from typing import Union
 
 from sqlalchemy import Integer, desc, func, or_, text
 from sqlalchemy.orm import undefer
@@ -156,7 +157,7 @@ def get_single_note(id_clinical_notes: int):
 
 
 @has_permission(Permission.READ_PRESCRIPTION, Permission.READ_REGULATION)
-def get_notes(admission_number: int, filter_date: str):
+def get_notes(admission_number: int, filter_date: Union[str, None]):
     has_primary_care = memory_service.has_feature("PRIMARYCARE")
     dates = None
     previous_admissions = []
@@ -178,22 +179,17 @@ def get_notes(admission_number: int, filter_date: str):
         )
 
         for tag in tags:
-            if tag["column"] != None:
-                dates_query = dates_query.add_columns(
-                    func.sum(getattr(ClinicalNotes, tag["column"])).label(tag["name"])
-                )
-            else:
-                column_name = tag["name"] + "_count"
-                dates_query = dates_query.add_columns(
-                    func.sum(
-                        func.cast(
-                            func.coalesce(
-                                ClinicalNotes.annotations[column_name].astext, "0"
-                            ),
-                            Integer,
-                        )
-                    ).label(tag["name"])
-                )
+            column_name = tag["name"] + "_count"
+            dates_query = dates_query.add_columns(
+                func.sum(
+                    func.cast(
+                        func.coalesce(
+                            ClinicalNotes.annotations[column_name].astext, "0"
+                        ),
+                        Integer,
+                    )
+                ).label(tag["name"])
+            )
 
         dates = dates_query.all()
 
@@ -300,15 +296,16 @@ def convert_notes(notes, has_primary_care, tags):
     }
 
     for tag in tags:
-        if tag["column"] != None:
-            obj[tag["column"]] = getattr(notes, tag["column"])
-        else:
-            obj[tag["name"]] = (
-                notes.annotations[tag["name"] + "_count"]
-                if notes.annotations != None
-                and (tag["name"] + "_count") in notes.annotations
-                else 0
-            )
+        obj[tag["name"]] = (
+            notes.annotations[tag["name"] + "_count"]
+            if notes.annotations is not None
+            and (tag["name"] + "_count") in notes.annotations
+            else 0
+        )
+
+        if tag["column"]:
+            # key compatibility
+            obj[tag["column"]] = obj[tag["name"]]
 
     return obj
 
@@ -369,15 +366,7 @@ def update_note_text(id: int, data: dict, user_context: User):
 
     if "text" in data.keys():
         n.text = data.get("text", None)
-        n.medications = n.text.count("annotation-medicamentos")
-        n.complication = n.text.count("annotation-complicacoes")
-        n.symptoms = n.text.count("annotation-sintomas")
-        n.diseases = n.text.count("annotation-doencas")
-        n.info = n.text.count("annotation-dados")
-        n.conduct = n.text.count("annotation-conduta")
-        n.signs = n.text.count("annotation-sinais")
         n.allergy = n.text.count("annotation-alergia")
-        n.names = n.text.count("annotation-nomes")
 
     if has_primary_care:
         if "date" in data.keys() and data.get("date", None) != None:

@@ -9,11 +9,11 @@ from botocore.exceptions import ReadTimeoutError
 from strands import Agent, tool
 from strands.models import BedrockModel
 
-from models.response.agents.n0_response import TicketForm
-from models.main import db, User
+from exception.validation_error import ValidationError
 from models.appendix import GlobalMemory
 from models.enums import GlobalMemoryEnum
-from exception.validation_error import ValidationError
+from models.main import User, db
+from models.response.agents.n0_response import TicketForm
 from utils import status
 
 logging.basicConfig()
@@ -109,15 +109,28 @@ def run_n0_form(query: str) -> str:
 
 
 def wrap_kb(config: dict):
-    """Wrap the knowledge base tool for the agent."""
+    """Wrap the knowledge base tool for the agent with call limiting."""
+
+    call_state = {"called": False, "result": None}
 
     @tool(
         name="buscar_conhecimento",
-        description="Busca informações na base de conhecimento da NoHarm.",
+        description="Busca informações na base de conhecimento da NoHarm. IMPORTANTE: Esta ferramenta pode ser chamada apenas UMA VEZ por consulta. Planeje sua busca cuidadosamente para obter todas as informações necessárias.",
     )
     def get_kb(query: str) -> dict:
-        """Tool to get knowledge base articles."""
-        return _get_knowledge_base(query=query, config=config)
+        """Tool to get knowledge base articles. Can only be called once per request."""
+
+        if call_state["called"]:
+            logger.warning(
+                "VALIDATION: get_kb tool called multiple times. Returning cached result."
+            )
+            return call_state["result"]
+
+        result = _get_knowledge_base(query=query, config=config)
+        call_state["called"] = True
+        call_state["result"] = result
+
+        return result
 
     return get_kb
 

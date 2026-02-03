@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List
 
-from sqlalchemy import asc, desc, func, text
+from sqlalchemy import asc, desc, func
 from sqlalchemy.dialects.postgresql import INTERVAL
 from sqlalchemy.orm import undefer
 
@@ -16,9 +16,10 @@ from models.prescription import (
     PatientAudit,
     Prescription,
 )
+from repository import patient_repository
 from services import memory_service
 from services.admin import admin_tag_service
-from utils import status
+from utils import dateutils, status
 from utils.dateutils import to_iso
 
 
@@ -175,6 +176,7 @@ def save_patient(
         db.session.add(p)
 
     update_prescription = False
+    update_observation = False
     if Permission.WRITE_PRESCRIPTION in user_permissions:
         if "weight" in request_data.keys():
             weight = request_data.get("weight", None)
@@ -200,7 +202,11 @@ def save_patient(
         if "pregnant" in request_data.keys():
             p.pregnant = request_data.get("pregnant", None)
         if "observation" in request_data.keys():
+            if p.observation != request_data.get("observation", None):
+                update_observation = True
+
             p.observation = request_data.get("observation", None)
+
         if "skinColor" in request_data.keys():
             p.skinColor = request_data.get("skinColor", None)
         if "gender" in request_data.keys():
@@ -229,17 +235,48 @@ def save_patient(
 
     _audit(patient=p, audit_type=PatientAuditTypeEnum.UPSERT, user=user_context)
 
+    if update_observation:
+        _audit(
+            patient=p,
+            audit_type=PatientAuditTypeEnum.OBSERVATION_RECORD,
+            user=user_context,
+        )
+
     return {
         "updatePrescription": update_prescription,
         "admissionNumber": int(admission_number),
     }
 
 
+@has_permission(Permission.READ_PRESCRIPTION)
+def get_patient_observation_history(admission_number: int):
+    """Get patient observation history"""
+    events = patient_repository.get_patient_observation_history(
+        admission_number=admission_number
+    )
+
+    results = []
+
+    for event in events:
+        results.append(
+            {
+                "id": event.id,
+                "text": event.extra.get("text", "") if event.extra else "",
+                "createdAt": dateutils.to_iso(event.createdAt),
+                "createdBy": event.name,
+            }
+        )
+    return results
+
+
 def _audit(patient: Patient, audit_type: PatientAuditTypeEnum, user: User):
     audit = PatientAudit()
     audit.admissionNumber = patient.admissionNumber
     audit.auditType = audit_type.value
-    audit.extra = _to_dict(patient=patient)
+    if audit_type == PatientAuditTypeEnum.OBSERVATION_RECORD:
+        audit.extra = {"text": patient.observation}
+    else:
+        audit.extra = _to_dict(patient=patient)
     audit.createdAt = datetime.today()
     audit.createdBy = user.id
 
