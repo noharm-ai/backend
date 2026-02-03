@@ -16,16 +16,7 @@ class ClinicalNotes(db.Model):
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.BigInteger, nullable=True)
 
-    medications = db.Column("medicamentos", db.Integer, nullable=True)
-    complication = db.Column("complicacoes", db.Integer, nullable=True)
-    symptoms = db.Column("sintomas", db.Integer, nullable=True)
-    diseases = db.Column("doencas", db.Integer, nullable=True)
-    info = db.Column("dados", db.Integer, nullable=True)
-    conduct = db.Column("conduta", db.Integer, nullable=True)
-    signs = db.Column("sinais", db.Integer, nullable=True)
     allergy = db.Column("alergia", db.Integer, nullable=True)
-    dialysis = db.Column("dialise", db.Integer, nullable=True)
-    names = db.Column("nomes", db.Integer, nullable=True)
 
     signsText = db.Column("sinaistexto", db.String, nullable=True)
     infoText = db.Column("dadostexto", db.String, nullable=True)
