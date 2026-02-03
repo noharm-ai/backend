@@ -1,9 +1,10 @@
 """Repository: patient related operations"""
 
-from sqlalchemy import select, desc
+from sqlalchemy import desc, select
 
-from models.main import db
-from models.prescription import Patient
+from models.enums import PatientAuditTypeEnum
+from models.main import User, db
+from models.prescription import Patient, PatientAudit
 
 
 def get_latest_admissions_by_id_patient(id_patient: int, limit: int = 2):
@@ -75,3 +76,18 @@ def get_previous_admissions(id_patient: int, admission_number: int, limit: int =
         admission_list.append(int(a.admissionNumber))
 
     return admission_list
+
+
+def get_patient_observation_history(admission_number: int):
+    """Get patient observation history"""
+
+    query = (
+        select(PatientAudit.id, PatientAudit.extra, PatientAudit.createdAt, User.name)
+        .select_from(PatientAudit)
+        .outerjoin(User, PatientAudit.createdBy == User.id)
+        .where(PatientAudit.admissionNumber == admission_number)
+        .where(PatientAudit.auditType == PatientAuditTypeEnum.OBSERVATION_RECORD.value)
+        .order_by(desc(PatientAudit.createdAt))
+    )
+
+    return db.session.execute(query).all()

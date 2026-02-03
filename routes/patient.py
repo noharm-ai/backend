@@ -22,6 +22,14 @@ def setPatientData(admissionNumber):
     )
 
 
+@app_pat.route("/patient/<int:admission_number>/observation-history", methods=["GET"])
+@api_endpoint()
+def get_observation_history(admission_number: int):
+    return patient_service.get_patient_observation_history(
+        admission_number=admission_number
+    )
+
+
 @app_pat.route("/patient", methods=["GET"])
 @api_endpoint()
 def list_patients():
