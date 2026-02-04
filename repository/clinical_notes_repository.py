@@ -1,12 +1,13 @@
 """Repository: clinical notes related operations"""
 
 from datetime import datetime, timedelta
-from sqlalchemy import func, desc, Integer
 
-from models.main import db, User
+from sqlalchemy import Integer, desc, func
+
+from decorators.timed_decorator import timed
+from models.main import User, db
 from models.notes import ClinicalNotes
 from services import cache_service, clinical_notes_service
-from decorators.timed_decorator import timed
 
 
 def get_dialysis_cache(admission_number: int):
@@ -283,7 +284,11 @@ def get_admission_stats(admission_number: int, user_context: User, cache=True):
                     )
 
             for tag in tags:
-                stats[tag["key"]] = total_counts[tag["name"] + "_count"]
+                stats_key = tag["name"] + "_count"
+                if  stats_key in total_counts:
+                    stats[tag["key"]] = total_counts[stats_key]
+                else:
+                    stats[tag["key"]] = 0
 
         return stats
 

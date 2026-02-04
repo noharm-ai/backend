@@ -17,6 +17,7 @@ class ClinicalNotes(db.Model):
     user = db.Column("update_by", db.BigInteger, nullable=True)
 
     allergy = db.Column("alergia", db.Integer, nullable=True)
+    dialysis = db.Column("dialise", db.Integer, nullable=True)
 
     signsText = db.Column("sinaistexto", db.String, nullable=True)
     infoText = db.Column("dadostexto", db.String, nullable=True)

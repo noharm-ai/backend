@@ -135,6 +135,7 @@ def get_tags():
         {"name": "medicamentos", "column": "medications", "key": "medications"},
         {"name": "paliativo", "column": None, "key": "palliative"},
         {"name": "medprevio", "column": None, "key": "prevdrug"},
+        {"name": "snctox", "column": None, "key": "snctox"},
     ]
 
 
