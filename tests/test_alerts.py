@@ -35,6 +35,7 @@ def test_dosemaxplus():
         schedules_fasting=None,
         cn_data=None,
         protocols=None,
+        is_cpoe=False,
     )
 
     stats = alerts.get("stats")
@@ -121,6 +122,7 @@ def test_max_dose_total_additional(
         schedules_fasting=None,
         cn_data=None,
         protocols=None,
+        is_cpoe=False,
     )
     max_dose_total_alerts = [
         alert
@@ -166,6 +168,7 @@ def test_dosemax():
         schedules_fasting=None,
         cn_data=None,
         protocols=None,
+        is_cpoe=False,
     )
 
     stats = alerts.get("stats")
@@ -214,6 +217,7 @@ def test_max_dose_additional(
         schedules_fasting=None,
         cn_data=None,
         protocols=None,
+        is_cpoe=False,
     )
 
     max_dose_alerts = alerts.get("alerts", {}).get("61", [])
@@ -258,6 +262,7 @@ def test_kidney_dialysis():
         schedules_fasting=None,
         cn_data=None,
         protocols=None,
+        is_cpoe=False,
     )
     stats = alerts.get("stats")
 
@@ -298,6 +303,7 @@ def test_kidney_ckd():
         schedules_fasting=None,
         cn_data=None,
         protocols=None,
+        is_cpoe=False,
     )
     stats = alerts.get("stats")
 
@@ -334,6 +340,7 @@ def test_kidney_swrtz2():
         schedules_fasting=None,
         cn_data=None,
         protocols=None,
+        is_cpoe=False,
     )
     stats = alerts.get("stats")
 
@@ -370,6 +377,7 @@ def test_kidney_swrtz1():
         schedules_fasting=None,
         cn_data=None,
         protocols=None,
+        is_cpoe=False,
     )
     stats = alerts.get("stats")
 
@@ -417,6 +425,7 @@ def test_kidney_alert_multiple(
         schedules_fasting=None,
         cn_data=None,
         protocols=None,
+        is_cpoe=False,
     )
     kidney_alerts = alerts.get("alerts", {}).get("1", [])
     kidney_alert_count = alerts.get("stats", {}).get(DrugAlertTypeEnum.KIDNEY.value, 0)
@@ -458,6 +467,7 @@ def test_liver():
         schedules_fasting=None,
         cn_data=None,
         protocols=None,
+        is_cpoe=False,
     )
     stats = alerts.get("stats")
 
@@ -503,6 +513,7 @@ def test_platelets():
         schedules_fasting=None,
         cn_data=None,
         protocols=None,
+        is_cpoe=False,
     )
     stats = alerts.get("stats")
 
@@ -547,6 +558,7 @@ def test_elderly():
         schedules_fasting=None,
         cn_data=None,
         protocols=None,
+        is_cpoe=False,
     )
 
     stats = alerts.get("stats")
@@ -592,6 +604,7 @@ def test_tube():
         schedules_fasting=None,
         cn_data=None,
         protocols=None,
+        is_cpoe=False,
     )
 
     stats = alerts.get("stats")
@@ -637,6 +650,7 @@ def test_allergy():
         schedules_fasting=None,
         cn_data=None,
         protocols=None,
+        is_cpoe=False,
     )
 
     stats = alerts.get("stats")
@@ -678,6 +692,7 @@ def test_ira():
         schedules_fasting=None,
         cn_data=None,
         protocols=None,
+        is_cpoe=False,
     )
 
     stats = alerts.get("stats")
@@ -753,6 +768,7 @@ def test_ira_alert_conditions(test_input, expected_alert):
         schedules_fasting=None,
         cn_data=cn_data,
         protocols=None,
+        is_cpoe=False,
     )
 
     alert1 = alerts.get("alerts", {}).get("61", [])
@@ -805,6 +821,7 @@ def test_pregnant():
         schedules_fasting=None,
         cn_data=None,
         protocols=None,
+        is_cpoe=False,
     )
 
     stats = alerts.get("stats")
@@ -851,6 +868,7 @@ def test_lactating():
         schedules_fasting=None,
         cn_data=None,
         protocols=None,
+        is_cpoe=False,
     )
 
     stats = alerts.get("stats")
@@ -896,6 +914,7 @@ def test_fasting():
         schedules_fasting=["8", "24"],
         cn_data=None,
         protocols=None,
+        is_cpoe=False,
     )
 
     stats = alerts.get("stats")
