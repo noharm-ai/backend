@@ -136,10 +136,10 @@ def getFeatures(result, agg_date: datetime = None, intervals_for_agg_date=False)
         score1 += int(d["score"] == "1")
         score2 += int(d["score"] == "2")
         score3 += int(int(d["score"]) > 2)
-        am += int(d["am"]) if not d["am"] is None else 0
-        av += int(d["av"]) if not d["av"] is None else 0
-        np += int(d["np"]) if not d["np"] is None else 0
-        control += int(d["c"]) if not d["c"] is None else 0
+        am += int(d["am"]) if d["am"] is not None else 0
+        av += int(d["av"]) if d["av"] is not None else 0
+        np += int(d["np"]) if d["np"] is not None else 0
+        control += int(d["c"]) if d["c"] is not None else 0
         diff += int(not d["checked"])
         tube += int(d["tubeAlert"])
 
@@ -155,14 +155,14 @@ def getFeatures(result, agg_date: datetime = None, intervals_for_agg_date=False)
                 if d.get("interval", None) != None:
                     times = split_interval(d.get("interval"))
                     for t in times:
-                        if not t in intervals:
+                        if t not in intervals:
                             intervals.append(t)
         else:
             # add all intervals
             if d.get("interval", None) != None:
                 times = split_interval(d.get("interval"))
                 for t in times:
-                    if not t in intervals:
+                    if t not in intervals:
                         intervals.append(t)
 
         intervals.sort()
@@ -264,3 +264,27 @@ def gen_agg_id(admission_number, id_segment, pdate):
     id += admission_number
 
     return id
+
+
+def get_prescription_item_period(
+    is_cpoe: bool, item_period: int | None, cpoe_period: int | None
+) -> tuple[str, int]:
+    """Get the period of a prescription item."""
+
+    total_period = 0
+
+    if is_cpoe:
+        period = "D" + str(round(cpoe_period)) if cpoe_period else ""
+        previous_period = item_period if item_period else 0
+
+        if previous_period > 0:
+            total_period = numberutils.none2zero(cpoe_period) + numberutils.none2zero(
+                item_period
+            )
+        else:
+            total_period = numberutils.none2zero(cpoe_period) + 1
+    else:
+        period = ("D" + str(item_period) if item_period else "",)
+        total_period = numberutils.none2zero(item_period)
+
+    return period, total_period

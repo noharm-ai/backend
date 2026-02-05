@@ -7,7 +7,7 @@ from models.appendix import Frequency
 from models.enums import DrugAlertLevelEnum, DrugAlertTypeEnum, DrugTypeEnum
 from models.main import Drug, DrugAttributes
 from models.prescription import PrescriptionDrug
-from utils import numberutils, stringutils
+from utils import numberutils, prescriptionutils, stringutils
 
 
 def find_alerts(
@@ -19,6 +19,7 @@ def find_alerts(
     schedules_fasting: List[str],
     cn_data: dict,
     protocols: Union[List[dict], None],
+    is_cpoe: bool,
 ):
     """
     Find alerts for a list of drugs
@@ -54,6 +55,7 @@ def find_alerts(
         prescription_expire_date = item[10]
         frequency = item[3]
         handling_types = item.substance_handling_types
+        cpoe_period = item[12]
 
         if protocols:
             add_alert(
@@ -120,7 +122,10 @@ def find_alerts(
         # maximum treatment period
         add_alert(
             _alert_max_time(
-                prescription_drug=prescription_drug, drug_attributes=drug_attributes
+                prescription_drug=prescription_drug,
+                drug_attributes=drug_attributes,
+                is_cpoe=is_cpoe,
+                cpoe_period=cpoe_period,
             ),
             handling_types=handling_types,
         )
@@ -331,7 +336,7 @@ def _alert_ira(
             maxira = 0.6219
 
             if ira > maxira and dialysis is None and dialysis_ia_count == 0:
-                alert["text"] = f"""
+                alert["text"] = """
                     Risco de desenvolvimento de Insuficiência Renal Aguda (IRA), já que o resultado do cálculo
                     [dose diária de VANCOMICINA/TFG/peso] é superior a 0,6219. Caso o paciente esteja em diálise,
                     desconsiderar. <a href="https://revista.ghc.com.br/index.php/cadernosdeensinoepesquisa/issue/view/3" target="_blank">Referência: CaEPS</a>
@@ -464,7 +469,10 @@ def _alert_max_dose_total(
 
 
 def _alert_max_time(
-    prescription_drug: PrescriptionDrug, drug_attributes: DrugAttributes
+    prescription_drug: PrescriptionDrug,
+    drug_attributes: DrugAttributes,
+    is_cpoe: bool,
+    cpoe_period: int | None,
 ):
     alert = _create_alert(
         id_prescription_drug=str(prescription_drug.id),
@@ -474,14 +482,18 @@ def _alert_max_time(
         text="",
     )
 
+    _, total_period = prescriptionutils.get_prescription_item_period(
+        is_cpoe=is_cpoe, item_period=prescription_drug.period, cpoe_period=cpoe_period
+    )
+
     if (
         drug_attributes
         and drug_attributes.maxTime
-        and prescription_drug.period
-        and prescription_drug.period > drug_attributes.maxTime
+        and total_period
+        and total_period > drug_attributes.maxTime
     ):
         alert["text"] = f"""
-          Tempo de tratamento atual ({str(prescription_drug.period)} dias) maior que o tempo máximo de tratamento (
+          Tempo de tratamento atual ({int(total_period)} dias) maior que o tempo máximo de tratamento (
           {str(drug_attributes.maxTime)} dias) usualmente recomendado.
         """
 
@@ -601,7 +613,7 @@ def _alert_elderly(
     )
 
     if drug_attributes.elderly and exams["age"] > 60:
-        alert["text"] = f"""
+        alert["text"] = """
             Medicamento potencialmente inapropriado para idosos, independente das comorbidades do paciente.
         """
 
@@ -639,7 +651,7 @@ def _alert_fasting(
         ):
             return None
 
-        alert["text"] = f"""
+        alert["text"] = """
             O medicamento deve ser administrado em jejum, verificar horários de administração.
         """
 
@@ -820,7 +832,7 @@ def _filter_drug_list(drug_list):
         if prescription_drug.source not in valid_sources:
             continue
 
-        if prescription_drug.suspendedDate != None:
+        if prescription_drug.suspendedDate is not None:
             continue
 
         filtered_list.append(item)
