@@ -619,6 +619,7 @@ def _get_alerts(
         schedules_fasting=config_data["schedules_fasting"],
         cn_data=cn_data,
         protocols=protocols.get("items", None) if protocols else None,
+        is_cpoe=config_data["is_cpoe"],
     )
 
     return {"relations": relations, "alerts": alerts, "protocols": protocols}
