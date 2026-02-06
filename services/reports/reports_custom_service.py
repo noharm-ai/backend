@@ -75,6 +75,7 @@ def get_report_link(
 
     return {
         "cached": True,
+        "title": report_data.name,
         "url": cached_link,
     }
 
@@ -178,7 +179,7 @@ def _get_resource_path(id_report: int, schema: str, filename: str):
     resource_path = f"reports/{schema}/CUSTOM/{id_report}/{filename}"
 
     if not stringutils.is_valid_filename(
-        resource_path=resource_path, valid_extensions={".csv", ".xlsx"}
+        resource_path=resource_path, valid_extensions={".csv", ".xlsx", ".json.gz"}
     ):
         raise ValidationError(
             "Nome de arquivo inválido",
