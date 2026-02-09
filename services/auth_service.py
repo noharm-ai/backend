@@ -89,7 +89,7 @@ def _has_force_schema_permission(user: User, force_schema: str = None):
     if Permission.MULTI_SCHEMA not in permissions:
         return False
 
-    if Permission.MAINTAINER not in permissions and force_schema != None:
+    if Permission.MAINTAINER not in permissions and force_schema is not None:
         valid_schemas = [schema["name"] for schema in user.config.get("schemas", [])]
         return force_schema in valid_schemas
 
@@ -466,7 +466,6 @@ def auth_provider(code, schema):
     keys = oauth_keys.value["keys"]
 
     token_headers = jwt.get_unverified_header(code)
-    token_alg = token_headers["alg"]
     token_kid = token_headers["kid"]
     public_key = None
     for key in keys:
@@ -483,7 +482,7 @@ def auth_provider(code, schema):
         jwt_user = jwt.decode(
             code,
             key=rsa_pem_key_bytes,
-            algorithms=[token_alg],
+            algorithms=["RS256", "HS256"],
             audience=[oauth_config["client_id"]],
         )
     except Exception as error:
@@ -578,14 +577,14 @@ def refresh_token(current_user, current_claims):
         )
 
     user = db.session.query(User).filter(User.id == current_user).first()
-    if user == None:
+    if user is None:
         raise ValidationError(
             "Usuário inválido",
             "errors.unauthorizedUser",
             status.HTTP_401_UNAUTHORIZED,
         )
 
-    if user.active == False:
+    if not user.active:
         raise ValidationError(
             "Usuário inativo",
             "errors.businessRules",
