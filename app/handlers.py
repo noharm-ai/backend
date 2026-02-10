@@ -37,6 +37,7 @@ def register_handlers(app):
                 new_cookies["refresh_token_cookie"] = clean_value
 
                 request.cookies = new_cookies
+                logger.backend_logger.warning("fix corrupted refresh token cookie")
 
     # JWT Error Handlers
     from .extensions import jwt
