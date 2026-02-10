@@ -25,10 +25,18 @@ def register_handlers(app):
         return {"status": "error", "message": "Erro inesperado"}, 500
 
     @app.before_request
-    def debug_refresh_token():
-        if request.path == "/refresh-token" and request.method == "POST":
-            refresh_cookie = request.cookies.get("refresh_token_cookie")
-            logger.backend_logger.warning("DEBUG COOKIE: %s", str(refresh_cookie))
+    def fix_corrupted_cookies():
+        """fix corrupted refresh token cookie. remove when its not necessary anymore"""
+        if "refresh_token_cookie" in request.cookies:
+            raw_value = request.cookies.get("refresh_token_cookie")
+
+            if raw_value is not None and "," in raw_value:
+                clean_value = raw_value.split(",")[0].strip()
+
+                new_cookies = dict(request.cookies)
+                new_cookies["refresh_token_cookie"] = clean_value
+
+                request.cookies = new_cookies
 
     # JWT Error Handlers
     from .extensions import jwt
