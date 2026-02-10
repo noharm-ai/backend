@@ -41,7 +41,7 @@ def _login(email: str, password: str) -> User:
 
     if not user:
         raise ValidationError(
-            "Usuário inválido",
+            "Usuário ou senha inválidos",
             "errors.unauthorizedUser",
             status.HTTP_400_BAD_REQUEST,
         )
@@ -362,7 +362,7 @@ def auth_local(
 
     if preCheckUser is None:
         raise ValidationError(
-            "Usuário inválido",
+            "Usuário ou senha inválidos",
             "errors.unauthorizedUser",
             status.HTTP_400_BAD_REQUEST,
         )
