@@ -483,6 +483,16 @@ def auth_provider(code, schema):
         if key["kid"] == token_kid:
             public_key = key
 
+    if not public_key:
+        logger.backend_logger.warning(
+            "Public key not found for token kid: %s/%s", token_kid, schema
+        )
+        raise ValidationError(
+            "OAUTH provider error: public key not found",
+            "errors.unauthorizedUser",
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
     rsa_pem_key = jwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(public_key))
     rsa_pem_key_bytes = rsa_pem_key.public_bytes(
         encoding=serialization.Encoding.PEM,
