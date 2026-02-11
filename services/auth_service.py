@@ -33,7 +33,7 @@ from repository import user_repository
 from security.role import Role
 from services import memory_service, user_service
 from services.admin import admin_integration_status_service
-from utils import status
+from utils import logger, status
 
 
 def _login(email: str, password: str) -> User:
@@ -466,6 +466,17 @@ def auth_provider(code, schema):
     keys = oauth_keys.value["keys"]
 
     token_headers = jwt.get_unverified_header(code)
+    token_alg = token_headers["alg"]
+
+    ALLOWED_ALGORITHMS = {"RS256", "RS384", "RS512"}
+    if token_alg not in ALLOWED_ALGORITHMS:
+        logger.backend_logger.error("Unsupported algorithm: %s", token_alg)
+        raise ValidationError(
+            "OAUTH provider error: unsupported algorithm",
+            "errors.unauthorizedUser",
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
     token_kid = token_headers["kid"]
     public_key = None
     for key in keys:
@@ -482,7 +493,7 @@ def auth_provider(code, schema):
         jwt_user = jwt.decode(
             code,
             key=rsa_pem_key_bytes,
-            algorithms=["RS256", "HS256"],
+            algorithms=[token_alg],
             audience=[oauth_config["client_id"]],
         )
     except Exception as error:
