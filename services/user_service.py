@@ -148,11 +148,7 @@ def get_reset_token(email: str, send_email=True, responsible: User = None):
         .first()
     )
     if not user:
-        raise ValidationError(
-            "Usuário inválido",
-            "errors.businessRules",
-            status.HTTP_400_BAD_REQUEST,
-        )
+        return
 
     expires = timedelta(hours=6)
     reset_token = create_access_token(identity=user.id, expires_delta=expires)

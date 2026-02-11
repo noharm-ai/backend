@@ -154,7 +154,7 @@ class NHInternalNameService(NameServiceStrategy):
             logger.backend_logger.warning(f"URL: {url}, Params: {params}")
 
         except requests.exceptions.RequestException as e:
-            logger.backend_logger.error(
+            logger.backend_logger.warning(
                 f"NH Internal service request error for schema {self.schema}: {str(e)}"
             )
 
@@ -201,7 +201,7 @@ class NHInternalNameService(NameServiceStrategy):
                 )
 
         except requests.exceptions.RequestException as e:
-            logger.backend_logger.error(
+            logger.backend_logger.warning(
                 f"NH Internal multiple service request error for schema {self.schema}: {str(e)}"
             )
 
@@ -246,7 +246,7 @@ class NHInternalNameService(NameServiceStrategy):
                 )
 
         except requests.exceptions.RequestException as e:
-            logger.backend_logger.error(
+            logger.backend_logger.warning(
                 f"NH Internal search request error for schema {self.schema}: {str(e)}"
             )
 
@@ -306,7 +306,7 @@ class ExternalNameService(NameServiceStrategy):
             logger.backend_logger.warning(f"URL: {url}, Params: {params}")
 
         except requests.exceptions.RequestException as e:
-            logger.backend_logger.error(
+            logger.backend_logger.warning(
                 f"External service request error for schema {self.schema}: {str(e)}"
             )
 
@@ -350,7 +350,7 @@ class ExternalNameService(NameServiceStrategy):
                 )
 
         except requests.exceptions.RequestException as e:
-            logger.backend_logger.error(
+            logger.backend_logger.warning(
                 f"External multiple service request error for schema {self.schema}: {str(e)}"
             )
 

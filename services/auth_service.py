@@ -33,7 +33,7 @@ from repository import user_repository
 from security.role import Role
 from services import memory_service, user_service
 from services.admin import admin_integration_status_service
-from utils import status
+from utils import logger, status
 
 
 def _login(email: str, password: str) -> User:
@@ -41,7 +41,7 @@ def _login(email: str, password: str) -> User:
 
     if not user:
         raise ValidationError(
-            "Usuário inválido",
+            "Usuário ou senha inválidos",
             "errors.unauthorizedUser",
             status.HTTP_400_BAD_REQUEST,
         )
@@ -89,7 +89,7 @@ def _has_force_schema_permission(user: User, force_schema: str = None):
     if Permission.MULTI_SCHEMA not in permissions:
         return False
 
-    if Permission.MAINTAINER not in permissions and force_schema != None:
+    if Permission.MAINTAINER not in permissions and force_schema is not None:
         valid_schemas = [schema["name"] for schema in user.config.get("schemas", [])]
         return force_schema in valid_schemas
 
@@ -362,7 +362,7 @@ def auth_local(
 
     if preCheckUser is None:
         raise ValidationError(
-            "Usuário inválido",
+            "Usuário ou senha inválidos",
             "errors.unauthorizedUser",
             status.HTTP_400_BAD_REQUEST,
         )
@@ -467,11 +467,31 @@ def auth_provider(code, schema):
 
     token_headers = jwt.get_unverified_header(code)
     token_alg = token_headers["alg"]
+
+    ALLOWED_ALGORITHMS = {"RS256", "RS384", "RS512"}
+    if token_alg not in ALLOWED_ALGORITHMS:
+        logger.backend_logger.error("Unsupported algorithm: %s", token_alg)
+        raise ValidationError(
+            "OAUTH provider error: unsupported algorithm",
+            "errors.unauthorizedUser",
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
     token_kid = token_headers["kid"]
     public_key = None
     for key in keys:
         if key["kid"] == token_kid:
             public_key = key
+
+    if not public_key:
+        logger.backend_logger.warning(
+            "Public key not found for token kid: %s/%s", token_kid, schema
+        )
+        raise ValidationError(
+            "OAUTH provider error: public key not found",
+            "errors.unauthorizedUser",
+            status.HTTP_401_UNAUTHORIZED,
+        )
 
     rsa_pem_key = jwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(public_key))
     rsa_pem_key_bytes = rsa_pem_key.public_bytes(
@@ -578,14 +598,14 @@ def refresh_token(current_user, current_claims):
         )
 
     user = db.session.query(User).filter(User.id == current_user).first()
-    if user == None:
+    if user is None:
         raise ValidationError(
             "Usuário inválido",
             "errors.unauthorizedUser",
             status.HTTP_401_UNAUTHORIZED,
         )
 
-    if user.active == False:
+    if not user.active:
         raise ValidationError(
             "Usuário inativo",
             "errors.businessRules",
