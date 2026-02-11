@@ -314,7 +314,7 @@ def create_agg_prescription_by_date(
         result=agg_data, agg_date=agg_p.date, intervals_for_agg_date=True
     )
     score_variation = _get_score_variation(prescription=agg_p, features=features)
-    features.update({"scoreVariation": score_variation})
+    features.update({"scoreVariation": score_variation, "should_update": False})
 
     agg_p.features = features
     agg_p.aggDrugs = agg_p.features["drugIDs"]
