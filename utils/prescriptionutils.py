@@ -82,9 +82,7 @@ def get_numeric_drug_attributes_list():
 def get_internal_prescription_ids(result: dict):
     id_prescription_list = set()
 
-    drug_list = result["prescription"]
-    drug_list.extend(result["solution"])
-    drug_list.extend(result["procedures"])
+    drug_list = result["prescription"] + result["solution"] + result["procedures"]
 
     for d in drug_list:
         # if cpoe search id inside cpoe attr (need refactor)
@@ -94,9 +92,7 @@ def get_internal_prescription_ids(result: dict):
 
 
 def getFeatures(result, agg_date: datetime = None, intervals_for_agg_date=False):
-    drugList = result["prescription"]
-    drugList.extend(result["solution"])
-    drugList.extend(result["procedures"])
+    drugList = result["prescription"] + result["solution"] + result["procedures"]
 
     allergy = alerts = alerts_prescription = pScore = score1 = score2 = score3 = 0
     am = av = control = np = tube = diff = 0
