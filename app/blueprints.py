@@ -46,6 +46,7 @@ from routes.regulation.regulation import app_regulation
 # Report routes
 from routes.reports.reports_antimicrobial import app_rpt_antimicrobial
 from routes.reports.reports_config_rpt import app_rpt_config
+from routes.reports.reports_consolidated import app_rpt_consolidated
 from routes.reports.reports_culture import app_rpt_culture
 from routes.reports.reports_custom import app_rpt_custom
 from routes.reports.reports_exams import app_rpt_exams
@@ -125,6 +126,7 @@ def register_blueprints(app):
     app.register_blueprint(app_rpt_integration)
     app.register_blueprint(app_rpt_regulation)
     app.register_blueprint(app_rpt_custom)
+    app.register_blueprint(app_rpt_consolidated)
 
     # Regulation blueprints
     app.register_blueprint(app_regulation)
