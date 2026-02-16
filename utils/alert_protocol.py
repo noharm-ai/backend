@@ -535,6 +535,9 @@ class AlertProtocol:
             if prescription_drug.source not in valid_sources:
                 continue
 
+            if prescription_drug.suspendedDate is not None:
+                continue
+
             filtered_list.append(item)
 
         return filtered_list
