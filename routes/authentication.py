@@ -157,6 +157,8 @@ def get_auth_provider(schema):
                 if "code_challenge_method" in oauth_config
                 else None
             ),
+            "nonce": (oauth_config["nonce"] if "nonce" in oauth_config else False),
+            "state": (oauth_config["state"] if "state" in oauth_config else False),
         },
     }, status.HTTP_200_OK
 

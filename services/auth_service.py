@@ -430,6 +430,15 @@ def auth_provider(code, schema, nonce=None):
             status.HTTP_401_UNAUTHORIZED,
         )
 
+    validate_nonce = oauth_config["nonce"] if "nonce" in oauth_config else False
+
+    if validate_nonce and nonce is None:
+        raise ValidationError(
+            "Nonce não fornecido",
+            "errors.unauthorizedUser",
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
     if "flow" in oauth_config and oauth_config["flow"] == "authentication_basic":
         params = {
             "grant_type": "authorization_code",
@@ -513,7 +522,7 @@ def auth_provider(code, schema, nonce=None):
             status.HTTP_401_UNAUTHORIZED,
         ) from error
 
-    if nonce is not None and jwt_user.get("nonce") != nonce:
+    if validate_nonce and jwt_user.get("nonce") != nonce:
         raise ValidationError(
             "OAUTH provider error: invalid nonce",
             "errors.unauthorizedUser",
