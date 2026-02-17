@@ -1,20 +1,20 @@
 from flask import (
     Blueprint,
-    request,
     after_this_request,
+    request,
 )
 from flask_jwt_extended import (
-    jwt_required,
-    get_jwt_identity,
     get_jwt,
+    get_jwt_identity,
+    jwt_required,
     set_refresh_cookies,
 )
 
+from decorators.api_endpoint_decorator import api_endpoint
+from exception.validation_error import ValidationError
 from models.main import db, dbSession
 from services import auth_service
-from exception.validation_error import ValidationError
-from utils import status, sessionutils
-from decorators.api_endpoint_decorator import api_endpoint
+from utils import sessionutils, status
 
 app_auth = Blueprint("app_auth", __name__)
 
@@ -116,7 +116,9 @@ def auth_provider():
         }, status.HTTP_400_BAD_REQUEST
 
     try:
-        auth_data = auth_service.auth_provider(code=data["code"], schema=data["schema"])
+        auth_data = auth_service.auth_provider(
+            code=data["code"], schema=data["schema"], nonce=data.get("nonce", None)
+        )
 
         refresh_token = auth_data["refresh_token"]
         # temp
