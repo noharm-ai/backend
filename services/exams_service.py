@@ -259,16 +259,16 @@ def get_exams_by_admission(admission_number: int, id_segment: int, user_context:
                 )
             )
 
-        if key not in exams_dict or exam.date > exams_dict[key]["date"]:
-            exams_dict[key] = {
-                "source": "postgres",
-                "exam": exam,
-                "date": exam.date,
-                "idExame": exam.idExame,
-                "typeExam": exam.typeExam,
-            }
-        else:
+        if key in exams_dict:
             cache_hit_count += 1
+
+        exams_dict[key] = {
+            "source": "postgres",
+            "exam": exam,
+            "date": exam.date,
+            "idExame": exam.idExame,
+            "typeExam": exam.typeExam,
+        }
 
     # Convert back to list, sorted by typeExam (asc) and date (desc)
     examsList = [
