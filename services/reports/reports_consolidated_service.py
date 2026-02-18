@@ -30,6 +30,7 @@ def get_patient_day_report(request_data: PatientDayReportRequest, user_context: 
         ),
         "global_score_start": request_data.global_score_start,
         "global_score_end": request_data.global_score_end,
+        "weekdays_only": request_data.weekdays_only,
     }
 
     lambda_client = boto3.client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
