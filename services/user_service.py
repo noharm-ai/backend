@@ -1,4 +1,6 @@
+import random
 import re
+import time
 from datetime import datetime, timedelta
 
 from flask import render_template, request
@@ -148,6 +150,7 @@ def get_reset_token(email: str, send_email=True, responsible: User = None):
         .first()
     )
     if not user:
+        time.sleep(random.uniform(0.5, 1.5))
         return
 
     expires = timedelta(hours=6)

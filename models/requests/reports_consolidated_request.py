@@ -12,3 +12,4 @@ class PatientDayReportRequest(BaseModel):
     end_date: Optional[date] = None
     global_score_start: Optional[int] = None
     global_score_end: Optional[int] = None
+    weekdays_only: Optional[bool] = None

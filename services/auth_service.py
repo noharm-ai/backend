@@ -408,7 +408,7 @@ def auth_local(
     )
 
 
-def auth_provider(code, schema):
+def auth_provider(code, schema, nonce=None):
     """Authenticate user using OAUTH provider."""
 
     if schema is None:
@@ -426,6 +426,15 @@ def auth_provider(code, schema):
     if oauth_config is None:
         raise ValidationError(
             "OAUTH não configurado",
+            "errors.unauthorizedUser",
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
+    validate_nonce = oauth_config["nonce"] if "nonce" in oauth_config else False
+
+    if validate_nonce and nonce is None:
+        raise ValidationError(
+            "Nonce não fornecido",
             "errors.unauthorizedUser",
             status.HTTP_401_UNAUTHORIZED,
         )
@@ -512,6 +521,13 @@ def auth_provider(code, schema):
             "errors.unauthorizedUser",
             status.HTTP_401_UNAUTHORIZED,
         ) from error
+
+    if validate_nonce and jwt_user.get("nonce") != nonce:
+        raise ValidationError(
+            "OAUTH provider error: invalid nonce",
+            "errors.unauthorizedUser",
+            status.HTTP_401_UNAUTHORIZED,
+        )
 
     email_attr = oauth_config["email_attr"]
     name_attr = oauth_config["name_attr"]

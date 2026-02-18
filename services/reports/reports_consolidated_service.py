@@ -30,6 +30,7 @@ def get_patient_day_report(request_data: PatientDayReportRequest, user_context: 
         ),
         "global_score_start": request_data.global_score_start,
         "global_score_end": request_data.global_score_end,
+        "weekdays_only": request_data.weekdays_only,
     }
 
     lambda_client = boto3.client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
@@ -39,4 +40,14 @@ def get_patient_day_report(request_data: PatientDayReportRequest, user_context: 
         Payload=json.dumps(payload),
     )
 
-    return json.loads(response["Payload"].read().decode("utf-8"))
+    response_json = json.loads(response["Payload"].read().decode("utf-8"))
+
+    if isinstance(response_json, str):
+        response_json = json.loads(response_json)
+
+    if response_json.get("error", False):
+        raise Exception(
+            f"Consolidated patient-day report ERROR: {response_json.get('message', 'Erro inesperado. Consulte os logs')}"
+        )
+
+    return response_json
