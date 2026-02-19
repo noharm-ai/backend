@@ -182,6 +182,7 @@ class DrugList:
             pdUnit = stringutils.strNone(pd[2].id) if pd[2] else ""
             pdWhiteList = bool(pd[6].whiteList) if pd[6] is not None else False
             doseWeightStr = None
+            doseWeightDayStr = None
             doseBodySurfaceStr = None
 
             tubeAlert = False
@@ -213,33 +214,56 @@ class DrugList:
                     if weight > 0:
                         weight = weight if weight > 0 else 1
 
-                        doseWeightStr = (
-                            stringutils.strFormatBR(
-                                round(pd[0].dose / float(weight), 2)
-                            )
-                            + " "
-                            + pdUnit
-                            + "/Kg"
-                        )
+                        dose_per_kg = pd[0].dose / float(weight)
+                        frequency = numberutils.none2zero(pd[0].frequency)
 
-                        if (
-                            pd[6].idMeasureUnit != None
+                        has_conv = (
+                            pd[6].idMeasureUnit is not None
                             and pd[6].idMeasureUnit != pdUnit
-                            and pd[0].doseconv != None
-                        ):
-                            calc_doseconv = (
+                            and pd[0].doseconv is not None
+                        )
+                        conv_per_kg = None
+                        if has_conv:
+                            conv_per_kg = (
                                 pd[0].doseconv
                                 if pd[6].useWeight
                                 else round(pd[0].doseconv / float(weight), 2)
                             )
-                            doseWeightStr += (
-                                " ou "
-                                + stringutils.strFormatBR(calc_doseconv)
-                                + " "
-                                + str(pd[6].idMeasureUnit)
-                                + "/Kg"
-                                + (" (faixa arredondada)" if pd[6].useWeight else "")
+
+                        for multiplier, suffix in [
+                            (1, "/Kg"),
+                            (frequency, "/Kg/Dia"),
+                        ]:
+                            if multiplier <= 0:
+                                continue
+
+                            if multiplier in [33, 44, 55, 66, 99]:
+                                continue
+
+                            value = stringutils.strFormatBR(
+                                round(dose_per_kg * multiplier, 2)
                             )
+                            result = f"{value} {pdUnit}{suffix}"
+
+                            if has_conv:
+                                conv_value = stringutils.strFormatBR(
+                                    round(conv_per_kg * multiplier, 2)
+                                    if not pd[6].useWeight
+                                    else conv_per_kg * multiplier
+                                )
+                                conv_suffix = (
+                                    " (faixa arredondada)" if pd[6].useWeight else ""
+                                )
+                                result += (
+                                    f" ou {conv_value} "
+                                    f"{pd[6].idMeasureUnit}{suffix}"
+                                    f"{conv_suffix}"
+                                )
+
+                            if suffix == "/Kg":
+                                doseWeightStr = result
+                            else:
+                                doseWeightDayStr = result
 
                 if (
                     not bool(pd[0].suspendedDate)
@@ -290,6 +314,7 @@ class DrugList:
                     "allergy": bool(pd[0].allergy == "S"),
                     "whiteList": pdWhiteList,
                     "doseWeight": doseWeightStr,
+                    "doseWeightDay": doseWeightDayStr,
                     "doseBodySurface": doseBodySurfaceStr,
                     "dose": pd[0].dose,
                     "measureUnit": (
