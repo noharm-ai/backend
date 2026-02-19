@@ -25,6 +25,13 @@ def validate_sql_query(sql: str):
     )  # Remove multi-line comments
     sql_clean = sql_clean.lower().strip()
 
+    # Remove string literals and quoted identifiers to avoid false positives
+    # (e.g. "Data Update" or 'update' should not trigger the UPDATE check)
+    sql_for_keyword_check = re.sub(r"'[^']*'", "", sql_clean)  # single-quoted strings
+    sql_for_keyword_check = re.sub(
+        r'"[^"]*"', "", sql_for_keyword_check
+    )  # double-quoted identifiers
+
     # List of forbidden SQL keywords/operations
     forbidden_keywords = [
         r"\bdelete\b",
@@ -55,7 +62,7 @@ def validate_sql_query(sql: str):
 
     # Check for forbidden keywords
     for keyword_pattern in forbidden_keywords:
-        if re.search(keyword_pattern, sql_clean):
+        if re.search(keyword_pattern, sql_for_keyword_check):
             raise ValidationError(
                 "Query SQL contém operação não permitida. Apenas SELECT é permitido.",
                 "errors.invalidSQL",
