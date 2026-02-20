@@ -36,6 +36,7 @@ class Prescription(db.Model):
     user = db.Column("update_by", db.BigInteger, nullable=True)
     origin_created_at = db.Column("dtcriacao_origem", db.DateTime, nullable=True)
     id_clinical_notes_type = db.Column("idtipoevolucao", db.String, nullable=True)
+    specialty = db.Column("especialidade", db.String, nullable=True)
 
     def getFuturePrescription(idPrescription, admissionNumber):
         return (

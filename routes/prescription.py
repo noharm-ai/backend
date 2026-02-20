@@ -111,6 +111,8 @@ def get_prescriptions():
         city=request.args.get("city", None),
         medical_record=request.args.get("medical_record", None),
         bed=request.args.get("bed", None),
+        bed_list=request.args.getlist("bedList[]") or None,
+        specialty_list=request.args.getlist("specialtyList[]") or None,
     )
 
     return prioritization_service.get_prioritization_list(prioritization_request)

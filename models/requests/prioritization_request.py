@@ -44,3 +44,5 @@ class PrioritizationRequest(BaseModel):
     city: Optional[str] = None
     medical_record: Optional[str] = None
     bed: Optional[str] = None
+    bed_list: Optional[list[str]] = None
+    specialty_list: Optional[list[str]] = None
