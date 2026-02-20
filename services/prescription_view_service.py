@@ -801,6 +801,7 @@ def _format(
         "insurance": prescription.insurance,
         "idICD": icd.id_str if icd else None,
         "nameICD": icd.name if icd else None,
+        "specialty": prescription.specialty,
         # patient
         "admissionDate": dateutils.to_iso(patient.admissionDate),
         "birthdate": dateutils.to_iso(patient.birthdate),

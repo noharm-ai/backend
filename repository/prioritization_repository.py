@@ -318,13 +318,6 @@ def get_prioritization_list(request: PrioritizationRequest):
     if request.medical_record is not None and len(request.medical_record.strip()) > 0:
         q = q.filter(Prescription.record == request.medical_record)
 
-    if request.bed is not None and len(request.bed.strip()) > 0:
-        raise ValidationError(
-            "Você está utilizando um filtro que foi descontinuado (leito). Limpe o filtro atual e tente novamente. Se você está aplicando um filtro gravado anteriormente, exclua e crie um novo filtro.",
-            "errors.businessRules",
-            status.HTTP_400_BAD_REQUEST,
-        )
-
     if request.bed_list and len(request.bed_list) > 0:
         bed_filters = []
         for b in request.bed_list:
