@@ -21,7 +21,7 @@ from utils import dateutils, status, stringutils
 def get_report_list(user_context: User, user_permissions: list[Permission]):
     """Get list of custom reports."""
     custom_reports_query_result = reports_repository.get_custom_reports(
-        all=Permission.ADMIN_REPORTS in user_permissions
+        all=Permission.READ_CUSTOM_REPORTS in user_permissions
     )
     custom_reports = []
     for report in custom_reports_query_result:
@@ -37,7 +37,7 @@ def get_report_list(user_context: User, user_permissions: list[Permission]):
                     schema=user_context.schema, id_report=report.id
                 ),
                 "error_message": report.error
-                if Permission.ADMIN_REPORTS in user_permissions
+                if Permission.READ_CUSTOM_REPORTS in user_permissions
                 else None,
             }
         )
@@ -102,7 +102,7 @@ def process_report(
 
     if (
         report_data.processed_at is not None
-        and Permission.ADMIN_REPORTS not in user_permissions
+        and Permission.READ_CUSTOM_REPORTS not in user_permissions
     ):
         # Allow reprocessing only if processed_at is older than 1 hour
         time_since_processed = datetime.now() - report_data.processed_at
@@ -146,7 +146,7 @@ def _validate_report(
             status.HTTP_400_BAD_REQUEST,
         )
 
-    if Permission.ADMIN_REPORTS in user_permissions:
+    if Permission.WRITE_CUSTOM_REPORTS in user_permissions:
         return True
 
     if report_data.active is False:

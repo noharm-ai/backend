@@ -51,7 +51,12 @@ class Permission(Enum):
     )
 
     READ_REPORTS = "READ_REPORTS"  # "grants permission to view reports"
-    ADMIN_REPORTS = "ADMIN_REPORTS"  # "admin permission to view and config reports"
+    READ_CUSTOM_REPORTS = (
+        "READ_CUSTOM_REPORTS"  # "grants permission to view custom reports"
+    )
+    WRITE_CUSTOM_REPORTS = (
+        "WRITE_CUSTOM_REPORTS"  # "write permission to config reports"
+    )
 
     READ_PRESCRIPTION = "READ_PRESCRIPTION"  # "view prescription"
     WRITE_PRESCRIPTION = "WRITE_PRESCRIPTION"  # "write prescription"

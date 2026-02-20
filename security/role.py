@@ -41,7 +41,8 @@ class Role(Enum):
             Permission.ADMIN_SEGMENTS,
             Permission.ADMIN_PATIENT,
             Permission.READ_REPORTS,
-            Permission.ADMIN_REPORTS,
+            Permission.READ_CUSTOM_REPORTS,
+            Permission.WRITE_CUSTOM_REPORTS,
             Permission.READ_PRESCRIPTION,
             Permission.WRITE_DRUG_ATTRIBUTES,
             Permission.WRITE_BASIC_FEATURES,
@@ -106,6 +107,8 @@ class Role(Enum):
             Permission.READ_REGULATION,
             Permission.UPDATE_USER_SG,
             Permission.READ_NAV,
+            Permission.READ_PROTOCOLS,
+            Permission.READ_CUSTOM_REPORTS,
         ],
     )
 

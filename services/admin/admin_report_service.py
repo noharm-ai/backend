@@ -12,7 +12,7 @@ from repository.reports import reports_repository
 from utils import dateutils, sqlutils, status
 
 
-@has_permission(Permission.ADMIN_REPORTS)
+@has_permission(Permission.WRITE_CUSTOM_REPORTS)
 def upsert_report(request_data: UpsertReportRequest, user_context: User):
     """Create or update a report."""
 
@@ -73,7 +73,7 @@ def upsert_report(request_data: UpsertReportRequest, user_context: User):
     }
 
 
-@has_permission(Permission.ADMIN_REPORTS)
+@has_permission(Permission.READ_CUSTOM_REPORTS)
 def get_report_list(user_context: User):
     """Get list of custom reports."""
     custom_reports_query_result = reports_repository.get_custom_reports(all=True)
