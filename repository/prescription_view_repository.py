@@ -114,6 +114,12 @@ def find_drugs_by_prescription(
     MeasureUnitSolutionConvert = db.aliased(MeasureUnitConvert)
     MeasureUnitSolution = db.aliased(MeasureUnit)
     MeasureUnitDefault = db.aliased(MeasureUnit)
+    _MeasureUnitAny = db.aliased(MeasureUnit)
+    _measure_unit_any_hospital = (
+        db.session.query(func.min(_MeasureUnitAny.idHospital))
+        .filter(_MeasureUnitAny.id == PrescriptionDrug.idMeasureUnit)
+        .scalar_subquery()
+    )
 
     ml_conversion_factor_subquery = (
         db.session.query(MeasureUnitSolutionConvert.factor)
@@ -161,7 +167,7 @@ def find_drugs_by_prescription(
             MeasureUnit,
             and_(
                 MeasureUnit.id == PrescriptionDrug.idMeasureUnit,
-                MeasureUnit.idHospital == Prescription.idHospital,
+                MeasureUnit.idHospital == _measure_unit_any_hospital,
             ),
         )
         .outerjoin(
