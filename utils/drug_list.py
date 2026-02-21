@@ -4,10 +4,15 @@ import math
 import re
 from difflib import SequenceMatcher
 
-from models.enums import DrugTypeEnum
+from models.appendix import MeasureUnit
+from models.enums import DefaultMeasureUnitEnum, DrugTypeEnum
+from models.main import Drug, DrugAttributes
+from models.prescription import PrescriptionDrug
 from services import drug_service
 from services.admin import admin_ai_service
 from utils import dateutils, numberutils, prescriptionutils, stringutils
+
+CARBOPLATIN_SCTID = 386905002
 
 
 def _get_legacy_alert(kind):
@@ -293,6 +298,8 @@ class DrugList:
                 # dialyzable drug and dialysis patient
                 dialyzable = True
 
+            auc_value = self.get_auc_value(pd)
+
             self.drug_results.append(
                 {
                     "idPrescription": str(pd[0].idPrescription),
@@ -402,6 +409,7 @@ class DrugList:
                     "orderNumber": pd[0].order_number,
                     "intravenous": pd[0].intravenous,
                     "feedingTube": pd[0].tube,
+                    "auc": auc_value,
                 }
             )
 
@@ -454,6 +462,96 @@ class DrugList:
             return pd[0].cpoe_group if pd[0].cpoe_group else pd[0].solutionGroup
 
         return str(pd[0].idPrescription) + str(pd[0].solutionGroup)
+
+    def get_auc_value(self, pd) -> dict | None:
+        """Calculate AUC value"""
+
+        prescription_drug: PrescriptionDrug = pd[0]
+        drug: Drug = pd[1]
+        pd_measure_unit: MeasureUnit = pd[2]
+        default_measure_unit_nh: str = pd.default_measure_unit_nh
+        pd_attributes: DrugAttributes = pd[6]
+
+        if not drug:
+            return None
+
+        if drug.sctid != CARBOPLATIN_SCTID:
+            return None
+
+        if not pd_measure_unit:
+            return {
+                "auc_cg": None,
+                "auc_ckd": None,
+                "missing_cg": "measure_unit",
+                "missing_ckd": "measure_unit",
+            }
+
+        if not self.exams:
+            return {
+                "auc_cg": None,
+                "auc_ckd": None,
+                "missing_cg": "exams",
+                "missing_ckd": "exams",
+            }
+
+        dose = None
+
+        exam_cg_value = self.exams["cg"]["value"] if "cg" in self.exams else None
+        exam_ckd21_value = (
+            self.exams["ckd21"]["value"] if "ckd21" in self.exams else None
+        )
+
+        if pd_measure_unit.measureunit_nh == DefaultMeasureUnitEnum.MG.value:
+            dose = prescription_drug.dose
+        else:
+            if default_measure_unit_nh == DefaultMeasureUnitEnum.MG.value:
+                if pd_attributes and pd_attributes.useWeight:
+                    # need to implement conversion
+                    return {
+                        "auc_cg": None,
+                        "auc_ckd": None,
+                        "missing_cg": "weight_conversion",
+                        "missing_ckd": "weight_conversion",
+                    }
+
+                dose = prescription_drug.doseconv
+
+        if not dose:
+            return {
+                "auc_cg": None,
+                "auc_ckd": None,
+                "missing_cg": "dose",
+                "missing_ckd": "dose",
+            }
+
+        missing_cg = None
+        missing_ckd = None
+        auc_cg = None
+        auc_ckd = None
+
+        if exam_cg_value:
+            auc_cg = round(dose / (exam_cg_value + 25), 2)
+        else:
+            missing_cg = "no_cg_exam"
+
+        if exam_ckd21_value:
+            bs_weight = numberutils.none2zero(self.exams.get("weight"))
+            bs_height = numberutils.none2zero(self.exams.get("height"))
+
+            if bs_weight > 0 and bs_height > 0:
+                body_surface = math.sqrt((bs_weight * bs_height) / 3600)
+                auc_ckd = round(dose / (exam_ckd21_value * body_surface / 1.73 + 25), 2)
+            else:
+                missing_ckd = "weight_height"
+        else:
+            missing_ckd = "no_ckd21_exam"
+
+        return {
+            "auc_cg": auc_cg,
+            "auc_ckd": auc_ckd,
+            "missing_cg": missing_cg,
+            "missing_ckd": missing_ckd,
+        }
 
     def get_solution_dose(self, pd):
         """Get solution dose for infusion calculations (always in ml)"""
