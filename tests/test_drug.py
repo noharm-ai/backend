@@ -1,6 +1,7 @@
 import json
 
 from conftest import get_access, make_headers, session, session_commit
+
 from models.main import Drug, Outlier, Substance
 from security.role import Role
 
@@ -112,26 +113,27 @@ def add_substance(sub_id, sub_name):
 
 def test_get_substance(client):
     """Teste get /substance - Valida status_code 200"""
-    # add substance since there's no in database. add before the response
-
     access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
 
-    allSubstances = session.query(Substance).delete()
+    # Only delete test-created substances (IDs >= 10000), preserve seed data
+    session.query(Substance).filter(Substance.id >= 10000).delete()
     session.commit()
 
-    add_substance(1, "substance1")
-    add_substance(2, "substance2")
+    add_substance(10001, "substance1")
+    add_substance(10002, "substance2")
 
     response = client.get("/substance", headers=make_headers(access_token))
     data = json.loads(response.data)
-    # TODO: Add consulta ao banco de dados e comparar retorno (retornando status 200 porém data = [])
 
     assert response.status_code == 200
-    assert len(data["data"]) == 2
 
     # structure check
     assert "sctid" in data["data"][0]
     assert "name" in data["data"][0]
+
+    # verify our 2 test substances are present in the response
+    response_ids = {d["sctid"] for d in data["data"]}
+    assert "10001" in response_ids and "10002" in response_ids
 
 
 def test_get_outliers_by_segment_and_drug(client):
