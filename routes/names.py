@@ -1,11 +1,15 @@
 """Route: names proxy"""
 
+import re
+
 from flask import Blueprint, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 
 from models.main import User, dbSession
 from services import name_service
 from utils import logger, status
+
+_SEARCH_TERM_RE = re.compile(r"^[A-Za-zÀ-ÿ0-9 '\-]{1,100}$")
 
 app_names = Blueprint("app_names", __name__)
 
@@ -70,7 +74,7 @@ def auth_token():
         )
         return {
             "status": "error",
-            "message": str(e),
+            "message": "Erro ao gerar token de autenticação",
         }, status.HTTP_400_BAD_REQUEST
 
 
@@ -78,6 +82,9 @@ def auth_token():
 @jwt_required()
 def search_name(term):
     """Inverted name search"""
+    if not _SEARCH_TERM_RE.match(term):
+        return {"status": "error", "data": []}, status.HTTP_400_BAD_REQUEST
+
     user = User.find(get_jwt_identity())
     dbSession.setSchema(user.schema)
 

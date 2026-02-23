@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 import boto3
 import requests
 from jwt import encode
+from markupsafe import escape as _escape_html
 
 from config import Config
 from exception.validation_error import ValidationError
@@ -51,6 +52,13 @@ class NameServiceStrategy(ABC):
             else url_prod
         )
 
+    @staticmethod
+    def _escape_str(value) -> str:
+        """HTML-escape a string value from an external source."""
+        if value is None:
+            return ""
+        return str(_escape_html(str(value)))
+
     def _create_error_response(self, id_patient: int) -> dict:
         """Create standard error response"""
         return {
@@ -81,7 +89,7 @@ class DynamoDBNameService(NameServiceStrategy):
                 return {
                     "status": "success",
                     "idPatient": int(id_patient),
-                    "name": item["nome"],
+                    "name": self._escape_str(item["nome"]),
                     "data": None,
                 }
 
@@ -144,7 +152,7 @@ class NHInternalNameService(NameServiceStrategy):
                 return {
                     "status": "success",
                     "idPatient": data["idPatient"],
-                    "name": data["name"],
+                    "name": self._escape_str(data["name"]),
                     "data": data.get("data"),
                 }
 
@@ -192,7 +200,7 @@ class NHInternalNameService(NameServiceStrategy):
                         {
                             "status": "success",
                             "idPatient": p["idPatient"],
-                            "name": p["name"],
+                            "name": self._escape_str(p["name"]),
                         }
                     )
             else:
@@ -232,10 +240,10 @@ class NHInternalNameService(NameServiceStrategy):
                 for p in data["results"][:MAX_SEARCH_RESULTS]:
                     results.append(
                         {
-                            "name": p["name"],
+                            "name": self._escape_str(p["name"]),
                             "idPatient": p["idPatient"],
-                            "birthdate": p["dtnascimento"],
-                            "number": p["cpf"],
+                            "birthdate": self._escape_str(p["dtnascimento"]),
+                            "number": self._escape_str(p["cpf"]),
                         }
                     )
                 return sorted(results, key=lambda d: d["name"])
@@ -297,7 +305,7 @@ class ExternalNameService(NameServiceStrategy):
                     return {
                         "status": "success",
                         "idPatient": patient["idPatient"],
-                        "name": patient["name"],
+                        "name": self._escape_str(patient["name"]),
                     }
 
             logger.backend_logger.warning(
@@ -341,7 +349,7 @@ class ExternalNameService(NameServiceStrategy):
                         {
                             "status": "success",
                             "idPatient": p["idPatient"],
-                            "name": p["name"],
+                            "name": self._escape_str(p["name"]),
                         }
                     )
             else:
