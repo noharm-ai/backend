@@ -273,6 +273,7 @@ def get_headers(
     is_pmc=False,
     is_cpoe=False,
     ignore_segments=None,
+    hide_names=False,
 ):
     """
     list individual prescriptions for the agg prescription
@@ -328,7 +329,7 @@ def get_headers(
             "expire": p[0].expire.isoformat() if p[0].expire else None,
             "status": p[0].status,
             "bed": p[0].bed,
-            "prescriber": p[0].prescriber,
+            "prescriber": "***" if hide_names else p[0].prescriber,
             "idSegment": p[0].idSegment,
             "idHospital": p[0].idHospital,
             "idDepartment": p[0].idDepartment,
@@ -336,7 +337,7 @@ def get_headers(
             "drugs": {},
             "procedures": {},
             "solutions": {},
-            "user": p[2],
+            "user": "***" if hide_names else p[2],
             "userId": p[0].user,
         }
 

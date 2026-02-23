@@ -1,27 +1,28 @@
 """Service: Intervention related operations"""
 
-from datetime import timedelta, datetime
+from datetime import datetime, timedelta
 
-from sqlalchemy import case, and_, func, or_, desc
+from sqlalchemy import and_, case, desc, func, or_
 from sqlalchemy.dialects import postgresql
 
-from models.main import db, User, Drug
+from decorators.has_permission_decorator import Permission, has_permission
+from exception.validation_error import ValidationError
+from models.appendix import Department, Frequency, InterventionReason, MeasureUnit
+from models.enums import FeatureEnum, InterventionAuditEnum, InterventionEconomyTypeEnum
+from models.main import Drug, User, db
 from models.prescription import (
     Intervention,
     InterventionAudit,
     Prescription,
     PrescriptionDrug,
 )
-from models.appendix import InterventionReason, MeasureUnit, Frequency, Department
-from models.enums import InterventionEconomyTypeEnum, InterventionAuditEnum
 from services import (
-    memory_service,
     data_authorization_service,
+    feature_service,
+    memory_service,
     segment_service,
 )
-from decorators.has_permission_decorator import has_permission, Permission
-from exception.validation_error import ValidationError
-from utils import status, prescriptionutils, dateutils
+from utils import dateutils, prescriptionutils, status
 
 
 @has_permission(Permission.READ_PRESCRIPTION)
@@ -232,6 +233,7 @@ def get_interventions(
         return "Intervenção arquivada"
 
     intervBuffer = []
+    hide_names = feature_service.has_user_feature(FeatureEnum.HIDE_NAMES)
     for i in interventions:
         intervBuffer.append(
             {
@@ -266,9 +268,15 @@ def get_interventions(
                 "interactionsList": prescriptionutils.interactionsList(i[4], splitStr),
                 "interactions": i[0].interactions,
                 "date": i[0].date.isoformat(),
-                "user": i[8],
+                "user": "***" if hide_names else i[8],
                 "department": i[9] if i[9] else i[11],
-                "prescriber": i[10] if i[10] else i[7].prescriber if i[7] else None,
+                "prescriber": "***"
+                if hide_names
+                else i[10]
+                if i[10]
+                else i[7].prescriber
+                if i[7]
+                else None,
                 "status": i[0].status,
                 "transcription": i[0].transcription,
                 "ram": i[0].ram,

@@ -41,6 +41,12 @@ def has_permission(*permissions: Permission):
 
             user_permissions = Role.get_permissions_from_user(user=user_context)
 
+            g.user_features = (
+                user_context.config["features"]
+                if user_context.config and "features" in user_context.config
+                else []
+            )
+
             # inject extra params
             if "user_permissions" in inspect.signature(f).parameters:
                 kwargs["user_permissions"] = user_permissions

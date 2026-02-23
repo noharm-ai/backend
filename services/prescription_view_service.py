@@ -214,6 +214,7 @@ def _build_headers(
         is_pmc=config_data["is_pmc"],
         is_cpoe=config_data["is_cpoe"],
         ignore_segments=config_data["ignore_segments"],
+        hide_names=feature_service.has_user_feature(FeatureEnum.HIDE_NAMES),
     )
 
     for pid in headers.keys():
@@ -771,6 +772,8 @@ def _format(
     alerts_data: dict,
     icd: ICDTable,
 ):
+
+    hide_names = feature_service.has_user_feature(FeatureEnum.HIDE_NAMES)
     return {
         # prescription
         "idPrescription": str(prescription.id),
@@ -794,11 +797,15 @@ def _format(
         "date": dateutils.to_iso(prescription.date),
         "expire": dateutils.to_iso(prescription.expire),
         "status": prescription.status,
-        "prescriber": prescription.prescriber,
+        "prescriber": prescription.prescriber if not hide_names else "***",
         "features": prescription.features,
-        "user": prescription_user.name if prescription_user else None,
+        "user": "***"
+        if hide_names
+        else prescription_user.name
+        if prescription_user
+        else None,
         "userId": prescription.user,
-        "insurance": prescription.insurance,
+        "insurance": "***" if hide_names else prescription.insurance,
         "idICD": icd.id_str if icd else None,
         "nameICD": icd.name if icd else None,
         "specialty": prescription.specialty,
@@ -823,7 +830,7 @@ def _format(
         "dischargeDate": dateutils.to_iso(patient.dischargeDate),
         "dischargeReason": patient.dischargeReason,
         "dischargeDateForecast": dateutils.to_iso(patient.dischargeDateForecast),
-        "responsiblePhysician": patient.responsiblePhysician,
+        "responsiblePhysician": "***" if hide_names else patient.responsiblePhysician,
         # extra
         "segmentName": segment.description if segment else None,
         "department": department.name if department else None,

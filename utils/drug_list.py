@@ -5,10 +5,10 @@ import re
 from difflib import SequenceMatcher
 
 from models.appendix import MeasureUnit
-from models.enums import DefaultMeasureUnitEnum, DrugTypeEnum
+from models.enums import DefaultMeasureUnitEnum, DrugTypeEnum, FeatureEnum
 from models.main import Drug, DrugAttributes
 from models.prescription import PrescriptionDrug
-from services import drug_service
+from services import drug_service, feature_service
 from services.admin import admin_ai_service
 from utils import dateutils, numberutils, prescriptionutils, stringutils
 
@@ -71,6 +71,7 @@ class DrugList:
             "level": "low",
         }
         self.drug_results = []
+        self.hide_names = feature_service.has_user_feature(FeatureEnum.HIDE_NAMES)
 
         self._process_drugs()
 
@@ -395,7 +396,7 @@ class DrugList:
                     "tubeAlert": tubeAlert,
                     "notes": pd[7],
                     "prevNotes": prevNotes,
-                    "prevNotesUser": prevNotesUser,
+                    "prevNotesUser": "***" if self.hide_names else prevNotesUser,
                     "drugInfoLink": pd[11].link if pd[11] != None else None,
                     "idSubstance": pd[11].id if pd[11] != None else None,
                     "idSubstanceClass": pd[11].idclass if pd[11] != None else None,

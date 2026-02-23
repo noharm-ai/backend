@@ -8,12 +8,12 @@ from sqlalchemy.orm import undefer
 
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
-from models.enums import UserAuditTypeEnum
+from models.enums import FeatureEnum, UserAuditTypeEnum
 from models.main import User, db, redis_client
 from models.notes import ClinicalNotes
 from models.prescription import Patient, Prescription
 from repository import clinical_notes_repository
-from services import memory_service, user_service
+from services import feature_service, memory_service, user_service
 from utils import status
 
 
@@ -285,6 +285,8 @@ def convert_notes(notes, has_primary_care, tags):
             notes_text[:max_length] + "<p>Evolução cortada por texto muito longo.</p>"
         )
 
+    hide_names = feature_service.has_user_feature(FeatureEnum.HIDE_NAMES)
+
     obj = {
         "id": str(notes.id),
         "admissionNumber": notes.admissionNumber,
@@ -292,7 +294,7 @@ def convert_notes(notes, has_primary_care, tags):
         "form": notes.form if has_primary_care else None,
         "template": notes.template if has_primary_care else None,
         "date": notes.date.isoformat(),
-        "prescriber": notes.prescriber,
+        "prescriber": "***" if hide_names else notes.prescriber,
         "position": notes.position,
     }
 

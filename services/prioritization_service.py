@@ -1,10 +1,11 @@
 """Service: prescription prioritization operations"""
 
 from decorators.has_permission_decorator import Permission, has_permission
+from models.enums import FeatureEnum
 from models.prescription import Patient
 from models.requests.prioritization_request import PrioritizationRequest
 from repository import prioritization_repository
-from services import prescription_service
+from services import feature_service, prescription_service
 from utils import numberutils, prescriptionutils
 
 
@@ -14,6 +15,7 @@ def get_prioritization_list(request: PrioritizationRequest):
     prioritization_results = prioritization_repository.get_prioritization_list(request)
 
     results = []
+    hide_names = feature_service.has_user_feature(FeatureEnum.HIDE_NAMES)
     for p in prioritization_results:
         patient = p[1]
         if patient is None:
@@ -106,7 +108,7 @@ def get_prioritization_list(request: PrioritizationRequest):
                     "dischargeReason": patient.dischargeReason,
                     "date": p[0].date.isoformat(),
                     "department": str(p[2]),
-                    "insurance": p[0].insurance,
+                    "insurance": p[0].insurance if not hide_names else "***",
                     "bed": p[0].bed,
                     "status": p[0].status,
                     "isBeingEvaluated": prescription_service.is_being_evaluated(

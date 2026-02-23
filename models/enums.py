@@ -68,6 +68,7 @@ class FeatureEnum(Enum):
     PATIENT_DAY_OUTPATIENT_FLOW = "PATIENT_DAY_OUTPATIENT_FLOW"
     # when schema is mixed (cpoe and non-cpoe segments), ignore non-cpoe segments in CPOE view
     IGNORE_NON_CPOE_SEGMENTS = "IGNORE_NON_CPOE_SEGMENTS"
+    HIDE_NAMES = "HIDE_NAMES"
 
 
 class PrescriptionAuditTypeEnum(Enum):
