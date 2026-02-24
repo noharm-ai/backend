@@ -1,14 +1,14 @@
 """Tests: Prescription Check related operations"""
 
-import json
 from datetime import datetime
 
-from tests.conftest import get_access, make_headers, session, session_commit
+from tests.conftest import session, session_commit
 from sqlalchemy import text
 
 from models.enums import DrugTypeEnum, PrescriptionAuditTypeEnum
 from models.prescription import Prescription, PrescriptionAudit, PrescriptionDrug
-from security.role import Role
+from static import prescalc
+from tests.utils import utils_test_prescription
 from tests.utils.utils_test_prescription import (
     create_basic_prescription,
     create_prescription,
@@ -16,35 +16,27 @@ from tests.utils.utils_test_prescription import (
     test_counters,
 )
 
-
-def _check_url():
-    return "/prescriptions/status"
+CHECK_URL = "/prescriptions/status"
+PRESCRIPTION = "20"
 
 
 def _check_payload(id_prescription, status="s"):
-    return json.dumps(
-        {
-            "idPrescription": id_prescription,
-            "status": status,
-            "evaluationTime": 0,
-            "alerts": [],
-            "fastCheck": False,
-        }
-    )
+    return {
+        "idPrescription": id_prescription,
+        "status": status,
+        "evaluationTime": 0,
+        "alerts": [],
+        "fastCheck": False,
+    }
 
 
-def test_check_prescription_sets_status(client):
+def test_check_prescription_sets_status(client, analyst_headers):
     """Check prescription: sets prescription status to 's'"""
-
     prescription = create_basic_prescription()
     id_pres = prescription.id
 
-    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
-
     response = client.post(
-        _check_url(),
-        data=_check_payload(id_pres),
-        headers=make_headers(access_token),
+        CHECK_URL, json=_check_payload(id_pres), headers=analyst_headers
     )
 
     assert response.status_code == 200
@@ -54,18 +46,13 @@ def test_check_prescription_sets_status(client):
     assert p.status == "s"
 
 
-def test_check_prescription_sets_checado_on_active_drugs(client):
+def test_check_prescription_sets_checado_on_active_drugs(client, analyst_headers):
     """Check prescription: sets checado=true on all active presmed rows"""
-
     prescription = create_basic_prescription()
     id_pres = prescription.id
 
-    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
-
     response = client.post(
-        _check_url(),
-        data=_check_payload(id_pres),
-        headers=make_headers(access_token),
+        CHECK_URL, json=_check_payload(id_pres), headers=analyst_headers
     )
 
     assert response.status_code == 200
@@ -83,7 +70,7 @@ def test_check_prescription_sets_checado_on_active_drugs(client):
         assert drug.checked is True
 
 
-def test_check_prescription_audit_total_itens_excludes_diet(client):
+def test_check_prescription_audit_total_itens_excludes_diet(client, analyst_headers):
     """Check prescription: audit totalItens counts only DRUG/SOLUTION/PROCEDURE, not DIET.
     checkedindex receives all non-suspended rows regardless of type."""
 
@@ -128,12 +115,8 @@ def test_check_prescription_audit_total_itens_excludes_diet(client):
     test_counters["id_prescription"] += 1
     test_counters["admission_number"] += 1
 
-    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
-
     response = client.post(
-        _check_url(),
-        data=_check_payload(id_pres),
-        headers=make_headers(access_token),
+        CHECK_URL, json=_check_payload(id_pres), headers=analyst_headers
     )
 
     assert response.status_code == 200
@@ -158,13 +141,13 @@ def test_check_prescription_audit_total_itens_excludes_diet(client):
     assert result.scalar() == 5
 
 
-def test_check_prescription_skips_suspended_drugs(client):
+def test_check_prescription_skips_suspended_drugs(client, analyst_headers):
     """Check prescription: does not set checado on suspended presmed rows"""
 
     id_pres = test_counters["id_prescription"]
     admission = test_counters["admission_number"]
 
-    prescription = create_prescription(
+    create_prescription(
         id=id_pres,
         admissionNumber=admission,
         idPatient=1,
@@ -186,12 +169,8 @@ def test_check_prescription_skips_suspended_drugs(client):
     test_counters["id_prescription"] += 1
     test_counters["admission_number"] += 1
 
-    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
-
     response = client.post(
-        _check_url(),
-        data=_check_payload(id_pres),
-        headers=make_headers(access_token),
+        CHECK_URL, json=_check_payload(id_pres), headers=analyst_headers
     )
 
     assert response.status_code == 200
@@ -205,51 +184,37 @@ def test_check_prescription_skips_suspended_drugs(client):
     assert suspended.checked is not True
 
 
-def test_check_prescription_already_checked_returns_error(client):
+def test_check_prescription_already_checked_returns_error(client, analyst_headers):
     """Check prescription: returns 400 when prescription is already checked"""
 
     prescription = create_basic_prescription()
     id_pres = prescription.id
 
-    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
-
     # First check
-    client.post(
-        _check_url(),
-        data=_check_payload(id_pres),
-        headers=make_headers(access_token),
-    )
+    client.post(CHECK_URL, json=_check_payload(id_pres), headers=analyst_headers)
 
     # Second check on already-checked prescription
     response = client.post(
-        _check_url(),
-        data=_check_payload(id_pres),
-        headers=make_headers(access_token),
+        CHECK_URL, json=_check_payload(id_pres), headers=analyst_headers
     )
 
     assert response.status_code == 400
 
 
-def test_uncheck_preserves_checado(client):
+def test_uncheck_preserves_checado(client, analyst_headers):
     """Uncheck prescription: checado flag on presmed rows is preserved after unchecking"""
 
     prescription = create_basic_prescription()
     id_pres = prescription.id
 
-    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
-
     # Check first
     client.post(
-        _check_url(),
-        data=_check_payload(id_pres, status="s"),
-        headers=make_headers(access_token),
+        CHECK_URL, json=_check_payload(id_pres, status="s"), headers=analyst_headers
     )
 
     # Then uncheck
     response = client.post(
-        _check_url(),
-        data=_check_payload(id_pres, status="0"),
-        headers=make_headers(access_token),
+        CHECK_URL, json=_check_payload(id_pres, status="0"), headers=analyst_headers
     )
 
     assert response.status_code == 200
@@ -268,3 +233,69 @@ def test_uncheck_preserves_checado(client):
     assert len(drugs) > 0
     for drug in drugs:
         assert drug.checked is True
+
+
+def test_check_prescription_viewer_unauthorized(client, viewer_headers):
+    """Teste put /prescriptions/status - Assegura que o usuário VIEWER não tenha autorização."""
+    response = client.post(
+        CHECK_URL,
+        json={"status": "s", "idPrescription": PRESCRIPTION},
+        headers=viewer_headers,
+    )
+
+    assert response.status_code == 401
+
+
+def test_check_aggregate_prescription(client, analyst_headers):
+    """Teste put /prescriptions/status - Verifica o status 's' e audit para prescrição agregada e as prescrições dentro dela."""
+    id = 2012301000000003
+    admissionNumber = 3
+    prescriptionid1 = 4
+    prescriptionid2 = 7
+
+    utils_test_prescription.prepare_test_aggregate(
+        id, admissionNumber, prescriptionid1, prescriptionid2
+    )
+
+    # Recreate the aggregate prescription
+    prescalc(
+        {"schema": "demo", "id_prescription": prescriptionid1, "force": True},
+        None,
+    )
+
+    # Check the aggregate prescription
+    client.post(
+        CHECK_URL,
+        json={"status": "s", "idPrescription": id},
+        headers=analyst_headers,
+    )
+
+    pInAg = (
+        session.query(Prescription)
+        .filter(Prescription.id.in_([prescriptionid1, id]))
+        .filter(Prescription.status == "s")
+        .all()
+    )
+    pOutAg = (
+        session.query(Prescription)
+        .filter(Prescription.id == prescriptionid2)
+        .filter(Prescription.status == "0")
+        .first()
+    )
+    pInAgaudit = (
+        session.query(PrescriptionAudit)
+        .filter(PrescriptionAudit.idPrescription.in_([prescriptionid1, id]))
+        .filter(PrescriptionAudit.auditType == 1)
+        .all()
+    )
+    pOutAgaudit = (
+        session.query(PrescriptionAudit)
+        .filter(PrescriptionAudit.idPrescription == prescriptionid2)
+        .filter(PrescriptionAudit.auditType == 1)
+        .first()
+    )
+
+    assert pOutAg
+    assert len(pInAg) == 2
+    assert len(pInAgaudit) == 2
+    assert not pOutAgaudit

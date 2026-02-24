@@ -1,49 +1,34 @@
-import json
 from datetime import datetime
 
-from tests.conftest import get_access, make_headers, session
+from tests.conftest import session
+
 from models.appendix import InterventionReason
 from models.prescription import Intervention
-from security.role import Role
 
 
-def test_get_interventions(client):
+def test_get_interventions(client, analyst_headers):
     """Teste get /intervention/search - Compara quantidade de intervenções enviadas com quantidade salva no banco e valida status_code 200"""
-
-    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
-
     data = {"startDate": datetime.today().isoformat()}
-
     response = client.post(
-        "/intervention/search",
-        data=json.dumps(data),
-        headers=make_headers(access_token),
+        "/intervention/search", json=data, headers=analyst_headers
     )
-    data = json.loads(response.data)["data"]
-    # TODO: Add consulta ao banco de dados e comparar count de intervenções
 
     assert response.status_code == 200
 
 
-def test_get_interventions_by_reason(client):
+def test_get_interventions_by_reason(client, analyst_headers):
     """Teste get /intervention/reasons - Compara quantidade de rasões enviadas com quantidade salva no banco e valida status_code 200"""
-
-    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
-    qtdReasons = session.query(InterventionReason).count()
-
-    response = client.get("/intervention/reasons", headers=make_headers(access_token))
-    data = json.loads(response.data)["data"]
+    qty_reasons = session.query(InterventionReason).count()
+    response = client.get("/intervention/reasons", headers=analyst_headers)
+    data = response.get_json()["data"]
 
     assert response.status_code == 200
-    assert qtdReasons == len(data)
+    assert qty_reasons == len(data)
 
 
-def test_put_interventions(client):
+def test_put_interventions(client, analyst_headers):
     """Teste put /intervention - Compara dados enviados com dados salvos no banco e valida status_code 200"""
-
-    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
-
-    idPrescriptionDrug = "1"
+    id_prescription_drug = "1"
     data = {
         "status": "s",
         "admissionNumber": 5,
@@ -52,21 +37,16 @@ def test_put_interventions(client):
         "cost": False,
         "observation": "teste observations",
         "interactions": [5],
-        "idPrescriptionDrug": idPrescriptionDrug,
+        "idPrescriptionDrug": id_prescription_drug,
     }
-    url = "/intervention"
 
-    response = client.put(
-        url, data=json.dumps(data), headers=make_headers(access_token)
-    )
-
+    response = client.put("/intervention", json=data, headers=analyst_headers)
     assert response.status_code == 200
 
-    responseData = json.loads(response.data)["data"]
-
+    response_data = response.get_json()["data"]
     intervention = (
         session.query(Intervention)
-        .filter(Intervention.idIntervention == responseData[0]["idIntervention"])
+        .filter(Intervention.idIntervention == response_data[0]["idIntervention"])
         .first()
     )
 
@@ -80,24 +60,15 @@ def test_put_interventions(client):
     assert intervention.interactions == data["interactions"]
 
 
-def test_put_interventions_permission(client):
+def test_put_interventions_permission(client, viewer_headers):
     """Teste put /intervention - Deve retornar erro [401 UNAUTHORIZED] devido ao usuário utilizado"""
-
-    access_token = get_access(client, roles=[Role.VIEWER.value])
-
-    idIntervention = "1"
-    idPrescription = "0"
     data = {
         "status": "s",
         "admissionNumber": "5",
-        "idIntervention": idIntervention,
-        "idPrescription": idPrescription,
+        "idIntervention": "1",
+        "idPrescription": "0",
     }
 
-    url = "/intervention"
-
-    response = client.put(
-        url, data=json.dumps(data), headers=make_headers(access_token)
-    )
+    response = client.put("/intervention", json=data, headers=viewer_headers)
 
     assert response.status_code == 401

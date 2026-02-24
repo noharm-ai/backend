@@ -1,9 +1,6 @@
-import json
 import pytest
 from unittest import TestCase
 
-from tests.conftest import get_access, make_headers
-from security.role import Role
 from tests.utils.utils_test_intervention import (
     dict_expected_before_outcome,
     payload_api_set_outcome,
@@ -12,12 +9,10 @@ from tests.utils.utils_test_intervention import (
 )
 
 
-# Creates new intervention
+# Creates new intervention and returns idIntervention
 @pytest.fixture
-def test_put_interventions(client):
-    """Tests put /intervention  and returns idIntervention"""
-    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
-
+def created_intervention(client, analyst_headers):
+    """Creates a new intervention via PUT /intervention and returns its idIntervention."""
     data = {
         "idPrescription": "198",
         "idPrescriptionDrug": "54",
@@ -31,83 +26,51 @@ def test_put_interventions(client):
         "version": "1.0",
         "updateResponsible": False,
     }
-    url = "/intervention"
 
-    response = client.put(
-        url, data=json.dumps(data), headers=make_headers(access_token)
-    )
-
+    response = client.put("/intervention", json=data, headers=analyst_headers)
     assert response.status_code == 200
 
-    responseData = json.loads(response.data)["data"]
-    idIntervention = responseData[0]["idIntervention"]
+    response_data = response.get_json()["data"]
+    id_intervention = response_data[0]["idIntervention"]
+    assert id_intervention is not None
+    return id_intervention
 
-    assert idIntervention is not None
-    return idIntervention
 
-
-# Retrieve data for concluding the intervention
-@pytest.mark.run(order=1)
-def test_outcome_data(client, test_put_interventions):
-    "Tests /intervention/outcome-data - Checks if the API call for retrieving the data is successful."
-    assert test_put_interventions is not None
-
-    data = {"idIntervention": test_put_interventions, "edit": "False"}
-    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
-
+def test_outcome_data(client, analyst_headers, created_intervention):
+    """Tests /intervention/outcome-data - Checks retrieval of intervention data before outcome."""
     response = client.get(
         "intervention/outcome-data",
-        query_string=data,
-        headers=make_headers(access_token),
+        query_string={"idIntervention": created_intervention, "edit": "False"},
+        headers=analyst_headers,
     )
     assert response.status_code == 200
 
-    response_data = json.loads(response.data)
-
+    response_data = response.get_json()
     remove_not_comparable_attributes(response_data)
     remove_not_comparable_attributes(dict_expected_before_outcome)
 
     TestCase().assertDictEqual(response_data, dict_expected_before_outcome)
 
 
-@pytest.mark.run(order=2)
-# Finishes the intervention
-def test_set_outcome(client, test_put_interventions):
-    """Tests  /intervention/set-outcome - Checks if the API call for finishing the intervention is successful."""
+def test_set_outcome(client, analyst_headers, created_intervention):
+    """Tests /intervention/set-outcome - Checks if finishing the intervention is successful."""
+    data = dict(payload_api_set_outcome)
+    data["idIntervention"] = created_intervention
 
-    assert test_put_interventions is not None
-
-    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
-    data = payload_api_set_outcome
-    data["idIntervention"] = test_put_interventions
-    response = client.post(
-        "/intervention/set-outcome",
-        data=json.dumps(data),
-        headers=make_headers(access_token),
-    )
-
+    response = client.post("/intervention/set-outcome", json=data, headers=analyst_headers)
     assert response.status_code == 200
 
 
-# Checks the outcome result
-@pytest.mark.run(order=3)
-def test_outcome_data_final(client, test_put_interventions):
-    "Tests /intervention/outcome-data - Check if the API call for retrieving the data is successful."
-    assert test_put_interventions is not None
-
-    data = {"idIntervention": test_put_interventions, "edit": "False"}
-    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
-
+def test_outcome_data_final(client, analyst_headers, created_intervention):
+    """Tests /intervention/outcome-data - Checks retrieval of intervention data after outcome."""
     response = client.get(
         "intervention/outcome-data",
-        query_string=data,
-        headers=make_headers(access_token),
+        query_string={"idIntervention": created_intervention, "edit": "False"},
+        headers=analyst_headers,
     )
-
     assert response.status_code == 200
 
-    response_data = json.loads(response.data)
-
+    response_data = response.get_json()
     remove_not_comparable_attributes(response_data)
     remove_not_comparable_attributes(dict_expected_after_outcome)
 
