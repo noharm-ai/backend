@@ -3,7 +3,7 @@
 import json
 from datetime import datetime
 
-from conftest import get_access, make_headers, session, session_commit
+from tests.conftest import get_access, make_headers, session, session_commit
 from sqlalchemy import text
 
 from models.enums import DrugTypeEnum, PrescriptionAuditTypeEnum

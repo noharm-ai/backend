@@ -1,6 +1,6 @@
 import json
 
-from conftest import get_access, make_headers
+from tests.conftest import get_access, make_headers
 
 from security.role import Role
 

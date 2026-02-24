@@ -1,6 +1,6 @@
 import json
 
-from conftest import get_access, make_headers, session
+from tests.conftest import get_access, make_headers, session
 from models.prescription import Prescription, PrescriptionAudit
 from security.role import Role
 

@@ -1,7 +1,7 @@
 import json
 from datetime import datetime
 
-from conftest import get_access, make_headers, session
+from tests.conftest import get_access, make_headers, session
 from models.appendix import InterventionReason
 from models.prescription import Intervention
 from security.role import Role

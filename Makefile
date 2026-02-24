@@ -1,4 +1,4 @@
-.PHONY: test-setup test test-file test-cov db-start db-stop db-reset
+.PHONY: test-setup test test-unit test-integration test-file test-cov db-start db-stop db-reset
 
 COMPOSE = docker compose -f docker-compose.test.yml
 
@@ -11,7 +11,15 @@ test-setup:
 test:
 	ENV=test python -m pytest
 
-## Run a specific test file (usage: make test-file FILE=tests/test_drug.py)
+## Run only unit tests (no DB required)
+test-unit:
+	ENV=test python -m pytest tests/unit/ -v
+
+## Run only integration tests (requires DB)
+test-integration:
+	ENV=test python -m pytest tests/integration/ -v
+
+## Run a specific test file (usage: make test-file FILE=tests/integration/test_drug.py)
 test-file:
 	ENV=test python -m pytest $(FILE) -v
 

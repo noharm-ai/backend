@@ -2,7 +2,7 @@
 
 import json
 
-from conftest import get_access, make_headers, session, session_commit
+from tests.conftest import get_access, make_headers, session, session_commit
 
 from models.prescription import Prescription
 from security.role import Role
