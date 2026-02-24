@@ -6,7 +6,8 @@ from datetime import datetime
 from conftest import get_access, make_headers, session, session_commit
 from sqlalchemy import text
 
-from models.prescription import Prescription, PrescriptionDrug
+from models.enums import DrugTypeEnum, PrescriptionAuditTypeEnum
+from models.prescription import Prescription, PrescriptionAudit, PrescriptionDrug
 from security.role import Role
 from tests.utils.utils_test_prescription import (
     create_basic_prescription,
@@ -80,6 +81,81 @@ def test_check_prescription_sets_checado_on_active_drugs(client):
     assert len(drugs) > 0
     for drug in drugs:
         assert drug.checked is True
+
+
+def test_check_prescription_audit_total_itens_excludes_diet(client):
+    """Check prescription: audit totalItens counts only DRUG/SOLUTION/PROCEDURE, not DIET.
+    checkedindex receives all non-suspended rows regardless of type."""
+
+    id_pres = test_counters["id_prescription"]
+    admission = test_counters["admission_number"]
+
+    create_prescription(id=id_pres, admissionNumber=admission, idPatient=1)
+
+    # 2 DRUG + 1 SOLUTION + 1 PROCEDURE = 4 countable items
+    create_prescription_drug(
+        id=int(f"{id_pres}001"),
+        idPrescription=id_pres,
+        idDrug=1,
+        source=DrugTypeEnum.DRUG.value,
+    )
+    create_prescription_drug(
+        id=int(f"{id_pres}002"),
+        idPrescription=id_pres,
+        idDrug=2,
+        source=DrugTypeEnum.DRUG.value,
+    )
+    create_prescription_drug(
+        id=int(f"{id_pres}003"),
+        idPrescription=id_pres,
+        idDrug=3,
+        source=DrugTypeEnum.SOLUTION.value,
+    )
+    create_prescription_drug(
+        id=int(f"{id_pres}004"),
+        idPrescription=id_pres,
+        idDrug=4,
+        source=DrugTypeEnum.PROCEDURE.value,
+    )
+    # 1 DIET — must NOT be counted in totalItens but IS written to checkedindex
+    create_prescription_drug(
+        id=int(f"{id_pres}005"),
+        idPrescription=id_pres,
+        idDrug=5,
+        source=DrugTypeEnum.DIET.value,
+    )
+
+    test_counters["id_prescription"] += 1
+    test_counters["admission_number"] += 1
+
+    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
+
+    response = client.post(
+        _check_url(),
+        data=_check_payload(id_pres),
+        headers=make_headers(access_token),
+    )
+
+    assert response.status_code == 200
+
+    session.expire_all()
+
+    # Audit record must count only the 3 valid drug types (4 items)
+    audit = (
+        session.query(PrescriptionAudit)
+        .filter(PrescriptionAudit.idPrescription == id_pres)
+        .filter(PrescriptionAudit.auditType == PrescriptionAuditTypeEnum.CHECK.value)
+        .first()
+    )
+    assert audit is not None
+    assert audit.totalItens == 4
+
+    # checkedindex must contain all 5 non-suspended rows (no source filter)
+    result = session.execute(
+        text("SELECT COUNT(*) FROM demo.checkedindex WHERE fkprescricao = :id"),
+        {"id": id_pres},
+    )
+    assert result.scalar() == 5
 
 
 def test_check_prescription_skips_suspended_drugs(client):
