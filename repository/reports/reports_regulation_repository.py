@@ -15,6 +15,20 @@ def get_indicators_panel_report(request_data: RegIndicatorsPanelReportRequest):
         func.count().over().label("total"),
     ).filter(RegIndicatorsPanelReport.current_version == True)
 
+    if (
+        request_data.indicator
+        == RegulationIndicatorReportEnum.SEVEN_GESTATIONAL_APPOINTMENTS.value
+    ):
+        query = query.filter(
+            RegIndicatorsPanelReport.has_seven_gestational_appointments != None
+        )
+
+        if request_data.has_indicator is not None:
+            query = query.filter(
+                RegIndicatorsPanelReport.has_seven_gestational_appointments
+                == request_data.has_indicator
+            )
+
     if request_data.indicator == RegulationIndicatorReportEnum.HPV_VACCINE.value:
         query = query.filter(RegIndicatorsPanelReport.has_vaccine != None)
 
