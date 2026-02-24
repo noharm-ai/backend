@@ -261,6 +261,19 @@ def _add_checkedindex(prescription: Prescription, user: User):
     if prescription.status != "s" or prescription.agg or prescription.concilia != None:
         return
 
+    # first update presmed to mark as checked
+    db.session.execute(
+        text(
+            f"""
+                UPDATE {user.schema}.presmed
+                SET checado = true
+                WHERE fkprescricao = :idPrescription
+                  AND dtsuspensao IS NULL
+                """
+        ),
+        {"idPrescription": prescription.id},
+    )
+
     query = text(
         f"""
         INSERT INTO {user.schema}.checkedindex
