@@ -107,7 +107,7 @@ def get_prioritization_list(request: PrioritizationRequest):
                     ),
                     "dischargeReason": patient.dischargeReason,
                     "date": p[0].date.isoformat(),
-                    "department": str(p[2]),
+                    "department": "***" if hide_names else str(p[2]),
                     "insurance": p[0].insurance if not hide_names else "***",
                     "bed": p[0].bed,
                     "status": p[0].status,

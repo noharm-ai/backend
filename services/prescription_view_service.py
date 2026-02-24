@@ -833,8 +833,8 @@ def _format(
         "responsiblePhysician": "***" if hide_names else patient.responsiblePhysician,
         # extra
         "segmentName": segment.description if segment else None,
-        "department": department.name if department else None,
-        "lastDepartment": last_dept[0] if last_dept else None,
+        "department": "***" if hide_names else department.name if department else None,
+        "lastDepartment": "***" if hide_names else last_dept[0] if last_dept else None,
         "patientScore": "High",
         "formTemplate": config_data["form_template"],
         "admissionReports": config_data["admission_reports"],
