@@ -1,16 +1,32 @@
 """Repository: prescription drug related operations"""
 
-from models.main import db, User
-from models.prescription import CheckedIndex
+from sqlalchemy import select
+
+from models.main import User, db
+from models.prescription import checkedindex_table
 
 
 def get_drug_check_history(admission_number: int, id_drug: int):
     """Get check history for a drug in a given admission from checkedindex table"""
-    return (
-        db.session.query(CheckedIndex, User)
-        .outerjoin(User, CheckedIndex.createdBy == User.id)
-        .filter(CheckedIndex.admissionNumber == admission_number)
-        .filter(CheckedIndex.idDrug == id_drug)
-        .order_by(CheckedIndex.createdAt.desc())
-        .all()
+    ci = checkedindex_table.c
+
+    stmt = (
+        select(
+            ci.dose,
+            ci.doseconv,
+            ci.frequenciadia,
+            ci.via,
+            ci.horario,
+            ci.fkprescricao,
+            ci.dtprescricao,
+            ci.created_at,
+            User.name.label("user_name"),
+        )
+        .outerjoin(User.__table__, ci.created_by == User.id)
+        .where(ci.nratendimento == admission_number)
+        .where(ci.fkmedicamento == id_drug)
+        .order_by(ci.created_at.desc())
+        .limit(100)
     )
+
+    return db.session.execute(stmt).fetchall()

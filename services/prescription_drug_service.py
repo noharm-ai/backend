@@ -1,23 +1,23 @@
 """Service: prescription drug related operations"""
 
-from datetime import datetime, date, timedelta
+from datetime import date, datetime, timedelta
 
-from sqlalchemy import literal, and_, func, or_, asc, case, select
+from sqlalchemy import and_, asc, case, func, literal, or_, select
 
-from models.main import db, User, Drug, Outlier, DrugAttributes
-from models.prescription import Prescription, PrescriptionDrug
-from models.appendix import Notes, MeasureUnit, Frequency
+from decorators.has_permission_decorator import Permission, has_permission
+from exception.validation_error import ValidationError
+from models.appendix import Frequency, MeasureUnit, Notes
 from models.enums import FeatureEnum
-from repository import prescription_view_repository, prescription_drug_repository
+from models.main import Drug, DrugAttributes, Outlier, User, db
+from models.prescription import Prescription, PrescriptionDrug
+from repository import prescription_drug_repository, prescription_view_repository
 from services import (
     data_authorization_service,
     memory_service,
     segment_service,
 )
 from services.admin import admin_ai_service
-from exception.validation_error import ValidationError
-from decorators.has_permission_decorator import has_permission, Permission
-from utils import status, prescriptionutils, dateutils
+from utils import dateutils, prescriptionutils, status
 
 
 @has_permission(Permission.READ_PRESCRIPTION)
@@ -530,11 +530,15 @@ def get_drug_check_history(
 
     return [
         {
-            "doseconv": r.CheckedIndex.doseconv,
-            "frequenciadia": r.CheckedIndex.frequenciadia,
-            "idPrescription": str(r.CheckedIndex.idPrescription),
-            "createdAt": dateutils.to_iso(r.CheckedIndex.createdAt),
-            "createdBy": r.User.name if r.User else None,
+            "dose": r.dose,
+            "doseconv": r.doseconv,
+            "frequencyDay": r.frequenciadia,
+            "route": r.via,
+            "interval": r.horario,
+            "idPrescription": str(r.fkprescricao),
+            "createdAt": dateutils.to_iso(r.created_at),
+            "prescriptionDate": dateutils.to_iso(r.dtprescricao),
+            "createdBy": r.user_name,
         }
         for r in records
     ]

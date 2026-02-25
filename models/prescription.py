@@ -230,24 +230,22 @@ class InterventionAudit(db.Model):
     createdBy = db.Column("created_by", db.BigInteger, nullable=False)
 
 
-class CheckedIndex(db.Model):
-    """Table to store prescription drug checked history data"""
-
-    __tablename__ = "checkedindex"
-
-    admissionNumber = db.Column("nratendimento", db.BigInteger, primary_key=True)
-    idDrug = db.Column("fkmedicamento", db.BigInteger, primary_key=True)
-    idPrescription = db.Column("fkprescricao", db.BigInteger, nullable=True)
-    doseconv = db.Column("doseconv", db.Float, nullable=True)
-    frequenciadia = db.Column("frequenciadia", db.Float, nullable=True)
-    solutionPhase = db.Column("sletapas", db.String(1), nullable=True)
-    solutionTime = db.Column("slhorafase", db.Float, nullable=True)
-    solutionTotalTime = db.Column("sltempoaplicacao", db.String(1), nullable=True)
-    solutionDose = db.Column("sldosagem", db.Float, nullable=True)
-    prescriptionDate = db.Column("dtprescricao", db.DateTime, nullable=True)
-    route = db.Column("via", db.String, nullable=True)
-    interval = db.Column("horario", db.String, nullable=True)
-    dose = db.Column("dose", db.Float, nullable=True)
-    notes = db.Column("complemento", db.String, nullable=True)
-    createdAt = db.Column("created_at", db.DateTime, nullable=True)
-    createdBy = db.Column("created_by", db.BigInteger, nullable=True)
+checkedindex_table = db.Table(
+    "checkedindex",
+    db.Column("nratendimento", db.BigInteger),
+    db.Column("fkmedicamento", db.BigInteger),
+    db.Column("fkprescricao", db.BigInteger),
+    db.Column("doseconv", db.Float),
+    db.Column("frequenciadia", db.Float),
+    db.Column("sletapas", db.String(1)),
+    db.Column("slhorafase", db.Float),
+    db.Column("sltempoaplicacao", db.String(1)),
+    db.Column("sldosagem", db.Float),
+    db.Column("dtprescricao", db.DateTime),
+    db.Column("via", db.String),
+    db.Column("horario", db.String),
+    db.Column("dose", db.Float),
+    db.Column("complemento", db.String),
+    db.Column("created_at", db.DateTime),
+    db.Column("created_by", db.BigInteger),
+)
