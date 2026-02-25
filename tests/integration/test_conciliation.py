@@ -1,21 +1,15 @@
-import json
+from tests.conftest import session
 
-from conftest import get_access, make_headers, session
 from models.prescription import Prescription, PrescriptionAudit
-from security.role import Role
+
+PRESCRIPTION_ID = "9199"
 
 
-def test_get_prescriptions_by_idPrescription_additional2(client):
+def test_get_prescriptions_by_idPrescription_additional2(client, analyst_headers):
     """Teste get /prescriptions/idPrescription - Compara response data com dados do banco e valida status_code 200
     Additional2 idPrescription data validation"""
-
-    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
-    idPrescription = "9199"
-
-    response = client.get(
-        "/prescriptions/" + idPrescription, headers=make_headers(access_token)
-    )
-    data = json.loads(response.data)["data"]
+    response = client.get("/prescriptions/" + PRESCRIPTION_ID, headers=analyst_headers)
+    data = response.get_json()["data"]
 
     assert data["concilia"] == "s"
     assert len(data["prescription"]) == 1
@@ -25,16 +19,12 @@ def test_get_prescriptions_by_idPrescription_additional2(client):
     assert data["birthdate"] == "1941-02-05"
 
 
-def test_putPrescriprionsCheck(client):
-    """Teste put /prescriptions/idPrescription - Checa o status "s" na prescrição e a existência de um resgistro na tabela prescricao_audit."""
-
-    url = f"/prescriptions/status"
-    access_token = get_access(client, roles=[Role.PRESCRIPTION_ANALYST.value])
-    PRESCRIPTION_ID = "9199"
+def test_putPrescriprionsCheck(client, analyst_headers):
+    """Teste put /prescriptions/idPrescription - Checa o status 's' na prescrição e a existência de um resgistro na tabela prescricao_audit."""
     data = {"status": "s", "idPrescription": PRESCRIPTION_ID}
 
     response = client.post(
-        url, data=json.dumps(data), headers=make_headers(access_token)
+        "/prescriptions/status", json=data, headers=analyst_headers
     )
 
     prescription = (

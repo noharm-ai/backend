@@ -1,8 +1,15 @@
 from flask import g
 
+from config import Config
+from models.appendix import GlobalMemory, Memory
+from models.enums import (
+    AppFeatureFlagEnum,
+    FeatureEnum,
+    GlobalMemoryEnum,
+    MemoryEnum,
+    NoHarmENV,
+)
 from models.main import db
-from models.appendix import Memory, GlobalMemory
-from models.enums import MemoryEnum, FeatureEnum, AppFeatureFlagEnum, GlobalMemoryEnum
 
 
 def has_feature(user_feature: FeatureEnum):
@@ -20,6 +27,18 @@ def has_feature(user_feature: FeatureEnum):
         if features_memory:
             features = features_memory.value
             g.features = features
+
+    return user_feature.value in features
+
+
+def has_user_feature(user_feature: FeatureEnum):
+    """
+    Check if user has a specific feature
+    """
+    if Config.ENV == NoHarmENV.TEST.value:
+        return []
+
+    features = g.get("user_features", [])
 
     return user_feature.value in features
 

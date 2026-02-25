@@ -83,7 +83,7 @@ def get_by_kind(kinds) -> dict:
 def save_memory(id, kind, value, user_context: User):
     newMem = False
     if id:
-        mem = Memory.query.get(id)
+        mem = db.session.get(Memory, id)
         if mem is None:
             raise ValidationError(
                 "Memória inexistente",

@@ -132,6 +132,7 @@ def create_agg_prescription_by_prescription(
     pAgg.bed = p.bed
     pAgg.record = p.record
     pAgg.prescriber = "Prescrição Agregada"
+    pAgg.specialty = p.specialty
     pAgg.insurance = p.insurance
     pAgg.agg = True
     pAgg.update = datetime.today()
@@ -267,6 +268,7 @@ def create_agg_prescription_by_date(
         agg_p.idSegment = last_prescription.idSegment
         agg_p.bed = last_prescription.bed
         agg_p.record = last_prescription.record
+        agg_p.specialty = last_prescription.specialty
         agg_p.prescriber = "Prescrição Agregada"
         agg_p.insurance = last_prescription.insurance
         agg_p.agg = True

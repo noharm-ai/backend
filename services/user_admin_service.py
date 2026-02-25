@@ -55,7 +55,7 @@ def _get_user_data(id_user: int):
     ).filter(User.id == UserAuthorization.idUser)
 
     user_result = (
-        db.session.query(User, segments_query.as_scalar())
+        db.session.query(User, segments_query.scalar_subquery())
         .filter(User.id == id_user)
         .first()
     )

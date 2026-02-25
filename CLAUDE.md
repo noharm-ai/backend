@@ -347,10 +347,44 @@ if feature_service.is_feature_enabled(FeatureEnum.FEATURE_NAME, user):
 - **Location:** `tests/`
 - **Framework:** pytest
 - **Plugins:** pytest-flask, pytest-cov, pytest-order
-- **Run:** `pytest`
+- **Database:** PostgreSQL (required — SQLite not compatible due to schema-based multi-tenancy)
+
+### Running Tests Locally
+
+**IMPORTANT:** Always use `make` targets to run tests. Do NOT run `pytest` directly — the database must be running first and `ENV=test` must be set.
+
+```bash
+# First-time setup (starts Docker container + loads database from noharm-ai/database repo)
+make test-setup
+
+# Run all tests
+make test
+
+# Run a specific test file
+make test-file FILE=tests/test_drug.py
+
+# Run with coverage report
+make test-cov
+
+# Stop the database between work sessions (data preserved)
+make db-stop
+make db-start
+
+# Full reset if something is broken
+make db-reset
+```
 
 ### Test Database
-Override in TestConfig (app/flask_config.py)
+- Container defined in `docker-compose.test.yml` (PostgreSQL 16)
+- Schema and seed data loaded from `github.com/noharm-ai/database` (same SQL files as CI)
+- Connection string: `postgresql://postgres@localhost/noharm`
+- Override via `TEST_DATABASE_URL` env var (see `TestConfig` in `app/flask_config.py`)
+- Tests use the `demo` schema (set via `schema_translate_map` in `tests/conftest.py`)
+
+### Test Isolation
+- A session-scoped `clean_test_artifacts` fixture in `tests/conftest.py` deletes test-generated rows before and after each test session — tests are re-runnable without manual cleanup
+- Test-generated prescriptions use IDs ≥ 100,000 (see `tests/utils/utils_test_prescription.py`)
+- Seed substance IDs are < 10,000; test substances use IDs ≥ 10,000
 
 ### Test Ordering
 Use `@pytest.mark.order(n)` for test execution order
@@ -444,11 +478,11 @@ python3 mobile.py
 # Run development server
 python3 mobile.py
 
-# Run tests
-pytest
-
-# Run tests with coverage
-pytest --cov=. --cov-report=html
+# Run tests (requires Docker + database setup — see Testing section)
+make test-setup   # first time only
+make test
+make test-file FILE=tests/test_drug.py
+make test-cov
 
 # Check code style
 pylint services/

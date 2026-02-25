@@ -4,10 +4,15 @@ import math
 import re
 from difflib import SequenceMatcher
 
-from models.enums import DrugTypeEnum
-from services import drug_service
+from models.appendix import MeasureUnit
+from models.enums import DefaultMeasureUnitEnum, DrugTypeEnum, FeatureEnum
+from models.main import Drug, DrugAttributes
+from models.prescription import PrescriptionDrug
+from services import drug_service, feature_service
 from services.admin import admin_ai_service
 from utils import dateutils, numberutils, prescriptionutils, stringutils
+
+CARBOPLATIN_SCTID = 386905002
 
 
 def _get_legacy_alert(kind):
@@ -66,6 +71,7 @@ class DrugList:
             "level": "low",
         }
         self.drug_results = []
+        self.hide_names = feature_service.has_user_feature(FeatureEnum.HIDE_NAMES)
 
         self._process_drugs()
 
@@ -182,6 +188,7 @@ class DrugList:
             pdUnit = stringutils.strNone(pd[2].id) if pd[2] else ""
             pdWhiteList = bool(pd[6].whiteList) if pd[6] is not None else False
             doseWeightStr = None
+            doseWeightDayStr = None
             doseBodySurfaceStr = None
 
             tubeAlert = False
@@ -213,33 +220,56 @@ class DrugList:
                     if weight > 0:
                         weight = weight if weight > 0 else 1
 
-                        doseWeightStr = (
-                            stringutils.strFormatBR(
-                                round(pd[0].dose / float(weight), 2)
-                            )
-                            + " "
-                            + pdUnit
-                            + "/Kg"
-                        )
+                        dose_per_kg = pd[0].dose / float(weight)
+                        frequency = numberutils.none2zero(pd[0].frequency)
 
-                        if (
-                            pd[6].idMeasureUnit != None
+                        has_conv = (
+                            pd[6].idMeasureUnit is not None
                             and pd[6].idMeasureUnit != pdUnit
-                            and pd[0].doseconv != None
-                        ):
-                            calc_doseconv = (
+                            and pd[0].doseconv is not None
+                        )
+                        conv_per_kg = None
+                        if has_conv:
+                            conv_per_kg = (
                                 pd[0].doseconv
                                 if pd[6].useWeight
                                 else round(pd[0].doseconv / float(weight), 2)
                             )
-                            doseWeightStr += (
-                                " ou "
-                                + stringutils.strFormatBR(calc_doseconv)
-                                + " "
-                                + str(pd[6].idMeasureUnit)
-                                + "/Kg"
-                                + (" (faixa arredondada)" if pd[6].useWeight else "")
+
+                        for multiplier, suffix in [
+                            (1, "/Kg"),
+                            (frequency, "/Kg/Dia"),
+                        ]:
+                            if multiplier <= 0:
+                                continue
+
+                            if multiplier in [33, 44, 55, 66, 99]:
+                                continue
+
+                            value = stringutils.strFormatBR(
+                                round(dose_per_kg * multiplier, 2)
                             )
+                            result = f"{value} {pdUnit}{suffix}"
+
+                            if has_conv:
+                                conv_value = stringutils.strFormatBR(
+                                    round(conv_per_kg * multiplier, 2)
+                                    if not pd[6].useWeight
+                                    else conv_per_kg * multiplier
+                                )
+                                conv_suffix = (
+                                    " (faixa arredondada)" if pd[6].useWeight else ""
+                                )
+                                result += (
+                                    f" ou {conv_value} "
+                                    f"{pd[6].idMeasureUnit}{suffix}"
+                                    f"{conv_suffix}"
+                                )
+
+                            if suffix == "/Kg":
+                                doseWeightStr = result
+                            else:
+                                doseWeightDayStr = result
 
                 if (
                     not bool(pd[0].suspendedDate)
@@ -269,6 +299,8 @@ class DrugList:
                 # dialyzable drug and dialysis patient
                 dialyzable = True
 
+            auc_value = self.get_auc_value(pd)
+
             self.drug_results.append(
                 {
                     "idPrescription": str(pd[0].idPrescription),
@@ -290,6 +322,7 @@ class DrugList:
                     "allergy": bool(pd[0].allergy == "S"),
                     "whiteList": pdWhiteList,
                     "doseWeight": doseWeightStr,
+                    "doseWeightDay": doseWeightDayStr,
                     "doseBodySurface": doseBodySurfaceStr,
                     "dose": pd[0].dose,
                     "measureUnit": (
@@ -363,7 +396,7 @@ class DrugList:
                     "tubeAlert": tubeAlert,
                     "notes": pd[7],
                     "prevNotes": prevNotes,
-                    "prevNotesUser": prevNotesUser,
+                    "prevNotesUser": "***" if self.hide_names else prevNotesUser,
                     "drugInfoLink": pd[11].link if pd[11] != None else None,
                     "idSubstance": pd[11].id if pd[11] != None else None,
                     "idSubstanceClass": pd[11].idclass if pd[11] != None else None,
@@ -377,6 +410,7 @@ class DrugList:
                     "orderNumber": pd[0].order_number,
                     "intravenous": pd[0].intravenous,
                     "feedingTube": pd[0].tube,
+                    "auc": auc_value,
                 }
             )
 
@@ -429,6 +463,96 @@ class DrugList:
             return pd[0].cpoe_group if pd[0].cpoe_group else pd[0].solutionGroup
 
         return str(pd[0].idPrescription) + str(pd[0].solutionGroup)
+
+    def get_auc_value(self, pd) -> dict | None:
+        """Calculate AUC value"""
+
+        prescription_drug: PrescriptionDrug = pd[0]
+        drug: Drug = pd[1]
+        pd_measure_unit: MeasureUnit = pd[2]
+        default_measure_unit_nh: str = pd.default_measure_unit_nh
+        pd_attributes: DrugAttributes = pd[6]
+
+        if not drug:
+            return None
+
+        if drug.sctid != CARBOPLATIN_SCTID:
+            return None
+
+        if not pd_measure_unit:
+            return {
+                "auc_cg": None,
+                "auc_ckd": None,
+                "missing_cg": "measure_unit",
+                "missing_ckd": "measure_unit",
+            }
+
+        if not self.exams:
+            return {
+                "auc_cg": None,
+                "auc_ckd": None,
+                "missing_cg": "exams",
+                "missing_ckd": "exams",
+            }
+
+        dose = None
+
+        exam_cg_value = self.exams["cg"]["value"] if "cg" in self.exams else None
+        exam_ckd21_value = (
+            self.exams["ckd21"]["value"] if "ckd21" in self.exams else None
+        )
+
+        if pd_measure_unit.measureunit_nh == DefaultMeasureUnitEnum.MG.value:
+            dose = prescription_drug.dose
+        else:
+            if default_measure_unit_nh == DefaultMeasureUnitEnum.MG.value:
+                if pd_attributes and pd_attributes.useWeight:
+                    # need to implement conversion
+                    return {
+                        "auc_cg": None,
+                        "auc_ckd": None,
+                        "missing_cg": "weight_conversion",
+                        "missing_ckd": "weight_conversion",
+                    }
+
+                dose = prescription_drug.doseconv
+
+        if not dose:
+            return {
+                "auc_cg": None,
+                "auc_ckd": None,
+                "missing_cg": "dose",
+                "missing_ckd": "dose",
+            }
+
+        missing_cg = None
+        missing_ckd = None
+        auc_cg = None
+        auc_ckd = None
+
+        if exam_cg_value:
+            auc_cg = round(dose / (exam_cg_value + 25), 2)
+        else:
+            missing_cg = "no_cg_exam"
+
+        if exam_ckd21_value:
+            bs_weight = numberutils.none2zero(self.exams.get("weight"))
+            bs_height = numberutils.none2zero(self.exams.get("height"))
+
+            if bs_weight > 0 and bs_height > 0:
+                body_surface = math.sqrt((bs_weight * bs_height) / 3600)
+                auc_ckd = round(dose / (exam_ckd21_value * body_surface / 1.73 + 25), 2)
+            else:
+                missing_ckd = "weight_height"
+        else:
+            missing_ckd = "no_ckd21_exam"
+
+        return {
+            "auc_cg": auc_cg,
+            "auc_ckd": auc_ckd,
+            "missing_cg": missing_cg,
+            "missing_ckd": missing_ckd,
+        }
 
     def get_solution_dose(self, pd):
         """Get solution dose for infusion calculations (always in ml)"""

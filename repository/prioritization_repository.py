@@ -318,8 +318,21 @@ def get_prioritization_list(request: PrioritizationRequest):
     if request.medical_record is not None and len(request.medical_record.strip()) > 0:
         q = q.filter(Prescription.record == request.medical_record)
 
-    if request.bed is not None and len(request.bed.strip()) > 0:
-        q = q.filter(Prescription.bed.ilike(f"%{request.bed}%"))
+    if request.bed_list and len(request.bed_list) > 0:
+        bed_filters = []
+        for b in request.bed_list:
+            if b and b.strip():
+                bed_filters.append(Prescription.bed.ilike(f"%{b.strip()}%"))
+        if bed_filters:
+            q = q.filter(or_(*bed_filters))
+
+    if request.specialty_list and len(request.specialty_list) > 0:
+        specialty_filters = []
+        for s in request.specialty_list:
+            if s and s.strip():
+                specialty_filters.append(Prescription.specialty.ilike(f"%{s.strip()}%"))
+        if specialty_filters:
+            q = q.filter(or_(*specialty_filters))
 
     if request.endDate is None:
         endDate = request.startDate

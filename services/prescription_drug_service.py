@@ -1,23 +1,24 @@
 """Service: prescription drug related operations"""
 
-from datetime import datetime, date, timedelta
+import hashlib
+from datetime import date, datetime, timedelta
 
-from sqlalchemy import literal, and_, func, or_, asc, case, select
+from sqlalchemy import and_, asc, case, func, literal, or_, select
 
-from models.main import db, User, Drug, Outlier, DrugAttributes
-from models.prescription import Prescription, PrescriptionDrug
-from models.appendix import Notes, MeasureUnit, Frequency
+from decorators.has_permission_decorator import Permission, has_permission
+from exception.validation_error import ValidationError
+from models.appendix import Frequency, MeasureUnit, Notes
 from models.enums import FeatureEnum
-from repository import prescription_view_repository
+from models.main import Drug, DrugAttributes, Outlier, User, db
+from models.prescription import Prescription, PrescriptionDrug
+from repository import prescription_drug_repository, prescription_view_repository
 from services import (
     data_authorization_service,
     memory_service,
     segment_service,
 )
 from services.admin import admin_ai_service
-from exception.validation_error import ValidationError
-from decorators.has_permission_decorator import has_permission, Permission
-from utils import status, prescriptionutils
+from utils import dateutils, prescriptionutils, status
 
 
 @has_permission(Permission.READ_PRESCRIPTION)
@@ -296,11 +297,11 @@ def get_drug_period(id_prescription_drug: int, future: bool, user_context: User)
 
 # TODO: needs refactor (very confuse)
 def _drug_period_query(id_prescription_drug: int, future: bool, is_cpoe=False):
-    pd = PrescriptionDrug.query.get(id_prescription_drug)
+    pd = db.session.get(PrescriptionDrug, id_prescription_drug)
     if pd is None:
         return [{1: []}], None
 
-    p = Prescription.query.get(pd.idPrescription)
+    p = db.session.get(Prescription, pd.idPrescription)
 
     admissionHistory = None
 
@@ -438,7 +439,7 @@ def _getDrugHistory(idPrescription, admissionNumber, id_drug, is_cpoe):
             .filter(pd1.suspendedDate == None)
             .filter(pr1.date > (date.today() - timedelta(days=30)))
             .order_by(asc(pr1.date))
-            .as_scalar()
+            .scalar_subquery()
         )
 
         return func.array(query)
@@ -488,3 +489,78 @@ def _getDrugHistory(idPrescription, admissionNumber, id_drug, is_cpoe):
         ).select_from(cpoeperiods)
 
         return query
+
+
+def _get_match_diff(r, pd: PrescriptionDrug) -> list:
+    """Compare a checkedindex row against the current PrescriptionDrug values.
+    Returns a list of field names that differ (empty = full match)."""
+    pd_complemento = hashlib.md5(pd.notes.encode()).hexdigest() if pd.notes else ""
+    checks = [
+        ("doseconv", r.doseconv == pd.doseconv),
+        ("frequenciadia", r.frequenciadia == pd.frequency),
+        ("sletapas", r.sletapas == (pd.solutionPhase or 0)),
+        ("slhorafase", r.slhorafase == (pd.solutionTime or 0)),
+        ("sltempoaplicacao", r.sltempoaplicacao == (pd.solutionTotalTime or 0)),
+        ("sldosagem", r.sldosagem == (pd.solutionDose or 0)),
+        ("via", r.via == (pd.route or "")),
+        ("horario", r.horario == (pd.interval[:50] if pd.interval else "")),
+        ("dose", r.dose == pd.dose),
+        ("complemento", (r.complemento or "") == pd_complemento),
+    ]
+    return [field for field, matches in checks if not matches]
+
+
+@has_permission(Permission.READ_PRESCRIPTION)
+def get_drug_check_history(
+    id_prescription_drug: int,
+    user_context: User,
+    user_permissions: list[Permission],
+):
+    """Get check history for a PrescriptionDrug from the checkedindex table"""
+    pd = (
+        db.session.query(PrescriptionDrug)
+        .filter(PrescriptionDrug.id == id_prescription_drug)
+        .first()
+    )
+
+    if pd is None:
+        raise ValidationError(
+            "Prescrição/medicamento inexistente",
+            "errors.invalidRecord",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    prescription = (
+        db.session.query(Prescription)
+        .filter(Prescription.id == pd.idPrescription)
+        .first()
+    )
+
+    if prescription is None:
+        raise ValidationError(
+            "Prescrição inexistente",
+            "errors.invalidRecord",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    records = prescription_drug_repository.get_drug_check_history(
+        admission_number=prescription.admissionNumber,
+        id_drug=pd.idDrug,
+    )
+
+    return [
+        {
+            "dose": r.dose,
+            "doseconv": r.doseconv,
+            "frequencyDay": r.frequenciadia,
+            "route": r.via,
+            "interval": r.horario,
+            "idPrescription": str(r.fkprescricao),
+            "createdAt": dateutils.to_iso(r.created_at),
+            "prescriptionDate": dateutils.to_iso(r.dtprescricao),
+            "createdBy": r.user_name,
+            "match": len(diff := _get_match_diff(r, pd)) == 0,
+            "matchDiff": diff,
+        }
+        for r in records
+    ]

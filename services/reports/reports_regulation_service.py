@@ -51,6 +51,9 @@ def get_indicators_panel_report(request_data: RegIndicatorsPanelReportRequest) -
                 "sexattention_appointment_date": row.RegIndicatorsPanelReport.sexattention_appointment_date.isoformat()
                 if row.RegIndicatorsPanelReport.sexattention_appointment_date
                 else None,
+                "seven_gestational_appointments_date": row.RegIndicatorsPanelReport.seven_gestational_appointments_date.isoformat()
+                if row.RegIndicatorsPanelReport.seven_gestational_appointments_date
+                else None,
                 "hpv_vaccine_date": dateutils.to_iso(
                     row.RegIndicatorsPanelReport.hpv_vaccine_date
                 ),
@@ -59,6 +62,7 @@ def get_indicators_panel_report(request_data: RegIndicatorsPanelReportRequest) -
                 "has_vaccine": row.RegIndicatorsPanelReport.has_vaccine,
                 "has_sexattention_appointment": row.RegIndicatorsPanelReport.has_sexattention_appointment,
                 "has_gestational_appointment": row.RegIndicatorsPanelReport.has_gestational_appointment,
+                "has_seven_gestational_appointments": row.RegIndicatorsPanelReport.has_seven_gestational_appointments,
             }
         )
 

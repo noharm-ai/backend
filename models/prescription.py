@@ -36,6 +36,7 @@ class Prescription(db.Model):
     user = db.Column("update_by", db.BigInteger, nullable=True)
     origin_created_at = db.Column("dtcriacao_origem", db.DateTime, nullable=True)
     id_clinical_notes_type = db.Column("idtipoevolucao", db.String, nullable=True)
+    specialty = db.Column("especialidade", db.String, nullable=True)
 
     def getFuturePrescription(idPrescription, admissionNumber):
         return (
@@ -227,3 +228,24 @@ class InterventionAudit(db.Model):
     extra = db.Column("extra", postgresql.JSON, nullable=True)
     createdAt = db.Column("created_at", db.DateTime, nullable=False)
     createdBy = db.Column("created_by", db.BigInteger, nullable=False)
+
+
+checkedindex_table = db.Table(
+    "checkedindex",
+    db.Column("nratendimento", db.BigInteger),
+    db.Column("fkmedicamento", db.BigInteger),
+    db.Column("fkprescricao", db.BigInteger),
+    db.Column("doseconv", db.Float),
+    db.Column("frequenciadia", db.Float),
+    db.Column("sletapas", db.String(1)),
+    db.Column("slhorafase", db.Float),
+    db.Column("sltempoaplicacao", db.String(1)),
+    db.Column("sldosagem", db.Float),
+    db.Column("dtprescricao", db.DateTime),
+    db.Column("via", db.String),
+    db.Column("horario", db.String),
+    db.Column("dose", db.Float),
+    db.Column("complemento", db.String),
+    db.Column("created_at", db.DateTime),
+    db.Column("created_by", db.BigInteger),
+)

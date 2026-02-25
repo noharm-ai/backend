@@ -89,7 +89,7 @@ def list_available_reports(schema: str, report: str):
     file_list = []
     for f in files["Contents"]:
         filename = f["Key"].split("/")[-1].replace(".gz", "")
-        if filename != "current":
+        if filename != "current" and "parquet" not in filename:
             file_list.append(
                 {
                     "name": f["Key"].split("/")[-1].replace(".gz", ""),

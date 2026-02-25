@@ -253,6 +253,12 @@ def upsert_seg_exam(data: dict, user_context: User):
     if data.get("max", None) != None:
         segExam.max = escape_html(data.get("max", None))
     if data.get("ref", None) != None:
+        if len(data.get("ref")) > 250:
+            raise ValidationError(
+                "O campo referência deve ter no máximo 250 caracteres",
+                "errors.businessRules",
+                status.HTTP_400_BAD_REQUEST,
+            )
         segExam.ref = escape_html(data.get("ref", None))
     if "active" in data.keys():
         segExam.active = bool(data.get("active", False))
