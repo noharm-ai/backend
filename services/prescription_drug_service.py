@@ -8,7 +8,7 @@ from models.main import db, User, Drug, Outlier, DrugAttributes
 from models.prescription import Prescription, PrescriptionDrug
 from models.appendix import Notes, MeasureUnit, Frequency
 from models.enums import FeatureEnum
-from repository import prescription_view_repository
+from repository import prescription_view_repository, prescription_drug_repository
 from services import (
     data_authorization_service,
     memory_service,
@@ -17,7 +17,7 @@ from services import (
 from services.admin import admin_ai_service
 from exception.validation_error import ValidationError
 from decorators.has_permission_decorator import has_permission, Permission
-from utils import status, prescriptionutils
+from utils import status, prescriptionutils, dateutils
 
 
 @has_permission(Permission.READ_PRESCRIPTION)
@@ -488,3 +488,53 @@ def _getDrugHistory(idPrescription, admissionNumber, id_drug, is_cpoe):
         ).select_from(cpoeperiods)
 
         return query
+
+
+@has_permission(Permission.READ_PRESCRIPTION)
+def get_drug_check_history(
+    id_prescription_drug: int,
+    user_context: User,
+    user_permissions: list[Permission],
+):
+    """Get check history for a PrescriptionDrug from the checkedindex table"""
+    pd = (
+        db.session.query(PrescriptionDrug)
+        .filter(PrescriptionDrug.id == id_prescription_drug)
+        .first()
+    )
+
+    if pd is None:
+        raise ValidationError(
+            "Prescrição/medicamento inexistente",
+            "errors.invalidRecord",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    prescription = (
+        db.session.query(Prescription)
+        .filter(Prescription.id == pd.idPrescription)
+        .first()
+    )
+
+    if prescription is None:
+        raise ValidationError(
+            "Prescrição inexistente",
+            "errors.invalidRecord",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    records = prescription_drug_repository.get_drug_check_history(
+        admission_number=prescription.admissionNumber,
+        id_drug=pd.idDrug,
+    )
+
+    return [
+        {
+            "doseconv": r.CheckedIndex.doseconv,
+            "frequenciadia": r.CheckedIndex.frequenciadia,
+            "idPrescription": str(r.CheckedIndex.idPrescription),
+            "createdAt": dateutils.to_iso(r.CheckedIndex.createdAt),
+            "createdBy": r.User.name if r.User else None,
+        }
+        for r in records
+    ]

@@ -240,3 +240,14 @@ def pep_link():
     return prescription_service.get_pep_link(
         id_prescription=request.args.get("idPrescription", None)
     )
+
+
+@app_pres.route(
+    "/prescriptions/drug/<int:id_prescription_drug>/check-history", methods=["GET"]
+)
+@api_endpoint()
+def get_drug_check_history(id_prescription_drug: int):
+    """List check history for a prescription drug from checkedindex table"""
+    return prescription_drug_service.get_drug_check_history(
+        id_prescription_drug=id_prescription_drug
+    )
