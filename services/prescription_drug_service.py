@@ -1,5 +1,6 @@
 """Service: prescription drug related operations"""
 
+import hashlib
 from datetime import date, datetime, timedelta
 
 from sqlalchemy import and_, asc, case, func, literal, or_, select
@@ -490,6 +491,25 @@ def _getDrugHistory(idPrescription, admissionNumber, id_drug, is_cpoe):
         return query
 
 
+def _get_match_diff(r, pd: PrescriptionDrug) -> list:
+    """Compare a checkedindex row against the current PrescriptionDrug values.
+    Returns a list of field names that differ (empty = full match)."""
+    pd_complemento = hashlib.md5(pd.notes.encode()).hexdigest() if pd.notes else ""
+    checks = [
+        ("doseconv", r.doseconv == pd.doseconv),
+        ("frequenciadia", r.frequenciadia == pd.frequency),
+        ("sletapas", r.sletapas == (pd.solutionPhase or 0)),
+        ("slhorafase", r.slhorafase == (pd.solutionTime or 0)),
+        ("sltempoaplicacao", r.sltempoaplicacao == (pd.solutionTotalTime or 0)),
+        ("sldosagem", r.sldosagem == (pd.solutionDose or 0)),
+        ("via", r.via == (pd.route or "")),
+        ("horario", r.horario == (pd.interval[:50] if pd.interval else "")),
+        ("dose", r.dose == pd.dose),
+        ("complemento", (r.complemento or "") == pd_complemento),
+    ]
+    return [field for field, matches in checks if not matches]
+
+
 @has_permission(Permission.READ_PRESCRIPTION)
 def get_drug_check_history(
     id_prescription_drug: int,
@@ -539,6 +559,8 @@ def get_drug_check_history(
             "createdAt": dateutils.to_iso(r.created_at),
             "prescriptionDate": dateutils.to_iso(r.dtprescricao),
             "createdBy": r.user_name,
+            "match": len(diff := _get_match_diff(r, pd)) == 0,
+            "matchDiff": diff,
         }
         for r in records
     ]
