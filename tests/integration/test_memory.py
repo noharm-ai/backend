@@ -18,7 +18,7 @@ def _add_memory(mem_kind, mem_value):
 
 
 def _delete_memory(key):
-    memory = session.query(Memory).get(key)
+    memory = session.get(Memory, key)
     if memory:
         session.delete(memory)
         session_commit()
@@ -54,7 +54,7 @@ def test_put_new_memory(client, analyst_headers):
     data = {"type": "new-memory", "value": "7"}
     response = client.put("memory/", json=data, headers=analyst_headers)
     id_memory = response.get_json()["data"]
-    mem = session.query(Memory).get(id_memory)
+    mem = session.get(Memory, id_memory)
 
     assert response.status_code == 200
     assert id_memory == mem.key
@@ -70,7 +70,7 @@ def test_update_memory(client, analyst_headers):
 
     data = {"type": "updated-memory", "value": "7"}
     response = client.put("memory/" + str(id_memory), json=data, headers=analyst_headers)
-    mem = session.query(Memory).get(id_memory)
+    mem = session.get(Memory, id_memory)
 
     assert response.status_code == 200
     assert id_memory == response.get_json()["data"]

@@ -296,11 +296,11 @@ def get_drug_period(id_prescription_drug: int, future: bool, user_context: User)
 
 # TODO: needs refactor (very confuse)
 def _drug_period_query(id_prescription_drug: int, future: bool, is_cpoe=False):
-    pd = PrescriptionDrug.query.get(id_prescription_drug)
+    pd = db.session.get(PrescriptionDrug, id_prescription_drug)
     if pd is None:
         return [{1: []}], None
 
-    p = Prescription.query.get(pd.idPrescription)
+    p = db.session.get(Prescription, pd.idPrescription)
 
     admissionHistory = None
 
@@ -438,7 +438,7 @@ def _getDrugHistory(idPrescription, admissionNumber, id_drug, is_cpoe):
             .filter(pd1.suspendedDate == None)
             .filter(pr1.date > (date.today() - timedelta(days=30)))
             .order_by(asc(pr1.date))
-            .as_scalar()
+            .scalar_subquery()
         )
 
         return func.array(query)

@@ -17,7 +17,7 @@ def test_get_prescriptions_by_idPrescription(client, analyst_headers):
     """Teste get /prescriptions/idPrescription - Compara response data com dados do banco e valida status_code 200"""
     response = client.get("/prescriptions/" + PRESCRIPTION, headers=analyst_headers)
     data = response.get_json()["data"]
-    prescription = session.query(Prescription).get(PRESCRIPTION)
+    prescription = session.get(Prescription, PRESCRIPTION)
 
     assert response.status_code == 200
     assert data["idPrescription"] == str(prescription.id)
@@ -55,7 +55,7 @@ def test_put_prescriptions_by_id(client, analyst_headers):
         "prescriptions/" + PRESCRIPTION, json=data, headers=analyst_headers
     )
     response_data = response.get_json()["data"]
-    prescription = session.query(Prescription).get(PRESCRIPTION)
+    prescription = session.get(Prescription, PRESCRIPTION)
 
     assert response.status_code == 200
     assert response_data == str(prescription.id)

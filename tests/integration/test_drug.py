@@ -1,6 +1,5 @@
-from tests.conftest import session, session_commit
-
 from models.main import Drug, Outlier, Substance
+from tests.conftest import session, session_commit
 
 
 def test_get_drugs(client, analyst_headers):

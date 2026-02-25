@@ -28,7 +28,7 @@ def test_post_patient(client, analyst_headers):
     data = {"height": "15.0"}
     response = client.post("patient/" + ADMISSION, json=data, headers=analyst_headers)
     response_data = response.get_json()["data"]
-    patient = session.query(Patient).get(ADMISSION)
+    patient = session.get(Patient, ADMISSION)
 
     assert response.status_code == 200
     assert data["height"] == str(patient.height)
