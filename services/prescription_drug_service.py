@@ -543,12 +543,14 @@ def get_drug_check_history(
             status.HTTP_400_BAD_REQUEST,
         )
 
+    audit = prescription_drug_repository.get_insertion_audit(id_prescription_drug)
+
     records = prescription_drug_repository.get_drug_check_history(
         admission_number=prescription.admissionNumber,
         id_drug=pd.idDrug,
     )
 
-    return [
+    records_list = [
         {
             "dose": r.dose,
             "doseconv": r.doseconv,
@@ -564,3 +566,18 @@ def get_drug_check_history(
         }
         for r in records
     ]
+
+    return {
+        "audit": {
+            "createdAt": dateutils.to_iso(audit.createdAt) if audit else None,
+            "config": audit.extra if audit else None,
+        },
+        "current": {
+            "dose": pd.dose,
+            "doseconv": pd.doseconv,
+            "frequencyDay": pd.frequency,
+            "route": pd.route,
+            "interval": pd.interval,
+        },
+        "records": records_list,
+    }
