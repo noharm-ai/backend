@@ -1,12 +1,17 @@
+import json
 import logging
 import time
-import json
+
 from redis.exceptions import TimeoutError
 
+from config import Config
+from models.enums import NoHarmENV
 from models.main import redis_client
 
 
 def get_by_key(key: str):
+    if Config.ENV == NoHarmENV.TEST.value:
+        return None
     try:
         return redis_client.json().get(key)
     except TimeoutError:
@@ -19,6 +24,8 @@ def get_by_key(key: str):
 
 
 def get_range(key: str, days_ago: int):
+    if Config.ENV == NoHarmENV.TEST.value:
+        return None
     now = time.time()
     min_date = now - (days_ago * 24 * 60 * 60)
 
@@ -43,9 +50,11 @@ def get_range(key: str, days_ago: int):
 
 
 def get_hgetall(key: str):
+    if Config.ENV == NoHarmENV.TEST.value:
+        return None
     try:
         cache_data = redis_client.hgetall(key)
-    except:
+    except TimeoutError:
         logging.basicConfig()
         logger = logging.getLogger("noharm.backend")
         logger.error(
