@@ -239,13 +239,10 @@ def get_exams_by_admission(admission_number: int, id_segment: int, user_context:
             }
 
     # Add PostgreSQL exams to dict
-    cache_hit_count = 0
-    cache_miss_count = 0
     for exam in examsList:
         key = (exam.idExame, exam.typeExam)
 
         if key not in exams_dict and exam.typeExam.lower() in segExam:
-            cache_miss_count += 1
             logger.backend_logger.debug(
                 json.dumps(
                     {
@@ -258,9 +255,6 @@ def get_exams_by_admission(admission_number: int, id_segment: int, user_context:
                     }
                 )
             )
-
-        if key in exams_dict:
-            cache_hit_count += 1
 
         exams_dict[key] = {
             "source": "postgres",
@@ -278,16 +272,8 @@ def get_exams_by_admission(admission_number: int, id_segment: int, user_context:
         )
     ]
 
-    logger.backend_logger.warning(
-        json.dumps(
-            {
-                "event": "dynamodb_stats",
-                "miss": cache_miss_count,
-                "hit": cache_hit_count,
-                "schema": user_context.schema,
-            }
-        )
-    )
+    # Build source lookup: (idExame, typeExam) -> source
+    exam_source_map = {key: item["source"] for key, item in exams_dict.items()}
 
     perc = {
         "h_conleuc": {
@@ -316,8 +302,11 @@ def get_exams_by_admission(admission_number: int, id_segment: int, user_context:
             )
             item["name"] = segExam[key].name
             item["perc"] = None
-            item["history"] = _history_exam(e.typeExam, examsList, segExam)
+            item["history"] = _history_exam(
+                e.typeExam, examsList, segExam, source_map=exam_source_map
+            )
             item["text"] = False
+            item["source"] = exam_source_map.get((e.idExame, e.typeExam), "postgres")
             bufferList[key] = item
             typeExams.append(key)
             if key in perc:
@@ -408,7 +397,7 @@ def get_exams_by_admission(admission_number: int, id_segment: int, user_context:
         slugExam = (
             stringutils.slugify(e.prescriber) if e.prescriber else "EXAMES TEXTUAIS"
         )
-        if not slugExam in resultsText.keys():
+        if slugExam not in resultsText.keys():
             resultsText[slugExam] = {
                 "name": e.prescriber,
                 "text": True,
@@ -426,7 +415,7 @@ def get_exams_by_admission(admission_number: int, id_segment: int, user_context:
     return dict(results, **resultsText)
 
 
-def _history_exam(typeExam, examsList, segExam):
+def _history_exam(typeExam, examsList, segExam, source_map=None):
     results = []
     for e in examsList:
         if e.typeExam == typeExam:
@@ -443,6 +432,11 @@ def _history_exam(typeExam, examsList, segExam):
             item["manual"] = bool(e.created_by)
             item["idExam"] = e.idExame
             item["admissionNumber"] = e.admissionNumber
+            item["source"] = (
+                source_map.get((e.idExame, e.typeExam), "postgres")
+                if source_map
+                else "postgres"
+            )
             results.append(item)
     return results
 
