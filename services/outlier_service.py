@@ -748,7 +748,7 @@ def get_outlier_drugs(
                 db.session.query(Outlier.idDrug.label("idDrug"))
                 .filter(Outlier.idSegment == id_segment)
                 .group_by(Outlier.idDrug)
-                .subquery()
+                .scalar_subquery()
             )
 
             drugs = db.session.query(Drug)
