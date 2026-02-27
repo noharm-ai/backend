@@ -1,8 +1,11 @@
 """Tests: Prescription Check related operations"""
 
+import threading
+import time
 from datetime import datetime
 from unittest.mock import patch
 
+from mobile import app as flask_app
 from tests.conftest import session, session_commit
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
@@ -351,3 +354,43 @@ def test_check_prescription_fails_after_max_retries(client, analyst_headers):
     session.expire_all()
     p = session.query(Prescription).filter(Prescription.id == id_pres).first()
     assert p.status == "0"  # rollback preserved the original status
+
+
+def test_for_update_blocks_until_lock_released(analyst_headers):
+    """with_for_update() blocks a check request while the prescription row is externally locked.
+    Once the external lock is released the request proceeds and succeeds (200).
+    """
+    prescription = create_basic_prescription()
+    id_pres = prescription.id
+
+    # Acquire a row-level lock from the test session — transaction stays open, no commit yet
+    session.query(Prescription).filter(Prescription.id == id_pres).with_for_update().first()
+
+    result = {"status_code": None, "done": False}
+
+    def do_check():
+        # Each thread gets its own Flask request context and its own DB session
+        with flask_app.test_client() as tc:
+            response = tc.post(
+                CHECK_URL, json=_check_payload(id_pres), headers=analyst_headers
+            )
+            result["status_code"] = response.status_code
+            result["done"] = True
+
+    t = threading.Thread(target=do_check)
+    t.start()
+
+    # Give the thread enough time to reach the SELECT FOR UPDATE and block at PostgreSQL
+    time.sleep(0.2)
+    assert not result["done"], "Request should be waiting for the row lock"
+
+    # Release the lock — the blocked request can now acquire it and proceed
+    session_commit()
+
+    t.join(timeout=5)
+
+    assert result["done"]
+    assert result["status_code"] == 200
+    session.expire_all()
+    p = session.query(Prescription).filter(Prescription.id == id_pres).first()
+    assert p.status == "s"
