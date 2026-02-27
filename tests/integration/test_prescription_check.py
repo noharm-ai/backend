@@ -1,10 +1,13 @@
 """Tests: Prescription Check related operations"""
 
 from datetime import datetime
+from unittest.mock import patch
 
 from tests.conftest import session, session_commit
 from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
 
+import services.prescription_check_service as prescription_check_service
 from models.enums import DrugTypeEnum, PrescriptionAuditTypeEnum
 from models.prescription import Prescription, PrescriptionAudit, PrescriptionDrug
 from static import prescalc
@@ -299,3 +302,52 @@ def test_check_aggregate_prescription(client, analyst_headers):
     assert len(pInAg) == 2
     assert len(pInAgaudit) == 2
     assert not pOutAgaudit
+
+
+def test_check_prescription_retries_on_deadlock(client, analyst_headers):
+    """check_prescription: recovers transparently from a single deadlock on presmed UPDATE"""
+    prescription = create_basic_prescription()
+    id_pres = prescription.id
+
+    call_count = {"n": 0}
+    original = prescription_check_service._add_checkedindex
+
+    def flaky(prescription, user):
+        call_count["n"] += 1
+        if call_count["n"] == 1:
+            raise OperationalError("deadlock detected", None, None)
+        return original(prescription=prescription, user=user)
+
+    with patch(
+        "services.prescription_check_service._add_checkedindex", side_effect=flaky
+    ):
+        response = client.post(
+            CHECK_URL, json=_check_payload(id_pres), headers=analyst_headers
+        )
+
+    assert response.status_code == 200
+    assert call_count["n"] == 2  # first call deadlocked, second succeeded on retry
+
+    session.expire_all()
+    p = session.query(Prescription).filter(Prescription.id == id_pres).first()
+    assert p.status == "s"
+
+
+def test_check_prescription_fails_after_max_retries(client, analyst_headers):
+    """check_prescription: returns 500 and leaves prescription unchanged when deadlock persists across all retries"""
+    prescription = create_basic_prescription()
+    id_pres = prescription.id
+
+    with patch(
+        "services.prescription_check_service._add_checkedindex",
+        side_effect=OperationalError("deadlock detected", None, None),
+    ):
+        response = client.post(
+            CHECK_URL, json=_check_payload(id_pres), headers=analyst_headers
+        )
+
+    assert response.status_code == 500
+
+    session.expire_all()
+    p = session.query(Prescription).filter(Prescription.id == id_pres).first()
+    assert p.status == "0"  # rollback preserved the original status
