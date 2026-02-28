@@ -1,15 +1,13 @@
-from sqlalchemy import func, or_, and_
 from datetime import datetime
 
-from models.main import db, Substance, User, Relation
-from decorators.has_permission_decorator import has_permission, Permission
-from exception.authorization_error import AuthorizationError
-from security.role import Role
+from sqlalchemy import and_, func, or_
+
+from decorators.has_permission_decorator import Permission, has_permission
+from models.main import Relation, Substance, User, db
 
 
 @has_permission(Permission.ADMIN_SUBSTANCE_RELATIONS)
 def get_relations(
-    user_context: User = None,
     id_origin_list=[],
     id_destination_list=[],
     kind_list=[],
@@ -18,7 +16,6 @@ def get_relations(
     limit=50,
     offset=0,
 ):
-    _validate_admin_role(user_context)
 
     SubstA = db.aliased(Substance)
     SubstB = db.aliased(Substance)
@@ -71,7 +68,7 @@ def get_relations(
                     **{
                         "originName": i[1].name if i[1] != None else None,
                         "destinationName": i[2].name if i[2] != None else None,
-                    }
+                    },
                 )
                 for i in results
             ],
@@ -128,7 +125,7 @@ def upsert_relation(data: dict, user_context: User):
         **{
             "originName": db_relation[1].name if db_relation[1] != None else None,
             "destinationName": db_relation[2].name if db_relation[2] != None else None,
-        }
+        },
     )
 
 
@@ -141,15 +138,3 @@ def _to_dto(r: Relation):
         "active": r.active,
         "level": r.level,
     }
-
-
-def _validate_admin_role(user_context: User):
-    roles = (
-        user_context.config["roles"]
-        if user_context and user_context.config and "roles" in user_context.config
-        else []
-    )
-
-    is_admin = any(str(role).upper() == Role.ADMIN.value for role in roles)
-    if not is_admin:
-        raise AuthorizationError()
