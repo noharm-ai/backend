@@ -3,10 +3,13 @@ from datetime import datetime
 
 from models.main import db, Substance, User, Relation
 from decorators.has_permission_decorator import has_permission, Permission
+from exception.authorization_error import AuthorizationError
+from security.role import Role
 
 
 @has_permission(Permission.ADMIN_SUBSTANCE_RELATIONS)
 def get_relations(
+    user_context: User = None,
     id_origin_list=[],
     id_destination_list=[],
     kind_list=[],
@@ -15,6 +18,8 @@ def get_relations(
     limit=50,
     offset=0,
 ):
+    _validate_admin_role(user_context)
+
     SubstA = db.aliased(Substance)
     SubstB = db.aliased(Substance)
 
@@ -136,3 +141,15 @@ def _to_dto(r: Relation):
         "active": r.active,
         "level": r.level,
     }
+
+
+def _validate_admin_role(user_context: User):
+    roles = (
+        user_context.config["roles"]
+        if user_context and user_context.config and "roles" in user_context.config
+        else []
+    )
+
+    is_admin = any(str(role).upper() == Role.ADMIN.value for role in roles)
+    if not is_admin:
+        raise AuthorizationError()
