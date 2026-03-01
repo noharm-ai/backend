@@ -83,6 +83,7 @@ class Role(Enum):
             Permission.INTEGRATION_STATUS,
             Permission.ADMIN_ROUTES,
             Permission.ADMIN_SUBSTANCES,
+            Permission.ADMIN_SUBSTANCE_RELATIONS,
             Permission.ADMIN_UNIT_CONVERSION,
             Permission.ADMIN_SEGMENTS,
             Permission.ADMIN_PATIENT,
