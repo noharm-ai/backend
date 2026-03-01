@@ -1,4 +1,5 @@
 import pytest
+
 from security.role import Role
 from tests.conftest import get_access, make_headers
 
@@ -25,3 +26,27 @@ def user_manager_headers(client):
 def config_manager_headers(client):
     """Headers with CONFIG_MANAGER role"""
     return make_headers(get_access(client, roles=[Role.CONFIG_MANAGER.value]))
+
+
+@pytest.fixture
+def admin_headers(client):
+    """Headers with ADMIN role"""
+    return make_headers(
+        get_access(
+            client,
+            email="user@admin.com",
+            password="useradmin",
+        )
+    )
+
+
+@pytest.fixture
+def curator_headers(client):
+    """Headers with CURATOR role"""
+    return make_headers(
+        get_access(
+            client,
+            email="user@curator.com",
+            password="usercurator",
+        )
+    )

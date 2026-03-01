@@ -394,7 +394,7 @@ def auth_local(
 
     permissions = Role.get_permissions_from_user(user=user)
 
-    if Permission.MAINTAINER in permissions:
+    if Permission.MAINTAINER in permissions and Config.ENV != NoHarmENV.TEST.value:
         raise ValidationError(
             f"Utilize o endereço {Config.MAIL_HOST}/login/noharm para fazer login na NoHarm",
             f"{Config.MAIL_HOST}/login/noharm",

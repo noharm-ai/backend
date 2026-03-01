@@ -1,8 +1,9 @@
-from sqlalchemy import func, or_, and_
 from datetime import datetime
 
-from models.main import db, Substance, User, Relation
-from decorators.has_permission_decorator import has_permission, Permission
+from sqlalchemy import and_, func, or_
+
+from decorators.has_permission_decorator import Permission, has_permission
+from models.main import Relation, Substance, User, db
 
 
 @has_permission(Permission.ADMIN_SUBSTANCE_RELATIONS)
@@ -15,6 +16,7 @@ def get_relations(
     limit=50,
     offset=0,
 ):
+
     SubstA = db.aliased(Substance)
     SubstB = db.aliased(Substance)
 
@@ -66,7 +68,7 @@ def get_relations(
                     **{
                         "originName": i[1].name if i[1] != None else None,
                         "destinationName": i[2].name if i[2] != None else None,
-                    }
+                    },
                 )
                 for i in results
             ],
@@ -123,7 +125,7 @@ def upsert_relation(data: dict, user_context: User):
         **{
             "originName": db_relation[1].name if db_relation[1] != None else None,
             "destinationName": db_relation[2].name if db_relation[2] != None else None,
-        }
+        },
     )
 
 

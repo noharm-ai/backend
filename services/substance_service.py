@@ -1,9 +1,9 @@
-from sqlalchemy import or_, asc, func, desc
+from sqlalchemy import asc, desc, func, or_
 
-from models.main import db, Substance, SubstanceClass, Relation
-from decorators.has_permission_decorator import has_permission, Permission
+from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
-from utils import status, stringutils, prescriptionutils
+from models.main import Relation, Substance, SubstanceClass, db
+from utils import prescriptionutils, status, stringutils
 
 
 @has_permission(Permission.READ_BASIC_FEATURES)
@@ -108,7 +108,7 @@ def get_substance_handling(sctid: int, alert_type: str):
     return None
 
 
-@has_permission(Permission.READ_PRESCRIPTION)
+@has_permission(Permission.ADMIN_SUBSTANCE_RELATIONS)
 def get_substance_relations(sctid: int):
     SubstA = db.aliased(Substance)
     SubstB = db.aliased(Substance)

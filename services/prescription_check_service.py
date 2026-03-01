@@ -13,7 +13,7 @@ from models.enums import (
     PrescriptionAuditTypeEnum,
     PrescriptionReviewTypeEnum,
 )
-from models.main import User, db
+from models.main import User, db, dbSession
 from models.prescription import (
     Prescription,
     PrescriptionAudit,
@@ -28,6 +28,7 @@ from services import (
     user_service,
 )
 from utils import status
+from utils.db_utils import run_with_deadlock_retry
 
 
 @has_permission(Permission.WRITE_PRESCRIPTION)
@@ -43,108 +44,126 @@ def check_prescription(
 ):
     """
     Check or uncheck a prescription.
+
+    The presmed UPDATE inside this flow can deadlock against the external
+    integration process that writes to the same table concurrently.
+    run_with_deadlock_retry handles PostgreSQL deadlock errors (40P01) by
+    rolling back and retrying up to 3 times with exponential back-off.
+    with_for_update() on the initial prescription read serialises concurrent
+    requests from this application on the same prescription row.
     """
 
-    p = db.session.query(Prescription).filter(Prescription.id == idPrescription).first()
-    if p is None:
-        raise ValidationError(
-            "Prescrição inexistente",
-            "errors.businessRules",
-            status.HTTP_400_BAD_REQUEST,
+    def _do_check():
+        p = (
+            db.session.query(Prescription)
+            .filter(Prescription.id == idPrescription)
+            .with_for_update()
+            .first()
         )
-
-    if p.status == p_status:
-        raise ValidationError(
-            (
-                "Não houve alteração da situação: Prescrição já está checada"
-                if p_status == "s"
-                else "Não houve alteração da situação: A checagem já foi desfeita"
-            ),
-            "errors.businessRules",
-            status.HTTP_400_BAD_REQUEST,
-        )
-
-    if not data_authorization_service.has_segment_authorization(
-        id_segment=p.idSegment, user=user_context
-    ):
-        raise ValidationError(
-            "Usuário não autorizado neste segmento",
-            "errors.businessRules",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-
-    has_lock_feature = memory_service.has_feature(
-        FeatureEnum.LOCK_CHECKED_PRESCRIPTION.value
-    )
-
-    if p_status == "0" and p.user != user_context.id:
-        # TODO: refactor (when user has permission to override this?)
-        if has_lock_feature:
+        if p is None:
             raise ValidationError(
-                "A checagem não pode ser desfeita, pois foi efetuada por outro usuário",
-                "errors.businessError",
+                "Prescrição inexistente",
+                "errors.businessRules",
                 status.HTTP_400_BAD_REQUEST,
             )
 
-    user_service.validate_return_integration(
-        user_context=user_context, user_permissions=user_permissions
+        if p.status == p_status:
+            raise ValidationError(
+                (
+                    "Não houve alteração da situação: Prescrição já está checada"
+                    if p_status == "s"
+                    else "Não houve alteração da situação: A checagem já foi desfeita"
+                ),
+                "errors.businessRules",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not data_authorization_service.has_segment_authorization(
+            id_segment=p.idSegment, user=user_context
+        ):
+            raise ValidationError(
+                "Usuário não autorizado neste segmento",
+                "errors.businessRules",
+                status.HTTP_401_UNAUTHORIZED,
+            )
+
+        has_lock_feature = memory_service.has_feature(
+            FeatureEnum.LOCK_CHECKED_PRESCRIPTION.value
+        )
+
+        if p_status == "0" and p.user != user_context.id:
+            # TODO: refactor (when user has permission to override this?)
+            if has_lock_feature:
+                raise ValidationError(
+                    "A checagem não pode ser desfeita, pois foi efetuada por outro usuário",
+                    "errors.businessError",
+                    status.HTTP_400_BAD_REQUEST,
+                )
+
+        user_service.validate_return_integration(
+            user_context=user_context, user_permissions=user_permissions
+        )
+
+        extra_info = {
+            "main_prescription": str(p.id),
+            "main_is_agg": bool(p.agg),
+            "main_evaluationStartDate": (
+                p.features["evaluation"]["startDate"]
+                if p.features != None
+                and "evaluation" in p.features
+                and "startDate" in p.features["evaluation"]
+                else None
+            ),
+            "evaluationTime": evaluation_time or 0,
+            "alerts": alerts,
+            "serviceUser": service_user,
+            "fastCheck": fast_check,
+        }
+
+        results = []
+
+        if p.agg:
+            internals = _check_agg_internal_prescriptions(
+                prescription=p,
+                p_status=p_status,
+                user=user_context,
+                has_lock_feature=has_lock_feature,
+                extra=extra_info,
+            )
+            single = _check_single_prescription(
+                prescription=p,
+                p_status=p_status,
+                user=user_context,
+                has_lock_feature=has_lock_feature,
+                extra=extra_info,
+            )
+
+            for i in internals:
+                results.append(i)
+            if single:
+                results.append(single)
+
+        else:
+            single = _check_single_prescription(
+                prescription=p,
+                p_status=p_status,
+                user=user_context,
+                has_lock_feature=has_lock_feature,
+                extra=extra_info,
+            )
+            _update_agg_status(prescription=p, user=user_context, extra=extra_info)
+
+            if single:
+                results.append(single)
+
+        _clean_checkedindex(user_context=user_context)
+
+        return results
+
+    return run_with_deadlock_retry(
+        _do_check,
+        on_retry=lambda: dbSession.setSchema(user_context.schema),
     )
-
-    extra_info = {
-        "main_prescription": str(p.id),
-        "main_is_agg": bool(p.agg),
-        "main_evaluationStartDate": (
-            p.features["evaluation"]["startDate"]
-            if p.features != None
-            and "evaluation" in p.features
-            and "startDate" in p.features["evaluation"]
-            else None
-        ),
-        "evaluationTime": evaluation_time or 0,
-        "alerts": alerts,
-        "serviceUser": service_user,
-        "fastCheck": fast_check,
-    }
-
-    results = []
-
-    if p.agg:
-        internals = _check_agg_internal_prescriptions(
-            prescription=p,
-            p_status=p_status,
-            user=user_context,
-            has_lock_feature=has_lock_feature,
-            extra=extra_info,
-        )
-        single = _check_single_prescription(
-            prescription=p,
-            p_status=p_status,
-            user=user_context,
-            has_lock_feature=has_lock_feature,
-            extra=extra_info,
-        )
-
-        for i in internals:
-            results.append(i)
-        if single:
-            results.append(single)
-
-    else:
-        single = _check_single_prescription(
-            prescription=p,
-            p_status=p_status,
-            user=user_context,
-            has_lock_feature=has_lock_feature,
-            extra=extra_info,
-        )
-        _update_agg_status(prescription=p, user=user_context, extra=extra_info)
-
-        if single:
-            results.append(single)
-
-    _clean_checkedindex(user_context=user_context)
-
-    return results
 
 
 @timed()

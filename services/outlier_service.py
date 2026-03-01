@@ -24,7 +24,7 @@ from models.main import (
     User,
     db,
 )
-from services import data_authorization_service, substance_service
+from services import data_authorization_service
 from services.admin import admin_drug_service, admin_integration_status_service
 from utils import examutils, logger, numberutils, prescriptionutils, status, stringutils
 
@@ -236,7 +236,7 @@ def refresh_outliers(id_segment, user, id_drug=None):
         params["idDrug"] = id_drug
         query += " and fkmedicamento = :idDrug "
 
-    query += f"""
+    query += """
         GROUP BY
             idsegmento, fkmedicamento, ROUND(doseconv::numeric,2), frequenciadia
         ON CONFLICT DO nothing
@@ -484,10 +484,7 @@ def get_outliers_list(
         .first()
     )
 
-    relations = []
     defaultNote = None
-    if drug and drug.sctid:
-        relations = substance_service.get_substance_relations(sctid=drug.sctid)
 
     if drugAttr is None:
         drugAttr = DrugAttributes()
@@ -607,7 +604,7 @@ def get_outliers_list(
             "divisionRange": substance.division_range if substance else None,
             "unit": substance.default_measureunit if substance else None,
         },
-        "relations": relations,
+        "relations": [],
         "relationTypes": [
             {"key": t, "value": examutils.typeRelations[t]}
             for t in examutils.typeRelations
@@ -748,7 +745,7 @@ def get_outlier_drugs(
                 db.session.query(Outlier.idDrug.label("idDrug"))
                 .filter(Outlier.idSegment == id_segment)
                 .group_by(Outlier.idDrug)
-                .subquery()
+                .scalar_subquery()
             )
 
             drugs = db.session.query(Drug)

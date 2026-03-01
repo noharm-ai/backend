@@ -127,6 +127,13 @@ def _setup_test_data():
         ),
         {"kind": "map-origin-diet", "value": '["Dietas"]'},
     )
+    session.execute(
+        text(
+            "INSERT INTO demo.memoria (tipo, valor, update_at, update_by) "
+            "VALUES (:kind, CAST(:value AS json), now(), 1)"
+        ),
+        {"kind": "map-origin-procedure", "value": '["Proced/Exames"]'},
+    )
     session_commit()
 
 

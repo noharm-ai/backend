@@ -1,10 +1,16 @@
 """Tests: Prescription Check related operations"""
 
+import threading
+import time
 from datetime import datetime
+from unittest.mock import patch
 
+from mobile import app as flask_app
 from tests.conftest import session, session_commit
 from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
 
+import services.prescription_check_service as prescription_check_service
 from models.enums import DrugTypeEnum, PrescriptionAuditTypeEnum
 from models.prescription import Prescription, PrescriptionAudit, PrescriptionDrug
 from static import prescalc
@@ -299,3 +305,92 @@ def test_check_aggregate_prescription(client, analyst_headers):
     assert len(pInAg) == 2
     assert len(pInAgaudit) == 2
     assert not pOutAgaudit
+
+
+def test_check_prescription_retries_on_deadlock(client, analyst_headers):
+    """check_prescription: recovers transparently from a single deadlock on presmed UPDATE"""
+    prescription = create_basic_prescription()
+    id_pres = prescription.id
+
+    call_count = {"n": 0}
+    original = prescription_check_service._add_checkedindex
+
+    def flaky(prescription, user):
+        call_count["n"] += 1
+        if call_count["n"] == 1:
+            raise OperationalError("deadlock detected", None, None)
+        return original(prescription=prescription, user=user)
+
+    with patch(
+        "services.prescription_check_service._add_checkedindex", side_effect=flaky
+    ):
+        response = client.post(
+            CHECK_URL, json=_check_payload(id_pres), headers=analyst_headers
+        )
+
+    assert response.status_code == 200
+    assert call_count["n"] == 2  # first call deadlocked, second succeeded on retry
+
+    session.expire_all()
+    p = session.query(Prescription).filter(Prescription.id == id_pres).first()
+    assert p.status == "s"
+
+
+def test_check_prescription_fails_after_max_retries(client, analyst_headers):
+    """check_prescription: returns 500 and leaves prescription unchanged when deadlock persists across all retries"""
+    prescription = create_basic_prescription()
+    id_pres = prescription.id
+
+    with patch(
+        "services.prescription_check_service._add_checkedindex",
+        side_effect=OperationalError("deadlock detected", None, None),
+    ):
+        response = client.post(
+            CHECK_URL, json=_check_payload(id_pres), headers=analyst_headers
+        )
+
+    assert response.status_code == 500
+
+    session.expire_all()
+    p = session.query(Prescription).filter(Prescription.id == id_pres).first()
+    assert p.status == "0"  # rollback preserved the original status
+
+
+def test_for_update_blocks_until_lock_released(analyst_headers):
+    """with_for_update() blocks a check request while the prescription row is externally locked.
+    Once the external lock is released the request proceeds and succeeds (200).
+    """
+    prescription = create_basic_prescription()
+    id_pres = prescription.id
+
+    # Acquire a row-level lock from the test session — transaction stays open, no commit yet
+    session.query(Prescription).filter(Prescription.id == id_pres).with_for_update().first()
+
+    result = {"status_code": None, "done": False}
+
+    def do_check():
+        # Each thread gets its own Flask request context and its own DB session
+        with flask_app.test_client() as tc:
+            response = tc.post(
+                CHECK_URL, json=_check_payload(id_pres), headers=analyst_headers
+            )
+            result["status_code"] = response.status_code
+            result["done"] = True
+
+    t = threading.Thread(target=do_check)
+    t.start()
+
+    # Give the thread enough time to reach the SELECT FOR UPDATE and block at PostgreSQL
+    time.sleep(0.2)
+    assert not result["done"], "Request should be waiting for the row lock"
+
+    # Release the lock — the blocked request can now acquire it and proceed
+    session_commit()
+
+    t.join(timeout=5)
+
+    assert result["done"]
+    assert result["status_code"] == 200
+    session.expire_all()
+    p = session.query(Prescription).filter(Prescription.id == id_pres).first()
+    assert p.status == "s"

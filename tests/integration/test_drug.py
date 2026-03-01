@@ -20,7 +20,7 @@ def test_get_drugs_by_idSegmento(client, analyst_headers):
         session.query(Outlier.idDrug.label("idDrug"))
         .filter(Outlier.idSegment == id)
         .group_by(Outlier.idDrug)
-        .subquery()
+        .scalar_subquery()
     )
     drugs_num = session.query(Drug).filter(Drug.id.in_(seg_drugs)).count()
 
@@ -37,7 +37,7 @@ def test_get_drugs_by_idSegment_and_qParam(client, analyst_headers):
         session.query(Outlier.idDrug.label("idDrug"))
         .filter(Outlier.idSegment == id)
         .group_by(Outlier.idDrug)
-        .subquery()
+        .scalar_subquery()
     )
     drugs_num = (
         session.query(Drug)
