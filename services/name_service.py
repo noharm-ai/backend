@@ -157,7 +157,7 @@ class NHInternalNameService(NameServiceStrategy):
                 }
 
             logger.backend_logger.warning(
-                f"NH Internal service error: {response.status_code} for schema {self.schema}"
+                f"NH Internal service warning: {response.status_code} for schema {self.schema}"
             )
             logger.backend_logger.warning(f"URL: {url}, Params: {params}")
 
@@ -205,12 +205,12 @@ class NHInternalNameService(NameServiceStrategy):
                     )
             else:
                 logger.backend_logger.warning(
-                    f"NH Internal multiple service error: {response.status_code} for schema {self.schema}"
+                    f"NH Internal multiple service warning: {response.status_code} for schema {self.schema}"
                 )
 
         except requests.exceptions.RequestException as e:
             logger.backend_logger.warning(
-                f"NH Internal multiple service request error for schema {self.schema}: {str(e)}"
+                f"NH Internal multiple service request warning for schema {self.schema}: {str(e)}"
             )
 
         # Add error responses for not found patients
@@ -250,12 +250,12 @@ class NHInternalNameService(NameServiceStrategy):
 
             if response.status_code != status.HTTP_404_NOT_FOUND:
                 logger.backend_logger.warning(
-                    f"NH Internal search error: {response.status_code} for schema {self.schema}"
+                    f"NH Internal search warning: {response.status_code} for schema {self.schema}"
                 )
 
         except requests.exceptions.RequestException as e:
             logger.backend_logger.warning(
-                f"NH Internal search request error for schema {self.schema}: {str(e)}"
+                f"NH Internal search request warning for schema {self.schema}: {str(e)}"
             )
 
         return []
@@ -309,13 +309,13 @@ class ExternalNameService(NameServiceStrategy):
                     }
 
             logger.backend_logger.warning(
-                f"External service error: {response.status_code} for schema {self.schema}"
+                f"External service warning: {response.status_code} for schema {self.schema}"
             )
             logger.backend_logger.warning(f"URL: {url}, Params: {params}")
 
         except requests.exceptions.RequestException as e:
             logger.backend_logger.warning(
-                f"External service request error for schema {self.schema}: {str(e)}"
+                f"External service request warning for schema {self.schema}: {str(e)}"
             )
 
         return self._create_error_response(id_patient)
@@ -354,12 +354,12 @@ class ExternalNameService(NameServiceStrategy):
                     )
             else:
                 logger.backend_logger.warning(
-                    f"External multiple service error: {response.status_code} for schema {self.schema}"
+                    f"External multiple service warning: {response.status_code} for schema {self.schema}"
                 )
 
         except requests.exceptions.RequestException as e:
             logger.backend_logger.warning(
-                f"External multiple service request error for schema {self.schema}: {str(e)}"
+                f"External multiple service request warning for schema {self.schema}: {str(e)}"
             )
 
         # Add error responses for not found patients

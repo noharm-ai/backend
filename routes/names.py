@@ -29,7 +29,7 @@ def proxy_name(idPatient):
         ) == "success" else status.HTTP_400_BAD_REQUEST
     except Exception as e:
         logger.backend_logger.warning(
-            f"Error getting patient name: {str(e)}", exc_info=True
+            f"Warning getting patient name: {str(e)}", exc_info=True
         )
         return {
             "status": "error",
@@ -53,7 +53,7 @@ def proxy_multiple():
         return names, status.HTTP_200_OK
     except Exception as e:
         logger.backend_logger.warning(
-            f"Error getting multiple patient names: {str(e)}", exc_info=True
+            f"Warning getting multiple patient names: {str(e)}", exc_info=True
         )
         return [], status.HTTP_500_INTERNAL_SERVER_ERROR
 
@@ -70,7 +70,7 @@ def auth_token():
         return {"status": "success", "data": token}, status.HTTP_200_OK
     except Exception as e:
         logger.backend_logger.warning(
-            f"Error generating auth token: {str(e)}", exc_info=True
+            f"Warning generating auth token: {str(e)}", exc_info=True
         )
         return {
             "status": "error",
@@ -96,6 +96,6 @@ def search_name(term):
         }, status.HTTP_200_OK
     except Exception as e:
         logger.backend_logger.warning(
-            f"Error searching patient name: {str(e)}", exc_info=True
+            f"Warning searching patient name: {str(e)}", exc_info=True
         )
         return {"status": "error", "data": []}, status.HTTP_200_OK

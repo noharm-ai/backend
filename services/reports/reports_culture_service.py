@@ -1,10 +1,10 @@
-from sqlalchemy import select, desc
+from sqlalchemy import desc, select
 
-from models.main import db
-from models.appendix import CultureHeader, Culture
+from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
-from utils import dateutils, status, numberutils
-from decorators.has_permission_decorator import has_permission, Permission
+from models.appendix import Culture, CultureHeader
+from models.main import db
+from utils import dateutils, numberutils, status
 
 
 @has_permission(Permission.READ_REPORTS)
@@ -83,14 +83,14 @@ def _group_culture_results(results):
         prediction_data = prediction(row)
 
         key = (
-            f"{row.id}-{row.idMicroorganism if row.idMicroorganism != None else 'None'}"
+            f"{row.id}-{row.microorganism if row.microorganism is not None else 'None'}"
         )
 
         if key in headers:
-            if culture_data != None:
+            if culture_data is not None:
                 headers[key]["cultures"].append(culture_data)
 
-            if prediction_data != None:
+            if prediction_data is not None:
                 headers[key]["predictions"].append(prediction_data)
         else:
             headers[key] = {
