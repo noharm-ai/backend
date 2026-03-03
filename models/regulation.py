@@ -120,4 +120,11 @@ class RegIndicatorsPanelReport(db.Model):
         "dt_atendimento_gestacao_sete_consultas", db.Date, nullable=True
     )
 
+    has_gestational_pressure_measurements = db.Column(
+        "tem_afericao", db.Boolean, nullable=True
+    )
+    gestational_pressure_measurements_date = db.Column(
+        "dt_ultima_afericao", db.Date, nullable=True
+    )
+
     current_version = db.Column("v_atual_ficha", db.Boolean, nullable=True)

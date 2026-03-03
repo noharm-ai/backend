@@ -29,6 +29,20 @@ def get_indicators_panel_report(request_data: RegIndicatorsPanelReportRequest):
                 == request_data.has_indicator
             )
 
+    if (
+        request_data.indicator
+        == RegulationIndicatorReportEnum.GESTATIONAL_PRESSURE_MEASUREMENTS.value
+    ):
+        query = query.filter(
+            RegIndicatorsPanelReport.has_gestational_pressure_measurements != None
+        )
+
+        if request_data.has_indicator is not None:
+            query = query.filter(
+                RegIndicatorsPanelReport.has_gestational_pressure_measurements
+                == request_data.has_indicator
+            )
+
     if request_data.indicator == RegulationIndicatorReportEnum.HPV_VACCINE.value:
         query = query.filter(RegIndicatorsPanelReport.has_vaccine != None)
 
