@@ -100,16 +100,16 @@ def test_prescalc_flow(client, analyst_headers):
 
 
 def test_prescalc_flow2(client, analyst_headers):
-    """Test when prescription check happens before prescalc
+    """Test when prescription check happens before prescalc, items unchanged
     1) check individual prescription
-    2) assert creation of patient-day prescription
-    3) check patient-day created
-    4) check individual prescriptions status, must be 's' because it was checked before prescalc
+    2) run prescalc
+    3) patient-day must be created with status 's' (inherited from checked individual)
+    4) individual prescription must remain 's'
     """
 
     prescription = utils_test_prescription.create_basic_prescription()
 
-    # 1) start checking individual prescription
+    # 1) check individual prescription before prescalc runs
     payload = {"status": "s", "idPrescription": prescription.id}
     response = client.post("/prescriptions/status", json=payload, headers=analyst_headers)
     assert response.status_code == 200
@@ -124,7 +124,59 @@ def test_prescalc_flow2(client, analyst_headers):
 
     session_commit()
 
-    # 3) check if patient-day is created
+    # 3) patient-day must be created with 's' (items unchanged, check is still valid)
+    patient_day = (
+        session.query(Prescription)
+        .filter(Prescription.agg)
+        .filter(Prescription.admissionNumber == prescription.admissionNumber)
+        .first()
+    )
+    assert patient_day is not None
+    assert patient_day.status == "s"
+
+    # 4) individual prescription must remain checked
+    prescription = (
+        session.query(Prescription).filter(Prescription.id == prescription.id).first()
+    )
+    assert prescription is not None
+    assert prescription.status == "s"
+
+
+def test_prescalc_flow2b(client, analyst_headers):
+    """Test when prescription check happens before prescalc, but items changed
+    1) check individual prescription
+    2) add more items to the prescription
+    3) run prescalc
+    4) patient-day must be created with status '0' (items changed, check invalidated)
+    5) individual prescription must be rolled back to '0'
+    """
+
+    prescription = utils_test_prescription.create_basic_prescription()
+
+    # 1) check individual prescription before prescalc runs
+    payload = {"status": "s", "idPrescription": prescription.id}
+    response = client.post("/prescriptions/status", json=payload, headers=analyst_headers)
+    assert response.status_code == 200
+
+    session_commit()
+
+    # 2) add more items after the check
+    utils_test_prescription.create_prescription_drug(
+        id=int(f"{prescription.id}003"), idPrescription=prescription.id, idDrug=5
+    )
+    utils_test_prescription.create_prescription_drug(
+        id=int(f"{prescription.id}004"), idPrescription=prescription.id, idDrug=6
+    )
+
+    # 3) run prescalc
+    prescalc(
+        {"schema": "demo", "id_prescription": prescription.id, "force": False},
+        None,
+    )
+
+    session_commit()
+
+    # 4) patient-day must be unchecked (item count changed, check invalidated)
     patient_day = (
         session.query(Prescription)
         .filter(Prescription.agg)
@@ -134,14 +186,12 @@ def test_prescalc_flow2(client, analyst_headers):
     assert patient_day is not None
     assert patient_day.status == "0"
 
-    # 4) verify individual prescription status
+    # 5) individual prescription must also be rolled back
     prescription = (
-        session.query(Prescription)
-        .filter(Prescription.id == prescription.admissionNumber)
-        .first()
+        session.query(Prescription).filter(Prescription.id == prescription.id).first()
     )
     assert prescription is not None
-    assert prescription.status == "s"
+    assert prescription.status == "0"
 
 
 def test_prescalc_flow3(client, analyst_headers):
