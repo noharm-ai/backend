@@ -77,6 +77,7 @@ def get_report_link(
         "cached": True,
         "title": report_data.name,
         "url": cached_link,
+        "graphs": report_data.graphs,
     }
 
 

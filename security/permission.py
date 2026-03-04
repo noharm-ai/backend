@@ -57,6 +57,9 @@ class Permission(Enum):
     WRITE_CUSTOM_REPORTS = (
         "WRITE_CUSTOM_REPORTS"  # "write permission to config reports"
     )
+    WRITE_CUSTOM_REPORTS_GRAPHS = (
+        "WRITE_CUSTOM_REPORTS_GRAPHS"  # "write permission to config reports graphs"
+    )
 
     READ_PRESCRIPTION = "READ_PRESCRIPTION"  # "view prescription"
     WRITE_PRESCRIPTION = "WRITE_PRESCRIPTION"  # "write prescription"
