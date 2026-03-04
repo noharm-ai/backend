@@ -43,6 +43,7 @@ class Role(Enum):
             Permission.READ_REPORTS,
             Permission.READ_CUSTOM_REPORTS,
             Permission.WRITE_CUSTOM_REPORTS,
+            Permission.WRITE_CUSTOM_REPORTS_GRAPHS,
             Permission.READ_PRESCRIPTION,
             Permission.WRITE_DRUG_ATTRIBUTES,
             Permission.WRITE_BASIC_FEATURES,
@@ -109,6 +110,7 @@ class Role(Enum):
             Permission.READ_NAV,
             Permission.READ_PROTOCOLS,
             Permission.READ_CUSTOM_REPORTS,
+            Permission.WRITE_CUSTOM_REPORTS_GRAPHS,
         ],
     )
 

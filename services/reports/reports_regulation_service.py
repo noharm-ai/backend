@@ -63,6 +63,10 @@ def get_indicators_panel_report(request_data: RegIndicatorsPanelReportRequest) -
                 "has_sexattention_appointment": row.RegIndicatorsPanelReport.has_sexattention_appointment,
                 "has_gestational_appointment": row.RegIndicatorsPanelReport.has_gestational_appointment,
                 "has_seven_gestational_appointments": row.RegIndicatorsPanelReport.has_seven_gestational_appointments,
+                "has_gestational_pressure_measurements": row.RegIndicatorsPanelReport.has_gestational_pressure_measurements,
+                "gestational_pressure_measurements_date": dateutils.to_iso(
+                    row.RegIndicatorsPanelReport.gestational_pressure_measurements_date
+                ),
             }
         )
 

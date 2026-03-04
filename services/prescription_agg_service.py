@@ -195,7 +195,11 @@ def create_agg_prescription_by_prescription(
                     prescription_check_service.audit_check(
                         prescription=pAgg,
                         user=prescalc_user,
-                        extra={"prescalc": True, "processed_status": processed_status},
+                        extra={
+                            "prescalc": True,
+                            "processed_status": processed_status,
+                            "prescalc_source": id_prescription,
+                        },
                     )
 
                     # remove individual prescription check
@@ -207,13 +211,32 @@ def create_agg_prescription_by_prescription(
                         user=prescalc_user,
                         extra={"prescalc": True, "processed_status": processed_status},
                     )
+                elif is_new_prescription:
+                    # new agg prescription inherits the checked status from the individual
+                    # prescription (items unchanged, review is still valid).
+                    # explicit UPDATE needed so the DB trigger on INSERT doesn't leave status as 0.
+                    pAgg.status = "s"
+                    prescription_check_service.audit_check(
+                        prescription=pAgg,
+                        user=prescalc_user,
+                        extra={
+                            "prescalc": True,
+                            "processed_status": processed_status,
+                            "is_new_prescription": True,
+                            "prescalc_source": id_prescription,
+                        },
+                    )
             elif pAgg.status == "s" and processed_status != "PROCESSED":
                 # remove prescription agg check
                 pAgg.status = 0
                 prescription_check_service.audit_check(
                     prescription=pAgg,
                     user=prescalc_user,
-                    extra={"prescalc": True, "processed_status": processed_status},
+                    extra={
+                        "prescalc": True,
+                        "processed_status": processed_status,
+                        "prescalc_source": id_prescription,
+                    },
                 )
 
     _log_processed_date(id_prescription_array=[id_prescription], schema=schema)

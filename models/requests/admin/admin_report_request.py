@@ -1,6 +1,6 @@
 """Request models for admin report operations"""
 
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
@@ -15,3 +15,9 @@ class UpsertReportRequest(BaseModel):
     )
     sql: str = Field(..., min_length=1, description="SQL query for the report")
     active: bool = Field(default=True, description="Whether the report is active")
+
+
+class UpdateReportGraphsRequest(BaseModel):
+    """Request model for updating report graphs"""
+
+    graphs: Optional[Any] = Field(None, description="Graph configurations as JSON")

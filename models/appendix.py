@@ -258,6 +258,7 @@ class Report(db.Model):
     active = db.Column("ativo", db.Boolean, nullable=False)
     status = db.Column("tp_status", db.Integer, nullable=False)
     error = db.Column("erro", db.String, nullable=True)
+    graphs = db.Column("graficos", postgresql.JSON, nullable=False)
     processed_at = db.Column("processed_at", db.DateTime, nullable=True)
     processed_by = db.Column("processed_by", db.BigInteger, nullable=True)
     updated_at = db.Column("updated_at", db.DateTime, nullable=True)
