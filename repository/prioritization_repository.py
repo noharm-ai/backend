@@ -189,11 +189,15 @@ def get_prioritization_list(request: PrioritizationRequest):
         )
 
     if len(request.idPatient) > 0:
-        try:
-            q = q.filter(
-                Prescription.idPatient.in_([int(i) for i in request.idPatient])
-            )
-        except ValueError:
+        patient_ids = []
+        for i in request.idPatient:
+            try:
+                patient_ids.append(int(i))
+            except (ValueError, TypeError):
+                pass
+        if patient_ids:
+            q = q.filter(Prescription.idPatient.in_(patient_ids))
+        else:
             q = q.filter(Prescription.idPatient == None)
 
     if request.id_patient_by_name_list and len(request.id_patient_by_name_list) > 0:
