@@ -423,7 +423,7 @@ def refresh_dialysis_cache(admission_number: int, user_context: User):
     for d in dialysis:
         if d.annotations:
             data = {
-                "dtevolucao": d.date.isoformat(),
+                "dtevolucao": d.date.replace(microsecond=0).isoformat(),
                 "fkevolucao": d.id,
                 "lista": d.annotations.get("dialise", []),
             }
@@ -447,7 +447,7 @@ def refresh_allergies_cache(admission_number: int, user_context: User):
     for a in allergies:
         if a.annotations:
             data = {
-                "dtevolucao": a.date.isoformat(),
+                "dtevolucao": a.date.replace(microsecond=0).isoformat(),
                 "fkevolucao": a.id,
                 "lista": a.annotations.get("allergiesComposed", []),
             }
