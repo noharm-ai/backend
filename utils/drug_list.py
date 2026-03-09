@@ -175,6 +175,8 @@ class DrugList:
         """Process drugList and add source information. Save result in drug_results"""
 
         for pd in self.drugList:
+            pd_drug_attributes: DrugAttributes = pd[6]
+
             if pd[0].source is None:
                 pd[0].source = "Medicamentos"
             if pd[0].source not in [
@@ -334,6 +336,9 @@ class DrugList:
                             "label": stringutils.strNone(pd[0].idMeasureUnit),
                         }
                     ),
+                    "idMeasureUnitDefault": pd_drug_attributes.idMeasureUnit
+                    if pd_drug_attributes
+                    else None,
                     "frequency": (
                         {"value": pd[3].id, "label": pd[3].description}
                         if pd[3]
