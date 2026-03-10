@@ -17,6 +17,20 @@ def get_indicators_panel_report(request_data: RegIndicatorsPanelReportRequest):
 
     if (
         request_data.indicator
+        == RegulationIndicatorReportEnum.GESTATIONAL_WEIGHT_HEIGHT_MEASUREMENTS.value
+    ):
+        query = query.filter(
+            RegIndicatorsPanelReport.has_weight_height_measurements != None
+        )
+
+        if request_data.has_indicator is not None:
+            query = query.filter(
+                RegIndicatorsPanelReport.has_weight_height_measurements
+                == request_data.has_indicator
+            )
+
+    if (
+        request_data.indicator
         == RegulationIndicatorReportEnum.SEVEN_GESTATIONAL_APPOINTMENTS.value
     ):
         query = query.filter(
