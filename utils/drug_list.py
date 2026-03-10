@@ -189,6 +189,8 @@ class DrugList:
 
             pdUnit = stringutils.strNone(pd[2].id) if pd[2] else ""
             pdWhiteList = bool(pd[6].whiteList) if pd[6] is not None else False
+            doseWeightValue = None
+            doseWeightDayValue = None
             doseWeightStr = None
             doseWeightDayStr = None
             doseBodySurfaceStr = None
@@ -252,6 +254,11 @@ class DrugList:
                                 round(dose_per_kg * multiplier, 2)
                             )
                             result = f"{value} {pdUnit}{suffix}"
+
+                            if suffix == "/Kg":
+                                doseWeightValue = value
+                            else:
+                                doseWeightDayValue = value
 
                             if has_conv:
                                 conv_value = stringutils.strFormatBR(
@@ -326,6 +333,8 @@ class DrugList:
                     "whiteList": pdWhiteList,
                     "doseWeight": doseWeightStr,
                     "doseWeightDay": doseWeightDayStr,
+                    "doseWeightValue": doseWeightValue,
+                    "doseWeightDayValue": doseWeightDayValue,
                     "doseBodySurface": doseBodySurfaceStr,
                     "dose": pd[0].dose,
                     "measureUnit": (
@@ -337,6 +346,12 @@ class DrugList:
                         }
                     ),
                     "idMeasureUnitDefault": pd_drug_attributes.idMeasureUnit
+                    if pd_drug_attributes
+                    else None,
+                    "useWeight": pd_drug_attributes.useWeight
+                    if pd_drug_attributes
+                    else None,
+                    "doseRange": pd_drug_attributes.division
                     if pd_drug_attributes
                     else None,
                     "frequency": (
