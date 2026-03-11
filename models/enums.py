@@ -19,6 +19,7 @@ class MemoryEnum(Enum):
     MAP_ORIGIN_SOLUTION = "map-origin-solution"
     MAP_ORIGIN_PROCEDURE = "map-origin-procedure"
     MAP_ORIGIN_DIET = "map-origin-diet"
+    MAP_ORIGIN_MATERIAL = "map-origin-material"
     MAP_ORIGIN_CUSTOM = "map-origin-custom"
     MAP_SCHEDULES_FASTING = "map-schedules-fasting"
     MAP_SCHEDULES = "map-schedules"
@@ -325,6 +326,7 @@ class RegulationIndicatorReportEnum(Enum):
     GESTATIONAL_APPOINTMENT = "GESTATIONAL_APPOINTMENT"
     SEVEN_GESTATIONAL_APPOINTMENTS = "SEVEN_GESTATIONAL_APPOINTMENTS"
     GESTATIONAL_PRESSURE_MEASUREMENTS = "GESTATIONAL_PRESSURE_MEASUREMENTS"
+    GESTATIONAL_WEIGHT_HEIGHT_MEASUREMENTS = "GESTATIONAL_WEIGHT_HEIGHT_MEASUREMENTS"
 
 
 class ReportStatusEnum(Enum):

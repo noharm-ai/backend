@@ -127,4 +127,11 @@ class RegIndicatorsPanelReport(db.Model):
         "dt_ultima_afericao", db.Date, nullable=True
     )
 
+    has_weight_height_measurements = db.Column(
+        "tem_indicador_peso_altura", db.Boolean, nullable=True
+    )
+    weight_height_measurements_date = db.Column(
+        "dt_ultimo_pesoaltura", db.Date, nullable=True
+    )
+
     current_version = db.Column("v_atual_ficha", db.Boolean, nullable=True)

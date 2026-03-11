@@ -175,6 +175,8 @@ class DrugList:
         """Process drugList and add source information. Save result in drug_results"""
 
         for pd in self.drugList:
+            pd_drug_attributes: DrugAttributes = pd[6]
+
             if pd[0].source is None:
                 pd[0].source = "Medicamentos"
             if pd[0].source not in [
@@ -187,6 +189,8 @@ class DrugList:
 
             pdUnit = stringutils.strNone(pd[2].id) if pd[2] else ""
             pdWhiteList = bool(pd[6].whiteList) if pd[6] is not None else False
+            doseWeightValue = None
+            doseWeightDayValue = None
             doseWeightStr = None
             doseWeightDayStr = None
             doseBodySurfaceStr = None
@@ -250,6 +254,11 @@ class DrugList:
                                 round(dose_per_kg * multiplier, 2)
                             )
                             result = f"{value} {pdUnit}{suffix}"
+
+                            if suffix == "/Kg":
+                                doseWeightValue = value
+                            else:
+                                doseWeightDayValue = value
 
                             if has_conv:
                                 conv_value = stringutils.strFormatBR(
@@ -324,6 +333,8 @@ class DrugList:
                     "whiteList": pdWhiteList,
                     "doseWeight": doseWeightStr,
                     "doseWeightDay": doseWeightDayStr,
+                    "doseWeightValue": doseWeightValue,
+                    "doseWeightDayValue": doseWeightDayValue,
                     "doseBodySurface": doseBodySurfaceStr,
                     "dose": pd[0].dose,
                     "measureUnit": (
@@ -334,6 +345,15 @@ class DrugList:
                             "label": stringutils.strNone(pd[0].idMeasureUnit),
                         }
                     ),
+                    "idMeasureUnitDefault": pd_drug_attributes.idMeasureUnit
+                    if pd_drug_attributes
+                    else None,
+                    "useWeight": pd_drug_attributes.useWeight
+                    if pd_drug_attributes
+                    else None,
+                    "doseRange": pd_drug_attributes.division
+                    if pd_drug_attributes
+                    else None,
                     "frequency": (
                         {"value": pd[3].id, "label": pd[3].description}
                         if pd[3]
@@ -398,9 +418,10 @@ class DrugList:
                     "notes": pd[7],
                     "prevNotes": prevNotes,
                     "prevNotesUser": "***" if self.hide_names else prevNotesUser,
-                    "drugInfoLink": pd[11].link if pd[11] != None else None,
-                    "idSubstance": pd[11].id if pd[11] != None else None,
-                    "idSubstanceClass": pd[11].idclass if pd[11] != None else None,
+                    "drugInfoLink": pd[11].link if pd[11] is not None else None,
+                    "idSubstance": pd[11].id if pd[11] is not None else None,
+                    "substanceName": pd[11].name if pd[11] is not None else None,
+                    "idSubstanceClass": pd[11].idclass if pd[11] is not None else None,
                     "cpoe_group": pd[0].cpoe_group,
                     "infusionKey": self.getInfusionKey(pd),
                     "formValues": pd[0].form,

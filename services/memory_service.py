@@ -173,6 +173,7 @@ def is_admin_memory(key):
         MemoryEnum.MAP_ORIGIN_SOLUTION.value,
         MemoryEnum.MAP_ORIGIN_PROCEDURE.value,
         MemoryEnum.MAP_ORIGIN_DIET.value,
+        MemoryEnum.MAP_ORIGIN_MATERIAL.value,
         MemoryEnum.MAP_ORIGIN_CUSTOM.value,
         MemoryEnum.CUSTOM_FORMS.value,
         MemoryEnum.TRANSCRIPTION_FIELDS.value,
