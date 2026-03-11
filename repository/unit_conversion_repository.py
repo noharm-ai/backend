@@ -47,12 +47,8 @@ def _build_units_cte(id_drug=None):
     )
 
     if id_drug is not None:
-        prescribed_units = prescribed_units.filter(
-            PrescriptionAgg.idDrug == id_drug
-        )
-        current_units = current_units.filter(
-            MeasureUnitConvert.idDrug == id_drug
-        )
+        prescribed_units = prescribed_units.filter(PrescriptionAgg.idDrug == id_drug)
+        current_units = current_units.filter(MeasureUnitConvert.idDrug == id_drug)
         price_units = price_units.filter(DrugAttributes.idDrug == id_drug)
 
     return prescribed_units.union(price_units, current_units).cte("units")
@@ -101,6 +97,21 @@ def get_unit_conversion_list(id_segment: int):
     )
 
     return conversion_query.order_by(Drug.name, MeasureUnitConvert.factor).all()
+
+
+def get_drugattributes_default_measure_unit_for_drug(id_drug: int):
+    """Returns the default measure unit defined in medatributos table"""
+    return (
+        db.session.query(
+            DrugAttributes.idMeasureUnit,
+            MeasureUnit.measureunit_nh,
+        )
+        .outerjoin(MeasureUnit, MeasureUnit.id == DrugAttributes.idMeasureUnit)
+        .filter(DrugAttributes.idDrug == id_drug)
+        .filter(DrugAttributes.idMeasureUnit.is_not(None))
+        .group_by(DrugAttributes.idMeasureUnit, MeasureUnit.measureunit_nh)
+        .all()
+    )
 
 
 def get_unit_conversion_for_drug(id_drug: int):
