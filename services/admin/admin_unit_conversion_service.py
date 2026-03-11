@@ -4,7 +4,7 @@ from datetime import datetime
 import boto3
 import requests
 from markupsafe import escape as escape_html
-from sqlalchemy import and_, func, text
+from sqlalchemy import text
 
 from config import Config
 from decorators.has_permission_decorator import Permission, has_permission
@@ -14,14 +14,13 @@ from models.enums import DefaultMeasureUnitEnum, SegmentTypeEnum
 from models.main import (
     Drug,
     DrugAttributes,
-    Outlier,
-    PrescriptionAgg,
     Substance,
     User,
     db,
 )
 from models.requests.admin.admin_unit_conversion_request import SetFactorRequest
 from models.segment import Segment
+from repository import unit_conversion_repository
 from services import drug_service as main_drug_service
 from services.admin import (
     admin_drug_service,
@@ -121,75 +120,8 @@ def get_conversion_list(id_segment):
             "description": du.description,
         }
 
-    active_drugs = (
-        db.session.query(
-            Outlier.idDrug.label("idDrug"),
-            func.sum(Outlier.countNum).label("prescribed_quantity"),
-        )
-        .group_by(Outlier.idDrug)
-        .cte("active_drugs")
-    )
-
-    prescribed_units = (
-        db.session.query(
-            PrescriptionAgg.idDrug.label("idDrug"),
-            PrescriptionAgg.idMeasureUnit.label("idMeasureUnit"),
-        )
-        .filter(PrescriptionAgg.idMeasureUnit != None)
-        .filter(PrescriptionAgg.idMeasureUnit != "")
-        .group_by(PrescriptionAgg.idDrug, PrescriptionAgg.idMeasureUnit)
-    )
-
-    current_units = (
-        db.session.query(
-            MeasureUnitConvert.idDrug.label("idDrug"),
-            MeasureUnitConvert.idMeasureUnit.label("idMeasureUnit"),
-        )
-        .filter(MeasureUnitConvert.idMeasureUnit != None)
-        .filter(MeasureUnitConvert.idMeasureUnit != "")
-        .group_by(MeasureUnitConvert.idDrug, MeasureUnitConvert.idMeasureUnit)
-    )
-
-    price_units = (
-        db.session.query(
-            DrugAttributes.idDrug.label("idDrug"),
-            DrugAttributes.idMeasureUnitPrice.label("idMeasureUnit"),
-        )
-        .filter(DrugAttributes.idMeasureUnitPrice != None)
-        .filter(DrugAttributes.idMeasureUnitPrice != "")
-        .group_by(DrugAttributes.idDrug, DrugAttributes.idMeasureUnitPrice)
-    )
-
-    units = prescribed_units.union(price_units, current_units).cte("units")
-
-    conversion_list = (
-        db.session.query(
-            func.count().over(),
-            Drug.id,
-            Drug.name,
-            units.c.idMeasureUnit,
-            MeasureUnitConvert.factor,
-            MeasureUnit.description,
-            Drug.sctid,
-            Substance.default_measureunit,
-            MeasureUnit.measureunit_nh,
-            active_drugs.c.prescribed_quantity,
-            Substance.tags,
-        )
-        .join(active_drugs, Drug.id == active_drugs.c.idDrug)
-        .join(units, Drug.id == units.c.idDrug)
-        .outerjoin(
-            MeasureUnitConvert,
-            and_(
-                MeasureUnitConvert.idDrug == Drug.id,
-                MeasureUnitConvert.idSegment == id_segment,
-                MeasureUnitConvert.idMeasureUnit == units.c.idMeasureUnit,
-            ),
-        )
-        .outerjoin(MeasureUnit, MeasureUnit.id == units.c.idMeasureUnit)
-        .outerjoin(Substance, Drug.sctid == Substance.id)
-        .order_by(Drug.name, MeasureUnitConvert.factor)
-        .all()
+    conversion_list = unit_conversion_repository.get_unit_conversion_list(
+        id_segment=id_segment
     )
 
     result = []
