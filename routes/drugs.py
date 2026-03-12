@@ -3,6 +3,7 @@
 from flask import Blueprint, request
 
 from decorators.api_endpoint_decorator import api_endpoint
+from models.requests.drug_request import DrugUnitConversionRequest
 from services import drug_service, unit_conversion_service
 
 app_drugs = Blueprint("app_drugs", __name__)
@@ -76,3 +77,17 @@ def update_substance():
 @api_endpoint()
 def get_unit_conversion(id_drug: int):
     return unit_conversion_service.get_unit_conversion_for_drug(id_drug=id_drug)
+
+
+@app_drugs.route("/drugs/unit-conversion/<int:id_drug>", methods=["POST"])
+@api_endpoint()
+def save_unit_conversion(id_drug: int):
+    return unit_conversion_service.save_unit_conversion_for_drug(
+        id_drug=id_drug, request_data=DrugUnitConversionRequest(**request.get_json())
+    )
+
+
+@app_drugs.route("/drugs/process-scores/<int:id_drug>", methods=["POST"])
+@api_endpoint()
+def process_scores(id_drug: int):
+    return unit_conversion_service.process_drug_scores(id_drug=id_drug)

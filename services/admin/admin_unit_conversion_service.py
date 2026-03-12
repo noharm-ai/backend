@@ -192,7 +192,13 @@ def get_conversion_list(id_segment):
 
 @has_permission(Permission.ADMIN_UNIT_CONVERSION)
 def save_conversions(
-    id_drug, id_segment, id_measure_unit_default, conversion_list, user_context: User
+    id_drug,
+    id_segment,
+    id_measure_unit_default,
+    conversion_list,
+    user_context: User,
+    wait_for_lambda: bool = False,
+    skip_lambda: bool = False,
 ):
     if (
         id_drug == None
@@ -261,11 +267,14 @@ def save_conversions(
 
         admin_drug_service.calculate_dosemax_uniq(id_drug=id_drug, id_segment=s.id)
 
-    # call lambda to generate scores (do not wait for response)
+    # call lambda to generate scores
+    if skip_lambda:
+        return {"updated": updated_segments}
+
     lambda_client = boto3.client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
-    lambda_client.invoke(
+    lambda_response = lambda_client.invoke(
         FunctionName=Config.BACKEND_FUNCTION_NAME,
-        InvocationType="Event",
+        InvocationType="RequestResponse" if wait_for_lambda else "Event",
         Payload=json.dumps(
             {
                 "command": "lambda_scores.process_drug_scores",
@@ -276,7 +285,13 @@ def save_conversions(
         ),
     )
 
-    return {"updated": updated_segments}
+    result = {"updated": updated_segments}
+
+    if wait_for_lambda:
+        payload = lambda_response.get("Payload")
+        result["lambdaResponse"] = json.loads(payload.read()) if payload else None
+
+    return result
 
 
 def _update_conversion_list(conversion_list, id_drug, id_segment, user):

@@ -37,6 +37,8 @@ def save_conversions():
         id_segment=data.get("idSegment", None),
         id_measure_unit_default=data.get("idMeasureUnitDefault", None),
         conversion_list=data.get("conversionList", []),
+        wait_for_lambda=data.get("waitForLambda", False),
+        skip_lambda=data.get("skipLambda", False),
     )
 
 

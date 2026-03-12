@@ -114,6 +114,16 @@ def get_drugattributes_default_measure_unit_for_drug(id_drug: int):
     )
 
 
+def get_substance_default_measure_unit_for_drug(id_drug: int) -> str | None:
+    """Returns the substance default measure unit for a given drug (via Drug.sctid → Substance)"""
+    return (
+        db.session.query(Substance.default_measureunit)
+        .join(Drug, Drug.sctid == Substance.id)
+        .filter(Drug.id == id_drug)
+        .scalar()
+    )
+
+
 def get_unit_conversion_for_drug(id_drug: int):
     """Returns unit conversion possibilities for a single drug (best factor across all segments)"""
 
