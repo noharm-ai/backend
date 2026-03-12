@@ -6,8 +6,9 @@ import boto3
 
 from config import Config
 from decorators.has_permission_decorator import Permission, has_permission
+from models.appendix import MeasureUnit
 from models.enums import DefaultMeasureUnitEnum
-from models.main import User
+from models.main import User, db
 from models.requests.drug_request import DrugUnitConversionRequest
 from repository import unit_conversion_repository
 from services.admin import admin_unit_conversion_service
@@ -99,6 +100,20 @@ def save_unit_conversion_for_drug(
         )
         or DefaultMeasureUnitEnum.MG.value
     )
+
+    measure_unit = (
+        db.session.query(MeasureUnit)
+        .filter(MeasureUnit.id == id_measure_unit_default)
+        .first()
+    )
+    if not measure_unit:
+        new_unit = MeasureUnit()
+        new_unit.id = id_measure_unit_default
+        new_unit.idHospital = 1  # default value
+        new_unit.description = id_measure_unit_default
+        new_unit.measureunit_nh = id_measure_unit_default
+        db.session.add(new_unit)
+        db.session.flush()
 
     conversions = []
     for c in request_data.conversion_list:
