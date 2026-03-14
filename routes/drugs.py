@@ -76,12 +76,16 @@ def update_substance():
 @app_drugs.route("/drugs/unit-conversion/<int:id_drug>", methods=["GET"])
 @api_endpoint()
 def get_unit_conversion(id_drug: int):
+    """Get all possible unit conversions for a drug"""
+
     return unit_conversion_service.get_unit_conversion_for_drug(id_drug=id_drug)
 
 
 @app_drugs.route("/drugs/unit-conversion/<int:id_drug>", methods=["POST"])
 @api_endpoint()
 def save_unit_conversion(id_drug: int):
+    """Save unit conversion for drug in all segments"""
+
     return unit_conversion_service.save_unit_conversion_for_drug(
         id_drug=id_drug, request_data=DrugUnitConversionRequest(**request.get_json())
     )
@@ -90,4 +94,14 @@ def save_unit_conversion(id_drug: int):
 @app_drugs.route("/drugs/process-scores/<int:id_drug>", methods=["POST"])
 @api_endpoint()
 def process_scores(id_drug: int):
+    """Process drug scores"""
+
     return unit_conversion_service.process_drug_scores(id_drug=id_drug)
+
+
+@app_drugs.route("/drugs/dashboard/<int:id_segment>/<int:id_drug>", methods=["GET"])
+@api_endpoint()
+def get_drug_dashboard(id_segment: int, id_drug: int):
+    """Get drug data for dashboard"""
+
+    return drug_service.get_drug_dashboard(id_segment=id_segment, id_drug=id_drug)
