@@ -737,7 +737,7 @@ def get_drug_dashboard(id_drug: int, id_segment: int):
         },
         "substance": {
             "name": substance.name,
-            "sctid": substance.id,
+            "sctid": str(substance.id),
             "idMeasureUnit": substance.default_measureunit,
             "divisionRange": substance.division_range,
         },
