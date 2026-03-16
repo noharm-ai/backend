@@ -1,5 +1,4 @@
 from flask import Blueprint, request
-from markupsafe import escape as escape_html
 
 from decorators.api_endpoint_decorator import api_endpoint
 from services.admin import admin_drug_service
@@ -33,28 +32,6 @@ def get_drug_list():
         min_drug_count=request_data.get("minDrugCount", None),
         tp_attribute_list=request_data.get("tpAttributeList", "in"),
     )
-
-
-@app_admin_drug.route("/admin/drug/price-factor", methods=["POST"])
-@api_endpoint(is_admin=True)
-def update_price_factor():
-    data = request.get_json()
-
-    id_drug = data.get("idDrug", None)
-    id_segment = data.get("idSegment", None)
-    factor = data.get("factor", None)
-
-    admin_drug_service.update_price_factor(
-        id_drug=id_drug,
-        id_segment=id_segment,
-        factor=factor,
-    )
-
-    return {
-        "idSegment": escape_html(id_segment),
-        "idDrug": escape_html(id_drug),
-        "factor": float(factor),
-    }
 
 
 @app_admin_drug.route("/admin/drug/ref", methods=["GET"])

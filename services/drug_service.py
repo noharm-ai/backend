@@ -24,6 +24,7 @@ from models.main import (
 )
 from models.prescription import Prescription, PrescriptionDrug
 from models.segment import Segment
+from repository import drugs_repository, outlier_repository
 from services import data_authorization_service, memory_service
 from services.admin import admin_drug_service
 from utils import prescriptionutils, status
@@ -208,13 +209,15 @@ def drug_config_to_generate_score(
     use_weight,
     measure_unit_list,
     user_context: User,
+    skip_measure_unit=False,
 ):
-    if id_measure_unit == None or id_measure_unit == "":
-        raise ValidationError(
-            "Unidade de medida inválida",
-            "errors.invalidParams",
-            status.HTTP_400_BAD_REQUEST,
-        )
+    if not skip_measure_unit:
+        if id_measure_unit == None or id_measure_unit == "":
+            raise ValidationError(
+                "Unidade de medida inválida",
+                "errors.invalidParams",
+                status.HTTP_400_BAD_REQUEST,
+            )
 
     if division != None and division == 1:
         raise ValidationError(
@@ -232,9 +235,10 @@ def drug_config_to_generate_score(
             status.HTTP_401_UNAUTHORIZED,
         )
 
-    if measure_unit_list:
-        for m in measure_unit_list:
-            _setDrugUnit(id_drug, m["idMeasureUnit"], id_segment, m["fator"])
+    if not skip_measure_unit:
+        if measure_unit_list:
+            for m in measure_unit_list:
+                _setDrugUnit(id_drug, m["idMeasureUnit"], id_segment, m["fator"])
 
     drugAttr = DrugAttributes.query.get((id_drug, id_segment))
 
@@ -245,12 +249,14 @@ def drug_config_to_generate_score(
 
     calc_dose_max = False
 
-    if drugAttr.idMeasureUnit != id_measure_unit or drugAttr.division != (
-        division if division != 0 else None
-    ):
-        calc_dose_max = True
+    if not skip_measure_unit:
+        if drugAttr.idMeasureUnit != id_measure_unit or drugAttr.division != (
+            division if division != 0 else None
+        ):
+            calc_dose_max = True
 
-    drugAttr.idMeasureUnit = id_measure_unit
+        drugAttr.idMeasureUnit = id_measure_unit
+
     drugAttr.division = division if division != 0 else None
     drugAttr.useWeight = use_weight
     drugAttr.update = datetime.today()
@@ -664,3 +670,82 @@ def update_convert_factor(
 
     if new:
         db.session.add(u)
+
+
+@has_permission(Permission.READ_PRESCRIPTION)
+def get_drug_dashboard(id_drug: int, id_segment: int):
+    """Get drug data for dashboard"""
+
+    drug, attributes, substance = drugs_repository.get_single_drug(
+        id_drug=id_drug, id_segment=id_segment
+    )
+
+    if drug is None:
+        raise ValidationError(
+            "Registro inexistente", "errors.invalidRecord", status.HTTP_400_BAD_REQUEST
+        )
+
+    if substance is None:
+        # substance not found: user must config
+        return {
+            "drug": {"idDrug": drug.id, "name": drug.name},
+            "substance": None,
+        }
+
+    outliers = outlier_repository.list_drug_outliers(
+        id_drug=id_drug, id_segment=id_segment
+    )
+
+    outlier_list = []
+    for o in outliers:
+        outlier_list.append(
+            {
+                "idOutlier": o.Outlier.id,
+                "idDrug": o.Outlier.idDrug,
+                "countNum": o.Outlier.countNum,
+                "dose": o.Outlier.dose,
+                "unit": attributes.idMeasureUnit if attributes else None,
+                "frequency": prescriptionutils.freqValue(o.Outlier.frequency),
+                "score": o.Outlier.score,
+                "manualScore": o.Outlier.manualScore,
+                "obs": o.Notes.notes if o.Notes is not None else "",
+                "divisionRange": attributes.division if attributes else None,
+                "useWeight": attributes.useWeight if attributes else False,
+                "updatedAt": o.Outlier.update.isoformat() if o.Outlier.update else None,
+            }
+        )
+
+    conversions = drugs_repository.get_conversions(id_drug=id_drug)
+
+    conversions_list = []
+    for c in conversions:
+        if c.MeasureUnitConvert.idSegment != id_segment:
+            continue
+
+        conversions_list.append(
+            {
+                "idMeasureUnit": c.MeasureUnitConvert.idMeasureUnit,
+                "name": c.MeasureUnit.description,
+                "factor": c.MeasureUnitConvert.factor,
+            }
+        )
+
+    return {
+        "drug": {
+            "idDrug": drug.id,
+            "name": drug.name,
+        },
+        "substance": {
+            "name": substance.name,
+            "sctid": str(substance.id),
+            "idMeasureUnit": substance.default_measureunit,
+            "divisionRange": substance.division_range,
+        },
+        "attributes": {
+            "divisionRange": attributes.division if attributes else None,
+            "idMeasureUnit": attributes.idMeasureUnit if attributes else None,
+            "useWeight": attributes.useWeight if attributes else False,
+        },
+        "outliers": outlier_list,
+        "conversions": conversions_list,
+    }
