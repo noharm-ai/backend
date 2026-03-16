@@ -1,7 +1,6 @@
 from flask import Blueprint, request
 
 from decorators.api_endpoint_decorator import api_endpoint
-from models.requests.admin.admin_unit_conversion_request import SetFactorRequest
 from services.admin import admin_unit_conversion_service
 
 app_admin_unit_conversion = Blueprint("app_admin_unit_conversion", __name__)
@@ -65,13 +64,3 @@ def copy_unit_conversion():
     )
 
     return result.rowcount
-
-
-@app_admin_unit_conversion.route(
-    "/admin/unit-conversion/substanceunit-factor", methods=["POST"]
-)
-@api_endpoint(is_admin=True)
-def set_substanceunit_factor():
-    return admin_unit_conversion_service.sut_substanceunit_factor(
-        request_data=SetFactorRequest(**request.get_json())
-    )

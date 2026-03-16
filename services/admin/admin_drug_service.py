@@ -18,7 +18,6 @@ from models.segment import Segment
 from repository import drug_attributes_repository, drugs_repository
 from repository.admin import admin_drug_repository
 from services import drug_service as main_drug_service
-from services.admin import admin_ai_service
 from utils import dateutils, status
 
 
@@ -134,45 +133,6 @@ def get_drug_ref(sctid: int):
         )
 
     return {"name": subst.name, "ref": subst.admin_text}
-
-
-@has_permission(Permission.ADMIN_DRUGS)
-def update_price_factor(id_drug, id_segment, factor):
-    attributes = (
-        db.session.query(DrugAttributes)
-        .filter(DrugAttributes.idDrug == id_drug)
-        .filter(DrugAttributes.idSegment == id_segment)
-        .first()
-    )
-
-    if attributes == None:
-        raise ValidationError(
-            "Registro inexistente", "errors.invalidRecord", status.HTTP_400_BAD_REQUEST
-        )
-
-    if attributes.idMeasureUnitPrice == None:
-        raise ValidationError(
-            "Medicamento não possui unidade de custo definida",
-            "errors.invalidRecord",
-            status.HTTP_400_BAD_REQUEST,
-        )
-
-    conversion = MeasureUnitConvert.query.get(
-        (attributes.idMeasureUnitPrice, id_drug, id_segment)
-    )
-
-    if conversion is None:
-        conversion = MeasureUnitConvert()
-        conversion.idMeasureUnit = attributes.idMeasureUnitPrice
-        conversion.idDrug = id_drug
-        conversion.idSegment = id_segment
-        conversion.factor = factor
-
-        db.session.add(conversion)
-    else:
-        conversion.factor = factor
-
-        db.session.flush()
 
 
 @has_permission(Permission.ADMIN_DRUGS, Permission.WRITE_SEGMENT_SCORE)
@@ -460,9 +420,11 @@ def get_max_dose_ref(
 
     def get_conversion(id_drug: int, id_segment: int, measureunit_nh: str):
         c_list = filter(
-            lambda item: item.MeasureUnitConvert.idDrug == id_drug
-            and item.MeasureUnitConvert.idSegment == id_segment
-            and item.MeasureUnit.measureunit_nh == measureunit_nh,
+            lambda item: (
+                item.MeasureUnitConvert.idDrug == id_drug
+                and item.MeasureUnitConvert.idSegment == id_segment
+                and item.MeasureUnit.measureunit_nh == measureunit_nh
+            ),
             conversions,
         )
 
