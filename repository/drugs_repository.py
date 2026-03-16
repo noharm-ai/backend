@@ -308,7 +308,7 @@ def get_single_drug(
             ),
         )
         .outerjoin(Substance, Drug.sctid == Substance.id)
-        .filter(DrugAttributes.idDrug == id_drug)
+        .filter(Drug.id == id_drug)
         .first()
     )
 
