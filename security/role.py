@@ -67,6 +67,7 @@ class Role(Enum):
             Permission.ADMIN_NZERO,
             Permission.UPDATE_USER_SG,
             Permission.READ_NAV,
+            Permission.ADMIN_KNOWLEDGE_BASE,
         ],
     )
 
@@ -111,6 +112,7 @@ class Role(Enum):
             Permission.READ_PROTOCOLS,
             Permission.READ_CUSTOM_REPORTS,
             Permission.WRITE_CUSTOM_REPORTS_GRAPHS,
+            Permission.ADMIN_KNOWLEDGE_BASE,
         ],
     )
 

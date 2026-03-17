@@ -291,3 +291,21 @@ class GlobalExam(db.Model):
     updated_by = db.Column("updated_by", db.BigInteger, nullable=True)
     created_at = db.Column("created_at", db.DateTime, nullable=False)
     created_by = db.Column("created_by", db.BigInteger, nullable=False)
+
+
+class KnowledgeBase(db.Model):
+    """Knowledge Base links table"""
+
+    __tablename__ = "base_conhecimento"
+    __table_args__ = {"schema": "public"}
+
+    id = db.Column("idbase_conhecimento", db.Integer, primary_key=True)
+    path = db.Column("pagina", postgresql.ARRAY(db.String), nullable=False)
+    link = db.Column("link", db.String, nullable=False)
+    title = db.Column("titulo", db.String, nullable=False)
+    description = db.Column("resumo", db.String, nullable=True)
+    active = db.Column("ativo", db.Boolean, nullable=False)
+    updated_at = db.Column("updated_at", db.DateTime, nullable=True)
+    updated_by = db.Column("updated_by", db.BigInteger, nullable=True)
+    created_at = db.Column("created_at", db.DateTime, nullable=False)
+    created_by = db.Column("created_by", db.BigInteger, nullable=False)

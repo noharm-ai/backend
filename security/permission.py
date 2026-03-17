@@ -111,3 +111,5 @@ class Permission(Enum):
 
     READ_NAV = "READ_NAV"  # permission to navigation data
     NAV_COPY_PATIENT = "NAV_COPY_PATIENT"  # permission to copy patient data
+
+    ADMIN_KNOWLEDGE_BASE = "ADMIN_KNOWLEDGE_BASE"  # permission to manage knowledge base records
