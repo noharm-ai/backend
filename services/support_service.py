@@ -12,7 +12,10 @@ from exception.validation_error import ValidationError
 from models.appendix import GlobalMemory
 from models.enums import GlobalMemoryEnum
 from models.main import User, db
-from repository import user_repository
+from models.requests.knowledge_base_request import (
+    KnowledgeBaseListRequest,
+)
+from repository import knowledge_base_repository, user_repository
 from security.role import Role
 from services import vector_search_service
 from utils import logger, status
@@ -590,3 +593,17 @@ def list_requesters(user_context: User):
         results.append({"name": user.name, "email": user.email})
 
     return {"requesters": results}
+
+
+@has_permission(Permission.READ_BASIC_FEATURES)
+def list_knowledge_base_articles(request_data: KnowledgeBaseListRequest):
+    results = knowledge_base_repository.list_knowledge_base(request_data=request_data)
+
+    return [
+        {
+            "link": kb.link,
+            "title": kb.title,
+            "description": kb.description,
+        }
+        for kb in results
+    ]

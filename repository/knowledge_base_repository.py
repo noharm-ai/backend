@@ -1,7 +1,7 @@
 """Repository: knowledge base related operations"""
 
-from models.main import db
 from models.appendix import KnowledgeBase
+from models.main import db
 from models.requests.knowledge_base_request import KnowledgeBaseListRequest
 
 
@@ -15,7 +15,7 @@ def list_knowledge_base(request_data: KnowledgeBaseListRequest) -> list[Knowledg
     if request_data.path:
         query = query.filter(KnowledgeBase.path.overlap(request_data.path))
 
-    return query.order_by(KnowledgeBase.path, KnowledgeBase.title).all()
+    return query.order_by(KnowledgeBase.title).all()
 
 
 def get_by_id(id: int) -> KnowledgeBase:

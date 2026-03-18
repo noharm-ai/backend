@@ -2,8 +2,11 @@
 
 from flask import Blueprint, request
 
-from services import support_service
 from decorators.api_endpoint_decorator import api_endpoint
+from models.requests.knowledge_base_request import (
+    KnowledgeBaseListRequest,
+)
+from services import support_service
 
 app_support = Blueprint("app_support", __name__)
 
@@ -83,6 +86,14 @@ def get_related_articles():
     data = request.get_json()
 
     return support_service.get_related_kb(question=data.get("question", None))
+
+
+@app_support.route("/support/knowledge-base-articles", methods=["POST"])
+@api_endpoint()
+def list_knowledge_base_articles():
+    return support_service.list_knowledge_base_articles(
+        request_data=KnowledgeBaseListRequest(**request.get_json())
+    )
 
 
 @app_support.route("/support/list-requesters", methods=["GET"])
