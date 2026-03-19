@@ -11,10 +11,10 @@ from sqlalchemy.orm import undefer
 from config import Config
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
-from models.requests.admin.admin_drug_request import AdminDrugListRequest
 from models.appendix import MeasureUnit, MeasureUnitConvert
 from models.enums import SegmentTypeEnum
 from models.main import Drug, DrugAttributes, Outlier, Substance, User, db
+from models.requests.admin.admin_drug_request import AdminDrugListRequest
 from models.segment import Segment
 from repository import drug_attributes_repository, drugs_repository
 from repository.admin import admin_drug_repository
@@ -65,6 +65,7 @@ def get_drug_list(request_data: AdminDrugListRequest):
                 "responsible": i.responsible,
                 "updateAt": dateutils.to_iso(i.update),
                 "drugCount": i.drug_count,
+                "doseRange": i.division,
             }
         )
 

@@ -59,6 +59,7 @@ def get_admin_drug_list(request_data: AdminDrugListRequest):
             User.name.label("responsible"),
             DrugAttributes.update,
             presc_query.c.count.label("drug_count"),
+            DrugAttributes.division,
         )
         .select_from(presc_query)
         .join(Drug, presc_query.c.idDrug == Drug.id)
@@ -230,6 +231,7 @@ def get_admin_drug_list(request_data: AdminDrugListRequest):
             ["lactante", DrugAttributes.lactating],
             ["gestante", DrugAttributes.pregnant],
             ["jejum", DrugAttributes.fasting],
+            ["use_weight", DrugAttributes.useWeight],
         ]
 
         for a in bool_attributes:
