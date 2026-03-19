@@ -1,7 +1,7 @@
 from flask import Blueprint, request
 
-from services import memory_service
 from decorators.api_endpoint_decorator import api_endpoint
+from services import memory_service
 
 app_mem = Blueprint("app_mem", __name__)
 
@@ -20,6 +20,17 @@ def save_memory(idMemory=None):
     data = request.get_json()
 
     mem = memory_service.save_memory(idMemory, data.get("type"), data.get("value"))
+
+    return mem.key
+
+
+@app_mem.route("/memory/custom-forms", methods=["PUT"])
+@app_mem.route("/memory/custom-forms/<int:idMemory>", methods=["PUT"])
+@api_endpoint()
+def save_custom_form(idMemory=None):
+    data = request.get_json() or {}
+
+    mem = memory_service.save_custom_form(id=idMemory, value=data.get("value"))
 
     return mem.key
 
