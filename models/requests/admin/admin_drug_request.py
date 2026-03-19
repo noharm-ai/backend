@@ -28,3 +28,5 @@ class AdminDrugListRequest(BaseModel):
     minDrugCount: Optional[int] = None
     tpAttributeList: Optional[str] = "in"
     idDrugList: Optional[list[int]] = []
+    hasSubstanceMaxDoseWeightAdult: Optional[bool] = None
+    hasSubstanceMaxDoseWeightPediatric: Optional[bool] = None

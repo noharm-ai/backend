@@ -133,10 +133,13 @@ def get_admin_drug_list(request_data: AdminDrugListRequest):
         if request_data.hasAISubstance:
             q = q.filter(Drug.ai_accuracy != None)
 
-            if request_data.aiAccuracyRange != None and len(request_data.aiAccuracyRange) == 2:
-                q = q.filter(Drug.ai_accuracy >= request_data.aiAccuracyRange[0]).filter(
-                    Drug.ai_accuracy <= request_data.aiAccuracyRange[1]
-                )
+            if (
+                request_data.aiAccuracyRange != None
+                and len(request_data.aiAccuracyRange) == 2
+            ):
+                q = q.filter(
+                    Drug.ai_accuracy >= request_data.aiAccuracyRange[0]
+                ).filter(Drug.ai_accuracy <= request_data.aiAccuracyRange[1])
         else:
             q = q.filter(Drug.ai_accuracy == None)
 
@@ -145,6 +148,18 @@ def get_admin_drug_list(request_data: AdminDrugListRequest):
             q = q.filter(DrugAttributes.maxDose != None)
         else:
             q = q.filter(DrugAttributes.maxDose == None)
+
+    if request_data.hasSubstanceMaxDoseWeightAdult != None:
+        if request_data.hasSubstanceMaxDoseWeightAdult:
+            q = q.filter(Substance.maxdose_adult_weight != None)
+        else:
+            q = q.filter(Substance.maxdose_adult_weight == None)
+
+    if request_data.hasSubstanceMaxDoseWeightPediatric != None:
+        if request_data.hasSubstanceMaxDoseWeightPediatric:
+            q = q.filter(Substance.maxdose_pediatric_weight != None)
+        else:
+            q = q.filter(Substance.maxdose_pediatric_weight == None)
 
     if request_data.tpRefMaxDose != None:
         if request_data.tpRefMaxDose == "empty":
@@ -248,7 +263,12 @@ def get_admin_drug_list(request_data: AdminDrugListRequest):
     if request_data.idDrugList:
         q = q.filter(DrugAttributes.idDrug.in_(request_data.idDrugList))
 
-    return q.order_by(Drug.name, Segment.description).limit(request_data.limit).offset(request_data.offset).all()
+    return (
+        q.order_by(Drug.name, Segment.description)
+        .limit(request_data.limit)
+        .offset(request_data.offset)
+        .all()
+    )
 
 
 def get_drug_attributes(id_drug: int = None, id_segment: int = None):
