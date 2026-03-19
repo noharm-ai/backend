@@ -1,6 +1,7 @@
 from flask import Blueprint, request
 
 from decorators.api_endpoint_decorator import api_endpoint
+from models.requests.admin.admin_drug_request import AdminDrugListRequest
 from services.admin import admin_drug_service
 
 app_admin_drug = Blueprint("app_admin_drug", __name__)
@@ -9,28 +10,8 @@ app_admin_drug = Blueprint("app_admin_drug", __name__)
 @app_admin_drug.route("/admin/drug/attributes-list", methods=["POST"])
 @api_endpoint(is_admin=True)
 def get_drug_list():
-    request_data = request.get_json()
-
     return admin_drug_service.get_drug_list(
-        has_price_conversion=request_data.get("hasPriceConversion", None),
-        has_substance=request_data.get("hasSubstance", None),
-        has_default_unit=request_data.get("hasDefaultUnit", None),
-        has_price_unit=request_data.get("hasPriceUnit", None),
-        has_inconsistency=request_data.get("hasInconsistency", None),
-        has_ai_substance=request_data.get("hasAISubstance", None),
-        ai_accuracy_range=request_data.get("aiAccuracyRange", None),
-        attribute_list=request_data.get("attributeList", []),
-        term=request_data.get("term", None),
-        substance=request_data.get("substance", None),
-        id_segment_list=request_data.get("idSegmentList", None),
-        has_max_dose=request_data.get("hasMaxDose", None),
-        limit=request_data.get("limit", 10),
-        offset=request_data.get("offset", 0),
-        tp_ref_max_dose=request_data.get("tpRefMaxDose", None),
-        substance_list=request_data.get("substanceList", []),
-        tp_substance_list=request_data.get("tpSubstanceList", "in"),
-        min_drug_count=request_data.get("minDrugCount", None),
-        tp_attribute_list=request_data.get("tpAttributeList", "in"),
+        request_data=AdminDrugListRequest(**request.get_json())
     )
 
 
