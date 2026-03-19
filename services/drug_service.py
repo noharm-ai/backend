@@ -13,6 +13,7 @@ from models.enums import (
     SegmentTypeEnum,
     SubstanceTagEnum,
 )
+from models.requests.admin.admin_drug_request import AdminDrugListRequest
 from models.main import (
     Drug,
     DrugAttributes,
@@ -457,7 +458,9 @@ def update_substance(id_drug, sctid, user_context: User):
         drug.id, drug.sctid, user=user_context, calc_dose_max=True
     )
 
-    return admin_drug_service.get_drug_list(id_drug_list=[id_drug], limit=20, offset=0)
+    return admin_drug_service.get_drug_list(
+        request_data=AdminDrugListRequest(idDrugList=[id_drug], limit=20, offset=0)
+    )
 
 
 def copy_substance_default_attributes(
