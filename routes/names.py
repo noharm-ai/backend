@@ -82,7 +82,7 @@ def auth_token():
 @jwt_required()
 def search_name(term):
     """Inverted name search"""
-    if not _SEARCH_TERM_RE.match(term):
+    if not _SEARCH_TERM_RE.fullmatch(term):
         return {"status": "error", "data": []}, status.HTTP_400_BAD_REQUEST
 
     user = User.find(get_jwt_identity())

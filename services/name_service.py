@@ -6,6 +6,8 @@ from datetime import datetime, timedelta, timezone
 import boto3
 import requests
 from jwt import encode
+from urllib.parse import quote as _url_quote
+
 from markupsafe import escape as _escape_html
 
 from config import Config
@@ -222,7 +224,7 @@ class NHInternalNameService(NameServiceStrategy):
 
     def search_by_name(self, search_term: str) -> list:
         url = self._get_url()
-        url += f"search-name/{search_term}"
+        url += f"search-name/{_url_quote(search_term, safe='')}"
         params = dict(self.config["getname"]["params"])
         token = self._get_token()
 
