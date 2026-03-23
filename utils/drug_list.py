@@ -314,7 +314,7 @@ class DrugList:
                 {
                     "idPrescription": str(pd[0].idPrescription),
                     "idPrescriptionDrug": str(pd[0].id),
-                    "idDrug": pd[0].idDrug,
+                    "idDrug": str(pd[0].idDrug),
                     "idDepartment": pd.idDepartment,
                     "idSegment": pd[0].idSegment,
                     "drug": (
