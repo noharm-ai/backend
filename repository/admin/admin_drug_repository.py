@@ -2,9 +2,9 @@
 
 from sqlalchemy import text
 
-from models.main import db, User
-from models.segment import Segment
 from models.enums import DrugAttributesAuditTypeEnum, SegmentTypeEnum
+from models.main import User, db
+from models.segment import Segment
 
 
 def copy_attributes(
@@ -47,7 +47,7 @@ def copy_attributes(
                 left join public.usuario u on (ma.update_by = u.idusuario)
             where 
                 ma.idsegmento = :idSegmentDestiny
-                {only_support_filter if not overwrite_all else ''}
+                {only_support_filter if not overwrite_all else ""}
         )
     """
 
@@ -107,7 +107,7 @@ def copy_attributes(
         update 
             {user_context.schema}.medatributos origem
         set 
-            {''.join(set_attributes)}
+            {"".join(set_attributes)}
             update_at = now(),
             update_by = :idUser
         from 
@@ -155,7 +155,8 @@ def _get_attributes_reference_query(
                 coalesce('tube' = any(s.tags), false) as sonda,
                 coalesce('chemoterapy' = any(s.tags), false) as quimio,
                 coalesce('dialyzable' = any(s.tags), false) as dialisavel,
-                coalesce('fasting' = any(s.tags), false) as jejum
+                coalesce('fasting' = any(s.tags), false) as jejum,
+                coalesce('not_standardized' = any(s.tags), false) as naopadronizado
             from
                 public.substancia s
         """
