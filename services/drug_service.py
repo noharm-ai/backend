@@ -679,9 +679,16 @@ def update_convert_factor(
 def get_drug_dashboard(id_drug: int, id_segment: int):
     """Get drug data for dashboard"""
 
-    drug, attributes, substance = drugs_repository.get_single_drug(
+    result = drugs_repository.get_single_drug(
         id_drug=id_drug, id_segment=id_segment
     )
+
+    if result is None:
+        raise ValidationError(
+            "Registro inexistente", "errors.invalidRecord", status.HTTP_400_BAD_REQUEST
+        )
+
+    drug, attributes, substance = result
 
     if drug is None:
         raise ValidationError(
