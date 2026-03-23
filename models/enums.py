@@ -230,6 +230,7 @@ class DefaultMeasureUnitEnum(Enum):
     ML = "ml"
     MCG = "mcg"
     UI = "UI"
+    UN = "un"
 
 
 class SubstanceTagEnum(Enum):
