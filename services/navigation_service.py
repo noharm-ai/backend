@@ -96,6 +96,9 @@ def copy_patient(request_data: NavCopyPatientRequest, user_context: User):
         "clinical_notes": encrypted_clinical_notes,
         "patient_name": encrypted_patient_name,
         "patient_phone": encrypted_patient_phone,
+        "id_department": agg_prescription.idDepartment,
+        "insurance": agg_prescription.insurance,
+        "bed": agg_prescription.bed,
         "encrypted": True,
     }
 
