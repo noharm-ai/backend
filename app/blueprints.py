@@ -19,6 +19,7 @@ from routes.admin.admin_relation import app_admin_relation
 from routes.admin.admin_report import app_admin_report
 from routes.admin.admin_segment import app_admin_segment
 from routes.admin.admin_substance import app_admin_subs
+from routes.admin.admin_knowledge_base import app_admin_knowledge_base
 from routes.admin.admin_tag import app_admin_tag
 from routes.admin.admin_unit import app_admin_unit
 from routes.admin.admin_unit_conversion import app_admin_unit_conversion
@@ -111,6 +112,7 @@ def register_blueprints(app):
     app.register_blueprint(app_admin_relation)
     app.register_blueprint(app_admin_unit)
     app.register_blueprint(app_admin_tag)
+    app.register_blueprint(app_admin_knowledge_base)
     app.register_blueprint(app_admin_protocol)
     app.register_blueprint(app_admin_global_exam)
     app.register_blueprint(app_admin_global_memory)

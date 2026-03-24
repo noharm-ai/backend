@@ -11,31 +11,11 @@ from models.main import (
     User,
     db,
 )
+from models.requests.admin.admin_drug_request import AdminDrugListRequest
 from models.segment import Segment
 
 
-def get_admin_drug_list(
-    has_substance=None,
-    has_price_conversion=None,
-    has_default_unit=None,
-    has_price_unit=None,
-    has_inconsistency=None,
-    attribute_list=[],
-    term=None,
-    substance=None,
-    limit=10,
-    offset=0,
-    id_segment_list=None,
-    has_ai_substance=None,
-    ai_accuracy_range=None,
-    has_max_dose=None,
-    tp_ref_max_dose=None,
-    substance_list=[],
-    tp_substance_list=None,
-    id_drug_list=[],
-    min_drug_count=None,
-    tp_attribute_list=None,
-):
+def get_admin_drug_list(request_data: AdminDrugListRequest):
     """Gets list of drugs with attributes and conversions for management"""
     SegmentOutlier = db.aliased(Segment)
 
@@ -79,6 +59,7 @@ def get_admin_drug_list(
             User.name.label("responsible"),
             DrugAttributes.update,
             presc_query.c.count.label("drug_count"),
+            DrugAttributes.division,
         )
         .select_from(presc_query)
         .join(Drug, presc_query.c.idDrug == Drug.id)
@@ -104,29 +85,29 @@ def get_admin_drug_list(
         .outerjoin(User, User.id == DrugAttributes.user)
     )
 
-    if has_substance != None:
-        if has_substance:
+    if request_data.hasSubstance != None:
+        if request_data.hasSubstance:
             q = q.filter(Substance.id != None)
         else:
             q = q.filter(Substance.id == None)
 
-    if has_default_unit != None:
-        if has_default_unit:
+    if request_data.hasDefaultUnit != None:
+        if request_data.hasDefaultUnit:
             q = q.filter(DrugAttributes.idMeasureUnit != None)
         else:
             q = q.filter(DrugAttributes.idMeasureUnit == None)
 
-    if min_drug_count is not None:
-        q = q.filter(presc_query.c.count >= min_drug_count)
+    if request_data.minDrugCount is not None:
+        q = q.filter(presc_query.c.count >= request_data.minDrugCount)
 
-    if has_price_unit != None:
-        if has_price_unit:
+    if request_data.hasPriceUnit != None:
+        if request_data.hasPriceUnit:
             q = q.filter(DrugAttributes.idMeasureUnitPrice != None)
         else:
             q = q.filter(DrugAttributes.idMeasureUnitPrice == None)
 
-    if has_price_conversion != None:
-        if has_price_conversion:
+    if request_data.hasPriceConversion != None:
+        if request_data.hasPriceConversion:
             q = q.filter(
                 or_(
                     MeasureUnitConvert.factor != None,
@@ -143,31 +124,46 @@ def get_admin_drug_list(
                 )
             )
 
-    if has_inconsistency != None:
-        if has_inconsistency:
+    if request_data.hasInconsistency != None:
+        if request_data.hasInconsistency:
             q = q.filter(DrugAttributes.idDrug == None)
         else:
             q = q.filter(DrugAttributes.idDrug != None)
 
-    if has_ai_substance != None:
-        if has_ai_substance:
+    if request_data.hasAISubstance != None:
+        if request_data.hasAISubstance:
             q = q.filter(Drug.ai_accuracy != None)
 
-            if ai_accuracy_range != None and len(ai_accuracy_range) == 2:
-                q = q.filter(Drug.ai_accuracy >= ai_accuracy_range[0]).filter(
-                    Drug.ai_accuracy <= ai_accuracy_range[1]
-                )
+            if (
+                request_data.aiAccuracyRange != None
+                and len(request_data.aiAccuracyRange) == 2
+            ):
+                q = q.filter(
+                    Drug.ai_accuracy >= request_data.aiAccuracyRange[0]
+                ).filter(Drug.ai_accuracy <= request_data.aiAccuracyRange[1])
         else:
             q = q.filter(Drug.ai_accuracy == None)
 
-    if has_max_dose != None:
-        if has_max_dose:
+    if request_data.hasMaxDose != None:
+        if request_data.hasMaxDose:
             q = q.filter(DrugAttributes.maxDose != None)
         else:
             q = q.filter(DrugAttributes.maxDose == None)
 
-    if tp_ref_max_dose != None:
-        if tp_ref_max_dose == "empty":
+    if request_data.hasSubstanceMaxDoseWeightAdult != None:
+        if request_data.hasSubstanceMaxDoseWeightAdult:
+            q = q.filter(Substance.maxdose_adult_weight != None)
+        else:
+            q = q.filter(Substance.maxdose_adult_weight == None)
+
+    if request_data.hasSubstanceMaxDoseWeightPediatric != None:
+        if request_data.hasSubstanceMaxDoseWeightPediatric:
+            q = q.filter(Substance.maxdose_pediatric_weight != None)
+        else:
+            q = q.filter(Substance.maxdose_pediatric_weight == None)
+
+    if request_data.tpRefMaxDose != None:
+        if request_data.tpRefMaxDose == "empty":
             q = q.filter(
                 or_(
                     and_(
@@ -183,7 +179,7 @@ def get_admin_drug_list(
                     ),
                 )
             )
-        elif tp_ref_max_dose == "diff":
+        elif request_data.tpRefMaxDose == "diff":
             q = q.filter(
                 or_(
                     and_(
@@ -199,7 +195,7 @@ def get_admin_drug_list(
                     ),
                 )
             )
-        elif tp_ref_max_dose == "equal":
+        elif request_data.tpRefMaxDose == "equal":
             q = q.filter(
                 or_(
                     and_(
@@ -216,7 +212,7 @@ def get_admin_drug_list(
                 )
             )
 
-    if len(attribute_list) > 0:
+    if len(request_data.attributeList) > 0:
         bool_attributes = [
             ["mav", DrugAttributes.mav],
             ["idoso", DrugAttributes.elderly],
@@ -235,11 +231,12 @@ def get_admin_drug_list(
             ["lactante", DrugAttributes.lactating],
             ["gestante", DrugAttributes.pregnant],
             ["jejum", DrugAttributes.fasting],
+            ["use_weight", DrugAttributes.useWeight],
         ]
 
         for a in bool_attributes:
-            if a[0] in attribute_list:
-                if tp_attribute_list == "notin":
+            if a[0] in request_data.attributeList:
+                if request_data.tpAttributeList == "notin":
                     if str(a[1].type) == "BOOLEAN":
                         q = q.filter(or_(a[1] == False, a[1] == None))
                     else:
@@ -250,25 +247,30 @@ def get_admin_drug_list(
                     else:
                         q = q.filter(a[1] != None)
 
-    if term:
-        q = q.filter(Drug.name.ilike(term))
+    if request_data.term:
+        q = q.filter(Drug.name.ilike(request_data.term))
 
-    if substance:
-        q = q.filter(Substance.name.ilike(substance))
+    if request_data.substance:
+        q = q.filter(Substance.name.ilike(request_data.substance))
 
-    if id_segment_list and len(id_segment_list) > 0:
-        q = q.filter(DrugAttributes.idSegment.in_(id_segment_list))
+    if request_data.idSegmentList and len(request_data.idSegmentList) > 0:
+        q = q.filter(DrugAttributes.idSegment.in_(request_data.idSegmentList))
 
-    if substance_list:
-        if tp_substance_list == "in":
-            q = q.filter(Substance.id.in_(substance_list))
+    if request_data.substanceList:
+        if request_data.tpSubstanceList == "in":
+            q = q.filter(Substance.id.in_(request_data.substanceList))
         else:
-            q = q.filter(~Substance.id.in_(substance_list))
+            q = q.filter(~Substance.id.in_(request_data.substanceList))
 
-    if id_drug_list:
-        q = q.filter(DrugAttributes.idDrug.in_(id_drug_list))
+    if request_data.idDrugList:
+        q = q.filter(DrugAttributes.idDrug.in_(request_data.idDrugList))
 
-    return q.order_by(Drug.name, Segment.description).limit(limit).offset(offset).all()
+    return (
+        q.order_by(Drug.name, Segment.description)
+        .limit(request_data.limit)
+        .offset(request_data.offset)
+        .all()
+    )
 
 
 def get_drug_attributes(id_drug: int = None, id_segment: int = None):

@@ -247,7 +247,7 @@ def get_interventions(
                 "idPrescription": str(
                     i[1].idPrescription if i[1] else i[0].idPrescription
                 ),
-                "idDrug": i[1].idDrug if i[1] else None,
+                "idDrug": str(i[1].idDrug) if i[1] else None,
                 "drugName": get_drug_name(i=i[0], pd=i[1], drug_name=i[3]),
                 "dose": i[1].dose if i[1] else None,
                 "measureUnit": (

@@ -79,6 +79,17 @@ def get_by_kind(kinds) -> dict:
     return memory_itens
 
 
+@has_permission(Permission.WRITE_CUSTOM_FORMS)
+def save_custom_form(id: int | None, value, user_context: User):
+    """Save custom forms"""
+    return save_memory(
+        id=id,
+        kind=MemoryEnum.CUSTOM_FORMS.value,
+        value=value,
+        user_context=user_context,
+    )
+
+
 @has_permission(Permission.WRITE_BASIC_FEATURES)
 def save_memory(id, kind, value, user_context: User):
     newMem = False
@@ -175,7 +186,6 @@ def is_admin_memory(key):
         MemoryEnum.MAP_ORIGIN_DIET.value,
         MemoryEnum.MAP_ORIGIN_MATERIAL.value,
         MemoryEnum.MAP_ORIGIN_CUSTOM.value,
-        MemoryEnum.CUSTOM_FORMS.value,
         MemoryEnum.TRANSCRIPTION_FIELDS.value,
     ]
 

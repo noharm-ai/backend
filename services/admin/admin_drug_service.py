@@ -14,6 +14,7 @@ from exception.validation_error import ValidationError
 from models.appendix import MeasureUnit, MeasureUnitConvert
 from models.enums import SegmentTypeEnum
 from models.main import Drug, DrugAttributes, Outlier, Substance, User, db
+from models.requests.admin.admin_drug_request import AdminDrugListRequest
 from models.segment import Segment
 from repository import drug_attributes_repository, drugs_repository
 from repository.admin import admin_drug_repository
@@ -22,50 +23,8 @@ from utils import dateutils, status
 
 
 @has_permission(Permission.ADMIN_DRUGS)
-def get_drug_list(
-    has_substance=None,
-    has_price_conversion=None,
-    has_default_unit=None,
-    has_price_unit=None,
-    has_inconsistency=None,
-    attribute_list=[],
-    term=None,
-    substance=None,
-    limit=10,
-    offset=0,
-    id_segment_list=None,
-    has_ai_substance=None,
-    ai_accuracy_range=None,
-    has_max_dose=None,
-    tp_ref_max_dose=None,
-    substance_list=[],
-    tp_substance_list=None,
-    tp_attribute_list=None,
-    id_drug_list=[],
-    min_drug_count=None,
-):
-    results = drugs_repository.get_admin_drug_list(
-        has_substance=has_substance,
-        has_price_conversion=has_price_conversion,
-        has_default_unit=has_default_unit,
-        has_price_unit=has_price_unit,
-        has_inconsistency=has_inconsistency,
-        attribute_list=attribute_list,
-        term=term,
-        substance=substance,
-        limit=limit,
-        offset=offset,
-        id_segment_list=id_segment_list,
-        has_ai_substance=has_ai_substance,
-        ai_accuracy_range=ai_accuracy_range,
-        has_max_dose=has_max_dose,
-        tp_ref_max_dose=tp_ref_max_dose,
-        substance_list=substance_list,
-        tp_substance_list=tp_substance_list,
-        id_drug_list=id_drug_list,
-        min_drug_count=min_drug_count,
-        tp_attribute_list=tp_attribute_list,
-    )
+def get_drug_list(request_data: AdminDrugListRequest):
+    results = drugs_repository.get_admin_drug_list(request_data=request_data)
 
     items = []
     for i in results:
@@ -106,6 +65,7 @@ def get_drug_list(
                 "responsible": i.responsible,
                 "updateAt": dateutils.to_iso(i.update),
                 "drugCount": i.drug_count,
+                "doseRange": i.division,
             }
         )
 

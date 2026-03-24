@@ -7,6 +7,7 @@ from models.main import db, Substance, SubstanceClass, User
 from models.requests.admin.admin_substance import AdminSubstanceRequest
 from decorators.has_permission_decorator import has_permission, Permission
 from exception.validation_error import ValidationError
+from repository import substance_repository
 from utils import status, dateutils
 
 
@@ -198,6 +199,26 @@ def upsert_substance(request_data: AdminSubstanceRequest, user_context: User):
         _to_dto(db_substance[0]),
         **{
             "className": db_substance[1].name if db_substance[1] != None else None,
+            "responsible": db_substance.User.name if db_substance.User else None,
+        }
+    )
+
+
+@has_permission(Permission.ADMIN_SUBSTANCES)
+def get_substance(substance_id: int):
+    db_substance = substance_repository.get_by_id(substance_id)
+
+    if db_substance is None:
+        raise ValidationError(
+            "Substância não encontrada",
+            "errors.notFound",
+            status.HTTP_404_NOT_FOUND,
+        )
+
+    return dict(
+        _to_dto(db_substance[0]),
+        **{
+            "className": db_substance[1].name if db_substance[1] is not None else None,
             "responsible": db_substance.User.name if db_substance.User else None,
         }
     )

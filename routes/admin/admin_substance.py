@@ -34,6 +34,12 @@ def get_substances():
     return list
 
 
+@app_admin_subs.route("/admin/substance/<int:id>", methods=["GET"])
+@api_endpoint(is_admin=True)
+def get_substance(id: int):
+    return admin_substance_service.get_substance(substance_id=id)
+
+
 @app_admin_subs.route("/admin/substance", methods=["POST"])
 @api_endpoint(is_admin=True)
 def update_substance():

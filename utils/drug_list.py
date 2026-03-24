@@ -314,7 +314,7 @@ class DrugList:
                 {
                     "idPrescription": str(pd[0].idPrescription),
                     "idPrescriptionDrug": str(pd[0].id),
-                    "idDrug": pd[0].idDrug,
+                    "idDrug": str(pd[0].idDrug),
                     "idDepartment": pd.idDepartment,
                     "idSegment": pd[0].idSegment,
                     "drug": (
@@ -671,7 +671,7 @@ class DrugList:
     def changeDrugName(pDrugs):
         result = []
         for p in pDrugs:
-            if p["idDrug"] == 0:
+            if p["idDrug"] == "0":
                 p["drug"] = p["time"]
             result.append(p)
 
@@ -681,14 +681,14 @@ class DrugList:
     def infer_substance_ml(pDrugs):
         names = []
         for p in pDrugs:
-            if p["idDrug"] == 0:
+            if p["idDrug"] == "0":
                 names.append(p["drug"])
 
         substances = admin_ai_service.get_substance_by_drug_name(drug_names=names)
 
         result = []
         for p in pDrugs:
-            if p["idDrug"] == 0:
+            if p["idDrug"] == "0":
                 if p["drug"] in substances:
                     p["sctid_infer"] = substances[p["drug"]]
 
@@ -774,7 +774,7 @@ class DrugList:
                 (
                     d
                     for d in result
-                    if d["idDrug"] == pd[0].idDrug
+                    if d["idDrug"] == str(pd[0].idDrug)
                     and d["recommendation"] == pd[0].notes
                     and d["dose"] == pd[0].dose
                     and d["frequencyday"] == pd[0].frequency
@@ -799,7 +799,7 @@ class DrugList:
                     {
                         "idPrescription": str(pd[0].idPrescription),
                         "idPrescriptionDrug": str(pd[0].id),
-                        "idDrug": pd[0].idDrug,
+                        "idDrug": str(pd[0].idDrug),
                         "drug": (
                             pd[1].name
                             if pd[1] is not None

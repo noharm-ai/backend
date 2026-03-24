@@ -43,7 +43,7 @@ def get_unit_conversion_for_drug(id_drug: int):
             show_factors = False
 
     if len(conversion_list) > 0 and substanceMeasureUnit is None:
-        substanceMeasureUnit = DefaultMeasureUnitEnum.MG.value
+        substanceMeasureUnit = DefaultMeasureUnitEnum.UN.value
         show_factors = False
 
     result = []
@@ -98,7 +98,7 @@ def save_unit_conversion_for_drug(
         unit_conversion_repository.get_substance_default_measure_unit_for_drug(
             id_drug=id_drug
         )
-        or DefaultMeasureUnitEnum.MG.value
+        or DefaultMeasureUnitEnum.UN.value
     )
 
     measure_unit = (

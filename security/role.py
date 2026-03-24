@@ -67,6 +67,8 @@ class Role(Enum):
             Permission.ADMIN_NZERO,
             Permission.UPDATE_USER_SG,
             Permission.READ_NAV,
+            Permission.ADMIN_KNOWLEDGE_BASE,
+            Permission.WRITE_CUSTOM_FORMS,
         ],
     )
 
@@ -111,6 +113,8 @@ class Role(Enum):
             Permission.READ_PROTOCOLS,
             Permission.READ_CUSTOM_REPORTS,
             Permission.WRITE_CUSTOM_REPORTS_GRAPHS,
+            Permission.ADMIN_KNOWLEDGE_BASE,
+            Permission.WRITE_CUSTOM_FORMS,
         ],
     )
 
@@ -208,6 +212,7 @@ class Role(Enum):
             Permission.NAV_COPY_PATIENT,
             Permission.MULTI_SCHEMA,
             Permission.READ_NAV,
+            Permission.WRITE_CUSTOM_FORMS,
         ],
     )
 
