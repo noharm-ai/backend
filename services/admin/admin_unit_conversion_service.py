@@ -88,6 +88,8 @@ def get_conversion_predictions(conversion_list: list) -> list:
 
 @has_permission(Permission.ADMIN_UNIT_CONVERSION)
 def get_conversion_list(id_segment):
+    unit_conversion_repository.ensure_default_measure_units()
+
     nh_default_units = (
         db.session.query(MeasureUnit)
         .filter(
@@ -97,18 +99,12 @@ def get_conversion_list(id_segment):
                     DefaultMeasureUnitEnum.MG.value,
                     DefaultMeasureUnitEnum.ML.value,
                     DefaultMeasureUnitEnum.UI.value,
+                    DefaultMeasureUnitEnum.UN.value,
                 ]
             )
         )
         .all()
     )
-
-    if not nh_default_units:
-        raise ValidationError(
-            "Pendência de configuração das unidades de medida",
-            "errors.invalidParams",
-            status.HTTP_400_BAD_REQUEST,
-        )
 
     default_units = {}
     for du in nh_default_units:

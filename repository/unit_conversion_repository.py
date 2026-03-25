@@ -1,8 +1,10 @@
 """Repository for unit conversion"""
 
 from sqlalchemy import and_, func
+from sqlalchemy.dialects.postgresql import insert
 
 from models.appendix import MeasureUnit, MeasureUnitConvert
+from models.enums import DefaultMeasureUnitEnum
 from models.main import (
     Drug,
     DrugAttributes,
@@ -11,6 +13,34 @@ from models.main import (
     Substance,
     db,
 )
+
+_DEFAULT_MEASURE_UNIT_DESCRIPTIONS = {
+    DefaultMeasureUnitEnum.MG: "Miligrama",
+    DefaultMeasureUnitEnum.ML: "Mililitro",
+    DefaultMeasureUnitEnum.MCG: "Micrograma",
+    DefaultMeasureUnitEnum.UI: "Unidade Internacional",
+    DefaultMeasureUnitEnum.UN: "Unidade",
+}
+
+
+def ensure_default_measure_units():
+    """Ensures that the 5 NH default measure units exist in unidademedida (idempotent upsert)."""
+    db.session.execute(
+        insert(MeasureUnit)
+        .values(
+            [
+                {
+                    "id": unit.value,
+                    "idHospital": 1,
+                    "description": _DEFAULT_MEASURE_UNIT_DESCRIPTIONS[unit],
+                    "measureunit_nh": unit.value,
+                }
+                for unit in DefaultMeasureUnitEnum
+            ]
+        )
+        .on_conflict_do_nothing()
+    )
+    db.session.flush()
 
 
 def _build_units_cte(id_drug=None):

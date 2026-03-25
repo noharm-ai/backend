@@ -408,10 +408,10 @@ class DrugList:
                     "status": pd[0].status,
                     "near": pd[0].near,
                     "prevIntervention": self.getPrevIntervention(
-                        pd[0].idDrug, pd[0].idPrescription
+                        str(pd[0].idDrug), pd[0].idPrescription
                     ),
                     "existIntervention": self.getExistIntervention(
-                        pd[0].idDrug, pd[0].idPrescription
+                        str(pd[0].idDrug), pd[0].idPrescription
                     ),
                     "alertsComplete": alerts_complete,
                     "tubeAlert": tubeAlert,
