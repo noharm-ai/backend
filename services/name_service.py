@@ -88,11 +88,16 @@ class DynamoDBNameService(NameServiceStrategy):
             item = response.get("Item")
 
             if item:
+                data = {
+                    k: self._escape_str(v) if isinstance(v, str) else v
+                    for k, v in item.items()
+                    if k not in ("nome", "schema_fkpessoa")
+                }
                 return {
                     "status": "success",
                     "idPatient": int(id_patient),
                     "name": self._escape_str(item["nome"]),
-                    "data": None,
+                    "data": data if data else None,
                 }
 
             return self._create_error_response(id_patient)
