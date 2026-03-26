@@ -13,22 +13,23 @@ from models.enums import (
     SegmentTypeEnum,
     SubstanceTagEnum,
 )
-from models.requests.admin.admin_drug_request import AdminDrugListRequest
 from models.main import (
     Drug,
     DrugAttributes,
     DrugAttributesAudit,
+    Outlier,
     PrescriptionAgg,
     Substance,
     User,
     db,
 )
 from models.prescription import Prescription, PrescriptionDrug
+from models.requests.admin.admin_drug_request import AdminDrugListRequest
 from models.segment import Segment
 from repository import drugs_repository, outlier_repository
 from services import data_authorization_service, memory_service
 from services.admin import admin_drug_service
-from utils import prescriptionutils, status
+from utils import numberutils, prescriptionutils, status
 
 
 @has_permission(Permission.READ_PRESCRIPTION)
@@ -676,12 +677,14 @@ def update_convert_factor(
 
 
 @has_permission(Permission.READ_PRESCRIPTION)
-def get_drug_dashboard(id_drug: int, id_segment: int):
+def get_drug_dashboard(
+    id_drug: int, id_segment: int, user_context: User = None, dose=None, frequency=None
+):
     """Get drug data for dashboard"""
+    dose = float(dose) if numberutils.is_float(dose) else None
+    frequency = float(frequency) if numberutils.is_float(frequency) else None
 
-    result = drugs_repository.get_single_drug(
-        id_drug=id_drug, id_segment=id_segment
-    )
+    result = drugs_repository.get_single_drug(id_drug=id_drug, id_segment=id_segment)
 
     if result is None:
         raise ValidationError(
@@ -706,8 +709,17 @@ def get_drug_dashboard(id_drug: int, id_segment: int):
         id_drug=id_drug, id_segment=id_segment
     )
 
+    selected_found = False
     outlier_list = []
     for o in outliers:
+        selected = (
+            dose is not None
+            and frequency is not None
+            and dose == o.Outlier.dose
+            and frequency == o.Outlier.frequency
+        )
+        if selected:
+            selected_found = True
         outlier_list.append(
             {
                 "idOutlier": o.Outlier.id,
@@ -722,6 +734,40 @@ def get_drug_dashboard(id_drug: int, id_segment: int):
                 "divisionRange": attributes.division if attributes else None,
                 "useWeight": attributes.useWeight if attributes else False,
                 "updatedAt": o.Outlier.update.isoformat() if o.Outlier.update else None,
+                "selected": selected,
+            }
+        )
+
+    if dose is not None and frequency is not None and not selected_found:
+        new_outlier = Outlier()
+        new_outlier.idDrug = id_drug
+        new_outlier.idSegment = id_segment
+        new_outlier.countNum = 1
+        new_outlier.dose = dose
+        new_outlier.frequency = frequency
+        new_outlier.score = 4
+        new_outlier.manualScore = None
+        new_outlier.update = datetime.today()
+        new_outlier.user = user_context.id
+
+        db.session.add(new_outlier)
+        db.session.flush()
+
+        outlier_list.append(
+            {
+                "idOutlier": new_outlier.id,
+                "idDrug": id_drug,
+                "countNum": 1,
+                "dose": dose,
+                "unit": attributes.idMeasureUnit if attributes else None,
+                "frequency": prescriptionutils.freqValue(frequency),
+                "score": 4,
+                "manualScore": None,
+                "obs": "",
+                "divisionRange": attributes.division if attributes else None,
+                "useWeight": attributes.useWeight if attributes else False,
+                "updatedAt": new_outlier.update.isoformat(),
+                "selected": True,
             }
         )
 
