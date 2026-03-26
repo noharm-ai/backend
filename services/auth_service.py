@@ -262,7 +262,12 @@ def _auth_user(
         "userFeatures": (
             user_config["features"] if user_config and "features" in user_config else []
         ),
-        "features": features.value if features is not None else [],
+        "features": (features.value if features is not None else [])
+        + (
+            [FeatureEnum.DISABLE_GETNAME.value]
+            if Config.ENV == NoHarmENV.TEST.value
+            else []
+        ),
         "preferences": preferences.value if preferences is not None else None,
         "nameUrl": nameUrl["value"] if "value" in nameUrl else None,
         "multipleNameUrl": nameUrl["multiple"] if "multiple" in nameUrl else None,
