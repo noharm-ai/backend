@@ -7,6 +7,7 @@ import pytest
 from services.name_service import (
     DynamoDBNameService,
     ExternalNameService,
+    GetNameProxyService,
     NameServiceFactory,
     NHInternalNameService,
 )
@@ -217,6 +218,108 @@ class TestExternalNameService:
             service._get_token()
 
 
+class TestGetNameProxyService:
+    """Test proxy-based name service strategy (no token generation)"""
+
+    @pytest.fixture
+    def config(self):
+        return {
+            "getname": {
+                "url": "https://proxy-api.com/patients",
+                "xapikey": "test-api-key",
+                "params": {},
+            }
+        }
+
+    @pytest.fixture
+    def service(self, config):
+        return GetNameProxyService(config, "test_schema")
+
+    @patch("services.name_service.requests.post")
+    @patch("services.name_service.requests.get")
+    def test_get_single_name_success(self, mock_get, mock_post, service):
+        """Test successful single name retrieval — no token request made"""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "data": [{"idPatient": 12345, "name": "Proxy Patient"}]
+        }
+        mock_get.return_value = mock_response
+
+        result = service.get_single_name(12345)
+
+        assert result["status"] == "success"
+        assert result["idPatient"] == 12345
+        assert result["name"] == "Proxy Patient"
+        mock_post.assert_not_called()
+        mock_get.assert_called_once()
+        _, kwargs = mock_get.call_args
+        assert kwargs["headers"]["X-API-Key"] == "test-api-key"
+
+    @patch("services.name_service.requests.get")
+    def test_get_single_name_not_found(self, mock_get, service):
+        """Test patient not found returns error response"""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"data": []}
+        mock_get.return_value = mock_response
+
+        result = service.get_single_name(12345)
+
+        assert result["status"] == "error"
+        assert result["idPatient"] == 12345
+
+    @patch("services.name_service.requests.get")
+    def test_get_single_name_request_error(self, mock_get, service):
+        """Test request exception returns error response"""
+        import requests as req
+
+        mock_get.side_effect = req.exceptions.RequestException("timeout")
+
+        result = service.get_single_name(12345)
+
+        assert result["status"] == "error"
+        assert result["idPatient"] == 12345
+
+    @patch("services.name_service.requests.post")
+    @patch("services.name_service.requests.get")
+    def test_get_multiple_names_success(self, mock_get, mock_post, service):
+        """Test multiple names retrieval — no token request made"""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "data": [
+                {"idPatient": 123, "name": "Patient One"},
+                {"idPatient": 456, "name": "Patient Two"},
+            ]
+        }
+        mock_get.return_value = mock_response
+
+        result = service.get_multiple_names([123, 456])
+
+        assert len(result) == 2
+        assert result[0]["status"] == "success"
+        assert result[1]["status"] == "success"
+        mock_post.assert_not_called()
+
+    @patch("services.name_service.requests.get")
+    def test_get_multiple_names_partial(self, mock_get, service):
+        """Test partial results — missing patients get error responses"""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "data": [{"idPatient": 123, "name": "Patient One"}]
+        }
+        mock_get.return_value = mock_response
+
+        result = service.get_multiple_names([123, 456, 789])
+
+        assert len(result) == 3
+        assert result[0]["status"] == "success"
+        not_found = [r for r in result if r["status"] == "error"]
+        assert len(not_found) == 2
+
+
 class TestNameServiceFactory:
     """Test the factory pattern for creating service instances"""
 
@@ -253,6 +356,19 @@ class TestNameServiceFactory:
         config = {"getname": {"token": {"url": "https://api.example.com/token"}}}
         service = NameServiceFactory.create_service(config, "test_schema")
         assert isinstance(service, ExternalNameService)
+
+    def test_create_proxy_service(self):
+        """Test factory creates GetNameProxyService for getname-proxy type"""
+        config = {
+            "getname": {
+                "type": "getname-proxy",
+                "url": "https://proxy-api.com/patients",
+                "xapikey": "key",
+                "params": {},
+            }
+        }
+        service = NameServiceFactory.create_service(config, "test_schema")
+        assert isinstance(service, GetNameProxyService)
 
 
 class TestServiceStrategyCommon:

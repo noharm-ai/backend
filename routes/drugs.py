@@ -104,4 +104,9 @@ def process_scores(id_drug: int):
 def get_drug_dashboard(id_segment: int, id_drug: int):
     """Get drug data for dashboard"""
 
-    return drug_service.get_drug_dashboard(id_segment=id_segment, id_drug=id_drug)
+    return drug_service.get_drug_dashboard(
+        id_segment=id_segment,
+        id_drug=id_drug,
+        dose=request.args.get("dose"),
+        frequency=request.args.get("frequency"),
+    )

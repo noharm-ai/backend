@@ -2,12 +2,11 @@
 
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta, timezone
+from urllib.parse import quote as _url_quote
 
 import boto3
 import requests
 from jwt import encode
-from urllib.parse import quote as _url_quote
-
 from markupsafe import escape as _escape_html
 
 from config import Config
@@ -384,6 +383,92 @@ class ExternalNameService(NameServiceStrategy):
         return []
 
 
+class GetNameProxyService(ExternalNameService):
+    """Name service for proxy-based access (no token generation required)"""
+
+    def get_single_name(self, id_patient: int) -> dict:
+        url = self._get_url()
+        params = dict(self.config["getname"]["params"], **{"cd_paciente": id_patient})
+        api_key = self.config["getname"].get("xapikey", "")
+
+        try:
+            response = requests.get(
+                url,
+                headers={"X-API-Key": api_key},
+                params=params,
+                verify=False,
+                timeout=TIMEOUT,
+            )
+
+            if response.status_code == status.HTTP_200_OK:
+                data = response.json()
+                if len(data["data"]) > 0:
+                    patient = data["data"][0]
+                    return {
+                        "status": "success",
+                        "idPatient": patient["idPatient"],
+                        "name": self._escape_str(patient["name"]),
+                    }
+
+            logger.backend_logger.warning(
+                f"Proxy service warning: {response.status_code} for schema {self.schema}"
+            )
+            logger.backend_logger.warning(f"URL: {url}, Params: {params}")
+
+        except requests.exceptions.RequestException as e:
+            logger.backend_logger.warning(
+                f"Proxy service request warning for schema {self.schema}: {str(e)}"
+            )
+
+        return self._create_error_response(id_patient)
+
+    def get_multiple_names(self, ids_list: list) -> list:
+        url = self._get_url()
+        params = dict(
+            self.config["getname"]["params"],
+            **{"cd_paciente": " ".join(str(id) for id in ids_list)},
+        )
+        api_key = self.config["getname"].get("xapikey", "")
+        names = []
+        found = []
+
+        try:
+            response = requests.get(
+                url,
+                headers={"X-API-Key": api_key},
+                params=params,
+                verify=False,
+                timeout=TIMEOUT,
+            )
+
+            if response.status_code == status.HTTP_200_OK:
+                data = response.json()
+                for p in data["data"]:
+                    found.append(str(p["idPatient"]))
+                    names.append(
+                        {
+                            "status": "success",
+                            "idPatient": p["idPatient"],
+                            "name": self._escape_str(p["name"]),
+                        }
+                    )
+            else:
+                logger.backend_logger.warning(
+                    f"Proxy multiple service warning: {response.status_code} for schema {self.schema}"
+                )
+
+        except requests.exceptions.RequestException as e:
+            logger.backend_logger.warning(
+                f"Proxy multiple service request warning for schema {self.schema}: {str(e)}"
+            )
+
+        for id_patient in ids_list:
+            if str(id_patient) not in found:
+                names.append(self._create_error_response(id_patient))
+
+        return names
+
+
 class NameServiceFactory:
     """Factory to create appropriate name service strategy"""
 
@@ -392,13 +477,16 @@ class NameServiceFactory:
         """Create appropriate service based on config"""
 
         # Determine service type
-        token_url = config["getname"]["token"]["url"]
+        token_url = config["getname"].get("token", {}).get("url", "")
         is_internal = config["getname"].get("internal", False)
+        getname_type = config["getname"].get("type", "default")
 
         if token_url.startswith("dy"):
             return DynamoDBNameService(config, schema)
         elif is_internal:
             return NHInternalNameService(config, schema)
+        elif getname_type == "getname-proxy":
+            return GetNameProxyService(config, schema)
         else:
             return ExternalNameService(config, schema)
 

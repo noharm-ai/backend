@@ -13,7 +13,12 @@ from models.requests.regulation_prioritization_request import (
 )
 
 ICD_GROUPS = {
-    "ONCO": [f"C{i:02}" for i in range(98)] + [f"D{i}" for i in range(37, 49)]
+    "ONCO": [f"C{i:02}" for i in range(98)] + [f"D{i}" for i in range(37, 49)],
+    "CARDIOVASCULAR": ["I10", "I11", "I20", "I50", "J81"],
+    "CEREBROVASCULAR": ["I63", "I64", "I65", "I66", "I67", "I69", "G45", "G46"],
+    "PULMONAR": ["J40", "J41", "J42", "J43", "J44", "J45", "J46"],
+    "TUBERCULOSE": ["A15", "A16", "A17", "A18", "A19"],
+    "DIABETES": ["E10", "E11", "E12", "E13", "E14"],
 }
 
 
