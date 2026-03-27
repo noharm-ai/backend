@@ -730,7 +730,7 @@ class DrugList:
             if not concilia_drug.get("drug"):
                 continue
 
-            if concilia_drug.get("idDrug") != 0:
+            if concilia_drug.get("idDrug") != "0":
                 concilia_drug["sctid_infer"] = concilia_drug["idSubstance"]
                 continue
 
