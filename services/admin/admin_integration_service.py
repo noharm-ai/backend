@@ -197,6 +197,10 @@ def _set_new_config(old_config: dict, new_config: dict):
                 "url": new_config["getname"]["token"]["url"],
                 "params": new_config["getname"]["token"]["params"],
             }
+        elif "getname-proxy" == config["getname"]["type"]:
+            config["getname"]["url"] = new_config["getname"]["url"]
+            config["getname"]["xapikey"] = new_config["getname"].get("xapikey", None)
+            config["getname"]["params"] = new_config["getname"]["params"]
 
     if "remotenifi" in new_config:
         main_schema = new_config["remotenifi"].get("main", None)

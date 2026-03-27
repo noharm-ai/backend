@@ -272,7 +272,9 @@ def _auth_user(
         "nameUrl": nameUrl["value"] if "value" in nameUrl else None,
         "multipleNameUrl": nameUrl["multiple"] if "multiple" in nameUrl else None,
         "nameHeaders": nameUrl["headers"] if "headers" in nameUrl else {},
-        "getnameType": getname_config.get("type", "default"),
+        "getnameType": "proxy"
+        if getname_config.get("type") == "getname-proxy"
+        else getname_config.get("type", "default"),
         "proxy": (
             nameUrl["proxy"] if "proxy" in nameUrl else False
         ),  # deprecated (use getnameType)
