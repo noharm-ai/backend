@@ -79,7 +79,7 @@ def get_interventions(
             func.array(reason).label("reason"),
             case(
                 (
-                    PrescriptionB.concilia != None,
+                    and_(PrescriptionB.concilia != None, PrescriptionDrug.idDrug == 0),
                     func.coalesce(PrescriptionDrug.interval, Drug.name),
                 ),
                 else_=Drug.name,
