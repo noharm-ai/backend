@@ -17,7 +17,6 @@ from models.main import User, db
 from utils import logger, status
 
 TIMEOUT = 15
-CHUNK_SIZE = 200
 MAX_SEARCH_RESULTS = 150
 
 
@@ -528,8 +527,10 @@ def get_multiple_patient_names(ids_list: list, user: User) -> list:
     config = _get_config(user)
     service = NameServiceFactory.create_service(config, user.schema)
 
+    chunk_size = config["getname"].get("chunk_size", 200)
+
     # Process in chunks
-    chunks = [ids_list[i : i + CHUNK_SIZE] for i in range(0, len(ids_list), CHUNK_SIZE)]
+    chunks = [ids_list[i : i + chunk_size] for i in range(0, len(ids_list), chunk_size)]
     names = []
 
     for chunk in chunks:
