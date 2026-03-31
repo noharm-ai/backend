@@ -3,13 +3,12 @@
 import csv
 from io import StringIO
 
-from service import feature_service
-
 from decorators.has_permission_decorator import Permission, has_permission
 from models.enums import FeatureEnum
 from models.main import User
 from models.requests.regulation_reports_request import RegIndicatorsPanelReportRequest
 from repository.reports import reports_regulation_repository
+from services import feature_service
 from utils import dateutils
 
 
