@@ -3,7 +3,10 @@
 import csv
 from io import StringIO
 
+from service import feature_service
+
 from decorators.has_permission_decorator import Permission, has_permission
+from models.enums import FeatureEnum
 from models.main import User
 from models.requests.regulation_reports_request import RegIndicatorsPanelReportRequest
 from repository.reports import reports_regulation_repository
@@ -16,6 +19,8 @@ def get_indicators_panel_report(request_data: RegIndicatorsPanelReportRequest) -
         request_data
     )
 
+    hide_names = feature_service.has_user_feature(FeatureEnum.HIDE_NAMES)
+
     results = []
 
     for row in query_result:
@@ -24,16 +29,18 @@ def get_indicators_panel_report(request_data: RegIndicatorsPanelReportRequest) -
                 "id": row.RegIndicatorsPanelReport.id,
                 "id_citizen": row.RegIndicatorsPanelReport.id_citizen,
                 "admission_number": row.RegIndicatorsPanelReport.admission_number,
-                "name": row.RegIndicatorsPanelReport.name,
+                "name": "***" if hide_names else row.RegIndicatorsPanelReport.name,
                 "birthdate": row.RegIndicatorsPanelReport.birthdate.isoformat()
                 if row.RegIndicatorsPanelReport.birthdate
                 else None,
                 "age": row.RegIndicatorsPanelReport.age,
-                "address": row.RegIndicatorsPanelReport.address,
-                "gender": row.RegIndicatorsPanelReport.gender,
+                "address": "***"
+                if hide_names
+                else row.RegIndicatorsPanelReport.address,
+                "gender": "***" if hide_names else row.RegIndicatorsPanelReport.gender,
                 "gestational_age": row.RegIndicatorsPanelReport.gestational_age,
-                "cpf": row.RegIndicatorsPanelReport.cpf,
-                "cns": row.RegIndicatorsPanelReport.cns,
+                "cpf": "***" if hide_names else row.RegIndicatorsPanelReport.cpf,
+                "cns": "***" if hide_names else row.RegIndicatorsPanelReport.cns,
                 "health_unit": row.RegIndicatorsPanelReport.health_unit,
                 "health_agent": row.RegIndicatorsPanelReport.health_agent,
                 "responsible_team": row.RegIndicatorsPanelReport.responsible_team,
