@@ -41,7 +41,9 @@ def get_indicators_panel_report(request_data: RegIndicatorsPanelReportRequest) -
                 "cpf": "***" if hide_names else row.RegIndicatorsPanelReport.cpf,
                 "cns": "***" if hide_names else row.RegIndicatorsPanelReport.cns,
                 "health_unit": row.RegIndicatorsPanelReport.health_unit,
-                "health_agent": row.RegIndicatorsPanelReport.health_agent,
+                "health_agent": "***"
+                if hide_names
+                else row.RegIndicatorsPanelReport.health_agent,
                 "responsible_team": row.RegIndicatorsPanelReport.responsible_team,
                 "ciap": row.RegIndicatorsPanelReport.ciap,
                 "icd": row.RegIndicatorsPanelReport.icd,
