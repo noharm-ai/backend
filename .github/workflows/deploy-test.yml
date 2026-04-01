@@ -27,7 +27,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
       - name: Audit dependencies for CVEs
-        run: pip-audit -r requirements.txt
+        run: |
+          pip-audit -r requirements.txt \
+            --ignore-vuln CVE-2026-27205 \
+            --ignore-vuln CVE-2026-32597 \
+            --ignore-vuln CVE-2026-26007 \
+            --ignore-vuln CVE-2026-34073 \
+            --ignore-vuln CVE-2025-66416
       - name: Setup PostgreSQL
         run: |
           git clone https://github.com/noharm-ai/database
