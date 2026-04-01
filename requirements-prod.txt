@@ -10,9 +10,9 @@ psycopg2-binary==2.9.11
 flask-mail==0.10.0
 random-password-generator==2.2.0
 PyJWT==2.9.0
-pyjwt[crypto]
 cryptography==44.0.1
 boto3==1.39.10
 redis==5.1.1
 pydantic==2.9.2
 strands-agents==1.1.0
+pip-audit==2.10.0

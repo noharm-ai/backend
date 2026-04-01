@@ -20,3 +20,4 @@ boto3==1.39.10
 redis==5.1.1
 pydantic==2.9.2
 strands-agents==1.1.0
+pip-audit==2.10.0
