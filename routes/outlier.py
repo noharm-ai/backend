@@ -7,17 +7,6 @@ from services import drug_service, outlier_service
 app_out = Blueprint("app_out", __name__)
 
 
-@app_out.route("/outliers/<int:idSegment>/<int:idDrug>", methods=["GET"])
-@api_endpoint()
-def getOutliers(idSegment=1, idDrug=1):
-    return outlier_service.get_outliers_list(
-        id_segment=idSegment,
-        id_drug=idDrug,
-        frequency=request.args.get("f", None),
-        dose=request.args.get("d", None),
-    )
-
-
 @app_out.route("/outliers/<int:idOutlier>", methods=["PUT"])
 @api_endpoint()
 def setManualOutlier(idOutlier):

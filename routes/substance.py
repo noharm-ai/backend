@@ -37,12 +37,6 @@ def find_substance_class():
     return substance_service.find_substance_class(term)
 
 
-@app_sub.route("/substance/<int:idSubstance>/relation", methods=["GET"])
-@api_endpoint()
-def getRelations(idSubstance):
-    return substance_service.get_substance_relations(sctid=idSubstance)
-
-
 @app_sub.route("/substance/class", methods=["GET"])
 @api_endpoint()
 def get_substance_class():

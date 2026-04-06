@@ -4,8 +4,6 @@ import io
 import json
 import logging
 from datetime import datetime
-from decimal import ROUND_HALF_UP, Decimal
-from math import ceil
 from typing import List
 
 import boto3
@@ -17,7 +15,6 @@ from exception.validation_error import ValidationError
 from models.appendix import MeasureUnit, MeasureUnitConvert, Notes
 from models.main import (
     Drug,
-    DrugAttributes,
     Outlier,
     PrescriptionAgg,
     Substance,
@@ -26,7 +23,7 @@ from models.main import (
 )
 from services import data_authorization_service
 from services.admin import admin_drug_service, admin_integration_status_service
-from utils import examutils, logger, numberutils, prescriptionutils, status, stringutils
+from utils import logger, status
 
 FOLD_SIZE = 10
 
@@ -454,163 +451,6 @@ def remove_outlier(id_drug, id_segment):
     db.session.query(Outlier).filter(Outlier.idDrug == id_drug).filter(
         Outlier.idSegment == id_segment
     ).delete()
-
-
-@has_permission(Permission.READ_PRESCRIPTION)
-def get_outliers_list(
-    id_segment: int, id_drug: int, user_context: User, frequency=None, dose=None
-):
-    outliers = (
-        db.session.query(Outlier, Notes)
-        .outerjoin(Notes, Notes.idOutlier == Outlier.id)
-        .filter(Outlier.idSegment == id_segment, Outlier.idDrug == id_drug)
-        .order_by(Outlier.countNum.desc(), Outlier.frequency.asc())
-        .all()
-    )
-    d = (
-        db.session.query(Drug, Substance)
-        .outerjoin(Substance, Substance.id == Drug.sctid)
-        .filter(Drug.id == id_drug)
-        .first()
-    )
-
-    drug: Drug = d.Drug if d else None
-    substance: Substance = d.Substance if d else None
-
-    drugAttr = (
-        db.session.query(DrugAttributes)
-        .filter(DrugAttributes.idDrug == id_drug)
-        .filter(DrugAttributes.idSegment == id_segment)
-        .first()
-    )
-
-    defaultNote = None
-
-    if drugAttr is None:
-        drugAttr = DrugAttributes()
-
-    if dose:
-        if drugAttr.division and dose:
-            dose = round(
-                ceil(((float(dose)) / drugAttr.division)) * drugAttr.division, 2
-            )
-        else:
-            rounded = Decimal(dose).quantize(Decimal("1e-2"), rounding=ROUND_HALF_UP)
-            dose = rounded
-
-    units = get_drug_outlier_units(id_drug=id_drug, id_segment=id_segment)
-    defaultUnit = "unlikely big name for a measure unit"
-    bUnit = False
-    for unit in units:
-        if unit["fator"] == 1 and len(unit["idMeasureUnit"]) < len(defaultUnit):
-            defaultUnit = unit["idMeasureUnit"]
-            bUnit = True
-
-    if not bUnit:
-        defaultUnit = ""
-
-    newOutlier = True
-    results = []
-    for o in outliers:
-        selected = False
-        if (
-            dose is not None
-            and frequency is not None
-            and numberutils.is_float(dose)
-            and numberutils.is_float(frequency)
-        ):
-            if float(dose) == o[0].dose and float(frequency) == o[0].frequency:
-                newOutlier = False
-                selected = True
-
-        results.append(
-            {
-                "idOutlier": o[0].id,
-                "idDrug": o[0].idDrug,
-                "countNum": o[0].countNum,
-                "dose": o[0].dose,
-                "unit": defaultUnit,
-                "frequency": prescriptionutils.freqValue(o[0].frequency),
-                "score": o[0].score,
-                "manualScore": o[0].manualScore,
-                "obs": o[1].notes if o[1] != None else "",
-                "updatedAt": o[0].update.isoformat() if o[0].update else None,
-                "selected": selected,
-            }
-        )
-
-    if (
-        dose is not None
-        and frequency is not None
-        and newOutlier
-        and numberutils.is_float(dose)
-        and numberutils.is_float(frequency)
-    ):
-        o = Outlier()
-        o.idDrug = id_drug
-        o.idSegment = id_segment
-        o.countNum = 1
-        o.dose = float(dose)
-        o.frequency = float(frequency)
-        o.score = 4
-        o.manualScore = None
-        o.update = datetime.today()
-        o.user = user_context.id
-
-        db.session.add(o)
-        db.session.flush()
-
-        results.append(
-            {
-                "idOutlier": o.id,
-                "idDrug": id_drug,
-                "countNum": 1,
-                "dose": float(dose),
-                "unit": defaultUnit,
-                "frequency": prescriptionutils.freqValue(float(frequency)),
-                "score": 4,
-                "manualScore": None,
-                "obs": "",
-                "updatedAt": o.update.isoformat() if o.update else None,
-                "selected": True,
-            }
-        )
-
-    return {
-        "outliers": results,
-        "antimicro": drugAttr.antimicro,
-        "mav": drugAttr.mav,
-        "controlled": drugAttr.controlled,
-        "notdefault": drugAttr.notdefault,
-        "maxDose": drugAttr.maxDose,
-        "kidney": drugAttr.kidney,
-        "liver": drugAttr.liver,
-        "platelets": drugAttr.platelets,
-        "elderly": drugAttr.elderly,
-        "tube": drugAttr.tube,
-        "division": drugAttr.division,
-        "useWeight": drugAttr.useWeight,
-        "idMeasureUnit": drugAttr.idMeasureUnit or defaultUnit,
-        "idMeasureUnitPrice": drugAttr.idMeasureUnitPrice,
-        "amount": drugAttr.amount,
-        "amountUnit": drugAttr.amountUnit,
-        "price": drugAttr.price,
-        "maxTime": drugAttr.maxTime,
-        "whiteList": drugAttr.whiteList,
-        "chemo": drugAttr.chemo,
-        "sctidA": str(drug.sctid) if d else "",
-        "sctNameA": stringutils.strNone(substance.name).upper() if substance else "",
-        "substance": {
-            "divisionRange": substance.division_range if substance else None,
-            "unit": substance.default_measureunit if substance else None,
-        },
-        "relations": [],
-        "relationTypes": [
-            {"key": t, "value": examutils.typeRelations[t]}
-            for t in examutils.typeRelations
-        ],
-        "defaultNote": defaultNote,
-    }
 
 
 @has_permission(Permission.READ_PRESCRIPTION)

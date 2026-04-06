@@ -2,8 +2,8 @@ from sqlalchemy import asc, desc, func, or_
 
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
-from models.main import Relation, Substance, SubstanceClass, db
-from utils import prescriptionutils, status, stringutils
+from models.main import Substance, SubstanceClass, db
+from utils import status
 
 
 @has_permission(Permission.READ_BASIC_FEATURES)
@@ -106,45 +106,6 @@ def get_substance_handling(sctid: int, alert_type: str):
         return subst.handling_text
 
     return None
-
-
-@has_permission(Permission.ADMIN_SUBSTANCE_RELATIONS)
-def get_substance_relations(sctid: int):
-    SubstA = db.aliased(Substance)
-    SubstB = db.aliased(Substance)
-
-    relations = (
-        db.session.query(Relation, SubstA.name, SubstB.name)
-        .outerjoin(SubstA, SubstA.id == Relation.sctida)
-        .outerjoin(SubstB, SubstB.id == Relation.sctidb)
-        .filter(or_(Relation.sctida == sctid, Relation.sctidb == sctid))
-        .all()
-    )
-
-    results = []
-    for r in relations:
-        if r[0].sctida == sctid:
-            sctidB = r[0].sctidb
-            nameB = r[2]
-        else:
-            sctidB = r[0].sctida
-            nameB = r[1]
-
-        results.append(
-            {
-                "sctidB": sctidB,
-                "nameB": stringutils.strNone(nameB).upper(),
-                "type": r[0].kind,
-                "text": r[0].text,
-                "active": r[0].active,
-                "level": r[0].level,
-                "editable": False,
-            }
-        )
-
-    results.sort(key=prescriptionutils.sortRelations)
-
-    return results
 
 
 @has_permission(Permission.READ_BASIC_FEATURES)
