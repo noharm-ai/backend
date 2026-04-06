@@ -7,12 +7,12 @@ from datetime import datetime
 from typing import List
 
 import boto3
-from sqlalchemy import and_, asc, func, literal, literal_column, or_, text
+from sqlalchemy import asc, func, literal, literal_column, text
 
 from config import Config
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
-from models.appendix import MeasureUnit, MeasureUnitConvert, Notes
+from models.appendix import Notes
 from models.main import (
     Drug,
     Outlier,
@@ -451,58 +451,6 @@ def remove_outlier(id_drug, id_segment):
     db.session.query(Outlier).filter(Outlier.idDrug == id_drug).filter(
         Outlier.idSegment == id_segment
     ).delete()
-
-
-@has_permission(Permission.READ_PRESCRIPTION)
-def get_drug_outlier_units(id_drug: int, id_segment: int):
-    u = db.aliased(MeasureUnit)
-    p = db.aliased(PrescriptionAgg)
-    mu = db.aliased(MeasureUnitConvert)
-    d = db.aliased(Drug)
-
-    units = (
-        db.session.query(
-            u.id,
-            u.description,
-            d.name,
-            func.sum(func.coalesce(p.countNum, 0)).label("count"),
-            func.max(mu.factor).label("factor"),
-        )
-        .select_from(u)
-        .join(d, and_(d.id == id_drug))
-        .outerjoin(
-            p,
-            and_(
-                p.idMeasureUnit == u.id, p.idDrug == id_drug, p.idSegment == id_segment
-            ),
-        )
-        .outerjoin(
-            mu,
-            and_(
-                mu.idMeasureUnit == u.id,
-                mu.idDrug == id_drug,
-                mu.idSegment == id_segment,
-            ),
-        )
-        .filter(or_(p.idSegment == id_segment, mu.idSegment == id_segment))
-        .group_by(u.id, u.description, p.idMeasureUnit, d.name)
-        .order_by(asc(u.description))
-        .all()
-    )
-
-    results = []
-    for u in units:
-        results.append(
-            {
-                "idMeasureUnit": u.id,
-                "description": u.description,
-                "drugName": u[2],
-                "fator": u[4] if u[4] != None else 1,
-                "contagem": u[3],
-            }
-        )
-
-    return results
 
 
 @has_permission(Permission.WRITE_DRUG_SCORE)

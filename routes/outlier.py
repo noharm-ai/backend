@@ -30,29 +30,6 @@ def getDrugs(idSegment=None):
     )
 
 
-@app_out.route("/drugs/<int:idDrug>/units", methods=["GET"])
-@api_endpoint()
-def getUnits(idDrug, idSegment=1):
-    return outlier_service.get_drug_outlier_units(
-        id_drug=idDrug, id_segment=request.args.get("idSegment", 1)
-    )
-
-
-@app_out.route("/drugs/<int:idSegment>/<int:idDrug>/convertunit", methods=["POST"])
-@api_endpoint()
-def setDrugUnit(idSegment, idDrug):
-    data = request.get_json()
-
-    drug_service.update_convert_factor(
-        id_measure_unit=data.get("idMeasureUnit", None),
-        id_drug=idDrug,
-        id_segment=idSegment,
-        factor=data.get("factor", 1),
-    )
-
-    return escape_html(data.get("idMeasureUnit", None))
-
-
 @app_out.route("/drugs/summary/<int:idSegment>/<int:idDrug>", methods=["GET"])
 @api_endpoint()
 def getDrugSummary(idDrug, idSegment):

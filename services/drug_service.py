@@ -641,41 +641,6 @@ def _audit(
     db.session.add(audit)
 
 
-@has_permission(Permission.WRITE_DRUG_ATTRIBUTES)
-def update_convert_factor(
-    id_measure_unit: str, id_drug: int, id_segment: int, factor: float
-):
-    if factor == 0:
-        raise ValidationError(
-            "Fator de conversão deve ser maior que zero.",
-            "errors.businessRules",
-            status.HTTP_400_BAD_REQUEST,
-        )
-
-    u = (
-        db.session.query(MeasureUnitConvert)
-        .filter(
-            MeasureUnitConvert.idMeasureUnit == id_measure_unit,
-            MeasureUnitConvert.idDrug == id_drug,
-            MeasureUnitConvert.idSegment == id_segment,
-        )
-        .first()
-    )
-    new = False
-
-    if u is None:
-        new = True
-        u = MeasureUnitConvert()
-        u.idMeasureUnit = id_measure_unit
-        u.idDrug = id_drug
-        u.idSegment = id_segment
-
-    u.factor = factor
-
-    if new:
-        db.session.add(u)
-
-
 @has_permission(Permission.READ_PRESCRIPTION)
 def get_drug_dashboard(
     id_drug: int, id_segment: int, user_context: User = None, dose=None, frequency=None
