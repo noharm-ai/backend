@@ -496,6 +496,9 @@ def auth_provider(code, schema, nonce=None):
             audience=[oauth_config["client_id"]],
         )
     except Exception as error:
+        logger.backend_logger.error(
+            "OAUTH provider error: decode error: %s", str(error)
+        )
         raise ValidationError(
             "OAUTH provider error: decode error",
             "errors.unauthorizedUser",
