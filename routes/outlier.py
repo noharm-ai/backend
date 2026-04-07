@@ -7,17 +7,6 @@ from services import drug_service, outlier_service
 app_out = Blueprint("app_out", __name__)
 
 
-@app_out.route("/outliers/<int:idSegment>/<int:idDrug>", methods=["GET"])
-@api_endpoint()
-def getOutliers(idSegment=1, idDrug=1):
-    return outlier_service.get_outliers_list(
-        id_segment=idSegment,
-        id_drug=idDrug,
-        frequency=request.args.get("f", None),
-        dose=request.args.get("d", None),
-    )
-
-
 @app_out.route("/outliers/<int:idOutlier>", methods=["PUT"])
 @api_endpoint()
 def setManualOutlier(idOutlier):
@@ -39,29 +28,6 @@ def getDrugs(idSegment=None):
         add_substance=bool(int(request.args.get("addSubstance", 0))),
         group=bool(int(request.args.get("group", 1))),
     )
-
-
-@app_out.route("/drugs/<int:idDrug>/units", methods=["GET"])
-@api_endpoint()
-def getUnits(idDrug, idSegment=1):
-    return outlier_service.get_drug_outlier_units(
-        id_drug=idDrug, id_segment=request.args.get("idSegment", 1)
-    )
-
-
-@app_out.route("/drugs/<int:idSegment>/<int:idDrug>/convertunit", methods=["POST"])
-@api_endpoint()
-def setDrugUnit(idSegment, idDrug):
-    data = request.get_json()
-
-    drug_service.update_convert_factor(
-        id_measure_unit=data.get("idMeasureUnit", None),
-        id_drug=idDrug,
-        id_segment=idSegment,
-        factor=data.get("factor", 1),
-    )
-
-    return escape_html(data.get("idMeasureUnit", None))
 
 
 @app_out.route("/drugs/summary/<int:idSegment>/<int:idDrug>", methods=["GET"])

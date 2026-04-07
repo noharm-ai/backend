@@ -291,33 +291,6 @@ def _auth_user(
     }
 
 
-# deprecated
-def pre_auth(email, password):
-    user = _login(email, password)
-
-    if _has_force_schema_permission(user=user, force_schema=None):
-        permissions = Role.get_permissions_from_user(user=user)
-
-        if Permission.MAINTAINER in permissions:
-            schema_results = db.session.query(SchemaConfig).order_by(
-                SchemaConfig.schemaName
-            )
-
-            schemas = []
-            for s in schema_results:
-                schemas.append(
-                    {
-                        "name": s.schemaName,
-                    }
-                )
-
-            return {"maintainer": True, "schemas": schemas}
-        else:
-            return {"maintainer": False, "schemas": user.config.get("schemas", [])}
-
-    return {"maintainer": False, "schemas": []}
-
-
 @has_permission(Permission.MULTI_SCHEMA)
 def get_switch_schema_data(user_permissions: list[Permission], user_context: User):
     """Get list of schemas to choose from"""
@@ -471,6 +444,13 @@ def auth_provider(code, schema, nonce=None):
         token_data = response.json()
         code = token_data["id_token"]
 
+    if not isinstance(code, (str, bytes)):
+        raise ValidationError(
+            "OAUTH provider error: invalid token format",
+            "errors.unauthorizedUser",
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
     oauth_keys = memory_service.get_memory(MemoryEnum.OAUTH_KEYS.value)
 
     if oauth_keys is None:
@@ -523,6 +503,9 @@ def auth_provider(code, schema, nonce=None):
             audience=[oauth_config["client_id"]],
         )
     except Exception as error:
+        logger.backend_logger.error(
+            "OAUTH provider error: decode error: %s", str(error)
+        )
         raise ValidationError(
             "OAUTH provider error: decode error",
             "errors.unauthorizedUser",

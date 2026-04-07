@@ -7,6 +7,7 @@ import boto3
 import dateutil
 from botocore.exceptions import ClientError
 from sqlalchemy import case, text
+from sqlalchemy.orm.attributes import flag_modified
 
 from config import Config
 from decorators.has_permission_decorator import Permission, has_permission
@@ -142,6 +143,7 @@ def update_integration_config(
         old_config=schema_config.config if schema_config.config else {},
         new_config=config,
     )
+    flag_modified(schema_config, "config")
     schema_config.return_integration = return_integration
     schema_config.tp_prescalc = (
         tp_prescalc if tp_prescalc in [0, 1, 2] else schema_config.tp_prescalc
@@ -205,6 +207,18 @@ def _set_new_config(old_config: dict, new_config: dict):
     if "remotenifi" in new_config:
         main_schema = new_config["remotenifi"].get("main", None)
         config["remotenifi"] = {"main": main_schema if main_schema != "" else None}
+
+    if "healthcheck" in new_config:
+        config["healthcheck"]["status"] = new_config["healthcheck"].get("status", 0)
+        config["healthcheck"]["metric_name"] = new_config["healthcheck"].get(
+            "metric_name", ""
+        )
+
+    if "nifilint" in new_config:
+        config["nifilint"]["skip"] = new_config["nifilint"].get("skip", False)
+        config["nifilint"]["max_backup_days"] = new_config["nifilint"].get(
+            "max_backup_days", 2
+        )
 
     return config
 

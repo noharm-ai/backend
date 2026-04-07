@@ -249,16 +249,6 @@ def drug_config_to_generate_score(
             id_drug=id_drug, id_segment=id_segment, user=user_context
         )
 
-    calc_dose_max = False
-
-    if not skip_measure_unit:
-        if drugAttr.idMeasureUnit != id_measure_unit or drugAttr.division != (
-            division if division != 0 else None
-        ):
-            calc_dose_max = True
-
-        drugAttr.idMeasureUnit = id_measure_unit
-
     drugAttr.division = division if division != 0 else None
     drugAttr.useWeight = use_weight
     drugAttr.update = datetime.today()
@@ -272,10 +262,7 @@ def drug_config_to_generate_score(
 
     db.session.flush()
 
-    if calc_dose_max:
-        admin_drug_service.calculate_dosemax_uniq(
-            id_drug=id_drug, id_segment=id_segment
-        )
+    admin_drug_service.calculate_dosemax_uniq(id_drug=id_drug, id_segment=id_segment)
 
 
 def _setDrugUnit(idDrug, idMeasureUnit, idSegment, factor):
@@ -639,41 +626,6 @@ def _audit(
     audit.createdBy = user.id
 
     db.session.add(audit)
-
-
-@has_permission(Permission.WRITE_DRUG_ATTRIBUTES)
-def update_convert_factor(
-    id_measure_unit: str, id_drug: int, id_segment: int, factor: float
-):
-    if factor == 0:
-        raise ValidationError(
-            "Fator de conversão deve ser maior que zero.",
-            "errors.businessRules",
-            status.HTTP_400_BAD_REQUEST,
-        )
-
-    u = (
-        db.session.query(MeasureUnitConvert)
-        .filter(
-            MeasureUnitConvert.idMeasureUnit == id_measure_unit,
-            MeasureUnitConvert.idDrug == id_drug,
-            MeasureUnitConvert.idSegment == id_segment,
-        )
-        .first()
-    )
-    new = False
-
-    if u is None:
-        new = True
-        u = MeasureUnitConvert()
-        u.idMeasureUnit = id_measure_unit
-        u.idDrug = id_drug
-        u.idSegment = id_segment
-
-    u.factor = factor
-
-    if new:
-        db.session.add(u)
 
 
 @has_permission(Permission.READ_PRESCRIPTION)

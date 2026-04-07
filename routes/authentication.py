@@ -19,22 +19,6 @@ from utils import sessionutils, status
 app_auth = Blueprint("app_auth", __name__)
 
 
-# deprecated
-@app_auth.route("/pre-auth", methods=["POST"])
-def pre_auth():
-    data = request.get_json()
-
-    email = data.get("email", None)
-    password = data.get("password", None)
-
-    try:
-        auth_data = auth_service.pre_auth(email, password)
-    except ValidationError as e:
-        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
-
-    return auth_data, status.HTTP_200_OK
-
-
 @app_auth.route("/switch-schema", methods=["GET"])
 @api_endpoint()
 def get_switch_schema_data():

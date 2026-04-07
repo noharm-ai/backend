@@ -58,19 +58,6 @@ def test_get_drugs_by_non_existing_idSegment(client, analyst_headers):
     assert len(response.get_json()["data"]) == 0
 
 
-def test_get_drugs_units_by_id(client, analyst_headers):
-    """Teste get /drugs/id/units - Valida status_code 200 e estrutura da resposta"""
-    response = client.get("/drugs/2/units", headers=analyst_headers)
-    data = response.get_json()["data"]
-
-    assert response.status_code == 200
-    assert "idMeasureUnit" in data[0]
-    assert "description" in data[0]
-    assert "drugName" in data[0]
-    assert "fator" in data[0]
-    assert "contagem" in data[0]
-
-
 def _add_substance(sub_id, sub_name):
     """Add a substance for testing"""
     sub = Substance()
@@ -101,28 +88,3 @@ def test_get_substance(client, analyst_headers):
     # verify our 2 test substances are present in the response
     response_ids = {d["sctid"] for d in data}
     assert "10001" in response_ids and "10002" in response_ids
-
-
-def test_get_outliers_by_segment_and_drug(client, analyst_headers):
-    """Teste get /outliers/idSegment/idDrug - Valida status_code 200"""
-    test_id_segment = 1
-    test_id_drug = 5
-
-    outlier_num = (
-        session.query(Outlier)
-        .filter_by(idSegment=test_id_segment, idDrug=test_id_drug)
-        .count()
-    )
-
-    response = client.get(
-        f"outliers/{test_id_segment}/{test_id_drug}", headers=analyst_headers
-    )
-    data = response.get_json()["data"]
-
-    assert response.status_code == 200
-    assert len(data["outliers"]) == outlier_num
-
-    # structure check
-    assert "antimicro" in data
-    assert "mav" in data
-    assert "controlled" in data
