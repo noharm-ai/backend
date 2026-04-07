@@ -444,6 +444,13 @@ def auth_provider(code, schema, nonce=None):
         token_data = response.json()
         code = token_data["id_token"]
 
+    if not isinstance(code, (str, bytes)):
+        raise ValidationError(
+            "OAUTH provider error: invalid token format",
+            "errors.unauthorizedUser",
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
     oauth_keys = memory_service.get_memory(MemoryEnum.OAUTH_KEYS.value)
 
     if oauth_keys is None:
