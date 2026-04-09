@@ -6,6 +6,7 @@ from sqlalchemy import asc, desc, func, text
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
 from models.main import User, db
+from models.requests.admin.admin_global_exam import SegmentExamGetRequest
 from models.segment import Exams, Segment, SegmentExam
 from repository import exams_repository
 from services import data_authorization_service
@@ -46,6 +47,42 @@ def get_segment_exams(id_segment: int):
         )
 
     return exams
+
+
+@has_permission(Permission.ADMIN_EXAMS)
+def get_segment_exam(request_data: SegmentExamGetRequest):
+    result = (
+        db.session.query(SegmentExam, Segment)
+        .filter(SegmentExam.idSegment == request_data.idSegment)
+        .filter(SegmentExam.typeExam == request_data.examType.lower())
+        .join(Segment, Segment.id == SegmentExam.idSegment)
+        .first()
+    )
+
+    if result is None:
+        raise ValidationError(
+            "Exame não encontrado",
+            "errors.notFound",
+            status.HTTP_404_NOT_FOUND,
+        )
+
+    se: SegmentExam = result[0]
+    s: Segment = result[1]
+
+    return {
+        "idSegment": s.id,
+        "segment": s.description,
+        "type": se.typeExam.lower(),
+        "initials": se.initials,
+        "name": se.name,
+        "min": se.min,
+        "max": se.max,
+        "ref": se.ref,
+        "order": se.order,
+        "active": se.active,
+        "updatedAt": dateutils.to_iso(se.update),
+        "tpExamRef": se.tp_exam_ref,
+    }
 
 
 @has_permission(Permission.ADMIN_EXAMS__COPY)

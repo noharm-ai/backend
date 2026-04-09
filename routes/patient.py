@@ -1,17 +1,9 @@
 from flask import Blueprint, request
 
 from decorators.api_endpoint_decorator import api_endpoint
-from services import exams_service, patient_service
+from services import patient_service
 
 app_pat = Blueprint("app_pat", __name__)
-
-
-@app_pat.route("/exams/<int:admissionNumber>", methods=["GET"])
-@api_endpoint()
-def getExamsbyAdmission(admissionNumber):
-    return exams_service.get_exams_by_admission(
-        admission_number=admissionNumber, id_segment=request.args.get("idSegment", 1)
-    )
 
 
 @app_pat.route("/patient/<int:admissionNumber>", methods=["POST"])
