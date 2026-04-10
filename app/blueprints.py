@@ -45,7 +45,7 @@ from routes.queue import app_queue
 from routes.regulation.regulation import app_regulation
 
 # Report routes
-from routes.reports.reports_antimicrobial import app_rpt_antimicrobial
+from routes.reports.reports_drug_attributes import app_rpt_drug_attributes
 from routes.reports.reports_config_rpt import app_rpt_config
 from routes.reports.reports_consolidated import app_rpt_consolidated
 from routes.reports.reports_culture import app_rpt_culture
@@ -121,7 +121,7 @@ def register_blueprints(app):
     # Report blueprints
     app.register_blueprint(app_rpt_general)
     app.register_blueprint(app_rpt_culture)
-    app.register_blueprint(app_rpt_antimicrobial)
+    app.register_blueprint(app_rpt_drug_attributes)
     app.register_blueprint(app_rpt_config)
     app.register_blueprint(app_rpt_prescription_history)
     app.register_blueprint(app_rpt_exams)

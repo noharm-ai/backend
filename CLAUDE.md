@@ -465,6 +465,7 @@ python3 mobile.py
 - Keep routes thin (just request/response handling)
 - Use type hints where helpful
 - Prefer explicit over implicit
+- Add a brief docstring to every function you create
 
 ### Git Workflow
 - Main branch: `master`
