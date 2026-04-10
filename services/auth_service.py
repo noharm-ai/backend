@@ -512,6 +512,9 @@ def auth_provider(code, schema, nonce=None):
             status.HTTP_401_UNAUTHORIZED,
         ) from error
 
+    if Config.ENV == NoHarmENV.STAGING.value:
+        logger.backend_logger.warning("OAUTH jwt_user content: %s", jwt_user)
+
     if validate_nonce and jwt_user.get("nonce") != nonce:
         raise ValidationError(
             "OAUTH provider error: invalid nonce",
