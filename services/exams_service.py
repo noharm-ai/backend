@@ -347,6 +347,7 @@ def get_exams_by_admission(admission_number: int, id_segment: int, user_context:
                         if itemCalc["value"]:
                             itemCalc["name"] = segExam[keyCalc].name
                             itemCalc["perc"] = None
+                            itemCalc["configured"] = True
                             itemCalc["date"] = item["date"]
                             itemCalc["history"] = _history_calc(
                                 keyCalc, item["history"], patient, segExam
