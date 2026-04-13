@@ -20,6 +20,7 @@ from utils import logger, status
 
 TIMEOUT = 15
 MAX_SEARCH_RESULTS = 150
+EXTRA_DATA_ALLOWED_KEYS = {"fone"}
 
 
 class NameServiceStrategy(ABC):
@@ -128,6 +129,15 @@ class DynamoDBNameService(NameServiceStrategy):
     ) -> dict:
         """Update patient name and/or extra data fields in DynamoDB"""
         try:
+            if extra_data:
+                invalid_keys = set(extra_data.keys()) - EXTRA_DATA_ALLOWED_KEYS
+                if invalid_keys:
+                    raise ValidationError(
+                        f"Invalid extra_data keys: {', '.join(sorted(invalid_keys))}",
+                        "errors.invalidParam",
+                        status.HTTP_400_BAD_REQUEST,
+                    )
+
             dynamodb = boto3.resource("dynamodb", region_name="sa-east-1")
             table_name = self.config["getname"]["token"]["url"].split(":")[1]
             table = dynamodb.Table(table_name)  # type: ignore
