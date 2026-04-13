@@ -424,9 +424,14 @@ def save_attributes(id_segment, id_drug, data, user_context: User):
 def update_substance(id_drug, sctid, user_context: User):
     drug = db.session.query(Drug).filter(Drug.id == id_drug).first()
 
-    if drug == None:
+    if drug is None:
         raise ValidationError(
             "Registro inexistente", "errors.invalidRecord", status.HTTP_400_BAD_REQUEST
+        )
+
+    if sctid is None:
+        raise ValidationError(
+            "Substância inválida", "errors.businessRules", status.HTTP_400_BAD_REQUEST
         )
 
     substance = db.session.query(Substance).filter(Substance.id == sctid).first()
