@@ -28,7 +28,7 @@ from models.enums import (
     UserAuditTypeEnum,
 )
 from models.main import Notify, User, UserExtra, db, dbSession
-from models.segment import Hospital, Segment
+from models.segment import Segment
 from repository import user_repository
 from security.role import Role
 from services import memory_service, user_service
@@ -192,11 +192,6 @@ def _auth_user(
     mem = db_session.query(Memory).filter_by(kind="getnameurl").first()
     nameUrl = mem.value if mem else {"value": "http://localhost/{idPatient}"}
 
-    hospitals = db_session.query(Hospital).order_by(asc(Hospital.name)).all()
-    hospitalList = []
-    for h in hospitals:
-        hospitalList.append({"id": h.id, "name": h.name})
-
     segments = db_session.query(Segment).order_by(asc(Segment.description)).all()
     segmentList = []
     for s in segments:
@@ -283,7 +278,6 @@ def _auth_user(
         "refresh_token": refresh_token,
         "apiKey": Config.API_KEY if hasattr(Config, "API_KEY") else "",
         "segments": segmentList,
-        "hospitals": hospitalList,
         "logoutUrl": logout_url,
         "integrationStatus": integration_status,
         "permissions": [p.name for p in permissions],

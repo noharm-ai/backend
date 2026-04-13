@@ -70,8 +70,7 @@ def auth():
         )
 
         refresh_token = auth_data["refresh_token"]
-        # temp
-        # auth_data.pop("refresh_token")
+        auth_data.pop("refresh_token")
     except ValidationError as e:
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
@@ -105,8 +104,7 @@ def auth_provider():
         )
 
         refresh_token = auth_data["refresh_token"]
-        # temp
-        # auth_data.pop("refresh_token")
+        auth_data.pop("refresh_token")
     except ValidationError as e:
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 
