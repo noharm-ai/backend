@@ -6,7 +6,7 @@ from sqlalchemy.dialects.postgresql import INTERVAL
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
 from models.appendix import GlobalMemory
-from models.enums import GlobalMemoryEnum
+from models.enums import FeatureEnum, GlobalMemoryEnum
 from models.main import User, db
 from models.notes import ClinicalNotes
 from models.prescription import Patient
@@ -16,6 +16,13 @@ from utils import status
 
 @has_permission(Permission.READ_DISCHARGE_SUMMARY)
 def get_structured_info(admission_number, user_context: User, mock=False):
+    if not memory_service.has_feature(FeatureEnum.DISCHARGE_SUMMARY.value):
+        raise ValidationError(
+            "Feature desabilitada",
+            "errors.unauthorizedFeature",
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
     patient = (
         db.session.query(Patient)
         .filter(Patient.admissionNumber == admission_number)
@@ -31,36 +38,28 @@ def get_structured_info(admission_number, user_context: User, mock=False):
 
     draft = memory_service.get_memory(f"draft_summary_{admission_number}")
 
-    engine = db.engines["report"]
-    with engine.connect() as report_connection:
-        data = {
-            "patient": _get_patient_data(patient),
-            "exams": _get_exams(
-                id_patient=patient.idPatient,
-                schema=user_context.schema,
-                report_connection=report_connection,
-            ),
-            "allergies": _get_allergies(
-                patient.idPatient, user_context.schema, report_connection
-            ),
-            "drugsUsed": _get_all_drugs_used(
-                admission_number=admission_number,
-                schema=user_context.schema,
-                report_connection=report_connection,
-            ),
-            "drugsSuspended": _get_all_drugs_suspended(
-                admission_number=admission_number,
-                schema=user_context.schema,
-                report_connection=report_connection,
-            ),
-            "receipt": _get_receipt(
-                admission_number=admission_number,
-                schema=user_context.schema,
-                report_connection=report_connection,
-            ),
-            "summaryConfig": _get_summary_config(admission_number, mock),
-            "draft": draft.value if draft else None,
-        }
+    data = {
+        "patient": _get_patient_data(patient),
+        "exams": _get_exams(
+            id_patient=patient.idPatient,
+            schema=user_context.schema,
+        ),
+        "allergies": _get_allergies(patient.idPatient, user_context.schema),
+        "drugsUsed": _get_all_drugs_used(
+            admission_number=admission_number,
+            schema=user_context.schema,
+        ),
+        "drugsSuspended": _get_all_drugs_suspended(
+            admission_number=admission_number,
+            schema=user_context.schema,
+        ),
+        "receipt": _get_receipt(
+            admission_number=admission_number,
+            schema=user_context.schema,
+        ),
+        "summaryConfig": _get_summary_config(admission_number, mock),
+        "draft": draft.value if draft else None,
+    }
 
     return data
 
@@ -294,7 +293,7 @@ def _get_annotation(admission_number, field, add, interval, compare_date):
     }
 
 
-def _get_exams(id_patient, schema, report_connection):
+def _get_exams(id_patient, schema):
     query = text(
         f"""
     select * from (
@@ -331,7 +330,7 @@ def _get_exams(id_patient, schema, report_connection):
     """
     )
 
-    exams = report_connection.execute(query, {"id_patient": id_patient})
+    exams = db.session.execute(query, {"id_patient": id_patient})
 
     exams_list = []
     for e in exams:
@@ -347,7 +346,7 @@ def _get_exams(id_patient, schema, report_connection):
     return exams_list
 
 
-def _get_allergies(id_patient, schema, report_connection):
+def _get_allergies(id_patient, schema):
     query = text(
         f"""
     select
@@ -365,7 +364,7 @@ def _get_allergies(id_patient, schema, report_connection):
     """
     )
 
-    items = report_connection.execute(query, {"id_patient": id_patient})
+    items = db.session.execute(query, {"id_patient": id_patient})
 
     list = []
     for i in items:
@@ -378,7 +377,7 @@ def _get_allergies(id_patient, schema, report_connection):
     return list
 
 
-def _get_all_drugs_used(admission_number, schema, report_connection):
+def _get_all_drugs_used(admission_number, schema):
     query = text(
         f"""
     select
@@ -434,7 +433,7 @@ def _get_all_drugs_used(admission_number, schema, report_connection):
     """
     )
 
-    result = report_connection.execute(query, {"admission_number": admission_number})
+    result = db.session.execute(query, {"admission_number": admission_number})
 
     list = []
     for i in result:
@@ -444,7 +443,7 @@ def _get_all_drugs_used(admission_number, schema, report_connection):
 
 
 # refactor
-def _get_all_drugs_suspended(admission_number, schema, report_connection):
+def _get_all_drugs_suspended(admission_number, schema):
     # needs refactor
     return []
 
@@ -476,7 +475,7 @@ def _get_all_drugs_suspended(admission_number, schema, report_connection):
     """
     )
 
-    result = report_connection.execute(query, {"admission_number": admission_number})
+    result = db.session.execute(query, {"admission_number": admission_number})
 
     list = []
     for i in result:
@@ -489,10 +488,10 @@ def _get_all_drugs_suspended(admission_number, schema, report_connection):
     return list
 
 
-def _get_receipt(admission_number, schema, report_connection):
+def _get_receipt(admission_number, schema):
     last_agg = prescription_agg_service.get_last_agg_prescription(admission_number)
 
-    if last_agg == None:
+    if last_agg is None:
         return []
 
     query = text(
@@ -516,7 +515,7 @@ def _get_receipt(admission_number, schema, report_connection):
     """
     )
 
-    result = report_connection.execute(
+    result = db.session.execute(
         query, {"admission_number": admission_number, "date": last_agg.date}
     )
 

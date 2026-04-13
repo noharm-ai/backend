@@ -22,6 +22,7 @@ from models.requests.admin.admin_integration_request import (
 )
 from services import storage_service
 from utils import network_utils, status
+from utils.stringutils import strip_control_chars
 
 
 def get_table_count(schema, table):
@@ -178,7 +179,14 @@ def _set_new_config(old_config: dict, new_config: dict):
         config["getname"] = {"type": new_config["getname"]["type"]}
 
         if "auth" == config["getname"]["type"]:
-            config["getname"]["secret"] = new_config["getname"]["secret"]
+            secret = strip_control_chars(new_config["getname"]["secret"]).strip()
+            if len(secret) < 32:
+                raise ValidationError(
+                    "O segredo deve ter pelo menos 32 caracteres",
+                    "errors.invalidParam",
+                    status.HTTP_400_BAD_REQUEST,
+                )
+            config["getname"]["secret"] = secret
         elif "proxy" == config["getname"]["type"]:
             config["getname"]["url"] = new_config["getname"]["url"]
             config["getname"]["urlDev"] = new_config["getname"].get("urlDev", None)

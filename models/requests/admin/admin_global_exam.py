@@ -5,6 +5,13 @@ from typing import Optional
 from pydantic import BaseModel
 
 
+class SegmentExamGetRequest(BaseModel):
+    """Request parameters to fetch a single segment exam"""
+
+    idSegment: int
+    examType: str
+
+
 class GlobalExamListRequest(BaseModel):
     """Global exam list request parameters"""
 

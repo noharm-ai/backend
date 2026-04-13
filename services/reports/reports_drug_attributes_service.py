@@ -1,22 +1,45 @@
-from sqlalchemy import select, desc, text
+from sqlalchemy import desc, select, text
 
-from models.main import db, User
+from decorators.has_permission_decorator import Permission, has_permission
+from exception.validation_error import ValidationError
+from models.main import User, db
 from models.prescription import (
     Patient,
 )
-from exception.validation_error import ValidationError
 from utils import dateutils, status
-from decorators.has_permission_decorator import has_permission, Permission
+
+VALID_ATTRIBUTES = {
+    "antimicro": "antimicro",
+    "mav": "mav",
+    "controlled": "controlados",
+    "notdefault": "naopadronizado",
+    "elderly": "idoso",
+    "tube": "sonda",
+    "whiteList": "linhabranca",
+    "chemo": "quimio",
+    "dialyzable": "dialisavel",
+}
 
 
 @has_permission(Permission.READ_REPORTS)
-def get_history(admission_number: int, user_context: User):
-    if admission_number == None:
+def get_history(
+    admission_number: int, attribute: str = "antimicro", user_context: User = None
+):
+    if admission_number is None:
         raise ValidationError(
-            "admissionNmber inválido",
+            "admissionNumber inválido",
             "errors.invalidParams",
             status.HTTP_400_BAD_REQUEST,
         )
+
+    if attribute not in VALID_ATTRIBUTES:
+        raise ValidationError(
+            f"attribute inválido. Valores aceitos: {', '.join(VALID_ATTRIBUTES.keys())}",
+            "errors.invalidParams",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    column_name = VALID_ATTRIBUTES[attribute]
 
     admission_list = [int(admission_number)]
     admission = db.session.execute(
@@ -25,7 +48,7 @@ def get_history(admission_number: int, user_context: User):
         .where(Patient.admissionNumber == admission_number)
     ).first()
 
-    if admission != None:
+    if admission is not None:
         admissions_query = (
             select(Patient.admissionNumber)
             .select_from(Patient)
@@ -42,9 +65,9 @@ def get_history(admission_number: int, user_context: User):
     query = text(
         f"""
             select
-                antimicro.*,
+                drug_attr.*,
                 m.nome as name,
-                s.nome as substance 
+                s.nome as substance
             from (
                 SELECT
                     p.fkprescricao as id,
@@ -66,12 +89,12 @@ def get_history(admission_number: int, user_context: User):
                     LEFT OUTER JOIN {user_context.schema}.unidademedida um ON um.fkunidademedida = pm.fkunidademedida
                 WHERE
                     p.nratendimento = ANY(:admissionList)
-                    AND ma.antimicro = TRUE
+                    AND ma.{column_name} = TRUE
                 ORDER BY
                     p.dtprescricao desc
                 limit 1000
-            ) antimicro
-            JOIN {user_context.schema}.medicamento m ON antimicro.fkmedicamento = m.fkmedicamento
+            ) drug_attr
+            JOIN {user_context.schema}.medicamento m ON drug_attr.fkmedicamento = m.fkmedicamento
             LEFT OUTER JOIN public.substancia s ON m.sctid = s.sctid
         """
     )

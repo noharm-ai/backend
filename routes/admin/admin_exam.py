@@ -1,6 +1,7 @@
 from flask import Blueprint, request
 
 from decorators.api_endpoint_decorator import api_endpoint
+from models.requests.admin.admin_global_exam import SegmentExamGetRequest
 from services.admin import admin_exam_service
 
 app_admin_exam = Blueprint("app_admin_exam", __name__)
@@ -31,6 +32,14 @@ def list_exams():
     data = request.get_json()
 
     return admin_exam_service.get_segment_exams(id_segment=data.get("idSegment", None))
+
+
+@app_admin_exam.route("/admin/exam/get", methods=["POST"])
+@api_endpoint()
+def get_seg_exam():
+    return admin_exam_service.get_segment_exam(
+        request_data=SegmentExamGetRequest(**request.get_json())
+    )
 
 
 @app_admin_exam.route("/admin/exam/types", methods=["GET"])

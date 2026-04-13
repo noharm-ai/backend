@@ -1,6 +1,5 @@
 """Service: exams related operations"""
 
-import copy
 import json
 from datetime import date, datetime, timedelta
 
@@ -242,20 +241,6 @@ def get_exams_by_admission(admission_number: int, id_segment: int, user_context:
     for exam in examsList:
         key = (exam.idExame, exam.typeExam)
 
-        if key not in exams_dict and exam.typeExam.lower() in segExam:
-            logger.backend_logger.debug(
-                json.dumps(
-                    {
-                        "event": "dynamodb_exam_miss",
-                        "fkpessoa": patient.idPatient,
-                        "tpexame": exam.typeExam,
-                        "idExame": exam.idExame,
-                        "dtexame": dateutils.to_iso(exam.date),
-                        "schema": user_context.schema,
-                    }
-                )
-            )
-
         exams_dict[key] = {
             "source": "postgres",
             "exam": exam,
@@ -291,7 +276,7 @@ def get_exams_by_admission(admission_number: int, id_segment: int, user_context:
     bufferList = {}
     typeExams = []
     for e in examsList:
-        if e.typeExam.lower() not in typeExams and e.typeExam.lower() in segExam:
+        if e.typeExam.lower() not in typeExams:
             key = e.typeExam.lower()
             item = examutils.formatExam(
                 value=e.value,
@@ -300,7 +285,9 @@ def get_exams_by_admission(admission_number: int, id_segment: int, user_context:
                 date=e.date.isoformat(),
                 segExam=segExam,
             )
-            item["name"] = segExam[key].name
+            item["configured"] = key in segExam
+            if key in segExam:
+                item["name"] = segExam[key].name
             item["perc"] = None
             item["history"] = _history_exam(
                 e.typeExam, examsList, segExam, source_map=exam_source_map
@@ -312,7 +299,7 @@ def get_exams_by_admission(admission_number: int, id_segment: int, user_context:
             if key in perc:
                 perc[key]["total"] = float(e.value)
 
-            if segExam[key].initials.lower() == "creatinina":
+            if key in segExam and segExam[key].initials.lower() == "creatinina":
                 for keyCalc in ["mdrd", "ckd", "ckd21", "cg", "swrtz2", "swrtz1"]:
                     if keyCalc in segExam and patient:
                         if keyCalc == "mdrd":
@@ -360,6 +347,7 @@ def get_exams_by_admission(admission_number: int, id_segment: int, user_context:
                         if itemCalc["value"]:
                             itemCalc["name"] = segExam[keyCalc].name
                             itemCalc["perc"] = None
+                            itemCalc["configured"] = True
                             itemCalc["date"] = item["date"]
                             itemCalc["history"] = _history_calc(
                                 keyCalc, item["history"], patient, segExam
@@ -373,12 +361,13 @@ def get_exams_by_admission(admission_number: int, id_segment: int, user_context:
                 val = bufferList[r]["value"]
                 bufferList[r]["perc"] = round((val * 100) / total, 1)
 
-    results = copy.deepcopy(segExam)
+    results = {}
     for e in segExam:
         if e in bufferList:
             results[e] = bufferList[e]
-        else:
-            del results[e]
+    for e in bufferList:
+        if e not in results:
+            results[e] = bufferList[e]
 
     # remove exams not relevant for adults
     age = dateutils.data2age(
@@ -429,6 +418,7 @@ def _history_exam(typeExam, examsList, segExam, source_map=None):
             if "ref" in item:
                 del item["ref"]
 
+            item["configured"] = e.typeExam.lower() in segExam
             item["manual"] = bool(e.created_by)
             item["idExam"] = e.idExame
             item["admissionNumber"] = e.admissionNumber

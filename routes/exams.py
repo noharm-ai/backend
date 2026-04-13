@@ -2,13 +2,13 @@
 
 from flask import Blueprint, request
 
+from decorators.api_endpoint_decorator import api_endpoint
 from models.requests.exam_request import (
+    ExamCreateMultipleRequest,
     ExamCreateRequest,
     ExamDeleteRequest,
-    ExamCreateMultipleRequest,
 )
 from services import exams_service
-from decorators.api_endpoint_decorator import api_endpoint
 
 app_exams = Blueprint("app_exams", __name__)
 
@@ -50,3 +50,11 @@ def list_exam_types():
     """Lists all exam types"""
 
     return exams_service.list_exam_types()
+
+
+@app_exams.route("/exams/<int:admission_number>", methods=["GET"])
+@api_endpoint()
+def get_exams_by_admission(admission_number):
+    return exams_service.get_exams_by_admission(
+        admission_number=admission_number, id_segment=request.args.get("idSegment", 1)
+    )
