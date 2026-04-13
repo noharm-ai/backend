@@ -192,6 +192,13 @@ def _auth_user(
     mem = db_session.query(Memory).filter_by(kind="getnameurl").first()
     nameUrl = mem.value if mem else {"value": "http://localhost/{idPatient}"}
 
+    mem_signature = (
+        db_session.query(Memory)
+        .filter(Memory.kind == f"config-signature_{user.id}")
+        .first()
+    )
+    signature = mem_signature.value if mem_signature else None
+
     segments = db_session.query(Segment).order_by(asc(Segment.description)).all()
     segmentList = []
     for s in segments:
@@ -282,6 +289,7 @@ def _auth_user(
         "integrationStatus": integration_status,
         "permissions": [p.name for p in permissions],
         "oauth": is_oauth,
+        "signature": signature,
     }
 
 
