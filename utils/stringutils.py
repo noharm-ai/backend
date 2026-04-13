@@ -7,6 +7,11 @@ from typing import Union
 from urllib.parse import unquote
 
 
+def strip_control_chars(text: str) -> str:
+    """Remove all non-printable characters (control chars, null bytes, etc.) from a string."""
+    return "".join(c for c in text if c.isprintable())
+
+
 def strNone(s):
     return "" if s is None else str(s)
 
