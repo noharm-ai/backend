@@ -10,10 +10,12 @@ from jwt import encode
 from markupsafe import escape as _escape_html
 
 from config import Config
+from decorators.has_permission_decorator import has_permission
 from exception.validation_error import ValidationError
 from models.appendix import SchemaConfig
 from models.enums import NoHarmENV
 from models.main import User, db
+from security.permission import Permission
 from utils import logger, status
 
 TIMEOUT = 15
@@ -120,6 +122,51 @@ class DynamoDBNameService(NameServiceStrategy):
             f"Search not supported for DynamoDB service in schema {self.schema}"
         )
         return []
+
+    def update_name(
+        self, id_patient: int, name: str = None, extra_data: dict = None
+    ) -> dict:
+        """Update patient name and/or extra data fields in DynamoDB"""
+        try:
+            dynamodb = boto3.resource("dynamodb", region_name="sa-east-1")
+            table_name = self.config["getname"]["token"]["url"].split(":")[1]
+            table = dynamodb.Table(table_name)  # type: ignore
+
+            update_parts = []
+            expr_names = {}
+            expr_values = {}
+
+            if name is not None:
+                update_parts.append("#nome = :nome")
+                expr_names["#nome"] = "nome"
+                expr_values[":nome"] = name
+
+            if extra_data:
+                for idx, (key, value) in enumerate(extra_data.items()):
+                    name_placeholder = f"#k{idx}"
+                    val_placeholder = f":v{idx}"
+                    update_parts.append(f"{name_placeholder} = {val_placeholder}")
+                    expr_names[name_placeholder] = key
+                    expr_values[val_placeholder] = value
+
+            if not update_parts:
+                raise ValueError("No fields to update")
+
+            table.update_item(
+                Key={"schema_fkpessoa": str(id_patient)},
+                UpdateExpression="SET " + ", ".join(update_parts),
+                ExpressionAttributeNames=expr_names,
+                ExpressionAttributeValues=expr_values,
+            )
+
+            return {"status": "success", "idPatient": int(id_patient)}
+
+        except Exception as e:
+            logger.backend_logger.error(
+                f"DynamoDB update error for patient {id_patient} in schema {self.schema}: {str(e)}",
+                exc_info=True,
+            )
+            return self._create_error_response(id_patient)
 
 
 class NHInternalNameService(NameServiceStrategy):
@@ -544,6 +591,25 @@ def search_patient_by_name(search_term: str, user: User) -> list:
     config = _get_config(user)
     service = NameServiceFactory.create_service(config, user.schema)
     return service.search_by_name(search_term)
+
+
+@has_permission(Permission.WRITE_NAME)
+def update_patient_name(
+    id_patient: int, name: str, extra_data: dict, user: User
+) -> dict:
+    """Update patient name record in DynamoDB (DynamoDB clients only)"""
+    config = _get_config(user)
+
+    token_url = config["getname"].get("token", {}).get("url", "")
+    if not token_url.startswith("dy"):
+        raise ValidationError(
+            "Update not supported for this service type",
+            "errors.invalid",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    service = DynamoDBNameService(config, user.schema)
+    return service.update_name(id_patient=id_patient, name=name, extra_data=extra_data)
 
 
 def generate_internal_token(user: User) -> str:

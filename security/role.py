@@ -213,6 +213,7 @@ class Role(Enum):
             Permission.MULTI_SCHEMA,
             Permission.READ_NAV,
             Permission.WRITE_CUSTOM_FORMS,
+            Permission.WRITE_NAME,
         ],
     )
 

@@ -6,6 +6,7 @@ from sqlalchemy.dialects.postgresql import INTERVAL
 from sqlalchemy.orm import undefer
 
 from decorators.has_permission_decorator import Permission, has_permission
+from exception.authorization_error import AuthorizationError
 from exception.validation_error import ValidationError
 from models.appendix import Tag
 from models.enums import FeatureEnum, PatientAuditTypeEnum, TagTypeEnum
@@ -17,7 +18,7 @@ from models.prescription import (
     Prescription,
 )
 from repository import patient_repository
-from services import memory_service
+from services import memory_service, name_service
 from services.admin import admin_tag_service
 from utils import dateutils, status
 from utils.dateutils import to_iso
@@ -229,6 +230,17 @@ def save_patient(
     if Permission.ADMIN_PATIENT in user_permissions:
         if "dischargeDate" in request_data.keys():
             p.dischargeDate = request_data.get("dischargeDate", None)
+
+    if "name" in request_data:
+        if Permission.WRITE_NAME not in user_permissions:
+            raise AuthorizationError()
+        name_data = request_data["name"]
+        name_service.update_patient_name(
+            id_patient=p.idPatient,
+            name=name_data.get("name"),
+            extra_data=name_data.get("data"),
+            user=user_context,
+        )
 
     p.update = datetime.today()
     p.user = user_context.id
