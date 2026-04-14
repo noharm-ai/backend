@@ -64,6 +64,12 @@ def get_prescription_drug_mock_row(
     period: int = None,
     notes: str = None,
     measure_unit_nh: str = None,
+    antimicro: bool = False,
+    controlled: bool = False,
+    chemo: bool = False,
+    mav: bool = False,
+    notdefault: bool = False,
+    dialyzable: bool = False,
 ):
     MockRow = namedtuple(
         "Mockrow",
@@ -102,12 +108,18 @@ def get_prescription_drug_mock_row(
     da.kidney = kidney
     da.liver = liver
     da.platelets = platelets
-    da.elderly = elderly
     da.tube = tube
     da.pregnant = pregnant
     da.lactating = lactating
     da.fasting = True
     da.useWeight = use_weight
+    da.antimicro = antimicro
+    da.controlled = controlled
+    da.chemo = chemo
+    da.mav = mav
+    da.notdefault = notdefault
+    da.elderly = elderly
+    da.dialyzable = dialyzable
 
     substance = Substance()
     substance.id = sctid

@@ -991,6 +991,36 @@ from utils.alert_protocol import AlertProtocol, ProtocolExtraInfo
             },
             False,
         ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
+                        "field": "combination",
+                        "substance": ["111111"],
+                        "drugAttribute": ["antimicro", "controlled"],
+                    },
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            True,
+        ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
+                        "field": "combination",
+                        "substance": ["111111"],
+                        "drugAttribute": ["elderly"],
+                    },
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            False,
+        ),
     ],
 )
 def test_trigger(protocol, has_result):
@@ -1008,6 +1038,7 @@ def test_trigger(protocol, has_result):
             notes="Take with food",
             intravenous=True,
             measure_unit_nh="mg",
+            antimicro=True,
         ),
         utils_test_prescription.get_prescription_drug_mock_row(
             id_prescription_drug=2,
@@ -1019,6 +1050,7 @@ def test_trigger(protocol, has_result):
             period=1,
             tube=True,
             measure_unit_nh="ml",
+            controlled=True,
         ),
         utils_test_prescription.get_prescription_drug_mock_row(
             id_prescription_drug=3,
