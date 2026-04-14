@@ -42,7 +42,7 @@ class PrioritizationRequest(BaseModel):
     id_icd_list: Optional[list[str]] = None
     id_icd_group_list: Optional[list[str]] = None
     city: Optional[str] = None
-    medical_record: Optional[str] = None
+    medical_record: Optional[int] = None
     bed: Optional[str] = None  # deprecated
     bed_list: Optional[list[str]] = None
     specialty_list: Optional[list[str]] = None

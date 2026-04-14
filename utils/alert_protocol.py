@@ -7,7 +7,7 @@ from typing import Optional, Union
 
 from models.appendix import MeasureUnit
 from models.enums import DrugTypeEnum
-from models.main import Substance
+from models.main import DrugAttributes, Substance
 from models.prescription import Patient, Prescription, PrescriptionDrug
 
 # Simpler regex that avoids ReDoS by using alternation without nested quantifiers
@@ -356,11 +356,15 @@ class AlertProtocol:
 
             v_default_measure_unit = variable.get("defaultMeasureUnit", None)
 
+            v_drug_attribute = variable.get("drugAttribute", None)
+
             found = False
             for d in self.filtered_drugs:
                 prescription_drug: PrescriptionDrug = d[0]
                 substance: Substance = d[11]
                 measure_unit: MeasureUnit = d[2]
+                drug_attributes: DrugAttributes = d[6]
+                drug_attr_keys = self._get_drug_attribute_keys(drug_attributes)
 
                 exp_result = True
 
@@ -487,6 +491,11 @@ class AlertProtocol:
                         )
                     )
 
+                if v_drug_attribute is not None:
+                    exp_result = exp_result and self._compare(
+                        op="IN", value1=drug_attr_keys, value2=v_drug_attribute
+                    )
+
                 if exp_result:
                     found = True
                     self.related_items.append(prescription_drug.id)
@@ -558,3 +567,30 @@ class AlertProtocol:
             return False
 
         return True
+
+    def _get_drug_attribute_keys(self, drug_attributes: DrugAttributes) -> list[str]:
+        drug_attr_keys = []
+
+        if drug_attributes is not None:
+            if drug_attributes.antimicro is not None and drug_attributes.antimicro:
+                drug_attr_keys.append("antimicro")
+
+            if drug_attributes.controlled is not None and drug_attributes.controlled:
+                drug_attr_keys.append("controlled")
+
+            if drug_attributes.chemo is not None and drug_attributes.chemo:
+                drug_attr_keys.append("chemo")
+
+            if drug_attributes.mav is not None and drug_attributes.mav:
+                drug_attr_keys.append("mav")
+
+            if drug_attributes.notdefault is not None and drug_attributes.notdefault:
+                drug_attr_keys.append("notdefault")
+
+            if drug_attributes.elderly is not None and drug_attributes.elderly:
+                drug_attr_keys.append("elderly")
+
+            if drug_attributes.dialyzable is not None and drug_attributes.dialyzable:
+                drug_attr_keys.append("dialyzable")
+
+        return drug_attr_keys
