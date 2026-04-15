@@ -124,6 +124,8 @@ def get_prioritization_list(request: PrioritizationRequest):
                         pdate=p[0].date,
                     ),
                     "patientTags": patient.tags,
+                    "city": patient.city,
+                    "id_icd": patient.id_icd,
                 },
             )
         )
