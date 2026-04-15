@@ -1,6 +1,7 @@
 from flask import Blueprint, request
 
 from decorators.api_endpoint_decorator import api_endpoint
+from models.requests.patient_request import PatientListRequest
 from services import patient_service
 
 app_pat = Blueprint("app_pat", __name__)
@@ -25,39 +26,26 @@ def get_observation_history(admission_number: int):
 @app_pat.route("/patient", methods=["GET"])
 @api_endpoint()
 def list_patients():
-    id_segment = request.args.get("idSegment", None)
-    id_department_list = request.args.getlist("idDepartment[]", None)
-    next_appointment_start_date = request.args.get("nextAppointmentStartDate", None)
-    next_appointment_end_date = request.args.get("nextAppointmentEndDate", None)
-    appointment = request.args.get("appointment", None)
-    scheduled_by_list = request.args.getlist("scheduledBy[]", None)
-    attended_by_list = request.args.getlist("attendedBy[]", None)
-
-    patients = patient_service.get_patients(
-        id_segment=id_segment,
-        id_department_list=id_department_list,
-        next_appointment_start_date=next_appointment_start_date,
-        next_appointment_end_date=next_appointment_end_date,
-        scheduled_by_list=scheduled_by_list,
-        attended_by_list=attended_by_list,
-        appointment=appointment,
+    """List patients (primary care) — legacy GET endpoint."""
+    return patient_service.get_patients(
+        request_data=PatientListRequest(
+            idSegment=request.args.get("idSegment"),
+            idDepartmentList=request.args.getlist("idDepartment[]") or None,
+            nextAppointmentStartDate=request.args.get("nextAppointmentStartDate"),
+            nextAppointmentEndDate=request.args.get("nextAppointmentEndDate"),
+            appointment=request.args.get("appointment"),
+            scheduledByList=request.args.getlist("scheduledBy[]") or None,
+            attendedByList=request.args.getlist("attendedBy[]") or None,
+            dischargeDateStart=request.args.get("dischargeDateStart"),
+            dischargeDateEnd=request.args.get("dischargeDateEnd"),
+        )
     )
 
-    list = []
 
-    for p in patients:
-        list.append(
-            {
-                "idPatient": p[0].idPatient,
-                "admissionNumber": p[0].admissionNumber,
-                "admissionDate": (
-                    p[0].admissionDate.isoformat() if p[0].admissionDate else None
-                ),
-                "birthdate": p[0].birthdate.isoformat() if p[0].birthdate else None,
-                "idPrescription": p[1].id,
-                "observation": p[0].observation,
-                "refDate": p[2].isoformat() if p[2] else None,
-            }
-        )
-
-    return list
+@app_pat.route("/patient/list", methods=["POST"])
+@api_endpoint()
+def list_patients_post():
+    """List patients (primary care) — POST endpoint with JSON body."""
+    return patient_service.get_patients(
+        request_data=PatientListRequest(**request.get_json())
+    )
