@@ -217,16 +217,16 @@ def _set_new_config(old_config: dict, new_config: dict):
         config["remotenifi"] = {"main": main_schema if main_schema != "" else None}
 
     if "healthcheck" in new_config:
-        config["healthcheck"]["status"] = new_config["healthcheck"].get("status", 0)
-        config["healthcheck"]["metric_name"] = new_config["healthcheck"].get(
-            "metric_name", ""
-        )
+        config["healthcheck"] = {
+            "status": new_config["healthcheck"].get("status", 0),
+            "metric_name": new_config["healthcheck"].get("metric_name", ""),
+        }
 
     if "nifilint" in new_config:
-        config["nifilint"]["skip"] = new_config["nifilint"].get("skip", False)
-        config["nifilint"]["max_backup_days"] = new_config["nifilint"].get(
-            "max_backup_days", 2
-        )
+        config["nifilint"] = {
+            "skip": new_config["nifilint"].get("skip", False),
+            "max_backup_days": new_config["nifilint"].get("max_backup_days", 2),
+        }
 
     return config
 
