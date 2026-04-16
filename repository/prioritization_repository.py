@@ -16,12 +16,28 @@ from utils import status
 
 ICD_GROUPS = {
     "ONCO": [f"C{i:02}" for i in range(98)] + [f"D{i}" for i in range(37, 49)],
-    "CARDIOVASCULAR": ["I10", "I11", "I20", "I50", "J81"],
-    "CEREBROVASCULAR": ["I63", "I64", "I65", "I66", "I67", "I69", "G45", "G46"],
-    "PULMONAR": ["J40", "J41", "J42", "J43", "J44", "J45", "J46"],
-    "TUBERCULOSE": ["A15", "A16", "A17", "A18", "A19"],
-    "DIABETES": ["E10", "E11", "E12", "E13", "E14"],
+    "CARDIOVASCULAR": ["I10%", "I11%", "I20%", "I50%", "J81%"],
+    "CEREBROVASCULAR": ["I63%", "I64%", "I65%", "I66%", "I67%", "I69%", "G45%", "G46%"],
+    "PULMONAR": ["J40%", "J41%", "J42%", "J43%", "J44%", "J45%", "J46%"],
+    "TUBERCULOSE": ["A15%", "A16%", "A17%", "A18%", "A19%"],
+    "DIABETES": ["E10%", "E11%", "E12%", "E13%", "E14%"],
 }
+
+
+def _icd_filter(column, codes):
+    """Build a SQLAlchemy filter for a list of ICD codes.
+
+    Codes containing '%' are matched with ILIKE (wildcard);
+    all other codes are matched with IN (exact match).
+    """
+    exact = [c for c in codes if "%" not in c]
+    wildcards = [c for c in codes if "%" in c]
+    conditions = []
+    if exact:
+        conditions.append(column.in_(exact))
+    for wc in wildcards:
+        conditions.append(column.ilike(wc))
+    return or_(*conditions)
 
 
 def _build_base_query(request: PrioritizationRequest):
@@ -202,7 +218,7 @@ def _build_base_query(request: PrioritizationRequest):
             pass
 
     if request.id_icd_list and len(request.id_icd_list) > 0:
-        q = q.filter(Patient.id_icd.in_(request.id_icd_list))
+        q = q.filter(_icd_filter(Patient.id_icd, request.id_icd_list))
 
     if request.id_icd_group_list and len(request.id_icd_group_list) > 0:
         query_icds = []
@@ -213,7 +229,7 @@ def _build_base_query(request: PrioritizationRequest):
                 query_icds += icds
 
         if query_icds:
-            q = q.filter(Patient.id_icd.in_(query_icds))
+            q = q.filter(_icd_filter(Patient.id_icd, query_icds))
 
     if len(request.intervals) > 0:
         q = q.filter(
