@@ -24,17 +24,15 @@ ICD_GROUPS = {
 }
 
 
-def get_prioritization_list(request: PrioritizationRequest):
+def _build_base_query(request: PrioritizationRequest):
+    """Build the filtered query without SELECT columns, ORDER BY, or LIMIT.
+
+    Returns a base SQLAlchemy query on the Prescription/Patient/Department/Segment
+    join with all WHERE filters applied. Callers add their own column projection,
+    ordering, and limiting on top via with_entities() / order_by() / limit().
+    """
     q = (
-        db.session.query(
-            Prescription,
-            Patient,
-            Department.name.label("department"),
-            func.count().over(),
-            (Prescription.features["globalScore"].astext.cast(Integer)).label(
-                "globalScore"
-            ),
-        )
+        db.session.query(Prescription)
         .outerjoin(Patient, Patient.admissionNumber == Prescription.admissionNumber)
         .outerjoin(
             Department,
@@ -158,38 +156,26 @@ def get_prioritization_list(request: PrioritizationRequest):
         )
 
     if len(request.substances) > 0:
-        elm = db.Column("elm", type_=postgresql.JSONB)
-        subs_query = (
-            db.session.query(elm.cast(postgresql.TEXT))
-            .select_from(
-                func.json_array_elements(Prescription.features["substanceIDs"]).alias(
-                    "elm"
-                )
-            )
-            .as_scalar()
-        )
-
         q = q.filter(
-            cast(func.array(subs_query), postgresql.ARRAY(BigInteger)).overlap(
-                cast(request.substances, postgresql.ARRAY(BigInteger))
+            or_(
+                *[
+                    cast(Prescription.features["substanceIDs"], postgresql.JSONB).op(
+                        "@>"
+                    )(func.cast(func.json_build_array(s), postgresql.JSONB))
+                    for s in request.substances
+                ]
             )
         )
 
     if len(request.substanceClasses) > 0:
-        elm_substance_class = db.Column("elmSubstanceClass", type_=postgresql.JSONB)
-        subs_query = (
-            db.session.query(elm_substance_class.cast(postgresql.TEXT))
-            .select_from(
-                func.json_array_elements_text(
-                    Prescription.features["substanceClassIDs"]
-                ).alias("elmSubstanceClass")
-            )
-            .as_scalar()
-        )
-
         q = q.filter(
-            cast(func.array(subs_query), postgresql.ARRAY(postgresql.TEXT)).overlap(
-                request.substanceClasses
+            or_(
+                *[
+                    cast(
+                        Prescription.features["substanceClassIDs"], postgresql.JSONB
+                    ).op("@>")(func.cast(func.json_build_array(s), postgresql.JSONB))
+                    for s in request.substanceClasses
+                ]
             )
         )
 
@@ -304,20 +290,14 @@ def get_prioritization_list(request: PrioritizationRequest):
         )
 
     if request.protocols:
-        elm = db.Column("elm", type_=postgresql.JSONB)
-        protocols_query = (
-            db.session.query(elm.cast(postgresql.TEXT))
-            .select_from(
-                func.json_array_elements(Prescription.features["protocolAlerts"]).alias(
-                    "elm"
-                )
-            )
-            .as_scalar()
-        )
-
         q = q.filter(
-            cast(func.array(protocols_query), postgresql.ARRAY(Integer)).overlap(
-                cast(request.protocols, postgresql.ARRAY(Integer))
+            or_(
+                *[
+                    cast(Prescription.features["protocolAlerts"], postgresql.JSONB).op(
+                        "@>"
+                    )(func.cast(func.json_build_array(p), postgresql.JSONB))
+                    for p in request.protocols
+                ]
             )
         )
 
@@ -365,8 +345,36 @@ def get_prioritization_list(request: PrioritizationRequest):
     q = q.filter(Prescription.date >= start)
     q = q.filter(Prescription.date <= end)
 
-    q = q.order_by(desc("globalScore"))
+    return q
 
-    q = q.options(undefer(Patient.observation))
 
-    return q.limit(500).all()
+def get_prioritization_list(request: PrioritizationRequest, run_count: bool = True):
+    """List prescriptions for prioritization with an optional total count.
+
+    Returns a tuple (results, total_records) where results is capped at 500 rows
+    ordered by globalScore descending. total_records is len(results) when run_count=False.
+    """
+    base_q = _build_base_query(request)
+
+    results = (
+        base_q.with_entities(
+            Prescription,
+            Patient,
+            Department.name.label("department"),
+            (Prescription.features["globalScore"].astext.cast(Integer)).label(
+                "globalScore"
+            ),
+        )
+        .order_by(desc("globalScore"))
+        .options(undefer(Patient.observation))
+        .limit(500)
+        .all()
+    )
+
+    total_records = (
+        base_q.with_entities(func.count(Prescription.id)).scalar()
+        if run_count
+        else len(results)
+    )
+
+    return results, total_records

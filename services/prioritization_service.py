@@ -12,7 +12,11 @@ from utils import numberutils, prescriptionutils
 @has_permission(Permission.READ_PRESCRIPTION)
 def get_prioritization_list(request: PrioritizationRequest):
     """List prescription prioritization results"""
-    prioritization_results = prioritization_repository.get_prioritization_list(request)
+    prioritization_results, total_records = (
+        prioritization_repository.get_prioritization_list(
+            request=request, run_count=False
+        )
+    )
 
     results = []
     hide_names = feature_service.has_user_feature(FeatureEnum.HIDE_NAMES)
@@ -116,7 +120,7 @@ def get_prioritization_list(request: PrioritizationRequest):
                     ),
                     "reviewType": p[0].reviewType,
                     "observation": observation,
-                    "totalRecords": p[3],
+                    "totalRecords": total_records,
                     "agg": p[0].agg,
                     "prescriptionAggId": prescriptionutils.gen_agg_id(
                         admission_number=p[0].admissionNumber,
