@@ -249,7 +249,7 @@ def upsert_seg_exam(data: dict, user_context: User):
             status.HTTP_400_BAD_REQUEST,
         )
 
-    typeExam = escape_html(typeExam)
+    typeExam = escape_html(typeExam).lower()
 
     if not data_authorization_service.has_segment_authorization(
         id_segment=id_segment, user=user_context
