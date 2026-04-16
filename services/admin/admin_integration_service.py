@@ -533,3 +533,34 @@ def get_template_list():
         results[folder] = {"backup_date": resource_date.isoformat()}
 
     return results
+
+
+@has_permission(Permission.INTEGRATION_UTILS)
+def create_return_logstream(user_context: User):
+    """Create return logstream"""
+
+    payload = {
+        "command": "lambda_create_schema.create_return_logstream",
+        "schema": user_context.schema,
+    }
+
+    lambda_client = boto3.client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
+    response = lambda_client.invoke(
+        FunctionName=Config.BACKEND_FUNCTION_NAME,
+        InvocationType="RequestResponse",
+        Payload=json.dumps(payload),
+    )
+
+    response_json = json.loads(response["Payload"].read().decode("utf-8"))
+
+    if isinstance(response_json, str):
+        response_json = json.loads(response_json)
+
+    if isinstance(response_json, dict) and response_json.get("error", False):
+        raise ValidationError(
+            response_json.get("message", "Erro inesperado. Consulte os logs"),
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    return response_json
