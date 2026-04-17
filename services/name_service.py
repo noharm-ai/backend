@@ -74,10 +74,15 @@ class NameServiceStrategy(ABC):
 class DynamoDBNameService(NameServiceStrategy):
     """DynamoDB-based name service"""
 
+    def _get_dynamo_resources(self):
+        """Return (dynamodb resource, table_name) for reuse across methods."""
+        dynamodb = boto3.resource("dynamodb", region_name="sa-east-1")
+        table_name = self.config["getname"]["token"]["url"].split(":")[1]
+        return dynamodb, table_name
+
     def get_single_name(self, id_patient: int) -> dict:
         try:
-            dynamodb = boto3.resource("dynamodb", region_name="sa-east-1")
-            table_name = self.config["getname"]["token"]["url"].split(":")[1]
+            dynamodb, table_name = self._get_dynamo_resources()
             table = dynamodb.Table(table_name)  # type: ignore
 
             response = table.get_item(
@@ -111,10 +116,55 @@ class DynamoDBNameService(NameServiceStrategy):
             return self._create_error_response(id_patient)
 
     def get_multiple_names(self, ids_list: list) -> list:
-        """Get multiple names from DynamoDB (individual queries)"""
+        """Get multiple names from DynamoDB using batch_get_item (max 100 keys per request)."""
+        if not ids_list:
+            return []
+
+        dynamodb, table_name = self._get_dynamo_resources()
+        found_items: dict = {}
+
+        try:
+            unique_ids = list(dict.fromkeys(str(id_patient) for id_patient in ids_list))
+            for i in range(0, len(unique_ids), 100):
+                chunk = unique_ids[i : i + 100]
+                request_items = {
+                    table_name: {
+                        "Keys": [{"schema_fkpessoa": id_str} for id_str in chunk]
+                    }
+                }
+
+                while request_items:
+                    response = dynamodb.batch_get_item(RequestItems=request_items)
+                    for item in response["Responses"].get(table_name, []):
+                        found_items[item["schema_fkpessoa"]] = item
+                    request_items = response.get("UnprocessedKeys", {})
+
+        except Exception as e:
+            logger.backend_logger.error(
+                f"DynamoDB batch_get_item error for schema {self.schema}: {str(e)}",
+                exc_info=True,
+            )
+
         names = []
         for id_patient in ids_list:
-            names.append(self.get_single_name(id_patient))
+            item = found_items.get(str(id_patient))
+            if item:
+                data = {
+                    k: self._escape_str(v) if isinstance(v, str) else v
+                    for k, v in item.items()
+                    if k not in ("nome", "schema_fkpessoa")
+                }
+                names.append(
+                    {
+                        "status": "success",
+                        "idPatient": int(id_patient),
+                        "name": self._escape_str(item["nome"]),
+                        "data": data if data else None,
+                    }
+                )
+            else:
+                names.append(self._create_error_response(id_patient))
+
         return names
 
     def search_by_name(self, search_term: str) -> list:
@@ -138,8 +188,7 @@ class DynamoDBNameService(NameServiceStrategy):
                         status.HTTP_400_BAD_REQUEST,
                     )
 
-            dynamodb = boto3.resource("dynamodb", region_name="sa-east-1")
-            table_name = self.config["getname"]["token"]["url"].split(":")[1]
+            dynamodb, table_name = self._get_dynamo_resources()
             table = dynamodb.Table(table_name)  # type: ignore
 
             update_parts = []

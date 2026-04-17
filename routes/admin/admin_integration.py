@@ -111,6 +111,15 @@ def upsert_security_group():
 
 
 @app_admin_integration.route(
+    "/admin/integration/create-return-logstream", methods=["POST"]
+)
+@api_endpoint(is_admin=True)
+def create_return_logstream():
+    """create return logstream"""
+    return admin_integration_service.create_return_logstream()
+
+
+@app_admin_integration.route(
     "/admin/integration/update-user-security-group", methods=["POST"]
 )
 @api_endpoint(is_admin=True)

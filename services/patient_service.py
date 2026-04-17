@@ -17,6 +17,7 @@ from models.prescription import (
     PatientAudit,
     Prescription,
 )
+from models.requests.patient_request import PatientListRequest
 from repository import patient_repository
 from services import memory_service, name_service
 from services.admin import admin_tag_service
@@ -24,16 +25,27 @@ from utils import dateutils, status
 from utils.dateutils import to_iso
 
 
+def _format_patients(patients):
+    """Serialize (Patient, Prescription, appointment_date) tuples."""
+    return [
+        {
+            "idPatient": p[0].idPatient,
+            "admissionNumber": p[0].admissionNumber,
+            "admissionDate": (
+                p[0].admissionDate.isoformat() if p[0].admissionDate else None
+            ),
+            "birthdate": p[0].birthdate.isoformat() if p[0].birthdate else None,
+            "idPrescription": p[1].id,
+            "observation": p[0].observation,
+            "refDate": p[2].isoformat() if p[2] else None,
+        }
+        for p in patients
+    ]
+
+
 @has_permission(Permission.READ_PRESCRIPTION)
-def get_patients(
-    id_segment,
-    id_department_list,
-    next_appointment_start_date,
-    next_appointment_end_date,
-    scheduled_by_list,
-    attended_by_list,
-    appointment=None,
-):
+def get_patients(request_data: PatientListRequest):
+    """List patients for primary care, filtered by the given request params."""
     if not memory_service.has_feature(FeatureEnum.PRIMARY_CARE.value):
         raise ValidationError(
             "Funcionalidade não está habilitada",
@@ -68,47 +80,55 @@ def get_patients(
         .options(undefer(Patient.observation))
     )
 
-    if id_segment:
-        query = query.filter(Prescription.idSegment == id_segment)
+    if request_data.idSegment:
+        query = query.filter(Prescription.idSegment == request_data.idSegment)
 
-    if id_department_list:
-        query = query.filter(Prescription.idDepartment.in_(id_department_list))
+    if request_data.idDepartmentList:
+        query = query.filter(
+            Prescription.idDepartment.in_(request_data.idDepartmentList)
+        )
 
-    if next_appointment_start_date:
-        query = query.filter(sq_appointment >= next_appointment_start_date)
+    if request_data.nextAppointmentStartDate:
+        query = query.filter(sq_appointment >= request_data.nextAppointmentStartDate)
 
-    if next_appointment_end_date:
-        query = query.filter(sq_appointment <= next_appointment_end_date)
+    if request_data.nextAppointmentEndDate:
+        query = query.filter(sq_appointment <= request_data.nextAppointmentEndDate)
 
-    if appointment == "scheduled":
+    if request_data.appointment == "scheduled":
         query = query.filter(sq_appointment != None)
 
-    if appointment == "not-scheduled":
+    if request_data.appointment == "not-scheduled":
         query = query.filter(sq_appointment == None)
 
-    if scheduled_by_list:
+    if request_data.scheduledByList:
         scheduled_by_query = (
             db.session.query(func.count())
             .select_from(ClinicalNotes)
             .filter(ClinicalNotes.admissionNumber == Prescription.admissionNumber)
             .filter(ClinicalNotes.position == "Agendamento")
-            .filter(ClinicalNotes.user.in_(scheduled_by_list))
+            .filter(ClinicalNotes.user.in_(request_data.scheduledByList))
         )
 
         query = query.filter(scheduled_by_query.exists())
 
-    if attended_by_list:
+    if request_data.attendedByList:
         attended_by_query = (
             db.session.query(func.count())
             .select_from(ClinicalNotes)
             .filter(ClinicalNotes.admissionNumber == Prescription.admissionNumber)
             .filter(ClinicalNotes.position != "Agendamento")
-            .filter(ClinicalNotes.user.in_(attended_by_list))
+            .filter(ClinicalNotes.user.in_(request_data.attendedByList))
         )
 
         query = query.filter(attended_by_query.exists())
 
-    return query.limit(1500).all()
+    if request_data.dischargeDateStart:
+        query = query.filter(Patient.dischargeDate >= request_data.dischargeDateStart)
+
+    if request_data.dischargeDateEnd:
+        query = query.filter(Patient.dischargeDate <= request_data.dischargeDateEnd)
+
+    return _format_patients(query.limit(1500).all())
 
 
 def get_patient_allergies(id_patient):

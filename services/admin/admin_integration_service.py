@@ -217,16 +217,16 @@ def _set_new_config(old_config: dict, new_config: dict):
         config["remotenifi"] = {"main": main_schema if main_schema != "" else None}
 
     if "healthcheck" in new_config:
-        config["healthcheck"]["status"] = new_config["healthcheck"].get("status", 0)
-        config["healthcheck"]["metric_name"] = new_config["healthcheck"].get(
-            "metric_name", ""
-        )
+        config["healthcheck"] = {
+            "status": new_config["healthcheck"].get("status", 0),
+            "metric_name": new_config["healthcheck"].get("metric_name", ""),
+        }
 
     if "nifilint" in new_config:
-        config["nifilint"]["skip"] = new_config["nifilint"].get("skip", False)
-        config["nifilint"]["max_backup_days"] = new_config["nifilint"].get(
-            "max_backup_days", 2
-        )
+        config["nifilint"] = {
+            "skip": new_config["nifilint"].get("skip", False),
+            "max_backup_days": new_config["nifilint"].get("max_backup_days", 2),
+        }
 
     return config
 
@@ -533,3 +533,34 @@ def get_template_list():
         results[folder] = {"backup_date": resource_date.isoformat()}
 
     return results
+
+
+@has_permission(Permission.INTEGRATION_UTILS)
+def create_return_logstream(user_context: User):
+    """Create return logstream"""
+
+    payload = {
+        "command": "lambda_create_schema.create_return_logstream",
+        "schema": user_context.schema,
+    }
+
+    lambda_client = boto3.client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
+    response = lambda_client.invoke(
+        FunctionName=Config.BACKEND_FUNCTION_NAME,
+        InvocationType="RequestResponse",
+        Payload=json.dumps(payload),
+    )
+
+    response_json = json.loads(response["Payload"].read().decode("utf-8"))
+
+    if isinstance(response_json, str):
+        response_json = json.loads(response_json)
+
+    if isinstance(response_json, dict) and response_json.get("error", False):
+        raise ValidationError(
+            response_json.get("message", "Erro inesperado. Consulte os logs"),
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    return response_json

@@ -6,7 +6,7 @@ from sqlalchemy.dialects.postgresql import INTERVAL
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
 from models.appendix import GlobalMemory
-from models.enums import FeatureEnum, GlobalMemoryEnum
+from models.enums import GlobalMemoryEnum
 from models.main import User, db
 from models.notes import ClinicalNotes
 from models.prescription import Patient
@@ -16,13 +16,6 @@ from utils import status
 
 @has_permission(Permission.READ_DISCHARGE_SUMMARY)
 def get_structured_info(admission_number, user_context: User, mock=False):
-    if not memory_service.has_feature(FeatureEnum.DISCHARGE_SUMMARY.value):
-        raise ValidationError(
-            "Feature desabilitada",
-            "errors.unauthorizedFeature",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-
     patient = (
         db.session.query(Patient)
         .filter(Patient.admissionNumber == admission_number)
