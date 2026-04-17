@@ -1,5 +1,6 @@
-from pydantic import BaseModel, Field
 from typing import Optional
+
+from pydantic import BaseModel, Field
 
 
 class TagListRequest(BaseModel):
@@ -8,7 +9,7 @@ class TagListRequest(BaseModel):
 
 
 class TagUpsertRequest(BaseModel):
-    name: str = Field(min_length=3, max_length=40)
+    name: str = Field(min_length=2, max_length=40)
     tagType: int
     active: bool
     new: bool = False
