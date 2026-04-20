@@ -118,8 +118,6 @@ def copy_attributes(
     """
     )
 
-    print("update", update_stmt)
-
     return db.session.execute(
         update_stmt,
         {
