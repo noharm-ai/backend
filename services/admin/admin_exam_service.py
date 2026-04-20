@@ -104,23 +104,50 @@ def copy_exams(id_segment_origin, id_segment_destiny, user_context: User):
     query = text(
         f"""
             insert into {user_context.schema}.segmentoexame
-            (idsegmento, tpexame, abrev, nome, min, max, referencia, posicao, ativo, update_at, update_by)
+            (idsegmento, tpexame, tpexame_ref, abrev, nome, min, max, referencia, posicao, ativo, update_at, update_by)
             select
                 :idSegmentDestiny,
-                tpexame,
-                abrev,
-                nome,
-                min,
-                max,
-                referencia,
-                posicao,
-                ativo,
+                se.tpexame,
+                se.tpexame_ref,
+                se.abrev,
+                se.nome,
+                case 
+                    when er.tpexame is not null then
+                        case 
+                            when s.tp_segmento = 1 then er.min_adulto
+                            else er.min_pediatrico
+                        end
+                    else
+                        se.min
+                end as min,
+                case 
+                    when er.tpexame is not null then
+                        case 
+                            when s.tp_segmento = 1 then er.max_adulto
+                            else er.max_pediatrico
+                        end
+                    else
+                        se.max
+                end as max,
+                case 
+                    when er.tpexame is not null then
+                        case 
+                            when s.tp_segmento = 1 then er.referencia_adulto 
+                            else er.referencia_pediatrico 
+                        end
+                    else
+                        se.referencia 
+                end as referencia,
+                se.posicao,
+                se.ativo,
                 now(),
                 :idUser
             from
-                {user_context.schema}.segmentoexame
+                {user_context.schema}.segmentoexame se
+                inner join {user_context.schema}.segmento s on s.idsegmento = :idSegmentDestiny
+                left join public.exame er on er.tpexame = se.tpexame_ref
             where
-                idsegmento = :idSegmentOrigin
+                se.idsegmento = :idSegmentOrigin
             on conflict (idsegmento, tpexame)
             do nothing
         """
@@ -267,7 +294,7 @@ def upsert_seg_exam(data: dict, user_context: User):
         .first()
     )
 
-    if data.get("new", False) == True and segExam != None:
+    if data.get("new", False) == True and segExam != None and segExam.active:
         raise ValidationError(
             "Este exame já foi cadastrado",
             "errors.businessRules",

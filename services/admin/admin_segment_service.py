@@ -5,13 +5,22 @@ from exception.validation_error import ValidationError
 from models.appendix import Department, SegmentDepartment
 from models.main import User, db
 from models.segment import Hospital, Segment
+from repository import drug_attributes_repository, outlier_repository
+from services.admin import admin_exam_service, admin_unit_conversion_service
 from utils import status
 
 
 @has_permission(Permission.ADMIN_SEGMENTS)
 def upsert_segment(
-    id_segment, description, active, user_context: User, type: int, cpoe: bool
+    id_segment,
+    description,
+    active,
+    user_context: User,
+    type: int,
+    cpoe: bool,
+    id_segment_origin: int,
 ):
+    new_record = False
     if id_segment:
         segment = db.session.query(Segment).filter(Segment.id == id_segment).first()
         if segment is None:
@@ -21,6 +30,7 @@ def upsert_segment(
                 status.HTTP_400_BAD_REQUEST,
             )
     else:
+        new_record = True
         segment = Segment()
         segment.cpoe_outpatient_clinic = False
 
@@ -30,6 +40,45 @@ def upsert_segment(
     segment.cpoe = cpoe if cpoe is not None else False
 
     db.session.add(segment)
+    db.session.flush()
+
+    if not new_record:
+        # skip copy
+        return
+
+    if not id_segment_origin:
+        raise ValidationError(
+            "Deve ser selecionado um segmento origem",
+            "errors.invalidParam",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    # start copying from origin
+    drug_attributes_repository.copy_segment_drug_attributes(
+        id_segment_origin=id_segment_origin,
+        id_segment_destiny=segment.id,
+        schema=user_context.schema,
+        id_user=user_context.id,
+    )
+
+    outlier_repository.copy_segment_outliers(
+        id_segment_origin=id_segment_origin,
+        id_segment_destiny=segment.id,
+        schema=user_context.schema,
+        id_user=user_context.id,
+    )
+
+    admin_unit_conversion_service.copy_unit_conversion(
+        id_segment_origin=id_segment_origin,
+        id_segment_destiny=segment.id,
+        user_context=user_context,
+    )
+
+    admin_exam_service.copy_exams(
+        id_segment_origin=id_segment_origin,
+        id_segment_destiny=segment.id,
+        user_context=user_context,
+    )
 
 
 @has_permission(Permission.ADMIN_SEGMENTS)
