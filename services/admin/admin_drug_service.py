@@ -49,7 +49,7 @@ def get_drug_list(request_data: AdminDrugListRequest):
                 "idMeasureUnitPrice": i[5],
                 "measureUnitPriceFactor": i[8],
                 "price": i[6],
-                "sctid": str(i[7]),
+                "sctid": str(i[7]) if i[7] else None,
                 "substance": i[10],
                 "segmentOutlier": i[11],
                 "substanceAccuracy": i[12],
