@@ -294,7 +294,7 @@ def upsert_seg_exam(data: dict, user_context: User):
         .first()
     )
 
-    if data.get("new", False) == True and segExam != None:
+    if data.get("new", False) == True and segExam != None and segExam.active:
         raise ValidationError(
             "Este exame já foi cadastrado",
             "errors.businessRules",
