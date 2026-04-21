@@ -1,6 +1,6 @@
 """Repository: drugs related operations"""
 
-from sqlalchemy import and_, func, or_
+from sqlalchemy import and_, func, literal, or_
 
 from models.appendix import MeasureUnit, MeasureUnitConvert
 from models.main import (
@@ -280,6 +280,56 @@ def get_admin_drug_list(request_data: AdminDrugListRequest):
 
     if request_data.idDrugList:
         q = q.filter(DrugAttributes.idDrug.in_(request_data.idDrugList))
+
+    if request_data.groupByDrug:
+        total = q.with_entities(func.count(func.distinct(Drug.id))).scalar()
+
+        # DISTINCT ON requires ORDER BY to start with Drug.id; wrap in a subquery
+        # so the outer query can order by name as usual.
+        subq = (
+            q.with_entities(
+                Drug.id,
+                Drug.name,
+                Segment.id,
+                Segment.description,
+                DrugAttributes.idMeasureUnit,
+                DrugAttributes.idMeasureUnitPrice,
+                DrugAttributes.price,
+                Drug.sctid,
+                MeasureUnitConvert.factor,
+                literal(total).label("total"),
+                Substance.name,
+                SegmentOutlier.description,
+                Drug.ai_accuracy,
+                DrugAttributes.maxDose,
+                DrugAttributes.useWeight,
+                MeasureUnit.description.label("measure_unit_default_name"),
+                Segment.type.label("segment_type"),
+                DrugAttributes.ref_maxdose,
+                DrugAttributes.ref_maxdose_weight,
+                Substance.maxdose_adult,
+                Substance.maxdose_adult_weight,
+                Substance.maxdose_pediatric,
+                Substance.maxdose_pediatric_weight,
+                Substance.default_measureunit,
+                MeasureUnit.measureunit_nh,
+                User.name.label("responsible"),
+                DrugAttributes.update,
+                presc_query.c.count.label("drug_count"),
+                DrugAttributes.division,
+            )
+            .distinct(Drug.id)
+            .order_by(Drug.id)
+            .subquery()
+        )
+
+        return (
+            db.session.query(subq)
+            .order_by(subq.c.name)
+            .limit(request_data.limit)
+            .offset(request_data.offset)
+            .all()
+        )
 
     return (
         q.order_by(Drug.name, Segment.description)
