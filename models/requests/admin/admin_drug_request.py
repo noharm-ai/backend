@@ -30,3 +30,4 @@ class AdminDrugListRequest(BaseModel):
     idDrugList: Optional[list[int]] = []
     hasSubstanceMaxDoseWeightAdult: Optional[bool] = None
     hasSubstanceMaxDoseWeightPediatric: Optional[bool] = None
+    substanceStatus: Optional[str] = None

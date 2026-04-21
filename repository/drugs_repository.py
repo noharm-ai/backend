@@ -144,6 +144,22 @@ def get_admin_drug_list(request_data: AdminDrugListRequest):
         else:
             q = q.filter(Drug.ai_accuracy == None)
 
+    if request_data.substanceStatus is not None:
+        if request_data.substanceStatus == "empty":
+            q = q.filter(Substance.id == None)
+        elif request_data.substanceStatus == "confirmed":
+            q = q.filter(Substance.id != None).filter(Drug.ai_accuracy == None)
+        elif request_data.substanceStatus == "not_confirmed":
+            q = q.filter(Substance.id != None).filter(Drug.ai_accuracy != None)
+        elif request_data.substanceStatus == "not_confirmed_95":
+            q = q.filter(Substance.id != None).filter(Drug.ai_accuracy < 95)
+        elif request_data.substanceStatus == "not_confirmed_85":
+            q = q.filter(Substance.id != None).filter(Drug.ai_accuracy < 85)
+        elif request_data.substanceStatus == "not_confirmed_75":
+            q = q.filter(Substance.id != None).filter(Drug.ai_accuracy < 75)
+        elif request_data.substanceStatus == "not_confirmed_50":
+            q = q.filter(Substance.id != None).filter(Drug.ai_accuracy < 50)
+
     if request_data.hasMaxDose != None:
         if request_data.hasMaxDose:
             q = q.filter(DrugAttributes.maxDose != None)
