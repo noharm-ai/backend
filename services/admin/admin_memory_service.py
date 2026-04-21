@@ -1,15 +1,16 @@
 from datetime import datetime, timedelta
-from markupsafe import escape as escape_html
-from utils import status
-from sqlalchemy import func
 from typing import List
 
-from models.main import db, User
-from models.appendix import Memory
-from models.prescription import Prescription, PrescriptionDrug
-from models.enums import MemoryEnum
-from decorators.has_permission_decorator import has_permission, Permission
+from markupsafe import escape as escape_html
+from sqlalchemy import func
+
+from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
+from models.appendix import Memory
+from models.enums import FeatureEnum, MemoryEnum
+from models.main import User, db
+from models.prescription import Prescription, PrescriptionDrug
+from utils import status
 
 KIND_ADMIN = [
     MemoryEnum.FEATURES.value,
@@ -78,7 +79,7 @@ def get_memory_itens(kinds):
     return itens
 
 
-@has_permission(Permission.INTEGRATION_UTILS, Permission.ADMIN_ROUTES)
+@has_permission(Permission.ADMIN_APP_FEATURES)
 def update_memory(
     key,
     kind,
@@ -87,16 +88,6 @@ def update_memory(
     user_permissions: List[Permission],
     unique=False,
 ):
-    authorized = True
-    if kind in KIND_ADMIN and Permission.INTEGRATION_UTILS not in user_permissions:
-        authorized = False
-
-    if not authorized:
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
 
     if unique:
         memory_item = db.session.query(Memory).filter(Memory.kind == kind).first()
@@ -107,6 +98,24 @@ def update_memory(
             .filter(Memory.kind == kind)
             .first()
         )
+
+    if kind == MemoryEnum.FEATURES.value:
+        existing_features = memory_item.value if memory_item is not None else []
+        protected = {
+            FeatureEnum.PRIMARY_CARE.value,
+            FeatureEnum.OAUTH.value,
+            FeatureEnum.PATIENT_DAY_OUTPATIENT_FLOW.value,
+        }
+        changed_protected = (
+            set(value or []).symmetric_difference(set(existing_features or []))
+            & protected
+        )
+        if changed_protected and Permission.INTEGRATION_UTILS not in user_permissions:
+            raise ValidationError(
+                f"Você não possui permissão para editar estas features: {', '.join(sorted(changed_protected))}",
+                "errors.unauthorized",
+                status.HTTP_403_FORBIDDEN,
+            )
 
     if memory_item == None:
         memory_item = Memory()
