@@ -21,7 +21,7 @@ test-integration:
 
 ## Run a specific test file (usage: make test-file FILE=tests/integration/test_drug.py)
 test-file:
-	ENV=test python -m pytest $(FILE) -v
+	ENV=test python -m pytest $(FILE) -v -s
 
 ## Run tests with coverage report
 test-cov:

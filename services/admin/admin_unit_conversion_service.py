@@ -9,7 +9,6 @@ from sqlalchemy import text
 from config import Config
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
-from models.appendix import MeasureUnit
 from models.enums import DefaultMeasureUnitEnum
 from models.main import (
     DrugAttributes,
@@ -90,44 +89,53 @@ def get_conversion_predictions(conversion_list: list) -> list:
 def get_conversion_list(id_segment):
     unit_conversion_repository.ensure_default_measure_units()
 
-    nh_default_units = (
-        db.session.query(MeasureUnit)
-        .filter(
-            MeasureUnit.measureunit_nh.in_(
-                [
-                    DefaultMeasureUnitEnum.MCG.value,
-                    DefaultMeasureUnitEnum.MG.value,
-                    DefaultMeasureUnitEnum.ML.value,
-                    DefaultMeasureUnitEnum.UI.value,
-                    DefaultMeasureUnitEnum.UN.value,
-                ]
-            )
-        )
-        .all()
-    )
+    nh_default_units = [
+        DefaultMeasureUnitEnum.MCG.value,
+        DefaultMeasureUnitEnum.MG.value,
+        DefaultMeasureUnitEnum.ML.value,
+        DefaultMeasureUnitEnum.UI.value,
+        DefaultMeasureUnitEnum.UN.value,
+    ]
 
     default_units = {}
     for du in nh_default_units:
-        default_units[du.measureunit_nh] = {
-            "idMeasureUnit": du.id,
-            "description": du.description,
+        default_units[du] = {
+            "idMeasureUnit": du,
+            "description": du,
+            "measureunit_nh": du,
         }
 
-    conversion_list = unit_conversion_repository.get_unit_conversion_list(
-        id_segment=id_segment
-    )
+    conversion_list = unit_conversion_repository.get_unit_conversion_list()
 
     result = []
     drug_defaultunit = set()
     for i in conversion_list:
         prediction = None
         probability = None
-        if i.default_measureunit == i.measureunit_nh:
-            drug_defaultunit.add(i.id)
 
-            if i.measureunit_nh:
-                prediction = 1
-                probability = 100
+        show_factors = True
+
+        if not i.uniform_measure_unit:
+            show_factors = False
+
+        effective_default = i.default_measureunit or DefaultMeasureUnitEnum.UN.value
+        is_default_unit = effective_default == i.measureunit_nh
+
+        if is_default_unit:
+            factor = 1
+            prediction = 100
+            probability = 100
+        elif show_factors:
+            factor = i.factor
+            prediction = None
+            probability = None
+        else:
+            factor = None
+            prediction = None
+            probability = None
+
+        if i.idMeasureUnit == effective_default:
+            drug_defaultunit.add(i.id)
 
         result.append(
             {
@@ -135,24 +143,26 @@ def get_conversion_list(id_segment):
                 "idDrug": i[1],
                 "name": escape_html(str(i[2])) if i[2] is not None else None,
                 "idMeasureUnit": i[3],
-                "factor": i[4],
-                "idSegment": escape_html(str(id_segment)),
+                "factor": factor,
                 "measureUnit": escape_html(str(i[5])) if i[5] is not None else None,
                 "sctid": escape_html(str(i.sctid)) if i.sctid is not None else None,
-                "substanceMeasureUnit": i.default_measureunit,
+                "substanceMeasureUnit": effective_default,
                 "drugMeasureUnitNh": i.measureunit_nh,
                 "prediction": prediction,
                 "probability": probability,
                 "prescribedQuantity": i.prescribed_quantity,
                 "substanceTags": i.tags,
+                "uniformMeasureUnit": i.uniform_measure_unit,
+                "substanceName": i.substance_name,
             }
         )
 
     for i in conversion_list:
-        if i.id not in drug_defaultunit and i.default_measureunit:
+        effective_default = i.default_measureunit or DefaultMeasureUnitEnum.UN.value
+        if i.id not in drug_defaultunit:
             drug_defaultunit.add(i.id)
 
-            d_unit = default_units.get(i.default_measureunit, None)
+            d_unit = default_units.get(effective_default, None)
 
             if d_unit:
                 result.append(
@@ -163,24 +173,46 @@ def get_conversion_list(id_segment):
                         if i.name is not None
                         else None,
                         "idMeasureUnit": d_unit.get("idMeasureUnit"),
-                        "factor": None,
-                        "idSegment": escape_html(str(id_segment)),
+                        "factor": 1,
                         "measureUnit": escape_html(str(d_unit.get("description")))
                         if d_unit.get("description") is not None
                         else None,
                         "sctid": escape_html(str(i.sctid))
                         if i.sctid is not None
                         else None,
-                        "substanceMeasureUnit": i.default_measureunit,
-                        "drugMeasureUnitNh": i.measureunit_nh,
+                        "substanceMeasureUnit": i.default_measureunit
+                        if i.default_measureunit
+                        else DefaultMeasureUnitEnum.UN.value,
+                        "drugMeasureUnitNh": d_unit.get("measureunit_nh", None),
                         "prediction": 1,
                         "probability": 100,
                         "prescribed_quantity": i.prescribed_quantity,
                         "substanceTags": i.tags,
+                        "uniformMeasureUnit": i.uniform_measure_unit,
+                        "substanceName": i.substance_name,
                     }
                 )
 
-    return result
+    grouped_result = {}
+    for item in result:
+        id_drug = item["idDrug"]
+        if id_drug not in grouped_result:
+            grouped_result[id_drug] = []
+        grouped_result[id_drug].append(item)
+
+    grouped_result = {
+        id_drug: items
+        for id_drug, items in grouped_result.items()
+        if all(i["substanceMeasureUnit"] == i["drugMeasureUnitNh"] for i in items)
+    }
+
+    for group in grouped_result.values():
+        print("id_drug", group[0]["idDrug"])
+        for item in group:
+            print(item["name"])
+        print("--- ---")
+
+    return grouped_result
 
 
 @has_permission(Permission.ADMIN_UNIT_CONVERSION)
