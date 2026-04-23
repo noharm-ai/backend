@@ -398,7 +398,9 @@ class AlertProtocol:
                     exp_result = exp_result and (
                         self._compare(
                             op=v_dose_op,
-                            value1=prescription_drug.doseconv,
+                            value1=prescription_drug.doseconv
+                            if prescription_drug.doseconv is not None
+                            else 0,
                             value2=v_dose,
                         )
                     )

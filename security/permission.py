@@ -119,3 +119,5 @@ class Permission(Enum):
     WRITE_CUSTOM_FORMS = "WRITE_CUSTOM_FORMS"  # permission to write custom forms
 
     WRITE_NAME = "WRITE_NAME"  # permission to update patient name records
+
+    ADMIN_APP_FEATURES = "ADMIN_APP_FEATURES"  # permission to manage app features

@@ -114,6 +114,7 @@ def get_unit_conversion_list(id_segment: int):
         )
         .join(active_drugs, Drug.id == active_drugs.c.idDrug)
         .join(units, Drug.id == units.c.idDrug)
+        .join(Substance, Drug.sctid == Substance.id)
         .outerjoin(
             MeasureUnitConvert,
             and_(
@@ -123,7 +124,6 @@ def get_unit_conversion_list(id_segment: int):
             ),
         )
         .outerjoin(MeasureUnit, MeasureUnit.id == units.c.idMeasureUnit)
-        .outerjoin(Substance, Drug.sctid == Substance.id)
     )
 
     return conversion_query.order_by(Drug.name, MeasureUnitConvert.factor).all()
