@@ -86,7 +86,7 @@ def get_conversion_predictions(conversion_list: list) -> list:
 
 
 @has_permission(Permission.ADMIN_UNIT_CONVERSION)
-def get_conversion_list(id_segment):
+def get_conversion_list():
     unit_conversion_repository.ensure_default_measure_units()
 
     nh_default_units = [
@@ -193,26 +193,7 @@ def get_conversion_list(id_segment):
                     }
                 )
 
-    grouped_result = {}
-    for item in result:
-        id_drug = item["idDrug"]
-        if id_drug not in grouped_result:
-            grouped_result[id_drug] = []
-        grouped_result[id_drug].append(item)
-
-    grouped_result = {
-        id_drug: items
-        for id_drug, items in grouped_result.items()
-        if all(i["substanceMeasureUnit"] == i["drugMeasureUnitNh"] for i in items)
-    }
-
-    for group in grouped_result.values():
-        print("id_drug", group[0]["idDrug"])
-        for item in group:
-            print(item["name"])
-        print("--- ---")
-
-    return grouped_result
+    return result
 
 
 @has_permission(Permission.ADMIN_UNIT_CONVERSION)

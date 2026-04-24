@@ -9,11 +9,7 @@ app_admin_unit_conversion = Blueprint("app_admin_unit_conversion", __name__)
 @app_admin_unit_conversion.route("/admin/unit-conversion/list", methods=["POST"])
 @api_endpoint(is_admin=True)
 def get_unit_conversion_list():
-    request_data = request.get_json()
-
-    return admin_unit_conversion_service.get_conversion_list(
-        id_segment=request_data.get("idSegment")
-    )
+    return admin_unit_conversion_service.get_conversion_list()
 
 
 @app_admin_unit_conversion.route("/admin/unit-conversion/predictions", methods=["POST"])

@@ -139,7 +139,9 @@ def setup_unit_conversion_test_data(clean_test_artifacts):  # noqa: ARG001
         _DRUG_NO_DEFAULT_UNIT, "Test Drug No Default Unit", _SCTID_NO_DEFAULT_UNIT
     )
     create_test_outlier(_OUTLIER_BASE_ID + 5, _DRUG_NO_DEFAULT_UNIT)
-    create_test_prescription_agg(_DRUG_NO_DEFAULT_UNIT, "mg", id_department=1, dose=20.0)
+    create_test_prescription_agg(
+        _DRUG_NO_DEFAULT_UNIT, "mg", id_department=1, dose=20.0
+    )
 
 
 def _drug_items(data: list, id_drug: int) -> list:
@@ -149,14 +151,14 @@ def _drug_items(data: list, id_drug: int) -> list:
 
 def test_unit_conversion_list_requires_admin(client, analyst_headers):
     """unit-conversion list: analyst (non-admin) receives 401"""
-    response = client.post(URL, json={"idSegment": 1}, headers=analyst_headers)
+    response = client.post(URL, headers=analyst_headers)
 
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
 
 def test_unit_conversion_list_drug_without_outlier_excluded(client, admin_headers):
     """unit-conversion list: drug with no outlier is excluded from results"""
-    response = client.post(URL, json={"idSegment": 1}, headers=admin_headers)
+    response = client.post(URL, headers=admin_headers)
     data = response.get_json()["data"]
 
     assert response.status_code == status.HTTP_200_OK
@@ -165,7 +167,7 @@ def test_unit_conversion_list_drug_without_outlier_excluded(client, admin_header
 
 def test_unit_conversion_list_basic_success(client, admin_headers):
     """unit-conversion list: drug with outlier and prescribed unit appears in results"""
-    response = client.post(URL, json={"idSegment": 1}, headers=admin_headers)
+    response = client.post(URL, headers=admin_headers)
     data = response.get_json()["data"]
 
     assert response.status_code == status.HTTP_200_OK
@@ -180,7 +182,7 @@ def test_unit_conversion_list_basic_success(client, admin_headers):
 
 def test_unit_conversion_list_synthetic_default_unit_entry(client, admin_headers):
     """unit-conversion list: drug prescribed in ml (not its default mg) gets a synthetic mg entry with prediction=1"""
-    response = client.post(URL, json={"idSegment": 1}, headers=admin_headers)
+    response = client.post(URL, headers=admin_headers)
     data = response.get_json()["data"]
 
     assert response.status_code == status.HTTP_200_OK
@@ -201,7 +203,7 @@ def test_unit_conversion_list_synthetic_default_unit_entry(client, admin_headers
 
 def test_unit_conversion_list_default_unit_factor_one(client, admin_headers):
     """unit-conversion list: uniform drug whose prescribed unit equals its substance default gets factor=1 and prediction=100"""
-    response = client.post(URL, json={"idSegment": 1}, headers=admin_headers)
+    response = client.post(URL, headers=admin_headers)
     data = response.get_json()["data"]
 
     assert response.status_code == status.HTTP_200_OK
@@ -217,7 +219,7 @@ def test_unit_conversion_list_default_unit_factor_one(client, admin_headers):
 
 def test_unit_conversion_list_non_uniform_hides_factor(client, admin_headers):
     """unit-conversion list: drug with no DrugAttributes (uniform=False) prescribed in a non-default unit gets factor=None"""
-    response = client.post(URL, json={"idSegment": 1}, headers=admin_headers)
+    response = client.post(URL, headers=admin_headers)
     data = response.get_json()["data"]
 
     assert response.status_code == status.HTTP_200_OK
@@ -235,7 +237,7 @@ def test_unit_conversion_list_non_uniform_hides_factor(client, admin_headers):
 
 def test_unit_conversion_list_uniform_with_saved_conversions(client, admin_headers):
     """unit-conversion list: uniform drug with saved conversions returns correct factors"""
-    response = client.post(URL, json={"idSegment": 1}, headers=admin_headers)
+    response = client.post(URL, headers=admin_headers)
     data = response.get_json()["data"]
 
     assert response.status_code == status.HTTP_200_OK
@@ -264,7 +266,7 @@ def test_unit_conversion_list_no_substance_default_unit_falls_back_to_un(
     client, admin_headers
 ):
     """unit-conversion list: drug whose substance has no default unit gets a synthetic 'un' entry"""
-    response = client.post(URL, json={"idSegment": 1}, headers=admin_headers)
+    response = client.post(URL, headers=admin_headers)
     data = response.get_json()["data"]
 
     assert response.status_code == status.HTTP_200_OK
