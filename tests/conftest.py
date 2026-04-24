@@ -108,6 +108,14 @@ def _cleanup():
         )
     )
 
+    # Unit-conversion test records (IDs >= 90000)
+    session.execute(text("DELETE FROM demo.medatributos WHERE fkmedicamento >= 90000"))
+    session.execute(text("DELETE FROM demo.unidadeconverte WHERE fkmedicamento >= 90000"))
+    session.execute(text("DELETE FROM demo.prescricaoagg WHERE fkmedicamento >= 90000"))
+    session.execute(text("DELETE FROM demo.outlier WHERE idoutlier >= 90000"))
+    session.execute(text("DELETE FROM demo.medicamento WHERE fkmedicamento >= 90000"))
+    session.execute(text("DELETE FROM public.substancia WHERE sctid >= 90000"))
+
     session_commit()
     pass
 

@@ -1,6 +1,9 @@
 from flask import Blueprint, request
 
 from decorators.api_endpoint_decorator import api_endpoint
+from models.requests.admin.admin_unit_conversion_request import (
+    AdminUnitConversionLLMRequest,
+)
 from services.admin import admin_unit_conversion_service
 
 app_admin_unit_conversion = Blueprint("app_admin_unit_conversion", __name__)
@@ -9,11 +12,7 @@ app_admin_unit_conversion = Blueprint("app_admin_unit_conversion", __name__)
 @app_admin_unit_conversion.route("/admin/unit-conversion/list", methods=["POST"])
 @api_endpoint(is_admin=True)
 def get_unit_conversion_list():
-    request_data = request.get_json()
-
-    return admin_unit_conversion_service.get_conversion_list(
-        id_segment=request_data.get("idSegment")
-    )
+    return admin_unit_conversion_service.get_conversion_list()
 
 
 @app_admin_unit_conversion.route("/admin/unit-conversion/predictions", methods=["POST"])
@@ -64,3 +63,13 @@ def copy_unit_conversion():
     )
 
     return result.rowcount
+
+
+@app_admin_unit_conversion.route(
+    "/admin/unit-conversion/llm-suggest", methods=["POST"]
+)
+@api_endpoint(is_admin=True)
+def get_llm_conversion_suggestions():
+    return admin_unit_conversion_service.get_llm_conversion_suggestions(
+        request_data=AdminUnitConversionLLMRequest(**request.get_json())
+    )

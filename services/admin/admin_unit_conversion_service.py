@@ -9,20 +9,22 @@ from sqlalchemy import text
 from config import Config
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
-from models.appendix import MeasureUnit
 from models.enums import DefaultMeasureUnitEnum
 from models.main import (
     DrugAttributes,
     User,
     db,
 )
+from models.requests.admin.admin_unit_conversion_request import (
+    AdminUnitConversionLLMRequest,
+)
 from models.segment import Segment
-from repository import unit_conversion_repository
+from repository import substance_repository, unit_conversion_repository
 from services import drug_service as main_drug_service
 from services.admin import (
     admin_drug_service,
 )
-from utils import status
+from utils import logger, status
 
 
 @has_permission(Permission.ADMIN_UNIT_CONVERSION)
@@ -87,47 +89,56 @@ def get_conversion_predictions(conversion_list: list) -> list:
 
 
 @has_permission(Permission.ADMIN_UNIT_CONVERSION)
-def get_conversion_list(id_segment):
+def get_conversion_list():
     unit_conversion_repository.ensure_default_measure_units()
 
-    nh_default_units = (
-        db.session.query(MeasureUnit)
-        .filter(
-            MeasureUnit.measureunit_nh.in_(
-                [
-                    DefaultMeasureUnitEnum.MCG.value,
-                    DefaultMeasureUnitEnum.MG.value,
-                    DefaultMeasureUnitEnum.ML.value,
-                    DefaultMeasureUnitEnum.UI.value,
-                    DefaultMeasureUnitEnum.UN.value,
-                ]
-            )
-        )
-        .all()
-    )
+    nh_default_units = [
+        DefaultMeasureUnitEnum.MCG.value,
+        DefaultMeasureUnitEnum.MG.value,
+        DefaultMeasureUnitEnum.ML.value,
+        DefaultMeasureUnitEnum.UI.value,
+        DefaultMeasureUnitEnum.UN.value,
+    ]
 
     default_units = {}
     for du in nh_default_units:
-        default_units[du.measureunit_nh] = {
-            "idMeasureUnit": du.id,
-            "description": du.description,
+        default_units[du] = {
+            "idMeasureUnit": du,
+            "description": du,
+            "measureunit_nh": du,
         }
 
-    conversion_list = unit_conversion_repository.get_unit_conversion_list(
-        id_segment=id_segment
-    )
+    conversion_list = unit_conversion_repository.get_unit_conversion_list()
 
     result = []
     drug_defaultunit = set()
     for i in conversion_list:
         prediction = None
         probability = None
-        if i.default_measureunit == i.measureunit_nh:
-            drug_defaultunit.add(i.id)
 
-            if i.measureunit_nh:
-                prediction = 1
-                probability = 100
+        show_factors = True
+
+        if not i.uniform_measure_unit:
+            show_factors = False
+
+        effective_default = i.default_measureunit or DefaultMeasureUnitEnum.UN.value
+        is_default_unit = effective_default == i.measureunit_nh
+
+        if is_default_unit:
+            factor = 1
+            prediction = 100
+            probability = 100
+        elif show_factors:
+            factor = i.factor
+            prediction = None
+            probability = None
+        else:
+            factor = None
+            prediction = None
+            probability = None
+
+        if i.idMeasureUnit == effective_default:
+            drug_defaultunit.add(i.id)
 
         result.append(
             {
@@ -135,24 +146,26 @@ def get_conversion_list(id_segment):
                 "idDrug": i[1],
                 "name": escape_html(str(i[2])) if i[2] is not None else None,
                 "idMeasureUnit": i[3],
-                "factor": i[4],
-                "idSegment": escape_html(str(id_segment)),
+                "factor": factor,
                 "measureUnit": escape_html(str(i[5])) if i[5] is not None else None,
                 "sctid": escape_html(str(i.sctid)) if i.sctid is not None else None,
-                "substanceMeasureUnit": i.default_measureunit,
+                "substanceMeasureUnit": effective_default,
                 "drugMeasureUnitNh": i.measureunit_nh,
                 "prediction": prediction,
                 "probability": probability,
                 "prescribedQuantity": i.prescribed_quantity,
                 "substanceTags": i.tags,
+                "uniformMeasureUnit": i.uniform_measure_unit,
+                "substanceName": i.substance_name,
             }
         )
 
     for i in conversion_list:
-        if i.id not in drug_defaultunit and i.default_measureunit:
+        effective_default = i.default_measureunit or DefaultMeasureUnitEnum.UN.value
+        if i.id not in drug_defaultunit:
             drug_defaultunit.add(i.id)
 
-            d_unit = default_units.get(i.default_measureunit, None)
+            d_unit = default_units.get(effective_default, None)
 
             if d_unit:
                 result.append(
@@ -163,20 +176,23 @@ def get_conversion_list(id_segment):
                         if i.name is not None
                         else None,
                         "idMeasureUnit": d_unit.get("idMeasureUnit"),
-                        "factor": None,
-                        "idSegment": escape_html(str(id_segment)),
+                        "factor": 1,
                         "measureUnit": escape_html(str(d_unit.get("description")))
                         if d_unit.get("description") is not None
                         else None,
                         "sctid": escape_html(str(i.sctid))
                         if i.sctid is not None
                         else None,
-                        "substanceMeasureUnit": i.default_measureunit,
-                        "drugMeasureUnitNh": i.measureunit_nh,
+                        "substanceMeasureUnit": i.default_measureunit
+                        if i.default_measureunit
+                        else DefaultMeasureUnitEnum.UN.value,
+                        "drugMeasureUnitNh": d_unit.get("measureunit_nh", None),
                         "prediction": 1,
                         "probability": 100,
                         "prescribed_quantity": i.prescribed_quantity,
                         "substanceTags": i.tags,
+                        "uniformMeasureUnit": i.uniform_measure_unit,
+                        "substanceName": i.substance_name,
                     }
                 )
 
@@ -195,7 +211,6 @@ def save_conversions(
 ):
     if (
         id_drug == None
-        or id_segment == None
         or id_measure_unit_default == None
         or conversion_list == None
         or len(conversion_list) == 0
@@ -428,3 +443,106 @@ def copy_unit_conversion(id_segment_origin, id_segment_destiny, user_context: Us
         query,
         {"idSegmentOrigin": id_segment_origin, "idSegmentDestiny": id_segment_destiny},
     )
+
+
+@has_permission(Permission.ADMIN_UNIT_CONVERSION)
+def get_llm_conversion_suggestions(request_data: AdminUnitConversionLLMRequest):
+    """Ask Bedrock Haiku to suggest conversion factors for each unit in the list."""
+    row = substance_repository.get_by_id(request_data.sctid)
+    if not row:
+        raise ValidationError(
+            "Substância não encontrada",
+            "errors.notFound",
+            status.HTTP_404_NOT_FOUND,
+        )
+
+    substance, *_ = row
+    default_unit = substance.default_measureunit or "un"
+
+    substance_parts = [
+        f"Substance reference: {substance.name}",
+        f"Standard substance unit: {default_unit}",
+    ]
+
+    if substance.admin_text:
+        substance_parts.append(f"Clinical notes: {substance.admin_text}")
+    substance_ref = "\n".join(substance_parts)
+
+    units_json = json.dumps(
+        [
+            {"idMeasureUnit": item.idMeasureUnit, "description": item.description}
+            for item in request_data.conversionList
+        ],
+        ensure_ascii=False,
+    )
+
+    user_message = (
+        f"Drug: {request_data.drugName}\n"
+        f"Default unit (base): {default_unit}\n"
+        f"{substance_ref}\n"
+        f"\nFor each unit below, return the numeric conversion factor: "
+        f"how many [{default_unit}] equal 1 unit of the given measure. "
+        f"If you cannot determine a factor, use null.\n\n"
+        f"Units to convert:\n{units_json}\n\n"
+        f'Return format: [{{"idMeasureUnit": "ml", "factor": 1.0}}, ...]'
+    )
+
+    messages = [{"role": "user", "content": user_message}]
+    system = (
+        "You are a clinical pharmacist expert in pharmaceutical units of measure. "
+        "Your task is to determine conversion factors between medication units. "
+        "Respond ONLY with a valid JSON array — no explanation, no markdown."
+    )
+
+    return _prompt_haiku(messages=messages, system=system)
+
+
+def _parse_llm_json(raw: str) -> list:
+    """Strip markdown fences from raw LLM output and parse as JSON."""
+    raw = raw.strip()
+    if raw.startswith("```"):
+        raw = raw.split("```", 2)[1]
+        if raw.startswith("json"):
+            raw = raw[4:]
+        raw = raw.strip()
+    try:
+        return json.loads(raw)
+    except (json.JSONDecodeError, KeyError) as error:
+        logger.backend_logger.error("Resposta inválida do serviço de IA: %s", error)
+        raise ValidationError(
+            "Resposta inválida do serviço de IA",
+            "errors.invalidParams",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+
+def _prompt_haiku(messages: list, system: str) -> list:
+    """Invoke Bedrock Claude Haiku 4.5 and return the parsed JSON list response."""
+    session = boto3.session.Session()
+    client = session.client("bedrock-runtime", region_name="us-east-1")
+
+    body = json.dumps(
+        {
+            "max_tokens": 512,
+            "system": system,
+            "messages": messages,
+            "anthropic_version": "bedrock-2023-05-31",
+        }
+    )
+
+    try:
+        response = client.invoke_model(
+            body=body,
+            modelId="us.anthropic.claude-haiku-4-5-20251001-v1:0",
+            accept="application/json",
+            contentType="application/json",
+        )
+    except Exception:
+        raise ValidationError(
+            "Serviço de IA indisponível",
+            "errors.serviceUnavailable",
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
+    response_body = json.loads(response.get("body").read())
+    return _parse_llm_json(response_body["content"][0]["text"])
