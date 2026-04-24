@@ -136,6 +136,7 @@ class Role(Enum):
             Permission.WRITE_BASIC_FEATURES,
             Permission.READ_BASIC_FEATURES,
             Permission.READ_SUPPORT,
+            Permission.WRITE_PATIENT_TAGS,
         ],
     )
 
@@ -216,6 +217,7 @@ class Role(Enum):
             Permission.READ_NAV,
             Permission.WRITE_CUSTOM_FORMS,
             Permission.WRITE_NAME,
+            Permission.WRITE_PATIENT_TAGS,
         ],
     )
 

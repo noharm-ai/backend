@@ -158,7 +158,11 @@ def get_patient_weight(id_patient):
     )
 
 
-@has_permission(Permission.WRITE_PRESCRIPTION, Permission.ADMIN_PATIENT)
+@has_permission(
+    Permission.WRITE_PRESCRIPTION,
+    Permission.ADMIN_PATIENT,
+    Permission.WRITE_PATIENT_TAGS,
+)
 def save_patient(
     request_data: dict,
     admission_number: int,
@@ -234,6 +238,11 @@ def save_patient(
             p.gender = request_data.get("gender", None)
         if "birthdate" in request_data.keys():
             p.birthdate = request_data.get("birthdate", None)
+
+    if (
+        Permission.WRITE_PRESCRIPTION in user_permissions
+        or Permission.WRITE_PATIENT_TAGS in user_permissions
+    ):
         if "tags" in request_data.keys():
             tags = request_data.get("tags", None)
 
@@ -254,13 +263,19 @@ def save_patient(
     if "name" in request_data:
         if Permission.WRITE_NAME not in user_permissions:
             raise AuthorizationError()
-        name_data = request_data["name"]
-        name_service.update_patient_name(
-            id_patient=p.idPatient,
-            name=name_data.get("name"),
-            extra_data=name_data.get("data"),
-            user=user_context,
-        )
+
+        user = db.session.query(User).filter(User.id == user_context.id).first()
+
+        if user.schema == user_context.schema:
+            # should do it only in his own schema
+
+            name_data = request_data["name"]
+            name_service.update_patient_name(
+                id_patient=p.idPatient,
+                name=name_data.get("name"),
+                extra_data=name_data.get("data"),
+                user=user_context,
+            )
 
     p.update = datetime.today()
     p.user = user_context.id

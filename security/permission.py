@@ -121,3 +121,5 @@ class Permission(Enum):
     WRITE_NAME = "WRITE_NAME"  # permission to update patient name records
 
     ADMIN_APP_FEATURES = "ADMIN_APP_FEATURES"  # permission to manage app features
+
+    WRITE_PATIENT_TAGS = "WRITE_PATIENT_TAGS"  # permission to write patient tags
