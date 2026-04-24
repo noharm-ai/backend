@@ -208,7 +208,6 @@ def save_conversions(
 ):
     if (
         id_drug == None
-        or id_segment == None
         or id_measure_unit_default == None
         or conversion_list == None
         or len(conversion_list) == 0
