@@ -15,13 +15,16 @@ from models.main import (
     User,
     db,
 )
+from models.requests.admin.admin_unit_conversion_request import (
+    AdminUnitConversionLLMRequest,
+)
 from models.segment import Segment
-from repository import unit_conversion_repository
+from repository import substance_repository, unit_conversion_repository
 from services import drug_service as main_drug_service
 from services.admin import (
     admin_drug_service,
 )
-from utils import status
+from utils import logger, status
 
 
 @has_permission(Permission.ADMIN_UNIT_CONVERSION)
@@ -440,3 +443,106 @@ def copy_unit_conversion(id_segment_origin, id_segment_destiny, user_context: Us
         query,
         {"idSegmentOrigin": id_segment_origin, "idSegmentDestiny": id_segment_destiny},
     )
+
+
+@has_permission(Permission.ADMIN_UNIT_CONVERSION)
+def get_llm_conversion_suggestions(request_data: AdminUnitConversionLLMRequest):
+    """Ask Bedrock Haiku to suggest conversion factors for each unit in the list."""
+    row = substance_repository.get_by_id(request_data.sctid)
+    if not row:
+        raise ValidationError(
+            "Substância não encontrada",
+            "errors.notFound",
+            status.HTTP_404_NOT_FOUND,
+        )
+
+    substance, *_ = row
+    default_unit = substance.default_measureunit or "un"
+
+    substance_parts = [
+        f"Substance reference: {substance.name}",
+        f"Standard substance unit: {default_unit}",
+    ]
+
+    if substance.admin_text:
+        substance_parts.append(f"Clinical notes: {substance.admin_text}")
+    substance_ref = "\n".join(substance_parts)
+
+    units_json = json.dumps(
+        [
+            {"idMeasureUnit": item.idMeasureUnit, "description": item.description}
+            for item in request_data.conversionList
+        ],
+        ensure_ascii=False,
+    )
+
+    user_message = (
+        f"Drug: {request_data.drugName}\n"
+        f"Default unit (base): {default_unit}\n"
+        f"{substance_ref}\n"
+        f"\nFor each unit below, return the numeric conversion factor: "
+        f"how many [{default_unit}] equal 1 unit of the given measure. "
+        f"If you cannot determine a factor, use null.\n\n"
+        f"Units to convert:\n{units_json}\n\n"
+        f'Return format: [{{"idMeasureUnit": "ml", "factor": 1.0}}, ...]'
+    )
+
+    messages = [{"role": "user", "content": user_message}]
+    system = (
+        "You are a clinical pharmacist expert in pharmaceutical units of measure. "
+        "Your task is to determine conversion factors between medication units. "
+        "Respond ONLY with a valid JSON array — no explanation, no markdown."
+    )
+
+    return _prompt_haiku(messages=messages, system=system)
+
+
+def _parse_llm_json(raw: str) -> list:
+    """Strip markdown fences from raw LLM output and parse as JSON."""
+    raw = raw.strip()
+    if raw.startswith("```"):
+        raw = raw.split("```", 2)[1]
+        if raw.startswith("json"):
+            raw = raw[4:]
+        raw = raw.strip()
+    try:
+        return json.loads(raw)
+    except (json.JSONDecodeError, KeyError) as error:
+        logger.backend_logger.error("Resposta inválida do serviço de IA: %s", error)
+        raise ValidationError(
+            "Resposta inválida do serviço de IA",
+            "errors.invalidParams",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+
+def _prompt_haiku(messages: list, system: str) -> list:
+    """Invoke Bedrock Claude Haiku 4.5 and return the parsed JSON list response."""
+    session = boto3.session.Session()
+    client = session.client("bedrock-runtime", region_name="us-east-1")
+
+    body = json.dumps(
+        {
+            "max_tokens": 512,
+            "system": system,
+            "messages": messages,
+            "anthropic_version": "bedrock-2023-05-31",
+        }
+    )
+
+    try:
+        response = client.invoke_model(
+            body=body,
+            modelId="us.anthropic.claude-haiku-4-5-20251001-v1:0",
+            accept="application/json",
+            contentType="application/json",
+        )
+    except Exception:
+        raise ValidationError(
+            "Serviço de IA indisponível",
+            "errors.serviceUnavailable",
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
+    response_body = json.loads(response.get("body").read())
+    return _parse_llm_json(response_body["content"][0]["text"])
