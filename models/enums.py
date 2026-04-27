@@ -253,6 +253,7 @@ class TagTypeEnum(Enum):
     """Enum: tag types"""
 
     PATIENT = 1
+    PATIENT_NAVIGATION = 2  # exclusive for navigator role
 
 
 class ProtocolTypeEnum(Enum):

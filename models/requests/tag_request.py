@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 class TagListRequest(BaseModel):
     active: Optional[bool] = None
     tagType: Optional[str] = None
+    tagTypeList: Optional[list[int]] = None
 
 
 class TagUpsertRequest(BaseModel):

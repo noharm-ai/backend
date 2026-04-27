@@ -45,6 +45,7 @@ from services import (
     segment_service,
 )
 from utils import dateutils, prescriptionutils, status
+from utils.tagutils import filter_nav_tags
 from utils.alert_protocol import ProtocolExtraInfo
 from utils.drug_list import DrugList
 
@@ -823,7 +824,7 @@ def _format(
         "patient": {
             "lactating": patient.lactating,
             "pregnant": patient.pregnant,
-            "tags": patient.tags,
+            "tags": filter_nav_tags(patient.tags),
         },
         "alert": patient.alert,
         "alertExpire": dateutils.to_iso(patient.alertExpire),

@@ -47,6 +47,8 @@ def has_permission(*permissions: Permission):
                 else []
             )
 
+            g.user_permissions = user_permissions
+
             # inject extra params
             if "user_permissions" in inspect.signature(f).parameters:
                 kwargs["user_permissions"] = user_permissions

@@ -7,6 +7,7 @@ from models.requests.prioritization_request import PrioritizationRequest
 from repository import prioritization_repository
 from services import feature_service, prescription_service
 from utils import numberutils, prescriptionutils
+from utils.tagutils import filter_nav_tags
 
 
 @has_permission(Permission.READ_PRESCRIPTION)
@@ -127,7 +128,7 @@ def get_prioritization_list(request: PrioritizationRequest):
                         id_segment=p[0].idSegment,
                         pdate=p[0].date,
                     ),
-                    "patientTags": patient.tags,
+                    "patientTags": filter_nav_tags(patient.tags),
                     "city": patient.city,
                     "id_icd": patient.id_icd,
                 },

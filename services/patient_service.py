@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import List
 
+from flask import g
 from sqlalchemy import asc, desc, func
 from sqlalchemy.dialects.postgresql import INTERVAL
 from sqlalchemy.orm import undefer
@@ -158,7 +159,11 @@ def get_patient_weight(id_patient):
     )
 
 
-@has_permission(Permission.WRITE_PRESCRIPTION, Permission.ADMIN_PATIENT)
+@has_permission(
+    Permission.WRITE_PRESCRIPTION,
+    Permission.ADMIN_PATIENT,
+    Permission.WRITE_PATIENT_TAGS,
+)
 def save_patient(
     request_data: dict,
     admission_number: int,
@@ -234,6 +239,11 @@ def save_patient(
             p.gender = request_data.get("gender", None)
         if "birthdate" in request_data.keys():
             p.birthdate = request_data.get("birthdate", None)
+
+    if (
+        Permission.WRITE_PRESCRIPTION in user_permissions
+        or Permission.WRITE_PATIENT_TAGS in user_permissions
+    ):
         if "tags" in request_data.keys():
             tags = request_data.get("tags", None)
 
@@ -245,7 +255,16 @@ def save_patient(
                     status.HTTP_400_BAD_REQUEST,
                 )
 
-            p.tags = _get_tags(tags=tags, user_context=user_context)
+            new_tags = _get_tags(tags=tags, user_context=user_context)
+
+            if Permission.READ_NAV not in user_permissions:
+                existing_nav_tags = [
+                    t for t in (p.tags or []) if t.startswith("NAVEGACAO_")
+                ]
+                if existing_nav_tags:
+                    new_tags = (new_tags or []) + existing_nav_tags
+
+            p.tags = new_tags
 
     if Permission.ADMIN_PATIENT in user_permissions:
         if "dischargeDate" in request_data.keys():
@@ -254,13 +273,19 @@ def save_patient(
     if "name" in request_data:
         if Permission.WRITE_NAME not in user_permissions:
             raise AuthorizationError()
-        name_data = request_data["name"]
-        name_service.update_patient_name(
-            id_patient=p.idPatient,
-            name=name_data.get("name"),
-            extra_data=name_data.get("data"),
-            user=user_context,
-        )
+
+        user = db.session.query(User).filter(User.id == user_context.id).first()
+
+        if user.schema == user_context.schema:
+            # should do it only in his own schema
+
+            name_data = request_data["name"]
+            name_service.update_patient_name(
+                id_patient=p.idPatient,
+                name=name_data.get("name"),
+                extra_data=name_data.get("data"),
+                user=user_context,
+            )
 
     p.update = datetime.today()
     p.user = user_context.id
@@ -350,7 +375,12 @@ def _get_tags(tags: list[str], user_context: User):
 
     current_tags = (
         db.session.query(Tag)
-        .filter(Tag.name.in_(tags_uppercase), Tag.tag_type == TagTypeEnum.PATIENT.value)
+        .filter(Tag.name.in_(tags_uppercase))
+        .filter(
+            Tag.tag_type.in_(
+                [TagTypeEnum.PATIENT.value, TagTypeEnum.PATIENT_NAVIGATION.value]
+            )
+        )
         .all()
     )
 
@@ -368,9 +398,23 @@ def _get_tags(tags: list[str], user_context: User):
                     status.HTTP_400_BAD_REQUEST,
                 )
 
+            user_permissions = g.get("user_permissions", [])
+
+            is_navigation = Permission.READ_NAV in user_permissions
+            if is_navigation and not tag.startswith("NAVEGACAO_"):
+                raise ValidationError(
+                    "Marcador de navegação deve começar com o prefixo NAVEGACAO_",
+                    "errors.businessRules",
+                    status.HTTP_400_BAD_REQUEST,
+                )
+
             new_tag = Tag()
             new_tag.name = tag
-            new_tag.tag_type = TagTypeEnum.PATIENT.value
+            new_tag.tag_type = (
+                TagTypeEnum.PATIENT_NAVIGATION.value
+                if is_navigation
+                else TagTypeEnum.PATIENT.value
+            )
             new_tag.active = True
             new_tag.created_at = datetime.today()
             new_tag.created_by = user_context.id
