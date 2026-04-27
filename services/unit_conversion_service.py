@@ -6,12 +6,14 @@ import boto3
 
 from config import Config
 from decorators.has_permission_decorator import Permission, has_permission
+from exception.validation_error import ValidationError
 from models.appendix import MeasureUnit
 from models.enums import DefaultMeasureUnitEnum
 from models.main import User, db
 from models.requests.drug_request import DrugUnitConversionRequest
 from repository import unit_conversion_repository
 from services.admin import admin_unit_conversion_service
+from utils import status
 
 
 @has_permission(Permission.WRITE_DRUG_ATTRIBUTES)
@@ -27,6 +29,13 @@ def get_unit_conversion_for_drug(id_drug: int):
     conversion_list = unit_conversion_repository.get_unit_conversion_for_drug(
         id_drug=id_drug
     )
+
+    if len(conversion_list) == 0:
+        raise ValidationError(
+            "Nenhuma conversão disponível para o medicamento",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
 
     substanceMeasureUnit = (
         conversion_list[0].default_measureunit if len(conversion_list) > 0 else None
