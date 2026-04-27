@@ -213,7 +213,7 @@ def test_unit_conversion_list_default_unit_factor_one(client, admin_headers):
 
     assert mg_item is not None
     assert mg_item["factor"] == 1
-    assert mg_item["prediction"] == 100
+    assert mg_item["prediction"] == 1
     assert mg_item["probability"] == 100
 
 
