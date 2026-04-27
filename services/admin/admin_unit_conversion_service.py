@@ -31,10 +31,8 @@ from utils import logger, status
 def get_conversion_predictions(conversion_list: list) -> list:
     to_infer = []
     for index, conversion_item in enumerate(conversion_list):
-        destiny_unit = (
-            conversion_item.get("substanceMeasureUnit", DefaultMeasureUnitEnum.MG.value)
-            if conversion_item.get("substanceMeasureUnit", None)
-            else DefaultMeasureUnitEnum.MG.value
+        destiny_unit = conversion_item.get(
+            "substanceMeasureUnit", DefaultMeasureUnitEnum.UN.value
         )
 
         if conversion_item.get("prediction", None) is None:
@@ -126,7 +124,7 @@ def get_conversion_list():
 
         if is_default_unit:
             factor = 1
-            prediction = 100
+            prediction = 1
             probability = 100
         elif show_factors:
             factor = i.factor
