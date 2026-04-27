@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import List
 
+from flask import g
 from sqlalchemy import asc, desc, func
 from sqlalchemy.dialects.postgresql import INTERVAL
 from sqlalchemy.orm import undefer
@@ -254,7 +255,16 @@ def save_patient(
                     status.HTTP_400_BAD_REQUEST,
                 )
 
-            p.tags = _get_tags(tags=tags, user_context=user_context)
+            new_tags = _get_tags(tags=tags, user_context=user_context)
+
+            if Permission.READ_NAV not in user_permissions:
+                existing_nav_tags = [
+                    t for t in (p.tags or []) if t.startswith("NAVEGACAO_")
+                ]
+                if existing_nav_tags:
+                    new_tags = (new_tags or []) + existing_nav_tags
+
+            p.tags = new_tags
 
     if Permission.ADMIN_PATIENT in user_permissions:
         if "dischargeDate" in request_data.keys():
@@ -365,7 +375,12 @@ def _get_tags(tags: list[str], user_context: User):
 
     current_tags = (
         db.session.query(Tag)
-        .filter(Tag.name.in_(tags_uppercase), Tag.tag_type == TagTypeEnum.PATIENT.value)
+        .filter(Tag.name.in_(tags_uppercase))
+        .filter(
+            Tag.tag_type.in_(
+                [TagTypeEnum.PATIENT.value, TagTypeEnum.PATIENT_NAVIGATION.value]
+            )
+        )
         .all()
     )
 
@@ -383,9 +398,15 @@ def _get_tags(tags: list[str], user_context: User):
                     status.HTTP_400_BAD_REQUEST,
                 )
 
+            user_permissions = g.get("user_permissions", [])
+
             new_tag = Tag()
             new_tag.name = tag
-            new_tag.tag_type = TagTypeEnum.PATIENT.value
+            new_tag.tag_type = (
+                TagTypeEnum.PATIENT_NAVIGATION.value
+                if Permission.READ_NAV in user_permissions
+                else TagTypeEnum.PATIENT.value
+            )
             new_tag.active = True
             new_tag.created_at = datetime.today()
             new_tag.created_by = user_context.id
