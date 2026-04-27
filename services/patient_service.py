@@ -400,11 +400,19 @@ def _get_tags(tags: list[str], user_context: User):
 
             user_permissions = g.get("user_permissions", [])
 
+            is_navigation = Permission.READ_NAV in user_permissions
+            if is_navigation and not tag.startswith("NAVEGACAO_"):
+                raise ValidationError(
+                    "Marcador de navegação deve começar com o prefixo NAVEGACAO_",
+                    "errors.businessRules",
+                    status.HTTP_400_BAD_REQUEST,
+                )
+
             new_tag = Tag()
             new_tag.name = tag
             new_tag.tag_type = (
                 TagTypeEnum.PATIENT_NAVIGATION.value
-                if Permission.READ_NAV in user_permissions
+                if is_navigation
                 else TagTypeEnum.PATIENT.value
             )
             new_tag.active = True
