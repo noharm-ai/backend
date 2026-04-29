@@ -522,6 +522,48 @@ def _get_clinical_notes_stats(
     }
 
 
+def _build_exams_card(exams_json: list) -> list:
+    """Build the first 20 exam highlights.
+
+    For each exam that has a tp_exam_ref, substitute it with the most recent
+    exam sharing that reference — if the fallback has a more recent date than
+    the current slot (a None date is treated as older than any real date).
+    """
+    ref_fallback = {}
+    for item in exams_json:
+        exam = item["value"]
+        tp_ref = exam.get("tp_exam_ref")
+        if not tp_ref or exam.get("value") is None:
+            continue
+        existing = ref_fallback.get(tp_ref)
+        if existing is None:
+            ref_fallback[tp_ref] = item
+        else:
+            exam_date = exam.get("date")
+            existing_date = existing["value"].get("date")
+            # Keep the most recent; treat None date as older than any real date
+            if exam_date and (existing_date is None or exam_date > existing_date):
+                ref_fallback[tp_ref] = item
+
+    exams_card = []
+    for item in exams_json:
+        if len(exams_card) == 20:
+            break
+        exam = item["value"]
+        tp_ref = exam.get("tp_exam_ref")
+        if tp_ref:
+            fallback = ref_fallback.get(tp_ref)
+            if fallback:
+                exam_date = exam.get("date")
+                fallback_date = fallback["value"].get("date")
+                if fallback_date and (exam_date is None or fallback_date > exam_date):
+                    exams_card.append(fallback)
+                    continue
+        exams_card.append(item)
+
+    return exams_card
+
+
 @timed()
 def _get_exams(
     patient: Patient,
@@ -563,7 +605,7 @@ def _get_exams(
         },
     )
 
-    return {"exams": exams, "exams_card": examsJson[:20], "alerts": alertExams}
+    return {"exams": exams, "exams_card": _build_exams_card(examsJson), "alerts": alertExams}
 
 
 @timed()
