@@ -44,16 +44,12 @@ def getPrescriptionDrug(idPrescriptionDrug):
         .outerjoin(Prescription, Prescription.id == PrescriptionDrug.idPrescription)
         .outerjoin(
             MeasureUnit,
-            and_(
-                MeasureUnit.id == PrescriptionDrug.idMeasureUnit,
-                MeasureUnit.idHospital == Prescription.idHospital,
-            ),
+            and_(MeasureUnit.id == PrescriptionDrug.idMeasureUnit),
         )
         .outerjoin(
             Frequency,
             and_(
                 Frequency.id == PrescriptionDrug.idFrequency,
-                Frequency.idHospital == Prescription.idHospital,
             ),
         )
         .outerjoin(

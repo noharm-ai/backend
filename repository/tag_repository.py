@@ -18,4 +18,4 @@ def list_tags(request_data: TagListRequest) -> list[Tag]:
     if request_data.tagType:
         query = query.filter(Tag.tag_type == request_data.tagType)
 
-    return query.order_by(Tag.tag_type, Tag.name).all()
+    return query.order_by(Tag.name).all()
