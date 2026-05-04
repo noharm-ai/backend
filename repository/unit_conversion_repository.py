@@ -141,7 +141,7 @@ def get_unit_conversion_list():
                     and_(
                         drug_attrs_uniformity.c.distinct_units_count == 1,
                         drug_attrs_uniformity.c.measureunit_nh
-                        == Substance.default_measureunit,
+                        == func.coalesce(Substance.default_measureunit, "un"),
                     ),
                     True,
                 ),
