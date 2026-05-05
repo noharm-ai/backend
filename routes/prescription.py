@@ -110,6 +110,8 @@ def get_prescriptions():
         id_icd_group_list=request.args.getlist("idIcdGroupList[]") or None,
         city=request.args.get("city", None),
         medical_record=request.args.get("medical_record", None),
+        medical_record_list=to_int_list(request.args.getlist("medicalRecordList[]"))
+        or None,
         bed=request.args.get("bed", None),
         bed_list=request.args.getlist("bedList[]") or None,
         specialty_list=request.args.getlist("specialtyList[]") or None,
