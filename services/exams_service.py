@@ -18,7 +18,7 @@ from models.requests.exam_request import (
 )
 from models.segment import Exams
 from repository import exams_repository
-from services import cache_service
+from services import cache_service, patient_service
 from utils import dateutils, examutils, logger, numberutils, status, stringutils
 
 
@@ -198,6 +198,14 @@ def get_exams_by_admission(admission_number: int, id_segment: int, user_context:
             "errors.invalidRecord",
             status.HTTP_400_BAD_REQUEST,
         )
+
+    db.session.expunge(patient)
+
+    if patient.weight is None:
+        patient_previous_data = patient_service.get_patient_weight(patient.idPatient)
+        if patient_previous_data is not None:
+            patient.weight = patient_previous_data.weight
+            patient.height = patient_previous_data.height
 
     # get exams configuration to this segment
     segExam = exams_repository.get_exams_reference(id_segment=id_segment)
