@@ -323,6 +323,9 @@ def _build_base_query(request: PrioritizationRequest):
     if request.medical_record is not None:
         q = q.filter(Prescription.record == request.medical_record)
 
+    if request.medical_record_list and len(request.medical_record_list) > 0:
+        q = q.filter(Prescription.record.in_(request.medical_record_list))
+
     if request.bed_list and len(request.bed_list) > 0:
         bed_filters = []
         for b in request.bed_list:
