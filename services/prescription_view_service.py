@@ -588,6 +588,8 @@ def _get_exams(
         cache=is_cache_active,
         cache_hybrid=is_cache_hybrid_active,
         is_complete=is_complete,
+        weight=config_data["weight"],
+        height=config_data["height"],
     )
 
     examsJson = []

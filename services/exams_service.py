@@ -599,6 +599,8 @@ def find_latest_exams(
     cache=True,
     cache_hybrid=True,
     is_complete=True,
+    weight=None,
+    height=None,
 ):
     """
     Get the latest exams for a patient
@@ -621,6 +623,8 @@ def find_latest_exams(
     age = dateutils.data2age(
         patient.birthdate.isoformat() if patient.birthdate else date.today().isoformat()
     )
+    effective_weight = weight if weight is not None else patient.weight
+    effective_height = height if height is not None else patient.height
 
     exams = {}
     for e in segExam:
@@ -708,7 +712,7 @@ def find_latest_exams(
                     exams["cr"]["value"],
                     patient.birthdate,
                     patient.gender,
-                    patient.weight,
+                    effective_weight,
                 )
             if "ckd" in exams:
                 exams["ckd"] = examutils.ckd_calc(
@@ -716,8 +720,8 @@ def find_latest_exams(
                     patient.birthdate,
                     patient.gender,
                     patient.skinColor,
-                    patient.height,
-                    patient.weight,
+                    effective_height,
+                    effective_weight,
                 )
             if "ckd21" in exams:
                 exams["ckd21"] = examutils.ckd_calc_21(
@@ -726,7 +730,7 @@ def find_latest_exams(
         else:
             if "swrtz2" in exams:
                 exams["swrtz2"] = examutils.schwartz2_calc(
-                    exams["cr"]["value"], patient.height
+                    exams["cr"]["value"], effective_height
                 )
 
             if "swrtz1" in exams:
@@ -734,7 +738,7 @@ def find_latest_exams(
                     exams["cr"]["value"],
                     patient.birthdate,
                     patient.gender,
-                    patient.height,
+                    effective_height,
                 )
 
     # set custom exams config
