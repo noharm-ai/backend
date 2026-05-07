@@ -1,36 +1,59 @@
-from utils import status
 from datetime import datetime
 
-from models.main import db, User
+from decorators.has_permission_decorator import Permission, has_permission
+from exception.validation_error import ValidationError
 from models.appendix import Tag
+from models.enums import TagTypeEnum
+from models.main import User, db
 from models.requests.tag_request import TagListRequest, TagUpsertRequest
 from repository import tag_repository
-from decorators.has_permission_decorator import has_permission, Permission
-from exception.validation_error import ValidationError
-from utils import dateutils
+from utils import dateutils, status
 
 MAX_TAG_CHARS = 40
 
 
 @has_permission(Permission.READ_PRESCRIPTION)
-def get_tags(request_data: TagListRequest):
+def get_tags(request_data: TagListRequest, user_permissions: list[Permission]):
+    """List tags filtered by allowed tag types based on user permissions."""
+    tag_types = [TagTypeEnum.PATIENT.value]
+
+    if Permission.READ_NAV in user_permissions:
+        tag_types.append(TagTypeEnum.PATIENT_NAVIGATION.value)
+
+    request_data.tagTypeList = tag_types
+
     results = tag_repository.list_tags(request_data=request_data)
 
-    tags = []
-    for item in results:
-        tags.append(_to_dto(item))
-
-    return tags
+    return [_to_dto(item) for item in results]
 
 
-@has_permission(Permission.WRITE_TAGS)
-def upsert_tag(request_data: TagUpsertRequest, user_context: User):
+@has_permission(Permission.WRITE_TAGS, Permission.WRITE_PATIENT_TAGS)
+def upsert_tag(
+    request_data: TagUpsertRequest,
+    user_context: User,
+    user_permissions: list[Permission],
+):
     if not request_data.name or len(request_data.name) > MAX_TAG_CHARS:
         raise ValidationError(
             f"Limite de caracteres para a Tag foi atingido ({MAX_TAG_CHARS})",
             "errors.businessRules",
             status.HTTP_400_BAD_REQUEST,
         )
+
+    if Permission.WRITE_TAGS not in user_permissions:
+        if request_data.tagType != TagTypeEnum.PATIENT_NAVIGATION.value:
+            raise ValidationError(
+                "Permissão insuficiente para este tipo de marcador",
+                "errors.businessRules",
+                status.HTTP_403_FORBIDDEN,
+            )
+
+        if not request_data.name.upper().startswith("NAVEGACAO_"):
+            raise ValidationError(
+                "O nome do marcador deve iniciar com 'NAVEGACAO_'",
+                "errors.businessRules",
+                status.HTTP_400_BAD_REQUEST,
+            )
 
     tag = (
         db.session.query(Tag)
@@ -49,7 +72,7 @@ def upsert_tag(request_data: TagUpsertRequest, user_context: User):
         db.session.add(tag)
     elif request_data.new:
         raise ValidationError(
-            f"Já existe um marcador com este nome",
+            "Já existe um marcador com este nome",
             "errors.businessRules",
             status.HTTP_400_BAD_REQUEST,
         )
