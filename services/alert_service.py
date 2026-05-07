@@ -381,9 +381,9 @@ def _alert_max_dose(
             else:
                 alert["text"] = f"""
                     Dose diária prescrita ({stringutils.strFormatBR(doseWeight)} {str(drug_attributes.idMeasureUnit)}/Kg)
-                    maior que a dose de alerta
+                     maior que a dose de alerta
                     ({stringutils.strFormatBR(drug_attributes.maxDose)} {str(drug_attributes.idMeasureUnit)}/Kg)
-                    usualmente recomendada (considerada a dose diária independente da indicação).
+                     usualmente recomendada (considerada a dose diária independente da indicação).
                 """
 
             return alert
@@ -392,8 +392,8 @@ def _alert_max_dose(
         if drug_attributes.maxDose and drug_attributes.maxDose < pd_dose_conv:
             alert["text"] = f"""
                 Dose diária prescrita ({str(pd_dose_conv)} {str(drug_attributes.idMeasureUnit)})
-                maior que a dose de alerta ({str(drug_attributes.maxDose)} {str(drug_attributes.idMeasureUnit)})
-                usualmente recomendada (considerada a dose diária independente da indicação).
+                 maior que a dose de alerta ({str(drug_attributes.maxDose)} {str(drug_attributes.idMeasureUnit)})
+                 usualmente recomendada (considerada a dose diária independente da indicação).
             """
 
             return alert
