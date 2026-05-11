@@ -615,6 +615,7 @@ class DrugList:
     def getInfusionList(self):
         """Infusion info for total volume calculation. Keyed by solution group. Used in Solution Calculator"""
         result = {}
+        priority_set = {}  # True once a "000"-suffix id item has set vol/amount for this key
 
         for pd in self.drugList:
             if pd[0].solutionGroup or pd[0].cpoe_group:
@@ -630,6 +631,7 @@ class DrugList:
                         "unit": "ml",
                         "disableTotal": False,
                     }
+                    priority_set[key] = False
 
                 pd_dose = self.get_solution_dose(pd)
 
@@ -638,27 +640,39 @@ class DrugList:
                     result[key]["disableTotal"] = True
 
                 if not bool(pd[0].suspendedDate):
+                    # ids ending in "000" are the main component of the solution
+                    is_priority = str(pd[0].id).endswith("000")
+                    should_update = is_priority or not priority_set[key]
+
                     if pd[6] and pd[6].amount and pd[6].amountUnit:
-                        result[key]["vol"] = pd_dose
-                        result[key]["amount"] = pd[6].amount
-                        result[key]["unit"] = pd[6].amountUnit
+                        if should_update:
+                            result[key]["vol"] = pd_dose
+                            result[key]["amount"] = pd[6].amount
+                            result[key]["unit"] = pd[6].amountUnit
+                            if is_priority:
+                                priority_set[key] = True
 
                         if (
                             pd[2]
                             and pd[2].id.lower() != "ml"
                             and pd[2].id.lower() == pd[6].amountUnit.lower()
                         ):
-                            result[key]["vol"] = pd_dose = round(
-                                pd[0].dose / pd[6].amount, 5
-                            )
+                            recalc = round(pd[0].dose / pd[6].amount, 5)
+                            if should_update:
+                                result[key]["vol"] = recalc
+                            pd_dose = recalc  # always update for totalVol
 
                     if pd[6] and pd[6].amount and pd[6].amountUnit is None:
-                        result[key]["vol"] = pd_dose = pd[6].amount
+                        if should_update:
+                            result[key]["vol"] = pd[6].amount
+                            if is_priority:
+                                priority_set[key] = True
+                        pd_dose = pd[6].amount  # always update for totalVol
 
-                    if pd[0].solutionDose:
+                    if pd[0].solutionDose and should_update:
                         result[key]["speed"] = pd[0].solutionDose
 
-                    if pd[0].solutionUnit:
+                    if pd[0].solutionUnit and should_update:
                         result[key]["speedUnit"] = pd[0].solutionUnit
 
                     result[key]["totalVol"] += pd_dose if pd_dose else 0
