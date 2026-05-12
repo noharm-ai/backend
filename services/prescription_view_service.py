@@ -45,9 +45,9 @@ from services import (
     segment_service,
 )
 from utils import dateutils, prescriptionutils, status
-from utils.tagutils import filter_nav_tags
 from utils.alert_protocol import ProtocolExtraInfo
 from utils.drug_list import DrugList
+from utils.tagutils import filter_nav_tags
 
 
 @has_permission(Permission.READ_PRESCRIPTION)
@@ -607,7 +607,11 @@ def _get_exams(
         },
     )
 
-    return {"exams": exams, "exams_card": _build_exams_card(examsJson), "alerts": alertExams}
+    return {
+        "exams": exams,
+        "exams_card": _build_exams_card(examsJson),
+        "alerts": alertExams,
+    }
 
 
 @timed()
@@ -643,6 +647,7 @@ def _get_alerts(
     )
 
     protocol_extra_info = ProtocolExtraInfo()
+    protocol_extra_info.is_cpoe = config_data["is_cpoe"]
     if segment:
         protocol_extra_info.segment_type = segment.type
 
