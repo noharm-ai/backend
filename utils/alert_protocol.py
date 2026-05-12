@@ -9,6 +9,7 @@ from models.appendix import MeasureUnit
 from models.enums import DrugTypeEnum
 from models.main import DrugAttributes, Substance
 from models.prescription import Patient, Prescription, PrescriptionDrug
+from utils import prescriptionutils
 
 # Simpler regex that avoids ReDoS by using alternation without nested quantifiers
 # Matches any combination of: keywords (True, False, and, or, not) OR structural chars (whitespace, parens)
@@ -18,6 +19,7 @@ SAFE_LOGICAL_EXPR_REGEX = r"^(?:True|False|and|or|not|[()\s])+$"
 @dataclass
 class ProtocolExtraInfo:
     segment_type: Optional[int] = None
+    is_cpoe: bool = False
 
 
 class AlertProtocol:
@@ -364,6 +366,7 @@ class AlertProtocol:
                 substance: Substance = d[11]
                 measure_unit: MeasureUnit = d[2]
                 drug_attributes: DrugAttributes = d[6]
+                period_cpoe = d.period_cpoe
                 drug_attr_keys = self._get_drug_attribute_keys(drug_attributes)
 
                 exp_result = True
@@ -467,10 +470,18 @@ class AlertProtocol:
                     except ValueError:
                         return False
 
+                    _, item_period = prescriptionutils.get_prescription_item_period(
+                        is_cpoe=self.protocol_extra_info.is_cpoe
+                        if self.protocol_extra_info
+                        else False,
+                        item_period=prescription_drug.period,
+                        cpoe_period=period_cpoe,
+                    )
+
                     exp_result = exp_result and (
                         self._compare(
                             op=v_period_op,
-                            value1=prescription_drug.period,
+                            value1=item_period,
                             value2=v_period,
                         )
                     )
