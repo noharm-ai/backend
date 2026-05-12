@@ -1,7 +1,6 @@
 """Repository for unit conversion"""
 
 from sqlalchemy import and_, case, func
-from sqlalchemy.dialects.postgresql import insert
 
 from models.appendix import MeasureUnit, MeasureUnitConvert
 from models.enums import DefaultMeasureUnitEnum
@@ -25,21 +24,24 @@ _DEFAULT_MEASURE_UNIT_DESCRIPTIONS = {
 
 def ensure_default_measure_units():
     """Ensures that the 5 NH default measure units exist in unidademedida (idempotent upsert)."""
-    db.session.execute(
-        insert(MeasureUnit)
-        .values(
-            [
-                {
-                    "id": unit.value,
-                    "idHospital": 1,
-                    "description": _DEFAULT_MEASURE_UNIT_DESCRIPTIONS[unit],
-                    "measureunit_nh": unit.value,
-                }
-                for unit in DefaultMeasureUnitEnum
-            ]
-        )
-        .on_conflict_do_nothing()
-    )
+    existing = {
+        row.id: row
+        for row in db.session.query(MeasureUnit)
+        .filter(MeasureUnit.id.in_([u.value for u in DefaultMeasureUnitEnum]))
+        .all()
+    }
+
+    for unit in DefaultMeasureUnitEnum:
+        if unit.value not in existing:
+            new_unit = MeasureUnit()
+            new_unit.id = unit.value
+            new_unit.idHospital = 1
+            new_unit.description = _DEFAULT_MEASURE_UNIT_DESCRIPTIONS[unit]
+            new_unit.measureunit_nh = unit.value
+            db.session.add(new_unit)
+        elif existing[unit.value].measureunit_nh != unit.value:
+            existing[unit.value].measureunit_nh = unit.value
+
     db.session.flush()
 
 
