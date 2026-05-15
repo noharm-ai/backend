@@ -9,4 +9,4 @@ permissions:
 
 jobs:
   call-shared:
-    uses: noharm-ai/.github/.github/workflows/security-check.yml@main
+    uses: noharm-ai/.github/.github/workflows/default.yml@main
