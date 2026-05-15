@@ -128,7 +128,10 @@ def find_drugs_by_prescription(
             MeasureUnitSolution.id == MeasureUnitSolutionConvert.idMeasureUnit,
         )
         .filter(MeasureUnitSolution.measureunit_nh == "ml")
-        .filter(MeasureUnitSolutionConvert.idSegment == PrescriptionDrug.idSegment)
+        .filter(
+            MeasureUnitSolutionConvert.idSegment
+            == func.coalesce(PrescriptionDrug.idSegment, Prescription.idSegment)
+        )
         .filter(MeasureUnitSolutionConvert.idDrug == PrescriptionDrug.idDrug)
         .limit(1)
         .scalar_subquery()
@@ -173,7 +176,8 @@ def find_drugs_by_prescription(
         .outerjoin(
             MeasureUnitConvert,
             and_(
-                MeasureUnitConvert.idSegment == PrescriptionDrug.idSegment,
+                MeasureUnitConvert.idSegment
+                == func.coalesce(PrescriptionDrug.idSegment, Prescription.idSegment),
                 MeasureUnitConvert.idDrug == PrescriptionDrug.idDrug,
                 MeasureUnitConvert.idMeasureUnit == MeasureUnit.id,
             ),
@@ -189,7 +193,8 @@ def find_drugs_by_prescription(
             DrugAttributes,
             and_(
                 DrugAttributes.idDrug == PrescriptionDrug.idDrug,
-                DrugAttributes.idSegment == PrescriptionDrug.idSegment,
+                DrugAttributes.idSegment
+                == func.coalesce(PrescriptionDrug.idSegment, Prescription.idSegment),
             ),
         )
         .outerjoin(
