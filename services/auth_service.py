@@ -195,6 +195,7 @@ def _auth_user(
     mem_signature = (
         db_session.query(Memory)
         .filter(Memory.kind == f"config-signature_{user.id}")
+        .order_by(Memory.update.desc())
         .first()
     )
     signature = mem_signature.value if mem_signature else None
