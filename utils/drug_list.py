@@ -745,7 +745,11 @@ class DrugList:
                 continue
 
             if concilia_drug.get("idDrug") != "0":
-                concilia_drug["sctid_infer"] = concilia_drug["idSubstance"]
+                concilia_drug["sctid_infer"] = (
+                    str(concilia_drug["idSubstance"])
+                    if concilia_drug.get("idSubstance", None)
+                    else None
+                )
                 continue
 
             best_match = None
@@ -836,6 +840,9 @@ class DrugList:
                         "recommendation": pd[0].notes,
                         "sctid": str(pd.Substance.id) if pd.Substance else None,
                         "substance": pd.Substance.name if pd.Substance else None,
+                        "idSubstanceClass": pd.Substance.idclass
+                        if pd.Substance
+                        else None,
                     }
                 )
 
