@@ -1,0 +1,12 @@
+name: Shared CI
+
+on:
+  pull_request:
+    branches: [main, master, develop]
+
+permissions:
+  contents: read
+
+jobs:
+  call-shared:
+    uses: noharm-ai/.github/.github/workflows/default.yml@main
