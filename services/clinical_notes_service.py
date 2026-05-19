@@ -329,6 +329,21 @@ def get_user_last_clinical_notes(admission_number: int):
     return None
 
 
+@has_permission(Permission.READ_PRESCRIPTION)
+def get_user_last_clinical_notes_list(admission_number: int):
+    """Return the last 5 clinical notes for the given admission number."""
+    notes = (
+        db.session.query(Prescription.notes, Prescription.date)
+        .filter(Prescription.admissionNumber == admission_number)
+        .filter(Prescription.notes.isnot(None))
+        .order_by(desc(Prescription.date))
+        .limit(5)
+        .all()
+    )
+
+    return [{"text": n.notes, "date": n.date.isoformat()} for n in notes]
+
+
 def get_count(admission_number: int, admission_date: datetime) -> int:
     cutoff_date = (
         datetime.today() - timedelta(days=120)
