@@ -11,7 +11,7 @@ from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
 from models.appendix import GlobalMemory
 from models.enums import GlobalMemoryEnum
-from models.main import User, db
+from models.main import User, UserExtra, db
 from models.requests.knowledge_base_request import (
     KnowledgeBaseListRequest,
 )
@@ -452,20 +452,30 @@ def list_tickets_v2(user_context: User, user_permissions: list[Permission]):
             if f.get("id") not in my_tickets_ids:
                 following.append(f)
 
-        if (
-            Permission.ADMIN_SUPPORT in user_permissions
-            and partner[0]
-            and partner[0].get("parent_id", None)
-        ):
+        if Permission.ADMIN_SUPPORT in user_permissions:
+            organization_schemas = [db_user.schema]
+            extra = (
+                db.session.query(UserExtra)
+                .filter(UserExtra.idUser == db_user.id)
+                .first()
+            )
+            if extra:
+                extra_schemas = extra.config.get("schemas", [])
+
+                for schema in extra_schemas:
+                    schema_name = schema.get("name", None)
+                    if schema_name:
+                        organization_schemas.append(schema_name)
+
             organization = client(
                 model="helpdesk.ticket",
                 action="search_read",
                 payload=[
                     [
                         [
-                            "commercial_partner_id",
+                            "x_studio_schema_1",
                             "in",
-                            [partner[0].get("parent_id", [])[0]],
+                            organization_schemas,
                         ],
                     ]
                 ],
