@@ -452,40 +452,42 @@ def list_tickets_v2(user_context: User, user_permissions: list[Permission]):
             if f.get("id") not in my_tickets_ids:
                 following.append(f)
 
-        if Permission.ADMIN_SUPPORT in user_permissions:
-            organization_schemas = [db_user.schema]
-            extra = (
-                db.session.query(UserExtra)
-                .filter(UserExtra.idUser == db_user.id)
-                .first()
-            )
-            if extra:
-                extra_schemas = extra.config.get("schemas", [])
-
-                for schema in extra_schemas:
-                    schema_name = schema.get("name", None)
-                    if schema_name:
-                        organization_schemas.append(schema_name)
-
-            organization = client(
-                model="helpdesk.ticket",
-                action="search_read",
-                payload=[
-                    [
-                        [
-                            "x_studio_schema_1",
-                            "in",
-                            organization_schemas,
-                        ],
-                    ]
-                ],
-                options=options,
-            )
     else:
         my_tickets = client(
             model="helpdesk.ticket",
             action="search_read",
             payload=[[["partner_email", "=", db_user.email]]],
+            options=options,
+        )
+
+    if Permission.ADMIN_SUPPORT in user_permissions:
+        organization_schemas = [db_user.schema]
+        extra = (
+            db.session.query(UserExtra).filter(UserExtra.idUser == db_user.id).first()
+        )
+        if extra:
+            extra_schemas = extra.config.get("schemas", [])
+
+            for schema in extra_schemas:
+                schema_name = schema.get("name", None)
+                if schema_name:
+                    organization_schemas.append(schema_name)
+
+        ignored_tags = [46, 48, 58, 60]
+
+        organization = client(
+            model="helpdesk.ticket",
+            action="search_read",
+            payload=[
+                [
+                    [
+                        "x_studio_schema_1",
+                        "in",
+                        organization_schemas,
+                    ],
+                    ["tag_ids", "not in", ignored_tags],
+                ]
+            ],
             options=options,
         )
 
