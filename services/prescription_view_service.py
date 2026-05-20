@@ -733,37 +733,66 @@ def _get_drug_data(
 
     # concilia data
     concilia_list = []
+    concilia_relations = []
     if prescription.concilia and is_complete:
         p_drugs = drug_list.changeDrugName(p_drugs)
-        last_agg_prescription = _get_current_agg_prescription(
-            patient.idPatient, patient.admissionNumber
-        )
-        if last_agg_prescription is not None:
-            concilia_drugs = prescription_view_repository.find_drugs_by_prescription(
-                idPrescription=last_agg_prescription.id,
-                admissionNumber=patient.admissionNumber,
-                aggDate=last_agg_prescription.date,
-                idSegment=None,
-                is_cpoe=config_data["is_cpoe"],
-                ignore_segments=config_data.get("ignore_segments"),
-            )
-            concilia_list = drug_list.conciliaList(concilia_drugs, [])
 
-        if concilia_list:
-            if Config.FEATURE_CONCILIATION_ALGORITHM == "FUZZY":
-                p_drugs = drug_list.infer_substance_fuzzy(
-                    concilia_drugs=p_drugs,
-                    prescription_drugs=concilia_list,
-                    min_similarity_threshold=0.7,
+        if prescription.status == "s":
+            # load concilia list and relations from audit
+            audit_check = (
+                db.session.query(PrescriptionAudit)
+                .filter(
+                    PrescriptionAudit.idPrescription == prescription.id,
                 )
-            else:
-                p_drugs = drug_list.infer_substance_ml(pDrugs=p_drugs)
+                .filter(
+                    PrescriptionAudit.auditType == PrescriptionAuditTypeEnum.CHECK.value
+                )
+                .order_by(PrescriptionAudit.createdAt.desc())
+                .first()
+            )
+
+            if audit_check:
+                concilia_list = audit_check.extra.get("conciliaList", [])
+                if concilia_list is None:
+                    concilia_list = []
+
+                concilia_relations = audit_check.extra.get("conciliaRelations", [])
+                if concilia_relations is None:
+                    concilia_relations = []
+
+        if not concilia_list:
+            last_agg_prescription = _get_current_agg_prescription(
+                patient.idPatient, patient.admissionNumber
+            )
+            if last_agg_prescription is not None:
+                concilia_drugs = (
+                    prescription_view_repository.find_drugs_by_prescription(
+                        idPrescription=last_agg_prescription.id,
+                        admissionNumber=patient.admissionNumber,
+                        aggDate=last_agg_prescription.date,
+                        idSegment=None,
+                        is_cpoe=config_data["is_cpoe"],
+                        ignore_segments=config_data.get("ignore_segments"),
+                    )
+                )
+                concilia_list = drug_list.conciliaList(concilia_drugs, [])
+
+            if concilia_list:
+                if Config.FEATURE_CONCILIATION_ALGORITHM == "FUZZY":
+                    p_drugs = drug_list.infer_substance_fuzzy(
+                        concilia_drugs=p_drugs,
+                        prescription_drugs=concilia_list,
+                        min_similarity_threshold=0.7,
+                    )
+                else:
+                    p_drugs = drug_list.infer_substance_ml(pDrugs=p_drugs)
 
     return {
         "drug_list": drug_list,
         "headers": headers,
         "infusion": p_infusion,
         "concilia_list": concilia_list,
+        "concilia_relations": concilia_relations,
         "source": {
             DrugTypeEnum.DRUG.value: p_drugs,
             DrugTypeEnum.SOLUTION.value: p_solution,
@@ -899,6 +928,7 @@ def _format(
         "diet": drug_data["source"][DrugTypeEnum.DIET.value],
         "infusion": drug_data["infusion"],
         "conciliaList": drug_data["concilia_list"],
+        "conciliaRelations": drug_data["concilia_relations"],
         # interventions
         "interventions": interventions,
         "prevIntervention": _get_prev_intervention(

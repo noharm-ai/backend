@@ -159,8 +159,10 @@ def _auth_user(
     )
 
     claims = {"schema": user_schema, "config": user_config}
-    access_token = create_access_token(identity=user.id, additional_claims=claims)
-    refresh_token = create_refresh_token(identity=user.id, additional_claims=claims)
+    access_token = create_access_token(identity=str(user.id), additional_claims=claims)
+    refresh_token = create_refresh_token(
+        identity=str(user.id), additional_claims=claims
+    )
 
     db_session = Session(db)
     db_session.connection(
@@ -640,7 +642,9 @@ def refresh_token(current_user, current_claims):
             status.HTTP_401_UNAUTHORIZED,
         )
 
-    access_token = create_access_token(identity=current_user, additional_claims=claims)
+    access_token = create_access_token(
+        identity=str(current_user), additional_claims=claims
+    )
 
     return {"access_token": access_token}
 

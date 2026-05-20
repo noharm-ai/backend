@@ -47,3 +47,4 @@ class PrioritizationRequest(BaseModel):
     bed: Optional[str] = None  # deprecated
     bed_list: Optional[list[str]] = None
     specialty_list: Optional[list[str]] = None
+    responsible_physician_list: Optional[list[str]] = None

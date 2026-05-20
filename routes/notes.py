@@ -56,3 +56,12 @@ def get_user_last():
     return clinical_notes_service.get_user_last_clinical_notes(
         admission_number=request.args.get("admissionNumber", None)
     )
+
+
+@app_note.route("/notes/get-user-last-list", methods=["GET"])
+@api_endpoint()
+def get_user_last_list():
+    """List the last 5 clinical notes for the given admission number."""
+    return clinical_notes_service.get_user_last_clinical_notes_list(
+        admission_number=request.args.get("admissionNumber", None)
+    )

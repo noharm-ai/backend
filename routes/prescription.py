@@ -115,6 +115,8 @@ def get_prescriptions():
         bed=request.args.get("bed", None),
         bed_list=request.args.getlist("bedList[]") or None,
         specialty_list=request.args.getlist("specialtyList[]") or None,
+        responsible_physician_list=request.args.getlist("responsiblePhysicianList[]")
+        or None,
     )
 
     return prioritization_service.get_prioritization_list(prioritization_request)
@@ -154,6 +156,8 @@ def setPrescriptionStatus():
     evaluation_time = data.get("evaluationTime", None)
     alerts = data.get("alerts", [])
     fast_check = data.get("fastCheck", False)
+    concilia_list = data.get("conciliaList", None)
+    concilia_relations = data.get("conciliaRelations", None)
 
     return prescription_check_service.check_prescription(
         idPrescription=id_prescription,
@@ -161,6 +165,8 @@ def setPrescriptionStatus():
         evaluation_time=evaluation_time,
         alerts=alerts,
         fast_check=fast_check,
+        concilia_list=concilia_list,
+        concilia_relations=concilia_relations,
     )
 
 

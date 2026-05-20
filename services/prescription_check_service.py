@@ -41,6 +41,8 @@ def check_prescription(
     alerts,
     service_user=False,
     fast_check=False,
+    concilia_list=None,
+    concilia_relations=None,
 ):
     """
     Check or uncheck a prescription.
@@ -118,6 +120,8 @@ def check_prescription(
             "alerts": alerts,
             "serviceUser": service_user,
             "fastCheck": fast_check,
+            "conciliaList": concilia_list,
+            "conciliaRelations": concilia_relations,
         }
 
         results = []

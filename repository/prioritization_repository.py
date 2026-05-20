@@ -342,6 +342,16 @@ def _build_base_query(request: PrioritizationRequest):
         if specialty_filters:
             q = q.filter(or_(*specialty_filters))
 
+    if request.responsible_physician_list and len(request.responsible_physician_list) > 0:
+        physician_filters = []
+        for p in request.responsible_physician_list:
+            if p and p.strip():
+                physician_filters.append(
+                    Patient.responsiblePhysician.ilike(f"%{p.strip()}%")
+                )
+        if physician_filters:
+            q = q.filter(or_(*physician_filters))
+
     if request.endDate is None:
         endDate = request.startDate
     else:
