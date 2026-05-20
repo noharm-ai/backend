@@ -154,7 +154,7 @@ def get_reset_token(email: str, send_email=True, responsible: User = None):
         return
 
     expires = timedelta(hours=6)
-    reset_token = create_access_token(identity=user.id, expires_delta=expires)
+    reset_token = create_access_token(identity=str(user.id), expires_delta=expires)
 
     audit_count = (
         db.session.query(UserAudit)

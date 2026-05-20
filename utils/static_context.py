@@ -111,7 +111,7 @@ def static_user_context(schema: str):
         # Create JWT claims and access token
         claims = {"schema": schema, "config": user_context.config}
         access_token = create_access_token(
-            identity=user_context.id, additional_claims=claims
+            identity=str(user_context.id), additional_claims=claims
         )
 
         # Set up request context with authorization headers
