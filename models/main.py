@@ -43,7 +43,7 @@ class User(db.Model):
 
     def find(id):
         user = User()
-        user.id = id
+        user.id = int(id)
         claims = get_jwt()
         user.schema = claims["schema"]
         user.config = claims["config"]
