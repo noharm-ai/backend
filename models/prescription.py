@@ -68,6 +68,24 @@ class PrescriptionAudit(db.Model):
     createdBy = db.Column("created_by", db.BigInteger, nullable=False)
 
 
+class PrescriptionClinicalNote(db.Model):
+    __tablename__ = "prescricao_evolucao"
+
+    id = db.Column("idprescricao_evolucao", db.BigInteger, primary_key=True)
+    idPrescription = db.Column("fkprescricao", db.BigInteger, nullable=False)
+    idTipoEvolucao = db.Column("idtipoevolucao", db.String(50), nullable=True)
+    concilia = db.Column("concilia", db.String(1), nullable=True)
+    tpStatus = db.Column("tp_status", db.SmallInteger, nullable=False, default=0)
+    descErroIntegracao = db.Column(
+        "desc_erro_integracao", db.String(255), nullable=True
+    )
+    texto = db.Column("texto", db.String, nullable=True)
+    createdAt = db.Column("created_at", db.DateTime, nullable=False)
+    createdBy = db.Column("created_by", db.Integer, nullable=False)
+    updatedAt = db.Column("updated_at", db.DateTime, nullable=True)
+    updatedBy = db.Column("updated_by", db.Integer, nullable=True)
+
+
 class Patient(db.Model):
     __tablename__ = "pessoa"
 
