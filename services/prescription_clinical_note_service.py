@@ -5,10 +5,11 @@ from datetime import datetime
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
 from models.main import User, db
-from models.prescription import PrescriptionClinicalNote
+from models.prescription import Prescription, PrescriptionClinicalNote
 from models.requests.prescription_clinical_note_request import (
     PrescriptionClinicalNoteUpsertRequest,
 )
+from services import data_authorization_service
 from utils import status
 
 
@@ -43,10 +44,18 @@ def upsert(
             .filter(PrescriptionClinicalNote.id == request_data.id)
             .first()
         )
+
         if record is None:
             raise ValidationError(
                 "Registro inexistente",
                 "errors.invalidRecord",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+        if record.tpStatus != 0:
+            raise ValidationError(
+                "Esta evolução não pode ser alterada, pois já foi integrada.",
+                "errors.businessRules",
                 status.HTTP_400_BAD_REQUEST,
             )
     else:
@@ -54,6 +63,28 @@ def upsert(
         record.idPrescription = request_data.idPrescription
         record.createdAt = datetime.today()
         record.createdBy = user_context.id
+
+    p = (
+        db.session.query(Prescription)
+        .filter(Prescription.id == record.idPrescription)
+        .first()
+    )
+
+    if p is None:
+        raise ValidationError(
+            "Prescrição inexistente",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    if not data_authorization_service.has_segment_authorization(
+        id_segment=p.idSegment, user=user_context
+    ):
+        raise ValidationError(
+            "Usuário não autorizado neste segmento",
+            "errors.invalidRegister",
+            status.HTTP_401_UNAUTHORIZED,
+        )
 
     record.updatedAt = datetime.today()
     record.updatedBy = user_context.id
