@@ -17,7 +17,10 @@ def list_records(id_prescription: int):
     """List clinical note records for a prescription."""
     records = prescription_clinical_note_service.get_by_prescription(id_prescription)
 
-    return [prescription_clinical_note_service.to_dto(r) for r in records]
+    return [
+        prescription_clinical_note_service.to_dto(r, created_by_name)
+        for r, created_by_name in records
+    ]
 
 
 @app_pres_clinical_note.route("/prescription-clinical-note", methods=["POST"])

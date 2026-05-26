@@ -14,9 +14,13 @@ from utils import status
 
 @has_permission(Permission.READ_PRESCRIPTION)
 def get_by_prescription(id_prescription: int):
-    """Return all clinical note records for the given prescription, ordered by id."""
+    """Return (PrescriptionClinicalNote, creator_name) tuples for a prescription, ordered by id."""
+    creator = db.aliased(User)
     return (
-        db.session.query(PrescriptionClinicalNote)
+        db.session.query(
+            PrescriptionClinicalNote, creator.name.label("created_by_name")
+        )
+        .outerjoin(creator, PrescriptionClinicalNote.createdBy == creator.id)
         .filter(PrescriptionClinicalNote.idPrescription == id_prescription)
         .order_by(PrescriptionClinicalNote.id)
         .all()
@@ -53,11 +57,11 @@ def upsert(
 
     record.updatedAt = datetime.today()
     record.updatedBy = user_context.id
-    record.idTipoEvolucao = request_data.idTipoEvolucao
+    record.idClinicalNoteType = request_data.idClinicalNoteType
     record.concilia = request_data.concilia
     record.tpStatus = request_data.tpStatus
-    record.descErroIntegracao = request_data.descErroIntegracao
-    record.texto = request_data.texto
+    record.errorDescription = request_data.errorDescription
+    record.text = request_data.text
 
     db.session.add(record)
     db.session.flush()
@@ -65,18 +69,18 @@ def upsert(
     return record
 
 
-def to_dto(record: PrescriptionClinicalNote) -> dict:
+def to_dto(record: PrescriptionClinicalNote, created_by_name: str = None) -> dict:
     """Convert a PrescriptionClinicalNote model instance to a dict."""
     return {
         "id": record.id,
         "idPrescription": record.idPrescription,
-        "idTipoEvolucao": record.idTipoEvolucao,
+        "notesType": record.idClinicalNoteType,
         "concilia": record.concilia,
         "tpStatus": record.tpStatus,
-        "descErroIntegracao": record.descErroIntegracao,
-        "texto": record.texto,
+        "notes": record.text,
         "createdAt": record.createdAt.isoformat() if record.createdAt else None,
         "createdBy": record.createdBy,
+        "createdByName": created_by_name,
         "updatedAt": record.updatedAt.isoformat() if record.updatedAt else None,
         "updatedBy": record.updatedBy,
     }
