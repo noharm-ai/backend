@@ -37,6 +37,7 @@ from routes.outlier import app_out
 from routes.outlier_generate import app_gen
 from routes.patient import app_pat
 from routes.prescription import app_pres
+from routes.prescription_clinical_note import app_pres_clinical_note
 from routes.prescription_crud import app_pres_crud
 from routes.protocol import app_protocol
 from routes.queue import app_queue
@@ -97,6 +98,7 @@ def register_blueprints(app):
     app.register_blueprint(app_navigation)
     app.register_blueprint(app_user_admin)
     app.register_blueprint(app_pres_crud)
+    app.register_blueprint(app_pres_clinical_note)
 
     # Admin blueprints
     app.register_blueprint(app_admin_freq)
