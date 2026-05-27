@@ -638,7 +638,7 @@ def get_drug_dashboard(
     id_drug: int, id_segment: int, user_context: User = None, dose=None, frequency=None
 ):
     """Get drug data for dashboard"""
-    dose = float(dose) if numberutils.is_float(dose) else None
+    dose = round(float(dose), 2) if numberutils.is_float(dose) else None
     frequency = float(frequency) if numberutils.is_float(frequency) else None
 
     result = drugs_repository.get_single_drug(id_drug=id_drug, id_segment=id_segment)
