@@ -4,6 +4,7 @@ from sqlalchemy import asc, between, desc, func, text
 from sqlalchemy.dialects.postgresql import INTERVAL
 
 from decorators.has_permission_decorator import Permission, has_permission
+from decorators.timed_decorator import timed
 from exception.validation_error import ValidationError
 from models.appendix import GlobalMemory
 from models.enums import GlobalMemoryEnum
@@ -81,6 +82,7 @@ def _get_patient_data(patient: Patient):
     }
 
 
+@timed()
 def _get_summary_config(admission_number, mock):
     summary_config = (
         db.session.query(GlobalMemory)
@@ -134,6 +136,7 @@ def _get_summary_config(admission_number, mock):
     return result
 
 
+@timed()
 def _get_all_annotations(admission_number, field_suffix=""):
     first = (
         db.session.query(ClinicalNotes)
@@ -286,6 +289,7 @@ def _get_annotation(admission_number, field, add, interval, compare_date):
     }
 
 
+@timed()
 def _get_exams(id_patient, schema):
     query = text(
         f"""
@@ -339,6 +343,7 @@ def _get_exams(id_patient, schema):
     return exams_list
 
 
+@timed()
 def _get_allergies(id_patient, schema):
     query = text(
         f"""
@@ -370,6 +375,7 @@ def _get_allergies(id_patient, schema):
     return list
 
 
+@timed()
 def _get_all_drugs_used(admission_number, schema):
     query = text(
         f"""
@@ -481,6 +487,7 @@ def _get_all_drugs_suspended(admission_number, schema):
     return list
 
 
+@timed()
 def _get_receipt(admission_number, schema):
     last_agg = prescription_agg_service.get_last_agg_prescription(admission_number)
 
