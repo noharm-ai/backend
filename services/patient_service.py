@@ -269,6 +269,11 @@ def save_patient(
     if Permission.ADMIN_PATIENT in user_permissions:
         if "dischargeDate" in request_data.keys():
             p.dischargeDate = request_data.get("dischargeDate", None)
+    elif Permission.READ_NAV in user_permissions:
+        if "dischargeDate" in request_data.keys():
+            user = db.session.query(User).filter(User.id == user_context.id).first()
+            if user.schema == user_context.schema:
+                p.dischargeDate = request_data.get("dischargeDate", None)
 
     if "name" in request_data:
         if Permission.WRITE_NAME not in user_permissions:
