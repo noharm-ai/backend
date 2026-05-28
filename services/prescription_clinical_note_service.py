@@ -4,6 +4,7 @@ from datetime import datetime
 
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
+from models.enums import PrescriptionClinicalNoteStatusEnum
 from models.main import User, db
 from models.prescription import Prescription, PrescriptionClinicalNote
 from models.requests.prescription_clinical_note_request import (
@@ -52,7 +53,7 @@ def upsert(
                 status.HTTP_400_BAD_REQUEST,
             )
 
-        if record.tpStatus != 0:
+        if record.tpStatus == PrescriptionClinicalNoteStatusEnum.SENT.value:
             raise ValidationError(
                 "Esta evolução não pode ser alterada, pois já foi integrada.",
                 "errors.businessRules",
@@ -90,7 +91,7 @@ def upsert(
     record.updatedBy = user_context.id
     record.idClinicalNoteType = request_data.idClinicalNoteType
     record.concilia = request_data.concilia
-    record.tpStatus = request_data.tpStatus
+    record.tpStatus = PrescriptionClinicalNoteStatusEnum.PENDING.value
     record.errorDescription = request_data.errorDescription
     record.text = request_data.text
 

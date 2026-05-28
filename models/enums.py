@@ -373,3 +373,9 @@ class TpPepEnum(Enum):
     TASY_CPOE = "TASY_CPOE"
     VITAI = "VITAI"
     WARELINE = "WARELINE"
+
+
+class PrescriptionClinicalNoteStatusEnum(Enum):
+    PENDING = 0
+    SENT = 1
+    ERROR = 2
