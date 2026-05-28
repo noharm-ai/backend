@@ -682,19 +682,25 @@ def find_latest_exams(
             )
 
         if exam_type in segExam:
-            if (
-                segExam[exam_type].initials.lower().strip() == "creatinina"
-                and "cr" in exams
-                and exams["cr"]["value"] == None
-            ):
-                exams["cr"] = examutils.formatExam(
-                    value=exam_object.get("value", None),
-                    typeExam=exam_type,
-                    unit=exam_object.get("unit", None),
-                    date=exam_object.get("date", None),
-                    segExam=segExam,
-                    prevValue=exam_object.get("prev", None),
-                )
+            if segExam[exam_type].initials.lower().strip() == "creatinina" and "cr" in exams:
+                existing_date = exams["cr"].get("date")
+                new_date = exam_object.get("date")
+                if (
+                    exams["cr"]["value"] is None
+                    or (
+                        new_date is not None
+                        and existing_date is not None
+                        and new_date > existing_date
+                    )
+                ):
+                    exams["cr"] = examutils.formatExam(
+                        value=exam_object.get("value", None),
+                        typeExam=exam_type,
+                        unit=exam_object.get("unit", None),
+                        date=exam_object.get("date", None),
+                        segExam=segExam,
+                        prevValue=exam_object.get("prev", None),
+                    )
 
             extra_config = [
                 {"exam_key": "tgo", "extra_key": "tgo"},
