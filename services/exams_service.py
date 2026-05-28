@@ -308,7 +308,13 @@ def get_exams_by_admission(admission_number: int, id_segment: int, user_context:
                 perc[key]["total"] = float(e.value)
 
             if key in segExam and segExam[key].initials.lower() == "creatinina":
-                for keyCalc in ["mdrd", "ckd", "ckd21", "cg", "swrtz2", "swrtz1"]:
+                custom_exams_types = ["mdrd", "ckd", "ckd21", "cg", "swrtz2", "swrtz1"]
+
+                if any(k in bufferList for k in custom_exams_types):
+                    # do not overwrite previous calculation (keep the most recent creatinina exam)
+                    continue
+
+                for keyCalc in custom_exams_types:
                     if keyCalc in segExam and patient:
                         if keyCalc == "mdrd":
                             itemCalc = examutils.mdrd_calc(
