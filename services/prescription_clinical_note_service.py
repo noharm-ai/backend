@@ -115,4 +115,5 @@ def to_dto(record: PrescriptionClinicalNote, created_by_name: str = None) -> dic
         "createdByName": created_by_name,
         "updatedAt": record.updatedAt.isoformat() if record.updatedAt else None,
         "updatedBy": record.updatedBy,
+        "sentAt": record.sentAt.isoformat() if record.sentAt else None,
     }
