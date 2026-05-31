@@ -241,23 +241,37 @@ def load_cases_from_db(schema: str, n_samples: int, seed: int) -> list[TestCase]
     conn = psycopg2.connect(**_db_config())
     cur = conn.cursor()
 
+    # conversoes_padrao identifies drugs that have a Convention-A anchor: a unit where
+    # fator=1 AND unidademedida_nh matches the substance's standard unit (unidadepadrao).
+    # Schemas that store fator=1 for all containers (Convention B) never satisfy this
+    # condition, so their drugs are naturally excluded.
     query = f"""
+        WITH conversoes_padrao AS (
+            SELECT DISTINCT uc.fkmedicamento
+            FROM {schema}.unidadeconverte uc
+            INNER JOIN {schema}.unidademedida um ON uc.fkunidademedida = um.fkunidademedida
+            INNER JOIN {schema}.medicamento    m  ON uc.fkmedicamento  = m.fkmedicamento
+            INNER JOIN public.substancia       s  ON m.sctid           = s.sctid
+            WHERE uc.fator = 1
+              AND um.unidademedida_nh IS NOT NULL
+              AND s.unidadepadrao = um.unidademedida_nh
+        )
         SELECT DISTINCT ON (m.fkmedicamento, uc.fkunidademedida)
             m.fkmedicamento,
-            m.nome                                        AS drug_name,
+            m.nome              AS drug_name,
             s.sctid,
-            s.nome                                        AS substance_name,
-            COALESCE(s.unidadepadrao, 'unidade')          AS unidade_noharm,
+            s.nome              AS substance_name,
+            s.unidadepadrao     AS unidade_noharm,
             uc.fkunidademedida,
-            uc.fator                                      AS factor,
+            uc.fator            AS factor,
             s.curadoria
         FROM {schema}.unidadeconverte uc
-        JOIN {schema}.medicamento m ON m.fkmedicamento = uc.fkmedicamento
-        JOIN public.substancia s ON s.sctid = m.sctid
+        INNER JOIN conversoes_padrao   cp ON uc.fkmedicamento  = cp.fkmedicamento
+        INNER JOIN {schema}.medicamento m  ON uc.fkmedicamento  = m.fkmedicamento
+        INNER JOIN public.substancia    s  ON m.sctid           = s.sctid
         WHERE uc.fator IS NOT NULL
           AND uc.fator != 0
           AND m.nome IS NOT NULL
-          AND m.sctid IS NOT NULL
         ORDER BY m.fkmedicamento, uc.fkunidademedida, uc.idsegmento
     """
 

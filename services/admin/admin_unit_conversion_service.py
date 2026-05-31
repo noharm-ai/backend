@@ -460,6 +460,15 @@ Examples (diverse cases — study these, do not copy as output):
                  AMP is container; 1 AMP=2mL × 500mg/mL=1000mg → F(AMP)=1000.
    → [{"idMeasureUnit":"ml","factor":500},{"idMeasureUnit":"AMP","factor":1000}]
 
+2b. "X mg/Y mL" means total content, not per-mL concentration. UNIDADE is a container
+    (never factor=1 when base≠unidade):
+   Drug: "METOCLOPRAMIDA 10MG/2ML SOL INJ AMPOLA 2ML", base=mg
+   Units: [{"idMeasureUnit":"AMPOLA"}, {"idMeasureUnit":"UNIDADE"}, {"idMeasureUnit":"ml"}]
+   Step-by-step: "10MG/2ML" = 10mg TOTAL in 2mL (not 10mg/mL). Concentration = 10÷2 = 5mg/mL.
+                 AMPOLA and UNIDADE are both containers of 2mL; 2mL × 5mg/mL = 10mg → F=10.
+                 ml: 5mg/mL → F=5.
+   → [{"idMeasureUnit":"AMPOLA","factor":10},{"idMeasureUnit":"UNIDADE","factor":10},{"idMeasureUnit":"ml","factor":5}]
+
 3. Bisnaga with size in name, base=unidade — chain sub-units through container:
    Drug: "BETAMETASONA DIPROPIONATO 0,05% CREME BIS 30G", base=unidade
    Units: [{"idMeasureUnit":"BIS"}, {"idMeasureUnit":"g"}, {"idMeasureUnit":"mg"}]
@@ -512,14 +521,17 @@ def build_conversion_messages(
         f"\nCalculate factor F for each unit below, where:\n"
         f"  dose_in_{default_unit} = prescribed_quantity × F\n\n"
         f"Rules:\n"
-        f"1. Container units (TB, BIS, AMP, fr, frasco, unidade, CMP, cap):\n"
-        f"   If 1 container = 1 {default_unit}: F = 1.\n"
-        f"   Exception: if the drug name encodes the container size (e.g. '30g bisnaga'), "
-        f"   and {default_unit} is NOT 'unidade', apply the size.\n"
-        f"2. Sub-container units (g, mg, ml, mcg):\n"
-        f"   F = ({default_unit} per 1 of this unit).\n"
-        f"   Example: '30g bisnaga', base=unidade → F(g) = 1/30 ≈ 0.0333.\n"
-        f"   Example: '500mg/mL', base=mg → F(mL) = 500.\n"
+        f"1. Container units (UNIDADE, TB, BIS, AMP, FR, frasco, CMP, COMPRIMIDO, cap, CAPSULA):\n"
+        f"   • base='unidade': every container → F = 1.\n"
+        f"   • base≠'unidade' (mg, mcg, ml, UI, etc.): F = total {default_unit} inside 1 container.\n"
+        f"     Extract dose from name: 'BUSPIRONA 10MG' → UNIDADE/COMPRIMIDO: F=10.\n"
+        f"     UNIDADE is a container (tablet/vial) — never assign F=1 when base≠'unidade' "
+        f"unless the container genuinely holds exactly 1 {default_unit}.\n"
+        f"2. Sub-container units (g, mg, ml, mcg, mL) — F = {default_unit} per 1 of this unit:\n"
+        f"   'X mg/mL' in name → per-mL concentration → F(mL) = X.\n"
+        f"   'X mg/Y mL' where Y > 1 → total content X in Y mL → F(mL) = X÷Y.\n"
+        f"     e.g. '10MG/2ML': F(mL)=5, F(container 2mL)=10.\n"
+        f"   'Y g bisnaga/frasco', base=unidade → F(g) = 1/Y.\n"
         f"3. Drops (gotas, gts):\n"
         f"   F = concentration_per_mL ÷ drops_per_mL.\n"
         f"   Example: '40mg/mL, 1mL=40 drops' → F(gotas) = 1.\n"
