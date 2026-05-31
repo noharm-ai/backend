@@ -235,6 +235,9 @@ def _extract_atributos(html: str) -> str:
 
 
 def load_cases_from_db(schema: str, n_samples: int, seed: int) -> list[TestCase]:
+    if not re.match(r"^[a-zA-Z0-9_]+$", schema):
+        sys.exit(f"Schema inválido: '{schema}'. Use apenas letras, números e underscore.")
+
     conn = psycopg2.connect(**_db_config())
     cur = conn.cursor()
 
