@@ -271,6 +271,7 @@ def load_cases_from_db(schema: str, n_samples: int, seed: int) -> list[TestCase]
         INNER JOIN public.substancia    s  ON m.sctid           = s.sctid
         WHERE uc.fator IS NOT NULL
           AND uc.fator != 0
+          AND uc.fator != 1
           AND m.nome IS NOT NULL
         ORDER BY m.fkmedicamento, uc.fkunidademedida, uc.idsegmento
     """
