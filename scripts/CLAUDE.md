@@ -96,14 +96,14 @@ Adicionalmente, fatores `= 1` são excluídos da validação porque:
 
 | Schema | Acurácia | Errado | Null |
 |---|---|---|---|
-| dasa_chn | **87.0%** | 10.5% | 2.5% |
-| unimedbh | **85.5%** | 11.5% | 3.0% |
-| beneficienciaportuguesa | **84.0%** | 6.5% | 9.5% |
-| santacasasjc | **76.0%** | 16.5% | 7.5% |
-| clinicaspoa | **76.0%** | 8.0% | 16.0% |
-| azambuja | **75.5%** | 12.0% | 12.5% |
-| fghsaude | **74.5%** | 13.5% | 12.0% |
-| primavera | **69.5%** | 6.0% | 24.5% |
+| schema1 | **87.0%** | 10.5% | 2.5% |
+| schema2 | **85.5%** | 11.5% | 3.0% |
+| schema3 | **84.0%** | 6.5% | 9.5% |
+| schema4 | **76.0%** | 16.5% | 7.5% |
+| schema5 | **76.0%** | 8.0% | 16.0% |
+| schema6 | **75.5%** | 12.0% | 12.5% |
+| schema7 | **74.5%** | 13.5% | 12.0% |
+| schema8 | **69.5%** | 6.0% | 24.5% |
 | **Média** | **~78%** | | |
 
 Custo: ~$0.08/100 amostras com Haiku 4.5.
@@ -124,9 +124,9 @@ Os 90% anteriores eram inflados — ~50% dos casos corretos eram âncoras trivia
 |---|---|---|
 | v1 | Prompt original sem few-shot | 80% (com triviais) |
 | v2 | + few-shot + CoT (5 exemplos) | 90% (com triviais) |
-| v3 | + exemplo 2b (UNIDADE como container, Xmg/YmL total content) | +3% fghsaude, +5% unimedbh vs v2 em amostras equivalentes |
-| v4 | + regra X% + regra G dimensional | **Revertido** — regra G causou NULL em comprimidos simples (-7.5% azambuja) |
-| v5 | + só regra X% (sem G) | **Revertido** — X% em Rule 2 ainda causava NULL excessivo (-7.5% azambuja) |
+| v3 | + exemplo 2b (UNIDADE como container, Xmg/YmL total content) | +3% schema7, +5% schema2 vs v2 em amostras equivalentes |
+| v4 | + regra X% + regra G dimensional | **Revertido** — regra G causou NULL em comprimidos simples (-7.5% schema6) |
+| v5 | + só regra X% (sem G) | **Revertido** — X% em Rule 2 ainda causava NULL excessivo (-7.5% schema6) |
 
 **Lição**: adicionar regras explícitas ao prompt de forma incremental é arriscado — regras longas tornam o modelo mais cauteloso em geral e causam NULL em casos simples. Exemplos few-shot são mais seguros do que regras textuais.
 
@@ -165,4 +165,4 @@ WHERE sc.status = 1
   AND sc.schema_name NOT LIKE 'ebserh%'
 ORDER BY drugs_conv_a DESC;
 ```
-Schemas maiores testados: `fghsaude` (5k drogas), `beneficienciaportuguesa` (2.4k), `primavera` (1.4k).
+Schemas maiores testados tiveram entre 1.4k e 5k drogas em Convenção A.
