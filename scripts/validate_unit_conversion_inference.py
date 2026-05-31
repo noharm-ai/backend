@@ -181,6 +181,7 @@ def _db_config() -> dict:
         "dbname": os.environ["DB_NAME"],
         "user": os.environ["DB_USER"],
         "password": os.environ["DB_PASSWORD"],
+        "connect_timeout": 10,
     }
 
 TOLERANCE_PCT = 5.0
@@ -519,7 +520,7 @@ def print_report(
         drug_short = r.case.drug_name[:44] + ("…" if len(r.case.drug_name) > 44 else "")
         pair = f"{r.case.fkunidademedida}→{r.case.unidade_noharm}"
         flag = ""
-        if not r.passed and r.predicted is not None and not r.error:
+        if not r.passed and r.predicted is not None and not r.error and r.case.expected_factor != 0:
             delta = abs(r.predicted - r.case.expected_factor) / abs(r.case.expected_factor) * 100
             flag = f"  (desvio {delta:.1f}%)"
         print(col.format(r.status(), pred_str, exp_str, f"{drug_short}  [{pair}]{flag}"))
