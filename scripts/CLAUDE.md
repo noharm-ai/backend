@@ -92,29 +92,30 @@ Adicionalmente, fatores `= 1` são excluídos da validação porque:
 - O serviço já retorna `prediction=1` para unidades âncora automaticamente (nunca chama o LLM)
 - Incluí-los inflacionava a acurácia em até 71% (casos triviais)
 
-### Benchmark multi-schema: prompt v3, seed=42, 200 amostras, apenas conversões não-triviais
+### Benchmark multi-schema: prompt v6, seed=42, 200 amostras, apenas conversões não-triviais
 
 | Schema | Acurácia | Errado | Null |
 |---|---|---|---|
-| schema1 | **87.0%** | 10.5% | 2.5% |
-| schema2 | **85.5%** | 11.5% | 3.0% |
-| schema3 | **84.0%** | 6.5% | 9.5% |
-| schema4 | **76.0%** | 16.5% | 7.5% |
-| schema5 | **76.0%** | 8.0% | 16.0% |
-| schema6 | **75.5%** | 12.0% | 12.5% |
-| schema7 | **74.5%** | 13.5% | 12.0% |
-| schema8 | **69.5%** | 6.0% | 24.5% |
-| **Média** | **~78%** | | |
+| schema1 | **91.0%** | 6.0% | 3.0% |
+| schema2 | **90.5%** | 6.5% | 3.0% |
+| schema3 | **88.0%** | 9.0% | 3.0% |
+| schema4 | **87.0%** | 9.0% | 4.0% |
+| schema5 | **85.0%** | 9.0% | 6.0% |
+| schema6 | **79.0%** | 7.5% | 13.5% |
+| schema7 | **78.5%** | 8.5% | 13.0% |
+| schema8 | **77.0%** | 7.0% | 16.0% |
+| **Média** | **~84.5%** | | |
 
 Custo: ~$0.08/100 amostras com Haiku 4.5.
 
-Resultados anteriores (histórico comparativo):
+Resultados históricos (histórico comparativo com linha de base pós-filtro válida):
 
 | Setup | Acurácia | Observação |
 |---|---|---|
 | prompt original sem few-shot, 100 amostras | 80% | inflado por fator=1 triviais |
 | prompt few-shot + CoT v1, 500 amostras | 90% | inflado por fator=1 triviais |
-| prompt v3, fator≠1, 8 schemas, 200 amostras | **~78%** | benchmark real, sem triviais |
+| prompt v3, fator≠1, 4 schemas, 200 amostras | **~76.9%** | baseline pós-filtro real (beneficienciaportuguesa 83%, fghsaude 72.5%, primavera 67%, unimedbh 85%) |
+| prompt v6, fator≠1, 8 schemas, 200 amostras | **~84.5%** | +6.4% vs v3 nos 4 schemas com baseline válido |
 
 Os 90% anteriores eram inflados — ~50% dos casos corretos eram âncoras triviais (`fator=1`) que o serviço já resolve sem LLM.
 
@@ -127,8 +128,11 @@ Os 90% anteriores eram inflados — ~50% dos casos corretos eram âncoras trivia
 | v3 | + exemplo 2b (UNIDADE como container, Xmg/YmL total content) | +3% schema7, +5% schema2 vs v2 em amostras equivalentes |
 | v4 | + regra X% + regra G dimensional | **Revertido** — regra G causou NULL em comprimidos simples (-7.5% schema6) |
 | v5 | + só regra X% (sem G) | **Revertido** — X% em Rule 2 ainda causava NULL excessivo (-7.5% schema6) |
+| v6 | + exemplos 6 (BOLSA/FA/UNIDADE como container c/ volume explícito), 7 (prefixo NP/NAO PADRAO), 8 (AMPOLA YmL confirma total) + FA/BOLSA/AMPOLA na Rule 1 | **+6.4% médio** — validação cruzada em 4 schemas, sem regressões |
 
 **Lição**: adicionar regras explícitas ao prompt de forma incremental é arriscado — regras longas tornam o modelo mais cauteloso em geral e causam NULL em casos simples. Exemplos few-shot são mais seguros do que regras textuais.
+
+**Abordagem de validação cruzada**: para cada novo exemplo, rodar baseline v3 no mesmo pool filtrado (seed=42, 200 amostras) antes de comparar. Pools pré-filtro e pós-filtro geram amostras diferentes (diferença de até 25% nos schemas com muitas âncoras), invalidando a comparação direta.
 
 ### Padrões de falha conhecidos (não resolvidos)
 
@@ -139,6 +143,16 @@ Os 90% anteriores eram inflados — ~50% dos casos corretos eram âncoras trivia
 | `MG/ML` como nome de unidade | Dexmedetomidina [MG/ML→mcg]: pred=1 | Schema usa `MG/ML` como nome de unidade; modelo não reconhece |
 | Combo drugs | AMPICILINA+SULBACTAM 1G+500MG: pred=1500, exp=1000 | Modelo soma ambos os componentes |
 | PT-BR número | "10.000 UI" → pred=10 | Modelo lê `.000` como decimal, não milhar |
+| NP sem dose explícita | NP: AC VALPROICO 500 → pred=50 | Nome sem "MG" — modelo incerto sobre a unidade do número |
+
+### Padrões resolvidos em v6
+
+| Padrão | Solução |
+|---|---|
+| BOLSA/FA → NULL (volume explícito no nome) | Exemplo 6: LEVOFLOXACINO 5MG/ML BOLSA 100ML → FA/BOLSA=500 |
+| UNIDADE → NULL (container c/ concentração×volume) | Exemplo 6 + FA/BOLSA adicionados à Rule 1 |
+| NP:/NAO PADRAO → F=1 em comprimidos | Exemplo 7: NP: BUSPIRONA 10MG → UNIDADE=10 |
+| AMPOLA 5ML → F=1250 (trata como /mL) | Exemplo 8: 250MG/5ML AMPOLA 5ML → F=250 (total), não 1250 |
 
 ### Interpretando os resultados
 

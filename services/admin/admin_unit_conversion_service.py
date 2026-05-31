@@ -492,6 +492,31 @@ Examples (diverse cases — study these, do not copy as output):
    Step-by-step: FR is container; no size in name or notes → cannot determine g per FR → null.
                  g is base unit itself → F(g)=1.
    → [{"idMeasureUnit":"FR","factor":null},{"idMeasureUnit":"g","factor":1}]
+
+6. Concentration + explicit container volume → BOLSA/FA/UNIDADE = total content:
+   Drug: "LEVOFLOXACINO 5MG/ML SOLUCAO INJETAVEL BOLSA 100ML", base=mg
+   Units: [{"idMeasureUnit":"BOLSA"}, {"idMeasureUnit":"FA"}, {"idMeasureUnit":"UNIDADE"}, {"idMeasureUnit":"ml"}]
+   Step-by-step: Name gives concentration (5mg/mL) and container volume (100mL).
+                 BOLSA, FA, UNIDADE all refer to the same 100mL container: 5mg/mL × 100mL = 500mg → F=500.
+                 ml: 5mg/mL → F=5.
+   → [{"idMeasureUnit":"BOLSA","factor":500},{"idMeasureUnit":"FA","factor":500},{"idMeasureUnit":"UNIDADE","factor":500},{"idMeasureUnit":"ml","factor":5}]
+
+7. (NP) or (NAO PADRAO) prefix — dose is still encoded in the name:
+   Drug: "NP: BUSPIRONA 10MG", base=mg
+   Units: [{"idMeasureUnit":"UNIDADE"}, {"idMeasureUnit":"COMPRIMIDO"}]
+   Step-by-step: "(NP)" and "(NAO PADRAO)" mean ambulatorial/outside ward stock — ignore as a prefix.
+                 Drug is still BUSPIRONA 10MG: each tablet holds 10mg.
+                 UNIDADE and COMPRIMIDO are both tablet containers → F=10.
+   → [{"idMeasureUnit":"UNIDADE","factor":10},{"idMeasureUnit":"COMPRIMIDO","factor":10}]
+
+8. Unit name includes volume (e.g. "AMPOLA 5ML") — use it to confirm total content:
+   Drug: "ACIDO TRANEXAMICO 250MG/5ML SOLUCAO INJETAVEL AMPOLA", base=mg
+   Units: [{"idMeasureUnit":"AMPOLA 5ML"}, {"idMeasureUnit":"MILILITRO"}]
+   Step-by-step: "250MG/5ML" = 250mg TOTAL in 5mL (not 250mg per mL).
+                 AMPOLA 5ML — the "5ML" in the unit name matches the denominator, confirming total.
+                 AMPOLA 5ML: total = 250mg → F=250.
+                 MILILITRO: 250mg ÷ 5mL = 50mg/mL → F=50.
+   → [{"idMeasureUnit":"AMPOLA 5ML","factor":250},{"idMeasureUnit":"MILILITRO","factor":50}]
 """
 
 
@@ -521,7 +546,7 @@ def build_conversion_messages(
         f"\nCalculate factor F for each unit below, where:\n"
         f"  dose_in_{default_unit} = prescribed_quantity × F\n\n"
         f"Rules:\n"
-        f"1. Container units (UNIDADE, TB, BIS, AMP, FR, frasco, CMP, COMPRIMIDO, cap, CAPSULA):\n"
+        f"1. Container units (UNIDADE, TB, BIS, AMP, AMPOLA, FA, BOLSA, FR, frasco, CMP, COMPRIMIDO, cap, CAPSULA, and variants like 'AMPOLA 5ML' that embed a volume):\n"
         f"   • base='unidade': every container → F = 1.\n"
         f"   • base≠'unidade' (mg, mcg, ml, UI, etc.): F = total {default_unit} inside 1 container.\n"
         f"     Extract dose from name: 'BUSPIRONA 10MG' → UNIDADE/COMPRIMIDO: F=10.\n"
