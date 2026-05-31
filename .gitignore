@@ -114,3 +114,5 @@ examples/example.class
 results.csv.gz
 results.csv
 config.py
+scripts/*.json
+scripts/*.log

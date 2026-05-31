@@ -30,6 +30,10 @@ env/bin/python3 scripts/validate_unit_conversion_inference.py \
 
 # verbose: mostra resultado por unidade durante a execução
 env/bin/python3 scripts/validate_unit_conversion_inference.py --verbose
+
+# salva casos FALHOU e NULL em JSON para análise
+env/bin/python3 scripts/validate_unit_conversion_inference.py \
+    --schema meu_schema --samples 500 --save-failures scripts/failures.json
 ```
 
 ### Variáveis de ambiente
@@ -55,25 +59,32 @@ Credenciais AWS para Bedrock seguem a cadeia padrão do boto3 (`~/.aws/credentia
 
 Trocar o modelo: use `--model <alias>` na linha de comando. Aliases disponíveis: `haiku`, `sonnet`, `opus`, `qwen3next`, `deepseekv32`, `kimik25`, `minimax21`, `minimax25`, `gptoss120b`.
 
-Resultados com **prompt few-shot + CoT**, seed=42, 100 amostras, apenas drogas com substância vinculada:
+Resultados com **prompt few-shot + CoT**, seed=42, **500 amostras**, apenas drogas com substância vinculada:
+
+| Modelo | Acurácia | Errado | Null | Erro API | Input tok | Output tok | Custo/500 | Custo/100 |
+|---|---|---|---|---|---|---|---|---|
+| **Haiku 4.5** | **90.0%** | 5.2% | 4.8% | 0 | 356,542 | 11,328 | $0.413 | $0.083 |
+| GPT-OSS 120B | 82.8% | 3.2% | 6.0% | 8.0% | 286,336 | 96,769 | $0.101 | $0.020 |
+
+Resultados com **prompt few-shot + CoT**, seed=42, **100 amostras**, apenas drogas com substância vinculada:
 
 | Modelo | Acurácia | Errado | Null | Input tok | Output tok | Custo/100 |
 |---|---|---|---|---|---|---|
-| **Kimi K2.5** | **88%** | 3% | 9% | 61,578 | 1,204 | $0.0406 |
-| **GPT-OSS 120B** | **87%** | 1% | 5% | 59,864 | 19,866 | $0.0209 |
-| **Haiku 4.5** | **91%** | 4% | 5% | 73,023 | 2,239 | $0.0842 |
-| DeepSeek V3.2 | 82% | 8% | 10% | 60,766 | 1,712 | $0.0408 |
-| Qwen3 Next 80B | 75% | 19% | 6% | 64,853 | 1,225 | $0.0112 |
-| MiniMax M2.1 | 47% | 0% | 1% | 29,507 | 13,999 | $0.0257 |
-| MiniMax M2.5 | 45% | 0% | 1% | 27,954 | 15,825 | $0.0274 |
+| **Kimi K2.5** | **88%** | 3% | 9% | 61,578 | 1,204 | $0.041 |
+| **GPT-OSS 120B** | **87%** | 1% | 5% | 59,864 | 19,866 | $0.021 |
+| **Haiku 4.5** | **91%** | 4% | 5% | 73,023 | 2,239 | $0.083 |
+| DeepSeek V3.2 | 82% | 8% | 10% | 60,766 | 1,712 | $0.041 |
+| Qwen3 Next 80B | 75% | 19% | 6% | 64,853 | 1,225 | $0.011 |
+| MiniMax M2.1 | 47% | 0% | 1% | 29,507 | 13,999 | $0.026 |
+| MiniMax M2.5 | 45% | 0% | 1% | 27,954 | 15,825 | $0.027 |
 
 Resultados com **prompt original** (sem few-shot), seed=42, 100 amostras:
 
 | Modelo | Acurácia | Errado | Null | Input tok | Output tok | Custo/100 |
 |---|---|---|---|---|---|---|
-| Haiku 4.5 | 80% | 5% | 15% | 14,320 | 2,441 | $0.0265 |
+| Haiku 4.5 | 80% | 5% | 15% | 14,320 | 2,441 | $0.027 |
 
-Preços: perfil global sa-east-1 (São Paulo). MiniMax M2.1/M2.5 são reasoning models — output tokens muito maiores por causa do CoT interno.
+Preços: perfil global sa-east-1 (São Paulo). GPT-OSS 120B teve 8% de erros de API (resposta sem bloco de texto) em 500 amostras — não recomendado para produção. MiniMax M2.1/M2.5 são reasoning models — output tokens muito maiores por causa do CoT interno.
 
 ### Interpretando os resultados
 

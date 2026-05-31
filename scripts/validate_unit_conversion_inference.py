@@ -428,6 +428,34 @@ def evaluate_group(cases: list[TestCase], dry_run: bool, old_prompt: bool = Fals
 
 # ── relatório ─────────────────────────────────────────────────────────────────
 
+def save_failures(results: list[CaseResult], path: str, model_id: str) -> None:
+    """Save FALHOU and NULL cases to a JSON file for prompt improvement analysis."""
+    failures = [
+        {
+            "status": r.status(),
+            "drug_id": r.case.drug_id,
+            "drug_name": r.case.drug_name,
+            "substance_name": r.case.substance_name,
+            "unit": r.case.fkunidademedida,
+            "base_unit": r.case.unidade_noharm,
+            "expected_factor": r.case.expected_factor,
+            "predicted_factor": r.predicted,
+            "deviation_pct": (
+                round(abs(r.predicted - r.case.expected_factor) / abs(r.case.expected_factor) * 100, 1)
+                if r.predicted is not None and r.case.expected_factor != 0
+                else None
+            ),
+            "substance_ref": r.case.substance_ref,
+        }
+        for r in results
+        if not r.passed and not r.error
+    ]
+    output = {"model": model_id, "total_failures": len(failures), "failures": failures}
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(output, f, ensure_ascii=False, indent=2)
+    print(f"\nFalhas salvas em: {path}  ({len(failures)} casos)")
+
+
 def print_report(
     results: list[CaseResult],
     schema: str,
@@ -492,6 +520,7 @@ def main() -> int:
     parser.add_argument("--old-prompt", action="store_true", help="Usa o prompt original (sem few-shot/CoT) para comparação")
     parser.add_argument("--model", default=None, help=f"Model ID ou alias ({', '.join(MODEL_ALIASES)})")
     parser.add_argument("--verbose", "-v", action="store_true")
+    parser.add_argument("--save-failures", metavar="FILE", default=None, help="Salva casos FALHOU e NULL em JSON para análise")
     args = parser.parse_args()
 
     global MODEL_ID
@@ -532,6 +561,8 @@ def main() -> int:
 
     if not args.dry_run:
         print_report(all_results, args.schema, args.seed, total_input_tokens, total_output_tokens, price_input, price_output, price_source)
+        if args.save_failures:
+            save_failures(all_results, args.save_failures, MODEL_ID)
 
     n_ok = sum(1 for r in all_results if r.passed)
     return 0 if n_ok == len(all_results) else 1
