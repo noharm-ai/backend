@@ -443,6 +443,107 @@ def copy_unit_conversion(id_segment_origin, id_segment_destiny, user_context: Us
     )
 
 
+_LLM_FEW_SHOT_EXAMPLES = """
+Examples (diverse cases — study these, do not copy as output):
+
+1. Container = 1 base unit (base="unidade"):
+   Drug: "ATRACURIO BESILATO 10MG/ML SOL INJ AMP 5ML", base=unidade
+   Units: [{"idMeasureUnit":"AMP"}, {"idMeasureUnit":"ml"}]
+   Step-by-step: AMP is a container; 1 AMP = 1 unidade → F=1.
+                 ml is sub-container; 1 AMP = 5mL → 1mL = 1/5 unidade → F=0.2.
+   → [{"idMeasureUnit":"AMP","factor":1},{"idMeasureUnit":"ml","factor":0.2}]
+
+2. Concentration encoded as mg/mL, multiple containers:
+   Drug: "DIPIRONA SODICA 500MG/ML SOL INJ AMP 2ML", base=mg
+   Units: [{"idMeasureUnit":"ml"}, {"idMeasureUnit":"AMP"}]
+   Step-by-step: ml is sub-container; 500mg/mL → F(ml)=500.
+                 AMP is container; 1 AMP=2mL × 500mg/mL=1000mg → F(AMP)=1000.
+   → [{"idMeasureUnit":"ml","factor":500},{"idMeasureUnit":"AMP","factor":1000}]
+
+3. Bisnaga with size in name, base=unidade — chain sub-units through container:
+   Drug: "BETAMETASONA DIPROPIONATO 0,05% CREME BIS 30G", base=unidade
+   Units: [{"idMeasureUnit":"BIS"}, {"idMeasureUnit":"g"}, {"idMeasureUnit":"mg"}]
+   Step-by-step: BIS = container = 1 unidade → F(BIS)=1.
+                 g: 1 BIS=30g=1 unidade → 1g=1/30 unidade → F(g)=0.0333.
+                 mg: 30g=30000mg=1 unidade → 1mg=1/30000 unidade → F(mg)=0.0000333.
+   → [{"idMeasureUnit":"BIS","factor":1},{"idMeasureUnit":"g","factor":0.0333},{"idMeasureUnit":"mg","factor":0.0000333}]
+
+4. Drops when mL/drop ratio is known from name or notes:
+   Drug: "DIPIRONA SODICA 500MG/ML SOL ORAL GOT FR 20ML", base=mg
+   Clinical notes: "1 mL = 20 gotas"
+   Units: [{"idMeasureUnit":"ml"}, {"idMeasureUnit":"gotas"}, {"idMeasureUnit":"FR"}]
+   Step-by-step: ml: 500mg/mL → F(ml)=500.
+                 gotas: 500mg/mL ÷ 20 gotas/mL = 25mg/gota → F(gotas)=25.
+                 FR: container 20mL × 500mg/mL = 10000mg → F(FR)=10000.
+   → [{"idMeasureUnit":"ml","factor":500},{"idMeasureUnit":"gotas","factor":25},{"idMeasureUnit":"FR","factor":10000}]
+
+5. Null when size/concentration is absent:
+   Drug: "CREME BASE FR", base=g
+   Units: [{"idMeasureUnit":"FR"}, {"idMeasureUnit":"g"}]
+   Step-by-step: FR is container; no size in name or notes → cannot determine g per FR → null.
+                 g is base unit itself → F(g)=1.
+   → [{"idMeasureUnit":"FR","factor":null},{"idMeasureUnit":"g","factor":1}]
+"""
+
+
+def build_conversion_messages(
+    drug_name: str,
+    substance_name: str,
+    default_unit: str,
+    units: list[dict],
+    clinical_notes: str = "",
+) -> tuple[list, str]:
+    """Build the (messages, system) tuple for the unit conversion LLM prompt.
+
+    Exported so the validation script can reuse the same prompt without duplication.
+    units: list of {"idMeasureUnit": str, "description": str}
+    clinical_notes: pre-formatted string, e.g. "Clinical notes: ..." (or empty string)
+    """
+    units_json = json.dumps(units, ensure_ascii=False)
+    notes_block = f"{clinical_notes}\n" if clinical_notes else ""
+
+    user_message = (
+        f"{_LLM_FEW_SHOT_EXAMPLES}\n"
+        f"--- NOW SOLVE ---\n\n"
+        f"Drug name: {drug_name}\n"
+        f"Substance: {substance_name}\n"
+        f"Base unit (unidade padrão): {default_unit}\n"
+        f"{notes_block}"
+        f"\nCalculate factor F for each unit below, where:\n"
+        f"  dose_in_{default_unit} = prescribed_quantity × F\n\n"
+        f"Rules:\n"
+        f"1. Container units (TB, BIS, AMP, fr, frasco, unidade, CMP, cap):\n"
+        f"   If 1 container = 1 {default_unit}: F = 1.\n"
+        f"   Exception: if the drug name encodes the container size (e.g. '30g bisnaga'), "
+        f"   and {default_unit} is NOT 'unidade', apply the size.\n"
+        f"2. Sub-container units (g, mg, ml, mcg):\n"
+        f"   F = ({default_unit} per 1 of this unit).\n"
+        f"   Example: '30g bisnaga', base=unidade → F(g) = 1/30 ≈ 0.0333.\n"
+        f"   Example: '500mg/mL', base=mg → F(mL) = 500.\n"
+        f"3. Drops (gotas, gts):\n"
+        f"   F = concentration_per_mL ÷ drops_per_mL.\n"
+        f"   Example: '40mg/mL, 1mL=40 drops' → F(gotas) = 1.\n"
+        f"   If clinical notes explicitly state the drop equivalence, use that value.\n"
+        f"4. Return EVERY unit listed — never omit any.\n"
+        f"5. Use null only when neither drug name nor clinical notes provide enough info.\n"
+        f"   This includes unrecognized abbreviations (e.g. SGA, BSA) that are not standard "
+        f"   units — do not guess for unknown abbreviations.\n\n"
+        f"Units to convert:\n{units_json}\n\n"
+        f'Return a JSON array with one object per input unit: [{{"idMeasureUnit": "ml", "factor": 1.0}}, ...]'
+    )
+
+    system = (
+        "You are a clinical pharmacist expert in pharmaceutical units of measure. "
+        "Your task is to calculate precise numeric conversion factors between medication units. "
+        "For each unit, mentally verify: (1) is it a container or sub-container unit? "
+        "(2) what size or concentration is encoded in the drug name? "
+        "(3) which rule applies? Then output the result. "
+        "Respond ONLY with a valid JSON array — no explanation, no markdown, no code fences."
+    )
+
+    return [{"role": "user", "content": user_message}], system
+
+
 @has_permission(Permission.ADMIN_UNIT_CONVERSION)
 def get_llm_conversion_suggestions(request_data: AdminUnitConversionLLMRequest):
     """Ask Bedrock Haiku to suggest conversion factors for each unit in the list."""
@@ -456,40 +557,19 @@ def get_llm_conversion_suggestions(request_data: AdminUnitConversionLLMRequest):
 
     substance, *_ = row
     default_unit = substance.default_measureunit or "un"
+    clinical_notes = f"Clinical notes: {substance.admin_text}" if substance.admin_text else ""
 
-    substance_parts = [
-        f"Substance reference: {substance.name}",
-        f"Standard substance unit: {default_unit}",
+    units = [
+        {"idMeasureUnit": item.idMeasureUnit, "description": item.description}
+        for item in request_data.conversionList
     ]
 
-    if substance.admin_text:
-        substance_parts.append(f"Clinical notes: {substance.admin_text}")
-    substance_ref = "\n".join(substance_parts)
-
-    units_json = json.dumps(
-        [
-            {"idMeasureUnit": item.idMeasureUnit, "description": item.description}
-            for item in request_data.conversionList
-        ],
-        ensure_ascii=False,
-    )
-
-    user_message = (
-        f"Drug: {request_data.drugName}\n"
-        f"Default unit (base): {default_unit}\n"
-        f"{substance_ref}\n"
-        f"\nFor each unit below, return the numeric conversion factor: "
-        f"how many [{default_unit}] equal 1 unit of the given measure. "
-        f"If you cannot determine a factor, use null.\n\n"
-        f"Units to convert:\n{units_json}\n\n"
-        f'Return format: [{{"idMeasureUnit": "ml", "factor": 1.0}}, ...]'
-    )
-
-    messages = [{"role": "user", "content": user_message}]
-    system = (
-        "You are a clinical pharmacist expert in pharmaceutical units of measure. "
-        "Your task is to determine conversion factors between medication units. "
-        "Respond ONLY with a valid JSON array — no explanation, no markdown."
+    messages, system = build_conversion_messages(
+        drug_name=request_data.drugName,
+        substance_name=substance.name,
+        default_unit=default_unit,
+        units=units,
+        clinical_notes=clinical_notes,
     )
 
     return _prompt_haiku(messages=messages, system=system)
@@ -521,7 +601,7 @@ def _prompt_haiku(messages: list, system: str) -> list:
 
     body = json.dumps(
         {
-            "max_tokens": 512,
+            "max_tokens": 1024,
             "system": system,
             "messages": messages,
             "anthropic_version": "bedrock-2023-05-31",
