@@ -166,6 +166,7 @@ def get_unit_conversion_list():
             drug_attrs_uniformity,
             drug_attrs_uniformity.c.idDrug == Drug.id,
         )
+        .filter(active_drugs.c.prescribed_quantity > 5)
     )
 
     return conversion_query.order_by(Drug.name, min_convert.c.factor).all()
