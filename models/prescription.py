@@ -82,6 +82,7 @@ class PrescriptionClinicalNote(db.Model):
     createdBy = db.Column("created_by", db.Integer, nullable=False)
     updatedAt = db.Column("updated_at", db.DateTime, nullable=True)
     updatedBy = db.Column("updated_by", db.Integer, nullable=True)
+    sentAt = db.Column("sent_at", db.DateTime, nullable=True)
 
 
 class Patient(db.Model):
