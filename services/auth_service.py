@@ -27,13 +27,27 @@ from models.enums import (
     NoHarmENV,
     UserAuditTypeEnum,
 )
-from models.main import Notify, User, UserExtra, db, dbSession
+from models.main import User, UserExtra, db, dbSession
 from models.segment import Segment
-from repository import user_repository
+from repository import notification_repository, user_repository
 from security.role import Role
 from services import memory_service, user_service
 from services.admin import admin_integration_status_service
 from utils import logger, status
+
+_MANAGER_ROLES = {
+    Role.USER_MANAGER.value,
+    Role.CONFIG_MANAGER.value,
+    Role.SUPPORT_MANAGER.value,
+}
+
+
+def _notification_visible(notification: dict, roles: list) -> bool:
+    """Check whether a notification is visible to a user based on target_group."""
+    target = (notification.get("target_group") or "ALL").upper()
+    if target == "MANAGERS":
+        return bool(set(roles) & _MANAGER_ROLES)
+    return True
 
 
 def _login(email: str, password: str) -> User:
@@ -169,20 +183,28 @@ def _auth_user(
         execution_options={"schema_translate_map": {None: user_schema}}
     )
 
-    notification = Notify.getNotification(schema=user_schema)
-
-    if notification is not None:
-        notificationMemory = (
-            db_session.query(Memory)
-            .filter(
-                Memory.kind
-                == "info-alert-" + str(notification["id"]) + "-" + str(user.id)
+    active_notifications = notification_repository.get_active_notifications(
+        schema=user_schema
+    )
+    dismissed_kinds = {
+        m.kind
+        for m in db_session.query(Memory.kind)
+        .filter(
+            Memory.kind.in_(
+                [
+                    "info-alert-" + str(n["id"]) + "-" + str(user.id)
+                    for n in active_notifications
+                ]
             )
-            .first()
         )
-
-        if notificationMemory is not None:
-            notification = None
+        .all()
+    }
+    notification = [
+        n
+        for n in active_notifications
+        if "info-alert-" + str(n["id"]) + "-" + str(user.id) not in dismissed_kinds
+        and _notification_visible(n, roles)
+    ]
 
     features = db_session.query(Memory).filter(Memory.kind == "features").first()
     preferences = (
@@ -283,7 +305,8 @@ def _auth_user(
         "proxy": (
             nameUrl["proxy"] if "proxy" in nameUrl else False
         ),  # deprecated (use getnameType)
-        "notify": notification,
+        "notify": None,  # deprecated
+        "notifications": notification if len(notification) > 0 else None,
         "access_token": access_token,
         "refresh_token": refresh_token,
         "apiKey": Config.API_KEY if hasattr(Config, "API_KEY") else "",
