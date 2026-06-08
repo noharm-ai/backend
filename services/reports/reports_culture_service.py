@@ -67,8 +67,8 @@ def _group_culture_results(results):
     def prediction(row):
         if (
             row.prediction != None
-            and numberutils.none2zero(row.predict_proba) > 0.7
-            and numberutils.none2zero(row.drug_proba) > 0.025
+            and numberutils.none2zero(row.predict_proba) > 0.6
+            and numberutils.none2zero(row.drug_proba) > 0.007
         ):
             return {
                 "drug": row.drug,

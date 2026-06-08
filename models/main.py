@@ -1,8 +1,6 @@
-from datetime import date
-
 import redis
 from flask_jwt_extended import get_jwt
-from sqlalchemy import asc, or_
+
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import deferred
 
@@ -157,27 +155,8 @@ class Notify(db.Model):
     startDate = db.Column("inicio", db.Date, nullable=False)
     endDate = db.Column("validade", db.Date, nullable=False)
     schema = db.Column("schema", db.String, nullable=False)
-
-    def getNotification(schema):
-        n = (
-            Notify.query.filter(Notify.startDate <= date.today())
-            .filter(Notify.endDate >= date.today())
-            .filter(or_(Notify.schema == schema, Notify.schema == None))
-            .order_by(asc(Notify.id))
-            .first()
-        )
-        return (
-            {
-                "id": n.id,
-                "title": n.title,
-                "tooltip": n.tooltip,
-                "link": n.link,
-                "icon": n.icon,
-                "classname": n.classname,
-            }
-            if n
-            else None
-        )
+    text = db.Column("texto", db.Text, nullable=True)
+    target_group = db.Column("grupo_alvo", db.String(100), nullable=True)
 
 
 class Drug(db.Model):
