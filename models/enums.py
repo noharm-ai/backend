@@ -190,6 +190,7 @@ class DrugAttributesAuditTypeEnum(Enum):
 class PatientAuditTypeEnum(Enum):
     UPSERT = 1
     OBSERVATION_RECORD = 2
+    NAVIGATION_IA_ELEGIBILITY = 3
 
 
 class PatientConciliationStatusEnum(Enum):
