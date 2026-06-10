@@ -73,6 +73,7 @@ class PrescriptionClinicalNote(db.Model):
 
     id = db.Column("idprescricao_evolucao", db.BigInteger, primary_key=True)
     idPrescription = db.Column("fkprescricao", db.BigInteger, nullable=False)
+    admission_number = db.Column("nratendimento", db.BigInteger, nullable=False)
     idClinicalNoteType = db.Column("idtipoevolucao", db.String(50), nullable=True)
     concilia = db.Column("concilia", db.String(1), nullable=True)
     tpStatus = db.Column("tp_status", db.SmallInteger, nullable=False, default=0)
