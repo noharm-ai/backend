@@ -11,7 +11,7 @@ from exception.validation_error import ValidationError
 from models.enums import FeatureEnum, UserAuditTypeEnum
 from models.main import User, db, redis_client
 from models.notes import ClinicalNotes
-from models.prescription import Patient, Prescription
+from models.prescription import Patient, Prescription, PrescriptionClinicalNote
 from repository import clinical_notes_repository
 from services import feature_service, memory_service, user_service
 from utils import status
@@ -162,6 +162,8 @@ def get_notes(admission_number: int, filter_date: Union[str, None]):
     has_primary_care = memory_service.has_feature("PRIMARYCARE")
     dates = None
     previous_admissions = []
+    pcn_notes = []
+    pcn_dates_dict = {}
 
     tags = get_tags()
 
@@ -194,13 +196,26 @@ def get_notes(admission_number: int, filter_date: Union[str, None]):
 
         dates = dates_query.all()
 
-        if len(dates) > 0:
-            dates_list = []
-            for row in range(3):
-                if len(dates) > row:
-                    dates_list.append(dates[row][0])
+        pcn_dates_query = (
+            db.session.query(
+                func.date(PrescriptionClinicalNote.updatedAt).label("date"),
+                func.count().label("total"),
+            )
+            .filter(PrescriptionClinicalNote.admission_number == admission_number)
+            .group_by(func.date(PrescriptionClinicalNote.updatedAt))
+            .all()
+        )
+        pcn_dates_dict = {d.date: d.total for d in pcn_dates_query}
 
+        cn_date_set = {d.date for d in dates}
+        all_dates_sorted = sorted(
+            cn_date_set | set(pcn_dates_dict.keys()), reverse=True
+        )
+        dates_list = all_dates_sorted[:3]
+
+        if dates_list:
             notes = get_notes_by_date(admission_number, dates_list, has_primary_care)
+            pcn_notes = get_prescription_notes_by_date(admission_number, dates_list)
         else:
             notes = []
 
@@ -233,15 +248,25 @@ def get_notes(admission_number: int, filter_date: Union[str, None]):
                 )
     else:
         notes = get_notes_by_date(admission_number, [filter_date], has_primary_care)
+        pcn_notes = get_prescription_notes_by_date(admission_number, [filter_date])
 
     noteResults = []
     for n in notes:
         noteResults.append(convert_notes(n, has_primary_care, tags))
+    for pn, creator_name in pcn_notes:
+        noteResults.append(convert_prescription_note(pn, creator_name, tags))
+    noteResults.sort(key=lambda x: x["date"], reverse=True)
 
     dateResults = []
     if dates is not None:
+        cn_date_set = {d.date for d in dates}
+
         for d in dates:
-            d_dict = {"date": d.date.isoformat(), "count": d.total, "roles": d.roles}
+            d_dict = {
+                "date": d.date.isoformat(),
+                "count": d.total + pcn_dates_dict.get(d.date, 0),
+                "roles": d.roles,
+            }
 
             for tag in tags:
                 if tag["column"] != None:
@@ -251,11 +276,40 @@ def get_notes(admission_number: int, filter_date: Union[str, None]):
 
             dateResults.append(d_dict)
 
+        for pcn_date, pcn_count in sorted(
+            pcn_dates_dict.items(), key=lambda x: x[0], reverse=True
+        ):
+            if pcn_date not in cn_date_set:
+                d_dict = {
+                    "date": pcn_date.isoformat(),
+                    "count": pcn_count,
+                    "roles": ["EVOLUÇÃO CRIADA NA NOHARM"],
+                }
+                for tag in tags:
+                    if tag["column"] != None:
+                        d_dict[tag["column"]] = 0
+                    d_dict[tag["name"]] = 0
+                dateResults.append(d_dict)
+
+        dateResults.sort(key=lambda x: x["date"], reverse=True)
+
     return {
         "dates": dateResults,
         "notes": noteResults,
         "previousAdmissions": previous_admissions,
     }
+
+
+def get_prescription_notes_by_date(admission_number, date_list):
+    """Fetch PrescriptionClinicalNote records for the given dates."""
+    return (
+        db.session.query(PrescriptionClinicalNote, User.name.label("creator_name"))
+        .outerjoin(User, User.id == PrescriptionClinicalNote.createdBy)
+        .filter(PrescriptionClinicalNote.admission_number == admission_number)
+        .filter(func.date(PrescriptionClinicalNote.updatedAt).in_(date_list))
+        .order_by(desc(PrescriptionClinicalNote.updatedAt))
+        .all()
+    )
 
 
 def get_notes_by_date(admission_number, dateList, has_primary_care):
@@ -309,6 +363,32 @@ def convert_notes(notes, has_primary_care, tags):
         if tag["column"]:
             # key compatibility
             obj[tag["column"]] = obj[tag["name"]]
+
+    return obj
+
+
+def convert_prescription_note(note, creator_name, tags):
+    """Convert a PrescriptionClinicalNote to the same dict shape as convert_notes()."""
+    hide_names = feature_service.has_user_feature(FeatureEnum.HIDE_NAMES)
+
+    obj = {
+        "id": str(note.id),
+        "admissionNumber": note.admission_number,
+        "text": note.text,
+        "form": None,
+        "template": None,
+        "date": note.updatedAt.isoformat(),
+        "prescriber": "***" if hide_names else (creator_name or ""),
+        "position": "EVOLUÇÃO CRIADA NA NOHARM",
+        "source": "prescription",
+        "integrationStatus": note.tpStatus,
+        "idPrescription": note.idPrescription,
+    }
+
+    for tag in tags:
+        obj[tag["name"]] = 0
+        if tag["column"]:
+            obj[tag["column"]] = 0
 
     return obj
 
