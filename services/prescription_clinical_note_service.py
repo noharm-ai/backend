@@ -87,6 +87,7 @@ def upsert(
             status.HTTP_401_UNAUTHORIZED,
         )
 
+    record.admission_number = p.admissionNumber
     record.updatedAt = datetime.today()
     record.updatedBy = user_context.id
     record.idClinicalNoteType = request_data.idClinicalNoteType
