@@ -30,12 +30,12 @@ def list_patients():
     return patient_service.get_patients(
         request_data=PatientListRequest(
             idSegment=request.args.get("idSegment"),
-            idDepartmentList=request.args.getlist("idDepartment[]") or None,
+            idDepartment=request.args.getlist("idDepartment[]") or None,
             nextAppointmentStartDate=request.args.get("nextAppointmentStartDate"),
             nextAppointmentEndDate=request.args.get("nextAppointmentEndDate"),
             appointment=request.args.get("appointment"),
-            scheduledByList=request.args.getlist("scheduledBy[]") or None,
-            attendedByList=request.args.getlist("attendedBy[]") or None,
+            scheduledBy=request.args.getlist("scheduledBy[]") or None,
+            attendedBy=request.args.getlist("attendedBy[]") or None,
             dischargeDateStart=request.args.get("dischargeDateStart"),
             dischargeDateEnd=request.args.get("dischargeDateEnd"),
         )
