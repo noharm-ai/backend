@@ -84,9 +84,9 @@ def get_patients(request_data: PatientListRequest):
     if request_data.idSegment:
         query = query.filter(Prescription.idSegment == request_data.idSegment)
 
-    if request_data.idDepartmentList:
+    if request_data.idDepartment:
         query = query.filter(
-            Prescription.idDepartment.in_(request_data.idDepartmentList)
+            Prescription.idDepartment.in_(request_data.idDepartment)
         )
 
     if request_data.nextAppointmentStartDate:
@@ -101,24 +101,24 @@ def get_patients(request_data: PatientListRequest):
     if request_data.appointment == "not-scheduled":
         query = query.filter(sq_appointment == None)
 
-    if request_data.scheduledByList:
+    if request_data.scheduledBy:
         scheduled_by_query = (
             db.session.query(func.count())
             .select_from(ClinicalNotes)
             .filter(ClinicalNotes.admissionNumber == Prescription.admissionNumber)
             .filter(ClinicalNotes.position == "Agendamento")
-            .filter(ClinicalNotes.user.in_(request_data.scheduledByList))
+            .filter(ClinicalNotes.user.in_(request_data.scheduledBy))
         )
 
         query = query.filter(scheduled_by_query.exists())
 
-    if request_data.attendedByList:
+    if request_data.attendedBy:
         attended_by_query = (
             db.session.query(func.count())
             .select_from(ClinicalNotes)
             .filter(ClinicalNotes.admissionNumber == Prescription.admissionNumber)
             .filter(ClinicalNotes.position != "Agendamento")
-            .filter(ClinicalNotes.user.in_(request_data.attendedByList))
+            .filter(ClinicalNotes.user.in_(request_data.attendedBy))
         )
 
         query = query.filter(attended_by_query.exists())
