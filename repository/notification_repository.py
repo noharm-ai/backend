@@ -15,7 +15,7 @@ def get_active_notifications(schema: str) -> list[dict]:
         .filter(Notify.endDate >= date.today())
         .filter(or_(Notify.schema == schema, Notify.schema == None))
         .order_by(asc(Notify.id))
-        .limit(5)
+        .limit(10)
         .all()
     )
     return [
