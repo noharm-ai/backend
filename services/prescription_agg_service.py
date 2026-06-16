@@ -336,7 +336,7 @@ def create_agg_prescription_by_date(
         agg_p.idSegment = last_prescription.idSegment
 
     features = prescriptionutils.getFeatures(
-        result=agg_data, agg_date=agg_p.date, intervals_for_agg_date=True
+        result=agg_data, agg_date=agg_p.date, intervals_for_agg_date=False
     )
     score_variation = _get_score_variation(prescription=agg_p, features=features)
     features.update({"scoreVariation": score_variation, "should_update": False})
