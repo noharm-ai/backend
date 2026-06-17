@@ -183,27 +183,21 @@ def _auth_user(
         execution_options={"schema_translate_map": {None: user_schema}}
     )
 
-    active_notifications = notification_repository.get_active_notifications(
-        schema=user_schema
-    )
-    dismissed_kinds = {
-        m.kind
+    dismissed_prefix = "info-alert-"
+    dismissed_suffix = "-" + str(user.id)
+    dismissed_ids = [
+        int(m.kind[len(dismissed_prefix) : -len(dismissed_suffix)])
         for m in db_session.query(Memory.kind)
-        .filter(
-            Memory.kind.in_(
-                [
-                    "info-alert-" + str(n["id"]) + "-" + str(user.id)
-                    for n in active_notifications
-                ]
-            )
-        )
+        .filter(Memory.kind.like(f"info-alert-%-{user.id}"))
         .all()
-    }
+        if m.kind.startswith(dismissed_prefix) and m.kind.endswith(dismissed_suffix)
+    ]
+    active_notifications = notification_repository.get_active_notifications(
+        schema=user_schema,
+        exclude_ids=dismissed_ids,
+    )
     notification = [
-        n
-        for n in active_notifications
-        if "info-alert-" + str(n["id"]) + "-" + str(user.id) not in dismissed_kinds
-        and _notification_visible(n, roles)
+        n for n in active_notifications if _notification_visible(n, roles)
     ]
 
     features = db_session.query(Memory).filter(Memory.kind == "features").first()

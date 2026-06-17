@@ -7,17 +7,20 @@ from sqlalchemy import asc, or_
 from models.main import Notify, db
 
 
-def get_active_notifications(schema: str) -> list[dict]:
-    """Return up to 5 active notifications visible to the given schema."""
-    results = (
+def get_active_notifications(
+    schema: str, exclude_ids: list[int] | None = None
+) -> list[dict]:
+    """Return up to 10 active notifications visible to the given schema, excluding dismissed IDs."""
+    query = (
         db.session.query(Notify)
         .filter(Notify.startDate <= date.today())
         .filter(Notify.endDate >= date.today())
         .filter(or_(Notify.schema == schema, Notify.schema == None))
         .order_by(asc(Notify.id))
-        .limit(10)
-        .all()
     )
+    if exclude_ids:
+        query = query.filter(Notify.id.notin_(exclude_ids))
+    results = query.limit(10).all()
     return [
         {
             "id": n.id,
