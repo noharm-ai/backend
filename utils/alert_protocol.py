@@ -504,7 +504,7 @@ class AlertProtocol:
                         )
                     )
 
-                if v_drug_attribute is not None:
+                if v_drug_attribute is not None and len(v_drug_attribute) > 0:
                     exp_result = exp_result and self._compare(
                         op="IN", value1=drug_attr_keys, value2=v_drug_attribute
                     )
