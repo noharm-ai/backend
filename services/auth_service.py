@@ -184,26 +184,11 @@ def _auth_user(
     )
 
     active_notifications = notification_repository.get_active_notifications(
-        schema=user_schema
+        schema=user_schema,
+        user_id=user.id,
     )
-    dismissed_kinds = {
-        m.kind
-        for m in db_session.query(Memory.kind)
-        .filter(
-            Memory.kind.in_(
-                [
-                    "info-alert-" + str(n["id"]) + "-" + str(user.id)
-                    for n in active_notifications
-                ]
-            )
-        )
-        .all()
-    }
     notification = [
-        n
-        for n in active_notifications
-        if "info-alert-" + str(n["id"]) + "-" + str(user.id) not in dismissed_kinds
-        and _notification_visible(n, roles)
+        n for n in active_notifications if _notification_visible(n, roles)
     ]
 
     features = db_session.query(Memory).filter(Memory.kind == "features").first()
