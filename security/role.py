@@ -117,6 +117,7 @@ class Role(Enum):
             Permission.ADMIN_KNOWLEDGE_BASE,
             Permission.WRITE_CUSTOM_FORMS,
             Permission.ADMIN_APP_FEATURES,
+            Permission.WRITE_PROTOCOLS,
         ],
     )
 
