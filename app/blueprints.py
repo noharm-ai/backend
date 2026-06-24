@@ -11,7 +11,6 @@ from routes.admin.admin_frequency import app_admin_freq
 from routes.admin.admin_global_exam import app_admin_global_exam
 from routes.admin.admin_global_memory import app_admin_global_memory
 from routes.admin.admin_integration import app_admin_integration
-from routes.admin.admin_integration_remote import app_admin_integration_remote
 from routes.admin.admin_intervention_reason import app_admin_interv
 from routes.admin.admin_memory import app_admin_memory
 from routes.admin.admin_protocol import app_admin_protocol
@@ -106,7 +105,6 @@ def register_blueprints(app):
     app.register_blueprint(app_admin_memory)
     app.register_blueprint(app_admin_drug)
     app.register_blueprint(app_admin_integration)
-    app.register_blueprint(app_admin_integration_remote)
     app.register_blueprint(app_admin_segment)
     app.register_blueprint(app_admin_exam)
     app.register_blueprint(app_admin_unit_conversion)

@@ -462,10 +462,6 @@ All endpoints in this section require administrator-level authorization.
 | `POST` | `/admin/integration/upsert-security-group` | Configure security group. |
 | `POST` | `/admin/integration/update-user-security-group` | Update user security group assignment. |
 | `POST` | `/admin/integration/create-return-logstream` | Create return log stream. |
-| `GET` | `/admin/integration-remote/template` | Get remote integration template. |
-| `GET` | `/admin/integration-remote/queue-status` | Get queue status (`?idQueueList[]=`). |
-| `POST` | `/admin/integration-remote/push-queue-request` | Push a request to the integration queue. |
-| `GET` | `/admin/integration-remote/get-errors` | Get integration errors. |
 
 ---
 
