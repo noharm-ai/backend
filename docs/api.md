@@ -450,18 +450,7 @@ All endpoints in this section require administrator-level authorization.
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/admin/integration/list` | List schema integrations. |
-| `GET` | `/admin/integration/status` | Get integration status. |
-| `POST` | `/admin/integration/update` | Update integration configuration. |
-| `POST` | `/admin/integration/create-schema` | Create a new client schema. |
-| `POST` | `/admin/integration/refresh-prescription` | Force prescription refresh. |
 | `POST` | `/admin/integration/init-intervention-reason` | Initialize default intervention reasons. |
-| `GET` | `/admin/integration/template-list` | List integration templates. |
-| `POST` | `/admin/integration/get-cloud-config` | Get cloud configuration. |
-| `POST` | `/admin/integration/upsert-getname` | Configure patient name service. |
-| `POST` | `/admin/integration/upsert-security-group` | Configure security group. |
-| `POST` | `/admin/integration/update-user-security-group` | Update user security group assignment. |
-| `POST` | `/admin/integration/create-return-logstream` | Create return log stream. |
 
 ---
 
