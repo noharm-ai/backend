@@ -29,7 +29,6 @@ class Role(Enum):
             Permission.ADMIN_EXAMS__MOST_FREQUENT,
             Permission.ADMIN_GLOBAL_EXAMS,
             Permission.ADMIN_FREQUENCIES,
-            Permission.ADMIN_INTEGRATION_REMOTE,
             Permission.WRITE_SEGMENT_SCORE,
             Permission.INTEGRATION_UTILS,
             Permission.ADMIN_INTERVENTION_REASON,
@@ -117,6 +116,7 @@ class Role(Enum):
             Permission.ADMIN_KNOWLEDGE_BASE,
             Permission.WRITE_CUSTOM_FORMS,
             Permission.ADMIN_APP_FEATURES,
+            Permission.WRITE_PROTOCOLS,
         ],
     )
 

@@ -169,24 +169,6 @@ class Culture(db.Model):
     prediction = db.Column("predict", db.String, nullable=True)
 
 
-class NifiQueue(db.Model):
-    """SQLALCHEMY model for nifi_queue table"""
-
-    __tablename__ = "nifi_queue"
-
-    id = db.Column("idqueue", db.Integer, primary_key=True)
-    url = db.Column("url", db.String, nullable=False)
-    method = db.Column("method", db.String, nullable=False)
-    body = db.Column("body", postgresql.JSONB, nullable=True)
-    extra = db.Column("extra", postgresql.JSONB, nullable=True)
-    runStatus = db.Column("run_status", db.Boolean, nullable=False)
-    responseCode = db.Column("response_code", db.Integer, nullable=True)
-    response = db.Column("response", postgresql.JSONB, nullable=True)
-    responseAt = db.Column("response_at", db.Date, nullable=True)
-    createdAt = db.Column("create_at", db.Date, nullable=False)
-    createdBy = db.Column("created_by", db.Integer, nullable=True)
-
-
 class Tag(db.Model):
     """SQLALCHEMY model for marcador table"""
 

@@ -33,10 +33,6 @@ class Permission(Enum):
 
     ADMIN_USERS = "ADMIN_USERS"  # "admin users"
 
-    ADMIN_INTEGRATION_REMOTE = (
-        "ADMIN_INTEGRATION_REMOTE"  # "grants integration remote access"
-    )
-
     ADMIN_INTERVENTION_REASON = (
         "ADMIN_INTERVENTION_REASON"  # "admin intervention reason recordss"
     )
