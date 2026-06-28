@@ -214,7 +214,7 @@ class DrugList:
                     bs_weight = numberutils.none2zero(self.exams["weight"])
                     bs_height = numberutils.none2zero(self.exams["height"])
 
-                    if bs_weight != 0 and bs_height != 0:
+                    if bs_weight > 0 and bs_height > 0:
                         body_surface = math.sqrt((bs_weight * bs_height) / 3600)
                         doseBodySurfaceStr = f"""{stringutils.strFormatBR(round(pd[0].dose / body_surface, 2))} {pdUnit}/m²"""
 
