@@ -16,3 +16,4 @@ class PatientListRequest(BaseModel):
     attendedBy: Optional[list[int]] = None
     dischargeDateStart: Optional[datetime] = None
     dischargeDateEnd: Optional[datetime] = None
+    tags: Optional[list[str]] = None
