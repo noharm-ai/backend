@@ -55,13 +55,23 @@ class AlertProtocol:
         self.drugs = drugs
         self.filtered_drugs = self._filter_drug_list()
         self.exams = exams
-        self.exams_by_ref = {
-            exam_data["tp_exam_ref"]: exam_data
-            for exam_data in exams.values()
-            if exam_data
-            and isinstance(exam_data, dict)
-            and exam_data.get("tp_exam_ref") is not None
-        }
+        self.exams_by_ref = {}
+        for exam_data in exams.values():
+            if not exam_data or not isinstance(exam_data, dict):
+                continue
+            ref = exam_data.get("tp_exam_ref")
+            if ref is None:
+                continue
+            existing = self.exams_by_ref.get(ref)
+            if existing is None:
+                self.exams_by_ref[ref] = exam_data
+            else:
+                new_date = exam_data.get("date")
+                existing_date = existing.get("date")
+                if new_date is not None and (
+                    existing_date is None or new_date > existing_date
+                ):
+                    self.exams_by_ref[ref] = exam_data
 
         self.cn_stats = cn_stats
 
