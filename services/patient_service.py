@@ -2,8 +2,8 @@ from datetime import datetime
 from typing import List
 
 from flask import g
-from sqlalchemy import asc, desc, func
-from sqlalchemy.dialects.postgresql import INTERVAL
+from sqlalchemy import asc, cast, desc, func
+from sqlalchemy.dialects.postgresql import ARRAY, INTERVAL
 from sqlalchemy.orm import undefer
 
 from decorators.has_permission_decorator import Permission, has_permission
@@ -38,6 +38,7 @@ def _format_patients(patients):
             "birthdate": p[0].birthdate.isoformat() if p[0].birthdate else None,
             "idPrescription": p[1].id,
             "observation": p[0].observation,
+            "tags": p[0].tags,
             "refDate": p[2].isoformat() if p[2] else None,
         }
         for p in patients
@@ -128,6 +129,11 @@ def get_patients(request_data: PatientListRequest):
 
     if request_data.dischargeDateEnd:
         query = query.filter(Patient.dischargeDate <= request_data.dischargeDateEnd)
+
+    if request_data.tags:
+        query = query.filter(
+            cast(request_data.tags, ARRAY(db.String)).overlap(Patient.tags)
+        )
 
     return _format_patients(query.limit(1500).all())
 
