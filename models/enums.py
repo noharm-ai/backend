@@ -167,6 +167,7 @@ class DrugAttributesAuditTypeEnum(Enum):
     UPSERT_UPDATE_SUBSTANCE = 3
     INSERT_FROM_REFERENCE = 4
     COPY_FROM_REFERENCE = 5
+    SET_DIVISION_RANGE = 6
 
 
 class PatientAuditTypeEnum(Enum):
