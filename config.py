@@ -44,6 +44,10 @@ class Config:
     CACHE_BUCKET_ID = getenv("CACHE_BUCKET_ID") or ""
     CACHE_BUCKET_KEY = getenv("CACHE_BUCKET_KEY") or ""
 
+    PRESCRIPTION_PRESENCE_TABLE_NAME = (
+        getenv("PRESCRIPTION_PRESENCE_TABLE_NAME") or "noharm_prescription_presence"
+    )
+
     ODOO_API_DB = getenv("ODOO_API_DB") or ""
     ODOO_API_KEY = getenv("ODOO_API_KEY") or ""
     ODOO_API_URL = getenv("ODOO_API_URL") or ""
