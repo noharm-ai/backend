@@ -49,7 +49,7 @@ Key areas covered by the API:
 
 ### Prerequisites
 
-- Python 3.11+
+- Python 3.12+
 - PostgreSQL (or Docker for test DB)
 - Redis
 
