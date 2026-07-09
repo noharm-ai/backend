@@ -19,6 +19,7 @@ def list_trainings(user_context: User):
             "title": item.title,
             "description": item.description,
             "position": item.position,
+            "mandatory": item.mandatory,
             "totalLessons": total_lessons,
             "totalLessonsFinished": total_lessons_finished,
             "finished": total_lessons > 0

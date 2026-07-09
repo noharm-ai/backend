@@ -287,6 +287,7 @@ class Training(db.Model):
     description = db.Column("resumo", db.Text, nullable=True)
     position = db.Column("posicao", db.Integer, nullable=False)
     active = db.Column("ativo", db.Boolean, nullable=False)
+    mandatory = db.Column("obrigatorio", db.Boolean, nullable=False)
     updated_at = db.Column("updated_at", db.DateTime, nullable=True)
     updated_by = db.Column("updated_by", db.BigInteger, nullable=True)
     created_at = db.Column("created_at", db.DateTime, nullable=False)
