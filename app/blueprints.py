@@ -61,6 +61,7 @@ from routes.substance import app_sub
 from routes.summary import app_summary
 from routes.support import app_support
 from routes.tag import app_tag
+from routes.training import app_training
 from routes.user import app_usr
 from routes.user_admin import app_user_admin
 
@@ -91,6 +92,7 @@ def register_blueprints(app):
     app.register_blueprint(app_conciliation)
     app.register_blueprint(app_tag)
     app.register_blueprint(app_protocol)
+    app.register_blueprint(app_training)
     app.register_blueprint(app_exams)
     app.register_blueprint(app_lists)
     app.register_blueprint(app_queue)
