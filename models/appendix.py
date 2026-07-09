@@ -313,6 +313,19 @@ class TrainingItem(db.Model):
     created_by = db.Column("created_by", db.BigInteger, nullable=False)
 
 
+class TrainingItemUser(db.Model):
+    """Tracks when a user finishes a training item"""
+
+    __tablename__ = "treinamento_item_usuario"
+    __table_args__ = {"schema": "public"}
+
+    training_item_id = db.Column("idtreinamento_item", db.Integer, primary_key=True)
+    user_id = db.Column("idusuario", db.Integer, primary_key=True)
+    duration_seconds = db.Column("duracao_segundos", db.Integer, nullable=True)
+    created_at = db.Column("created_at", db.DateTime, nullable=False)
+    updated_at = db.Column("updated_at", db.DateTime, nullable=True)
+
+
 class KnowledgeBase(db.Model):
     """Knowledge Base links table"""
 

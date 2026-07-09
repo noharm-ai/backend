@@ -1,23 +1,60 @@
 """Repository: training related operations"""
 
+from datetime import datetime
+
+from sqlalchemy import and_, case, func
+
 from models.main import db
-from models.appendix import Training, TrainingItem
+from models.appendix import Training, TrainingItem, TrainingItemUser
 
 
-def list_trainings() -> list[Training]:
-    """List all active training records ordered by position"""
+def list_trainings(user_id: int) -> list:
+    """List all active training records ordered by position, paired with the
+    total number of active lessons and how many of those the user finished"""
+    total_lessons = (
+        db.session.query(func.count(TrainingItem.id))
+        .filter(
+            TrainingItem.training_id == Training.id,
+            TrainingItem.active == True,
+        )
+        .correlate(Training)
+        .scalar_subquery()
+    )
+
+    total_lessons_finished = (
+        db.session.query(func.count(TrainingItemUser.training_item_id))
+        .join(TrainingItem, TrainingItem.id == TrainingItemUser.training_item_id)
+        .filter(
+            TrainingItem.training_id == Training.id,
+            TrainingItem.active == True,
+            TrainingItemUser.user_id == user_id,
+        )
+        .correlate(Training)
+        .scalar_subquery()
+    )
+
     return (
-        db.session.query(Training)
+        db.session.query(Training, total_lessons, total_lessons_finished)
         .filter(Training.active == True)
         .order_by(Training.position)
         .all()
     )
 
 
-def list_training_items(training_id: int) -> list[TrainingItem]:
-    """List all active items of a training record ordered by position"""
+def list_training_items(training_id: int, user_id: int) -> list:
+    """List all active items of a training record ordered by position, paired
+    with whether the given user has finished each item"""
+    finished = case((TrainingItemUser.user_id.isnot(None), True), else_=False)
+
     return (
-        db.session.query(TrainingItem)
+        db.session.query(TrainingItem, finished)
+        .outerjoin(
+            TrainingItemUser,
+            and_(
+                TrainingItemUser.training_item_id == TrainingItem.id,
+                TrainingItemUser.user_id == user_id,
+            ),
+        )
         .filter(
             TrainingItem.training_id == training_id,
             TrainingItem.active == True,
@@ -25,3 +62,23 @@ def list_training_items(training_id: int) -> list[TrainingItem]:
         .order_by(TrainingItem.position)
         .all()
     )
+
+
+def finish_training_item(
+    training_item_id: int, user_id: int, duration_seconds: int = None
+) -> TrainingItemUser:
+    """Create or update the record marking a training item as finished by a user"""
+    record = TrainingItemUser.query.get((training_item_id, user_id))
+
+    if record is None:
+        record = TrainingItemUser()
+        record.training_item_id = training_item_id
+        record.user_id = user_id
+        record.created_at = datetime.today()
+        db.session.add(record)
+    else:
+        record.updated_at = datetime.today()
+
+    record.duration_seconds = duration_seconds
+
+    return record
