@@ -58,9 +58,22 @@ def finish_training_item(
     request_data: TrainingItemFinishRequest,
     user_context: User,
 ):
-    """Register that the current user finished a training item"""
+    """Register that the current user finished a training item, marking the
+    whole training module as finished if this was the last pending item"""
     training_repository.finish_training_item(
         training_item_id=training_item_id,
         user_id=user_context.id,
         duration_seconds=request_data.durationSeconds,
     )
+
+    training_id = training_repository.get_training_id_for_item(training_item_id)
+    module_finished = False
+
+    if training_repository.is_training_finished(
+        training_id=training_id, user_id=user_context.id
+    ):
+        module_finished = training_repository.finish_training(
+            training_id=training_id, user_id=user_context.id
+        )
+
+    return {"moduleFinished": module_finished}

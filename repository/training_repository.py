@@ -5,7 +5,7 @@ from datetime import datetime
 from sqlalchemy import and_, case, func
 
 from models.main import db
-from models.appendix import Training, TrainingItem, TrainingItemUser
+from models.appendix import Training, TrainingItem, TrainingItemUser, TrainingUser
 
 
 def list_trainings(user_id: int) -> list:
@@ -82,3 +82,57 @@ def finish_training_item(
     record.duration_seconds = duration_seconds
 
     return record
+
+
+def get_training_id_for_item(training_item_id: int) -> int:
+    """Return the training id that owns the given training item"""
+    return (
+        db.session.query(TrainingItem.training_id)
+        .filter(TrainingItem.id == training_item_id)
+        .scalar()
+    )
+
+
+def is_training_finished(training_id: int, user_id: int) -> bool:
+    """Check whether the user has finished every active item of a training"""
+    total_items = (
+        db.session.query(func.count(TrainingItem.id))
+        .filter(
+            TrainingItem.training_id == training_id,
+            TrainingItem.active == True,
+        )
+        .scalar()
+    )
+
+    if not total_items:
+        return False
+
+    finished_items = (
+        db.session.query(func.count(TrainingItemUser.training_item_id))
+        .join(TrainingItem, TrainingItem.id == TrainingItemUser.training_item_id)
+        .filter(
+            TrainingItem.training_id == training_id,
+            TrainingItem.active == True,
+            TrainingItemUser.user_id == user_id,
+        )
+        .scalar()
+    )
+
+    return finished_items == total_items
+
+
+def finish_training(training_id: int, user_id: int) -> bool:
+    """Create the record marking a training module as finished by a user, if
+    not already present. Returns True the first time it's created for this user"""
+    record = TrainingUser.query.get((training_id, user_id))
+
+    if record is not None:
+        return False
+
+    record = TrainingUser()
+    record.training_id = training_id
+    record.user_id = user_id
+    record.created_at = datetime.today()
+    db.session.add(record)
+
+    return True

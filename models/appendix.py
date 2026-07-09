@@ -327,6 +327,18 @@ class TrainingItemUser(db.Model):
     updated_at = db.Column("updated_at", db.DateTime, nullable=True)
 
 
+class TrainingUser(db.Model):
+    """Tracks when a user finishes every item of a training module"""
+
+    __tablename__ = "treinamento_usuario"
+    __table_args__ = {"schema": "public"}
+
+    training_id = db.Column("idtreinamento", db.Integer, primary_key=True)
+    user_id = db.Column("idusuario", db.Integer, primary_key=True)
+    created_at = db.Column("created_at", db.DateTime, nullable=False)
+    updated_at = db.Column("updated_at", db.DateTime, nullable=True)
+
+
 class KnowledgeBase(db.Model):
     """Knowledge Base links table"""
 
