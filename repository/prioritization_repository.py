@@ -238,6 +238,13 @@ def _build_base_query(request: PrioritizationRequest):
             )
         )
 
+    if len(request.first_administration_hour) > 0:
+        q = q.filter(
+            cast(Prescription.features["intervals"][0], db.String).op("~*")(
+                "|".join(map(re.escape, request.first_administration_hour))
+            )
+        )
+
     if request.diff is not None:
         if request.diff:
             q = q.filter(Prescription.features["diff"].astext.cast(Integer) > 0)
@@ -342,7 +349,10 @@ def _build_base_query(request: PrioritizationRequest):
         if specialty_filters:
             q = q.filter(or_(*specialty_filters))
 
-    if request.responsible_physician_list and len(request.responsible_physician_list) > 0:
+    if (
+        request.responsible_physician_list
+        and len(request.responsible_physician_list) > 0
+    ):
         physician_filters = []
         for p in request.responsible_physician_list:
             if p and p.strip():
