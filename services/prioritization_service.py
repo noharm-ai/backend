@@ -79,12 +79,12 @@ def get_prioritization_list(request: PrioritizationRequest):
             features["scoreVariation"] = 0
             features["class"] = "blue"
 
+        # p.observation is truncated to 301 chars in SQL (func.left); a length
+        # over 300 means the original text overflows and gets an ellipsis
         observation = None
-        if p[1] and p[1].observation != None and p[1].observation != "":
+        if p.observation:
             observation = (
-                p[1].observation[:300] + "..."
-                if len(p[1].observation) > 300
-                else p[1].observation
+                p.observation[:300] + "..." if len(p.observation) > 300 else p.observation
             )
 
         results.append(
