@@ -4,8 +4,6 @@ import json
 from datetime import datetime, timedelta
 from typing import Union
 
-import boto3
-
 from config import Config
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
@@ -14,7 +12,7 @@ from models.enums import ReportStatusEnum
 from models.main import User
 from repository.reports import reports_repository
 from services.reports import reports_cache_service
-from utils import dateutils, status, stringutils
+from utils import aws, dateutils, status, stringutils
 
 
 @has_permission(Permission.READ_REPORTS)
@@ -121,7 +119,7 @@ def process_report(
         "schema": user_context.schema,
     }
 
-    lambda_client = boto3.client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
+    lambda_client = aws.get_client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
     lambda_client.invoke(
         FunctionName=Config.BACKEND_FUNCTION_NAME,
         InvocationType="Event",

@@ -2,7 +2,6 @@
 
 import json
 
-import boto3
 from sqlalchemy import text
 
 from config import Config
@@ -11,7 +10,7 @@ from exception.validation_error import ValidationError
 from models.appendix import InterventionReason, SchemaConfig, SchemaConfigAudit
 from models.enums import SchemaConfigAuditTypeEnum
 from models.main import User, db
-from utils import network_utils, status
+from utils import aws, network_utils, status
 
 
 def get_table_count(schema, table):
@@ -93,7 +92,7 @@ def update_user_security_group(user_context: User):
         "new_cidr": remote_addr + "/32",
     }
 
-    lambda_client = boto3.client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
+    lambda_client = aws.get_client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
     response = lambda_client.invoke(
         FunctionName=Config.BACKEND_FUNCTION_NAME,
         InvocationType="RequestResponse",

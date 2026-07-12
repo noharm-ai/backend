@@ -2,13 +2,11 @@
 
 import json
 
-import boto3
-
 from config import Config
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
 from models.main import User
-from utils import status
+from utils import aws, status
 
 
 @has_permission(Permission.READ_BASIC_FEATURES)
@@ -29,7 +27,7 @@ def check_sqs_message(request_id: str, user_context: User, max_iterations: int =
         )
 
     # Get SQS queue URL
-    sqs_client = boto3.client("sqs", region_name=Config.NIFI_SQS_QUEUE_REGION)
+    sqs_client = aws.get_client("sqs", region_name=Config.NIFI_SQS_QUEUE_REGION)
 
     try:
         # Get queue URL for "backend" queue

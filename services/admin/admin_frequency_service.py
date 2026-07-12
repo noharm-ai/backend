@@ -2,14 +2,13 @@
 
 import json
 
-import boto3
 from sqlalchemy import asc
 
 from models.main import db, User
 from models.appendix import Frequency
 from decorators.has_permission_decorator import has_permission, Permission
 from exception.validation_error import ValidationError
-from utils import status
+from utils import aws, status
 from config import Config
 
 
@@ -48,7 +47,7 @@ def update_frequency(id, daily_frequency, fasting):
 @has_permission(Permission.ADMIN_FREQUENCIES)
 def infer_frequency(user_context: User):
     """Try to define frequenciadia based on history"""
-    lambda_client = boto3.client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
+    lambda_client = aws.get_client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
     response = lambda_client.invoke(
         FunctionName=Config.SCORES_FUNCTION_NAME,
         InvocationType="RequestResponse",

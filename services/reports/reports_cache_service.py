@@ -1,17 +1,16 @@
 from datetime import datetime, timedelta
 
-import boto3
 import dateutil
 from botocore.exceptions import ClientError
 
 from config import Config
 from exception.validation_error import ValidationError
-from utils import logger, status, stringutils
+from utils import aws, logger, status, stringutils
 from utils.dateutils import to_iso
 
 
 def _get_client():
-    return boto3.client("s3")
+    return aws.get_client("s3")
 
 
 def generate_link(resource_path: str):

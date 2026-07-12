@@ -2,8 +2,6 @@
 
 import json
 
-import boto3
-
 from config import Config
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
@@ -11,7 +9,7 @@ from models.main import User, db
 from models.requests.navigation_request import NavCopyPatientRequest
 from repository import prescription_view_repository
 from services import prescription_agg_service, segment_service
-from utils import cryptutils, lambdautils, logger, status, stringutils
+from utils import aws, cryptutils, lambdautils, logger, status, stringutils
 
 
 @has_permission(Permission.NAV_COPY_PATIENT)
@@ -102,7 +100,7 @@ def copy_patient(request_data: NavCopyPatientRequest, user_context: User):
         "encrypted": True,
     }
 
-    lambda_client = boto3.client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
+    lambda_client = aws.get_client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
     response = lambda_client.invoke(
         FunctionName=Config.BACKEND_FUNCTION_NAME,
         InvocationType="RequestResponse",
