@@ -73,6 +73,7 @@ def get_prescriptions():
         idDrug=to_int_list(request.args.getlist("idDrug[]")),
         idPatient=to_int_list(request.args.getlist("idPatient[]")),
         intervals=request.args.getlist("intervals[]"),
+        first_administration_hour=request.args.getlist("first_administration_hour[]"),
         allDrugs=to_bool(request.args.get("allDrugs"), default=False),
         startDate=parse_date(request.args.get("startDate")) or date.today(),
         endDate=parse_date(request.args.get("endDate")),

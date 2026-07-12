@@ -10,6 +10,22 @@ from utils import numberutils, prescriptionutils
 from utils.tagutils import filter_nav_tags
 
 
+def _get_first_administration_hour(intervals):
+    """Extract the first administration hour (0-23) from a sorted intervals list, or None if unavailable/invalid"""
+    if not intervals:
+        return None
+
+    first_interval = intervals[0]
+    if not isinstance(first_interval, str) or not first_interval.isdigit():
+        return None
+
+    hour = int(first_interval)
+    if hour < 0 or hour > 23:
+        return None
+
+    return hour
+
+
 @has_permission(Permission.READ_PRESCRIPTION)
 def get_prioritization_list(request: PrioritizationRequest):
     """List prescription prioritization results"""
@@ -73,18 +89,23 @@ def get_prioritization_list(request: PrioritizationRequest):
             else:
                 features["scoreVariation"] = 0
 
+            features["firstAdministrationHour"] = _get_first_administration_hour(
+                p[0].features.get("intervals", [])
+            )
+
         else:
             features["processed"] = False
             features["globalScore"] = 0
             features["scoreVariation"] = 0
             features["class"] = "blue"
+            features["firstAdministrationHour"] = None
 
+        # p.observation is truncated to 301 chars in SQL (func.left); a length
+        # over 300 means the original text overflows and gets an ellipsis
         observation = None
-        if p[1] and p[1].observation != None and p[1].observation != "":
+        if p.observation:
             observation = (
-                p[1].observation[:300] + "..."
-                if len(p[1].observation) > 300
-                else p[1].observation
+                p.observation[:300] + "..." if len(p.observation) > 300 else p.observation
             )
 
         results.append(

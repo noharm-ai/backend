@@ -20,7 +20,7 @@ from models.prescription import (
     PrescriptionAudit,
 )
 from models.regulation import RegSolicitation
-from repository import prescription_view_repository
+from repository import prescription_presence_repository, prescription_view_repository
 from services import (
     data_authorization_service,
     feature_service,
@@ -172,9 +172,12 @@ def search(search_key: int, user_permissions: list[Permission]):
     return result_list
 
 
-@has_permission(Permission.WRITE_PRESCRIPTION)
-def start_evaluation(id_prescription, user_context: User):
-    """Save or gets the user currently analysing the prescription"""
+@has_permission(Permission.READ_PRESCRIPTION)
+def start_evaluation(
+    id_prescription, user_context: User, user_permissions: list[Permission]
+):
+    """Return every user currently viewing id_prescription. Also records a
+    heartbeat for the caller if they have write access to the prescription"""
     p = (
         db.session.query(Prescription)
         .filter(Prescription.id == id_prescription)
@@ -187,27 +190,32 @@ def start_evaluation(id_prescription, user_context: User):
             status.HTTP_400_BAD_REQUEST,
         )
 
-    if not p.features:
-        return None
+    if Permission.WRITE_PRESCRIPTION in user_permissions:
+        current_user = db.session.query(User).filter(User.id == user_context.id).first()
+        prescription_presence_repository.record_heartbeat(
+            schema=user_context.schema,
+            id_prescription=id_prescription,
+            user_id=user_context.id,
+            user_name=current_user.name,
+        )
 
-    if is_being_evaluated(p.features):
-        return p.features["evaluation"] if "evaluation" in p.features else None
+    viewers = prescription_presence_repository.get_active_viewers(
+        schema=user_context.schema, id_prescription=id_prescription
+    )
 
-    current_user = db.session.query(User).filter(User.id == user_context.id).first()
-    evaluation_object = {
-        "userId": user_context.id,
-        "userName": current_user.name,
-        "startDate": datetime.today().isoformat(),
-    }
-
-    p.features = dict(p.features, **{"evaluation": evaluation_object})
-
-    db.session.flush()
-
-    return evaluation_object
+    return [
+        {
+            "userId": int(v["userId"]),
+            "userName": v.get("userName"),
+            "startDate": v.get("startDate"),
+        }
+        for v in viewers
+    ]
 
 
 def is_being_evaluated(features):
+    """Deprecated: using dynamodb to track evaluation data."""
+    # TODO: remove
     max_evaluation_minutes = 5
 
     if (

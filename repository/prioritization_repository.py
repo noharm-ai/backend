@@ -1,9 +1,8 @@
 import re
 from datetime import date, datetime, timedelta
 
-from sqlalchemy import BigInteger, Integer, and_, cast, desc, func, or_
+from sqlalchemy import BigInteger, Integer, and_, cast, desc, func, or_, text
 from sqlalchemy.dialects import postgresql
-from sqlalchemy.orm import undefer
 
 from exception.validation_error import ValidationError
 from models.appendix import Department
@@ -238,6 +237,13 @@ def _build_base_query(request: PrioritizationRequest):
             )
         )
 
+    if len(request.first_administration_hour) > 0:
+        q = q.filter(
+            cast(Prescription.features["intervals"][0], db.String).op("~*")(
+                "|".join(map(re.escape, request.first_administration_hour))
+            )
+        )
+
     if request.diff is not None:
         if request.diff:
             q = q.filter(Prescription.features["diff"].astext.cast(Integer) > 0)
@@ -342,7 +348,10 @@ def _build_base_query(request: PrioritizationRequest):
         if specialty_filters:
             q = q.filter(or_(*specialty_filters))
 
-    if request.responsible_physician_list and len(request.responsible_physician_list) > 0:
+    if (
+        request.responsible_physician_list
+        and len(request.responsible_physician_list) > 0
+    ):
         physician_filters = []
         for p in request.responsible_physician_list:
             if p and p.strip():
@@ -385,6 +394,10 @@ def get_prioritization_list(request: PrioritizationRequest, run_count: bool = Tr
     """
     base_q = _build_base_query(request)
 
+    # SET LOCAL lasts until the request transaction ends; keeps this query below
+    # the 30s API Gateway limit and stops abandoned queries from loading the db
+    db.session.execute(text("SET LOCAL statement_timeout = '25s'"))
+
     results = (
         base_q.with_entities(
             Prescription,
@@ -393,9 +406,10 @@ def get_prioritization_list(request: PrioritizationRequest, run_count: bool = Tr
             (Prescription.features["globalScore"].astext.cast(Integer)).label(
                 "globalScore"
             ),
+            # the service truncates to 300 chars; fetch 301 to detect overflow
+            func.left(Patient.observation, 301).label("observation"),
         )
         .order_by(desc("globalScore"))
-        .options(undefer(Patient.observation))
         .limit(500)
         .all()
     )

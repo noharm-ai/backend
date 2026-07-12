@@ -167,7 +167,13 @@ def api_endpoint(download_headers=None, is_admin=False):
                 db.session.remove()
 
                 logger.backend_logger.exception(str(e))
-                logger.backend_logger.error("Request data: %s", request.get_data())
+                # request.get_data() is the body only; log the query string too
+                # so GET params (e.g. /prescriptions filters) show up on timeouts
+                logger.backend_logger.error(
+                    "Request data: %s | query string: %s",
+                    request.get_data(),
+                    request.query_string.decode("utf-8", "replace"),
+                )
 
                 logger.backend_logger.warning(
                     json.dumps(
