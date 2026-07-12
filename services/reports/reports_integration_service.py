@@ -2,11 +2,11 @@
 
 from datetime import timedelta
 
-import boto3
 import dateutil
 
 from config import Config
 from decorators.has_permission_decorator import Permission, has_permission
+from utils import aws
 
 LINT_FILE = "nifilint.json.gz"
 
@@ -16,7 +16,7 @@ def get_nifilint():
     """Get nifilint report link."""
 
     """Retrieve the checklist presigned url from S3."""
-    client = boto3.client("s3")
+    client = aws.get_client("s3")
 
     resource_info = client.head_object(
         Bucket=Config.NIFI_BUCKET_NAME,

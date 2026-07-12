@@ -3,7 +3,6 @@
 import json
 import logging
 
-import boto3
 from botocore.config import Config
 from botocore.exceptions import ReadTimeoutError
 from strands import Agent, tool
@@ -14,7 +13,7 @@ from models.appendix import GlobalMemory
 from models.enums import GlobalMemoryEnum
 from models.main import User, db
 from models.response.agents.n0_response import TicketForm
-from utils import status
+from utils import aws, status
 
 logging.basicConfig()
 logger = logging.getLogger("noharm.backend")
@@ -141,13 +140,13 @@ def _get_knowledge_base(query: str, config: dict) -> dict:
     try:
         logger.info("Iniciando busca na base de conhecimento com a consulta: %s", query)
 
-        bedrock = boto3.client(
+        bedrock = aws.get_client(
             "bedrock-runtime", region_name=config["embedding_model"]["region_name"]
         )
-        s3vectors = boto3.client(
+        s3vectors = aws.get_client(
             "s3vectors", region_name=config["vector_index"]["region_name"]
         )
-        s3_client = boto3.client(
+        s3_client = aws.get_client(
             "s3", region_name=config["vector_index"]["region_name"]
         )
 

@@ -2,10 +2,9 @@
 
 import json
 
-import boto3
-
 from config import Config
 from models.enums import NoHarmENV
+from utils import aws
 
 
 def get_substance_by_drug_name(drug_names: list[str]):
@@ -16,7 +15,7 @@ def get_substance_by_drug_name(drug_names: list[str]):
     if not drug_names:
         return {}
 
-    lambda_client = boto3.client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
+    lambda_client = aws.get_client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
     response = lambda_client.invoke(
         FunctionName=Config.BACKEND_FUNCTION_NAME,
         InvocationType="RequestResponse",

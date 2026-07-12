@@ -1,14 +1,12 @@
 import json
 import re
 
-import boto3
-
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
 from models.appendix import GlobalMemory
 from models.enums import GlobalMemoryEnum
 from models.main import db
-from utils import status
+from utils import aws, status
 
 
 @has_permission(Permission.READ_DISCHARGE_SUMMARY)
@@ -68,8 +66,7 @@ def _prompt_maritaca(messages, options={}):
 
 
 def _prompt_claude(messages):
-    session = boto3.session.Session()
-    client = session.client("bedrock-runtime", region_name="us-east-1")
+    client = aws.get_client("bedrock-runtime", region_name="us-east-1")
 
     body = json.dumps(
         {
@@ -93,8 +90,7 @@ def _prompt_claude(messages):
 
 
 def _prompt_gpt_oss(messages):
-    session = boto3.session.Session()
-    client = session.client("bedrock-runtime", region_name="us-east-1")
+    client = aws.get_client("bedrock-runtime", region_name="us-east-1")
 
     body = json.dumps(
         {
@@ -122,8 +118,7 @@ def _prompt_gpt_oss(messages):
 
 
 def _prompt_llama(messages):
-    session = boto3.session.Session()
-    client = session.client("bedrock-runtime", region_name="us-west-2")
+    client = aws.get_client("bedrock-runtime", region_name="us-west-2")
 
     prompt = "<|begin_of_text|>"
     for m in messages:

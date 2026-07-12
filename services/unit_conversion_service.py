@@ -2,8 +2,6 @@
 
 import json
 
-import boto3
-
 from config import Config
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
@@ -13,7 +11,7 @@ from models.main import User, db
 from models.requests.drug_request import DrugUnitConversionRequest
 from repository import unit_conversion_repository
 from services.admin import admin_unit_conversion_service
-from utils import status
+from utils import aws, status
 
 
 @has_permission(Permission.WRITE_DRUG_ATTRIBUTES)
@@ -141,7 +139,7 @@ def save_unit_conversion_for_drug(
 
 @has_permission(Permission.WRITE_DRUG_ATTRIBUTES)
 def process_drug_scores(id_drug: int, user_context: User):
-    lambda_client = boto3.client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
+    lambda_client = aws.get_client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
     lambda_response = lambda_client.invoke(
         FunctionName=Config.BACKEND_FUNCTION_NAME,
         InvocationType="Event",

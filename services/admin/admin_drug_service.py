@@ -4,7 +4,6 @@ import json
 from datetime import datetime
 from typing import List
 
-import boto3
 from sqlalchemy import and_, distinct, func, text
 from sqlalchemy.orm import undefer
 
@@ -19,7 +18,7 @@ from models.segment import Segment
 from repository import drug_attributes_repository, drugs_repository
 from repository.admin import admin_drug_repository
 from services import drug_service as main_drug_service
-from utils import dateutils, status
+from utils import aws, dateutils, status
 
 
 @has_permission(Permission.ADMIN_DRUGS)
@@ -194,7 +193,7 @@ def copy_drug_attributes(
 
 @has_permission(Permission.ADMIN_DRUGS)
 def predict_substance(user_context: User):
-    lambda_client = boto3.client("lambda", region_name="sa-east-1")
+    lambda_client = aws.get_client("lambda", region_name="sa-east-1")
 
     response = lambda_client.invoke(
         FunctionName=Config.BACKEND_FUNCTION_NAME,

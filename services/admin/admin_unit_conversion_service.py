@@ -1,7 +1,6 @@
 import json
 from datetime import datetime
 
-import boto3
 import requests
 from markupsafe import escape as escape_html
 from sqlalchemy import text
@@ -24,7 +23,7 @@ from services import drug_service as main_drug_service
 from services.admin import (
     admin_drug_service,
 )
-from utils import logger, status
+from utils import aws, logger, status
 
 
 @has_permission(Permission.ADMIN_UNIT_CONVERSION)
@@ -277,7 +276,7 @@ def save_conversions(
     if skip_lambda:
         return {"updated": updated_segments}
 
-    lambda_client = boto3.client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
+    lambda_client = aws.get_client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
     lambda_response = lambda_client.invoke(
         FunctionName=Config.BACKEND_FUNCTION_NAME,
         InvocationType="RequestResponse" if wait_for_lambda else "Event",
@@ -516,8 +515,7 @@ def _parse_llm_json(raw: str) -> list:
 
 def _prompt_haiku(messages: list, system: str) -> list:
     """Invoke Bedrock Claude Haiku 4.5 and return the parsed JSON list response."""
-    session = boto3.session.Session()
-    client = session.client("bedrock-runtime", region_name="us-east-1")
+    client = aws.get_client("bedrock-runtime", region_name="us-east-1")
 
     body = json.dumps(
         {

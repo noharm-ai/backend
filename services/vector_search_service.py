@@ -2,8 +2,9 @@
 
 import json
 
-import boto3
 from pydantic import BaseModel
+
+from utils import aws
 
 
 class SearchConfig(BaseModel):
@@ -19,8 +20,8 @@ class SearchConfig(BaseModel):
 
 def search(query: str, config: SearchConfig) -> dict:
     """Search vector index"""
-    bedrock = boto3.client("bedrock-runtime", region_name=config.embedding_region)
-    s3vectors = boto3.client("s3vectors", region_name=config.vector_region)
+    bedrock = aws.get_client("bedrock-runtime", region_name=config.embedding_region)
+    s3vectors = aws.get_client("s3vectors", region_name=config.vector_region)
 
     # Generate the vector embedding.
     embedding_response = bedrock.invoke_model(

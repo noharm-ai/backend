@@ -1,7 +1,5 @@
 import json
 
-import boto3
-
 from config import Config
 from decorators.has_permission_decorator import Permission, has_permission
 from models.enums import NoHarmENV
@@ -10,6 +8,7 @@ from models.requests.reports_consolidated_request import (
     PatientDayReportRequest,
     PrescriptionReportRequest,
 )
+from utils import aws
 
 
 @has_permission(Permission.READ_REPORTS)
@@ -36,7 +35,7 @@ def get_patient_day_report(request_data: PatientDayReportRequest, user_context: 
         "weekdays_only": request_data.weekdays_only,
     }
 
-    lambda_client = boto3.client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
+    lambda_client = aws.get_client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
     response = lambda_client.invoke(
         FunctionName=Config.BACKEND_FUNCTION_NAME,
         InvocationType="RequestResponse",
@@ -80,7 +79,7 @@ def get_prescription_report(request_data: PrescriptionReportRequest, user_contex
         "remove_prescription_at_discharge_date": request_data.remove_prescription_at_discharge_date,
     }
 
-    lambda_client = boto3.client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
+    lambda_client = aws.get_client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
     response = lambda_client.invoke(
         FunctionName=Config.BACKEND_FUNCTION_NAME,
         InvocationType="RequestResponse",
