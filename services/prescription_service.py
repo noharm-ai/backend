@@ -213,6 +213,20 @@ def start_evaluation(
     ]
 
 
+@has_permission(Permission.READ_PRESCRIPTION)
+def get_prescriptions_status(id_prescription_list: list):
+    if not id_prescription_list:
+        return []
+
+    results = (
+        db.session.query(Prescription.id, Prescription.status)
+        .filter(Prescription.id.in_(id_prescription_list))
+        .all()
+    )
+
+    return [{"idPrescription": str(r.id), "status": r.status} for r in results]
+
+
 def is_being_evaluated(features):
     """Deprecated: using dynamodb to track evaluation data."""
     # TODO: remove

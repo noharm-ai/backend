@@ -171,6 +171,21 @@ def setPrescriptionStatus():
     )
 
 
+@app_pres.route("/prescriptions/status-list", methods=["POST"])
+@api_endpoint()
+def getPrescriptionsStatusList():
+    """Return status for a list of idPrescription (lightweight refresh, no filters/joins)"""
+    data = request.get_json()
+    id_prescription_list = data.get("idPrescriptionList", [])
+
+    try:
+        id_prescription_list = [int(i) for i in id_prescription_list if i]
+    except (ValueError, TypeError):
+        id_prescription_list = []
+
+    return prescription_service.get_prescriptions_status(id_prescription_list)
+
+
 @app_pres.route("/prescriptions/review", methods=["POST"])
 @api_endpoint()
 def review_prescription():
