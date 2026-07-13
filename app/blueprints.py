@@ -7,7 +7,6 @@ This module imports and registers all Flask blueprints for the application.
 # Admin routes
 from routes.admin.admin_drug import app_admin_drug
 from routes.admin.admin_exam import app_admin_exam
-from routes.admin.admin_global_exam import app_admin_global_exam
 from routes.admin.admin_global_memory import app_admin_global_memory
 from routes.admin.admin_integration import app_admin_integration
 from routes.admin.admin_intervention_reason import app_admin_interv
@@ -114,7 +113,6 @@ def register_blueprints(app):
     app.register_blueprint(app_admin_tag)
     app.register_blueprint(app_admin_knowledge_base)
     app.register_blueprint(app_admin_protocol)
-    app.register_blueprint(app_admin_global_exam)
     app.register_blueprint(app_admin_global_memory)
     app.register_blueprint(app_admin_report)
 

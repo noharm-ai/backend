@@ -374,8 +374,6 @@ All endpoints in this section require administrator-level authorization.
 | `POST` | `/admin/exam/copy` | Copy exams between segments. |
 | `GET` | `/admin/exam/most-frequent` | Get most frequently used exams. |
 | `POST` | `/admin/exam/most-frequent/add` | Add an exam to the most-frequent list. |
-| `POST` | `/admin/global-exam/list` | List global exam configurations. |
-| `POST` | `/admin/global-exam/upsert` | Create or update a global exam configuration. |
 
 ### Segment & Department Management
 
