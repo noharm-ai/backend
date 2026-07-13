@@ -16,8 +16,3 @@ def list_knowledge_base(request_data: KnowledgeBaseListRequest) -> list[Knowledg
         query = query.filter(KnowledgeBase.path.overlap(request_data.path))
 
     return query.order_by(KnowledgeBase.title).all()
-
-
-def get_by_id(id: int) -> KnowledgeBase:
-    """Fetch a single knowledge base record by id"""
-    return db.session.query(KnowledgeBase).filter(KnowledgeBase.id == id).first()
