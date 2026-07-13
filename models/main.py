@@ -84,6 +84,19 @@ class UserExtra(db.Model):
     createdBy = db.Column("created_by", db.BigInteger, nullable=False)
 
 
+class UserNumbers(db.Model):
+    __tablename__ = "usuario_numeros"
+    __table_args__ = {"schema": "public"}
+
+    idUser = db.Column("idusuario", db.Integer, primary_key=True)
+    logins = db.Column("logins", db.Integer, nullable=True)
+    checks = db.Column("checagens", db.Integer, nullable=True)
+    interventions = db.Column("intervencoes", db.Integer, nullable=True)
+    evolutions = db.Column("evolucoes", db.Integer, nullable=True)
+    updatedAt = db.Column("updated_at", db.DateTime, nullable=True)
+    createdAt = db.Column("created_at", db.DateTime, nullable=False)
+
+
 class Substance(db.Model):
     __tablename__ = "substancia"
     __table_args__ = {"schema": "public"}

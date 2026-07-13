@@ -1,5 +1,6 @@
 """Service: Prescription Check related operations"""
 
+from botocore import useragent
 from datetime import datetime, timedelta
 
 from sqlalchemy import func, text
@@ -18,7 +19,7 @@ from models.prescription import (
     Prescription,
     PrescriptionAudit,
 )
-from repository import prescription_view_repository
+from repository import prescription_view_repository, user_numbers_repository
 from security.role import Role
 from services import (
     data_authorization_service,
@@ -161,6 +162,9 @@ def check_prescription(
                 results.append(single)
 
         _clean_checkedindex(user_context=user_context)
+
+        if p_status == "s":
+            user_numbers_repository.increment_checks(user_context.id)
 
         return results
 
