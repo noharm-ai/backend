@@ -397,13 +397,6 @@ All endpoints in this section require administrator-level authorization.
 | `POST` | `/admin/protocol/list` | List clinical protocols. |
 | `POST` | `/admin/protocol/upsert` | Create or update a protocol. |
 
-### Intervention Reasons
-
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/admin/intervention-reason` | List all intervention reasons. |
-| `POST` | `/admin/intervention-reason` | Create or update an intervention reason. |
-
 ### Tags
 
 | Method | Path | Description |

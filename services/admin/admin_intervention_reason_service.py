@@ -3,11 +3,9 @@
 from sqlalchemy import asc, func, literal_column
 
 from decorators.has_permission_decorator import Permission, has_permission
-from exception.validation_error import ValidationError
 from models.appendix import InterventionReason
 from models.main import db
 from models.prescription import Intervention
-from utils import status
 
 
 @has_permission(Permission.ADMIN_INTERVENTION_REASON, Permission.READ_PRESCRIPTION)
@@ -43,53 +41,6 @@ def get_reasons(id=None, active_only=False):
     return q.all()
 
 
-@has_permission(Permission.ADMIN_INTERVENTION_REASON)
-def upsert_reason(id, reason: InterventionReason):
-    is_protected = False
-
-    if id != None:
-        records = get_reasons(id)
-        if len(records) == 0:
-            raise ValidationError(
-                "Registro inexistente",
-                "errors.invalidRecord",
-                status.HTTP_400_BAD_REQUEST,
-            )
-
-        record = records[0][0]
-        is_protected = records[0][3]
-    else:
-        record = InterventionReason()
-
-    if not is_protected:
-        record.description = reason.description
-        record.mamy = reason.mamy
-
-    tp_count = (
-        int(reason.substitution) + int(reason.suspension) + int(reason.customEconomy)
-    )
-    if tp_count > 1:
-        raise ValidationError(
-            "Você pode escolher somente um tipo de economia para este motivo de intervenção",
-            "errors.businessRoles",
-            status.HTTP_400_BAD_REQUEST,
-        )
-
-    record.idHospital = reason.idHospital
-    record.active = reason.active
-    record.suspension = reason.suspension
-    record.substitution = reason.substitution
-    record.customEconomy = reason.customEconomy
-    record.blocking = reason.blocking
-    record.relation_type = reason.relation_type
-    record.ram = reason.ram
-
-    db.session.add(record)
-    db.session.flush()
-
-    return get_reasons(record.id)
-
-
 def list_to_dto(reasons):
     list = []
 
@@ -112,18 +63,3 @@ def list_to_dto(reasons):
         )
 
     return list
-
-
-def data_to_object(data) -> InterventionReason:
-    return InterventionReason(
-        description=data.get("name", None),
-        mamy=data.get("parentId", None),
-        active=data.get("active", False),
-        suspension=data.get("suspension", False),
-        substitution=data.get("substitution", False),
-        customEconomy=data.get("customEconomy", False),
-        relation_type=data.get("relationType", 0),
-        idHospital=data.get("idHospital", 1),
-        blocking=data.get("blocking", False),
-        ram=data.get("ram", False),
-    )

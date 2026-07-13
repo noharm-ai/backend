@@ -9,7 +9,6 @@ from routes.admin.admin_drug import app_admin_drug
 from routes.admin.admin_exam import app_admin_exam
 from routes.admin.admin_global_memory import app_admin_global_memory
 from routes.admin.admin_integration import app_admin_integration
-from routes.admin.admin_intervention_reason import app_admin_interv
 from routes.admin.admin_memory import app_admin_memory
 from routes.admin.admin_protocol import app_admin_protocol
 from routes.admin.admin_relation import app_admin_relation
@@ -100,7 +99,6 @@ def register_blueprints(app):
     app.register_blueprint(app_pres_clinical_note)
 
     # Admin blueprints
-    app.register_blueprint(app_admin_interv)
     app.register_blueprint(app_admin_memory)
     app.register_blueprint(app_admin_drug)
     app.register_blueprint(app_admin_integration)
