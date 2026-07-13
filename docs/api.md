@@ -348,14 +348,6 @@ All endpoints in this section require administrator-level authorization.
 | `GET` | `/admin/substance/<id>` | Get substance detail. |
 | `POST` | `/admin/substance` | Create or update a substance. |
 
-### Frequency Management
-
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/admin/frequency/list` | List frequencies. |
-| `PUT` | `/admin/frequency` | Update a frequency. |
-| `POST` | `/admin/frequency/infer` | AI-infer frequency from free text. |
-
 ### Unit & Conversion Management
 
 | Method | Path | Description |

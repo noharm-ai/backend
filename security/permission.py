@@ -19,7 +19,6 @@ class Permission(Enum):
 
     ADMIN_GLOBAL_EXAMS = "ADMIN_GLOBAL_EXAMS"  # "admin global exams"
 
-    ADMIN_FREQUENCIES = "ADMIN_FREQUENCIES"  # "admin frequency configs"
     ADMIN_ROUTES = "ADMIN_ROUTES"  # "admin routes configs"
     ADMIN_SUBSTANCE_RELATIONS = (
         "ADMIN_SUBSTANCE_RELATIONS"  # "admin substance relations"
