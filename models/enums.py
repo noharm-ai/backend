@@ -295,6 +295,7 @@ class InterventionAuditEnum(Enum):
 
     UPDATE = 1
     CREATE = 2
+    INTEGRATION_INTERVENTION = 3
 
 
 class PrescriptionDrugPeriodTypeEnum(Enum):
