@@ -7,7 +7,7 @@ from boto3.dynamodb.conditions import Key
 
 from config import Config
 from models.enums import NoHarmENV
-from utils import logger
+from utils import logger, aws
 
 MAX_INACTIVITY_MINUTES = 5
 TTL_BUFFER_MINUTES = 10
@@ -45,7 +45,7 @@ def record_heartbeat(schema: str, id_prescription: int, user_id: int, user_name:
         return fallback_item
 
     try:
-        dynamodb = boto3.resource("dynamodb", region_name="sa-east-1")
+        dynamodb = aws.get_resource("dynamodb", region_name="sa-east-1")
         table = dynamodb.Table(Config.PRESCRIPTION_PRESENCE_TABLE_NAME)
         expires_at = int(
             (
@@ -87,7 +87,7 @@ def get_active_viewers(schema: str, id_prescription: int) -> list[dict]:
         return []
 
     try:
-        dynamodb = boto3.resource("dynamodb", region_name="sa-east-1")
+        dynamodb = aws.get_resource("dynamodb", region_name="sa-east-1")
         table = dynamodb.Table(Config.PRESCRIPTION_PRESENCE_TABLE_NAME)
 
         response = table.query(
