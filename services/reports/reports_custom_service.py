@@ -16,8 +16,8 @@ from services.reports import reports_cache_service
 from utils import aws, dateutils, logger, status, stringutils
 
 CHART_SUGGESTION_MODEL_ID = "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
-CHART_SUGGESTION_MAX_TOKENS = 2048
-MAX_SUGGESTIONS = 4
+CHART_SUGGESTION_MAX_TOKENS = 1024
+MAX_SUGGESTIONS = 1
 
 CHART_SUGGESTION_EXAMPLES = (
     '[{"type": "hbar", "title": "Incidência por Germe", '
@@ -209,7 +209,7 @@ def _validate_report(
 
 @has_permission(Permission.WRITE_CUSTOM_REPORTS_GRAPHS)
 def suggest_graphs(request_data: SuggestGraphsRequest) -> list[dict]:
-    """Ask Bedrock Claude Sonnet to suggest chart configurations for the report data."""
+    """Ask Bedrock Claude Sonnet to suggest the single most insightful chart for the report data."""
     columns_json = json.dumps(
         [
             {
@@ -238,9 +238,10 @@ def suggest_graphs(request_data: SuggestGraphsRequest) -> list[dict]:
     system = (
         "You are a data-visualization assistant embedded in NoHarm, a clinical "
         "pharmacy analytics tool. You receive the column schema and a few sample "
-        "rows of a tabular report and must propose up to 4 chart configurations "
-        "that give the most useful insight into the data.\n\n"
-        "Respond ONLY with a valid, compact JSON array of chart objects — no "
+        "rows of a tabular report and must propose the single chart "
+        "configuration that gives the most useful insight into the data.\n\n"
+        "Respond ONLY with a valid, compact JSON array containing exactly 1 "
+        "chart object — or [] if no meaningful chart is possible. No "
         "explanation, no markdown fences, no trailing text.\n\n"
         "Each chart object may contain ONLY these fields:\n"
         '- "type": "bar" | "hbar" | "line" | "pie" (required)\n'
@@ -278,10 +279,12 @@ def suggest_graphs(request_data: SuggestGraphsRequest) -> list[dict]:
         "positivo/negativo), suggest a stacked hbar comparing them.\n"
         '- Title style: short Brazilian Portuguese noun phrases like "Incidência '
         'por X" or "Perfil de Y - Z".\n'
-        "- Do not repeat any of the existing chart titles.\n"
         "- If the user provides a hint, treat it as the top priority.\n"
-        "- Return between 1 and 4 charts. If no meaningful chart is possible, "
-        "return [].\n\n"
+        "- Consider which visualization is most insightful given the schema, "
+        "sample rows, hint and existing chart titles, then return ONLY that "
+        "one chart. Never repeat an existing chart title — each request must "
+        "yield a chart different from the ones already created.\n"
+        "- If no meaningful chart is possible, return [].\n\n"
         "Examples of well-made charts from OTHER reports (style reference ONLY — "
         "their column keys do NOT exist in this dataset, never reuse them):\n"
         f"{CHART_SUGGESTION_EXAMPLES}"
