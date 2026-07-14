@@ -37,8 +37,8 @@ class TestRecordHeartbeat:
     """Test heartbeat upsert"""
 
     @patch("repository.prescription_presence_repository.Config")
-    @patch("repository.prescription_presence_repository.boto3")
-    def test_record_heartbeat_calls_update_item(self, mock_boto3, mock_config):
+    @patch("repository.prescription_presence_repository.aws")
+    def test_record_heartbeat_calls_update_item(self, mock_aws, mock_config):
         mock_config.ENV = "development"
         mock_config.PRESCRIPTION_PRESENCE_TABLE_NAME = "test-table"
 
@@ -51,7 +51,7 @@ class TestRecordHeartbeat:
                 "lastSeen": "2026-01-01T12:00:00",
             }
         }
-        mock_boto3.resource.return_value.Table.return_value = mock_table
+        mock_aws.get_resource.return_value.Table.return_value = mock_table
 
         result = record_heartbeat(
             schema="demo", id_prescription=123, user_id=1, user_name="Dr. Test"
@@ -76,11 +76,11 @@ class TestRecordHeartbeat:
         assert result["userName"] == "Dr. Test"
 
     @patch("repository.prescription_presence_repository.Config")
-    @patch("repository.prescription_presence_repository.boto3")
-    def test_record_heartbeat_degrades_on_error(self, mock_boto3, mock_config):
+    @patch("repository.prescription_presence_repository.aws")
+    def test_record_heartbeat_degrades_on_error(self, mock_aws, mock_config):
         mock_config.ENV = "development"
         mock_config.PRESCRIPTION_PRESENCE_TABLE_NAME = "test-table"
-        mock_boto3.resource.side_effect = Exception("boom")
+        mock_aws.get_resource.side_effect = Exception("boom")
 
         result = record_heartbeat(
             schema="demo", id_prescription=123, user_id=1, user_name="Dr. Test"
@@ -94,8 +94,8 @@ class TestGetActiveViewers:
     """Test querying and freshness filtering"""
 
     @patch("repository.prescription_presence_repository.Config")
-    @patch("repository.prescription_presence_repository.boto3")
-    def test_filters_out_stale_viewers(self, mock_boto3, mock_config):
+    @patch("repository.prescription_presence_repository.aws")
+    def test_filters_out_stale_viewers(self, mock_aws, mock_config):
         mock_config.ENV = "development"
         mock_config.PRESCRIPTION_PRESENCE_TABLE_NAME = "test-table"
 
@@ -110,7 +110,7 @@ class TestGetActiveViewers:
                 {"userId": 2, "userName": "Stale User", "lastSeen": stale_seen},
             ]
         }
-        mock_boto3.resource.return_value.Table.return_value = mock_table
+        mock_aws.get_resource.return_value.Table.return_value = mock_table
 
         viewers = get_active_viewers(schema="demo", id_prescription=123)
 
@@ -125,10 +125,10 @@ class TestGetActiveViewers:
         assert get_active_viewers(schema="demo", id_prescription=123) == []
 
     @patch("repository.prescription_presence_repository.Config")
-    @patch("repository.prescription_presence_repository.boto3")
-    def test_degrades_to_empty_list_on_error(self, mock_boto3, mock_config):
+    @patch("repository.prescription_presence_repository.aws")
+    def test_degrades_to_empty_list_on_error(self, mock_aws, mock_config):
         mock_config.ENV = "development"
         mock_config.PRESCRIPTION_PRESENCE_TABLE_NAME = "test-table"
-        mock_boto3.resource.side_effect = Exception("boom")
+        mock_aws.get_resource.side_effect = Exception("boom")
 
         assert get_active_viewers(schema="demo", id_prescription=123) == []
