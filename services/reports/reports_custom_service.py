@@ -15,7 +15,7 @@ from repository.reports import reports_repository
 from services.reports import reports_cache_service
 from utils import aws, dateutils, logger, status, stringutils
 
-CHART_SUGGESTION_MODEL_ID = "global.anthropic.claude-sonnet-4-6"
+CHART_SUGGESTION_MODEL_ID = "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
 CHART_SUGGESTION_MAX_TOKENS = 2048
 MAX_SUGGESTIONS = 4
 
@@ -429,7 +429,8 @@ def _prompt_sonnet(messages: list, system: str) -> list:
             accept="application/json",
             contentType="application/json",
         )
-    except Exception:
+    except Exception as error:
+        logger.backend_logger.error("Serviço de IA indisponível: %s", error)
         raise ValidationError(
             "Serviço de IA indisponível",
             "errors.serviceUnavailable",
