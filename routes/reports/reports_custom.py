@@ -1,8 +1,9 @@
 """Route: Custom Reports routes."""
 
-from flask import Blueprint
+from flask import Blueprint, request
 
 from decorators.api_endpoint_decorator import api_endpoint
+from models.requests.reports_custom_request import SuggestGraphsRequest
 from services.reports import reports_custom_service
 
 app_rpt_custom = Blueprint("app_rpt_custom", __name__)
@@ -31,3 +32,12 @@ def process(id_report: int):
 def get_list():
     """List custom reports."""
     return reports_custom_service.get_report_list()
+
+
+@app_rpt_custom.route("/reports/custom/suggest-graphs", methods=["POST"])
+@api_endpoint()
+def suggest_graphs():
+    """Suggest chart configurations for a custom report via LLM."""
+    return reports_custom_service.suggest_graphs(
+        request_data=SuggestGraphsRequest(**request.get_json())
+    )
