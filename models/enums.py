@@ -107,6 +107,7 @@ class DrugTypeEnum(Enum):
     SOLUTION = "Soluções"
     PROCEDURE = "Proced/Exames"
     DIET = "Dietas"
+    MATERIAL = "Materiais"
 
 
 class ReportEnum(Enum):

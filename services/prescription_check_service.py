@@ -1,6 +1,5 @@
 """Service: Prescription Check related operations"""
 
-from botocore import useragent
 from datetime import datetime, timedelta
 
 from sqlalchemy import func, text
@@ -18,6 +17,7 @@ from models.main import User, db, dbSession
 from models.prescription import (
     Prescription,
     PrescriptionAudit,
+    PrescriptionDrug,
 )
 from repository import prescription_view_repository, user_numbers_repository
 from security.role import Role
@@ -199,6 +199,15 @@ def _update_agg_status(prescription: Prescription, user: User, extra={}):
         )
     )
     unchecked_prescriptions = unchecked_prescriptions.filter(Prescription.status != "s")
+
+    # discard prescriptions that have only "Materiais" items
+    non_material_count = (
+        db.session.query(func.count().label("count"))
+        .filter(PrescriptionDrug.idPrescription == Prescription.id)
+        .filter(PrescriptionDrug.source != DrugTypeEnum.MATERIAL.value)
+        .scalar_subquery()
+    )
+    unchecked_prescriptions = unchecked_prescriptions.filter(non_material_count > 0)
 
     agg_status = "0" if unchecked_prescriptions.count() > 0 else "s"
 

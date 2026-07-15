@@ -307,6 +307,68 @@ def test_check_aggregate_prescription(client, analyst_headers):
     assert not pOutAgaudit
 
 
+def test_check_internal_prescription_agg_ignores_material_only(
+    client, analyst_headers
+):
+    """Check internal prescription: agg status becomes 's' even when an unchecked
+    Materiais-only prescription remains inside the aggregation"""
+
+    admission = test_counters["admission_number"]
+    id_agg = test_counters["id_prescription"]
+    id_normal = id_agg + 1
+    id_material = id_agg + 2
+
+    test_counters["id_prescription"] += 3
+    test_counters["admission_number"] += 1
+
+    date = datetime.now()
+
+    # aggregate prescription
+    create_prescription(
+        id=id_agg, admissionNumber=admission, idPatient=1, agg=True, date=date
+    )
+
+    # internal prescription with a normal drug
+    create_prescription(
+        id=id_normal, admissionNumber=admission, idPatient=1, date=date
+    )
+    create_prescription_drug(
+        id=int(f"{id_normal}001"), idPrescription=id_normal, idDrug=3
+    )
+
+    # internal prescription containing only "Materiais" items
+    create_prescription(
+        id=id_material, admissionNumber=admission, idPatient=1, date=date
+    )
+    create_prescription_drug(
+        id=int(f"{id_material}001"),
+        idPrescription=id_material,
+        idDrug=4,
+    )
+    # Set origem via raw SQL — the ORM insert does not reliably persist it (because of the trigger)
+    session.execute(
+        text("UPDATE demo.presmed SET origem = :source WHERE fkpresmed = :id"),
+        {"source": DrugTypeEnum.MATERIAL.value, "id": int(f"{id_material}001")},
+    )
+    session_commit()
+
+    response = client.post(
+        CHECK_URL, json=_check_payload(id_normal), headers=analyst_headers
+    )
+    assert response.status_code == 200
+
+    session.expire_all()
+
+    # Materiais-only prescription remains unchecked but no longer blocks the agg
+    agg = session.query(Prescription).filter(Prescription.id == id_agg).first()
+    assert agg.status == "s"
+
+    material = (
+        session.query(Prescription).filter(Prescription.id == id_material).first()
+    )
+    assert material.status == "0"
+
+
 def test_check_prescription_retries_on_deadlock(client, analyst_headers):
     """check_prescription: recovers transparently from a single deadlock on presmed UPDATE"""
     prescription = create_basic_prescription()
