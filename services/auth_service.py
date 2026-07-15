@@ -187,9 +187,7 @@ def _auth_user(
         schema=user_schema,
         user_id=user.id,
     )
-    notification = [
-        n for n in active_notifications if _notification_visible(n, roles)
-    ]
+    notification = [n for n in active_notifications if _notification_visible(n, roles)]
 
     features = db_session.query(Memory).filter(Memory.kind == "features").first()
     preferences = (
@@ -519,7 +517,7 @@ def auth_provider(code, schema, nonce=None):
         )
     except Exception as error:
         logger.backend_logger.error(
-            "OAUTH provider error: decode error: %s", str(error)
+            "%s: OAUTH provider error: decode error: %s", schema, str(error)
         )
         raise ValidationError(
             "OAUTH provider error: decode error",
