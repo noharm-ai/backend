@@ -9,7 +9,7 @@ from models.enums import NoHarmENV
 class Config:
     """Configuration class for the application."""
 
-    VERSION = "v6.43-beta"
+    VERSION = "v6.44-beta"
     FRONTEND_VERSION = "5.1.6"
     ENV = getenv("ENV") or NoHarmENV.DEVELOPMENT.value
     SECRET_KEY = getenv("SECRET_KEY") or "secret_key"
@@ -43,6 +43,10 @@ class Config:
     CACHE_BUCKET_NAME = getenv("CACHE_BUCKET_NAME") or ""
     CACHE_BUCKET_ID = getenv("CACHE_BUCKET_ID") or ""
     CACHE_BUCKET_KEY = getenv("CACHE_BUCKET_KEY") or ""
+
+    PRESCRIPTION_PRESENCE_TABLE_NAME = (
+        getenv("PRESCRIPTION_PRESENCE_TABLE_NAME") or "noharm_prescription_presence"
+    )
 
     ODOO_API_DB = getenv("ODOO_API_DB") or ""
     ODOO_API_KEY = getenv("ODOO_API_KEY") or ""

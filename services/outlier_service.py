@@ -6,7 +6,6 @@ import logging
 from datetime import datetime
 from typing import List
 
-import boto3
 from sqlalchemy import asc, func, literal, literal_column, text
 
 from config import Config
@@ -23,7 +22,7 @@ from models.main import (
 )
 from services import data_authorization_service
 from services.admin import admin_drug_service, admin_integration_status_service
-from utils import logger, status
+from utils import aws, logger, status
 
 FOLD_SIZE = 10
 
@@ -119,7 +118,7 @@ def generate(
 
     start_date = datetime.now()
 
-    lambda_client = boto3.client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
+    lambda_client = aws.get_client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
     response = lambda_client.invoke(
         FunctionName=Config.BACKEND_FUNCTION_NAME,
         InvocationType="RequestResponse",
@@ -418,7 +417,7 @@ def generate_segment_scores(id_segment: int, user_context: User):
         "id_user": user_context.id,
         "id_segment": id_segment,
     }
-    lambda_client = boto3.client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
+    lambda_client = aws.get_client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
     response = lambda_client.invoke(
         FunctionName=Config.BACKEND_FUNCTION_NAME,
         InvocationType="Event",
@@ -587,7 +586,7 @@ def refresh_agg(user_context: User):
         "schema": user_context.schema,
     }
 
-    lambda_client = boto3.client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
+    lambda_client = aws.get_client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
     response = lambda_client.invoke(
         FunctionName=Config.BACKEND_FUNCTION_NAME,
         InvocationType="Event",

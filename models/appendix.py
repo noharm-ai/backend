@@ -275,6 +275,70 @@ class GlobalExam(db.Model):
     created_by = db.Column("created_by", db.BigInteger, nullable=False)
 
 
+class Training(db.Model):
+    """Training module content table"""
+
+    __tablename__ = "treinamento"
+    __table_args__ = {"schema": "public"}
+
+    id = db.Column("idtreinamento", db.Integer, primary_key=True)
+    page = db.Column("pagina", db.String(255), nullable=False)
+    title = db.Column("titulo", db.String(255), nullable=False)
+    description = db.Column("resumo", db.Text, nullable=True)
+    position = db.Column("posicao", db.Integer, nullable=False)
+    active = db.Column("ativo", db.Boolean, nullable=False)
+    mandatory = db.Column("obrigatorio", db.Boolean, nullable=False)
+    updated_at = db.Column("updated_at", db.DateTime, nullable=True)
+    updated_by = db.Column("updated_by", db.BigInteger, nullable=True)
+    created_at = db.Column("created_at", db.DateTime, nullable=False)
+    created_by = db.Column("created_by", db.BigInteger, nullable=False)
+
+
+class TrainingItem(db.Model):
+    """Training module item (step/lesson within a Training record)"""
+
+    __tablename__ = "treinamento_item"
+    __table_args__ = {"schema": "public"}
+
+    id = db.Column("idtreinamento_item", db.Integer, primary_key=True)
+    training_id = db.Column("idtreinamento", db.Integer, nullable=False)
+    title = db.Column("titulo", db.String(255), nullable=False)
+    text = db.Column("texto", db.Text, nullable=True)
+    video = db.Column("video", db.String(255), nullable=True)
+    position = db.Column("posicao", db.Integer, nullable=False)
+    active = db.Column("ativo", db.Boolean, nullable=False)
+    questions = db.Column("questoes", postgresql.JSON, nullable=True)
+    updated_at = db.Column("updated_at", db.DateTime, nullable=True)
+    updated_by = db.Column("updated_by", db.BigInteger, nullable=True)
+    created_at = db.Column("created_at", db.DateTime, nullable=False)
+    created_by = db.Column("created_by", db.BigInteger, nullable=False)
+
+
+class TrainingItemUser(db.Model):
+    """Tracks when a user finishes a training item"""
+
+    __tablename__ = "treinamento_item_usuario"
+    __table_args__ = {"schema": "public"}
+
+    training_item_id = db.Column("idtreinamento_item", db.Integer, primary_key=True)
+    user_id = db.Column("idusuario", db.Integer, primary_key=True)
+    duration_seconds = db.Column("duracao_segundos", db.Integer, nullable=True)
+    created_at = db.Column("created_at", db.DateTime, nullable=False)
+    updated_at = db.Column("updated_at", db.DateTime, nullable=True)
+
+
+class TrainingUser(db.Model):
+    """Tracks when a user finishes every item of a training module"""
+
+    __tablename__ = "treinamento_usuario"
+    __table_args__ = {"schema": "public"}
+
+    training_id = db.Column("idtreinamento", db.Integer, primary_key=True)
+    user_id = db.Column("idusuario", db.Integer, primary_key=True)
+    created_at = db.Column("created_at", db.DateTime, nullable=False)
+    updated_at = db.Column("updated_at", db.DateTime, nullable=True)
+
+
 class KnowledgeBase(db.Model):
     """Knowledge Base links table"""
 

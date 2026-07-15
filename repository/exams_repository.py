@@ -2,7 +2,6 @@
 
 from datetime import date, timedelta
 
-import boto3
 from boto3.dynamodb.conditions import Key
 from sqlalchemy import asc, desc, func
 
@@ -11,6 +10,7 @@ from models.appendix import GlobalExam
 from models.enums import NoHarmENV
 from models.main import db
 from models.segment import Exams, SegmentExam
+from utils import aws
 
 
 def get_exams_by_patient(idPatient: int, days: int):
@@ -31,7 +31,7 @@ def get_exams_by_patient_from_dynamodb(schema: str, id_patient: int):
     if Config.ENV == NoHarmENV.TEST.value:
         return []
 
-    dynamodb = boto3.resource("dynamodb", region_name="sa-east-1")
+    dynamodb = aws.get_resource("dynamodb", region_name="sa-east-1")
     table = dynamodb.Table("noharm_exame")
 
     PARTITION_KEY_VALUE = f"{schema}:{id_patient}"

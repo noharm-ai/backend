@@ -73,6 +73,7 @@ def get_prescriptions():
         idDrug=to_int_list(request.args.getlist("idDrug[]")),
         idPatient=to_int_list(request.args.getlist("idPatient[]")),
         intervals=request.args.getlist("intervals[]"),
+        first_administration_hour=request.args.getlist("first_administration_hour[]"),
         allDrugs=to_bool(request.args.get("allDrugs"), default=False),
         startDate=parse_date(request.args.get("startDate")) or date.today(),
         endDate=parse_date(request.args.get("endDate")),
@@ -168,6 +169,21 @@ def setPrescriptionStatus():
         concilia_list=concilia_list,
         concilia_relations=concilia_relations,
     )
+
+
+@app_pres.route("/prescriptions/status-list", methods=["POST"])
+@api_endpoint()
+def getPrescriptionsStatusList():
+    """Return status for a list of idPrescription (lightweight refresh, no filters/joins)"""
+    data = request.get_json()
+    id_prescription_list = data.get("idPrescriptionList", [])
+
+    try:
+        id_prescription_list = [int(i) for i in id_prescription_list if i]
+    except (ValueError, TypeError):
+        id_prescription_list = []
+
+    return prescription_service.get_prescriptions_status(id_prescription_list)
 
 
 @app_pres.route("/prescriptions/review", methods=["POST"])

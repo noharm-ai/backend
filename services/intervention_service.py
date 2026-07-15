@@ -16,6 +16,7 @@ from models.prescription import (
     Prescription,
     PrescriptionDrug,
 )
+from repository import user_numbers_repository
 from services import (
     data_authorization_service,
     feature_service,
@@ -390,6 +391,8 @@ def add_multiple_interventions(
         db.session.add(i)
         db.session.flush()
 
+        user_numbers_repository.increment_interventions(user_context.id)
+
         audit = InterventionAudit()
         audit.auditType = InterventionAuditEnum.CREATE.value
         audit.idIntervention = i.idIntervention
@@ -616,6 +619,8 @@ def save_intervention(
     if new_intv:
         db.session.add(i)
         db.session.flush()
+
+        user_numbers_repository.increment_interventions(user_context.id)
 
     audit = InterventionAudit()
     audit.auditType = (

@@ -29,15 +29,15 @@ class TestDynamoDBNameService:
     def service(self, config):
         return DynamoDBNameService(config, "test_schema")
 
-    @patch("services.name_service.boto3")
-    def test_get_single_name_success(self, mock_boto3, service):
+    @patch("services.name_service.aws")
+    def test_get_single_name_success(self, mock_aws, service):
         """Test successful single patient name retrieval from DynamoDB"""
         # Mock DynamoDB response
         mock_table = MagicMock()
         mock_table.get_item.return_value = {
             "Item": {"schema_fkpessoa": "12345", "nome": "John Doe"}
         }
-        mock_boto3.resource.return_value.Table.return_value = mock_table
+        mock_aws.get_resource.return_value.Table.return_value = mock_table
 
         result = service.get_single_name(12345)
 
@@ -46,12 +46,12 @@ class TestDynamoDBNameService:
         assert result["name"] == "John Doe"
         mock_table.get_item.assert_called_once()
 
-    @patch("services.name_service.boto3")
-    def test_get_single_name_not_found(self, mock_boto3, service):
+    @patch("services.name_service.aws")
+    def test_get_single_name_not_found(self, mock_aws, service):
         """Test patient not found in DynamoDB"""
         mock_table = MagicMock()
         mock_table.get_item.return_value = {}
-        mock_boto3.resource.return_value.Table.return_value = mock_table
+        mock_aws.get_resource.return_value.Table.return_value = mock_table
 
         result = service.get_single_name(12345)
 

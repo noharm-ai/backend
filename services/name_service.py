@@ -4,7 +4,6 @@ from abc import ABC, abstractmethod
 from datetime import datetime, timedelta, timezone
 from urllib.parse import quote as _url_quote
 
-import boto3
 import requests
 from jwt import encode
 from markupsafe import escape as _escape_html
@@ -16,7 +15,7 @@ from models.appendix import SchemaConfig
 from models.enums import NoHarmENV
 from models.main import User, db
 from security.permission import Permission
-from utils import logger, status
+from utils import aws, logger, status
 
 TIMEOUT = 15
 MAX_SEARCH_RESULTS = 150
@@ -76,7 +75,7 @@ class DynamoDBNameService(NameServiceStrategy):
 
     def _get_dynamo_resources(self):
         """Return (dynamodb resource, table_name) for reuse across methods."""
-        dynamodb = boto3.resource("dynamodb", region_name="sa-east-1")
+        dynamodb = aws.get_resource("dynamodb", region_name="sa-east-1")
         table_name = self.config["getname"]["token"]["url"].split(":")[1]
         return dynamodb, table_name
 

@@ -348,14 +348,6 @@ All endpoints in this section require administrator-level authorization.
 | `GET` | `/admin/substance/<id>` | Get substance detail. |
 | `POST` | `/admin/substance` | Create or update a substance. |
 
-### Frequency Management
-
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/admin/frequency/list` | List frequencies. |
-| `PUT` | `/admin/frequency` | Update a frequency. |
-| `POST` | `/admin/frequency/infer` | AI-infer frequency from free text. |
-
 ### Unit & Conversion Management
 
 | Method | Path | Description |
@@ -382,8 +374,6 @@ All endpoints in this section require administrator-level authorization.
 | `POST` | `/admin/exam/copy` | Copy exams between segments. |
 | `GET` | `/admin/exam/most-frequent` | Get most frequently used exams. |
 | `POST` | `/admin/exam/most-frequent/add` | Add an exam to the most-frequent list. |
-| `POST` | `/admin/global-exam/list` | List global exam configurations. |
-| `POST` | `/admin/global-exam/upsert` | Create or update a global exam configuration. |
 
 ### Segment & Department Management
 
@@ -406,13 +396,6 @@ All endpoints in this section require administrator-level authorization.
 |---|---|---|
 | `POST` | `/admin/protocol/list` | List clinical protocols. |
 | `POST` | `/admin/protocol/upsert` | Create or update a protocol. |
-
-### Intervention Reasons
-
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/admin/intervention-reason` | List all intervention reasons. |
-| `POST` | `/admin/intervention-reason` | Create or update an intervention reason. |
 
 ### Tags
 

@@ -7,18 +7,14 @@ This module imports and registers all Flask blueprints for the application.
 # Admin routes
 from routes.admin.admin_drug import app_admin_drug
 from routes.admin.admin_exam import app_admin_exam
-from routes.admin.admin_frequency import app_admin_freq
-from routes.admin.admin_global_exam import app_admin_global_exam
 from routes.admin.admin_global_memory import app_admin_global_memory
 from routes.admin.admin_integration import app_admin_integration
-from routes.admin.admin_intervention_reason import app_admin_interv
 from routes.admin.admin_memory import app_admin_memory
 from routes.admin.admin_protocol import app_admin_protocol
 from routes.admin.admin_relation import app_admin_relation
 from routes.admin.admin_report import app_admin_report
 from routes.admin.admin_segment import app_admin_segment
 from routes.admin.admin_substance import app_admin_subs
-from routes.admin.admin_knowledge_base import app_admin_knowledge_base
 from routes.admin.admin_tag import app_admin_tag
 from routes.admin.admin_unit import app_admin_unit
 from routes.admin.admin_unit_conversion import app_admin_unit_conversion
@@ -61,6 +57,7 @@ from routes.substance import app_sub
 from routes.summary import app_summary
 from routes.support import app_support
 from routes.tag import app_tag
+from routes.training import app_training
 from routes.user import app_usr
 from routes.user_admin import app_user_admin
 
@@ -91,6 +88,7 @@ def register_blueprints(app):
     app.register_blueprint(app_conciliation)
     app.register_blueprint(app_tag)
     app.register_blueprint(app_protocol)
+    app.register_blueprint(app_training)
     app.register_blueprint(app_exams)
     app.register_blueprint(app_lists)
     app.register_blueprint(app_queue)
@@ -100,8 +98,6 @@ def register_blueprints(app):
     app.register_blueprint(app_pres_clinical_note)
 
     # Admin blueprints
-    app.register_blueprint(app_admin_freq)
-    app.register_blueprint(app_admin_interv)
     app.register_blueprint(app_admin_memory)
     app.register_blueprint(app_admin_drug)
     app.register_blueprint(app_admin_integration)
@@ -112,9 +108,7 @@ def register_blueprints(app):
     app.register_blueprint(app_admin_relation)
     app.register_blueprint(app_admin_unit)
     app.register_blueprint(app_admin_tag)
-    app.register_blueprint(app_admin_knowledge_base)
     app.register_blueprint(app_admin_protocol)
-    app.register_blueprint(app_admin_global_exam)
     app.register_blueprint(app_admin_global_memory)
     app.register_blueprint(app_admin_report)
 

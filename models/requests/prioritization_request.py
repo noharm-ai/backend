@@ -26,6 +26,7 @@ class PrioritizationRequest(BaseModel):
     drugAttributes: list[str] = Field(default_factory=list)
     idPatient: list[int] = Field(default_factory=list)
     intervals: list[str] = Field(default_factory=list)
+    first_administration_hour: list[str] = Field(default_factory=list)
     prescriber: Optional[str] = None
     diff: Optional[bool] = None
     global_score_min: Optional[int] = None

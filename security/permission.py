@@ -17,9 +17,6 @@ class Permission(Enum):
         "ADMIN_EXAMS__MOST_FREQUENT"  # "get most frequent exams"
     )
 
-    ADMIN_GLOBAL_EXAMS = "ADMIN_GLOBAL_EXAMS"  # "admin global exams"
-
-    ADMIN_FREQUENCIES = "ADMIN_FREQUENCIES"  # "admin frequency configs"
     ADMIN_ROUTES = "ADMIN_ROUTES"  # "admin routes configs"
     ADMIN_SUBSTANCE_RELATIONS = (
         "ADMIN_SUBSTANCE_RELATIONS"  # "admin substance relations"
@@ -107,10 +104,6 @@ class Permission(Enum):
 
     READ_NAV = "READ_NAV"  # permission to navigation data
     NAV_COPY_PATIENT = "NAV_COPY_PATIENT"  # permission to copy patient data
-
-    ADMIN_KNOWLEDGE_BASE = (
-        "ADMIN_KNOWLEDGE_BASE"  # permission to manage knowledge base records
-    )
 
     WRITE_CUSTOM_FORMS = "WRITE_CUSTOM_FORMS"  # permission to write custom forms
 
