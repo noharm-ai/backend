@@ -18,13 +18,9 @@ class Permission(Enum):
     )
 
     ADMIN_ROUTES = "ADMIN_ROUTES"  # "admin routes configs"
-    ADMIN_SUBSTANCE_RELATIONS = (
-        "ADMIN_SUBSTANCE_RELATIONS"  # "admin substance relations"
-    )
     ADMIN_SUBSTANCES = "ADMIN_SUBSTANCES"  # "admin substances"
     ADMIN_SEGMENTS = "ADMIN_SEGMENTS"  # "admin segments"
     ADMIN_UNIT_CONVERSION = "ADMIN_UNIT_CONVERSION"  # "admin unit conversions"
-    ADMIN_UNIT = "ADMIN_UNIT"  # admin units
 
     ADMIN_PATIENT = "ADMIN_PATIENT"  # "admin extra patient configs"
 

@@ -67,53 +67,6 @@ def get_drug_summary(
     routeResults = []
     intervalResults = []
 
-    if complete:
-        max_days = 90
-        routes = (
-            db.session.query(PrescriptionDrug.route)
-            .select_from(PrescriptionDrug)
-            .join(Prescription, Prescription.id == PrescriptionDrug.idPrescription)
-            .filter(
-                and_(
-                    PrescriptionDrug.idDrug == id_drug,
-                    PrescriptionDrug.idSegment == id_segment,
-                    Prescription.date > func.current_date() - max_days,
-                )
-            )
-            .group_by(PrescriptionDrug.route)
-            .all()
-        )
-
-        routeResults = []
-        for r in routes:
-            routeResults.append({"id": r.route, "description": r.route})
-
-        intervals = (
-            db.session.query(PrescriptionDrug.interval, PrescriptionDrug.idFrequency)
-            .select_from(PrescriptionDrug)
-            .join(Prescription, Prescription.id == PrescriptionDrug.idPrescription)
-            .filter(
-                and_(
-                    PrescriptionDrug.idDrug == id_drug,
-                    PrescriptionDrug.idSegment == id_segment,
-                    Prescription.date > func.current_date() - max_days,
-                    PrescriptionDrug.interval != None,
-                )
-            )
-            .group_by(PrescriptionDrug.interval, PrescriptionDrug.idFrequency)
-            .all()
-        )
-
-        intervalResults = []
-        for i in intervals:
-            intervalResults.append(
-                {
-                    "id": i.interval,
-                    "idFrequency": i.idFrequency,
-                    "description": prescriptionutils.timeValue(i.interval),
-                }
-            )
-
     remove_fields = memory_service.get_memory(
         MemoryEnum.TRANSCRIPTION_REMOVE_FIELDS.value
     )
@@ -121,14 +74,78 @@ def get_drug_summary(
         MemoryEnum.TRANSCRIPTION_FIELDS.value
     )
 
+    if complete:
+        max_days = 15
+
+        map_routes = memory_service.get_memory(MemoryEnum.MAP_ROUTES.value)
+        if map_routes and map_routes.value:
+            for r in map_routes.value:
+                if isinstance(r, dict):
+                    routeResults.append(
+                        {"id": r.get("id"), "description": r.get("value")}
+                    )
+        else:
+            routes = (
+                db.session.query(PrescriptionDrug.route)
+                .select_from(PrescriptionDrug)
+                .join(Prescription, Prescription.id == PrescriptionDrug.idPrescription)
+                .filter(
+                    and_(
+                        PrescriptionDrug.idDrug == id_drug,
+                        PrescriptionDrug.idSegment == id_segment,
+                        Prescription.date > func.current_date() - max_days,
+                    )
+                )
+                .group_by(PrescriptionDrug.route)
+                .all()
+            )
+
+            for r in routes:
+                routeResults.append({"id": r.route, "description": r.route})
+
+        has_intervals = True
+        if remove_fields and remove_fields.value and "interval" in remove_fields.value:
+            has_intervals = False
+
+        if has_intervals:
+            intervals = (
+                db.session.query(
+                    PrescriptionDrug.interval, PrescriptionDrug.idFrequency
+                )
+                .select_from(PrescriptionDrug)
+                .join(Prescription, Prescription.id == PrescriptionDrug.idPrescription)
+                .filter(
+                    and_(
+                        PrescriptionDrug.idDrug == id_drug,
+                        PrescriptionDrug.idSegment == id_segment,
+                        Prescription.date > func.current_date() - max_days,
+                        PrescriptionDrug.interval != None,
+                    )
+                )
+                .group_by(PrescriptionDrug.interval, PrescriptionDrug.idFrequency)
+                .all()
+            )
+
+            for i in intervals:
+                intervalResults.append(
+                    {
+                        "id": i.interval,
+                        "idFrequency": i.idFrequency,
+                        "description": prescriptionutils.timeValue(i.interval),
+                    }
+                )
+
     return {
         "drug": {"id": int(id_drug), "name": drug.name if drug else ""},
         "units": unitResults,
         "frequencies": frequencyResults,
         "routes": routeResults,
         "intervals": intervalResults,
-        "extraFields": transcription_fields.value if transcription_fields else [],
-        "removeFields": remove_fields.value if remove_fields else [],
+        "extraFields": (
+            transcription_fields.value if transcription_fields else None
+        )
+        or [],
+        "removeFields": (remove_fields.value if remove_fields else None) or [],
     }
 
 
