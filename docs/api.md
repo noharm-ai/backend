@@ -348,12 +348,10 @@ All endpoints in this section require administrator-level authorization.
 | `GET` | `/admin/substance/<id>` | Get substance detail. |
 | `POST` | `/admin/substance` | Create or update a substance. |
 
-### Unit & Conversion Management
+### Unit Conversion Management
 
 | Method | Path | Description |
 |---|---|---|
-| `POST` | `/admin/unit/list` | List measurement units. |
-| `PUT` | `/admin/unit` | Update a unit. |
 | `POST` | `/admin/unit-conversion/list` | List unit conversions. |
 | `POST` | `/admin/unit-conversion/predictions` | Get AI-predicted conversions. |
 | `POST` | `/admin/unit-conversion/save` | Save unit conversions. |
@@ -382,13 +380,6 @@ All endpoints in this section require administrator-level authorization.
 | `POST` | `/admin/segments` | Create or update a segment. |
 | `GET` | `/admin/segments/departments/<idSegment>` | Get departments for a segment. |
 | `POST` | `/admin/segments/departments` | Create or update a department. |
-
-### Drug Relations (Interactions)
-
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/admin/relation/list` | List drug relations/interactions. |
-| `POST` | `/admin/relation` | Create or update a drug relation. |
 
 ### Protocol Management
 
