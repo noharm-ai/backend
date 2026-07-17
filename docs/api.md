@@ -424,7 +424,7 @@ All endpoints in this section require administrator-level authorization.
 
 | Method | Path | Description |
 |---|---|---|
-| `POST` | `/admin/integration/init-intervention-reason` | Initialize default intervention reasons. |
+| `POST` | `/admin/integration/update-user-security-group` | Update user security group rules. |
 
 ---
 

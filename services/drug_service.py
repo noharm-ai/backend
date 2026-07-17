@@ -77,11 +77,13 @@ def get_drug_summary(
     if complete:
         max_days = 15
 
-        routeResults = []
         map_routes = memory_service.get_memory(MemoryEnum.MAP_ROUTES.value)
         if map_routes and map_routes.value:
             for r in map_routes.value:
-                routeResults.append({"id": r["id"], "description": r["value"]})
+                if isinstance(r, dict):
+                    routeResults.append(
+                        {"id": r.get("id"), "description": r.get("value")}
+                    )
         else:
             routes = (
                 db.session.query(PrescriptionDrug.route)
@@ -102,7 +104,7 @@ def get_drug_summary(
                 routeResults.append({"id": r.route, "description": r.route})
 
         has_intervals = True
-        if remove_fields and "interval" in remove_fields.value:
+        if remove_fields and remove_fields.value and "interval" in remove_fields.value:
             has_intervals = False
 
         if has_intervals:
@@ -124,7 +126,6 @@ def get_drug_summary(
                 .all()
             )
 
-            intervalResults = []
             for i in intervals:
                 intervalResults.append(
                     {
@@ -140,8 +141,11 @@ def get_drug_summary(
         "frequencies": frequencyResults,
         "routes": routeResults,
         "intervals": intervalResults,
-        "extraFields": transcription_fields.value if transcription_fields else [],
-        "removeFields": remove_fields.value if remove_fields else [],
+        "extraFields": (
+            transcription_fields.value if transcription_fields else None
+        )
+        or [],
+        "removeFields": (remove_fields.value if remove_fields else None) or [],
     }
 
 
