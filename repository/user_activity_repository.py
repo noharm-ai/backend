@@ -1,26 +1,28 @@
-"""Repository: User numbers (rough usage counters) operations"""
+"""Repository: User activity (daily usage counters) operations"""
 
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import func
 from sqlalchemy.dialects.postgresql import insert
 
-from models.main import db, UserNumbers
+from models.main import db, UserActivity
 
 
 def _increment(user_id: int, field: str):
-    """Increment one counter field for a user, creating the row if needed"""
+    """Increment one counter field for a user on the current day, creating the row if needed"""
     now = datetime.today()
+    today = date.today()
 
-    stmt = insert(UserNumbers.__table__).values(
+    stmt = insert(UserActivity.__table__).values(
         idusuario=user_id,
+        dt_atividade=today,
         **{field: 1},
         created_at=now,
     )
     stmt = stmt.on_conflict_do_update(
-        index_elements=["idusuario"],
+        index_elements=["idusuario", "dt_atividade"],
         set_={
-            field: func.coalesce(UserNumbers.__table__.c[field], 0) + 1,
+            field: func.coalesce(UserActivity.__table__.c[field], 0) + 1,
             "updated_at": now,
         },
     )

@@ -10,7 +10,7 @@ from models.prescription import Prescription, PrescriptionClinicalNote
 from models.requests.prescription_clinical_note_request import (
     PrescriptionClinicalNoteUpsertRequest,
 )
-from repository import user_numbers_repository
+from repository import user_activity_repository
 from services import data_authorization_service
 from utils import status
 
@@ -66,7 +66,7 @@ def upsert(
         record.createdAt = datetime.today()
         record.createdBy = user_context.id
 
-        user_numbers_repository.increment_evolutions(user_context.id)
+        user_activity_repository.increment_evolutions(user_context.id)
 
     p = (
         db.session.query(Prescription)

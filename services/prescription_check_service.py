@@ -19,7 +19,7 @@ from models.prescription import (
     PrescriptionAudit,
     PrescriptionDrug,
 )
-from repository import prescription_view_repository, user_numbers_repository
+from repository import prescription_view_repository, user_activity_repository
 from security.role import Role
 from services import (
     data_authorization_service,
@@ -164,7 +164,7 @@ def check_prescription(
         _clean_checkedindex(user_context=user_context)
 
         if p_status == "s":
-            user_numbers_repository.increment_checks(user_context.id)
+            user_activity_repository.increment_checks(user_context.id)
 
         return results
 

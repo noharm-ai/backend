@@ -29,7 +29,7 @@ from models.enums import (
 )
 from models.main import User, UserExtra, db, dbSession
 from models.segment import Segment
-from repository import notification_repository, user_numbers_repository, user_repository
+from repository import notification_repository, user_activity_repository, user_repository
 from security.role import Role
 from services import memory_service, user_service
 from services.admin import admin_integration_status_service
@@ -258,7 +258,7 @@ def _auth_user(
             extra=extra_audit,
         )
 
-    user_numbers_repository.increment_logins(user.id)
+    user_activity_repository.increment_logins(user.id)
 
     getname_config = (
         schema_config.config.get("getname", {}) if schema_config.config else {}
