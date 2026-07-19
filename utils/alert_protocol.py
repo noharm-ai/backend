@@ -10,6 +10,12 @@ from models.enums import DrugTypeEnum
 from models.main import DrugAttributes, Substance
 from models.prescription import Patient, Prescription, PrescriptionDrug
 from utils import prescriptionutils
+from utils.alert_protocol_trace import (
+    CombinationCriterionTrace,
+    CombinationDrugTrace,
+    TraceReasonEnum,
+    VariableTrace,
+)
 
 # Simpler regex that avoids ReDoS by using alternation without nested quantifiers
 # Matches any combination of: keywords (True, False, and, or, not) OR structural chars (whitespace, parens)
@@ -40,6 +46,7 @@ class AlertProtocol:
     protocol_msgs = None
     related_items = None  # list of prescriptions items who were related to the protocol being active
     protocol_extra_info: Union[ProtocolExtraInfo, None] = None
+    trace_log = None  # list of VariableTrace filled when tracing is enabled
 
     def __init__(
         self,
@@ -84,6 +91,11 @@ class AlertProtocol:
         self.related_items = []
         self.protocol_extra_info = protocol_extra_info if protocol_extra_info else None
 
+        self._trace_enabled = False
+        self.trace_log = []
+        self._current_trace = None
+        self._last_substituted_trigger = None
+
         # fill lists
         for d in self.filtered_drugs:
             prescription_drug: PrescriptionDrug = d[0]
@@ -109,7 +121,21 @@ class AlertProtocol:
         self.related_items = []
 
         for v in protocol.get("variables", []):
+            if self._trace_enabled:
+                self._current_trace = VariableTrace(
+                    name=v.get("name"),
+                    field=v.get("field"),
+                    operator=v.get("operator"),
+                    expected_value=v.get("value"),
+                )
+
             self.protocol_variables[v.get("name")] = self._fill_variable(variable=v)
+
+            if self._trace_enabled and self._current_trace is not None:
+                self._current_trace.result = self.protocol_variables[v.get("name")]
+                self.trace_log.append(self._current_trace)
+                self._current_trace = None
+
             fail_msg = v.get("message", {})
             if fail_msg.get("if", None) == self.protocol_variables[v.get("name")]:
                 self.protocol_msgs.append(fail_msg.get("then"))
@@ -117,6 +143,8 @@ class AlertProtocol:
         trigger = protocol.get("trigger")
         for var, value in self.protocol_variables.items():
             trigger = trigger.replace("{{" + var + "}}", str(value))
+
+        self._last_substituted_trigger = trigger
 
         if not self._is_safe_logical_expression(trigger):
             raise ValueError("unsafe expression")
@@ -132,6 +160,93 @@ class AlertProtocol:
 
         return None
 
+    def evaluate_with_trace(self, protocol: dict) -> dict:
+        """Runs get_protocol_alerts with tracing enabled and returns the result
+        plus a structured evaluation trace (one VariableTrace per variable)"""
+
+        self._trace_enabled = True
+        self.trace_log = []
+        try:
+            result = self.get_protocol_alerts(protocol=protocol)
+        finally:
+            self._trace_enabled = False
+            self._current_trace = None
+
+        return {
+            "activated": result is not None,
+            "result": result,
+            "trigger": protocol.get("trigger"),
+            "substituted_trigger": self._last_substituted_trigger,
+            "variables": self.trace_log,
+            "related_items": list(self.related_items),
+            "variable_messages": list(self.protocol_msgs),
+        }
+
+    def _trace_miss(self, reason: TraceReasonEnum, **details) -> bool:
+        """Records an early-exit reason when tracing; always returns False"""
+
+        if self._trace_enabled and self._current_trace is not None:
+            self._current_trace.reason = reason.value
+            self._current_trace.details.update(details)
+
+        return False
+
+    def _trace_compare(self, op: str, value1, value2, **details) -> bool:
+        """Wraps _compare, recording actual/expected values when tracing"""
+
+        result = self._compare(op=op, value1=value1, value2=value2)
+
+        if self._trace_enabled and self._current_trace is not None:
+            self._current_trace.reason = TraceReasonEnum.COMPARED.value
+            self._current_trace.actual_value = value1
+            self._current_trace.details.update(details)
+
+            if op in ("IN", "NOTIN", "NOT IN"):
+                try:
+                    self._current_trace.details["matched"] = sorted(
+                        set(value1) & set(value2)
+                    )
+                except TypeError:
+                    pass
+
+        return result
+
+    def _combo_criterion(
+        self, current: bool, criterion: str, op: str, value1, value2, drug_trace
+    ) -> bool:
+        """Evaluates one combination criterion preserving short-circuit semantics;
+        records per-drug trace when tracing is enabled"""
+
+        if not current:
+            if drug_trace is not None:
+                drug_trace.criteria.append(
+                    CombinationCriterionTrace(
+                        criterion=criterion,
+                        operator=op,
+                        expected=value2,
+                        actual=None,
+                        result=None,
+                    )
+                )
+            return False
+
+        result = self._compare(op=op, value1=value1, value2=value2)
+
+        if drug_trace is not None:
+            drug_trace.criteria.append(
+                CombinationCriterionTrace(
+                    criterion=criterion,
+                    operator=op,
+                    expected=value2,
+                    actual=value1,
+                    result=result,
+                )
+            )
+            if not result and drug_trace.failed_criterion is None:
+                drug_trace.failed_criterion = criterion
+
+        return result
+
     def _fill_variable(self, variable: dict):
         field = variable.get("field", None)
         operator = variable.get("operator")
@@ -139,43 +254,63 @@ class AlertProtocol:
 
         if field == "substance":
             value = [str(v) for v in value]
-            return self._compare(op=operator, value1=self.substance_list, value2=value)
+            return self._trace_compare(
+                op=operator, value1=self.substance_list, value2=value
+            )
 
         if field == "class":
-            return self._compare(op=operator, value1=self.class_list, value2=value)
+            return self._trace_compare(
+                op=operator, value1=self.class_list, value2=value
+            )
 
         if field == "idDrug":
             value = [str(v) for v in value]
-            return self._compare(op=operator, value1=self.id_drug_list, value2=value)
+            return self._trace_compare(
+                op=operator, value1=self.id_drug_list, value2=value
+            )
 
         if field == "route":
-            return self._compare(op=operator, value1=self.route_list, value2=value)
+            return self._trace_compare(
+                op=operator, value1=self.route_list, value2=value
+            )
 
         if field == "cn_stats":
             stats_type = variable.get("statsType")
             if stats_type not in self.cn_stats:
-                return False
+                return self._trace_miss(
+                    TraceReasonEnum.STAT_NOT_FOUND, statsType=stats_type
+                )
 
             if self.cn_stats.get(stats_type, None) is None:
-                return False
+                return self._trace_miss(
+                    TraceReasonEnum.STAT_NOT_FOUND, statsType=stats_type
+                )
 
             try:
                 stats_value = int(self.cn_stats.get(stats_type))
                 value = int(value)
             except ValueError:
-                return False
+                return self._trace_miss(
+                    TraceReasonEnum.VALUE_NOT_NUMERIC, statsType=stats_type
+                )
 
-            return self._compare(op=operator, value1=stats_value, value2=value)
+            return self._trace_compare(
+                op=operator, value1=stats_value, value2=value, statsType=stats_type
+            )
 
         if field == "exam":
             exam_type = variable.get("examType")
             exam_period = variable.get("examPeriod", None)
 
             if exam_type not in self.exams:
-                return False
+                return self._trace_miss(
+                    TraceReasonEnum.EXAM_NOT_FOUND, examType=exam_type
+                )
 
             if self.exams[exam_type]["value"] is None:
-                return False
+                return self._trace_miss(
+                    TraceReasonEnum.EXAM_VALUE_MISSING, examType=exam_type
+                )
 
             if exam_period is not None:
                 try:
@@ -185,30 +320,52 @@ class AlertProtocol:
                     days_diff = (date.today() - exam_date).days
 
                     if int(days_diff) > int(exam_period):
-                        return False
+                        return self._trace_miss(
+                            TraceReasonEnum.EXAM_EXPIRED,
+                            examType=exam_type,
+                            examDate=exam_date.isoformat(),
+                            daysDiff=days_diff,
+                            examPeriod=exam_period,
+                        )
                 except (ValueError, KeyError):
-                    return False
+                    return self._trace_miss(
+                        TraceReasonEnum.EXAM_DATE_INVALID, examType=exam_type
+                    )
 
             try:
                 exam_value = float(self.exams[exam_type]["value"])
                 value = float(value)
             except ValueError:
-                return False
+                return self._trace_miss(
+                    TraceReasonEnum.VALUE_NOT_NUMERIC, examType=exam_type
+                )
 
-            return self._compare(op=operator, value1=exam_value, value2=value)
+            return self._trace_compare(
+                op=operator,
+                value1=exam_value,
+                value2=value,
+                examType=exam_type,
+                examDate=self.exams[exam_type].get("date"),
+            )
 
         if field == "exam_ref":
             exam_type = variable.get("examRefType")
             exam_period = variable.get("examRefPeriod", None)
 
             if not self.exams_by_ref:
-                return False
+                return self._trace_miss(
+                    TraceReasonEnum.EXAM_NOT_FOUND, examType=exam_type
+                )
 
             if exam_type not in self.exams_by_ref:
-                return False
+                return self._trace_miss(
+                    TraceReasonEnum.EXAM_NOT_FOUND, examType=exam_type
+                )
 
             if self.exams_by_ref[exam_type]["value"] is None:
-                return False
+                return self._trace_miss(
+                    TraceReasonEnum.EXAM_VALUE_MISSING, examType=exam_type
+                )
 
             if exam_period is not None:
                 try:
@@ -218,24 +375,40 @@ class AlertProtocol:
                     days_diff = (date.today() - exam_date).days
 
                     if int(days_diff) > int(exam_period):
-                        return False
+                        return self._trace_miss(
+                            TraceReasonEnum.EXAM_EXPIRED,
+                            examType=exam_type,
+                            examDate=exam_date.isoformat(),
+                            daysDiff=days_diff,
+                            examPeriod=exam_period,
+                        )
                 except (ValueError, KeyError):
-                    return False
+                    return self._trace_miss(
+                        TraceReasonEnum.EXAM_DATE_INVALID, examType=exam_type
+                    )
 
             try:
                 exam_value = float(self.exams_by_ref[exam_type]["value"])
                 value = float(value)
             except ValueError:
-                return False
+                return self._trace_miss(
+                    TraceReasonEnum.VALUE_NOT_NUMERIC, examType=exam_type
+                )
 
-            return self._compare(op=operator, value1=exam_value, value2=value)
+            return self._trace_compare(
+                op=operator,
+                value1=exam_value,
+                value2=value,
+                examType=exam_type,
+                examDate=self.exams_by_ref[exam_type].get("date"),
+            )
 
         if field == "admissionTime":
             if not self.patient:
-                return False
+                return self._trace_miss(TraceReasonEnum.NO_PATIENT)
 
             if not self.patient.admissionDate:
-                return False
+                return self._trace_miss(TraceReasonEnum.NO_ADMISSION_DATE)
 
             hours_diff = (
                 datetime.now() - self.patient.admissionDate
@@ -244,13 +417,18 @@ class AlertProtocol:
             try:
                 value = float(value)
             except ValueError:
-                return False
+                return self._trace_miss(TraceReasonEnum.VALUE_NOT_NUMERIC)
 
-            return self._compare(op=operator, value1=hours_diff, value2=value)
+            return self._trace_compare(
+                op=operator,
+                value1=hours_diff,
+                value2=value,
+                admissionDate=self.patient.admissionDate.isoformat(),
+            )
 
         if field == "stConcilia":
             if not self.patient:
-                return False
+                return self._trace_miss(TraceReasonEnum.NO_PATIENT)
 
             st_concilia = (
                 self.patient.st_conciliation
@@ -261,41 +439,41 @@ class AlertProtocol:
             try:
                 value = int(value)
             except ValueError:
-                return False
+                return self._trace_miss(TraceReasonEnum.VALUE_NOT_NUMERIC)
 
-            return self._compare(op=operator, value1=st_concilia, value2=value)
+            return self._trace_compare(op=operator, value1=st_concilia, value2=value)
 
         if field == "age":
             age = self.exams.get("age", None)
             if not age:
-                return False
+                return self._trace_miss(TraceReasonEnum.AGE_MISSING)
 
             try:
                 age = float(age)
                 value = float(value)
             except ValueError:
-                return False
+                return self._trace_miss(TraceReasonEnum.VALUE_NOT_NUMERIC)
 
-            return self._compare(op=operator, value1=age, value2=value)
+            return self._trace_compare(op=operator, value1=age, value2=value)
 
         if field == "weight":
             weight = self.exams.get("weight", None)
             if not weight:
-                return False
+                return self._trace_miss(TraceReasonEnum.WEIGHT_MISSING)
             try:
                 weight = float(weight)
                 value = float(value)
             except ValueError:
-                return False
+                return self._trace_miss(TraceReasonEnum.VALUE_NOT_NUMERIC)
 
-            return self._compare(op=operator, value1=weight, value2=value)
+            return self._trace_compare(op=operator, value1=weight, value2=value)
 
         if field == "segmentType":
             if (
                 self.protocol_extra_info is None
                 or self.protocol_extra_info.segment_type is None
             ):
-                return False
+                return self._trace_miss(TraceReasonEnum.NO_SEGMENT_TYPE)
 
             if operator in ["IN", "NOT IN"]:
                 segment_type = [self.protocol_extra_info.segment_type]
@@ -303,7 +481,7 @@ class AlertProtocol:
             else:
                 segment_type = self.protocol_extra_info.segment_type
 
-            return self._compare(op=operator, value1=segment_type, value2=value)
+            return self._trace_compare(op=operator, value1=segment_type, value2=value)
 
         if field == "idDepartment":
             if operator in ["IN", "NOT IN"]:
@@ -312,27 +490,29 @@ class AlertProtocol:
             else:
                 department = self.prescription.idDepartment
 
-            return self._compare(op=operator, value1=department, value2=value)
+            return self._trace_compare(op=operator, value1=department, value2=value)
 
         if field == "idIcd":
             if operator in ["IN", "NOT IN"]:
                 id_icd = [str(self.patient.id_icd).lower()]
                 value = [str(v).lower() for v in value]
             else:
-                return False
+                return self._trace_miss(
+                    TraceReasonEnum.OPERATOR_NOT_SUPPORTED, operator=operator
+                )
 
-            return self._compare(op=operator, value1=id_icd, value2=value)
+            return self._trace_compare(op=operator, value1=id_icd, value2=value)
 
         if field == "dischargeReason":
-            return self._compare(
+            return self._trace_compare(
                 op="CONTAINS", value1=self.patient.dischargeReason, value2=value
             )
 
         if field == "insurance":
             if self.prescription is None or self.prescription.insurance is None:
-                return False
+                return self._trace_miss(TraceReasonEnum.INSURANCE_MISSING)
 
-            return self._compare(
+            return self._trace_compare(
                 op="CONTAINS", value1=self.prescription.insurance, value2=value
             )
 
@@ -343,7 +523,7 @@ class AlertProtocol:
             else:
                 segment = self.prescription.idSegment
 
-            return self._compare(op=operator, value1=segment, value2=value)
+            return self._trace_compare(op=operator, value1=segment, value2=value)
 
         if field == "combination":
             v_substance = variable.get("substance", None)
@@ -379,57 +559,81 @@ class AlertProtocol:
                 period_cpoe = d.period_cpoe
                 drug_attr_keys = self._get_drug_attribute_keys(drug_attributes)
 
+                drug_trace = None
+                if self._trace_enabled and self._current_trace is not None:
+                    drug_trace = CombinationDrugTrace(
+                        id_prescription_drug=prescription_drug.id,
+                        id_drug=prescription_drug.idDrug,
+                        drug_name=d[1].name if d[1] is not None else None,
+                    )
+                    self._current_trace.drugs.append(drug_trace)
+
                 exp_result = True
 
                 if v_substance is not None:
-                    if substance:
-                        exp_result = exp_result and self._compare(
-                            op="IN", value1=[str(substance.id)], value2=v_substance
-                        )
-                    else:
-                        exp_result = False
+                    exp_result = self._combo_criterion(
+                        current=exp_result,
+                        criterion="substance",
+                        op="IN",
+                        value1=[str(substance.id)] if substance else [],
+                        value2=v_substance,
+                        drug_trace=drug_trace,
+                    )
 
                 if v_drug is not None:
-                    exp_result = exp_result and self._compare(
-                        op="IN", value1=[str(prescription_drug.idDrug)], value2=v_drug
+                    exp_result = self._combo_criterion(
+                        current=exp_result,
+                        criterion="drug",
+                        op="IN",
+                        value1=[str(prescription_drug.idDrug)],
+                        value2=v_drug,
+                        drug_trace=drug_trace,
                     )
 
                 if v_class is not None:
-                    if substance:
-                        exp_result = exp_result and self._compare(
-                            op="IN", value1=[str(substance.idclass)], value2=v_class
-                        )
-                    else:
-                        exp_result = False
+                    exp_result = self._combo_criterion(
+                        current=exp_result,
+                        criterion="class",
+                        op="IN",
+                        value1=[str(substance.idclass)] if substance else [],
+                        value2=v_class,
+                        drug_trace=drug_trace,
+                    )
 
                 if v_dose is not None:
                     try:
                         v_dose = float(v_dose)
                     except ValueError:
-                        return False
-
-                    exp_result = exp_result and (
-                        self._compare(
-                            op=v_dose_op,
-                            value1=prescription_drug.doseconv
-                            if prescription_drug.doseconv is not None
-                            else 0,
-                            value2=v_dose,
+                        return self._trace_miss(
+                            TraceReasonEnum.VALUE_NOT_NUMERIC, criterion="dose"
                         )
+
+                    exp_result = self._combo_criterion(
+                        current=exp_result,
+                        criterion="dose",
+                        op=v_dose_op,
+                        value1=prescription_drug.doseconv
+                        if prescription_drug.doseconv is not None
+                        else 0,
+                        value2=v_dose,
+                        drug_trace=drug_trace,
                     )
 
                 if v_frequencyday is not None:
                     try:
                         v_frequencyday = float(v_frequencyday)
                     except ValueError:
-                        return False
-
-                    exp_result = exp_result and (
-                        self._compare(
-                            op=v_frequency_op,
-                            value1=prescription_drug.frequency,
-                            value2=v_frequencyday,
+                        return self._trace_miss(
+                            TraceReasonEnum.VALUE_NOT_NUMERIC, criterion="frequencyday"
                         )
+
+                    exp_result = self._combo_criterion(
+                        current=exp_result,
+                        criterion="frequencyday",
+                        op=v_frequency_op,
+                        value1=prescription_drug.frequency,
+                        value2=v_frequencyday,
+                        drug_trace=drug_trace,
                     )
 
                 if v_intravenous is not None:
@@ -439,12 +643,13 @@ class AlertProtocol:
                         else False
                     )
 
-                    exp_result = exp_result and (
-                        self._compare(
-                            op="=",
-                            value1=intravenous_value,
-                            value2=bool(v_intravenous),
-                        )
+                    exp_result = self._combo_criterion(
+                        current=exp_result,
+                        criterion="intravenous",
+                        op="=",
+                        value1=intravenous_value,
+                        value2=bool(v_intravenous),
+                        drug_trace=drug_trace,
                     )
 
                 if v_feeding_tube is not None:
@@ -454,31 +659,38 @@ class AlertProtocol:
                         else False
                     )
 
-                    exp_result = exp_result and (
-                        self._compare(
-                            op="=",
-                            value1=feeding_tube_value,
-                            value2=bool(v_feeding_tube),
-                        )
+                    exp_result = self._combo_criterion(
+                        current=exp_result,
+                        criterion="feedingTube",
+                        op="=",
+                        value1=feeding_tube_value,
+                        value2=bool(v_feeding_tube),
+                        drug_trace=drug_trace,
                     )
 
                 if v_default_measure_unit is not None:
                     if measure_unit is None:
-                        return False
-
-                    exp_result = exp_result and (
-                        self._compare(
-                            op="=",
-                            value1=measure_unit.measureunit_nh,
-                            value2=v_default_measure_unit,
+                        return self._trace_miss(
+                            TraceReasonEnum.MEASURE_UNIT_MISSING,
+                            criterion="defaultMeasureUnit",
                         )
+
+                    exp_result = self._combo_criterion(
+                        current=exp_result,
+                        criterion="defaultMeasureUnit",
+                        op="=",
+                        value1=measure_unit.measureunit_nh,
+                        value2=v_default_measure_unit,
+                        drug_trace=drug_trace,
                     )
 
                 if v_period is not None:
                     try:
                         v_period = int(v_period)
                     except ValueError:
-                        return False
+                        return self._trace_miss(
+                            TraceReasonEnum.VALUE_NOT_NUMERIC, criterion="period"
+                        )
 
                     _, item_period = prescriptionutils.get_prescription_item_period(
                         is_cpoe=self.protocol_extra_info.is_cpoe
@@ -488,40 +700,58 @@ class AlertProtocol:
                         cpoe_period=period_cpoe,
                     )
 
-                    exp_result = exp_result and (
-                        self._compare(
-                            op=v_period_op,
-                            value1=item_period,
-                            value2=v_period,
-                        )
+                    exp_result = self._combo_criterion(
+                        current=exp_result,
+                        criterion="period",
+                        op=v_period_op,
+                        value1=item_period,
+                        value2=v_period,
+                        drug_trace=drug_trace,
                     )
 
                 if v_route is not None:
-                    exp_result = exp_result and (
-                        self._compare(
-                            op="IN",
-                            value1=[prescription_drug.route],
-                            value2=v_route,
-                        )
+                    exp_result = self._combo_criterion(
+                        current=exp_result,
+                        criterion="route",
+                        op="IN",
+                        value1=[prescription_drug.route],
+                        value2=v_route,
+                        drug_trace=drug_trace,
                     )
 
                 if v_observation is not None:
-                    exp_result = exp_result and (
-                        self._compare(
-                            op="CONTAINS",
-                            value1=prescription_drug.notes,
-                            value2=v_observation,
-                        )
+                    exp_result = self._combo_criterion(
+                        current=exp_result,
+                        criterion="observation",
+                        op="CONTAINS",
+                        value1=prescription_drug.notes,
+                        value2=v_observation,
+                        drug_trace=drug_trace,
                     )
 
                 if v_drug_attribute is not None and len(v_drug_attribute) > 0:
-                    exp_result = exp_result and self._compare(
-                        op="IN", value1=drug_attr_keys, value2=v_drug_attribute
+                    exp_result = self._combo_criterion(
+                        current=exp_result,
+                        criterion="drugAttribute",
+                        op="IN",
+                        value1=drug_attr_keys,
+                        value2=v_drug_attribute,
+                        drug_trace=drug_trace,
                     )
+
+                if drug_trace is not None:
+                    drug_trace.matched = exp_result
 
                 if exp_result:
                     found = True
                     self.related_items.append(prescription_drug.id)
+
+            if self._trace_enabled and self._current_trace is not None:
+                self._current_trace.reason = (
+                    TraceReasonEnum.COMBINATION_MATCHED.value
+                    if found
+                    else TraceReasonEnum.COMBINATION_NO_MATCH.value
+                )
 
             return found
 

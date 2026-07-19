@@ -42,7 +42,7 @@ def find_protocols(
     results = {"items": []}
     summary = set()
 
-    drugs_by_expire_date = _split_drugs_by_date(
+    drugs_by_expire_date = split_drugs_by_date(
         drug_list=drug_list, prescription=prescription
     )
 
@@ -74,7 +74,8 @@ def find_protocols(
     return results
 
 
-def _split_drugs_by_date(drug_list: dict, prescription: Prescription):
+def split_drugs_by_date(drug_list: dict, prescription: Prescription):
+    """Groups prescription drugs by expire date (protocols run per date group)"""
     expire_dates = {}
     is_cpoe = segment_service.is_cpoe(id_segment=prescription.idSegment)
 
