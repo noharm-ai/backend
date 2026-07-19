@@ -84,11 +84,12 @@ class UserExtra(db.Model):
     createdBy = db.Column("created_by", db.BigInteger, nullable=False)
 
 
-class UserNumbers(db.Model):
-    __tablename__ = "usuario_numeros"
+class UserActivity(db.Model):
+    __tablename__ = "usuario_atividade"
     __table_args__ = {"schema": "public"}
 
     idUser = db.Column("idusuario", db.Integer, primary_key=True)
+    date = db.Column("dt_atividade", db.DateTime, primary_key=True)
     logins = db.Column("logins", db.Integer, nullable=True)
     checks = db.Column("checagens", db.Integer, nullable=True)
     interventions = db.Column("intervencoes", db.Integer, nullable=True)

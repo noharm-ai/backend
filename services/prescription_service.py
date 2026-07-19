@@ -23,7 +23,7 @@ from models.regulation import RegSolicitation
 from repository import (
     prescription_presence_repository,
     prescription_view_repository,
-    user_numbers_repository,
+    user_activity_repository,
 )
 from services import (
     data_authorization_service,
@@ -445,7 +445,7 @@ def update_prescription_data(
         p.notes_at = datetime.today()
 
         if data.get("notes", None):
-            user_numbers_repository.increment_evolutions(user_context.id)
+            user_activity_repository.increment_evolutions(user_context.id)
 
         has_integration_event = (
             db.session.query(PrescriptionAudit)
