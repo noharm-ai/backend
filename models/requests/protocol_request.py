@@ -13,6 +13,13 @@ class ProtocolListRequest(BaseModel):
     statusType: Optional[int] = None
 
 
+class ProtocolTraceRequest(BaseModel):
+    """Protocol trace request parameters"""
+
+    idPrescription: int
+    idProtocol: Optional[int] = None
+
+
 class ProtocolConfig(BaseModel):
     """Protocol: structure of a protocol configuration"""
 

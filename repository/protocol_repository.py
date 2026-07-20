@@ -36,6 +36,19 @@ def list_protocols(request_data: ProtocolListRequest, schema: str) -> list[Proto
     )
 
 
+def get_protocol_by_id(protocol_id: int, schema: str) -> Protocol:
+    """Get one protocol visible to the schema (global or schema-owned)"""
+
+    return (
+        db.session.query(Protocol)
+        .filter(
+            Protocol.id == protocol_id,
+            or_(Protocol.schema == None, Protocol.schema == schema),
+        )
+        .first()
+    )
+
+
 def get_active_protocols(schema: str, protocol_type_list: list[ProtocolTypeEnum]):
     """get protocols to apply"""
 

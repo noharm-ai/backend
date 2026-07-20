@@ -676,6 +676,57 @@ def _get_alerts(
     return {"relations": relations, "alerts": alerts, "protocols": protocols}
 
 
+def get_protocol_evaluation_context(id_prescription: int, user_context: User) -> dict:
+    """Builds the same inputs _get_alerts uses for protocol evaluation.
+    Reused by the protocol trace endpoint to replay evaluation with tracing."""
+
+    prescription, patient, _, segment, _, _ = _get_prescription_data(
+        id_prescription=id_prescription
+    )
+
+    config_data = _get_configs(
+        prescription=prescription, patient=patient, is_complete=False
+    )
+
+    cn_data = _get_clinical_notes_stats(
+        prescription=prescription,
+        patient=patient,
+        config_data=config_data,
+        user_context=user_context,
+        is_complete=False,
+    )
+
+    exam_data = _get_exams(
+        patient=patient,
+        prescription=prescription,
+        config_data=config_data,
+        is_complete=False,
+        user_context=user_context,
+    )
+
+    drug_list = _get_drug_list(
+        prescription=prescription,
+        patient=patient,
+        config_data=config_data,
+        user_context=user_context,
+    )
+
+    protocol_extra_info = ProtocolExtraInfo()
+    protocol_extra_info.is_cpoe = config_data["is_cpoe"]
+    if segment:
+        protocol_extra_info.segment_type = segment.type
+
+    return {
+        "prescription": prescription,
+        "patient": patient,
+        "segment": segment,
+        "drug_list": drug_list,
+        "exams": exam_data["exams"],
+        "cn_stats": cn_data["cn_stats"],
+        "protocol_extra_info": protocol_extra_info,
+    }
+
+
 @timed()
 def _get_drug_data(
     drugs,
