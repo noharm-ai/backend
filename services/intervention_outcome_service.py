@@ -1,24 +1,25 @@
 """Service: Intervention outcome related operations"""
 
-from datetime import timedelta, datetime
+from datetime import datetime, timedelta
+
 from sqlalchemy import and_, func, or_
 
-from models.main import db, User, Drug, DrugAttributes
+from decorators.has_permission_decorator import Permission, has_permission
+from exception.validation_error import ValidationError
+from models.appendix import Frequency, MeasureUnit, MeasureUnitConvert
+from models.enums import (
+    InterventionEconomyTypeEnum,
+    InterventionStatusEnum,
+)
+from models.main import Drug, DrugAttributes, User, db
 from models.prescription import (
     Intervention,
     Prescription,
     PrescriptionDrug,
 )
-from models.appendix import MeasureUnit, MeasureUnitConvert, Frequency
-from models.enums import (
-    InterventionEconomyTypeEnum,
-    InterventionStatusEnum,
-)
-from services import data_authorization_service, segment_service
 from repository import intervention_outcome_repository, patient_repository
-from decorators.has_permission_decorator import has_permission, Permission
-from exception.validation_error import ValidationError
-from utils import status, prescriptionutils, numberutils
+from services import data_authorization_service, segment_service
+from utils import numberutils, prescriptionutils, status
 
 DEFAULT_SEGMENT = 1
 
@@ -563,9 +564,7 @@ def _calc_economy(origin, destiny):
             origin["item"]["frequencyDay"]
         ) - numberutils.none2zero(
             destiny["item"]["pricePerDose"]
-        ) * numberutils.none2zero(
-            destiny["item"]["frequencyDay"]
-        )
+        ) * numberutils.none2zero(destiny["item"]["frequencyDay"])
     else:
         economy = numberutils.none2zero(
             origin["item"]["pricePerDose"]
@@ -740,8 +739,10 @@ def _outcome_calc(list, user: User, date_base_economy, destination=False):
                     "idPrescriptionAggregate": str(id_prescription_aggregate),
                     "idPrescriptionDrug": str(prescription_drug.id),
                     "prescriptionDate": prescription.date.isoformat(),
+                    "concilia": prescription.concilia is not None,
                     "idDrug": drug.id if drug else prescription_drug.idDrug,
                     "name": drug.name if drug else "NP",
+                    "drugNpName": prescription_drug.interval,
                     "price": str(origin_price) if origin_price != None else None,
                     "dose": str(dose) if dose != None else None,
                     "idMeasureUnit": (
