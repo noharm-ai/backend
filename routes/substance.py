@@ -29,12 +29,30 @@ def find_substance():
     return substance_service.find_substance(term)
 
 
+@app_sub.route("/substance/resolve", methods=["GET"])
+@api_endpoint()
+def resolve_substances():
+    ids_param = request.args.get("ids", "")
+    ids = [i for i in ids_param.split(",") if i]
+
+    return substance_service.find_substances_by_ids(ids)
+
+
 @app_sub.route("/substance/class/find", methods=["GET"])
 @api_endpoint()
 def find_substance_class():
     term = request.args.get("term", "")
 
     return substance_service.find_substance_class(term)
+
+
+@app_sub.route("/substance/class/resolve", methods=["GET"])
+@api_endpoint()
+def resolve_substance_classes():
+    ids_param = request.args.get("ids", "")
+    ids = [i for i in ids_param.split(",") if i]
+
+    return substance_service.find_substance_classes_by_ids(ids)
 
 
 @app_sub.route("/substance/class", methods=["GET"])
