@@ -63,7 +63,8 @@ def test_list_tags_returns_expected_shape(client, analyst_headers, seed_tags):
 
     assert response.status_code == 200
     items = response.get_json()["data"]
-    match = next(item for item in items if item["name"] == TAG_ACTIVE)
+    match = next((item for item in items if item["name"] == TAG_ACTIVE), None)
+    assert match is not None, f"Tag {TAG_ACTIVE} not found in response"
     assert match["tagType"] == PATIENT
     assert match["active"] is True
 
