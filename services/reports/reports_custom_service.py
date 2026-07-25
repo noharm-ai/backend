@@ -28,7 +28,12 @@ CHART_SUGGESTION_EXAMPLES = (
     '"aggregation": "sum", "stacked": true, "width": "full"}, '
     '{"type": "line", "title": "Evolução Mensal de Atendimentos", '
     '"xKeys": ["data_atendimento"], "yKeys": [], '
-    '"aggregation": "count", "dateGrouping": "month", "width": "full"}]'
+    '"aggregation": "count", "dateGrouping": "month", "width": "full"}, '
+    '{"type": "bar", "title": "Taxa de Aceitação por Setor", '
+    '"xKeys": ["setor"], "yKeys": [], "aggregation": "none", '
+    '"series": [{"label": "Aceitação (%)", '
+    '"expr": "soma(aceito) / contagem() * 100"}], '
+    '"sortOrder": "desc", "width": "half"}]'
 )
 
 _VALID_CHART_TYPES = {"bar", "hbar", "line", "pie"}
@@ -47,6 +52,7 @@ _ALLOWED_CHART_FIELDS = {
     "topN",
     "sortOrder",
     "stacked",
+    "series",
 }
 
 
@@ -264,7 +270,25 @@ def suggest_graphs(request_data: SuggestGraphsRequest) -> list[dict]:
         '- "sortOrder": "none" | "asc" | "desc" — sort by value; use "desc" '
         "together with topN\n"
         '- "stacked": boolean — only for bar/hbar with 2+ yKeys or when comparing '
-        "categories\n\n"
+        "categories\n"
+        '- "series": array of ADVANCED metric objects — an alternative to '
+        '"yKeys"+"aggregation" for computed metrics (rates, percentages or ratios '
+        'between aggregations). When you use "series", set "aggregation" to "none" '
+        'and "yKeys" to []. Each object is { "label": short PT-BR name, "expr": '
+        "formula string } (see the formula syntax below).\n\n"
+        'Formula syntax for "series" expressions (each is evaluated per X '
+        "category):\n"
+        "- Aggregation functions: contagem() = number of rows in the category; "
+        "contagem(coluna) = rows where that column has a value; and soma(coluna), "
+        "media(coluna), minimo(coluna), maximo(coluna), which require a NUMERIC "
+        "column.\n"
+        "- Combine them with + - * / and parentheses. Reference columns by their "
+        "schema key; wrap keys containing spaces in double quotes.\n"
+        "- Typical use is a rate/percentage. For a 0/1 indicator column named "
+        '"aceito", the acceptance rate is "soma(aceito) / contagem() * 100"; use '
+        "contagem(coluna) to count filled values, NOT to sum a 0/1 flag.\n"
+        '- Prefer a plain "aggregation" for simple metrics; only reach for '
+        '"series" when the insight needs arithmetic between aggregations.\n\n'
         "Guidelines:\n"
         "- Use ONLY column keys present in the schema. Never invent keys.\n"
         '- Good patterns: low-cardinality string column + "count" -> bar or pie; '
@@ -310,6 +334,32 @@ def _truncate_rows(rows: list[dict], max_len: int = 120) -> list[dict]:
     return truncated
 
 
+def _sanitize_series(raw) -> list[dict]:
+    """Validate expression-based metric series suggested by the LLM.
+
+    Keeps only objects with a non-empty string ``expr`` (``label`` optional).
+    Column references inside the expression are validated on the client, so
+    here we only enforce basic shape and length limits.
+    """
+    if not isinstance(raw, list):
+        return []
+    clean = []
+    for s in raw:
+        if not isinstance(s, dict):
+            continue
+        expr = s.get("expr")
+        if not isinstance(expr, str) or not expr.strip():
+            continue
+        entry = {"expr": expr.strip()[:500]}
+        label = s.get("label")
+        if isinstance(label, str) and label.strip():
+            entry["label"] = label.strip()[:120]
+        clean.append(entry)
+        if len(clean) >= 6:
+            break
+    return clean
+
+
 def _sanitize_suggestions(
     parsed, request_data: SuggestGraphsRequest
 ) -> list[dict]:
@@ -339,9 +389,18 @@ def _sanitize_suggestions(
         if chart_type not in _VALID_CHART_TYPES:
             continue
 
-        aggregation = chart.get("aggregation")
-        if aggregation not in _VALID_AGGREGATIONS:
-            continue
+        # Advanced metric: expression-based series. When present and valid it
+        # replaces aggregation/yKeys (both forced to "none"/[]).
+        series = _sanitize_series(chart.get("series"))
+        if series:
+            chart["series"] = series
+            aggregation = "none"
+            chart["aggregation"] = "none"
+        else:
+            chart.pop("series", None)
+            aggregation = chart.get("aggregation")
+            if aggregation not in _VALID_AGGREGATIONS:
+                continue
 
         title = chart.get("title")
         if not isinstance(title, str) or not title.strip():
@@ -356,16 +415,19 @@ def _sanitize_suggestions(
             continue
         chart["xKeys"] = x_keys
 
-        y_keys = chart.get("yKeys") if isinstance(chart.get("yKeys"), list) else []
-        y_keys = [k for k in y_keys if k in valid_keys]
+        if series:
+            chart["yKeys"] = []
+        else:
+            y_keys = chart.get("yKeys") if isinstance(chart.get("yKeys"), list) else []
+            y_keys = [k for k in y_keys if k in valid_keys]
 
-        if aggregation in ("count", "count_pct"):
-            y_keys = []
-        elif aggregation in _NUMERIC_AGGREGATIONS:
-            y_keys = [k for k in y_keys if k in numeric_keys]
-            if not y_keys:
-                continue
-        chart["yKeys"] = y_keys[:1] if chart_type == "pie" else y_keys
+            if aggregation in ("count", "count_pct"):
+                y_keys = []
+            elif aggregation in _NUMERIC_AGGREGATIONS:
+                y_keys = [k for k in y_keys if k in numeric_keys]
+                if not y_keys:
+                    continue
+            chart["yKeys"] = y_keys[:1] if chart_type == "pie" else y_keys
 
         date_grouping = chart.get("dateGrouping")
         if x_keys[0] not in date_keys or date_grouping not in _VALID_DATE_GROUPINGS:
