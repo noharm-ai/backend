@@ -1,9 +1,9 @@
 """Repository: protocol related operations"""
 
-from sqlalchemy import or_
+from sqlalchemy import asc, func, or_
 
 from models.main import db
-from models.appendix import Protocol
+from models.appendix import Department, Protocol
 from models.requests.protocol_request import ProtocolListRequest
 from models.enums import ProtocolTypeEnum, ProtocolStatusTypeEnum, NoHarmENV
 from config import Config
@@ -32,6 +32,23 @@ def list_protocols(request_data: ProtocolListRequest, schema: str) -> list[Proto
             or_(Protocol.schema == None, Protocol.schema == schema),
         )
         .order_by(Protocol.name)
+        .all()
+    )
+
+
+def list_departments():
+    """List distinct departments (setor) deduped by fksetor.
+
+    The same fksetor may appear once per hospital, possibly with different
+    names; we dedupe by fksetor and ignore the hospital here.
+    """
+    return (
+        db.session.query(
+            Department.id,
+            func.min(Department.name).label("name"),
+        )
+        .group_by(Department.id)
+        .order_by(asc(func.min(Department.name)))
         .all()
     )
 

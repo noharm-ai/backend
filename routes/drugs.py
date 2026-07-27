@@ -23,6 +23,23 @@ def getDrugSummary(idDrug, idSegment, idHospital=None):
     )
 
 
+@app_drugs.route("/drugs/find", methods=["GET"])
+@api_endpoint()
+def find_protocol_drugs():
+    term = request.args.get("term", "")
+
+    return drug_service.find_protocol_drugs(term)
+
+
+@app_drugs.route("/drugs/resolve", methods=["GET"])
+@api_endpoint()
+def resolve_drugs():
+    ids_param = request.args.get("ids", "")
+    ids = [i for i in ids_param.split(",") if i]
+
+    return drug_service.find_drugs_by_ids(ids)
+
+
 @app_drugs.route("/drugs/frequencies", methods=["GET"])
 @api_endpoint()
 def get_frequencies():

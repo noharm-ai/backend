@@ -34,6 +34,35 @@ def find_substance(term):
 
 
 @has_permission(Permission.READ_BASIC_FEATURES)
+def find_substances_by_ids(ids):
+    if not ids:
+        return []
+
+    # sctid is a BigInteger column, so only numeric ids can match.
+    numeric_ids = [int(i) for i in ids if str(i).lstrip("-").isdigit()]
+
+    if not numeric_ids:
+        return []
+
+    items = (
+        Substance.query.filter(Substance.id.in_(numeric_ids))
+        .order_by(asc(Substance.name))
+        .all()
+    )
+
+    results = []
+    for d in items:
+        results.append(
+            {
+                "sctid": str(d.id),
+                "name": d.name.upper(),
+            }
+        )
+
+    return results
+
+
+@has_permission(Permission.READ_BASIC_FEATURES)
 def find_substance_class(term):
     if term == "" or term == None:
         raise ValidationError(
@@ -59,6 +88,33 @@ def find_substance_class(term):
                 SubstanceClass.id.ilike(f"%{term}%"),
             )
         )
+        .outerjoin(parent, SubstanceClass.idParent == parent.id)
+        .order_by(asc("concat_field"))
+    )
+
+    results = []
+    for i in items:
+        results.append({"id": i[0].id, "name": i[0].name, "parent": i[1]})
+
+    return results
+
+
+@has_permission(Permission.READ_BASIC_FEATURES)
+def find_substance_classes_by_ids(ids):
+    if not ids:
+        return []
+
+    parent = db.aliased(SubstanceClass)
+
+    items = (
+        db.session.query(
+            SubstanceClass,
+            parent.name.label("parent_name"),
+            func.concat(
+                func.coalesce(parent.name, ""), " - ", SubstanceClass.name
+            ).label("concat_field"),
+        )
+        .filter(SubstanceClass.id.in_([str(i) for i in ids]))
         .outerjoin(parent, SubstanceClass.idParent == parent.id)
         .order_by(asc("concat_field"))
     )

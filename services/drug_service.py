@@ -779,3 +779,49 @@ def get_drug_dashboard(
         "outliers": outlier_list,
         "conversions": conversions_list,
     }
+
+
+@has_permission(Permission.READ_BASIC_FEATURES)
+def find_protocol_drugs(term):
+    if term == "" or term == None:
+        raise ValidationError(
+            "Busca inválida",
+            "errors.invalidParams",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Only drugs referenced in the outlier table (any segment) are searchable.
+    outlier_drugs = (
+        db.session.query(Outlier.idDrug).group_by(Outlier.idDrug).scalar_subquery()
+    )
+
+    drugs = (
+        db.session.query(Drug)
+        .filter(Drug.id.in_(outlier_drugs))
+        .filter(Drug.name.ilike(f"%{term}%"))
+        .order_by(asc(Drug.name))
+        .all()
+    )
+
+    return [{"idDrug": str(d.id), "name": d.name} for d in drugs]
+
+
+@has_permission(Permission.READ_BASIC_FEATURES)
+def find_drugs_by_ids(ids):
+    if not ids:
+        return []
+
+    # fkmedicamento is a BigInteger column, so only numeric ids can match.
+    numeric_ids = [int(i) for i in ids if str(i).lstrip("-").isdigit()]
+
+    if not numeric_ids:
+        return []
+
+    drugs = (
+        db.session.query(Drug)
+        .filter(Drug.id.in_(numeric_ids))
+        .order_by(asc(Drug.name))
+        .all()
+    )
+
+    return [{"idDrug": str(d.id), "name": d.name} for d in drugs]

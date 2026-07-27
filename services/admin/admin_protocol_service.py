@@ -43,6 +43,14 @@ def list_protocols(request_data: ProtocolListRequest, user_context: User):
     return protocols
 
 
+@has_permission(Permission.READ_PROTOCOLS)
+def list_departments():
+    """List distinct departments (setor) for protocol variable selection."""
+    departments = protocol_repository.list_departments()
+
+    return [{"idDepartment": str(d.id), "name": d.name} for d in departments]
+
+
 @has_permission(Permission.WRITE_PROTOCOLS)
 def upsert_protocol(request_data: ProtocolUpsertRequest, user_context: User):
     """Upsert protocol records"""

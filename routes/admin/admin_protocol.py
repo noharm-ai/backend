@@ -18,6 +18,13 @@ def list_protocols():
     )
 
 
+@app_admin_protocol.route("/admin/protocol/department/list", methods=["GET"])
+@api_endpoint(is_admin=True)
+def list_departments():
+    """List distinct departments (setor) for protocol variable selection"""
+    return admin_protocol_service.list_departments()
+
+
 @app_admin_protocol.route("/admin/protocol/upsert", methods=["POST"])
 @api_endpoint(is_admin=True)
 def upsert():
