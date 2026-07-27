@@ -33,7 +33,7 @@ def test_encrypt_data_raises_when_key_missing(monkeypatch):
 
 def test_encrypt_data_roundtrips_to_original(fernet_key):
     """The ciphertext is base64-wrapped Fernet output that decrypts to the input."""
-    plaintext = "paciente 12345 - dado sensível"
+    plaintext = "generic-placeholder-value-ção"
 
     ciphertext = cryptutils.encrypt_data(plaintext)
 
