@@ -1,7 +1,8 @@
 from flask import Blueprint, request
 from markupsafe import escape as escape_html
 
-from services import clinical_notes_service
+from models.requests.clinical_notes_request import GenerateSoapRequest
+from services import clinical_notes_service, soap_service
 from decorators.api_endpoint_decorator import api_endpoint
 
 app_note = Blueprint("app_note", __name__)
@@ -35,6 +36,15 @@ def create():
     data = request.get_json()
 
     return clinical_notes_service.create_clinical_notes(data=data)
+
+
+@app_note.route("/notes/soap", methods=["POST"])
+@api_endpoint()
+def generate_soap():
+    """Generate a SOAP evolution from a clinical note via LLM."""
+    return soap_service.generate_soap(
+        request_data=GenerateSoapRequest(**request.get_json())
+    )
 
 
 @app_note.route("/notes/remove-annotation", methods=["POST"])

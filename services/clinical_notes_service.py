@@ -17,9 +17,13 @@ from services import feature_service, memory_service, user_service
 from utils import status
 
 
-@has_permission(Permission.WRITE_PRESCRIPTION)
-def create_clinical_notes(data, user_context: User):
-    if not memory_service.has_feature("PRIMARYCARE"):
+@has_permission(Permission.WRITE_PRESCRIPTION, Permission.READ_NAV)
+def create_clinical_notes(
+    data, user_context: User, user_permissions: list[Permission]
+):
+    if Permission.READ_NAV not in user_permissions and not memory_service.has_feature(
+        "PRIMARYCARE"
+    ):
         raise ValidationError(
             "Usuário não autorizado",
             "errors.unauthorizedUser",
