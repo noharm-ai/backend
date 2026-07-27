@@ -15,6 +15,13 @@ def list_icds():
     return lists_service.list_icds()
 
 
+@app_lists.route("/lists/routes", methods=["GET"])
+@api_endpoint()
+def list_routes():
+    """List routes"""
+    return lists_service.list_routes()
+
+
 @app_lists.route("/lists/icds/find", methods=["GET"])
 @api_endpoint()
 def find_icds():

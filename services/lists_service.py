@@ -1,6 +1,8 @@
 """Service: simple list records operations"""
 
 from repository import lists_repository
+from services import memory_service
+from models.enums import MemoryEnum
 from decorators.has_permission_decorator import has_permission, Permission
 from exception.validation_error import ValidationError
 from utils import status
@@ -36,6 +38,20 @@ def find_icds(term):
     query_results = lists_repository.find_icds(term)
 
     return [{"id": item.id_str, "name": item.name} for item in query_results]
+
+
+@has_permission(Permission.READ_BASIC_FEATURES)
+def list_routes():
+    """List routes stored in the map-routes memory"""
+    map_routes = memory_service.get_memory(MemoryEnum.MAP_ROUTES.value)
+
+    results = []
+    if map_routes and map_routes.value:
+        for r in map_routes.value:
+            if isinstance(r, dict) and r.get("id") is not None:
+                results.append({"id": r.get("id"), "name": r.get("value")})
+
+    return results
 
 
 @has_permission(Permission.READ_BASIC_FEATURES)
