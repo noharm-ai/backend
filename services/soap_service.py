@@ -13,7 +13,6 @@ from models.notes import ClinicalNotes
 from models.requests.clinical_notes_request import GenerateSoapRequest
 from utils import aws, logger, status
 
-SOAP_DEFAULT_MODEL_ID = "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
 SOAP_DEFAULT_MAX_TOKENS = 4096
 SOAP_INPUT_MAX_CHARS = 60000
 
@@ -26,7 +25,7 @@ def generate_soap(request_data: GenerateSoapRequest, user_context: User):
 
     note = (
         db.session.query(ClinicalNotes)
-        .options(undefer(ClinicalNotes.form))
+        .options(undefer(ClinicalNotes.form), undefer(ClinicalNotes.template))
         .filter(ClinicalNotes.id == request_data.id)
         .first()
     )
@@ -57,11 +56,16 @@ def _get_config() -> dict:
 
     config = (
         db.session.query(GlobalMemory)
-        .filter(GlobalMemory.kind == GlobalMemoryEnum.SOAP_CONFIG.value)
+        .filter(GlobalMemory.kind == GlobalMemoryEnum.NAV_SOAP_CONFIG.value)
         .first()
     )
 
-    if not config or not config.value or not config.value.get("prompt"):
+    if (
+        not config
+        or not config.value
+        or not config.value.get("prompt")
+        or not config.value.get("model_id")
+    ):
         raise ValidationError(
             "Configuração da evolução SOAP não encontrada.",
             "errors.businessRules",
@@ -82,14 +86,52 @@ def _get_note_content(note: ClinicalNotes) -> str:
     ]
 
     if note.form:
-        parts.append("## Formulário da consulta (respostas)")
-        parts.append(json.dumps(note.form, ensure_ascii=False, indent=2))
+        parts.append("## Formulário da consulta (perguntas e respostas)")
+        parts.append(_get_form_content(form=note.form, template=note.template))
 
     if note.text:
         parts.append("## Texto da evolução")
         parts.append(note.text[:SOAP_INPUT_MAX_CHARS])
 
     return "\n\n".join(parts)
+
+
+def _get_form_content(form: dict, template: list) -> str:
+    """Render form answers as question/answer text using the note template."""
+
+    if not template:
+        return json.dumps(form, ensure_ascii=False, indent=2)
+
+    parts = []
+    answered = set()
+
+    for group in template:
+        group_parts = []
+
+        for question in group.get("questions", []):
+            answer = form.get(question.get("id"))
+
+            if answer in (None, "", []):
+                continue
+
+            answered.add(question.get("id"))
+
+            if isinstance(answer, list):
+                answer = ", ".join(str(item) for item in answer)
+
+            group_parts.append(f"Pergunta: {question.get('label')}")
+            group_parts.append(f"Resposta: {answer}")
+
+        if group_parts:
+            parts.append(f"### {group.get('group')}")
+            parts.extend(group_parts)
+
+    for key, answer in form.items():
+        if key not in answered and answer not in (None, "", []):
+            parts.append(f"Pergunta: {key}")
+            parts.append(f"Resposta: {answer}")
+
+    return "\n".join(parts)
 
 
 def _prompt_soap(messages: list, system: str, config: dict) -> str:
@@ -109,7 +151,7 @@ def _prompt_soap(messages: list, system: str, config: dict) -> str:
     try:
         response = client.invoke_model(
             body=body,
-            modelId=config.get("model_id", SOAP_DEFAULT_MODEL_ID),
+            modelId=config.get("model_id"),
             accept="application/json",
             contentType="application/json",
         )
@@ -123,4 +165,18 @@ def _prompt_soap(messages: list, system: str, config: dict) -> str:
 
     response_body = json.loads(response.get("body").read())
 
-    return response_body["content"][0]["text"]
+    return _strip_code_fences(response_body["content"][0]["text"])
+
+
+def _strip_code_fences(text: str) -> str:
+    """Remove markdown code fences (```html ... ```) wrapping the LLM output."""
+
+    text = text.strip()
+
+    if text.startswith("```"):
+        text = text.split("\n", 1)[1] if "\n" in text else ""
+
+    if text.endswith("```"):
+        text = text[: -len("```")]
+
+    return text.strip()
