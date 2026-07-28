@@ -12,13 +12,13 @@ FAKE_SOAP_TEXT = "EVOLUÇÃO FARMACÊUTICA - Teleconsulta NoHarm\n\n(S)\n\nTeste
 
 @pytest.fixture
 def soap_test_data():
-    """Insert the soap-config global memory and a source clinical note"""
+    """Insert the nav-soap-config global memory and a source clinical note"""
     session.execute(
         text(
             "INSERT INTO public.memoria (tipo, valor, update_at, update_by) "
-            "VALUES ('soap-config', CAST(:value AS json), now(), 1)"
+            "VALUES ('nav-soap-config', CAST(:value AS json), now(), 1)"
         ),
-        {"value": '{"prompt": "test soap prompt"}'},
+        {"value": '{"prompt": "test soap prompt", "model_id": "test-model-id"}'},
     )
     session.execute(
         text(
@@ -39,7 +39,7 @@ def soap_test_data():
         text("DELETE FROM demo.evolucao WHERE fkevolucao = :id"),
         {"id": SOAP_NOTE_ID},
     )
-    session.execute(text("DELETE FROM public.memoria WHERE tipo = 'soap-config'"))
+    session.execute(text("DELETE FROM public.memoria WHERE tipo = 'nav-soap-config'"))
     session_commit()
 
 
@@ -95,7 +95,7 @@ def test_generate_soap_missing_config(client, navigator_headers):
 
 
 def test_create_note_as_navigator(client, navigator_headers):
-    """POST /notes — navigators (READ_NAV) can create notes without the PRIMARYCARE feature"""
+    """POST /notes — returns 401 for navigators (READ_NAV does not allow note creation)"""
     payload = {
         "admissionNumber": ADMISSION_NUMBER,
         "notes": "Evolução SOAP de teste",
@@ -104,24 +104,7 @@ def test_create_note_as_navigator(client, navigator_headers):
 
     response = client.post("/notes", json=payload, headers=navigator_headers)
 
-    assert response.status_code == 200
-    created_id = response.get_json()["data"]
-
-    result = session.execute(
-        text(
-            "SELECT texto, cargo FROM demo.evolucao WHERE fkevolucao = :id"
-        ),
-        {"id": created_id},
-    ).fetchone()
-
-    assert result is not None
-    assert result[0] == payload["notes"]
-    assert result[1] == payload["tplName"]
-
-    session.execute(
-        text("DELETE FROM demo.evolucao WHERE fkevolucao = :id"), {"id": created_id}
-    )
-    session_commit()
+    assert response.status_code == 401
 
 
 def test_create_note_permission_denied(client, viewer_headers):
