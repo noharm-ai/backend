@@ -17,6 +17,12 @@ def viewer_headers(client):
 
 
 @pytest.fixture
+def navigator_headers(client):
+    """Headers with NAVIGATOR role"""
+    return make_headers(get_access(client, roles=[Role.NAVIGATOR.value]))
+
+
+@pytest.fixture
 def user_manager_headers(client):
     """Headers with USER_MANAGER role"""
     return make_headers(get_access(client, roles=[Role.USER_MANAGER.value]))
