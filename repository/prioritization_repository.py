@@ -121,8 +121,13 @@ def _build_base_query(request: PrioritizationRequest):
     if request.agg:
         q = q.filter(Prescription.agg == True)
 
+        # only cpoe segments must hide prescriptions dated after discharge
         q = q.filter(
-            Prescription.date <= func.coalesce(Patient.dischargeDate, Prescription.date)
+            or_(
+                func.coalesce(Segment.cpoe, False) == False,
+                Prescription.date
+                <= func.coalesce(Patient.dischargeDate, Prescription.date),
+            )
         )
     else:
         q = q.filter(Prescription.agg == None)
