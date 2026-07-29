@@ -2,7 +2,8 @@
 
 from datetime import datetime
 
-from sqlalchemy import and_, any_, func, select
+from sqlalchemy import and_, any_, func, select, text
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import aliased
 
 from models.enums import PrescriptionAuditTypeEnum, PrescriptionDrugAuditTypeEnum
@@ -12,6 +13,46 @@ from models.prescription import (
     PrescriptionDrug,
     PrescriptionDrugAudit,
 )
+
+
+PRESCALC_LOCK_TIMEOUT_SECONDS = 15
+
+
+def acquire_admission_lock(
+    schema: str, admission_number: int, timeout_seconds: float = None
+) -> bool:
+    """
+    Serializes prescalc per schema+admission using a transaction-scoped advisory lock.
+
+    Concurrent prescalc executions for the same admission compute the same
+    agg prescription id and race on its insert/update. The lock is released
+    automatically at commit/rollback.
+
+    Waits up to timeout_seconds (default PRESCALC_LOCK_TIMEOUT_SECONDS) for the
+    lock. Returns True if acquired; False on timeout — in that case the aborted
+    transaction is rolled back and the caller should skip processing.
+    """
+    timeout = (
+        timeout_seconds if timeout_seconds is not None else PRESCALC_LOCK_TIMEOUT_SECONDS
+    )
+
+    try:
+        # SET does not accept bind params; int() sanitizes. Value in ms.
+        db.session.execute(text(f"SET LOCAL lock_timeout = '{int(timeout * 1000)}'"))
+        db.session.execute(
+            text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"),
+            {"key": f"prescalc:{schema}:{admission_number}"},
+        )
+        # restore the session value so the timeout doesn't leak into later
+        # row-lock waits in the same transaction
+        db.session.execute(text("SET LOCAL lock_timeout = DEFAULT"))
+        return True
+    except OperationalError as e:
+        if getattr(e.orig, "pgcode", None) == "55P03":  # lock_not_available
+            # lock_timeout aborts the transaction; clear it before returning
+            db.session.rollback()
+            return False
+        raise
 
 
 def get_processed_status(id_prescription_list: list[int]):

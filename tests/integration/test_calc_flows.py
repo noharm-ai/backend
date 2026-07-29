@@ -1,10 +1,17 @@
 """Tests: Prescription calculation flows (prescalc and atendcalc)"""
 
 import json
+import threading
+import time
+
+from sqlalchemy import text
 
 from tests.conftest import session, session_commit
 
+from mobile import app as flask_app
+from models.main import db
 from models.prescription import Prescription
+from repository import prescalc_repository
 from static import atendcalc, prescalc
 from tests.utils import utils_test_prescription
 
@@ -404,3 +411,118 @@ def test_atendcalc_flow(client, analyst_headers):
     )
     assert prescription is not None
     assert prescription.status == "s"
+
+
+# ─── prescalc admission lock ──────────────────────────────────────────────────
+
+
+def test_prescalc_admission_lock_serializes_same_admission():
+    """acquire_admission_lock: blocks a concurrent transaction on the same schema+admission,
+    does not block a different admission, and releases automatically on commit."""
+
+    # Hold the lock for admission 999001 from the test session — transaction stays open
+    session.execute(
+        text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"),
+        {"key": "prescalc:demo:999001"},
+    )
+
+    result = {"same_done": False, "other_done": False}
+
+    def acquire(admission_number, flag):
+        # Each thread gets its own app context and its own DB session/connection
+        with flask_app.app_context():
+            try:
+                result[flag] = prescalc_repository.acquire_admission_lock(
+                    schema="demo", admission_number=admission_number
+                )
+            finally:
+                db.session.rollback()
+                db.session.remove()
+
+    other = threading.Thread(target=acquire, args=(999002, "other_done"))
+    other.start()
+    other.join(timeout=5)
+    assert result["other_done"], "Different admission must not be blocked"
+
+    same = threading.Thread(target=acquire, args=(999001, "same_done"))
+    same.start()
+
+    # Give the thread enough time to reach the advisory lock and block at PostgreSQL
+    time.sleep(0.2)
+    assert not result["same_done"], "Same admission should be waiting for the advisory lock"
+
+    # Commit ends the test session's transaction, releasing the xact-scoped lock
+    session_commit()
+
+    same.join(timeout=5)
+    assert result["same_done"]
+
+
+def test_prescalc_admission_lock_times_out():
+    """acquire_admission_lock: returns False when the lock is not acquired within the
+    timeout, and the session stays usable (aborted transaction was rolled back)."""
+
+    # Hold the lock for admission 999003 from the test session — transaction stays open
+    session.execute(
+        text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"),
+        {"key": "prescalc:demo:999003"},
+    )
+
+    result = {"acquired": None, "usable": False}
+
+    def acquire():
+        with flask_app.app_context():
+            try:
+                result["acquired"] = prescalc_repository.acquire_admission_lock(
+                    schema="demo", admission_number=999003, timeout_seconds=0.2
+                )
+                # session must be usable after the rolled-back lock timeout
+                db.session.execute(text("SELECT 1"))
+                result["usable"] = True
+            finally:
+                db.session.rollback()
+                db.session.remove()
+
+    t = threading.Thread(target=acquire)
+    t.start()
+    t.join(timeout=5)
+
+    session_commit()
+
+    assert result["acquired"] is False
+    assert result["usable"]
+
+
+def test_prescalc_skips_when_admission_locked(monkeypatch):
+    """prescalc: returns success without processing when another prescalc holds the
+    admission lock past the timeout; no patient-day prescription is created."""
+
+    prescription = utils_test_prescription.create_basic_prescription()
+
+    monkeypatch.setattr(prescalc_repository, "PRESCALC_LOCK_TIMEOUT_SECONDS", 0.2)
+
+    # Hold the lock for this admission from the test session — transaction stays open
+    session.execute(
+        text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"),
+        {"key": f"prescalc:demo:{prescription.admissionNumber}"},
+    )
+
+    try:
+        response = prescalc(
+            {"schema": "demo", "id_prescription": prescription.id, "force": False},
+            None,
+        )
+    finally:
+        # release the lock
+        session_commit()
+
+    response_obj = json.loads(response)
+    assert response_obj.get("status") == "success"
+
+    patient_day = (
+        session.query(Prescription)
+        .filter(Prescription.agg)
+        .filter(Prescription.admissionNumber == prescription.admissionNumber)
+        .first()
+    )
+    assert patient_day is None
