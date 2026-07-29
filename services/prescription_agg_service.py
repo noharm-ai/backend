@@ -63,6 +63,32 @@ def create_agg_prescription_by_prescription(
             status.HTTP_400_BAD_REQUEST,
         )
 
+    # copy before the lock call: on timeout the aborted transaction is rolled
+    # back, which expires p — accessing it would trigger a refresh query
+    admission_number = p.admissionNumber
+
+    # serialize concurrent prescalc runs for the same admission: they compute
+    # the same agg prescription id and would race on its insert/update
+    lock_acquired = prescalc_repository.acquire_admission_lock(
+        schema=schema, admission_number=admission_number
+    )
+    if not lock_acquired:
+        # skip: items stay unmarked as PROCESSED, so the next prescalc event
+        # for this prescription reprocesses it (NEW_ITENS)
+        logger.backend_logger.warning(
+            json.dumps(
+                {
+                    "event": "prescalc_lock_timeout",
+                    "path": "prescription_agg_service.create_agg_prescription_by_prescription",
+                    "schema": schema,
+                    "message": "Prescalc concorrente em andamento — processamento ignorado",
+                    "admission_number": admission_number,
+                    "id_prescription": id_prescription,
+                }
+            )
+        )
+        return
+
     processed_status = prescalc_repository.get_processed_status(
         id_prescription_list=[id_prescription]
     )
@@ -268,6 +294,25 @@ def create_agg_prescription_by_date(
                     "path": "prescription_agg_service.create_agg_prescription_by_date",
                     "schema": schema,
                     "message": "Não foi possível encontrar o segmento deste atendimento",
+                }
+            )
+        )
+        return
+
+    # serialize concurrent prescalc runs for the same admission: they compute
+    # the same agg prescription id and would race on its insert/update
+    lock_acquired = prescalc_repository.acquire_admission_lock(
+        schema=schema, admission_number=admission_number
+    )
+    if not lock_acquired:
+        logger.backend_logger.warning(
+            json.dumps(
+                {
+                    "event": "prescalc_lock_timeout",
+                    "path": "prescription_agg_service.create_agg_prescription_by_date",
+                    "schema": schema,
+                    "message": "Prescalc concorrente em andamento — processamento ignorado",
+                    "admission_number": admission_number,
                 }
             )
         )
