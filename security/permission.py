@@ -108,3 +108,5 @@ class Permission(Enum):
     ADMIN_APP_FEATURES = "ADMIN_APP_FEATURES"  # permission to manage app features
 
     WRITE_PATIENT_TAGS = "WRITE_PATIENT_TAGS"  # permission to write patient tags
+
+    WRITE_HELP_TEXT = "WRITE_HELP_TEXT"  # permission to create and edit help texts

@@ -20,6 +20,7 @@ from routes.authentication import app_auth
 from routes.conciliation import app_conciliation
 from routes.drugs import app_drugs
 from routes.exams import app_exams
+from routes.help_text import app_help_text
 from routes.intervention import app_itrv
 from routes.lists import app_lists
 from routes.memory import app_mem
@@ -37,13 +38,13 @@ from routes.queue import app_queue
 
 # Regulation routes
 from routes.regulation.regulation import app_regulation
-
-# Report routes
-from routes.reports.reports_drug_attributes import app_rpt_drug_attributes
 from routes.reports.reports_config_rpt import app_rpt_config
 from routes.reports.reports_consolidated import app_rpt_consolidated
 from routes.reports.reports_culture import app_rpt_culture
 from routes.reports.reports_custom import app_rpt_custom
+
+# Report routes
+from routes.reports.reports_drug_attributes import app_rpt_drug_attributes
 from routes.reports.reports_exams import app_rpt_exams
 from routes.reports.reports_general import app_rpt_general
 from routes.reports.reports_integration import app_rpt_integration
@@ -94,6 +95,7 @@ def register_blueprints(app):
     app.register_blueprint(app_user_admin)
     app.register_blueprint(app_pres_crud)
     app.register_blueprint(app_pres_clinical_note)
+    app.register_blueprint(app_help_text)
 
     # Admin blueprints
     app.register_blueprint(app_admin_memory)

@@ -64,6 +64,7 @@ class Role(Enum):
             Permission.READ_NAV,
             Permission.WRITE_CUSTOM_FORMS,
             Permission.ADMIN_APP_FEATURES,
+            Permission.WRITE_HELP_TEXT,
         ],
     )
 
@@ -107,6 +108,7 @@ class Role(Enum):
             Permission.WRITE_CUSTOM_FORMS,
             Permission.ADMIN_APP_FEATURES,
             Permission.WRITE_PROTOCOLS,
+            Permission.WRITE_HELP_TEXT,
         ],
     )
 
