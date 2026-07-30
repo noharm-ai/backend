@@ -51,6 +51,14 @@ def get_user_list(user_context: User):
     return results
 
 
+@has_permission(Permission.READ_BASIC_FEATURES, Permission.READ_USERS)
+def get_user_manager_list(user_context: User):
+    """get active user managers, so users without READ_USERS know who to contact"""
+    users = user_repository.get_user_manager_list(schema=user_context.schema)
+
+    return [{"id": u.id, "name": u.name, "email": u.email} for u in users]
+
+
 def _get_user_data(id_user: int):
     segments_query = db.session.query(
         func.array_agg(UserAuthorization.idSegment)

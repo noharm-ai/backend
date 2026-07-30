@@ -1,3 +1,7 @@
+import json
+
+from sqlalchemy import text
+
 from tests.conftest import session, session_commit
 
 from models.main import User
@@ -28,6 +32,49 @@ def test_get_users_permission(client, analyst_headers):
     response = client.get("/users", headers=analyst_headers)
 
     assert response.status_code == 401
+
+
+def test_get_user_manager_list(client, analyst_headers):
+    """Teste get /user-admin/manager-list - Deve listar os gestores de usuários ativos mesmo sem READ_USERS"""
+    response = client.get("/user-admin/manager-list", headers=analyst_headers)
+
+    assert response.status_code == 200
+
+    data = response.get_json()["data"]
+    assert isinstance(data, list)
+
+    for manager in data:
+        assert set(manager.keys()) == {"id", "name", "email"}
+
+        user = session.query(User).filter(User.id == manager["id"]).first()
+        assert user.active
+        assert Role.USER_MANAGER.value in user.config["roles"]
+
+
+def test_get_user_manager_list_ignores_staff(client, analyst_headers):
+    """Teste get /user-admin/manager-list - Não deve listar usuários staff (papéis definidos em UserExtra)"""
+    manager = session.query(User).filter(User.email == "e2e@e2e.com").first()
+
+    session.execute(
+        text(
+            "insert into public.usuario_extra (idusuario, config, created_at, created_by)"
+            " values (:id, :config, now(), :id)"
+        ),
+        {"id": manager.id, "config": json.dumps({"roles": [Role.CURATOR.value]})},
+    )
+    session_commit()
+
+    try:
+        response = client.get("/user-admin/manager-list", headers=analyst_headers)
+
+        assert response.status_code == 200
+        assert manager.id not in [u["id"] for u in response.get_json()["data"]]
+    finally:
+        session.execute(
+            text("delete from public.usuario_extra where idusuario = :id"),
+            {"id": manager.id},
+        )
+        session_commit()
 
 
 def test_put_user(client, user_manager_headers):

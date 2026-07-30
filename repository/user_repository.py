@@ -41,43 +41,57 @@ def get_users_by_role(schema: str, role: Union[Role, List[Role]]):
     return query.filter(User.active == True).order_by(User.name).all()
 
 
+STAFF_ROLES = [
+    Role.ADMIN,
+    Role.CURATOR,
+    Role.RESEARCHER,
+    Role.SERVICE_INTEGRATOR,
+    Role.STATIC_USER,
+    Role.TRAINING,
+]
+
+
+def _remove_staff_users(query):
+    """Remove staff users from a User query. Staff roles may be set either in
+    User.config or, out of band, in UserExtra"""
+    extra_roles_query = (
+        db.session.query(UserExtra)
+        .filter(UserExtra.idUser == User.id)
+        .filter(
+            or_(
+                *[
+                    UserExtra.config["roles"].astext.contains(r.value)
+                    for r in STAFF_ROLES
+                ]
+            )
+        )
+    )
+
+    return query.filter(
+        *[~User.config["roles"].astext.contains(r.value) for r in STAFF_ROLES]
+    ).filter(~extra_roles_query.exists())
+
+
 def get_admin_users_list(schema: str):
     """Get users list removing staff users"""
     segments_query = db.session.query(
         func.array_agg(UserAuthorization.idSegment)
     ).filter(User.id == UserAuthorization.idUser)
 
-    extra_roles_query = (
-        db.session.query(UserExtra)
-        .filter(UserExtra.idUser == User.id)
-        .filter(
-            or_(
-                UserExtra.config["roles"].astext.contains(Role.ADMIN.value),
-                UserExtra.config["roles"].astext.contains(Role.CURATOR.value),
-                UserExtra.config["roles"].astext.contains(Role.RESEARCHER.value),
-                UserExtra.config["roles"].astext.contains(
-                    Role.SERVICE_INTEGRATOR.value
-                ),
-                UserExtra.config["roles"].astext.contains(Role.STATIC_USER.value),
-                UserExtra.config["roles"].astext.contains(Role.TRAINING.value),
-            )
-        )
+    query = db.session.query(User, segments_query.scalar_subquery()).filter(
+        User.schema == schema
     )
 
-    users = (
-        db.session.query(User, segments_query.scalar_subquery())
+    return _remove_staff_users(query).order_by(desc(User.active), asc(User.name)).all()
+
+
+def get_user_manager_list(schema: str):
+    """Get active user managers, removing staff users"""
+    query = (
+        db.session.query(User)
         .filter(User.schema == schema)
-        .filter(
-            ~User.config["roles"].astext.contains(Role.ADMIN.value),
-            ~User.config["roles"].astext.contains(Role.CURATOR.value),
-            ~User.config["roles"].astext.contains(Role.RESEARCHER.value),
-            ~User.config["roles"].astext.contains(Role.SERVICE_INTEGRATOR.value),
-            ~User.config["roles"].astext.contains(Role.STATIC_USER.value),
-            ~User.config["roles"].astext.contains(Role.TRAINING.value),
-        )
-        .filter(~extra_roles_query.exists())
-        .order_by(desc(User.active), asc(User.name))
-        .all()
+        .filter(User.active == True)
+        .filter(User.config["roles"].astext.contains(Role.USER_MANAGER.value))
     )
 
-    return users
+    return _remove_staff_users(query).order_by(asc(User.name)).all()
