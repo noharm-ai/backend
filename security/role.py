@@ -1,7 +1,6 @@
 """Module for the Role Enum class."""
 
 from enum import Enum
-from typing import List
 
 from models.main import User
 from security.permission import Permission
@@ -15,7 +14,7 @@ class Role(Enum):
         obj._value_ = args[0]
         return obj
 
-    def __init__(self, id: str, permissions: List[Permission]):
+    def __init__(self, id: str, permissions: list[Permission]):
         self.id = id
         self.permissions = permissions
 
@@ -185,6 +184,19 @@ class Role(Enum):
         ],
     )
 
+    TRAINING = (
+        "TRAINING",
+        [
+            Permission.READ_PRESCRIPTION,
+            Permission.READ_REPORTS,
+            Permission.READ_BASIC_FEATURES,
+            Permission.READ_SUPPORT,
+            Permission.READ_USERS,
+            Permission.MULTI_SCHEMA,
+            Permission.TRAINING_RECORDING,
+        ],
+    )
+
     DISCHARGE_MANAGER = (
         "DISCHARGE_MANAGER",
         [
@@ -244,7 +256,7 @@ class Role(Enum):
     ORGANIZATION_MANAGER = "ORGANIZATION_MANAGER", [Permission.MULTI_SCHEMA]
 
     @staticmethod
-    def get_permissions_from_user(user: User) -> List[Permission]:
+    def get_permissions_from_user(user: User) -> list[Permission]:
         """Return a list of permissions from a user."""
         roles = user.config["roles"] if user.config and "roles" in user.config else []
         user_permissions = []
@@ -267,4 +279,5 @@ class Role(Enum):
             Role.STATIC_USER.value,
             Role.SERVICE_INTEGRATOR.value,
             Role.NAVIGATOR.value,
+            Role.TRAINING.value,
         ]

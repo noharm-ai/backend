@@ -59,6 +59,7 @@ def get_admin_users_list(schema: str):
                     Role.SERVICE_INTEGRATOR.value
                 ),
                 UserExtra.config["roles"].astext.contains(Role.STATIC_USER.value),
+                UserExtra.config["roles"].astext.contains(Role.TRAINING.value),
             )
         )
     )
@@ -72,6 +73,7 @@ def get_admin_users_list(schema: str):
             ~User.config["roles"].astext.contains(Role.RESEARCHER.value),
             ~User.config["roles"].astext.contains(Role.SERVICE_INTEGRATOR.value),
             ~User.config["roles"].astext.contains(Role.STATIC_USER.value),
+            ~User.config["roles"].astext.contains(Role.TRAINING.value),
         )
         .filter(~extra_roles_query.exists())
         .order_by(desc(User.active), asc(User.name))
