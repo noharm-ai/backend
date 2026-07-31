@@ -391,6 +391,20 @@ def _build_base_query(request: PrioritizationRequest):
     return q
 
 
+def sample_prescription_ids(request: PrioritizationRequest, limit: int) -> list[int]:
+    """Ids of the most recent prescriptions matching the request filters"""
+
+    results = (
+        _build_base_query(request)
+        .with_entities(Prescription.id)
+        .order_by(desc(Prescription.date))
+        .limit(limit)
+        .all()
+    )
+
+    return [r[0] for r in results]
+
+
 def get_prioritization_list(request: PrioritizationRequest, run_count: bool = True):
     """List prescriptions for prioritization with an optional total count.
 
