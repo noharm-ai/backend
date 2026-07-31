@@ -1,11 +1,9 @@
 from sqlalchemy import and_, asc, func
 
 from decorators.has_permission_decorator import Permission, has_permission
-from exception.validation_error import ValidationError
 from models.appendix import Department, SegmentDepartment
 from models.main import db
 from models.segment import Hospital
-from utils import status
 
 
 @has_permission(Permission.ADMIN_SEGMENTS)
@@ -53,28 +51,3 @@ def get_departments(id_segment):
         )
 
     return deps
-
-
-@has_permission(Permission.ADMIN_SEGMENTS)
-def update_segment_departments(id_segment, department_list):
-    if id_segment is None:
-        raise ValidationError(
-            "Parâmetro inválido", "errors.invalidParam", status.HTTP_400_BAD_REQUEST
-        )
-
-    db.session.query(SegmentDepartment).filter(
-        SegmentDepartment.id == id_segment
-    ).delete()
-
-    for d in department_list:
-        if d["idHospital"] is None or d["idDepartment"] is None:
-            raise ValidationError(
-                "Parâmetro inválido", "errors.invalidParam", status.HTTP_400_BAD_REQUEST
-            )
-
-        sd = SegmentDepartment()
-        sd.id = id_segment
-        sd.idHospital = d["idHospital"]
-        sd.idDepartment = d["idDepartment"]
-
-        db.session.add(sd)
