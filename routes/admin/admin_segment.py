@@ -7,23 +7,6 @@ from services.admin import admin_segment_service
 app_admin_segment = Blueprint("app_admin_segment", __name__)
 
 
-@app_admin_segment.route("/admin/segments", methods=["POST"])
-@api_endpoint(is_admin=True)
-def upsert_segment():
-    data = request.get_json()
-
-    admin_segment_service.upsert_segment(
-        id_segment=data.get("idSegment", None),
-        description=data.get("description", None),
-        active=data.get("active", None),
-        type=data.get("type", None),
-        cpoe=data.get("cpoe", None),
-        id_segment_origin=data.get("idSegmentOrigin", None),
-    )
-
-    return escape_html(data.get("idSegment"))
-
-
 @app_admin_segment.route(
     "/admin/segments/departments/<int:id_segment>", methods=["GET"]
 )
