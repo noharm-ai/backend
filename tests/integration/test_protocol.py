@@ -1,7 +1,7 @@
 """Integration tests for the /protocol/list endpoint (protocol_service.list_protocols)."""
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 
 from tests.conftest import get_access, make_headers, session, session_commit
 
@@ -49,8 +49,9 @@ def seed_protocols():
 
     session.execute(
         text("DELETE FROM public.protocolo WHERE idprotocolo IN :ids").bindparams(
-            ids=_ALL_IDS
-        )
+            bindparam("ids", expanding=True)
+        ),
+        {"ids": list(_ALL_IDS)},
     )
     session_commit()
 
