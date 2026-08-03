@@ -12,7 +12,6 @@ from routes.admin.admin_integration import app_admin_integration
 from routes.admin.admin_memory import app_admin_memory
 from routes.admin.admin_protocol import app_admin_protocol
 from routes.admin.admin_report import app_admin_report
-from routes.admin.admin_segment import app_admin_segment
 from routes.admin.admin_substance import app_admin_subs
 from routes.admin.admin_tag import app_admin_tag
 from routes.admin.admin_unit_conversion import app_admin_unit_conversion
@@ -20,6 +19,7 @@ from routes.authentication import app_auth
 from routes.conciliation import app_conciliation
 from routes.drugs import app_drugs
 from routes.exams import app_exams
+from routes.help_text import app_help_text
 from routes.intervention import app_itrv
 from routes.lists import app_lists
 from routes.memory import app_mem
@@ -37,13 +37,13 @@ from routes.queue import app_queue
 
 # Regulation routes
 from routes.regulation.regulation import app_regulation
-
-# Report routes
-from routes.reports.reports_drug_attributes import app_rpt_drug_attributes
 from routes.reports.reports_config_rpt import app_rpt_config
 from routes.reports.reports_consolidated import app_rpt_consolidated
 from routes.reports.reports_culture import app_rpt_culture
 from routes.reports.reports_custom import app_rpt_custom
+
+# Report routes
+from routes.reports.reports_drug_attributes import app_rpt_drug_attributes
 from routes.reports.reports_exams import app_rpt_exams
 from routes.reports.reports_general import app_rpt_general
 from routes.reports.reports_integration import app_rpt_integration
@@ -94,12 +94,12 @@ def register_blueprints(app):
     app.register_blueprint(app_user_admin)
     app.register_blueprint(app_pres_crud)
     app.register_blueprint(app_pres_clinical_note)
+    app.register_blueprint(app_help_text)
 
     # Admin blueprints
     app.register_blueprint(app_admin_memory)
     app.register_blueprint(app_admin_drug)
     app.register_blueprint(app_admin_integration)
-    app.register_blueprint(app_admin_segment)
     app.register_blueprint(app_admin_exam)
     app.register_blueprint(app_admin_unit_conversion)
     app.register_blueprint(app_admin_subs)

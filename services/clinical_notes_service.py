@@ -13,7 +13,7 @@ from models.main import User, db, redis_client
 from models.notes import ClinicalNotes
 from models.prescription import Patient, Prescription, PrescriptionClinicalNote
 from repository import clinical_notes_repository
-from services import feature_service, memory_service, user_service
+from services import cache_service, feature_service, memory_service, user_service
 from utils import status
 
 
@@ -489,19 +489,28 @@ def refresh_clinical_notes_stats_cache(admission_number: int, user_context: User
             redis_client.json().set(key, "$", cache_data)
             redis_client.expire(key, expire_in)
 
-    # signs (expires in 30 days)
     signs = clinical_notes_repository.get_signs(
         admission_number=admission_number, user_context=user_context, cache=False
     )
-    key = f"{user_context.schema}:{admission_number}:sinais"
-    _add_cache(key=key, data=signs, expire_in=(30 * 24 * 60 * 60))
-
-    # infos (expires in 30 days)
     infos = clinical_notes_repository.get_infos(
         admission_number=admission_number, user_context=user_context, cache=False
     )
-    key = f"{user_context.schema}:{admission_number}:dados"
-    _add_cache(key=key, data=infos, expire_in=(30 * 24 * 60 * 60))
+
+    with cache_service.tolerate_failure(
+        operation="refresh_clinical_notes_stats_cache",
+        key=f"{user_context.schema}:{admission_number}",
+    ):
+        # both expire in 30 days
+        _add_cache(
+            key=f"{user_context.schema}:{admission_number}:sinais",
+            data=signs,
+            expire_in=(30 * 24 * 60 * 60),
+        )
+        _add_cache(
+            key=f"{user_context.schema}:{admission_number}:dados",
+            data=infos,
+            expire_in=(30 * 24 * 60 * 60),
+        )
 
 
 @has_permission(Permission.WRITE_PRESCRIPTION, Permission.MAINTAINER)
@@ -513,22 +522,23 @@ def refresh_dialysis_cache(admission_number: int, user_context: User):
     now = int(time.time())
     ten_days_ago = now - (10 * 24 * 60 * 60)
 
-    redis_client.delete(key)
+    with cache_service.tolerate_failure(operation="refresh_dialysis_cache", key=key):
+        redis_client.delete(key)
 
-    for d in dialysis:
-        if d.annotations:
-            data = {
-                "dtevolucao": d.date.replace(microsecond=0).isoformat(),
-                "fkevolucao": d.id,
-                "lista": d.annotations.get("dialise", []),
-            }
-            data_json = json.dumps(data)
-            timestamp = int(
-                time.mktime(time.strptime(data["dtevolucao"], "%Y-%m-%dT%H:%M:%S"))
-            )
-            redis_client.zadd(key, {data_json: timestamp})
-            redis_client.zremrangebyscore(key, min=0, max=ten_days_ago)
-            redis_client.expire(key, (10 * 24 * 60 * 60))  # 10 days
+        for d in dialysis:
+            if d.annotations:
+                data = {
+                    "dtevolucao": d.date.replace(microsecond=0).isoformat(),
+                    "fkevolucao": d.id,
+                    "lista": d.annotations.get("dialise", []),
+                }
+                data_json = json.dumps(data)
+                timestamp = int(
+                    time.mktime(time.strptime(data["dtevolucao"], "%Y-%m-%dT%H:%M:%S"))
+                )
+                redis_client.zadd(key, {data_json: timestamp})
+                redis_client.zremrangebyscore(key, min=0, max=ten_days_ago)
+                redis_client.expire(key, (10 * 24 * 60 * 60))  # 10 days
 
 
 @has_permission(Permission.WRITE_PRESCRIPTION, Permission.MAINTAINER)
@@ -537,18 +547,19 @@ def refresh_allergies_cache(admission_number: int, user_context: User):
         admission_number=admission_number
     )
     key = f"{user_context.schema}:{admission_number}:alergia"
-    redis_client.delete(key)
+    with cache_service.tolerate_failure(operation="refresh_allergies_cache", key=key):
+        redis_client.delete(key)
 
-    for a in allergies:
-        if a.annotations:
-            data = {
-                "dtevolucao": a.date.replace(microsecond=0).isoformat(),
-                "fkevolucao": a.id,
-                "lista": a.annotations.get("allergiesComposed", []),
-            }
-            data_json = json.dumps(data)
-            timestamp = int(
-                time.mktime(time.strptime(data["dtevolucao"], "%Y-%m-%dT%H:%M:%S"))
-            )
-            redis_client.zadd(key, {data_json: timestamp})
-            redis_client.expire(key, (120 * 24 * 60 * 60))  # 120 days
+        for a in allergies:
+            if a.annotations:
+                data = {
+                    "dtevolucao": a.date.replace(microsecond=0).isoformat(),
+                    "fkevolucao": a.id,
+                    "lista": a.annotations.get("allergiesComposed", []),
+                }
+                data_json = json.dumps(data)
+                timestamp = int(
+                    time.mktime(time.strptime(data["dtevolucao"], "%Y-%m-%dT%H:%M:%S"))
+                )
+                redis_client.zadd(key, {data_json: timestamp})
+                redis_client.expire(key, (120 * 24 * 60 * 60))  # 120 days

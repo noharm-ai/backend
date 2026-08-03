@@ -1,27 +1,29 @@
 """Service: user admin related operations"""
 
 from datetime import datetime
-from typing import List
-from sqlalchemy import func
-from password_generator import PasswordGenerator
-from flask import render_template
 
-from models.main import User, db, UserAuthorization
+from flask import render_template
+from password_generator import PasswordGenerator
+from sqlalchemy import func
+
+from config import Config
+from decorators.has_permission_decorator import Permission, has_permission
+from exception.validation_error import ValidationError
 from models.appendix import SchemaConfig
 from models.enums import FeatureEnum, UserAuditTypeEnum
+from models.main import User, UserAuthorization, db
 from repository import user_repository
-from services import memory_service, user_service, feature_service
-from utils import status, emailutils
-from config import Config
-from decorators.has_permission_decorator import has_permission, Permission
-from exception.validation_error import ValidationError
 from security.role import Role
+from services import feature_service, memory_service, user_service
+from utils import emailutils, status
 
 
 @has_permission(Permission.READ_USERS)
 def get_user_list(user_context: User):
     """get users list, ignores staff users"""
     users = user_repository.get_admin_users_list(schema=user_context.schema)
+
+    hide_names = feature_service.has_user_feature(FeatureEnum.HIDE_NAMES)
 
     results = []
     for user in users:
@@ -32,8 +34,8 @@ def get_user_list(user_context: User):
             {
                 "id": u.id,
                 "external": u.external,
-                "name": u.name,
-                "email": u.email,
+                "name": "***" if hide_names else u.name,
+                "email": "***" if hide_names else u.email,
                 "active": u.active,
                 "roles": u.config["roles"] if u.config and "roles" in u.config else [],
                 "features": (
@@ -49,6 +51,14 @@ def get_user_list(user_context: User):
     return results
 
 
+@has_permission(Permission.READ_BASIC_FEATURES, Permission.READ_USERS)
+def get_user_manager_list(user_context: User):
+    """get active user managers, so users without READ_USERS know who to contact"""
+    users = user_repository.get_user_manager_list(schema=user_context.schema)
+
+    return [{"id": u.id, "name": u.name, "email": u.email} for u in users]
+
+
 def _get_user_data(id_user: int):
     segments_query = db.session.query(
         func.array_agg(UserAuthorization.idSegment)
@@ -61,7 +71,7 @@ def _get_user_data(id_user: int):
     )
 
     user = user_result[0]
-    segments = segments = user_result[1] if user_result[1] else []
+    segments = user_result[1] if user_result[1] else []
 
     return {
         "id": user.id,
@@ -81,7 +91,7 @@ def _get_user_data(id_user: int):
 
 
 @has_permission(Permission.WRITE_USERS)
-def upsert_user(data: dict, user_context: User, user_permissions: List[Permission]):
+def upsert_user(data: dict, user_context: User, user_permissions: list[Permission]):
     """upsert user"""
     id_user = data.get("id", None)
     id_segment_list = data.get("segments", [])

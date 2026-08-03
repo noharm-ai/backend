@@ -77,31 +77,32 @@ def get_drug_summary(
     if complete:
         max_days = 15
 
-        map_routes = memory_service.get_memory(MemoryEnum.MAP_ROUTES.value)
-        if map_routes and map_routes.value:
-            for r in map_routes.value:
-                if isinstance(r, dict):
-                    routeResults.append(
-                        {"id": r.get("id"), "description": r.get("value")}
-                    )
-        else:
-            routes = (
-                db.session.query(PrescriptionDrug.route)
-                .select_from(PrescriptionDrug)
-                .join(Prescription, Prescription.id == PrescriptionDrug.idPrescription)
-                .filter(
-                    and_(
-                        PrescriptionDrug.idDrug == id_drug,
-                        PrescriptionDrug.idSegment == id_segment,
-                        Prescription.date > func.current_date() - max_days,
-                    )
+        routes = (
+            db.session.query(PrescriptionDrug.route)
+            .select_from(PrescriptionDrug)
+            .join(Prescription, Prescription.id == PrescriptionDrug.idPrescription)
+            .filter(
+                and_(
+                    PrescriptionDrug.idDrug == id_drug,
+                    PrescriptionDrug.idSegment == id_segment,
+                    Prescription.date > func.current_date() - max_days,
                 )
-                .group_by(PrescriptionDrug.route)
-                .all()
             )
+            .group_by(PrescriptionDrug.route)
+            .all()
+        )
 
-            for r in routes:
-                routeResults.append({"id": r.route, "description": r.route})
+        for r in routes:
+            routeResults.append({"id": r.route, "description": r.route})
+
+        if not routeResults:
+            map_routes = memory_service.get_memory(MemoryEnum.MAP_ROUTES.value)
+            if map_routes and map_routes.value:
+                for r in map_routes.value:
+                    if isinstance(r, dict):
+                        routeResults.append(
+                            {"id": r.get("id"), "description": r.get("value")}
+                        )
 
         has_intervals = True
         if remove_fields and remove_fields.value and "interval" in remove_fields.value:

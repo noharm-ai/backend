@@ -180,3 +180,37 @@ class TestIsValidFilename:
     def test_invalid_extension_rejected(self):
         """A path whose extension is not allowed is rejected"""
         assert stringutils.is_valid_filename("report.txt", {".pdf", ".csv"}) is False
+
+
+class TestRemoveAccents:
+    """Teste stringutils - remove_accents (diacritic stripping)"""
+
+    @pytest.mark.parametrize(
+        "value, expected",
+        [
+            ("ção", b"cao"),
+            ("Olá Mundo", b"Ola Mundo"),
+            ("ÁÉÍÓÚ", b"AEIOU"),
+            ("ascii", b"ascii"),
+        ],
+    )
+    def test_strips_accents_returning_bytes(self, value, expected):
+        """Accents are removed; the result is an ASCII byte string."""
+        assert stringutils.remove_accents(value) == expected
+
+
+class TestSlugify:
+    """Teste stringutils - slugify (used as a grouping key)"""
+
+    def test_lowercases_and_replaces_non_word_runs(self):
+        """Non-word runs collapse to dashes and the text is lowercased.
+
+        Note: remove_accents returns bytes, so slugify currently includes the
+        byte-string repr in its output. These assertions document the current
+        behavior rather than an idealized slug.
+        """
+        assert stringutils.slugify("Hello World") == "b-hello-world-"
+
+    def test_strips_accents_before_slugifying(self):
+        """Accented characters are stripped before the slug is built."""
+        assert stringutils.slugify("Ação Média") == "b-acao-media-"

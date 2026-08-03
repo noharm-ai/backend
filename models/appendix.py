@@ -99,6 +99,19 @@ class GlobalMemory(db.Model):
     user = db.Column("update_by", db.BigInteger, nullable=False)
 
 
+class HelpText(db.Model):
+    __tablename__ = "texto_ajuda"
+    __table_args__ = {"schema": "public"}
+
+    id = db.Column("idtexto_ajuda", db.Integer, primary_key=True)
+    key = db.Column("chave", db.String(255), unique=True, nullable=False)
+    content = db.Column("conteudo", db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, nullable=True)
+    created_by = db.Column(db.Integer, nullable=True)
+    updated_at = db.Column(db.DateTime, nullable=True)
+    updated_by = db.Column(db.Integer, nullable=True)
+
+
 class SchemaConfig(db.Model):
     __tablename__ = "schema_config"
     __table_args__ = {"schema": "public"}

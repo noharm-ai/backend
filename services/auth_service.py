@@ -29,7 +29,11 @@ from models.enums import (
 )
 from models.main import User, UserExtra, db, dbSession
 from models.segment import Segment
-from repository import notification_repository, user_activity_repository, user_repository
+from repository import (
+    notification_repository,
+    user_activity_repository,
+    user_repository,
+)
 from security.role import Role
 from services import memory_service, user_service
 from services.admin import admin_integration_status_service
@@ -88,10 +92,8 @@ def _prepare_user(user: User) -> User:
         extra_schemas = extra.config.get("schemas", [])
         user.config = dict(
             user.config,
-            **{
-                "roles": user.config.get("roles", []) + extra_roles,
-                "schemas": user.config.get("schemas", []) + extra_schemas,
-            },
+            roles=user.config.get("roles", []) + extra_roles,
+            schemas=user.config.get("schemas", []) + extra_schemas,
         )
 
     return user
@@ -103,11 +105,25 @@ def _has_force_schema_permission(user: User, force_schema: str = None):
     if Permission.MULTI_SCHEMA not in permissions:
         return False
 
-    if Permission.MAINTAINER not in permissions and force_schema is not None:
+    if force_schema is not None and Permission.MAINTAINER not in permissions:
+        if Permission.TRAINING_RECORDING in permissions:
+            # training users may record in any existing schema
+            return _schema_exists(schema=force_schema)
+
         valid_schemas = [schema["name"] for schema in user.config.get("schemas", [])]
         return force_schema in valid_schemas
 
     return True
+
+
+def _schema_exists(schema: str) -> bool:
+    """Check whether the given schema is configured."""
+    return (
+        db.session.query(SchemaConfig)
+        .filter(SchemaConfig.schemaName == schema)
+        .first()
+        is not None
+    )
 
 
 def _auth_user(
@@ -127,9 +143,7 @@ def _auth_user(
     if Config.ENV == NoHarmENV.STAGING.value:
         if FeatureEnum.STAGING_ACCESS.value not in user_features:
             raise ValidationError(
-                "Este é o ambiente de homologação da NoHarm. Acesse {} para utilizar a NoHarm.".format(
-                    Config.APP_URL
-                ),
+                f"Este é o ambiente de homologação da NoHarm. Acesse {Config.APP_URL} para utilizar a NoHarm.",
                 "errors.unauthorizedUser",
                 status.HTTP_401_UNAUTHORIZED,
             )
@@ -152,18 +166,20 @@ def _auth_user(
             # if NAVIGATOR in a external schema, add fixed roles
             user_config = dict(
                 user.config,
-                **{
-                    "roles": [Role.NAVIGATOR.value, Role.VIEWER.value],
-                },
+                roles=[Role.NAVIGATOR.value, Role.VIEWER.value],
             )
 
         user_schema = force_schema
         if Permission.MAINTAINER in permissions:
             user_config = dict(
                 user.config,
-                **{
-                    "features": user_features + extra_features,
-                },
+                features=user_features + extra_features,
+            )
+        elif Permission.TRAINING_RECORDING in permissions:
+            user_config = dict(
+                user.config,
+                features=user_features
+                + [FeatureEnum.DISABLE_GETNAME.value, FeatureEnum.HIDE_NAMES.value],
             )
 
     schema_config = (
@@ -323,6 +339,21 @@ def get_switch_schema_data(user_permissions: list[Permission], user_context: Use
 
         return {"maintainer": True, "schemas": schemas}
 
+    if Permission.TRAINING_RECORDING in user_permissions:
+        schema_results = db.session.query(SchemaConfig).order_by(
+            SchemaConfig.schemaName
+        )
+
+        schemas = []
+        for s in schema_results:
+            schemas.append(
+                {
+                    "name": s.schemaName,
+                }
+            )
+
+        return {"maintainer": False, "schemas": schemas}
+
     extra = (
         db.session.query(UserExtra).filter(UserExtra.idUser == user_context.id).first()
     )
@@ -376,10 +407,8 @@ def auth_local(
 
     if features is not None and FeatureEnum.OAUTH.value in features.value:
         raise ValidationError(
-            "Utilize o endereço {}/login/{} para fazer login na NoHarm".format(
-                Config.MAIL_HOST, preCheckUser.schema
-            ),
-            "{}/login/{}".format(Config.APP_URL, preCheckUser.schema),
+            f"Utilize o endereço {Config.MAIL_HOST}/login/{preCheckUser.schema} para fazer login na NoHarm",
+            f"{Config.APP_URL}/login/{preCheckUser.schema}",
             status.HTTP_401_UNAUTHORIZED,
         )
 
@@ -562,8 +591,10 @@ def auth_provider(code, schema, nonce=None):
     )
 
     if (
-        features is None or FeatureEnum.OAUTH.value not in features.value
-    ) and Permission.MAINTAINER not in permissions:
+        (features is None or FeatureEnum.OAUTH.value not in features.value)
+        and Permission.MAINTAINER not in permissions
+        and Permission.TRAINING_RECORDING not in permissions
+    ):
         raise ValidationError(
             "OAUTH bloqueado",
             "errors.unauthorizedUser",

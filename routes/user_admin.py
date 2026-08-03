@@ -27,6 +27,13 @@ def get_users():
     return user_admin_service.get_user_list()
 
 
+@app_user_admin.route("/user-admin/manager-list", methods=["GET"])
+@api_endpoint()
+def get_user_managers():
+    """Get active user managers list"""
+    return user_admin_service.get_user_manager_list()
+
+
 @app_user_admin.route("/user-admin/reset-token", methods=["POST"])
 @app_user_admin.route("/user/reset-token", methods=["POST"])
 @api_endpoint()
