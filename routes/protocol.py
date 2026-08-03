@@ -6,6 +6,7 @@ from decorators.api_endpoint_decorator import api_endpoint
 from models.requests.protocol_request import (
     ProtocolAiGenerateTriggerRequest,
     ProtocolAiReviewTriggerRequest,
+    ProtocolDescriptionRequest,
     ProtocolListRequest,
     ProtocolTestRequest,
     ProtocolTestSampleRequest,
@@ -22,6 +23,15 @@ def list_protocols():
     """List all and filter protocols"""
     return protocol_service.list_protocols(
         request_data=ProtocolListRequest(**request.args)
+    )
+
+
+@app_protocol.route("/protocol/<int:id_protocol>/description", methods=["GET"])
+@api_endpoint()
+def describe_protocol(id_protocol: int):
+    """Describe a protocol trigger in plain language, with resolved item names"""
+    return protocol_service.describe_protocol(
+        request_data=ProtocolDescriptionRequest(idProtocol=id_protocol)
     )
 
 

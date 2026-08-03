@@ -12,6 +12,12 @@ class ProtocolListRequest(BaseModel):
     statusType: int | None = None
 
 
+class ProtocolDescriptionRequest(BaseModel):
+    """Protocol description request parameters"""
+
+    idProtocol: int
+
+
 class ProtocolTraceRequest(BaseModel):
     """Protocol trace request parameters"""
 

@@ -1,11 +1,13 @@
-"""Integration tests for the /protocol/list endpoint (protocol_service.list_protocols)."""
+"""Integration tests for the /protocol/list and /protocol/<id>/description
+endpoints (protocol_service.list_protocols / describe_protocol)."""
+
+import json
 
 import pytest
 from sqlalchemy import bindparam, text
 
-from tests.conftest import get_access, make_headers, session, session_commit
-
 from security.role import Role
+from tests.conftest import get_access, make_headers, session, session_commit
 
 # Protocol test rows live in the shared public.protocolo table. Use a high
 # idprotocolo range so they never collide with real seed data and are trivial
@@ -157,3 +159,155 @@ def test_list_protocols_ordered_by_name(client, analyst_headers, seed_protocols)
     # "ZZTest Demo Inactive" < "ZZTest Demo Individual" < "ZZTest Global Agg".
     assert positions[_DEMO_INACTIVE[0]] < positions[_DEMO_ACTIVE[0]]
     assert positions[_DEMO_ACTIVE[0]] < positions[_GLOBAL_ACTIVE[0]]
+
+
+# --- /protocol/<id>/description ------------------------------------------------
+
+# Rows backing the described protocol's variables. High ids so they never
+# collide with seed data.
+_DESC_SUBSTANCE = (9900000001, "ZZTest Substância Descrita")
+_DESC_SEGMENT = (990011, "ZZTest Segmento Descrito")
+_DESC_PROTOCOL_ID = 990005
+_MISSING_SUBSTANCE_ID = 9900000002
+
+_DESC_CONFIG = {
+    "trigger": "{{subs}} and ({{idade}} or {{seg}})",
+    "variables": [
+        {
+            "name": "subs",
+            "field": "substance",
+            "operator": "IN",
+            "value": [str(_DESC_SUBSTANCE[0]), str(_MISSING_SUBSTANCE_ID)],
+        },
+        {"name": "idade", "field": "age", "operator": ">=", "value": 65},
+        {
+            "name": "seg",
+            "field": "idSegment",
+            "operator": "IN",
+            "value": [_DESC_SEGMENT[0]],
+        },
+    ],
+    "result": {"level": "high", "message": "m", "description": "d"},
+}
+
+
+@pytest.fixture
+def seed_described_protocol():
+    """Protocol with a real config plus the substance/segment rows it references."""
+    session.execute(
+        text(
+            "INSERT INTO public.substancia (sctid, nome, link, ativo) "
+            "VALUES (:id, :name, '', true)"
+        ),
+        {"id": _DESC_SUBSTANCE[0], "name": _DESC_SUBSTANCE[1]},
+    )
+    session.execute(
+        text(
+            "INSERT INTO demo.segmento "
+            "(idsegmento, nome, status, cpoe, cpoe_ambulatorio) "
+            "VALUES (:id, :name, 1, false, false)"
+        ),
+        {"id": _DESC_SEGMENT[0], "name": _DESC_SEGMENT[1]},
+    )
+    session.execute(
+        text(
+            "INSERT INTO public.protocolo "
+            "(idprotocolo, schema_name, nome, tp_protocolo, tp_situacao, "
+            "configuracao, created_at, created_by) "
+            "VALUES (:id, 'demo', 'ZZTest Descrito', 1, 1, "
+            "CAST(:config AS json), now(), 1)"
+        ),
+        {"id": _DESC_PROTOCOL_ID, "config": json.dumps(_DESC_CONFIG)},
+    )
+    session_commit()
+
+    yield
+
+    session.execute(
+        text("DELETE FROM public.protocolo WHERE idprotocolo = :id"),
+        {"id": _DESC_PROTOCOL_ID},
+    )
+    session.execute(
+        text("DELETE FROM demo.segmento WHERE idsegmento = :id"),
+        {"id": _DESC_SEGMENT[0]},
+    )
+    session.execute(
+        text("DELETE FROM public.substancia WHERE sctid = :id"),
+        {"id": _DESC_SUBSTANCE[0]},
+    )
+    session_commit()
+
+
+def test_describe_protocol_permission_denied(client, seed_described_protocol):
+    """A user without READ_PRESCRIPTION cannot describe a protocol [401]."""
+    headers = make_headers(get_access(client, roles=[Role.SUPPORT_REQUESTER.value]))
+    response = client.get(f"/protocol/{_DESC_PROTOCOL_ID}/description", headers=headers)
+
+    assert response.status_code == 401
+
+
+def test_describe_protocol_returns_trigger_and_variables(
+    client, analyst_headers, seed_described_protocol
+):
+    """The description exposes the trigger expression and its variables."""
+    response = client.get(
+        f"/protocol/{_DESC_PROTOCOL_ID}/description", headers=analyst_headers
+    )
+
+    assert response.status_code == 200
+    data = response.get_json()["data"]
+
+    assert data["id"] == _DESC_PROTOCOL_ID
+    assert data["name"] == "ZZTest Descrito"
+    assert data["trigger"] == _DESC_CONFIG["trigger"]
+    assert [v["name"] for v in data["variables"]] == ["subs", "idade", "seg"]
+
+
+def test_describe_protocol_resolves_item_names(
+    client, analyst_headers, seed_described_protocol
+):
+    """Ids referenced by the variables come back as names, grouped by kind."""
+    response = client.get(
+        f"/protocol/{_DESC_PROTOCOL_ID}/description", headers=analyst_headers
+    )
+
+    assert response.status_code == 200
+    labels = response.get_json()["data"]["labels"]
+
+    assert labels["substance"][str(_DESC_SUBSTANCE[0])] == _DESC_SUBSTANCE[1]
+    assert labels["segment"][str(_DESC_SEGMENT[0])] == _DESC_SEGMENT[1]
+    # an id with no matching row is simply absent, so the client falls back to it
+    assert str(_MISSING_SUBSTANCE_ID) not in labels["substance"]
+    # fields that carry no ids produce no label group
+    assert "drug" not in labels
+
+
+def test_describe_protocol_hides_other_schema(client, analyst_headers, seed_protocols):
+    """A protocol owned by another schema cannot be described [400]."""
+    response = client.get(
+        f"/protocol/{_OTHER_SCHEMA[0]}/description", headers=analyst_headers
+    )
+
+    assert response.status_code == 400
+
+
+def test_describe_protocol_unknown_id(client, analyst_headers):
+    """An unknown protocol id is rejected [400]."""
+    response = client.get("/protocol/999999999/description", headers=analyst_headers)
+
+    assert response.status_code == 400
+
+
+def test_describe_protocol_without_config(client, analyst_headers, seed_protocols):
+    """A protocol with an empty config describes as having no trigger [200]."""
+    response = client.get(
+        f"/protocol/{_GLOBAL_ACTIVE[0]}/description", headers=analyst_headers
+    )
+
+    assert response.status_code == 200
+    data = response.get_json()["data"]
+
+    # the client renders its "description unavailable" notice for this shape
+    assert data["trigger"] is None
+    assert data["variables"] == []
+    assert data["labels"] == {}
