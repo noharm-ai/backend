@@ -3,6 +3,7 @@
 from flask import Blueprint, request
 
 from decorators.api_endpoint_decorator import api_endpoint
+from models.requests.protocol_agent_request import ProtocolAgentChatRequest
 from models.requests.protocol_request import (
     ProtocolAiGenerateTriggerRequest,
     ProtocolAiReviewTriggerRequest,
@@ -12,7 +13,12 @@ from models.requests.protocol_request import (
     ProtocolTestSampleRequest,
     ProtocolTraceRequest,
 )
-from services import protocol_ai_service, protocol_service, protocol_trace_service
+from services import (
+    protocol_agent_service,
+    protocol_ai_service,
+    protocol_service,
+    protocol_trace_service,
+)
 
 app_protocol = Blueprint("app_protocol", __name__)
 
@@ -77,4 +83,13 @@ def ai_review_trigger():
     """Review the semantics of a trigger expression"""
     return protocol_ai_service.review_trigger(
         request_data=ProtocolAiReviewTriggerRequest(**request.get_json())
+    )
+
+
+@app_protocol.route("/protocol/ai/agent-chat", methods=["POST"])
+@api_endpoint()
+def ai_agent_chat():
+    """Run one chat turn of the protocol creation co-pilot"""
+    return protocol_agent_service.chat(
+        request_data=ProtocolAgentChatRequest(**request.get_json())
     )
