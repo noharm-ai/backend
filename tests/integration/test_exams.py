@@ -1,14 +1,16 @@
+from datetime import datetime, timedelta
 from unittest.mock import patch
 
 import pytest
-
-from tests.conftest import session
+from sqlalchemy import bindparam, text
 
 from models.segment import Exams
+from tests.conftest import session, session_commit
 
 # Admission / patient present in the seed data (see tests/integration/test_patient.py)
 ADMISSION = 5
 PATIENT_ID = 5
+SEGMENT = 1
 
 
 @pytest.fixture(autouse=True)
@@ -136,3 +138,140 @@ def test_list_exam_types_returns_list(client, analyst_headers):
 
     assert response.status_code == 200
     assert isinstance(response.get_json()["data"], list)
+
+
+# Two exam types configured as creatinina. "ACR" sorts before "ZCR", so the older
+# one is reached first when the exam list is walked (it is sorted by type, not date).
+OLD_CREATININA_TYPE = "ACR"
+NEW_CREATININA_TYPE = "ZCR"
+OLD_CREATININA_DATE = datetime.today() - timedelta(days=10)
+NEW_CREATININA_DATE = datetime.today() - timedelta(days=1)
+CREATININA_EXAM_IDS = [900001, 900002]
+CREATININA_EXAM_TYPES = [
+    OLD_CREATININA_TYPE.lower(),
+    NEW_CREATININA_TYPE.lower(),
+    "mdrd",
+]
+
+
+def _add_seg_exam(type_exam: str, initials: str, name: str, order: int):
+    """Configure an exam type for the test segment"""
+    session.execute(
+        text(
+            "INSERT INTO demo.segmentoexame "
+            "(idsegmento, tpexame, abrev, nome, min, max, referencia, posicao, ativo, update_by) "
+            "VALUES (:seg, :tp, :abrev, :name, 0, 2, '', :order, true, 1)"
+        ),
+        {
+            "seg": SEGMENT,
+            "tp": type_exam.lower(),
+            "abrev": initials,
+            "name": name,
+            "order": order,
+        },
+    )
+
+
+def _add_exam(id_exam: int, type_exam: str, exam_date: datetime, value: float):
+    """Add a result for the test patient"""
+    session.execute(
+        text(
+            "INSERT INTO demo.exame "
+            "(fkexame, fkpessoa, nratendimento, dtexame, tpexame, resultado, unidade) "
+            "VALUES (:id, :patient, :admission, :date, :tp, :value, 'mg/dL')"
+        ),
+        {
+            "id": id_exam,
+            "patient": PATIENT_ID,
+            "admission": ADMISSION,
+            "date": exam_date,
+            "tp": type_exam,
+            "value": value,
+        },
+    )
+
+
+def _clean_creatinina_setup():
+    """Remove the exam types and results created by the creatinina fixtures"""
+    session.execute(
+        text("DELETE FROM demo.exame WHERE fkexame IN :ids").bindparams(
+            bindparam("ids", expanding=True)
+        ),
+        {"ids": CREATININA_EXAM_IDS},
+    )
+    session.execute(
+        text(
+            "DELETE FROM demo.segmentoexame "
+            "WHERE idsegmento = :seg AND tpexame IN :types"
+        ).bindparams(bindparam("types", expanding=True)),
+        {"seg": SEGMENT, "types": CREATININA_EXAM_TYPES},
+    )
+    session_commit()
+
+
+@pytest.fixture
+def two_creatinina_types():
+    """Two exam types configured as creatinina (plus mdrd), one result of each."""
+    _clean_creatinina_setup()
+
+    _add_seg_exam(OLD_CREATININA_TYPE, "creatinina", "Creatinina", 1)
+    _add_seg_exam(NEW_CREATININA_TYPE, "creatinina", "Creatinina", 2)
+    _add_seg_exam("mdrd", "MDRD", "MDRD", 3)
+
+    _add_exam(CREATININA_EXAM_IDS[0], OLD_CREATININA_TYPE, OLD_CREATININA_DATE, 1.0)
+    _add_exam(CREATININA_EXAM_IDS[1], NEW_CREATININA_TYPE, NEW_CREATININA_DATE, 3.0)
+    session_commit()
+
+    yield
+
+    _clean_creatinina_setup()
+
+
+@pytest.fixture
+def padded_creatinina_initials():
+    """A single creatinina exam type whose initials carry trailing whitespace."""
+    _clean_creatinina_setup()
+
+    _add_seg_exam(NEW_CREATININA_TYPE, "creatinina ", "Creatinina", 1)
+    _add_seg_exam("mdrd", "MDRD", "MDRD", 2)
+
+    _add_exam(CREATININA_EXAM_IDS[1], NEW_CREATININA_TYPE, NEW_CREATININA_DATE, 3.0)
+    session_commit()
+
+    yield
+
+    _clean_creatinina_setup()
+
+
+def test_exams_by_admission_uses_most_recent_creatinina(
+    client, analyst_headers, two_creatinina_types
+):
+    """GET /exams/<admission> - renal calc uses the most recent creatinina, not the first exam type"""
+    response = client.get(
+        f"/exams/{ADMISSION}?idSegment={SEGMENT}", headers=analyst_headers
+    )
+
+    assert response.status_code == 200
+    data = response.get_json()["data"]
+
+    # both creatinina types are still reported individually
+    assert data[OLD_CREATININA_TYPE.lower()]["value"] == 1.0
+    assert data[NEW_CREATININA_TYPE.lower()]["value"] == 3.0
+
+    # the derived calculation must be based on the most recent one
+    assert data["mdrd"]["date"] == NEW_CREATININA_DATE.isoformat()
+
+
+def test_exams_by_admission_creatinina_initials_are_trimmed(
+    client, analyst_headers, padded_creatinina_initials
+):
+    """GET /exams/<admission> - renal calc runs even when the creatinina initials are padded"""
+    response = client.get(
+        f"/exams/{ADMISSION}?idSegment={SEGMENT}", headers=analyst_headers
+    )
+
+    assert response.status_code == 200
+    data = response.get_json()["data"]
+
+    assert "mdrd" in data
+    assert data["mdrd"]["date"] == NEW_CREATININA_DATE.isoformat()

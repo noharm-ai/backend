@@ -1,11 +1,22 @@
 import redis
 from flask_jwt_extended import get_jwt
-
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import deferred
 
 from app.extensions import db
 from config import Config
+from models.enums import NoHarmENV
+
+
+def redis_cert_reqs(env: str):
+    """Certificate verification mode for the redis connection.
+
+    Development points REDIS_HOST at a remote instance by IP, which no certificate
+    can be valid for, so verification is skipped there (the traffic is still
+    encrypted). Every other environment verifies the certificate and the hostname.
+    """
+    return None if env == NoHarmENV.DEVELOPMENT.value else "required"
+
 
 redis_client = redis.StrictRedis(
     host=Config.REDIS_HOST,
@@ -13,6 +24,7 @@ redis_client = redis.StrictRedis(
     db=0,
     decode_responses=True,
     ssl=True,
+    ssl_cert_reqs=redis_cert_reqs(Config.ENV),
     socket_timeout=2,
     socket_connect_timeout=2,
 )

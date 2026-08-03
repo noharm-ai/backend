@@ -283,6 +283,7 @@ def get_exams_by_admission(admission_number: int, id_segment: int, user_context:
 
     bufferList = {}
     typeExams = []
+    creatinina_exam = None
     for e in examsList:
         if e.typeExam.lower() not in typeExams:
             key = e.typeExam.lower()
@@ -307,66 +308,25 @@ def get_exams_by_admission(admission_number: int, id_segment: int, user_context:
             if key in perc:
                 perc[key]["total"] = float(e.value)
 
-            if key in segExam and segExam[key].initials.lower() == "creatinina":
-                custom_exams_types = ["mdrd", "ckd", "ckd21", "cg", "swrtz2", "swrtz1"]
+            if key in segExam and segExam[key].initials.lower().strip() == "creatinina":
+                # more than one exam type can be configured as creatinina.
+                # keep the most recent one to base the renal function calculations on
+                # (examsList is sorted by typeExam, not by date)
+                if (
+                    creatinina_exam is None
+                    or e.date.timestamp() > creatinina_exam[0].date.timestamp()
+                ):
+                    creatinina_exam = (e, item)
 
-                if any(k in bufferList for k in custom_exams_types):
-                    # do not overwrite previous calculation (keep the most recent creatinina exam)
-                    continue
-
-                for keyCalc in custom_exams_types:
-                    if keyCalc in segExam and patient:
-                        if keyCalc == "mdrd":
-                            itemCalc = examutils.mdrd_calc(
-                                e.value,
-                                patient.birthdate,
-                                patient.gender,
-                                patient.skinColor,
-                            )
-                        elif keyCalc == "cg":
-                            itemCalc = examutils.cg_calc(
-                                e.value,
-                                patient.birthdate,
-                                patient.gender,
-                                patient.weight,
-                            )
-                        elif keyCalc == "ckd":
-                            itemCalc = examutils.ckd_calc(
-                                e.value,
-                                patient.birthdate,
-                                patient.gender,
-                                patient.skinColor,
-                                patient.height,
-                                patient.weight,
-                            )
-                        elif keyCalc == "ckd21":
-                            itemCalc = examutils.ckd_calc_21(
-                                e.value, patient.birthdate, patient.gender
-                            )
-                        elif keyCalc == "swrtz2":
-                            itemCalc = examutils.schwartz2_calc(e.value, patient.height)
-                        elif keyCalc == "swrtz1":
-                            itemCalc = examutils.schwartz1_calc(
-                                e.value,
-                                patient.birthdate,
-                                patient.gender,
-                                patient.height,
-                            )
-
-                        # set custom exams config
-                        itemCalc = _fill_custom_exams(
-                            exam_type=keyCalc, custom_exam=itemCalc, seg_exam=segExam
-                        )
-
-                        if itemCalc["value"]:
-                            itemCalc["name"] = segExam[keyCalc].name
-                            itemCalc["perc"] = None
-                            itemCalc["configured"] = True
-                            itemCalc["date"] = item["date"]
-                            itemCalc["history"] = _history_calc(
-                                keyCalc, item["history"], patient, segExam
-                            )
-                            bufferList[keyCalc] = itemCalc
+    if creatinina_exam is not None:
+        _add_creatinina_calcs(
+            exam=creatinina_exam[0],
+            exam_item=creatinina_exam[1],
+            patient=patient,
+            seg_exam=segExam,
+            buffer_list=bufferList,
+            reported_exams=typeExams,
+        )
 
     for p in perc:
         total = perc[p]["total"]
@@ -771,6 +731,80 @@ def find_latest_exams(
     return dict(exams, **examsExtra)
 
 
+def _add_creatinina_calcs(
+    exam,
+    exam_item: dict,
+    patient: Patient,
+    seg_exam: dict,
+    buffer_list: dict,
+    reported_exams: list,
+):
+    """Add the renal function calculations derived from a creatinina exam to buffer_list"""
+
+    if not patient:
+        return
+
+    for keyCalc in ["mdrd", "ckd", "ckd21", "cg", "swrtz2", "swrtz1"]:
+        if keyCalc not in seg_exam:
+            continue
+
+        if keyCalc in reported_exams:
+            # an exam with this type was reported by the client: do not overwrite it
+            continue
+
+        if keyCalc == "mdrd":
+            itemCalc = examutils.mdrd_calc(
+                exam.value,
+                patient.birthdate,
+                patient.gender,
+                patient.skinColor,
+            )
+        elif keyCalc == "cg":
+            itemCalc = examutils.cg_calc(
+                exam.value,
+                patient.birthdate,
+                patient.gender,
+                patient.weight,
+            )
+        elif keyCalc == "ckd":
+            itemCalc = examutils.ckd_calc(
+                exam.value,
+                patient.birthdate,
+                patient.gender,
+                patient.skinColor,
+                patient.height,
+                patient.weight,
+            )
+        elif keyCalc == "ckd21":
+            itemCalc = examutils.ckd_calc_21(
+                exam.value, patient.birthdate, patient.gender
+            )
+        elif keyCalc == "swrtz2":
+            itemCalc = examutils.schwartz2_calc(exam.value, patient.height)
+        elif keyCalc == "swrtz1":
+            itemCalc = examutils.schwartz1_calc(
+                exam.value,
+                patient.birthdate,
+                patient.gender,
+                patient.height,
+            )
+
+        # set custom exams config
+        itemCalc = _fill_custom_exams(
+            exam_type=keyCalc, custom_exam=itemCalc, seg_exam=seg_exam
+        )
+
+        if itemCalc["value"]:
+            itemCalc["name"] = seg_exam[keyCalc].name
+            itemCalc["perc"] = None
+            itemCalc["configured"] = True
+            itemCalc["date"] = exam_item["date"]
+            itemCalc["history"] = _history_calc(
+                keyCalc, exam_item["history"], patient, seg_exam
+            )
+            buffer_list[keyCalc] = itemCalc
+
+
 def _fill_custom_exams(exam_type: str, custom_exam: dict, seg_exam: dict):
     if exam_type in seg_exam:
         ref = seg_exam[exam_type]
@@ -807,8 +841,9 @@ def refresh_exams_cache(id_patient: int, user_context: User):
     )
 
     key = f"{user_context.schema}:{id_patient}:exames"
-    for type_exam, exam in exams.items():
-        redis_client.hset(key, type_exam, json.dumps(exam))
+    with cache_service.tolerate_failure(operation="refresh_exams_cache", key=key):
+        for type_exam, exam in exams.items():
+            redis_client.hset(key, type_exam, json.dumps(exam))
 
 
 @has_permission(Permission.READ_PRESCRIPTION)
