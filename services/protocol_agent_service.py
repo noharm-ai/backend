@@ -76,7 +76,7 @@ AGENT_SYSTEM_PROMPT = (
     "- exam → > < >= <= = != → number; requires examType (list_exam_types); "
     "optional examPeriod. Fallback only: use exam_ref instead whenever the "
     "exam exists in list_reference_exams.\n"
-    "- age, weight, admissionTime (days since admission), stConcilia → "
+    "- age, weight, admissionTime (hours since admission), stConcilia → "
     "> < >= <= = != → number.\n"
     "- cn_stats → > < >= <= = != → number; requires statsType.\n"
     "- dischargeReason, insurance → CONTAINS → text.\n"
