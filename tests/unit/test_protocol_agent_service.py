@@ -14,6 +14,7 @@ from models.requests.protocol_agent_request import (
 from models.response.agents.protocol_agent_response import ProtocolAgentTurnOutput
 from services.protocol_agent_service import (
     LIMIT_TURNS_MESSAGE,
+    _is_valid_trigger,
     _run_agent_turn,
     _to_strands_messages,
     _turn_prompt,
@@ -252,3 +253,27 @@ def test_run_agent_turn_guardrail_raises_503(
         _run_agent_turn(request_data=_chat_request(), user_context=_user())
 
     assert error.value.code == "errors.serviceUnavailable"
+
+
+def test_valid_trigger_passes():
+    assert _is_valid_trigger(
+        trigger="{{v1}} and not ({{v2}} or {{v1}})", variable_names=["v1", "v2"]
+    )
+
+
+def test_unknown_variable_is_rejected():
+    assert not _is_valid_trigger(
+        trigger="{{v1}} and {{ghost}}", variable_names=["v1"]
+    )
+
+
+def test_unbalanced_parentheses_are_rejected():
+    assert not _is_valid_trigger(
+        trigger="({{v1}} and {{v2}}", variable_names=["v1", "v2"]
+    )
+
+
+def test_disallowed_tokens_are_rejected():
+    assert not _is_valid_trigger(
+        trigger="__import__('os').system('id')", variable_names=["v1"]
+    )

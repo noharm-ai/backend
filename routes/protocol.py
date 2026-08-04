@@ -5,8 +5,6 @@ from flask import Blueprint, request
 from decorators.api_endpoint_decorator import api_endpoint
 from models.requests.protocol_agent_request import ProtocolAgentChatRequest
 from models.requests.protocol_request import (
-    ProtocolAiGenerateTriggerRequest,
-    ProtocolAiReviewTriggerRequest,
     ProtocolDescriptionRequest,
     ProtocolListRequest,
     ProtocolTestRequest,
@@ -15,7 +13,6 @@ from models.requests.protocol_request import (
 )
 from services import (
     protocol_agent_service,
-    protocol_ai_service,
     protocol_service,
     protocol_trace_service,
 )
@@ -65,24 +62,6 @@ def test_protocol_config():
     """Evaluate an unsaved protocol config against a chunk of prescriptions"""
     return protocol_trace_service.test_protocol(
         request_data=ProtocolTestRequest(**request.get_json())
-    )
-
-
-@app_protocol.route("/protocol/ai/generate-trigger", methods=["POST"])
-@api_endpoint()
-def ai_generate_trigger():
-    """Generate a trigger expression from a natural-language description"""
-    return protocol_ai_service.generate_trigger(
-        request_data=ProtocolAiGenerateTriggerRequest(**request.get_json())
-    )
-
-
-@app_protocol.route("/protocol/ai/review-trigger", methods=["POST"])
-@api_endpoint()
-def ai_review_trigger():
-    """Review the semantics of a trigger expression"""
-    return protocol_ai_service.review_trigger(
-        request_data=ProtocolAiReviewTriggerRequest(**request.get_json())
     )
 
 

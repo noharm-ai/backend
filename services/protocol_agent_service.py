@@ -8,6 +8,7 @@ same rules applied on protocol upsert before it reaches the client.
 """
 
 import json
+import re
 
 from botocore.config import Config as BotoConfig
 from botocore.exceptions import ReadTimeoutError
@@ -23,10 +24,10 @@ from models.enums import ProtocolTypeEnum
 from models.main import User
 from models.requests.protocol_agent_request import ProtocolAgentChatRequest
 from models.response.agents.protocol_agent_response import ProtocolAgentTurnOutput
-from services import protocol_ai_service
 from services.admin import admin_protocol_service
 from services.protocol_agent_tools import build_tools
 from utils import logger, status
+from utils.alert_protocol import SAFE_LOGICAL_EXPR_REGEX
 
 BEDROCK_READ_TIMEOUT = 20
 MAX_MESSAGE_LENGTH = 4000
@@ -62,17 +63,17 @@ AGENT_SYSTEM_PROMPT = (
     '"message": "<short alert>", "description": "<longer explanation>"}.\n\n'
     "VARIABLE FIELDS (field → operator → value)\n"
     "- substance → IN/NOTIN → list of sctid strings (resolve with "
-    "buscar_substancias).\n"
-    "- class → IN/NOTIN → list of class ids (buscar_classes_substancia).\n"
-    "- idDrug → IN/NOTIN → list of idDrug strings (buscar_medicamentos).\n"
-    "- route → IN/NOTIN → list of route ids (listar_vias).\n"
-    "- idDepartment → IN/NOTIN → list of idDepartment strings (listar_setores).\n"
-    "- idSegment → IN/NOTIN → list of segment ids (listar_segmentos).\n"
-    "- idIcd → IN/NOTIN → list of ICD ids (buscar_cids).\n"
-    "- exam → > < >= <= = != → number; requires examType (listar_tipos_exame); "
+    "search_substances).\n"
+    "- class → IN/NOTIN → list of class ids (search_substance_classes).\n"
+    "- idDrug → IN/NOTIN → list of idDrug strings (search_drugs).\n"
+    "- route → IN/NOTIN → list of route ids (list_routes).\n"
+    "- idDepartment → IN/NOTIN → list of idDepartment strings (list_departments).\n"
+    "- idSegment → IN/NOTIN → list of segment ids (list_segments).\n"
+    "- idIcd → IN/NOTIN → list of ICD ids (search_icds).\n"
+    "- exam → > < >= <= = != → number; requires examType (list_exam_types); "
     "optional examPeriod (max age of the exam, in days).\n"
     "- exam_ref → > < >= <= = != → number; requires examRefType "
-    "(listar_exames_referencia); optional examRefPeriod.\n"
+    "(list_reference_exams); optional examRefPeriod.\n"
     "- age, weight, admissionTime (days since admission), stConcilia → "
     "> < >= <= = != → number.\n"
     "- cn_stats → > < >= <= = != → number; requires statsType.\n"
@@ -90,8 +91,8 @@ AGENT_SYSTEM_PROMPT = (
     "- Ask ONE focused question at a time while information is missing "
     "(protocol intent, which drugs/exams, thresholds, alert level/texts).\n"
     "- When you have enough information, build the full proposal and call "
-    "validar_protocolo before presenting it; fix any reported errors first.\n"
-    "- Use testar_protocolo when the user wants to see the rule against "
+    "validate_protocol before presenting it; fix any reported errors first.\n"
+    "- Use test_protocol when the user wants to see the rule against "
     "real prescriptions.\n"
     "- Trigger: use ONLY declared variable names; keep it as simple as "
     "possible.\n"
@@ -196,7 +197,7 @@ def _turn_prompt(request_data: ProtocolAgentChatRequest) -> str:
 
 
 def _validate_config(config: dict, protocol_type: int) -> list[str]:
-    """Validate an unsaved config (adapter used by the validar_protocolo tool)."""
+    """Validate an unsaved config (adapter used by the validate_protocol tool)."""
     return _validate_proposal(
         proposal={"protocolType": protocol_type, "config": config}, draft={}
     )
@@ -235,16 +236,11 @@ def _validate_proposal(proposal: dict, draft: dict) -> list[str]:
         errors.append("Gatilho não informado")
     elif len(trigger) > MAX_TRIGGER_LENGTH:
         errors.append("Gatilho excede o tamanho máximo")
-    else:
-        try:
-            protocol_ai_service._assert_valid_trigger(
-                trigger=trigger,
-                variable_names=[
-                    str(v.get("name")) for v in variables if isinstance(v, dict)
-                ],
-            )
-        except ValidationError:
-            errors.append("Gatilho possui formato inválido")
+    elif not _is_valid_trigger(
+        trigger=trigger,
+        variable_names=[str(v.get("name")) for v in variables if isinstance(v, dict)],
+    ):
+        errors.append("Gatilho possui formato inválido")
 
     if not isinstance(result, dict) or not str(result.get("message") or "").strip():
         errors.append("Mensagem de alerta não informada")
@@ -264,6 +260,23 @@ def _validate_proposal(proposal: dict, draft: dict) -> list[str]:
             errors.append(str(error))
 
     return errors
+
+
+def _is_valid_trigger(trigger: str, variable_names: list[str]) -> bool:
+    """Check a trigger only references known variables with safe boolean syntax."""
+    substituted = trigger
+    for name in variable_names:
+        substituted = substituted.replace("{{" + name + "}}", "True")
+
+    if not re.match(SAFE_LOGICAL_EXPR_REGEX, substituted):
+        return False
+
+    try:
+        compile(substituted, "<trigger>", "eval")
+    except SyntaxError:
+        return False
+
+    return True
 
 
 def _raise_unavailable():
