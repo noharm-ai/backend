@@ -3,7 +3,10 @@
 from flask import Blueprint, request
 
 from decorators.api_endpoint_decorator import api_endpoint
-from models.requests.protocol_request import ProtocolListRequest, ProtocolUpsertRequest
+from models.requests.protocol_request import (
+    AdminProtocolListRequest,
+    ProtocolUpsertRequest,
+)
 from services.admin import admin_protocol_service
 
 app_admin_protocol = Blueprint("app_admin_protocol", __name__)
@@ -14,7 +17,17 @@ app_admin_protocol = Blueprint("app_admin_protocol", __name__)
 def list_protocols():
     """List all and filter protocols"""
     return admin_protocol_service.list_protocols(
-        request_data=ProtocolListRequest(**request.get_json())
+        request_data=AdminProtocolListRequest(**request.get_json())
+    )
+
+
+@app_admin_protocol.route("/admin/protocol/<int:id_protocol>", methods=["GET"])
+@api_endpoint(is_admin=True)
+def get_protocol(id_protocol: int):
+    """Get a single protocol, to be edited or copied"""
+    return admin_protocol_service.get_protocol(
+        id_protocol=id_protocol,
+        all_schemas=request.args.get("allSchemas", "false") == "true",
     )
 
 

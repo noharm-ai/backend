@@ -10,6 +10,19 @@ class ProtocolListRequest(BaseModel):
     protocolType: str | None = None
     protocolTypeList: list[int] = None
     statusType: int | None = None
+    term: str | None = None
+
+
+class AdminProtocolListRequest(ProtocolListRequest):
+    """Admin protocol list parameters
+
+    Adds cross-schema lookup, used to find a protocol from another schema to
+    copy. It lives in a separate model on purpose: the user-facing
+    /protocol/list builds ProtocolListRequest straight from the query string,
+    so allSchemas must not be reachable from there.
+    """
+
+    allSchemas: bool = False
 
 
 class ProtocolDescriptionRequest(BaseModel):
