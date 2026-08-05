@@ -122,6 +122,7 @@ COMBINATION_CRITERION_LABELS = {
     "feedingTube": "sonda",
     "defaultMeasureUnit": "unidade de medida padrão",
     "drugAttribute": "atributo do medicamento",
+    "drugAlertLimit": "valor limite nefrotóxico/hepático",
 }
 
 # templates for early-exit reasons ("why the variable defaulted to false")

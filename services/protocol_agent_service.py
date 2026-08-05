@@ -61,6 +61,7 @@ COMBINATION_CRITERIA_FIELDS = (
     "class",
     "drug",
     "drugAttribute",
+    "drugAlertLimit",
     "route",
     "intravenous",
     "feedingTube",
@@ -139,7 +140,14 @@ AGENT_SYSTEM_PROMPT = (
     "prescribed item — copy the id exactly, including case), drugAttribute "
     "(list of: mav = alta vigilância, antimicro, controlled, dialyzable, "
     "elderly = inapropriado para idosos, notdefault = não padronizado, "
-    "chemo = quimioterápico; no other value exists), intravenous "
+    "chemo = quimioterápico; no other value exists), drugAlertLimit "
+    "(list of: kidney = possui valor limite nefrotóxico, liver = possui valor "
+    "limite hepático, not_kidney = não possui valor limite nefrotóxico, "
+    "not_liver = não possui valor limite hepático; no other value exists — "
+    "never write renal, nefrotoxico or hepatico. Tests whether the drug has a "
+    "nephro/hepatotoxicity alert threshold configured in medatributos "
+    "renal/hepatico; a blank or zero threshold counts as 'não possui'. Matches "
+    "when the item satisfies ANY of the selected options), intravenous "
     "(true/false), feedingTube (true/false), dose + doseOperator, "
     "defaultMeasureUnit (mg|ml|mcg|UI, the unit the dose is expressed in), "
     "frequencyday + frequencydayOperator, period + periodOperator, "

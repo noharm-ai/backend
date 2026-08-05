@@ -260,12 +260,15 @@ def _validate_variables(variables: list[dict], protocol_type: int):
 
 def _test_protocol(protocol: dict):
     drug_list = [
+        # Drug A/B carry a nephro/hepatotoxicity limit and Drug C none, so every
+        # drugAlertLimit option has something to match against in this sample.
         _get_prescription_drug_mock_row(
             id_prescription_drug=1,
             dose=10,
             drug_name="Drug A",
             drug_class="J1",
             route="IV",
+            kidney=30,
         ),
         _get_prescription_drug_mock_row(
             id_prescription_drug=2,
@@ -273,6 +276,7 @@ def _test_protocol(protocol: dict):
             drug_name="Drug B",
             drug_class="J2",
             route="IV",
+            liver=100,
         ),
         _get_prescription_drug_mock_row(
             id_prescription_drug=3,
