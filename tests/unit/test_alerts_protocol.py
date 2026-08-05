@@ -395,6 +395,37 @@ from utils.alert_protocol import AlertProtocol, ProtocolExtraInfo
             },
             True,
         ),
+        # imc: weight 80kg / (170cm)^2 = 27.68
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
+                        "field": "imc",
+                        "operator": ">",
+                        "value": 25,
+                    }
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            True,
+        ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
+                        "field": "imc",
+                        "operator": ">=",
+                        "value": 30,
+                    }
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            False,
+        ),
         (
             {
                 "variables": [
@@ -1130,6 +1161,7 @@ def test_trigger(protocol, has_result):
     exams = {
         "age": 50,
         "weight": 80,
+        "height": 170,
         "ckd21": {
             "value": 3.2,
             "date": (date.today() - timedelta(days=3)).isoformat(),

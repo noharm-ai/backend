@@ -25,6 +25,7 @@ class TraceReasonEnum(Enum):
     NO_ADMISSION_DATE = "NO_ADMISSION_DATE"
     AGE_MISSING = "AGE_MISSING"
     WEIGHT_MISSING = "WEIGHT_MISSING"
+    HEIGHT_MISSING = "HEIGHT_MISSING"
     NO_SEGMENT_TYPE = "NO_SEGMENT_TYPE"
     INSURANCE_MISSING = "INSURANCE_MISSING"
     OPERATOR_NOT_SUPPORTED = "OPERATOR_NOT_SUPPORTED"
@@ -85,6 +86,7 @@ FIELD_LABELS = {
     "stConcilia": "situação da conciliação",
     "age": "idade",
     "weight": "peso (kg)",
+    "imc": "IMC (kg/m²)",
     "segmentType": "tipo de segmento",
     "idDepartment": "setor",
     "idIcd": "CID",
@@ -137,6 +139,7 @@ REASON_TEMPLATES = {
     TraceReasonEnum.NO_ADMISSION_DATE.value: "o paciente não possui data de internação registrada",
     TraceReasonEnum.AGE_MISSING.value: "o paciente não possui idade registrada",
     TraceReasonEnum.WEIGHT_MISSING.value: "o paciente não possui peso registrado",
+    TraceReasonEnum.HEIGHT_MISSING.value: "o paciente não possui altura registrada",
     TraceReasonEnum.NO_SEGMENT_TYPE.value: "o segmento da prescrição não possui tipo definido",
     TraceReasonEnum.INSURANCE_MISSING.value: "a prescrição não possui convênio registrado",
     TraceReasonEnum.OPERATOR_NOT_SUPPORTED.value: "o operador '{operator}' não é suportado para este campo",

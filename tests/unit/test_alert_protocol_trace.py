@@ -279,6 +279,80 @@ def test_get_protocol_alerts_unchanged():
     assert len(alert_protocol.trace_log) == 1
 
 
+def _imc_protocol(operator: str, value):
+    return {
+        "variables": [
+            {
+                "name": "imc_elevado",
+                "field": "imc",
+                "operator": operator,
+                "value": value,
+            },
+        ],
+        "trigger": "{{imc_elevado}}",
+        "result": {"type": "SHOW_MESSAGE", "level": "high", "message": "test"},
+    }
+
+
+def test_trace_imc_computed():
+    """Protocol trace: imc is computed from weight and height (kg / m²)"""
+
+    alert_protocol = _get_alert_protocol(exams={"weight": 80, "height": 170})
+
+    trace = alert_protocol.evaluate_with_trace(protocol=_imc_protocol(">", 25))
+
+    variable = alert_protocol.trace_log[0]
+    assert variable.field == "imc"
+    assert variable.reason == TraceReasonEnum.COMPARED.value
+    # 80 / (1.70 ** 2) = 27.68
+    assert variable.actual_value == 27.68
+    assert variable.result is True
+    assert trace["activated"] is True
+
+    assert build_variable_message(variable) == (
+        "Variável 'imc_elevado' (IMC (kg/m²)): o valor encontrado foi 27.68; "
+        "esperado: maior que 25 → verdadeiro"
+    )
+
+
+def test_trace_imc_below_threshold():
+    """Protocol trace: imc comparison evaluates to false when below the threshold"""
+
+    alert_protocol = _get_alert_protocol(exams={"weight": 50, "height": 180})
+
+    trace = alert_protocol.evaluate_with_trace(protocol=_imc_protocol(">", 25))
+
+    variable = alert_protocol.trace_log[0]
+    assert variable.reason == TraceReasonEnum.COMPARED.value
+    # 50 / (1.80 ** 2) = 15.43
+    assert variable.actual_value == 15.43
+    assert variable.result is False
+    assert trace["activated"] is False
+
+
+def test_trace_imc_missing_data():
+    """Protocol trace: imc reports which patient measure is missing"""
+
+    no_height = _get_alert_protocol(exams={"weight": 80})
+    no_height.evaluate_with_trace(protocol=_imc_protocol(">", 25))
+    variable = no_height.trace_log[0]
+    assert variable.reason == TraceReasonEnum.HEIGHT_MISSING.value
+    assert variable.result is False
+    assert build_variable_message(variable) == (
+        "Variável 'imc_elevado' (IMC (kg/m²)): o paciente não possui altura "
+        "registrada → falso (dado indisponível)"
+    )
+
+    no_weight = _get_alert_protocol(exams={"height": 170})
+    no_weight.evaluate_with_trace(protocol=_imc_protocol(">", 25))
+    assert no_weight.trace_log[0].reason == TraceReasonEnum.WEIGHT_MISSING.value
+
+    # a zero height must not raise ZeroDivisionError
+    zero_height = _get_alert_protocol(exams={"weight": 80, "height": "0"})
+    zero_height.evaluate_with_trace(protocol=_imc_protocol(">", 25))
+    assert zero_height.trace_log[0].reason == TraceReasonEnum.HEIGHT_MISSING.value
+
+
 def test_pt_messages():
     """Protocol trace: Portuguese message builder output"""
 

@@ -289,6 +289,7 @@ def _test_protocol(protocol: dict):
     exams = {
         "age": 50,
         "weight": 80,
+        "height": 170,
         "ckd21": {
             "value": 3.2,
             "date": (datetime.today().date() - timedelta(days=3)).isoformat(),

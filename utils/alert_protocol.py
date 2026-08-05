@@ -468,6 +468,29 @@ class AlertProtocol:
 
             return self._trace_compare(op=operator, value1=weight, value2=value)
 
+        if field == "imc":
+            weight = self.exams.get("weight", None)
+            height = self.exams.get("height", None)
+            if not weight:
+                return self._trace_miss(TraceReasonEnum.WEIGHT_MISSING)
+            if not height:
+                return self._trace_miss(TraceReasonEnum.HEIGHT_MISSING)
+
+            try:
+                weight = float(weight)
+                height = float(height)
+                value = float(value)
+            except ValueError:
+                return self._trace_miss(TraceReasonEnum.VALUE_NOT_NUMERIC)
+
+            if height <= 0:
+                return self._trace_miss(TraceReasonEnum.HEIGHT_MISSING)
+
+            # height is stored in cm
+            imc = round(weight / pow(height / 100, 2), 2)
+
+            return self._trace_compare(op=operator, value1=imc, value2=value)
+
         if field == "segmentType":
             if (
                 self.protocol_extra_info is None
