@@ -24,6 +24,8 @@ from models.enums import ProtocolTypeEnum, ProtocolVariableFieldEnum
 from models.main import User
 from models.requests.protocol_agent_request import ProtocolAgentChatRequest
 from models.response.agents.protocol_agent_response import ProtocolAgentTurnOutput
+from repository import exams_repository
+from services import clinical_notes_service
 from services.admin import admin_protocol_service
 from services.protocol_agent_tools import build_tools
 from utils import logger, status
@@ -34,6 +36,11 @@ MAX_MESSAGE_LENGTH = 4000
 MAX_PROPOSAL_VARIABLES = 50
 MAX_TRIGGER_LENGTH = 500
 RESULT_LEVELS = {"low", "medium", "high"}
+
+# Exam keys that are valid at runtime but never appear in the exam type catalog:
+# the creatinina exam is stored under "cr" instead of its own type, and these
+# three are merged in as extra keys derived from the exam initials.
+EXAM_TYPE_ALIASES = {"cr", "tgo", "tgp", "plqt"}
 
 # Per-item criteria of a "combination" variable. They live as flat sibling keys
 # of the variable itself (that is what the form renders and what
@@ -96,14 +103,16 @@ AGENT_SYSTEM_PROMPT = (
     "- idSegment → IN/NOTIN → list of segment ids (list_segments).\n"
     "- idIcd → IN/NOTIN → list of ICD ids (search_icds).\n"
     "- exam_ref → > < >= <= = != → number; requires examRefType "
-    "(list_reference_exams); optional examRefPeriod (max age of the exam, "
-    "in days). PREFERRED field for exam-based criteria.\n"
-    "- exam → > < >= <= = != → number; requires examType (list_exam_types); "
-    "optional examPeriod. Fallback only: use exam_ref instead whenever the "
-    "exam exists in list_reference_exams.\n"
+    "(search_reference_exams: copy the tpexam field VERBATIM, including case); "
+    "optional examRefPeriod (max age of the exam, in days). Prefer an exam with "
+    "configuredInThisHospital=true. PREFERRED field for exam-based criteria.\n"
+    "- exam → > < >= <= = != → number; requires examType, always lower case "
+    "(search_exam_types); optional examPeriod. Fallback only: use exam_ref "
+    "instead whenever the exam exists in search_reference_exams.\n"
     "- age, weight, admissionTime (hours since admission), stConcilia → "
     "> < >= <= = != → number.\n"
-    "- cn_stats → > < >= <= = != → number; requires statsType.\n"
+    "- cn_stats → > < >= <= = != → number; requires statsType "
+    "(list_stats_types).\n"
     "- dischargeReason, insurance → CONTAINS → text.\n"
     "- segmentType → IN/NOTIN → list.\n"
     "- combination (only for protocolType 4): per-item criteria. True when ANY "
@@ -126,16 +135,26 @@ AGENT_SYSTEM_PROMPT = (
     'WRONG (criteria are lost): {"name": "...", "field": "combination", '
     '"operator": "PRESENT", "value": {"substance": ["22165008"]}}\n\n'
     "RULES\n"
-    "- NEVER invent ids (sctid, idDrug, class, examType...). Always resolve "
-    "them with the tools. If a lookup returns nothing, say so and ask the "
-    "user to refine.\n"
-    "- For exam criteria, ALWAYS check list_reference_exams first and use "
-    "exam_ref; only fall back to exam (list_exam_types) when the exam is "
+    "- NEVER invent ids (sctid, idDrug, class, examType, examRefType, "
+    "statsType...). Only ever write an id you read from a tool result in this "
+    "conversation, and NEVER derive one from the name of the exam. If a lookup "
+    "returns nothing, say so and ask the user to refine.\n"
+    "- Catalog listings return {items, returned, total, truncated}. When "
+    "truncated is true the list is INCOMPLETE: call the tool again with a "
+    "narrower search term. Never pick an id from a truncated list and never "
+    "guess the one you were looking for.\n"
+    "- When a tool returns an error, tell the user the lookup failed and stop; "
+    "never continue with an id you could not resolve.\n"
+    "- For exam criteria, ALWAYS check search_reference_exams first and use "
+    "exam_ref; only fall back to exam (search_exam_types) when the exam is "
     "not available as a reference exam.\n"
     "- Ask ONE focused question at a time while information is missing "
     "(protocol intent, which drugs/exams, thresholds, alert level/texts).\n"
     "- When you have enough information, build the full proposal and call "
-    "validate_protocol before presenting it; fix any reported errors first.\n"
+    "validate_protocol. You MUST get valid=true before presenting a proposal; "
+    "fix every reported error first. If it reports an exam or indicator that "
+    "does not exist, search again with the proper tool and correct the id — "
+    "never present a proposal that failed validation.\n"
     "- Use test_protocol when the user wants to see the rule against "
     "real prescriptions.\n"
     "- Trigger: use ONLY declared variable names; keep it as simple as "
@@ -283,6 +302,15 @@ def _normalize_variable(variable: dict) -> dict:
     if not isinstance(variable, dict):
         return variable
 
+    # examType is keyed in lower case at runtime, so a model that answers with
+    # the exam name in upper case still resolves. examRefType is deliberately
+    # left alone: it is matched verbatim, so lowercasing would break valid ids.
+    if variable.get("field") == ProtocolVariableFieldEnum.EXAM.value:
+        exam_type = variable.get("examType")
+        if isinstance(exam_type, str):
+            return {**variable, "examType": exam_type.strip().lower()}
+        return variable
+
     if variable.get("field") != ProtocolVariableFieldEnum.COMBINATION.value:
         return variable
 
@@ -301,6 +329,117 @@ def _normalize_variable(variable: dict) -> dict:
             normalized[key] = value
 
     return normalized
+
+
+def _load_exam_catalogs(variables: list) -> dict:
+    """Load the catalogs needed to check the ids used by these variables.
+
+    Returns a dict with an entry per catalog, or None for a catalog that could
+    not be loaded. The check is skipped for a catalog that is None: a database
+    hiccup must not block every proposal, and the missing check is logged.
+    """
+    fields = {v.get("field") for v in variables if isinstance(v, dict)}
+    catalogs = {"exam": None, "exam_ref": None, "stats": None}
+
+    # No catalog read at all when nothing references one.
+    if ProtocolVariableFieldEnum.EXAM.value in fields:
+        try:
+            catalogs["exam"] = {
+                str(r.typeExam).strip().lower()
+                for r in exams_repository.get_exam_types()
+            } | EXAM_TYPE_ALIASES
+        except Exception as error:
+            logger.backend_logger.warning(
+                "Protocol agent: exam type catalog unavailable: %s", str(error)[:300]
+            )
+
+    if ProtocolVariableFieldEnum.EXAM_REF.value in fields:
+        try:
+            catalogs["exam_ref"] = {
+                str(e.tp_exam).strip().lower(): e.tp_exam
+                for e in exams_repository.get_global_exams()
+            }
+        except Exception as error:
+            logger.backend_logger.warning(
+                "Protocol agent: reference exam catalog unavailable: %s",
+                str(error)[:300],
+            )
+
+    if ProtocolVariableFieldEnum.CN_STATS.value in fields:
+        try:
+            catalogs["stats"] = {
+                tag["key"] for tag in clinical_notes_service.get_tags()
+            }
+        except Exception as error:
+            logger.backend_logger.warning(
+                "Protocol agent: stats catalog unavailable: %s", str(error)[:300]
+            )
+
+    return catalogs
+
+
+def _catalog_errors(variables: list, catalogs: dict) -> list[str]:
+    """Reject ids the agent invented instead of resolving with its tools.
+
+    An id that is not in the catalog never matches at runtime: the protocol is
+    silently never activated and the trace blames the patient for not having the
+    exam. Rejecting it here surfaces the mistake to the agent through the
+    validate_protocol tool, inside the turn, so it can search again and correct
+    before the user ever sees the proposal.
+    """
+    errors = []
+    exam_types = catalogs.get("exam")
+    exam_refs = catalogs.get("exam_ref")
+    stats_types = catalogs.get("stats")
+
+    for variable in variables:
+        if not isinstance(variable, dict):
+            continue
+
+        field = variable.get("field")
+        name = variable.get("name")
+
+        if field == ProtocolVariableFieldEnum.EXAM.value and exam_types is not None:
+            exam_type = variable.get("examType")
+            # a missing examType is already rejected by _validate_variables
+            if exam_type and str(exam_type).strip().lower() not in exam_types:
+                errors.append(
+                    f"Variável {name}: tipo de exame '{exam_type}' não existe neste "
+                    "hospital (use search_exam_types para localizar o examType correto)"
+                )
+
+        if field == ProtocolVariableFieldEnum.EXAM_REF.value and exam_refs is not None:
+            exam_ref = variable.get("examRefType")
+            if not exam_ref:
+                errors.append(f"Variável {name}: exame de referência não informado")
+            elif exam_ref not in exam_refs.values():
+                canonical = exam_refs.get(str(exam_ref).strip().lower())
+                if canonical:
+                    # only the case is wrong: exam_ref is matched verbatim at
+                    # runtime, so name the exact spelling instead of guessing
+                    errors.append(
+                        f"Variável {name}: exame de referência '{exam_ref}' deve ser "
+                        f"escrito exatamente como '{canonical}'"
+                    )
+                else:
+                    errors.append(
+                        f"Variável {name}: exame de referência '{exam_ref}' não existe "
+                        "no catálogo (use search_reference_exams para localizar o "
+                        "tpexam correto)"
+                    )
+
+        if (
+            field == ProtocolVariableFieldEnum.CN_STATS.value
+            and stats_types is not None
+        ):
+            stats_type = variable.get("statsType")
+            if stats_type and stats_type not in stats_types:
+                errors.append(
+                    f"Variável {name}: indicador NoHarm Care '{stats_type}' não existe "
+                    "(use list_stats_types para localizar o statsType correto)"
+                )
+
+    return errors
 
 
 def _validate_proposal(proposal: dict, draft: dict) -> list[str]:
@@ -333,6 +472,11 @@ def _validate_proposal(proposal: dict, draft: dict) -> list[str]:
         errors.append(str(error))
 
     errors.extend(_combination_criteria_errors(variables=variables))
+    errors.extend(
+        _catalog_errors(
+            variables=variables, catalogs=_load_exam_catalogs(variables=variables)
+        )
+    )
 
     if not trigger:
         errors.append("Gatilho não informado")

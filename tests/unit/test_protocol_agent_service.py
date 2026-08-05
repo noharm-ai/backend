@@ -12,6 +12,7 @@ from models.requests.protocol_agent_request import (
     ProtocolAgentDraft,
 )
 from models.response.agents.protocol_agent_response import ProtocolAgentTurnOutput
+from repository import exams_repository
 from services.protocol_agent_service import (
     LIMIT_TURNS_MESSAGE,
     _is_valid_trigger,
@@ -19,8 +20,10 @@ from services.protocol_agent_service import (
     _run_agent_turn,
     _to_strands_messages,
     _turn_prompt,
+    _validate_config,
     _validate_proposal,
 )
+from services.protocol_agent_tools import _success, build_tools
 
 
 def _valid_proposal():
@@ -369,3 +372,299 @@ def test_disallowed_tokens_are_rejected():
     assert not _is_valid_trigger(
         trigger="__import__('os').system('id')", variable_names=["v1"]
     )
+
+
+class _ExamTypeRow:
+    """Row shape returned by exams_repository.get_exam_types"""
+
+    def __init__(self, type_exam, name="Exame"):
+        self.typeExam = type_exam
+        self.name = name
+
+
+class _GlobalExamRow:
+    """Row shape returned by exams_repository.get_global_exams"""
+
+    def __init__(self, tp_exam, name="Exame global"):
+        self.tp_exam = tp_exam
+        self.name = name
+
+
+def _exam_proposal(variable: dict):
+    """A minimal valid proposal whose single variable is the one under test."""
+    return {
+        "protocolType": 2,
+        "config": {
+            "variables": [variable],
+            "trigger": "{{v1}}",
+            "result": {
+                "type": "SHOW_MESSAGE",
+                "level": "high",
+                "message": "Alerta",
+                "description": "Descrição",
+            },
+        },
+    }
+
+
+def _exam_variable(**extra):
+    return {"name": "v1", "field": "exam", "operator": ">", "value": 2, **extra}
+
+
+def _exam_ref_variable(**extra):
+    return {"name": "v1", "field": "exam_ref", "operator": ">", "value": 2, **extra}
+
+
+def _patch_exam_types(*type_exams):
+    return mock.patch.object(
+        exams_repository,
+        "get_exam_types",
+        return_value=[_ExamTypeRow(t) for t in type_exams],
+    )
+
+
+def _patch_global_exams(*tp_exams):
+    return mock.patch.object(
+        exams_repository,
+        "get_global_exams",
+        return_value=[_GlobalExamRow(t) for t in tp_exams],
+    )
+
+
+def test_unknown_exam_type_is_rejected():
+    with _patch_exam_types("potassio", "sodio"):
+        errors = _validate_proposal(
+            proposal=_exam_proposal(_exam_variable(examType="creatinina_fake")),
+            draft={},
+        )
+
+    assert len(errors) == 1
+    assert "v1" in errors[0]
+    assert "creatinina_fake" in errors[0]
+    assert "search_exam_types" in errors[0]
+
+
+def test_known_exam_type_passes():
+    with _patch_exam_types("potassio", "sodio"):
+        assert (
+            _validate_proposal(
+                proposal=_exam_proposal(_exam_variable(examType="potassio")), draft={}
+            )
+            == []
+        )
+
+
+def test_configured_calculated_exam_passes():
+    # ckd21 and friends are ordinary segment exam rows when configured, so the
+    # catalog already contains them: they must not be rejected
+    with _patch_exam_types("ckd21"):
+        assert (
+            _validate_proposal(
+                proposal=_exam_proposal(_exam_variable(examType="ckd21")), draft={}
+            )
+            == []
+        )
+
+
+@pytest.mark.parametrize("alias", ["cr", "tgo", "tgp", "plqt"])
+def test_runtime_alias_exam_types_pass(alias):
+    # these keys never appear in the catalog but do exist at runtime
+    with _patch_exam_types("potassio"):
+        assert (
+            _validate_proposal(
+                proposal=_exam_proposal(_exam_variable(examType=alias)), draft={}
+            )
+            == []
+        )
+
+
+def test_exam_type_is_matched_case_insensitively():
+    with _patch_exam_types("potassio"):
+        assert (
+            _validate_proposal(
+                proposal=_exam_proposal(_exam_variable(examType="POTASSIO")), draft={}
+            )
+            == []
+        )
+
+
+def test_unknown_reference_exam_is_rejected():
+    with _patch_global_exams("ckd21_nh"):
+        errors = _validate_proposal(
+            proposal=_exam_proposal(_exam_ref_variable(examRefType="CREAT_FAKE")),
+            draft={},
+        )
+
+    assert len(errors) == 1
+    assert "CREAT_FAKE" in errors[0]
+    assert "search_reference_exams" in errors[0]
+
+
+def test_known_reference_exam_passes():
+    with _patch_global_exams("ckd21_nh"):
+        assert (
+            _validate_proposal(
+                proposal=_exam_proposal(_exam_ref_variable(examRefType="ckd21_nh")),
+                draft={},
+            )
+            == []
+        )
+
+
+def test_reference_exam_with_wrong_case_names_the_canonical_spelling():
+    # exam_ref is matched verbatim at runtime, so the exact spelling is reported
+    # instead of being silently rewritten
+    with _patch_global_exams("ckd21_NH"):
+        errors = _validate_proposal(
+            proposal=_exam_proposal(_exam_ref_variable(examRefType="ckd21_nh")),
+            draft={},
+        )
+
+    assert len(errors) == 1
+    assert "ckd21_NH" in errors[0]
+
+
+def test_missing_reference_exam_type_is_rejected():
+    # _validate_variables has no exam_ref branch, so this gate is the only one
+    with _patch_global_exams("ckd21_nh"):
+        errors = _validate_proposal(
+            proposal=_exam_proposal(_exam_ref_variable()), draft={}
+        )
+
+    assert len(errors) == 1
+    assert "não informado" in errors[0]
+
+
+def test_unknown_stats_type_is_rejected():
+    errors = _validate_proposal(
+        proposal=_exam_proposal(
+            {
+                "name": "v1",
+                "field": "cn_stats",
+                "operator": ">",
+                "value": 1,
+                "statsType": "inventado",
+            }
+        ),
+        draft={},
+    )
+
+    assert len(errors) == 1
+    assert "inventado" in errors[0]
+    assert "list_stats_types" in errors[0]
+
+
+def test_known_stats_type_passes():
+    assert (
+        _validate_proposal(
+            proposal=_exam_proposal(
+                {
+                    "name": "v1",
+                    "field": "cn_stats",
+                    "operator": ">",
+                    "value": 1,
+                    "statsType": "dialysis",
+                }
+            ),
+            draft={},
+        )
+        == []
+    )
+
+
+def test_catalog_failure_does_not_block_the_proposal():
+    # a database hiccup must not make every proposal invalid
+    with mock.patch.object(
+        exams_repository, "get_exam_types", side_effect=Exception("db down")
+    ):
+        assert (
+            _validate_proposal(
+                proposal=_exam_proposal(_exam_variable(examType="whatever")), draft={}
+            )
+            == []
+        )
+
+
+def test_catalogs_are_not_loaded_without_exam_variables():
+    # the existing suite runs with no database: a proposal that references no
+    # catalog must not touch one
+    with mock.patch.object(exams_repository, "get_exam_types") as exam_types, (
+        mock.patch.object(exams_repository, "get_global_exams")
+    ) as global_exams:
+        assert _validate_proposal(proposal=_valid_proposal(), draft={}) == []
+
+    exam_types.assert_not_called()
+    global_exams.assert_not_called()
+
+
+def test_normalization_lowercases_exam_type_only():
+    config = _normalize_config(
+        config={
+            "variables": [
+                _exam_variable(examType="  POTASSIO "),
+                _exam_ref_variable(examRefType="ckd21_NH"),
+            ],
+            "trigger": "{{v1}}",
+        }
+    )
+
+    assert config["variables"][0]["examType"] == "potassio"
+    # matched verbatim at runtime, so it must survive untouched
+    assert config["variables"][1]["examRefType"] == "ckd21_NH"
+
+
+def test_success_reports_truncation_for_long_lists():
+    payload = _success(list(range(60)), max_results=50)["content"][0]["json"]["result"]
+
+    assert payload["total"] == 60
+    assert payload["returned"] == 50
+    assert payload["truncated"] is True
+    assert payload["items"] == list(range(50))
+
+
+def test_success_does_not_report_truncation_for_short_lists():
+    payload = _success([1, 2, 3], max_results=50)["content"][0]["json"]["result"]
+
+    assert payload["total"] == 3
+    assert payload["truncated"] is False
+
+
+def test_success_passes_dict_results_through_unwrapped():
+    # validate_protocol and test_protocol return dicts: wrapping them in items
+    # would break the self-correction loop the agent depends on
+    result = {"valid": False, "errors": ["boom"]}
+
+    assert _success(result)["content"][0]["json"]["result"] == result
+
+
+def test_validate_protocol_tool_reports_an_invented_exam():
+    """The tool is the only place the agent sees its own mistake.
+
+    proposalErrors returned by chat() go to the frontend, which replays only
+    role and content, so a rejected proposal never reaches the model. The
+    validate_protocol tool result does, inside the same turn.
+    """
+    tools = {
+        t.tool_spec["name"]: t
+        for t in build_tools(
+            schema="demo",
+            validate_config=_validate_config,
+            normalize_config=_normalize_config,
+        )
+    }
+
+    with mock.patch("services.protocol_agent_tools.dbSession.setSchema"), (
+        _patch_global_exams("ckd21_nh")
+    ):
+        output = tools["validate_protocol"]._tool_func(
+            config=_exam_proposal(_exam_ref_variable(examRefType="CREAT_FAKE"))[
+                "config"
+            ],
+            protocol_type=2,
+        )
+
+    assert output["status"] == "success"
+    result = output["content"][0]["json"]["result"]
+    assert result["valid"] is False
+    assert any("CREAT_FAKE" in e for e in result["errors"])
+    assert any("search_reference_exams" in e for e in result["errors"])

@@ -13,19 +13,60 @@ from models.requests.protocol_request import (
     ProtocolTestRequest,
     ProtocolTestSampleRequest,
 )
+from repository import exams_repository
 from services import (
+    clinical_notes_service,
     drug_service,
-    exams_service,
     lists_service,
     protocol_trace_service,
     segment_service,
     substance_service,
 )
-from services.admin import admin_exam_service, admin_protocol_service
+from services.admin import admin_protocol_service
 from utils import logger
 
 MAX_RESULTS = 50
+MAX_EXAM_TYPE_RESULTS = 200
+MAX_REFERENCE_EXAM_RESULTS = 25
 MAX_TEST_PRESCRIPTIONS = 3
+
+
+def _filter_items(items: list, term: str, keys: tuple) -> list:
+    """Case-insensitive substring filter over the given keys of each item."""
+    if not term:
+        return items
+
+    needle = str(term).strip().lower()
+    if not needle:
+        return items
+
+    return [
+        item
+        for item in items
+        if any(needle in str(item.get(key) or "").lower() for key in keys)
+    ]
+
+
+def _success(result, max_results: int = MAX_RESULTS) -> dict:
+    """Wrap a tool result in the success shape.
+
+    A truncated list used to be indistinguishable from a complete one, which is
+    what pushed the agent to invent ids it could not find: the catalog listings
+    are ordered by name, so anything past the cap simply did not exist as far as
+    the model could tell. Lists now report the total and an explicit truncated
+    flag so the agent knows to narrow its search term instead of guessing.
+    Non-list results (validate_protocol, test_protocol) pass through unwrapped.
+    """
+    if isinstance(result, list):
+        items = result[:max_results]
+        result = {
+            "items": items,
+            "returned": len(items),
+            "total": len(result),
+            "truncated": len(result) > len(items),
+        }
+
+    return {"status": "success", "content": [{"json": {"result": result}}]}
 
 
 def build_tools(schema: str, validate_config, normalize_config) -> list:
@@ -36,18 +77,11 @@ def build_tools(schema: str, validate_config, normalize_config) -> list:
     (both injected by the service to avoid a circular import).
     """
 
-    def _success(result) -> dict:
-        """Wrap a tool result in the success shape, truncating long lists."""
-        if isinstance(result, list):
-            result = result[:MAX_RESULTS]
-
-        return {"status": "success", "content": [{"json": {"result": result}}]}
-
-    def _run(fn, *args, **kwargs) -> dict:
+    def _run(fn, *args, max_results: int = MAX_RESULTS, **kwargs) -> dict:
         """Run a tool body with the tenant schema set; errors become tool errors."""
         try:
             dbSession.setSchema(schema)
-            return _success(fn(*args, **kwargs))
+            return _success(fn(*args, **kwargs), max_results=max_results)
         except Exception as error:
             logger.backend_logger.warning(
                 "Protocol agent tool error: %s", str(error)[:500]
@@ -102,26 +136,58 @@ def build_tools(schema: str, validate_config, normalize_config) -> list:
         return _run(lists_service.find_icds, term)
 
     @tool(
-        name="list_exam_types",
+        name="search_exam_types",
         description=(
-            "Lista os tipos de exame do hospital. Retorna examType e nome. "
-            "Use o examType em variáveis do tipo exam."
+            "Busca os tipos de exame do hospital pelo nome ou pelo próprio examType "
+            "(parcial). Omita o termo para listar todos. Retorna examType e nome. "
+            "Use o examType, sempre em minúsculas, em variáveis do tipo exam."
         ),
     )
-    def list_exam_types() -> dict:
-        """List schema exam types."""
-        return _run(exams_service.list_exam_types)
+    def search_exam_types(term: str = None) -> dict:
+        """Search schema exam types."""
+
+        # Read the repository directly instead of exams_service.list_exam_types:
+        # that service hides the calculated exams (ckd21, mdrd...) which are
+        # valid at runtime, and this is the same source the proposal validator
+        # checks against, so anything findable here passes validation.
+        def _list():
+            items = [
+                {"examType": r.typeExam.lower(), "name": r.name}
+                for r in exams_repository.get_exam_types()
+            ]
+            return _filter_items(items, term, ("examType", "name"))
+
+        return _run(_list, max_results=MAX_EXAM_TYPE_RESULTS)
 
     @tool(
-        name="list_reference_exams",
+        name="search_reference_exams",
         description=(
-            "Lista exames de referência globais (com faixas normais). Retorna tpexam, "
-            "nome e faixas. Use o tpexam em variáveis do tipo exam_ref."
+            "Busca exames de referência globais pelo nome, abreviação ou tpexam "
+            "(parcial). Omita o termo para listar todos. ATENÇÃO: o valor do campo "
+            "tpexam é o que deve ser escrito em examRefType, copiado exatamente como "
+            "retornado, inclusive maiúsculas e minúsculas. Prefira exames com "
+            "configuredInThisHospital=true: os demais nunca produzem resultado neste "
+            "hospital."
         ),
     )
-    def list_reference_exams() -> dict:
-        """List global reference exams."""
-        return _run(admin_exam_service.get_global_exams)
+    def search_reference_exams(term: str = None) -> dict:
+        """Search global reference exams."""
+
+        def _list():
+            configured = set(exams_repository.get_configured_exam_ref_types())
+            items = [
+                {
+                    "tpexam": e.tp_exam,
+                    "name": e.name,
+                    "initials": e.initials,
+                    "measureUnit": e.measureunit,
+                    "configuredInThisHospital": e.tp_exam in configured,
+                }
+                for e in exams_repository.get_global_exams()
+            ]
+            return _filter_items(items, term, ("tpexam", "name", "initials"))
+
+        return _run(_list, max_results=MAX_REFERENCE_EXAM_RESULTS)
 
     @tool(
         name="list_departments",
@@ -162,6 +228,24 @@ def build_tools(schema: str, validate_config, normalize_config) -> list:
     def list_routes() -> dict:
         """List administration routes."""
         return _run(lists_service.list_routes)
+
+    @tool(
+        name="list_stats_types",
+        description=(
+            "Lista os indicadores NoHarm Care. Retorna statsType e nome. "
+            "Use o statsType em variáveis do tipo cn_stats."
+        ),
+    )
+    def list_stats_types() -> dict:
+        """List clinical notes stats indicators."""
+
+        def _list():
+            return [
+                {"statsType": tag["key"], "name": tag["name"]}
+                for tag in clinical_notes_service.get_tags()
+            ]
+
+        return _run(_list)
 
     @tool(
         name="validate_protocol",
@@ -226,11 +310,12 @@ def build_tools(schema: str, validate_config, normalize_config) -> list:
         search_substance_classes,
         search_drugs,
         search_icds,
-        list_exam_types,
-        list_reference_exams,
+        search_exam_types,
+        search_reference_exams,
         list_departments,
         list_segments,
         list_routes,
+        list_stats_types,
         validate_protocol,
         test_protocol,
     ]
