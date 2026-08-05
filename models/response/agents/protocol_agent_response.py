@@ -41,7 +41,12 @@ class ProtocolAgentTurnOutput(BaseModel):
     """Structured output of one co-pilot chat turn."""
 
     message: str = Field(
-        description="Resposta em português (PT-BR) exibida ao usuário no chat"
+        description=(
+            "Resposta em português (PT-BR) exibida ao usuário no chat, em HTML "
+            "simples. Use apenas as tags <p>, <br>, <strong>, <em>, <ul>, <ol>, "
+            "<li>, <code>, sempre envolvendo os parágrafos em <p>. Nunca use "
+            "Markdown, outras tags ou atributos"
+        )
     )
     proposal: Optional[ProtocolAgentProposal] = Field(
         default=None,

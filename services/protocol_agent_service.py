@@ -141,7 +141,13 @@ AGENT_SYSTEM_PROMPT = (
     "- Trigger: use ONLY declared variable names; keep it as simple as "
     "possible.\n"
     "- Set proposal to null when the turn is only a question or explanation.\n"
-    "- The message field is always short, clear Brazilian Portuguese."
+    "- The message field is always short, clear Brazilian Portuguese, written "
+    "as simple HTML because it is rendered directly in the chat. Use ONLY "
+    "these tags: <p>, <br>, <strong>, <em>, <ul>, <ol>, <li>, <code>, and "
+    "wrap every paragraph in <p>. NEVER use Markdown — no **bold**, no # "
+    "headings, no - bullets, no ``` code fences. Never emit <a>, <img>, "
+    "headings, tables, or any tag attribute: they are stripped before "
+    "rendering and the user loses the formatting."
 )
 
 
