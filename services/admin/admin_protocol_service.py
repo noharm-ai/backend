@@ -225,7 +225,11 @@ def _validate_variables(variables: list[dict], protocol_type: int):
                     )
 
         else:
-            if not operator or not value:
+            # 0 is a legitimate threshold, not an empty field: comparing an exam
+            # to "> 0" is how the absence of a result is expressed (the trigger
+            # negates the variable), so only a genuinely empty value is rejected.
+            # The editor sends numbers as text, so it reaches here as "0".
+            if not operator or value is None or value == "" or value == []:
                 raise ValidationError(
                     f"Variável {name}: Todos os campos são obrigatórios",
                     "errors.businessRules",

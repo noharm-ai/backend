@@ -42,6 +42,15 @@ RESULT_LEVELS = {"low", "medium", "high"}
 # three are merged in as extra keys derived from the exam initials.
 EXAM_TYPE_ALIASES = {"cr", "tgo", "tgp", "plqt"}
 
+# Fields where the model tends to invent an impossible value to mean "absent".
+# No real threshold reaches -999, so anything at or below it is a sentinel.
+SENTINEL_CHECKED_FIELDS = {
+    ProtocolVariableFieldEnum.EXAM.value,
+    ProtocolVariableFieldEnum.EXAM_REF.value,
+    ProtocolVariableFieldEnum.CN_STATS.value,
+}
+SENTINEL_VALUE_THRESHOLD = -999
+
 # Per-item criteria of a "combination" variable. They live as flat sibling keys
 # of the variable itself (that is what the form renders and what
 # utils.alert_protocol reads), but the model likes to wrap them in an object
@@ -90,7 +99,7 @@ AGENT_SYSTEM_PROMPT = (
     "- config.trigger: expression combining variables as {{name}} with "
     '"and", "or", "not" and parentheses (Python precedence: or < and < not). '
     "Nothing else is allowed — no literals, no comparisons, no function "
-    "calls. Maximum 500 characters.\n"
+    "calls. Write the operators in LOWER CASE. Maximum 500 characters.\n"
     '- config.result: {"type": "SHOW_MESSAGE", "level": "low"|"medium"|"high", '
     '"message": "<short alert>", "description": "<longer explanation>"}.\n\n'
     "VARIABLE FIELDS (field → operator → value)\n"
@@ -134,6 +143,29 @@ AGENT_SYSTEM_PROMPT = (
     '"doseOperator": ">", "defaultMeasureUnit": "mg"}\n'
     'WRONG (criteria are lost): {"name": "...", "field": "combination", '
     '"operator": "PRESENT", "value": {"substance": ["22165008"]}}\n\n'
+    "ABSENCE OF DATA (exam, exam_ref, cn_stats)\n"
+    "When the user asks about the ABSENCE of an exam or indicator — 'paciente "
+    "sem creatinina', 'não tem hemograma', 'nenhum exame de função renal' — "
+    "there is NO value that means absent. NEVER invent an impossible number "
+    "like -999 to represent it: no such row exists in the database, so the "
+    "comparison is simply never true and the protocol never fires.\n"
+    "The pattern is: declare the variable POSITIVELY with operator '>' and "
+    "value 0, which is true whenever any result of that type exists, and negate "
+    "it in the TRIGGER with 'not'. A variable is false when the patient has no "
+    "result, so its negation is exactly 'the patient has no such exam'.\n"
+    'CORRECT — variable {"name": "tem_creatinina", "field": "exam_ref", '
+    '"examRefType": "<tpexam>", "operator": ">", "value": 0} '
+    'with trigger "not {{tem_creatinina}}".\n'
+    'WRONG (never matches): {"name": "sem_creatinina", "field": "exam_ref", '
+    '"examRefType": "<tpexam>", "operator": "=", "value": -999} '
+    'with trigger "{{sem_creatinina}}".\n'
+    "Name the variable after what it detects when TRUE (tem_..., possui_...), "
+    "because the trigger is what inverts it. Combine it freely with other "
+    "variables, e.g. \"{{idoso}} and not {{tem_creatinina}}\".\n"
+    "This trick is ONLY for the numeric fields (exam, exam_ref, cn_stats), which "
+    "have no negative operator. For list fields (substance, class, idDrug, "
+    "route, idDepartment, idSegment, idIcd) use the NOTIN operator directly on "
+    "the variable and do NOT negate the trigger.\n\n"
     "RULES\n"
     "- NEVER invent ids (sctid, idDrug, class, examType, examRefType, "
     "statsType...). Only ever write an id you read from a tool result in this "
@@ -331,6 +363,39 @@ def _normalize_variable(variable: dict) -> dict:
     return normalized
 
 
+def _sentinel_value_errors(variables: list) -> list[str]:
+    """Reject an impossible value used to mean "the patient has no such result".
+
+    No row in the database carries a sentinel, so the comparison never matches
+    and the protocol silently never fires. Absence is expressed by declaring the
+    variable positively (operator '>' value 0, true when any result exists) and
+    negating it in the trigger with 'not'.
+    """
+    errors = []
+
+    for variable in variables:
+        if not isinstance(variable, dict):
+            continue
+
+        if variable.get("field") not in SENTINEL_CHECKED_FIELDS:
+            continue
+
+        try:
+            value = float(variable.get("value"))
+        except (TypeError, ValueError):
+            continue
+
+        if value <= SENTINEL_VALUE_THRESHOLD:
+            errors.append(
+                f"Variável {variable.get('name')}: valor {variable.get('value')} não "
+                "existe na base. Para detectar a ausência do resultado, declare a "
+                'variável com operator ">" e value 0 e negue no gatilho com "not '
+                '{{nome_da_variavel}}"'
+            )
+
+    return errors
+
+
 def _load_exam_catalogs(variables: list) -> dict:
     """Load the catalogs needed to check the ids used by these variables.
 
@@ -472,6 +537,7 @@ def _validate_proposal(proposal: dict, draft: dict) -> list[str]:
         errors.append(str(error))
 
     errors.extend(_combination_criteria_errors(variables=variables))
+    errors.extend(_sentinel_value_errors(variables=variables))
     errors.extend(
         _catalog_errors(
             variables=variables, catalogs=_load_exam_catalogs(variables=variables)

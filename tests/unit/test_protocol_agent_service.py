@@ -668,3 +668,52 @@ def test_validate_protocol_tool_reports_an_invented_exam():
     assert result["valid"] is False
     assert any("CREAT_FAKE" in e for e in result["errors"])
     assert any("search_reference_exams" in e for e in result["errors"])
+
+
+def test_sentinel_exam_value_is_rejected():
+    # the model reaches for an impossible value to mean "no such exam"
+    with _patch_global_exams("creatinina_NH"):
+        errors = _validate_proposal(
+            proposal=_exam_proposal(
+                _exam_ref_variable(
+                    examRefType="creatinina_NH", operator="=", value=-999
+                )
+            ),
+            draft={},
+        )
+
+    assert len(errors) == 1
+    assert "-999" in errors[0]
+    assert "not" in errors[0]
+
+
+def test_absence_pattern_passes():
+    # the supported way to express absence: positive variable, negated trigger
+    with _patch_global_exams("creatinina_NH"):
+        proposal = _exam_proposal(
+            _exam_ref_variable(examRefType="creatinina_NH", operator=">", value=0)
+        )
+        proposal["config"]["trigger"] = "not {{v1}}"
+
+        assert _validate_proposal(proposal=proposal, draft={}) == []
+
+
+def test_negated_trigger_is_accepted_by_the_trigger_validator():
+    assert _is_valid_trigger(trigger="not {{v1}}", variable_names=["v1"])
+    assert _is_valid_trigger(
+        trigger="{{v1}} and not {{v2}}", variable_names=["v1", "v2"]
+    )
+
+
+def test_plausible_negative_threshold_is_not_treated_as_a_sentinel():
+    # some exams are legitimately negative (base excess, delta values)
+    with _patch_exam_types("be"):
+        assert (
+            _validate_proposal(
+                proposal=_exam_proposal(
+                    _exam_variable(examType="be", operator="<", value=-5)
+                ),
+                draft={},
+            )
+            == []
+        )

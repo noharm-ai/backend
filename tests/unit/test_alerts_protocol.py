@@ -1021,6 +1021,66 @@ from utils.alert_protocol import AlertProtocol, ProtocolExtraInfo
             },
             False,
         ),
+        # absence of an exam: "> 0" is true whenever a result exists, so the
+        # negated trigger is what detects a patient without the exam
+        (
+            {
+                "variables": [
+                    {"name": "tem", "field": "exam", "examType": "ckd21",
+                     "operator": ">", "value": 0},
+                ],
+                "trigger": "{{tem}}",
+                "result": {"message": "result"},
+            },
+            True,
+        ),
+        (
+            {
+                "variables": [
+                    {"name": "tem", "field": "exam", "examType": "ckd21",
+                     "operator": ">", "value": 0},
+                ],
+                "trigger": "not {{tem}}",
+                "result": {"message": "result"},
+            },
+            False,
+        ),
+        (
+            {
+                "variables": [
+                    {"name": "tem", "field": "exam", "examType": "hemograma",
+                     "operator": ">", "value": 0},
+                ],
+                "trigger": "not {{tem}}",
+                "result": {"message": "result"},
+            },
+            True,
+        ),
+        # combined with another condition
+        (
+            {
+                "variables": [
+                    {"name": "idoso", "field": "age", "operator": ">", "value": 40},
+                    {"name": "tem", "field": "exam", "examType": "hemograma",
+                     "operator": ">", "value": 0},
+                ],
+                "trigger": "{{idoso}} and not {{tem}}",
+                "result": {"message": "result"},
+            },
+            True,
+        ),
+        # the sentinel the model reaches for instead: never matches
+        (
+            {
+                "variables": [
+                    {"name": "sem", "field": "exam", "examType": "ckd21",
+                     "operator": "=", "value": -999},
+                ],
+                "trigger": "{{sem}}",
+                "result": {"message": "result"},
+            },
+            False,
+        ),
     ],
 )
 def test_trigger(protocol, has_result):
