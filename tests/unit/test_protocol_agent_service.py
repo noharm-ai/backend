@@ -15,6 +15,7 @@ from models.response.agents.protocol_agent_response import ProtocolAgentTurnOutp
 from services.protocol_agent_service import (
     LIMIT_TURNS_MESSAGE,
     _is_valid_trigger,
+    _normalize_config,
     _run_agent_turn,
     _to_strands_messages,
     _turn_prompt,
@@ -109,6 +110,97 @@ def test_item_protocol_without_combination_is_rejected():
     errors = _validate_proposal(proposal=proposal, draft={})
 
     assert any("COMBO" in error for error in errors)
+
+
+def _nested_combination_config():
+    """The shape the model actually produces for a combo: criteria under value."""
+    return {
+        "variables": [
+            {
+                "name": "dipirona_oral_dose_alta",
+                "field": "combination",
+                "operator": "PRESENT",
+                "value": {
+                    "substance": ["22165008"],
+                    "route": ["Oral"],
+                    "dose": 200,
+                    "doseOperator": ">",
+                },
+            }
+        ],
+        "trigger": "{{dipirona_oral_dose_alta}}",
+        "result": {
+            "type": "SHOW_MESSAGE",
+            "level": "low",
+            "message": "Dipirona oral com dose acima de 200 mg",
+            "description": "Verificar se a dose está adequada",
+        },
+    }
+
+
+def test_nested_combination_criteria_are_flattened():
+    config = _normalize_config(config=_nested_combination_config())
+
+    assert config["variables"] == [
+        {
+            "name": "dipirona_oral_dose_alta",
+            "field": "combination",
+            "substance": ["22165008"],
+            "route": ["Oral"],
+            "dose": 200,
+            "doseOperator": ">",
+        }
+    ]
+
+
+def test_flat_combination_criteria_win_over_nested_ones():
+    config = _nested_combination_config()
+    config["variables"][0]["dose"] = 500
+
+    normalized = _normalize_config(config=config)
+
+    assert normalized["variables"][0]["dose"] == 500
+
+
+def test_normalization_keeps_other_variables_untouched():
+    config = _valid_proposal()["config"]
+
+    assert _normalize_config(config=config) == config
+
+
+def test_combination_wrapped_in_combination_key_is_flattened():
+    config = _nested_combination_config()
+    variable = config["variables"][0]
+    variable["combination"] = variable.pop("value")
+
+    normalized = _normalize_config(config=config)
+
+    assert normalized["variables"][0]["substance"] == ["22165008"]
+    assert "combination" not in normalized["variables"][0]
+
+
+def test_item_protocol_with_nested_combination_passes_after_normalization():
+    proposal = {
+        "protocolType": 4,
+        "config": _normalize_config(config=_nested_combination_config()),
+    }
+
+    assert _validate_proposal(proposal=proposal, draft={}) == []
+
+
+def test_combination_without_any_criteria_is_rejected():
+    proposal = {
+        "protocolType": 4,
+        "config": {
+            **_nested_combination_config(),
+            "variables": [{"name": "combo", "field": "combination"}],
+        },
+    }
+    proposal["config"]["trigger"] = "{{combo}}"
+
+    errors = _validate_proposal(proposal=proposal, draft={})
+
+    assert any("sem nenhum critério" in error for error in errors)
 
 
 def test_non_dict_proposal_is_rejected():

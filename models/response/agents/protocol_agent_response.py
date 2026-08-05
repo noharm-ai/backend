@@ -11,7 +11,11 @@ class ProtocolAgentProposalConfig(BaseModel):
     variables: list[dict] = Field(
         description=(
             "Variáveis do protocolo. Cada item: name, field, operator, value e "
-            "campos extras do tipo (examType, examPeriod, statsType, combination...)"
+            "campos extras do tipo (examType, examPeriod, examRefType, "
+            "examRefPeriod, statsType). Variáveis do tipo combination não têm "
+            "operator nem value: cada critério (substance, drug, class, route, "
+            "dose, doseOperator...) é uma chave direta da variável, nunca um "
+            "objeto aninhado"
         )
     )
     trigger: str = Field(

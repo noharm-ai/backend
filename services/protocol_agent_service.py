@@ -20,7 +20,7 @@ from strands.types.agent import Limits
 from config import Config
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
-from models.enums import ProtocolTypeEnum
+from models.enums import ProtocolTypeEnum, ProtocolVariableFieldEnum
 from models.main import User
 from models.requests.protocol_agent_request import ProtocolAgentChatRequest
 from models.response.agents.protocol_agent_response import ProtocolAgentTurnOutput
@@ -34,6 +34,30 @@ MAX_MESSAGE_LENGTH = 4000
 MAX_PROPOSAL_VARIABLES = 50
 MAX_TRIGGER_LENGTH = 500
 RESULT_LEVELS = {"low", "medium", "high"}
+
+# Per-item criteria of a "combination" variable. They live as flat sibling keys
+# of the variable itself (that is what the form renders and what
+# utils.alert_protocol reads), but the model likes to wrap them in an object
+# under "value" / "combination", which would reach the client as a combo with no
+# criteria — silently matching every prescription item. Normalization unwraps it.
+COMBINATION_CRITERIA_FIELDS = (
+    "substance",
+    "class",
+    "drug",
+    "drugAttribute",
+    "route",
+    "intravenous",
+    "feedingTube",
+    "dose",
+    "doseOperator",
+    "defaultMeasureUnit",
+    "frequencyday",
+    "frequencydayOperator",
+    "period",
+    "periodOperator",
+    "observation",
+)
+COMBINATION_NESTED_KEYS = ("value", "combination", "criteria")
 
 LIMIT_TURNS_MESSAGE = (
     "Não consegui concluir a análise dentro do limite desta rodada. "
@@ -53,7 +77,8 @@ AGENT_SYSTEM_PROMPT = (
     "variable with field 'combination').\n"
     "- config.variables: boolean variables, each pre-evaluated by the system "
     "at runtime. Every variable has: name (short identifier, e.g. var_1), "
-    "field, operator, value. Optional per-variable message: "
+    "field, operator, value — except field 'combination', which has neither "
+    "operator nor value (see below). Optional per-variable message: "
     '{"if": true|false, "then": "<text shown when the variable equals if>"}.\n'
     "- config.trigger: expression combining variables as {{name}} with "
     '"and", "or", "not" and parentheses (Python precedence: or < and < not). '
@@ -81,11 +106,25 @@ AGENT_SYSTEM_PROMPT = (
     "- cn_stats → > < >= <= = != → number; requires statsType.\n"
     "- dischargeReason, insurance → CONTAINS → text.\n"
     "- segmentType → IN/NOTIN → list.\n"
-    "- combination (only for protocolType 4): object combining per-item "
-    "criteria: substance, drug, class, route, dose+doseOperator, "
-    "frequencyday+frequencydayOperator, period+periodOperator, intravenous, "
-    "feedingTube, observation. True when ANY prescription item matches all "
-    "criteria.\n\n"
+    "- combination (only for protocolType 4): per-item criteria. True when ANY "
+    "prescription item matches ALL the filled criteria. This field has NO "
+    "operator and NO value: every criterion is a FLAT key of the variable "
+    "itself. NEVER nest them inside an object. Available criteria: substance "
+    "(list of sctid), class (list), drug (list of idDrug), route (list of "
+    "route ids from list_routes, compared verbatim against the route of the "
+    "prescribed item — copy the id exactly, including case), drugAttribute "
+    "(list of: mav = alta vigilância, antimicro, controlled, dialyzable, "
+    "elderly = inapropriado para idosos, notdefault = não padronizado, "
+    "chemo = quimioterápico; no other value exists), intravenous "
+    "(true/false), feedingTube (true/false), dose + doseOperator, "
+    "defaultMeasureUnit (mg|ml|mcg|UI, the unit the dose is expressed in), "
+    "frequencyday + frequencydayOperator, period + periodOperator, "
+    "observation (free text). Correct shape:\n"
+    '{"name": "dipirona_dose_alta", "field": "combination", '
+    '"substance": ["22165008"], "route": ["ORAL"], "dose": 200, '
+    '"doseOperator": ">", "defaultMeasureUnit": "mg"}\n'
+    'WRONG (criteria are lost): {"name": "...", "field": "combination", '
+    '"operator": "PRESENT", "value": {"substance": ["22165008"]}}\n\n'
     "RULES\n"
     "- NEVER invent ids (sctid, idDrug, class, examType...). Always resolve "
     "them with the tools. If a lookup returns nothing, say so and ask the "
@@ -116,6 +155,7 @@ def chat(request_data: ProtocolAgentChatRequest, user_context: User):
     proposal_errors = []
 
     if proposal is not None:
+        proposal["config"] = _normalize_config(config=proposal.get("config"))
         proposal_errors = _validate_proposal(
             proposal=proposal, draft=request_data.draft.model_dump()
         )
@@ -142,7 +182,9 @@ def _run_agent_turn(
     agent = Agent(
         model=bedrock_model,
         tools=build_tools(
-            schema=user_context.schema, validate_config=_validate_config
+            schema=user_context.schema,
+            validate_config=_validate_config,
+            normalize_config=_normalize_config,
         ),
         system_prompt=AGENT_SYSTEM_PROMPT,
         messages=_to_strands_messages(request_data=request_data),
@@ -204,8 +246,55 @@ def _turn_prompt(request_data: ProtocolAgentChatRequest) -> str:
 def _validate_config(config: dict, protocol_type: int) -> list[str]:
     """Validate an unsaved config (adapter used by the validate_protocol tool)."""
     return _validate_proposal(
-        proposal={"protocolType": protocol_type, "config": config}, draft={}
+        proposal={"protocolType": protocol_type, "config": _normalize_config(config)},
+        draft={},
     )
+
+
+def _normalize_config(config: dict) -> dict:
+    """Return the config with every variable in the shape the system expects."""
+    if not isinstance(config, dict):
+        return config
+
+    variables = config.get("variables")
+    if not isinstance(variables, list):
+        return config
+
+    return {
+        **config,
+        "variables": [_normalize_variable(variable=v) for v in variables],
+    }
+
+
+def _normalize_variable(variable: dict) -> dict:
+    """Flatten a combination variable whose criteria came wrapped in an object.
+
+    The model tends to answer with {"operator": "PRESENT", "value": {...}} for
+    combination variables. Neither key exists for this field, so the criteria
+    have to be lifted to the variable itself; an already flat criterion always
+    wins over the nested one.
+    """
+    if not isinstance(variable, dict):
+        return variable
+
+    if variable.get("field") != ProtocolVariableFieldEnum.COMBINATION.value:
+        return variable
+
+    normalized = dict(variable)
+    nested_criteria = {}
+
+    for key in COMBINATION_NESTED_KEYS:
+        nested = normalized.pop(key, None)
+        if isinstance(nested, dict):
+            nested_criteria.update(nested)
+
+    normalized.pop("operator", None)
+
+    for key, value in nested_criteria.items():
+        if key in COMBINATION_CRITERIA_FIELDS and normalized.get(key) is None:
+            normalized[key] = value
+
+    return normalized
 
 
 def _validate_proposal(proposal: dict, draft: dict) -> list[str]:
@@ -237,6 +326,8 @@ def _validate_proposal(proposal: dict, draft: dict) -> list[str]:
     except ValidationError as error:
         errors.append(str(error))
 
+    errors.extend(_combination_criteria_errors(variables=variables))
+
     if not trigger:
         errors.append("Gatilho não informado")
     elif len(trigger) > MAX_TRIGGER_LENGTH:
@@ -263,6 +354,36 @@ def _validate_proposal(proposal: dict, draft: dict) -> list[str]:
             )
         except ValidationError as error:
             errors.append(str(error))
+
+    return errors
+
+
+def _combination_criteria_errors(variables: list) -> list[str]:
+    """Reject combination variables with no criteria at all.
+
+    Upsert tolerates them (it only drops the empty attributes), but a criteria-less
+    combo matches every prescription item, so an agent proposal must never carry
+    one — usually the sign of criteria the model put in the wrong place.
+    """
+    errors = []
+
+    for variable in variables:
+        if not isinstance(variable, dict):
+            continue
+
+        if variable.get("field") != ProtocolVariableFieldEnum.COMBINATION.value:
+            continue
+
+        has_criteria = any(
+            variable.get(field) is not None and variable.get(field) != []
+            for field in COMBINATION_CRITERIA_FIELDS
+        )
+
+        if not has_criteria:
+            errors.append(
+                f"Variável {variable.get('name')}: COMBO sem nenhum critério "
+                "preenchido"
+            )
 
     return errors
 

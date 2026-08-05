@@ -28,11 +28,12 @@ MAX_RESULTS = 50
 MAX_TEST_PRESCRIPTIONS = 3
 
 
-def build_tools(schema: str, validate_config) -> list:
+def build_tools(schema: str, validate_config, normalize_config) -> list:
     """Build the co-pilot tool set bound to the tenant schema.
 
     validate_config: callable(config: dict, protocol_type: int) -> list[str]
-    (injected by the service to avoid a circular import).
+    normalize_config: callable(config: dict) -> dict
+    (both injected by the service to avoid a circular import).
     """
 
     def _success(result) -> dict:
@@ -193,6 +194,10 @@ def build_tools(schema: str, validate_config) -> list:
         """Evaluate an unsaved protocol config against real prescriptions."""
 
         def _test():
+            # Same normalization applied to a proposal: the evaluator reads the
+            # combination criteria as flat keys, so a nested combo would be
+            # tested as an empty one and match every item.
+            normalized_config = normalize_config(config)
             ids = id_prescription_list
             if not ids:
                 sample = protocol_trace_service.sample_prescriptions(
@@ -207,7 +212,7 @@ def build_tools(schema: str, validate_config) -> list:
 
             return protocol_trace_service.test_protocol(
                 request_data=ProtocolTestRequest(
-                    config=config,
+                    config=normalized_config,
                     protocolType=protocol_type,
                     idPrescriptionList=ids[:MAX_TEST_PRESCRIPTIONS],
                     detailed=False,
