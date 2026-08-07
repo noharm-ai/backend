@@ -377,6 +377,9 @@ def _get_allergies(id_patient, schema):
 
 @timed()
 def _get_all_drugs_used(admission_number, schema):
+    #needs refactor
+    return []
+    
     query = text(
         f"""
     select
@@ -489,6 +492,9 @@ def _get_all_drugs_suspended(admission_number, schema):
 
 @timed()
 def _get_receipt(admission_number, schema):
+     # needs refactor
+    return []
+
     last_agg = prescription_agg_service.get_last_agg_prescription(admission_number)
 
     if last_agg is None:
