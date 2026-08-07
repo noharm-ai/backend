@@ -34,7 +34,7 @@ def get_saved_queries(schema: str) -> list[dict]:
         where
             schema_report = :schema
         order by
-            title
+            idreport desc
     """
 
     query_result = db.session.execute(text(query), {"schema": schema}).all()
