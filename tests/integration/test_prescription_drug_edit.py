@@ -5,8 +5,6 @@ and the "missing drugs" discovery/copy flow that fills a prescription with drugs
 were prescribed on other prescriptions of the same admission.
 """
 
-from datetime import datetime, timedelta
-
 from mobile import app as flask_app
 from tests.conftest import session
 from tests.utils.utils_test_prescription import (
