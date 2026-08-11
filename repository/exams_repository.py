@@ -104,3 +104,21 @@ def get_global_exams():
         .order_by(GlobalExam.name.asc())
         .all()
     )
+
+
+def get_configured_exam_ref_types():
+    """Get the reference exam types actually bound to active exams of this schema.
+
+    A protocol variable of type exam_ref is matched at runtime against the
+    tpexame_ref of the schema exams, not against the global catalog, so a
+    globally valid tpexame that no active exam maps to never produces a result
+    for this hospital.
+    """
+    return [
+        r[0]
+        for r in db.session.query(SegmentExam.tp_exam_ref)
+        .filter(SegmentExam.active == True)
+        .filter(SegmentExam.tp_exam_ref != None)
+        .distinct()
+        .all()
+    ]

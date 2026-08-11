@@ -3,16 +3,19 @@
 from flask import Blueprint, request
 
 from decorators.api_endpoint_decorator import api_endpoint
+from models.requests.protocol_agent_request import ProtocolAgentChatRequest
 from models.requests.protocol_request import (
-    ProtocolAiGenerateTriggerRequest,
-    ProtocolAiReviewTriggerRequest,
     ProtocolDescriptionRequest,
     ProtocolListRequest,
     ProtocolTestRequest,
     ProtocolTestSampleRequest,
     ProtocolTraceRequest,
 )
-from services import protocol_ai_service, protocol_service, protocol_trace_service
+from services import (
+    protocol_agent_service,
+    protocol_service,
+    protocol_trace_service,
+)
 
 app_protocol = Blueprint("app_protocol", __name__)
 
@@ -62,19 +65,10 @@ def test_protocol_config():
     )
 
 
-@app_protocol.route("/protocol/ai/generate-trigger", methods=["POST"])
+@app_protocol.route("/protocol/ai/agent-chat", methods=["POST"])
 @api_endpoint()
-def ai_generate_trigger():
-    """Generate a trigger expression from a natural-language description"""
-    return protocol_ai_service.generate_trigger(
-        request_data=ProtocolAiGenerateTriggerRequest(**request.get_json())
-    )
-
-
-@app_protocol.route("/protocol/ai/review-trigger", methods=["POST"])
-@api_endpoint()
-def ai_review_trigger():
-    """Review the semantics of a trigger expression"""
-    return protocol_ai_service.review_trigger(
-        request_data=ProtocolAiReviewTriggerRequest(**request.get_json())
+def ai_agent_chat():
+    """Run one chat turn of the protocol creation co-pilot"""
+    return protocol_agent_service.chat(
+        request_data=ProtocolAgentChatRequest(**request.get_json())
     )

@@ -468,6 +468,29 @@ class AlertProtocol:
 
             return self._trace_compare(op=operator, value1=weight, value2=value)
 
+        if field == "imc":
+            weight = self.exams.get("weight", None)
+            height = self.exams.get("height", None)
+            if not weight:
+                return self._trace_miss(TraceReasonEnum.WEIGHT_MISSING)
+            if not height:
+                return self._trace_miss(TraceReasonEnum.HEIGHT_MISSING)
+
+            try:
+                weight = float(weight)
+                height = float(height)
+                value = float(value)
+            except ValueError:
+                return self._trace_miss(TraceReasonEnum.VALUE_NOT_NUMERIC)
+
+            if height <= 0:
+                return self._trace_miss(TraceReasonEnum.HEIGHT_MISSING)
+
+            # height is stored in cm
+            imc = round(weight / pow(height / 100, 2), 2)
+
+            return self._trace_compare(op=operator, value1=imc, value2=value)
+
         if field == "segmentType":
             if (
                 self.protocol_extra_info is None
@@ -550,6 +573,8 @@ class AlertProtocol:
 
             v_drug_attribute = variable.get("drugAttribute", None)
 
+            v_drug_alert_limit = variable.get("drugAlertLimit", None)
+
             found = False
             for d in self.filtered_drugs:
                 prescription_drug: PrescriptionDrug = d[0]
@@ -558,6 +583,7 @@ class AlertProtocol:
                 drug_attributes: DrugAttributes = d[6]
                 period_cpoe = d.period_cpoe
                 drug_attr_keys = self._get_drug_attribute_keys(drug_attributes)
+                drug_alert_limit_keys = self._get_drug_alert_limit_keys(drug_attributes)
 
                 drug_trace = None
                 if self._trace_enabled and self._current_trace is not None:
@@ -739,6 +765,16 @@ class AlertProtocol:
                         drug_trace=drug_trace,
                     )
 
+                if v_drug_alert_limit is not None and len(v_drug_alert_limit) > 0:
+                    exp_result = self._combo_criterion(
+                        current=exp_result,
+                        criterion="drugAlertLimit",
+                        op="IN",
+                        value1=drug_alert_limit_keys,
+                        value2=v_drug_alert_limit,
+                        drug_trace=drug_trace,
+                    )
+
                 if drug_trace is not None:
                     drug_trace.matched = exp_result
 
@@ -847,3 +883,28 @@ class AlertProtocol:
                 drug_attr_keys.append("dialyzable")
 
         return drug_attr_keys
+
+    def _get_drug_alert_limit_keys(
+        self, drug_attributes: DrugAttributes
+    ) -> list[str]:
+        """Which nephro/hepatotoxicity alert limits the drug has configured.
+
+        Mirrors alert_service._alert_kidney/_alert_liver, which treat a blank or
+        zero threshold alike as "no limit". A drug with no attributes row for the
+        segment has no limit either, so the negative keys are the default.
+        """
+
+        keys = []
+
+        keys.append(
+            "kidney"
+            if drug_attributes is not None and drug_attributes.kidney
+            else "not_kidney"
+        )
+        keys.append(
+            "liver"
+            if drug_attributes is not None and drug_attributes.liver
+            else "not_liver"
+        )
+
+        return keys

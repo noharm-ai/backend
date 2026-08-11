@@ -270,6 +270,7 @@ class ProtocolVariableFieldEnum(Enum):
     EXAM_REF = "exam_ref"
     AGE = "age"
     WEIGHT = "weight"
+    IMC = "imc"
     ID_DEPARTMENT = "idDepartment"
     ID_SEGMENT = "idSegment"
     COMBINATION = "combination"

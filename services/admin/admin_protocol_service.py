@@ -12,35 +12,57 @@ from models.enums import (
 )
 from models.main import Drug, DrugAttributes, Substance, User, db
 from models.prescription import Patient, Prescription, PrescriptionDrug
-from models.requests.protocol_request import ProtocolListRequest, ProtocolUpsertRequest
+from models.requests.protocol_request import (
+    AdminProtocolListRequest,
+    ProtocolUpsertRequest,
+)
 from repository import protocol_repository
 from utils import dateutils, status
 from utils.alert_protocol import AlertProtocol
 
 
 @has_permission(Permission.READ_PROTOCOLS)
-def list_protocols(request_data: ProtocolListRequest, user_context: User):
-    """List schema protocols"""
+def list_protocols(request_data: AdminProtocolListRequest, user_context: User):
+    """List schema protocols (optionally from every schema, to copy from)"""
     results = protocol_repository.list_protocols(
-        request_data=request_data, schema=user_context.schema
+        request_data=request_data,
+        schema=user_context.schema,
+        all_schemas=request_data.allSchemas,
     )
 
-    protocols = []
-    for item in results:
-        protocols.append(
-            {
-                "id": item.id,
-                "name": item.name,
-                "schema": item.schema,
-                "protocolType": item.protocol_type,
-                "config": item.config,
-                "statusType": item.status_type,
-                "createdAt": dateutils.to_iso(item.created_at),
-                "updatedAt": dateutils.to_iso(item.updated_at),
-            }
-        )
+    return [_list_item_to_dict(item) for item in results]
 
-    return protocols
+
+@has_permission(Permission.READ_PROTOCOLS)
+def get_protocol(id_protocol: int, user_context: User, all_schemas: bool = False):
+    """Get one protocol, config included.
+
+    Returns None when the id does not exist or is not visible: the editor
+    renders both the same way. all_schemas reaches protocols owned by other
+    schemas, which can only be used as a copy source.
+    """
+    protocol = protocol_repository.get_protocol_by_id(
+        protocol_id=id_protocol, schema=user_context.schema, all_schemas=all_schemas
+    )
+
+    if not protocol:
+        return None
+
+    return {**_list_item_to_dict(protocol), "config": protocol.config}
+
+
+def _list_item_to_dict(item: Protocol) -> dict:
+    """Protocol without its config: the listing only renders the header fields,
+    and the configs of a whole schema add up to a heavy payload."""
+    return {
+        "id": item.id,
+        "name": item.name,
+        "schema": item.schema,
+        "protocolType": item.protocol_type,
+        "statusType": item.status_type,
+        "createdAt": dateutils.to_iso(item.created_at),
+        "updatedAt": dateutils.to_iso(item.updated_at),
+    }
 
 
 @has_permission(Permission.READ_PROTOCOLS)
@@ -67,7 +89,11 @@ def upsert_protocol(request_data: ProtocolUpsertRequest, user_context: User):
                 status.HTTP_400_BAD_REQUEST,
             )
 
-        if protocol.schema != user_context.schema:
+        # Global protocols (schema NULL) apply to every schema and are
+        # maintained from any of them. Schema-owned records stay restricted to
+        # their owner. Either way the schema column is left untouched, so a
+        # global protocol never becomes schema-owned by being edited.
+        if protocol.schema is not None and protocol.schema != user_context.schema:
             raise ValidationError(
                 "Registro de protocolo inválido (schema)",
                 "errors.businessRules",
@@ -199,7 +225,11 @@ def _validate_variables(variables: list[dict], protocol_type: int):
                     )
 
         else:
-            if not operator or not value:
+            # 0 is a legitimate threshold, not an empty field: comparing an exam
+            # to "> 0" is how the absence of a result is expressed (the trigger
+            # negates the variable), so only a genuinely empty value is rejected.
+            # The editor sends numbers as text, so it reaches here as "0".
+            if not operator or value is None or value == "" or value == []:
                 raise ValidationError(
                     f"Variável {name}: Todos os campos são obrigatórios",
                     "errors.businessRules",
@@ -230,12 +260,15 @@ def _validate_variables(variables: list[dict], protocol_type: int):
 
 def _test_protocol(protocol: dict):
     drug_list = [
+        # Drug A/B carry a nephro/hepatotoxicity limit and Drug C none, so every
+        # drugAlertLimit option has something to match against in this sample.
         _get_prescription_drug_mock_row(
             id_prescription_drug=1,
             dose=10,
             drug_name="Drug A",
             drug_class="J1",
             route="IV",
+            kidney=30,
         ),
         _get_prescription_drug_mock_row(
             id_prescription_drug=2,
@@ -243,6 +276,7 @@ def _test_protocol(protocol: dict):
             drug_name="Drug B",
             drug_class="J2",
             route="IV",
+            liver=100,
         ),
         _get_prescription_drug_mock_row(
             id_prescription_drug=3,
@@ -259,6 +293,7 @@ def _test_protocol(protocol: dict):
     exams = {
         "age": 50,
         "weight": 80,
+        "height": 170,
         "ckd21": {
             "value": 3.2,
             "date": (datetime.today().date() - timedelta(days=3)).isoformat(),
@@ -279,7 +314,7 @@ def _test_protocol(protocol: dict):
         alert_protocol.get_protocol_alerts(protocol=protocol)
     except Exception as e:
         raise ValidationError(
-            f"Gatilho possui formato inválido: {str(e)}",
+            f"Gatilho possui formato inválido: {e!s}",
             "errors.businessRules",
             status.HTTP_400_BAD_REQUEST,
         )

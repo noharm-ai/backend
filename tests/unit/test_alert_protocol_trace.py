@@ -279,6 +279,209 @@ def test_get_protocol_alerts_unchanged():
     assert len(alert_protocol.trace_log) == 1
 
 
+def _alert_limit_drug_list():
+    """One drug with a kidney limit, one with a liver limit, one with neither"""
+
+    return [
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=1,
+            dose=10,
+            drug_name="NEFRO",
+            kidney=30,
+        ),
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=2,
+            dose=20,
+            drug_name="HEPATO",
+            liver=100,
+        ),
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=3,
+            dose=30,
+            drug_name="SEM LIMITE",
+        ),
+    ]
+
+
+def _alert_limit_protocol(selected, extra: dict = None):
+    variable = {
+        "name": "combo_limite",
+        "field": "combination",
+        "drugAlertLimit": selected,
+    }
+    if extra:
+        variable.update(extra)
+
+    return {
+        "variables": [variable],
+        "trigger": "{{combo_limite}}",
+        "result": {"type": "SHOW_MESSAGE", "level": "high", "message": "test"},
+    }
+
+
+def test_combination_drug_alert_limit():
+    """Combination: drugAlertLimit matches drugs by configured renal/hepatic limit"""
+
+    def matched_names(selected):
+        alert_protocol = _get_alert_protocol(drug_list=_alert_limit_drug_list())
+        alert_protocol.evaluate_with_trace(protocol=_alert_limit_protocol(selected))
+
+        return [d.drug_name for d in alert_protocol.trace_log[0].drugs if d.matched]
+
+    assert matched_names(["kidney"]) == ["NEFRO"]
+    assert matched_names(["liver"]) == ["HEPATO"]
+    # every drug lacking the given limit matches the negative option
+    assert matched_names(["not_kidney"]) == ["HEPATO", "SEM LIMITE"]
+    assert matched_names(["not_liver"]) == ["NEFRO", "SEM LIMITE"]
+    # a drug with no limit at all satisfies both negative options
+    assert matched_names(["not_kidney", "not_liver"]) == [
+        "NEFRO",
+        "HEPATO",
+        "SEM LIMITE",
+    ]
+    # selecting both positives is an OR, mirroring drugAttribute
+    assert matched_names(["kidney", "liver"]) == ["NEFRO", "HEPATO"]
+
+
+def test_combination_drug_alert_limit_empty_is_ignored():
+    """Combination: an empty drugAlertLimit must not block an otherwise-matching combo
+
+    The multi-select yields [] once the user deselects every option; treating that
+    as a real criterion would silently stop the whole combo from matching.
+    """
+
+    for selected in ([], None):
+        alert_protocol = _get_alert_protocol(drug_list=_alert_limit_drug_list())
+        trace = alert_protocol.evaluate_with_trace(
+            protocol=_alert_limit_protocol(selected, extra={"dose": 10, "doseOperator": ">="})
+        )
+
+        assert trace["activated"] is True
+        criteria = [
+            c.criterion for d in alert_protocol.trace_log[0].drugs for c in d.criteria
+        ]
+        assert "drugAlertLimit" not in criteria
+
+
+def test_combination_drug_alert_limit_no_attributes_row():
+    """Combination: a drug with no attributes row counts as having no limit"""
+
+    drug_list = _alert_limit_drug_list()
+    # d[6] is the DrugAttributes row; production can hand us None for a segment
+    # that has no medatributos entry for the drug
+    drug_list[0] = drug_list[0]._replace(drug_attributes=None)
+
+    alert_protocol = _get_alert_protocol(drug_list=drug_list)
+    alert_protocol.evaluate_with_trace(
+        protocol=_alert_limit_protocol(["not_kidney", "not_liver"])
+    )
+
+    matched = [d.drug_name for d in alert_protocol.trace_log[0].drugs if d.matched]
+    assert "NEFRO" in matched
+
+    alert_protocol = _get_alert_protocol(drug_list=drug_list)
+    alert_protocol.evaluate_with_trace(protocol=_alert_limit_protocol(["kidney"]))
+
+    matched = [d.drug_name for d in alert_protocol.trace_log[0].drugs if d.matched]
+    assert matched == []
+
+
+def test_combination_drug_alert_limit_zero_counts_as_missing():
+    """Combination: a zero threshold counts as "não possui", as the alerts read it"""
+
+    drug_list = [
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=1,
+            dose=10,
+            drug_name="ZERO",
+            kidney=0,
+            liver=0,
+        ),
+    ]
+
+    alert_protocol = _get_alert_protocol(drug_list=drug_list)
+    alert_protocol.evaluate_with_trace(protocol=_alert_limit_protocol(["not_kidney"]))
+    assert alert_protocol.trace_log[0].drugs[0].matched is True
+
+    alert_protocol = _get_alert_protocol(drug_list=drug_list)
+    alert_protocol.evaluate_with_trace(protocol=_alert_limit_protocol(["kidney"]))
+    assert alert_protocol.trace_log[0].drugs[0].matched is False
+
+
+def _imc_protocol(operator: str, value):
+    return {
+        "variables": [
+            {
+                "name": "imc_elevado",
+                "field": "imc",
+                "operator": operator,
+                "value": value,
+            },
+        ],
+        "trigger": "{{imc_elevado}}",
+        "result": {"type": "SHOW_MESSAGE", "level": "high", "message": "test"},
+    }
+
+
+def test_trace_imc_computed():
+    """Protocol trace: imc is computed from weight and height (kg / m²)"""
+
+    alert_protocol = _get_alert_protocol(exams={"weight": 80, "height": 170})
+
+    trace = alert_protocol.evaluate_with_trace(protocol=_imc_protocol(">", 25))
+
+    variable = alert_protocol.trace_log[0]
+    assert variable.field == "imc"
+    assert variable.reason == TraceReasonEnum.COMPARED.value
+    # 80 / (1.70 ** 2) = 27.68
+    assert variable.actual_value == 27.68
+    assert variable.result is True
+    assert trace["activated"] is True
+
+    assert build_variable_message(variable) == (
+        "Variável 'imc_elevado' (IMC (kg/m²)): o valor encontrado foi 27.68; "
+        "esperado: maior que 25 → verdadeiro"
+    )
+
+
+def test_trace_imc_below_threshold():
+    """Protocol trace: imc comparison evaluates to false when below the threshold"""
+
+    alert_protocol = _get_alert_protocol(exams={"weight": 50, "height": 180})
+
+    trace = alert_protocol.evaluate_with_trace(protocol=_imc_protocol(">", 25))
+
+    variable = alert_protocol.trace_log[0]
+    assert variable.reason == TraceReasonEnum.COMPARED.value
+    # 50 / (1.80 ** 2) = 15.43
+    assert variable.actual_value == 15.43
+    assert variable.result is False
+    assert trace["activated"] is False
+
+
+def test_trace_imc_missing_data():
+    """Protocol trace: imc reports which patient measure is missing"""
+
+    no_height = _get_alert_protocol(exams={"weight": 80})
+    no_height.evaluate_with_trace(protocol=_imc_protocol(">", 25))
+    variable = no_height.trace_log[0]
+    assert variable.reason == TraceReasonEnum.HEIGHT_MISSING.value
+    assert variable.result is False
+    assert build_variable_message(variable) == (
+        "Variável 'imc_elevado' (IMC (kg/m²)): o paciente não possui altura "
+        "registrada → falso (dado indisponível)"
+    )
+
+    no_weight = _get_alert_protocol(exams={"height": 170})
+    no_weight.evaluate_with_trace(protocol=_imc_protocol(">", 25))
+    assert no_weight.trace_log[0].reason == TraceReasonEnum.WEIGHT_MISSING.value
+
+    # a zero height must not raise ZeroDivisionError
+    zero_height = _get_alert_protocol(exams={"weight": 80, "height": "0"})
+    zero_height.evaluate_with_trace(protocol=_imc_protocol(">", 25))
+    assert zero_height.trace_log[0].reason == TraceReasonEnum.HEIGHT_MISSING.value
+
+
 def test_pt_messages():
     """Protocol trace: Portuguese message builder output"""
 

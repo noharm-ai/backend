@@ -9,7 +9,7 @@ from models.enums import NoHarmENV
 class Config:
     """Configuration class for the application."""
 
-    VERSION = "v6.52-beta"
+    VERSION = "v6.53-beta"
     FRONTEND_VERSION = "5.1.6"
     ENV = getenv("ENV") or NoHarmENV.DEVELOPMENT.value
     SECRET_KEY = getenv("SECRET_KEY") or "secret_key"
@@ -65,6 +65,12 @@ class Config:
 
     SCORES_FUNCTION_NAME = getenv("SCORES_FUNCTION_NAME", "")
     BACKEND_FUNCTION_NAME = getenv("BACKEND_FUNCTION_NAME", "")
+
+    PROTOCOL_AGENT_MODEL_ID = getenv(
+        "PROTOCOL_AGENT_MODEL_ID", "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
+    )
+    PROTOCOL_AGENT_REGION = getenv("PROTOCOL_AGENT_REGION", "us-east-1")
+    PROTOCOL_AGENT_MAX_TURNS = int(getenv("PROTOCOL_AGENT_MAX_TURNS", "8"))
 
     SERVICE_INFERENCE = getenv("SERVICE_INFERENCE", None)
 

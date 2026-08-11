@@ -408,6 +408,16 @@ def _getDrugFuture(
     return func.array(query.order_by(asc(pr1.date)).as_scalar())
 
 
+def _format_dose(dose_column):
+    """Format a dose number with Brazilian separators (e.g. 1.234,56).
+    Uses literal separators in to_char (locale-independent) and swaps them."""
+    return func.translate(
+        func.trim(func.to_char(dose_column, "9,999,990.99")),
+        ",.",
+        ".,",
+    )
+
+
 # TODO: needs refactor (very confuse)
 def _getDrugHistory(idPrescription, admissionNumber, id_drug, is_cpoe):
     pd1 = db.aliased(PrescriptionDrug)
@@ -421,7 +431,7 @@ def _getDrugHistory(idPrescription, admissionNumber, id_drug, is_cpoe):
                     " (",
                     pd1.frequency,
                     "x ",
-                    func.trim(func.to_char(pd1.dose, "9G999G999D99")),
+                    _format_dose(pd1.dose),
                     " ",
                     pd1.idMeasureUnit,
                     ")",
@@ -476,7 +486,7 @@ def _getDrugHistory(idPrescription, admissionNumber, id_drug, is_cpoe):
                 " (",
                 cpoeperiods.c.frequency,
                 "x ",
-                func.trim(func.to_char(cpoeperiods.c.dose, "9G999G999D99")),
+                _format_dose(cpoeperiods.c.dose),
                 " ",
                 cpoeperiods.c.idMeasureUnit,
                 ")",

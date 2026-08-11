@@ -10,6 +10,19 @@ class ProtocolListRequest(BaseModel):
     protocolType: str | None = None
     protocolTypeList: list[int] = None
     statusType: int | None = None
+    term: str | None = None
+
+
+class AdminProtocolListRequest(ProtocolListRequest):
+    """Admin protocol list parameters
+
+    Adds cross-schema lookup, used to find a protocol from another schema to
+    copy. It lives in a separate model on purpose: the user-facing
+    /protocol/list builds ProtocolListRequest straight from the query string,
+    so allSchemas must not be reachable from there.
+    """
+
+    allSchemas: bool = False
 
 
 class ProtocolDescriptionRequest(BaseModel):
@@ -59,27 +72,3 @@ class ProtocolUpsertRequest(BaseModel):
     protocolType: int
     statusType: int
     config: ProtocolConfig
-
-
-class ProtocolAiVariable(BaseModel):
-    """Protocol AI: declared variable as prompt context (name + human summary)"""
-
-    name: str = Field(min_length=1, max_length=50)
-    summary: str = Field(default="", max_length=300)
-
-
-class ProtocolAiGenerateTriggerRequest(BaseModel):
-    """Protocol AI: generate a trigger expression from a natural-language hint"""
-
-    hint: str = Field(min_length=3, max_length=500)
-    variables: list[ProtocolAiVariable] = Field(min_length=1, max_length=50)
-    currentTrigger: str | None = Field(default=None, max_length=1000)
-
-
-class ProtocolAiReviewTriggerRequest(BaseModel):
-    """Protocol AI: review a trigger expression for semantic issues"""
-
-    trigger: str = Field(min_length=1, max_length=1000)
-    variables: list[ProtocolAiVariable] = Field(min_length=1, max_length=50)
-    resultMessage: str | None = Field(default=None, max_length=500)
-    resultDescription: str | None = Field(default=None, max_length=1000)
