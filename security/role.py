@@ -57,6 +57,7 @@ class Role(Enum):
             Permission.MAINTAINER,
             Permission.READ_DISPENSATION,
             Permission.READ_REGULATION,
+            Permission.READ_TAGS,
             Permission.WRITE_TAGS,
             Permission.READ_PROTOCOLS,
             Permission.WRITE_PROTOCOLS,
@@ -101,6 +102,7 @@ class Role(Enum):
             Permission.MULTI_SCHEMA,
             Permission.MAINTAINER,
             Permission.READ_DISPENSATION,
+            Permission.READ_TAGS,
             Permission.WRITE_TAGS,
             Permission.READ_REGULATION,
             Permission.UPDATE_USER_SG,
@@ -132,6 +134,8 @@ class Role(Enum):
             Permission.READ_BASIC_FEATURES,
             Permission.READ_SUPPORT,
             Permission.WRITE_PATIENT_TAGS,
+            Permission.READ_TAGS,
+            Permission.READ_CONFIG_EXAMS,
         ],
     )
 
@@ -165,6 +169,7 @@ class Role(Enum):
             Permission.READ_BASIC_FEATURES,
             Permission.WRITE_DRUG_SCORE,
             Permission.READ_SUPPORT,
+            Permission.READ_TAGS,
             Permission.WRITE_TAGS,
         ],
     )
@@ -200,6 +205,7 @@ class Role(Enum):
             Permission.READ_USERS,
             Permission.MULTI_SCHEMA,
             Permission.READ_CONFIG_EXAMS,
+            Permission.READ_TAGS,
             Permission.TRAINING_RECORDING,
         ],
     )

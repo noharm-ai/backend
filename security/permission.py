@@ -97,6 +97,7 @@ class Permission(Enum):
     READ_REGULATION = "READ_REGULATION"  # grants access to read regulation data
     WRITE_REGULATION = "WRITE_REGULATION"  # grants access to write regulation data
 
+    READ_TAGS = "READ_TAGS"  # permission to view tags configuration
     WRITE_TAGS = "WRITE_TAGS"  # permission to create and edit tags
 
     READ_PROTOCOLS = "READ_PROTOCOLS"  # permission to view protocols
