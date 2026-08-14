@@ -70,7 +70,20 @@ def list_departments():
     """List distinct departments (setor) for protocol variable selection."""
     departments = protocol_repository.list_departments()
 
-    return [{"idDepartment": str(d.id), "name": d.name} for d in departments]
+    segments_by_department = {}
+    for s in protocol_repository.list_department_segments():
+        segments_by_department.setdefault(str(s.idDepartment), []).append(
+            {"id": s.id, "name": s.segment_name}
+        )
+
+    return [
+        {
+            "idDepartment": str(d.id),
+            "name": d.name,
+            "segments": segments_by_department.get(str(d.id), []),
+        }
+        for d in departments
+    ]
 
 
 @has_permission(Permission.WRITE_PROTOCOLS)
