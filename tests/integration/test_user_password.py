@@ -39,6 +39,9 @@ _UNKNOWN_EMAIL = "testnobody@noharm.ai"
 _NEW_PASSWORD = "ChangedPass9"
 _WEAK_PASSWORD = "weak"
 
+# Reset tokens a user can request per day before /user/forget starts refusing.
+_DAILY_TOKEN_LIMIT = 6
+
 
 def _upsert_user(id_user: int, email: str, password: str, active: bool = True) -> None:
     """Create (or reset) a test user with a known password."""
@@ -208,10 +211,13 @@ def test_forget_password_is_silent_for_inactive_user(client):
 
 
 def test_forget_password_enforces_daily_limit(client):
-    """GET /user/forget - more than 5 requests on the same day are refused [400]"""
+    """GET /user/forget - the 7th request on the same day is refused [400]"""
     _delete_audits(_RATE_LIMITED_ID)
 
-    for _ in range(6):
+    # get_reset_token counts the audits already stored for today and refuses when
+    # that count is > 5. The count is taken before the current request is audited,
+    # so the 6th request still sees only 5 predecessors and succeeds.
+    for _ in range(_DAILY_TOKEN_LIMIT):
         response = client.get(f"/user/forget?email={_RATE_LIMITED_EMAIL}")
         assert response.status_code == 200
 
@@ -219,7 +225,11 @@ def test_forget_password_enforces_daily_limit(client):
 
     assert response.status_code == 400
     assert response.get_json()["code"] == "errors.businessRules"
-    assert len(_audits(_RATE_LIMITED_ID, UserAuditTypeEnum.FORGOT_PASSWORD)) == 6
+    # the refused request is not audited, so the trail stops at the last success
+    assert (
+        len(_audits(_RATE_LIMITED_ID, UserAuditTypeEnum.FORGOT_PASSWORD))
+        == _DAILY_TOKEN_LIMIT
+    )
 
 
 def test_reset_password_consumes_the_token_once(client):
