@@ -34,6 +34,13 @@ def get_user_managers():
     return user_admin_service.get_user_manager_list()
 
 
+@app_user_admin.route("/user-admin/contact-list", methods=["GET"])
+@api_endpoint()
+def get_contact_list():
+    """Get active users of a contactable role, to know who to ask for a change"""
+    return user_admin_service.get_contact_list(role=request.args.get("role", None))
+
+
 @app_user_admin.route("/user-admin/reset-token", methods=["POST"])
 @app_user_admin.route("/user/reset-token", methods=["POST"])
 @api_endpoint()

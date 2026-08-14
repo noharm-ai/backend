@@ -77,6 +77,43 @@ def test_get_user_manager_list_ignores_staff(client, analyst_headers):
         session_commit()
 
 
+def test_get_contact_list(client, analyst_headers):
+    """Teste get /user-admin/contact-list - Deve listar os gestores de configurações ativos"""
+    response = client.get(
+        f"/user-admin/contact-list?role={Role.CONFIG_MANAGER.value}",
+        headers=analyst_headers,
+    )
+
+    assert response.status_code == 200
+
+    data = response.get_json()["data"]
+    assert isinstance(data, list)
+
+    for contact in data:
+        assert set(contact.keys()) == {"id", "name", "email"}
+
+        user = session.query(User).filter(User.id == contact["id"]).first()
+        assert user.active
+        assert Role.CONFIG_MANAGER.value in user.config["roles"]
+
+
+def test_get_contact_list_invalid_role(client, analyst_headers):
+    """Teste get /user-admin/contact-list - Não deve permitir listar usuários de um papel fora da allowlist"""
+    for role in ["ADMIN", "CURATOR", "ORGANIZATION_MANAGER", "config_manager"]:
+        response = client.get(
+            f"/user-admin/contact-list?role={role}", headers=analyst_headers
+        )
+
+        assert response.status_code == 400
+
+
+def test_get_contact_list_missing_role(client, analyst_headers):
+    """Teste get /user-admin/contact-list - Deve exigir o parâmetro role"""
+    response = client.get("/user-admin/contact-list", headers=analyst_headers)
+
+    assert response.status_code == 400
+
+
 def test_put_user(client, user_manager_headers):
     """Teste put /editUser - Compara o response.data e cria o usuário"""
     data = {

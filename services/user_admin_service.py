@@ -64,6 +64,31 @@ def get_user_manager_list(user_context: User):
     return [{"id": u.id, "name": u.name, "email": u.email} for u in users]
 
 
+# roles a user may look up to know who to ask for a change. Kept as an explicit
+# allowlist so this endpoint cannot be used to enumerate users by any role.
+CONTACTABLE_ROLES = [Role.USER_MANAGER, Role.CONFIG_MANAGER]
+
+
+@has_permission(Permission.READ_BASIC_FEATURES, Permission.READ_USERS)
+def get_contact_list(role: str, user_context: User):
+    """get active users of a contactable role, so users without write
+    permission know who to ask for a change"""
+    target_role = next((r for r in CONTACTABLE_ROLES if r.value == role), None)
+
+    if target_role is None:
+        raise ValidationError(
+            "Perfil inválido",
+            "errors.invalidParams",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    users = user_repository.get_active_users_by_role(
+        schema=user_context.schema, role=target_role
+    )
+
+    return [{"id": u.id, "name": u.name, "email": u.email} for u in users]
+
+
 def _get_user_data(id_user: int):
     segments_query = db.session.query(
         func.array_agg(UserAuthorization.idSegment)
