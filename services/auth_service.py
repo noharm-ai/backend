@@ -25,6 +25,7 @@ from models.enums import (
     IntegrationStatusEnum,
     MemoryEnum,
     NoHarmENV,
+    UserAttributeEnum,
     UserAuditTypeEnum,
 )
 from models.main import User, UserExtra, db, dbSession
@@ -32,6 +33,7 @@ from models.segment import Segment
 from repository import (
     notification_repository,
     user_activity_repository,
+    user_attribute_repository,
     user_repository,
 )
 from security.role import Role
@@ -317,6 +319,9 @@ def _auth_user(
         "permissions": [p.name for p in permissions],
         "oauth": is_oauth,
         "signature": signature,
+        "onboardingStatus": user_attribute_repository.get_value(
+            id_user=user.id, kind=UserAttributeEnum.ONBOARDING.value
+        ),
     }
 
 

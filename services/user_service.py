@@ -12,9 +12,13 @@ from config import Config
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
 from models.appendix import SchemaConfig
-from models.enums import UserAuditTypeEnum
+from models.enums import (
+    UserAttributeEnum,
+    UserAuditTypeEnum,
+    UserOnboardingStatusEnum,
+)
 from models.main import User, UserAudit, db
-from repository import user_repository
+from repository import user_attribute_repository, user_repository
 from utils import status
 
 
@@ -49,6 +53,31 @@ def create_audit(
     audit.createdAt = datetime.today()
 
     db.session.add(audit)
+
+
+@has_permission(Permission.WRITE_BASIC_FEATURES)
+def complete_onboarding(user_context: User):
+    """Mark the onboarding as done. Users without a pending onboarding are kept as is."""
+    current_status = user_attribute_repository.get_value(
+        id_user=user_context.id, kind=UserAttributeEnum.ONBOARDING.value
+    )
+
+    if current_status != UserOnboardingStatusEnum.PENDING.value:
+        return
+
+    user_attribute_repository.set_value(
+        id_user=user_context.id,
+        kind=UserAttributeEnum.ONBOARDING.value,
+        value=UserOnboardingStatusEnum.ONBOARDED.value,
+        responsible_id=user_context.id,
+    )
+
+    create_audit(
+        auditType=UserAuditTypeEnum.UPDATE,
+        id_user=user_context.id,
+        responsible=user_context,
+        extra={"onboarding": UserOnboardingStatusEnum.ONBOARDED.value},
+    )
 
 
 def reset_password(token: str, password: str):

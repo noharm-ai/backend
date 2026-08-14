@@ -96,6 +96,19 @@ class UserExtra(db.Model):
     createdBy = db.Column("created_by", db.BigInteger, nullable=False)
 
 
+class UserAttribute(db.Model):
+    __tablename__ = "usuario_atributo"
+    __table_args__ = {"schema": "public"}
+
+    idUser = db.Column("idusuario", db.BigInteger, primary_key=True)
+    kind = db.Column("tipo", db.String(64), primary_key=True)
+    value = db.Column("valor", db.String(255), nullable=True)
+    createdAt = db.Column("created_at", db.DateTime, nullable=False)
+    createdBy = db.Column("created_by", db.BigInteger, nullable=True)
+    updatedAt = db.Column("updated_at", db.DateTime, nullable=True)
+    updatedBy = db.Column("updated_by", db.BigInteger, nullable=True)
+
+
 class UserActivity(db.Model):
     __tablename__ = "usuario_atividade"
     __table_args__ = {"schema": "public"}

@@ -10,9 +10,14 @@ from config import Config
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
 from models.appendix import SchemaConfig
-from models.enums import FeatureEnum, UserAuditTypeEnum
+from models.enums import (
+    FeatureEnum,
+    UserAttributeEnum,
+    UserAuditTypeEnum,
+    UserOnboardingStatusEnum,
+)
 from models.main import User, UserAuthorization, db
-from repository import user_repository
+from repository import user_attribute_repository, user_repository
 from security.role import Role
 from services import feature_service, memory_service, user_service
 from utils import emailutils, status
@@ -181,6 +186,14 @@ def upsert_user(data: dict, user_context: User, user_permissions: list[Permissio
             user=new_user,
             responsible=user_context,
         )
+
+        if Config.FEATURE_USER_ONBOARDING:
+            user_attribute_repository.set_value(
+                id_user=new_user.id,
+                kind=UserAttributeEnum.ONBOARDING.value,
+                value=UserOnboardingStatusEnum.PENDING.value,
+                responsible_id=user_context.id,
+            )
 
         user_service.create_audit(
             auditType=UserAuditTypeEnum.CREATE,

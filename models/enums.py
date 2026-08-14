@@ -140,6 +140,16 @@ class UserAuditTypeEnum(Enum):
     REMOVE_CLINICAL_NOTE_ANNOTATION = 6
 
 
+class UserAttributeEnum(Enum):
+    ONBOARDING = "onboarding"
+
+
+class UserOnboardingStatusEnum(Enum):
+    # users without the onboarding attribute row are exempt
+    PENDING = "pending"
+    ONBOARDED = "onboarded"
+
+
 class DrugAlertTypeEnum(Enum):
     KIDNEY = "kidney"
     LIVER = "liver"

@@ -75,3 +75,7 @@ class Config:
     SERVICE_INFERENCE = getenv("SERVICE_INFERENCE", None)
 
     FEATURE_CONCILIATION_ALGORITHM = getenv("FEATURE_CONCILIATION_ALGORITHM", "FUZZY")
+    # enable only after the onboarding/training app version is released
+    FEATURE_USER_ONBOARDING = (
+        getenv("FEATURE_USER_ONBOARDING", "false").lower() == "true"
+    )

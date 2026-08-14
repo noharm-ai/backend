@@ -22,6 +22,14 @@ def update_user_password():
     return True
 
 
+@app_usr.route("/user/complete-onboarding", methods=["POST"])
+@api_endpoint()
+def complete_onboarding():
+    user_service.complete_onboarding()
+
+    return True
+
+
 @app_usr.route("/users/search", methods=["GET"])
 @api_endpoint()
 def search_users():
