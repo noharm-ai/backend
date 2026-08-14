@@ -115,6 +115,9 @@ def _cleanup():
     # Unit-conversion test records (IDs >= 90000)
     session.execute(text("DELETE FROM demo.medatributos WHERE fkmedicamento >= 90000"))
     session.execute(
+        text("DELETE FROM demo.medatributos_audit WHERE fkmedicamento >= 90000")
+    )
+    session.execute(
         text("DELETE FROM demo.unidadeconverte WHERE fkmedicamento >= 90000")
     )
     session.execute(text("DELETE FROM demo.prescricaoagg WHERE fkmedicamento >= 90000"))
