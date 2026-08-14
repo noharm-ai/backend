@@ -35,9 +35,12 @@ def switch_schema():
 
     schema = data.get("schema", None)
     extra_features = data.get("extraFeatures", None)
+    run_as_role = data.get("runAsRole", None)
 
     auth_data = auth_service.switch_schema(
-        switch_to_schema=schema, extra_features=extra_features
+        switch_to_schema=schema,
+        extra_features=extra_features,
+        run_as_role=run_as_role,
     )
 
     refresh_token = auth_data["refresh_token"]

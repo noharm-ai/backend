@@ -116,6 +116,56 @@ def test_training_cannot_switch_to_unknown_schema(client, training_headers):
     assert response.status_code == 401
 
 
+def test_admin_can_switch_to_training_role(client, admin_headers):
+    """POST /switch-schema — ADMIN assumes the TRAINING role via runAsRole"""
+    response = client.post(
+        "/switch-schema",
+        json={"schema": "teste", "runAsRole": Role.TRAINING.value},
+        headers=admin_headers,
+    )
+
+    assert response.status_code == 200
+    data = response.get_json()["data"]
+    assert data["roles"] == [Role.TRAINING.value]
+    assert FeatureEnum.HIDE_NAMES.value in data["userFeatures"]
+    assert FeatureEnum.DISABLE_GETNAME.value in data["userFeatures"]
+
+
+def test_curator_can_switch_to_training_role(client, curator_headers):
+    """POST /switch-schema — CURATOR assumes the TRAINING role via runAsRole"""
+    response = client.post(
+        "/switch-schema",
+        json={"schema": "teste", "runAsRole": Role.TRAINING.value},
+        headers=curator_headers,
+    )
+
+    assert response.status_code == 200
+    data = response.get_json()["data"]
+    assert data["roles"] == [Role.TRAINING.value]
+
+
+def test_regular_user_cannot_switch_to_training_role(client, training_headers):
+    """POST /switch-schema — runAsRole is rejected without ADMIN/CURATOR"""
+    response = client.post(
+        "/switch-schema",
+        json={"schema": "teste", "runAsRole": Role.TRAINING.value},
+        headers=training_headers,
+    )
+
+    assert response.status_code == 401
+
+
+def test_switch_to_other_role_is_rejected(client, admin_headers):
+    """POST /switch-schema — runAsRole only accepts TRAINING"""
+    response = client.post(
+        "/switch-schema",
+        json={"schema": "teste", "runAsRole": Role.ADMIN.value},
+        headers=admin_headers,
+    )
+
+    assert response.status_code == 400
+
+
 def test_training_cannot_check_prescription(client, training_headers):
     """POST /prescriptions/status — TRAINING cannot check a prescription"""
     response = client.post(

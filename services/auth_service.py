@@ -370,11 +370,34 @@ def get_switch_schema_data(user_permissions: list[Permission], user_context: Use
 
 
 @has_permission(Permission.MULTI_SCHEMA)
-def switch_schema(switch_to_schema: str, extra_features: list[str], user_context: User):
+def switch_schema(
+    switch_to_schema: str,
+    extra_features: list[str],
+    user_context: User,
+    run_as_role: str = None,
+):
     """Switch to other schema"""
     user = db.session.query(User).filter(User.id == user_context.id).first()
 
     user = _prepare_user(user=user)
+
+    if run_as_role is not None:
+        if run_as_role != Role.TRAINING.value:
+            raise ValidationError(
+                "Papel inválido",
+                "errors.invalidParams",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+        user_roles = user.config.get("roles", [])
+        if Role.ADMIN.value not in user_roles and Role.CURATOR.value not in user_roles:
+            raise ValidationError(
+                "Usuário não autorizado neste recurso",
+                "errors.unauthorizedUser",
+                status.HTTP_401_UNAUTHORIZED,
+            )
+
+        user.config = dict(user.config, roles=[Role.TRAINING.value])
 
     return _auth_user(
         user=user, force_schema=switch_to_schema, extra_features=extra_features
