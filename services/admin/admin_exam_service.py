@@ -14,7 +14,7 @@ from services.admin import admin_integration_service
 from utils import dateutils, status
 
 
-@has_permission(Permission.ADMIN_EXAMS)
+@has_permission(Permission.READ_CONFIG_EXAMS, Permission.ADMIN_EXAMS)
 def get_segment_exams(id_segment: int):
     segExams = (
         db.session.query(SegmentExam, Segment)
@@ -49,7 +49,7 @@ def get_segment_exams(id_segment: int):
     return exams
 
 
-@has_permission(Permission.ADMIN_EXAMS)
+@has_permission(Permission.READ_CONFIG_EXAMS, Permission.ADMIN_EXAMS)
 def get_segment_exam(request_data: SegmentExamGetRequest):
     result = (
         db.session.query(SegmentExam, Segment)
@@ -222,7 +222,7 @@ def add_most_frequent(exam_types, id_segment, user_context: User):
             db.session.add(se)
 
 
-@has_permission(Permission.ADMIN_EXAMS)
+@has_permission(Permission.READ_CONFIG_EXAMS, Permission.ADMIN_EXAMS)
 def get_exam_types():
     typesExam = (
         db.session.query(Exams.typeExam)
@@ -239,7 +239,7 @@ def get_exam_types():
     return results
 
 
-@has_permission(Permission.ADMIN_EXAMS)
+@has_permission(Permission.READ_CONFIG_EXAMS, Permission.ADMIN_EXAMS)
 def get_global_exams():
     """List actives global exams"""
     exams = exams_repository.get_global_exams()
@@ -264,7 +264,7 @@ def get_global_exams():
     return results
 
 
-@has_permission(Permission.ADMIN_EXAMS)
+@has_permission(Permission.WRITE_CONFIG_EXAMS, Permission.ADMIN_EXAMS)
 def upsert_seg_exam(data: dict, user_context: User):
     id_segment = data.get("idSegment", None)
     typeExam = data.get("type", None)
@@ -353,7 +353,7 @@ def upsert_seg_exam(data: dict, user_context: User):
     }
 
 
-@has_permission(Permission.ADMIN_EXAMS)
+@has_permission(Permission.WRITE_CONFIG_EXAMS, Permission.ADMIN_EXAMS)
 def set_exams_order(exams, id_segment, user_context: User):
     if not exams or not id_segment:
         raise ValidationError(
