@@ -22,6 +22,8 @@ def test_training_role_permissions():
         Permission.READ_SUPPORT,
         Permission.READ_USERS,
         Permission.MULTI_SCHEMA,
+        Permission.READ_CONFIG_EXAMS,
+        Permission.READ_TAGS,
         Permission.TRAINING_RECORDING,
     }
 
