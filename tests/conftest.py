@@ -112,6 +112,18 @@ def _cleanup():
         text("DELETE FROM demo.prescricao_evolucao WHERE fkprescricao = 20")
     )
 
+    # Admin global-memory test records (reserved kind prefix, includes _bkp rows)
+    session.execute(text("DELETE FROM public.memoria WHERE tipo LIKE 'zztest-gm%'"))
+
+    # Admin tag test records (reserved uppercase name prefixes)
+    session.execute(
+        text(
+            "DELETE FROM demo.marcador "
+            "WHERE nome LIKE 'ZZTEST!_ADMIN%' ESCAPE '!' "
+            "OR nome LIKE 'NAVEGACAO!_ZZTEST%' ESCAPE '!'"
+        )
+    )
+
     # Unit-conversion test records (IDs >= 90000)
     session.execute(text("DELETE FROM demo.medatributos WHERE fkmedicamento >= 90000"))
     session.execute(
