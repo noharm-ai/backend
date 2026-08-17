@@ -60,10 +60,11 @@ _ALLOWED_CHART_FIELDS = {
 def get_report_list(user_context: User, user_permissions: list[Permission]):
     """Get list of custom reports."""
     custom_reports_query_result = reports_repository.get_custom_reports(
-        all=Permission.READ_CUSTOM_REPORTS in user_permissions
+        schema=user_context.schema,
+        all=Permission.READ_CUSTOM_REPORTS in user_permissions,
     )
     custom_reports = []
-    for report in custom_reports_query_result:
+    for report, processed_by_name in custom_reports_query_result:
         custom_reports.append(
             {
                 "id": report.id,
@@ -72,6 +73,7 @@ def get_report_list(user_context: User, user_permissions: list[Permission]):
                 "active": report.active,
                 "status": report.status,
                 "processed_at": dateutils.to_iso(report.processed_at),
+                "processed_by_name": processed_by_name,
                 "available_reports": reports_cache_service.list_available_custom_reports(
                     schema=user_context.schema, id_report=report.id
                 ),

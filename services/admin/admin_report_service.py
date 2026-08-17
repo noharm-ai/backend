@@ -102,9 +102,11 @@ def update_report_graphs(
 @has_permission(Permission.READ_CUSTOM_REPORTS)
 def get_report_list(user_context: User):
     """Get list of custom reports."""
-    custom_reports_query_result = reports_repository.get_custom_reports(all=True)
+    custom_reports_query_result = reports_repository.get_custom_reports(
+        schema=user_context.schema, all=True
+    )
     custom_reports = []
-    for report in custom_reports_query_result:
+    for report, _ in custom_reports_query_result:
         custom_reports.append(
             {
                 "id": report.id,

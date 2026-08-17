@@ -1,15 +1,22 @@
 """Repository for managing reports."""
 
-from sqlalchemy import text
+from sqlalchemy import and_, text
 
 from models.appendix import Report
-from models.main import db
+from models.main import User, db
 
 
-def get_custom_reports(all: bool = False):
-    """Get all custom reports."""
+def get_custom_reports(schema: str, all: bool = False):
+    """Get all custom reports and the user who last processed each one.
 
-    query = db.session.query(Report)
+    Returns (Report, processed_by_name) rows. The name is resolved only when the
+    processing user belongs to `schema`: reports processed by users from other
+    schemas are still listed, but with the name as None.
+    """
+
+    query = db.session.query(Report, User.name.label("processed_by_name")).outerjoin(
+        User, and_(User.id == Report.processed_by, User.schema == schema)
+    )
 
     if not all:
         query = query.filter(Report.active)
