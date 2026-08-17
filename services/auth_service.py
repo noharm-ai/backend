@@ -327,19 +327,12 @@ def _auth_user(
         "onboardingStatus": user_attribute_repository.get_value(
             id_user=user.id, kind=UserAttributeEnum.ONBOARDING.value
         ),
-        "training": _get_training_summary(user_id=user.id, schema=user_schema),
+        # the effective schema: force_schema has already been applied to
+        # user_schema above, so a switched session reports the target's modules
+        "training": training_service.get_mandatory_summary(
+            user_id=user.id, schema=user_schema
+        ),
     }
-
-
-def _get_training_summary(user_id: int, schema: str):
-    """Mandatory training progress for the login payload. The env flag gates
-    *obligations*, not content: with it off the header shows nothing, while
-    Training Central still lists whatever modules exist (that page is only
-    reachable when the same flag exposes the menu entry)"""
-    if not Config.FEATURE_USER_ONBOARDING:
-        return {"mandatoryTotal": 0, "mandatoryFinished": 0}
-
-    return training_service.get_mandatory_summary(user_id=user_id, schema=schema)
 
 
 @has_permission(Permission.MULTI_SCHEMA)

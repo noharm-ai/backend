@@ -1,5 +1,6 @@
 """Service: training related operations"""
 
+from config import Config
 from repository import training_repository, user_attribute_repository
 from models.enums import TrainingAudienceEnum, UserAttributeEnum
 from models.main import User, db
@@ -48,13 +49,28 @@ def _list_user_trainings(user_id: int, schema: str) -> list:
 def get_mandatory_summary(user_id: int, schema: str) -> dict:
     """How many modules are mandatory for this user and how many of those they
     finished. Derived on every call, so publishing a new mandatory module shows
-    up here without any per-user backfill"""
+    up here without any per-user backfill.
+
+    The env flag gates *obligations*, not content: with it off nobody owes
+    anything, while list_trainings still returns whatever modules exist.
+    """
+    if not Config.FEATURE_USER_ONBOARDING:
+        return {"mandatoryTotal": 0, "mandatoryFinished": 0}
+
     mandatory = [m for m in _list_user_trainings(user_id, schema) if m["mandatory"]]
 
     return {
         "mandatoryTotal": len(mandatory),
         "mandatoryFinished": len([m for m in mandatory if m["finished"]]),
     }
+
+
+def has_pending_mandatory_training(user_id: int, schema: str) -> bool:
+    """Whether the user still owes mandatory training. The gate other features
+    (support tickets) consult, so they never re-derive the rule"""
+    summary = get_mandatory_summary(user_id=user_id, schema=schema)
+
+    return summary["mandatoryFinished"] < summary["mandatoryTotal"]
 
 
 @has_permission(Permission.READ_BASIC_FEATURES)

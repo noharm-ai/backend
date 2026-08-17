@@ -47,7 +47,7 @@ def _data(response):
 
 def test_list_icds_permission_denied(client):
     """A user without READ_BASIC_FEATURES cannot list ICDs [401 UNAUTHORIZED]."""
-    headers = make_headers(get_access(client, roles=[Role.SUPPORT_REQUESTER.value]))
+    headers = make_headers(get_access(client, roles=[Role.DISPENSING_MANAGER.value]))
     response = client.get("/lists/icds", headers=headers)
 
     assert response.status_code == 401

@@ -17,7 +17,7 @@ from models.requests.knowledge_base_request import (
 )
 from repository import knowledge_base_repository, user_repository
 from security.role import Role
-from services import vector_search_service
+from services import training_service, vector_search_service
 from utils import logger, status
 
 
@@ -139,9 +139,38 @@ def ask_n0_form(question: str):
     return {"agent": response}
 
 
+def _check_mandatory_training(
+    user_context: User, user_permissions: list[Permission], urgent: bool
+) -> bool:
+    """Users who still owe mandatory training may not open tickets. Holders of
+    ADMIN_SUPPORT can override it for an urgent ticket. Returns whether the
+    override was used, so the ticket can record it"""
+    # Never block someone who cannot comply: the training endpoints all require
+    # READ_BASIC_FEATURES, which SUPPORT_REQUESTER and SUPPORT_MANAGER do not
+    # hold, so gating them would be a permanent lockout with no way out. If those
+    # roles ever gain the permission, the gate starts applying on its own.
+    if Permission.READ_BASIC_FEATURES not in user_permissions:
+        return False
+
+    if not training_service.has_pending_mandatory_training(
+        user_id=user_context.id, schema=user_context.schema
+    ):
+        return False
+
+    if urgent and Permission.ADMIN_SUPPORT in user_permissions:
+        return True
+
+    raise ValidationError(
+        "Você precisa concluir os treinamentos obrigatórios antes de abrir um chamado.",
+        "errors.pendingMandatoryTraining",
+        status.HTTP_400_BAD_REQUEST,
+    )
+
+
 @has_permission(Permission.WRITE_SUPPORT)
 def create_ticket(
     user_context: User,
+    user_permissions: list[Permission],
     from_url,
     filelist,
     category,
@@ -149,10 +178,24 @@ def create_ticket(
     title,
     nzero_response: str,
     nzero_summary: str,
+    urgent: bool = False,
 ):
     """Creates a new ticket"""
 
+    training_override = _check_mandatory_training(
+        user_context=user_context, user_permissions=user_permissions, urgent=urgent
+    )
+
     db_user = db.session.query(User).filter(User.id == user_context.id).first()
+
+    if training_override:
+        # the support team needs to see why this one skipped the training gate
+        description = (
+            f"{description or ''}"
+            "<hr/><h4>Chamado urgente</h4>"
+            "Aberto com treinamento obrigatório pendente "
+            f"(bypass ADMIN_SUPPORT — {db_user.email})"
+        )
 
     client = _get_client()
 

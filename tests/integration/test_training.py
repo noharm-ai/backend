@@ -176,6 +176,13 @@ def seed_training():
 
 
 @pytest.fixture(autouse=True)
+def feature_enabled(monkeypatch):
+    """Obligations are gated by FEATURE_USER_ONBOARDING, which is off by default
+    in the test environment. Tests about the flag itself override this again."""
+    monkeypatch.setattr(Config, "FEATURE_USER_ONBOARDING", True)
+
+
+@pytest.fixture(autouse=True)
 def reset_progress():
     """Each test starts with no completion recorded for the seeded training."""
     _clear_user_progress()
@@ -264,7 +271,7 @@ def test_list_trainings_excludes_inactive_module(client, analyst_headers):
 def test_list_trainings_requires_basic_features_permission(client):
     """GET /training/list returns 401 for a role without READ_BASIC_FEATURES."""
     headers = make_headers(
-        get_access(client, roles=[Role.SUPPORT_REQUESTER.value])
+        get_access(client, roles=[Role.DISPENSING_MANAGER.value])
     )
     response = client.get("/training/list", headers=headers)
 
@@ -367,7 +374,7 @@ def test_finishing_completed_module_again_returns_false(client, analyst_headers)
 def test_finish_item_requires_basic_features_permission(client):
     """POST finish returns 401 for a role without READ_BASIC_FEATURES."""
     headers = make_headers(
-        get_access(client, roles=[Role.SUPPORT_REQUESTER.value])
+        get_access(client, roles=[Role.DISPENSING_MANAGER.value])
     )
     response = client.post(
         f"/training/item/{ITEM_1_ID}/finish", json={}, headers=headers

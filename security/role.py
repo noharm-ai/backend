@@ -252,12 +252,19 @@ class Role(Enum):
 
     SUPPORT_REQUESTER = (
         "SUPPORT_REQUESTER",
-        [Permission.READ_SUPPORT, Permission.WRITE_SUPPORT],
+        [
+            # needed to reach the training pages: opening a ticket requires the
+            # mandatory training to be complete
+            Permission.READ_BASIC_FEATURES,
+            Permission.READ_SUPPORT,
+            Permission.WRITE_SUPPORT,
+        ],
     )
 
     SUPPORT_MANAGER = (
         "SUPPORT_MANAGER",
         [
+            Permission.READ_BASIC_FEATURES,
             Permission.READ_SUPPORT,
             Permission.WRITE_SUPPORT,
             Permission.ADMIN_SUPPORT,

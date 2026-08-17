@@ -24,6 +24,8 @@ def create_ticket():
         filelist=request.files.getlist("fileList[]"),
         nzero_response=request.form.get("nzero_response", None),
         nzero_summary=request.form.get("nzero_summary", None),
+        # multipart form: booleans arrive as strings
+        urgent=request.form.get("urgent", None) == "true",
     )
 
 
