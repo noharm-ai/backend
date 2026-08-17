@@ -182,7 +182,7 @@ def _clean_checkedindex(user_context: User):
         text(
             f"""DELETE FROM {user_context.schema}.checkedindex WHERE created_at < :maxDate"""
         ),
-        {"maxDate": (datetime.today() - timedelta(days=15))},
+        {"maxDate": (datetime.today() - timedelta(days=4))},
     )
 
 
