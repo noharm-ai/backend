@@ -122,6 +122,13 @@ def stored_report():
     return id_report
 
 
+class _Omit:
+    """Sentinel telling _upsert to leave an attribute out of the payload."""
+
+
+_OMIT = _Omit()
+
+
 def _upsert(client, headers, **overrides):
     """Call the upsert endpoint, defaulting every required attribute."""
     payload = {
@@ -143,13 +150,6 @@ def _patch_graphs(client, headers, id_report, graphs):
         data=json.dumps({"graphs": graphs}),
         headers=headers,
     )
-
-
-class _Omit:
-    """Sentinel telling _upsert to leave an attribute out of the payload."""
-
-
-_OMIT = _Omit()
 
 
 # ---------------------------------------------------------------------------
@@ -253,7 +253,12 @@ def test_create_rejects_a_name_over_the_column_length(client, admin_headers):
         "insert into demo.marcador (nome) values ('x')",
         "drop table demo.prescricao",
         "truncate demo.prescricao",
-        "select fkprescricao from demo.prescricao where 1 = 1 alter",
+        "alter table demo.prescricao add column zztest int",
+        "grant all on demo.prescricao to public",
+        # postgres can write a query result straight to the filesystem
+        "copy (select fkprescricao from demo.prescricao) to '/tmp/out.csv'",
+        # ...and the mysql spelling of the same exfiltration
+        "select fkprescricao from demo.prescricao into outfile '/tmp/out.csv'",
     ],
 )
 def test_create_rejects_a_destructive_statement(client, admin_headers, sql):
@@ -388,8 +393,18 @@ def test_create_accepts_a_join_inside_the_own_schema(client, admin_headers):
     assert response.status_code == status.HTTP_200_OK
 
 
-def test_create_rejects_a_reference_to_the_catalog(client, admin_headers):
-    """information_schema is off limits anywhere in the query [400 BAD REQUEST]."""
+def test_create_rejects_the_catalog_schema(client, admin_headers):
+    """Enumerating the database through information_schema is refused [400 BAD REQUEST]."""
+    response = _upsert(
+        client, admin_headers, sql="select table_name from information_schema.tables"
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.get_json()["code"] == "errors.unauthorizedSchemaAccess"
+
+
+def test_create_rejects_a_catalog_name_anywhere_in_the_query(client, admin_headers):
+    """The catalog check is a substring match, so even a quoted mention trips it."""
     response = _upsert(
         client,
         admin_headers,
