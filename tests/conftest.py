@@ -102,9 +102,11 @@ def _cleanup():
         text("UPDATE demo.prescricao set status = '0' WHERE fkprescricao in (9199, 20)")
     )
 
+    # every kind inserted by _setup_test_data, so a re-run does not stack duplicates
     session.execute(
         text(
-            "DELETE FROM demo.memoria WHERE tipo IN ('map-origin-solution', 'map-origin-diet')"
+            "DELETE FROM demo.memoria WHERE tipo IN "
+            "('map-origin-solution', 'map-origin-diet', 'map-origin-procedure')"
         )
     )
 
@@ -114,6 +116,14 @@ def _cleanup():
 
     # Admin global-memory test records (reserved kind prefix, includes _bkp rows)
     session.execute(text("DELETE FROM public.memoria WHERE tipo LIKE 'zztest-gm%'"))
+
+    # Admin schema-memory test records (reserved kind prefix, includes _bkp rows)
+    session.execute(text("DELETE FROM demo.memoria WHERE tipo LIKE 'zztest-am%'"))
+
+    # Admin custom-report test records (reserved uppercase name prefix)
+    session.execute(
+        text("DELETE FROM demo.relatorio WHERE nome LIKE 'ZZTEST!_RPT%' ESCAPE '!'")
+    )
 
     # Admin tag test records (reserved uppercase name prefixes)
     session.execute(
