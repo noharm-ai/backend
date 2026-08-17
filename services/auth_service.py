@@ -37,7 +37,7 @@ from repository import (
     user_repository,
 )
 from security.role import Role
-from services import memory_service, user_service
+from services import memory_service, training_service, user_service
 from services.admin import admin_integration_status_service
 from utils import logger, status
 
@@ -297,6 +297,11 @@ def _auth_user(
             [FeatureEnum.DISABLE_GETNAME.value]
             if Config.ENV == NoHarmENV.TEST.value
             else []
+        )
+        + (
+            [FeatureEnum.USER_ONBOARDING.value]
+            if Config.FEATURE_USER_ONBOARDING
+            else []
         ),
         "preferences": preferences.value if preferences is not None else None,
         "nameUrl": nameUrl["value"] if "value" in nameUrl else None,
@@ -322,7 +327,19 @@ def _auth_user(
         "onboardingStatus": user_attribute_repository.get_value(
             id_user=user.id, kind=UserAttributeEnum.ONBOARDING.value
         ),
+        "training": _get_training_summary(user_id=user.id, schema=user_schema),
     }
+
+
+def _get_training_summary(user_id: int, schema: str):
+    """Mandatory training progress for the login payload. The env flag gates
+    *obligations*, not content: with it off the header shows nothing, while
+    Training Central still lists whatever modules exist (that page is only
+    reachable when the same flag exposes the menu entry)"""
+    if not Config.FEATURE_USER_ONBOARDING:
+        return {"mandatoryTotal": 0, "mandatoryFinished": 0}
+
+    return training_service.get_mandatory_summary(user_id=user_id, schema=schema)
 
 
 @has_permission(Permission.MULTI_SCHEMA)

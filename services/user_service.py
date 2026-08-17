@@ -55,7 +55,7 @@ def create_audit(
     db.session.add(audit)
 
 
-@has_permission(Permission.WRITE_BASIC_FEATURES)
+@has_permission(Permission.READ_BASIC_FEATURES)
 def complete_onboarding(user_context: User):
     """Mark the onboarding as done. Users without a pending onboarding are kept as is."""
     current_status = user_attribute_repository.get_value(

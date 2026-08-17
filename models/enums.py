@@ -73,6 +73,8 @@ class FeatureEnum(Enum):
     HIDE_NAMES = "HIDE_NAMES"
     DISABLE_GETNAME = "DISABLE_GETNAME"
     DISCHARGE_SUMMARY = "DISCHARGE_SUMMARY"
+    # driven by the FEATURE_USER_ONBOARDING env var, not by the schema config
+    USER_ONBOARDING = "USER_ONBOARDING"
 
 
 class PrescriptionAuditTypeEnum(Enum):
@@ -141,6 +143,8 @@ class UserAuditTypeEnum(Enum):
 
 
 class UserAttributeEnum(Enum):
+    # the presence of an ONBOARDING row also marks the user as a "new user", which
+    # is what TrainingAudienceEnum.NEW_USERS targets (usuario has no created_at)
     ONBOARDING = "onboarding"
 
 
@@ -148,6 +152,22 @@ class UserOnboardingStatusEnum(Enum):
     # users without the onboarding attribute row are exempt
     PENDING = "pending"
     ONBOARDED = "onboarded"
+
+
+class TrainingScopeEnum(Enum):
+    """Which schemas a training module applies to"""
+
+    GLOBAL = "global"
+    # only schemas with a treinamento_esquema row: no rows means no schema, so
+    # removing the last one hides the module instead of promoting it to global
+    SCHEMAS = "schemas"
+
+
+class TrainingAudienceEnum(Enum):
+    """Which users a mandatory training module is mandatory for"""
+
+    ALL = "all"
+    NEW_USERS = "new_users"
 
 
 class DrugAlertTypeEnum(Enum):

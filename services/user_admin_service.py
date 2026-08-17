@@ -213,6 +213,8 @@ def upsert_user(data: dict, user_context: User, user_permissions: list[Permissio
         )
 
         if Config.FEATURE_USER_ONBOARDING:
+            # this row drives the welcome modal and also marks the user as new,
+            # which is what a training with audiencia='new_users' targets
             user_attribute_repository.set_value(
                 id_user=new_user.id,
                 kind=UserAttributeEnum.ONBOARDING.value,

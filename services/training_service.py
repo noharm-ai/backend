@@ -1,16 +1,31 @@
 """Service: training related operations"""
 
-from repository import training_repository
-from models.main import User
+from repository import training_repository, user_attribute_repository
+from models.enums import TrainingAudienceEnum, UserAttributeEnum
+from models.main import User, db
 from models.requests.training_request import TrainingItemFinishRequest
 from decorators.has_permission_decorator import has_permission, Permission
 
 
-@has_permission(Permission.READ_BASIC_FEATURES)
-def list_trainings(user_context: User):
-    """List all active trainings ordered by position, including lesson
-    counts and completion status for the current user"""
-    results = training_repository.list_trainings(user_id=user_context.id)
+def _list_user_trainings(user_id: int, schema: str) -> list:
+    """Modules visible to the given schema, each flagged with whether it is
+    mandatory *for this user* - the schema scope is resolved in SQL, the audience
+    is applied here - and whether they already finished it.
+
+    The single source of truth for effective mandatory-ness: nothing else may
+    compute it, or the header count and the Training Central page would silently
+    disagree. Not permission decorated, so it can also run during login.
+    """
+    # usuario has no created_at, so the onboarding attribute row is what marks a
+    # user as new; absence of the row means a pre-existing user
+    is_new_user = (
+        user_attribute_repository.get_value(
+            id_user=user_id, kind=UserAttributeEnum.ONBOARDING.value
+        )
+        is not None
+    )
+
+    results = training_repository.list_trainings(user_id=user_id, schema=schema)
 
     return [
         {
@@ -19,14 +34,34 @@ def list_trainings(user_context: User):
             "title": item.title,
             "description": item.description,
             "position": item.position,
-            "mandatory": item.mandatory,
+            "mandatory": bool(scope_mandatory)
+            and (item.audience == TrainingAudienceEnum.ALL.value or is_new_user),
             "totalLessons": total_lessons,
             "totalLessonsFinished": total_lessons_finished,
             "finished": total_lessons > 0
             and total_lessons_finished == total_lessons,
         }
-        for item, total_lessons, total_lessons_finished in results
+        for item, total_lessons, total_lessons_finished, scope_mandatory in results
     ]
+
+
+def get_mandatory_summary(user_id: int, schema: str) -> dict:
+    """How many modules are mandatory for this user and how many of those they
+    finished. Derived on every call, so publishing a new mandatory module shows
+    up here without any per-user backfill"""
+    mandatory = [m for m in _list_user_trainings(user_id, schema) if m["mandatory"]]
+
+    return {
+        "mandatoryTotal": len(mandatory),
+        "mandatoryFinished": len([m for m in mandatory if m["finished"]]),
+    }
+
+
+@has_permission(Permission.READ_BASIC_FEATURES)
+def list_trainings(user_context: User):
+    """List all active trainings visible to the user's schema, ordered by
+    position, including lesson counts and completion status"""
+    return _list_user_trainings(user_id=user_context.id, schema=user_context.schema)
 
 
 @has_permission(Permission.READ_BASIC_FEATURES)
@@ -58,8 +93,9 @@ def finish_training_item(
     request_data: TrainingItemFinishRequest,
     user_context: User,
 ):
-    """Register that the current user finished a training item, marking the
-    whole training module as finished if this was the last pending item"""
+    """Register that the current user finished a training item, marking the whole
+    training module as finished if this was the last pending item, and returning
+    the recomputed mandatory summary so the client can update without a re-login"""
     training_repository.finish_training_item(
         training_item_id=training_item_id,
         user_id=user_context.id,
@@ -76,4 +112,13 @@ def finish_training_item(
             training_id=training_id, user_id=user_context.id
         )
 
-    return {"moduleFinished": module_finished}
+    # the writes above are only staged in the session, and the summary below
+    # counts finished lessons and modules
+    db.session.flush()
+
+    return {
+        "moduleFinished": module_finished,
+        "training": get_mandatory_summary(
+            user_id=user_context.id, schema=user_context.schema
+        ),
+    }
