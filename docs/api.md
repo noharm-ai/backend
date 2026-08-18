@@ -416,8 +416,6 @@ All endpoints in this section require administrator-level authorization.
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/admin/report/list` | List custom reports. |
-| `POST` | `/admin/report` | Create or update a custom report. |
 | `PATCH` | `/admin/report/<idReport>/graphs` | Update report graph configuration. |
 | `GET` | `/reports/integration/nifilint` | Download NiFi lint archive. |
 
