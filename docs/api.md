@@ -349,13 +349,6 @@ All endpoints in this section require administrator-level authorization.
 | `GET` | `/admin/substance/<id>` | Get substance detail. |
 | `POST` | `/admin/substance` | Create or update a substance. |
 
-### Unit Conversion Management
-
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/admin/unit-conversion/list` | List unit conversions. |
-| `POST` | `/admin/unit-conversion/save` | Save unit conversions. |
-
 ### Exam Management
 
 | Method | Path | Description |

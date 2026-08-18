@@ -14,7 +14,6 @@ from routes.admin.admin_protocol import app_admin_protocol
 from routes.admin.admin_report import app_admin_report
 from routes.admin.admin_substance import app_admin_subs
 from routes.admin.admin_tag import app_admin_tag
-from routes.admin.admin_unit_conversion import app_admin_unit_conversion
 from routes.authentication import app_auth
 from routes.conciliation import app_conciliation
 from routes.drugs import app_drugs
@@ -101,7 +100,6 @@ def register_blueprints(app):
     app.register_blueprint(app_admin_drug)
     app.register_blueprint(app_admin_integration)
     app.register_blueprint(app_admin_exam)
-    app.register_blueprint(app_admin_unit_conversion)
     app.register_blueprint(app_admin_subs)
     app.register_blueprint(app_admin_tag)
     app.register_blueprint(app_admin_protocol)

@@ -1,136 +1,22 @@
 import json
 from datetime import datetime
 
-from markupsafe import escape as escape_html
 from sqlalchemy import text
 
 from config import Config
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
-from models.enums import DefaultMeasureUnitEnum
 from models.main import (
     DrugAttributes,
     User,
     db,
 )
 from models.segment import Segment
-from repository import unit_conversion_repository
 from services import drug_service as main_drug_service
 from services.admin import (
     admin_drug_service,
 )
 from utils import aws, status
-
-
-@has_permission(Permission.ADMIN_UNIT_CONVERSION)
-def get_conversion_list():
-    unit_conversion_repository.ensure_default_measure_units()
-
-    nh_default_units = [
-        DefaultMeasureUnitEnum.MCG.value,
-        DefaultMeasureUnitEnum.MG.value,
-        DefaultMeasureUnitEnum.ML.value,
-        DefaultMeasureUnitEnum.UI.value,
-        DefaultMeasureUnitEnum.UN.value,
-    ]
-
-    default_units = {}
-    for du in nh_default_units:
-        default_units[du] = {
-            "idMeasureUnit": du,
-            "description": du,
-            "measureunit_nh": du,
-        }
-
-    conversion_list = unit_conversion_repository.get_unit_conversion_list()
-
-    result = []
-    drug_defaultunit = set()
-    for i in conversion_list:
-        prediction = None
-        probability = None
-
-        show_factors = True
-
-        if not i.uniform_measure_unit:
-            show_factors = False
-
-        effective_default = i.default_measureunit or DefaultMeasureUnitEnum.UN.value
-        is_default_unit = effective_default == i.measureunit_nh
-
-        if is_default_unit:
-            factor = 1
-            prediction = 1
-            probability = 100
-        elif show_factors:
-            factor = i.factor
-            prediction = None
-            probability = None
-        else:
-            factor = None
-            prediction = None
-            probability = None
-
-        if i.idMeasureUnit == effective_default:
-            drug_defaultunit.add(i.id)
-
-        result.append(
-            {
-                "id": f"{i.id}-{i.idMeasureUnit}",
-                "idDrug": i[1],
-                "name": escape_html(str(i[2])) if i[2] is not None else None,
-                "idMeasureUnit": i[3],
-                "factor": factor,
-                "measureUnit": escape_html(str(i[5])) if i[5] is not None else None,
-                "sctid": escape_html(str(i.sctid)) if i.sctid is not None else None,
-                "substanceMeasureUnit": effective_default,
-                "drugMeasureUnitNh": i.measureunit_nh,
-                "prediction": prediction,
-                "probability": probability,
-                "prescribedQuantity": i.prescribed_quantity,
-                "substanceTags": i.tags,
-                "uniformMeasureUnit": i.uniform_measure_unit,
-                "substanceName": i.substance_name,
-            }
-        )
-
-    for i in conversion_list:
-        effective_default = i.default_measureunit or DefaultMeasureUnitEnum.UN.value
-        if i.id not in drug_defaultunit:
-            drug_defaultunit.add(i.id)
-
-            d_unit = default_units.get(effective_default, None)
-
-            if d_unit:
-                result.append(
-                    {
-                        "id": f"{i.id}-{d_unit.get('idMeasureUnit')}",
-                        "idDrug": i.id,
-                        "name": escape_html(str(i.name))
-                        if i.name is not None
-                        else None,
-                        "idMeasureUnit": d_unit.get("idMeasureUnit"),
-                        "factor": 1,
-                        "measureUnit": escape_html(str(d_unit.get("description")))
-                        if d_unit.get("description") is not None
-                        else None,
-                        "sctid": escape_html(str(i.sctid))
-                        if i.sctid is not None
-                        else None,
-                        "substanceMeasureUnit": i.default_measureunit
-                        if i.default_measureunit
-                        else DefaultMeasureUnitEnum.UN.value,
-                        "drugMeasureUnitNh": d_unit.get("measureunit_nh", None),
-                        "prediction": 1,
-                        "probability": 100,
-                        "prescribed_quantity": i.prescribed_quantity,
-                        "substanceTags": i.tags,
-                        "uniformMeasureUnit": i.uniform_measure_unit,
-                        "substanceName": i.substance_name,
-                    }
-                )
-
-    return result
 
 
 @has_permission(Permission.ADMIN_UNIT_CONVERSION)

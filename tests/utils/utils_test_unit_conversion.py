@@ -3,31 +3,14 @@
 from datetime import datetime
 
 from sqlalchemy import text
-from sqlalchemy.dialects.postgresql import insert
 
-from models.appendix import MeasureUnit, MeasureUnitConvert
-from models.main import Drug, DrugAttributes, Outlier, PrescriptionAgg
+from models.main import Drug, Outlier
 from tests.conftest import session, session_commit
 
 # IDs reserved for unit-conversion tests — must not overlap with seed data.
 # Substances:  public.substancia.sctid  >= 90000
 # Drugs:       demo.medicamento          >= 90000
 # Outliers:    demo.outlier              >= 90000
-
-
-def create_test_measure_unit(id: str, description: str, measureunit_nh: str) -> None:
-    """Upsert a row into demo.unidademedida (idempotent — safe if already in seed data)."""
-    session.execute(
-        insert(MeasureUnit)
-        .values(
-            id=id,
-            idHospital=1,
-            description=description,
-            measureunit_nh=measureunit_nh,
-        )
-        .on_conflict_do_nothing()
-    )
-    session_commit()
 
 
 def create_test_substance(id: int, name: str, default_measureunit: str | None = "mg") -> None:
@@ -81,65 +64,3 @@ def create_test_outlier(id: int, id_drug: int, id_segment: int = 1) -> Outlier:
     session_commit()
 
     return outlier
-
-
-def create_test_prescription_agg(
-    id_drug: int,
-    id_measure_unit: str,
-    id_department: int = 1,
-    id_frequency: str = "1x",
-    dose: float = 100.0,
-) -> PrescriptionAgg:
-    """Insert a prescricaoagg row to register a drug's prescribed unit."""
-    agg = PrescriptionAgg()
-    agg.idHospital = 1
-    agg.idDepartment = id_department
-    agg.idSegment = 1
-    agg.idDrug = id_drug
-    agg.idMeasureUnit = id_measure_unit
-    agg.idFrequency = id_frequency
-    agg.dose = dose
-    agg.doseconv = dose
-    agg.frequency = 1.0
-    agg.countNum = 5
-
-    session.add(agg)
-    session_commit()
-
-    return agg
-
-
-def create_test_measure_unit_convert(
-    id_drug: int,
-    id_measure_unit: str,
-    id_segment: int = 1,
-    factor: float = 1000.0,
-) -> MeasureUnitConvert:
-    """Insert a unidadeconverte row with the given conversion factor."""
-    convert = MeasureUnitConvert()
-    convert.idDrug = id_drug
-    convert.idMeasureUnit = id_measure_unit
-    convert.idSegment = id_segment
-    convert.factor = factor
-
-    session.add(convert)
-    session_commit()
-
-    return convert
-
-
-def create_test_drug_attributes(
-    id_drug: int,
-    id_segment: int = 1,
-    id_measure_unit: str = "mg",
-) -> DrugAttributes:
-    """Insert a medatributos row that sets the drug's default measure unit."""
-    attrs = DrugAttributes()
-    attrs.idDrug = id_drug
-    attrs.idSegment = id_segment
-    attrs.idMeasureUnit = id_measure_unit
-
-    session.add(attrs)
-    session_commit()
-
-    return attrs
