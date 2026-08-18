@@ -72,7 +72,6 @@ class Config:
     PROTOCOL_AGENT_REGION = getenv("PROTOCOL_AGENT_REGION", "us-east-1")
     PROTOCOL_AGENT_MAX_TURNS = int(getenv("PROTOCOL_AGENT_MAX_TURNS", "8"))
 
-    SERVICE_INFERENCE = getenv("SERVICE_INFERENCE", None)
 
     FEATURE_CONCILIATION_ALGORITHM = getenv("FEATURE_CONCILIATION_ALGORITHM", "FUZZY")
     # enable only after the onboarding/training app version is released
