@@ -148,7 +148,21 @@ def upsert_user(data: dict, user_context: User, user_permissions: list[Permissio
         user_name = data.get("name", None)
 
         if user_email:
-            user_email = user_email.lower()
+            user_email = user_email.strip().lower()
+
+        if not user_email:
+            raise ValidationError(
+                "O campo Email é de preenchimento obrigatório",
+                "errors.businessRules",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not emailutils.is_valid_email(user_email):
+            raise ValidationError(
+                "Email inválido",
+                "errors.businessRules",
+                status.HTTP_400_BAD_REQUEST,
+            )
 
         email_exists = user_repository.get_user_by_email(email=user_email)
 

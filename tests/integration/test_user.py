@@ -1,5 +1,6 @@
 import json
 
+import pytest
 from sqlalchemy import text
 
 from tests.conftest import session, session_commit
@@ -130,6 +131,69 @@ def test_put_user(client, user_manager_headers):
 
     assert response.status_code == 200
     assert user_id == user.id
+
+
+def test_create_user_trims_email(client, user_manager_headers):
+    """Teste put /editUser - Espaços em volta do email devem ser removidos na criação"""
+    email = "trim@noharm.ai"
+    _delete_user(email)
+
+    data = {
+        "email": "  Trim@noharm.ai  ",
+        "name": "trimTest",
+        "external": "trimTest",
+        "active": "true",
+        "roles": [Role.PRESCRIPTION_ANALYST.value],
+    }
+
+    response = client.post("/editUser", json=data, headers=user_manager_headers)
+    assert response.status_code == 200
+
+    session_commit()
+
+    user = session.query(User).filter(User.id == response.get_json()["data"]["id"]).first()
+    assert user.email == email
+
+
+def test_create_user_blank_email(client, user_manager_headers):
+    """Teste put /editUser - Email em branco deve retornar erro [400 BAD REQUEST]"""
+    data = {
+        "email": "   ",
+        "name": "blankEmailTest",
+        "external": "blankEmailTest",
+        "active": "true",
+        "roles": [Role.PRESCRIPTION_ANALYST.value],
+    }
+
+    response = client.post("/editUser", json=data, headers=user_manager_headers)
+    assert response.status_code == 400
+
+
+@pytest.mark.parametrize(
+    "email",
+    [
+        "joão@noharm.ai",
+        "invalid email@noharm.ai",
+        "Nome Sobrenome <invalid@noharm.ai>",
+        "invalid@noharm.ai,other@noharm.ai",
+        "invalid@localhost",
+        "invalid",
+    ],
+)
+def test_create_user_invalid_email(client, user_manager_headers, email):
+    """Teste put /editUser - Email com formato inválido deve retornar erro [400 BAD REQUEST]"""
+    data = {
+        "email": email,
+        "name": "invalidEmailTest",
+        "external": "invalidEmailTest",
+        "active": "true",
+        "roles": [Role.PRESCRIPTION_ANALYST.value],
+    }
+
+    response = client.post("/editUser", json=data, headers=user_manager_headers)
+    assert response.status_code == 400
+
+    assert session.query(User).filter(User.email == email).first() is None
 
 
 def test_put_editUser(client, user_manager_headers):
