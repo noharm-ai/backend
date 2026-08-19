@@ -255,7 +255,7 @@ def create_ticket(
                         "res_model": "helpdesk.ticket",
                         "res_id": result[0]["id"],
                         "type": "binary",
-                        "datas": str(base64.b64encode(f.read()))[2:],
+                        "raw": base64.b64encode(f.read()).decode("ascii"),
                     }
                 ],
                 options={},
@@ -389,7 +389,7 @@ def add_attachment(id_ticket: int, files):
                         "res_model": "helpdesk.ticket",
                         "res_id": int(id_ticket),
                         "type": "binary",
-                        "datas": str(base64.b64encode(f.read()))[2:],
+                        "raw": base64.b64encode(f.read()).decode("ascii"),
                     }
                 ],
                 options={},
