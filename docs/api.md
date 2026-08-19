@@ -207,7 +207,7 @@ Set `idPrescriptionDrugList` (array of ints) to save the same intervention on mu
 | `GET` | `/notes/<admissionNumber>/v2` | Get clinical notes for a patient (`?date=`). |
 | `GET` | `/notes/single/<idClinicalNotes>` | Get a single clinical note. |
 | `POST` | `/notes` | Create a clinical note. |
-| `POST` | `/notes/soap` | Generate a SOAP evolution from a clinical note via LLM. |
+| `POST` | `/notes/soap` | Generate a SOAP evolution from a clinical note via LLM (optional `prompt_key` selects a prompt version). |
 | `POST` | `/notes/<idNote>` | Update a clinical note. |
 | `POST` | `/notes/remove-annotation` | Remove an annotation from a note. |
 | `GET` | `/notes/get-user-last` | Get the current user's last notes (`?admissionNumber=`). |

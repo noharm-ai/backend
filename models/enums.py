@@ -36,6 +36,7 @@ class GlobalMemoryEnum(Enum):
     N0_AGENT = "n0-agent"
     USER_KB = "user-kb"
     NAV_SOAP_CONFIG = "nav-soap-config"
+    NAV_SOAP_CONFIG_V2 = "nav-soap-config-v2"
 
 
 class NoHarmENV(Enum):
