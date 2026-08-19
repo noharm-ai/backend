@@ -215,7 +215,7 @@ def _update_agg_status(prescription: Prescription, user: User, extra={}):
         db.session.query(Prescription)
         .filter(Prescription.admissionNumber == prescription.admissionNumber)
         .filter(Prescription.idSegment == prescription.idSegment)
-        .filter(Prescription.agg != None)
+        .filter(Prescription.agg == True)
         .filter(func.date(Prescription.date) == func.date(prescription.date))
         .first()
     )

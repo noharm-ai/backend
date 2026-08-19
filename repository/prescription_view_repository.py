@@ -212,7 +212,7 @@ def find_drugs_by_prescription(
     else:
         q = (
             q.filter(Prescription.admissionNumber == admissionNumber)
-            .filter(Prescription.agg == None)
+            .filter(or_(Prescription.agg == None, Prescription.agg == False))
             .filter(Prescription.concilia == None)
         )
 
@@ -295,7 +295,7 @@ def get_headers(
         )
         .outerjoin(User, Prescription.user == User.id)
         .filter(Prescription.admissionNumber == admissionNumber)
-        .filter(Prescription.agg == None)
+        .filter(or_(Prescription.agg == None, Prescription.agg == False))
         .filter(Prescription.concilia == None)
     )
 
@@ -364,7 +364,7 @@ def get_query_prescriptions_by_agg(
         db.session.query(Prescription.id if only_id else Prescription)
         .filter(Prescription.admissionNumber == agg_prescription.admissionNumber)
         .filter(Prescription.concilia == None)
-        .filter(Prescription.agg == None)
+        .filter(or_(Prescription.agg == None, Prescription.agg == False))
     )
 
     q = _get_period_filter(

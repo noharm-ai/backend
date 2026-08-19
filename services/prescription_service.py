@@ -81,7 +81,7 @@ def search(search_key: int, user_permissions: list[Permission]):
                     and_(
                         Prescription.admissionNumber == search_key,
                         func.date(Prescription.date) <= date.today(),
-                        Prescription.agg != None,
+                        Prescription.agg == True,
                     ),
                 )
             )
