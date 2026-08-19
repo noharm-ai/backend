@@ -12,7 +12,9 @@ from utils import dateutils, status
 MAX_TAG_CHARS = 40
 
 
-@has_permission(Permission.READ_PRESCRIPTION)
+@has_permission(
+    Permission.READ_PRESCRIPTION, Permission.READ_TAGS, Permission.WRITE_TAGS
+)
 def get_tags(request_data: TagListRequest, user_permissions: list[Permission]):
     """List tags filtered by allowed tag types based on user permissions."""
     tag_types = [TagTypeEnum.PATIENT.value]

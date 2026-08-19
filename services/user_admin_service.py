@@ -10,9 +10,14 @@ from config import Config
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
 from models.appendix import SchemaConfig
-from models.enums import FeatureEnum, UserAuditTypeEnum
+from models.enums import (
+    FeatureEnum,
+    UserAttributeEnum,
+    UserAuditTypeEnum,
+    UserOnboardingStatusEnum,
+)
 from models.main import User, UserAuthorization, db
-from repository import user_repository
+from repository import user_attribute_repository, user_repository
 from security.role import Role
 from services import feature_service, memory_service, user_service
 from utils import emailutils, status
@@ -55,6 +60,31 @@ def get_user_list(user_context: User):
 def get_user_manager_list(user_context: User):
     """get active user managers, so users without READ_USERS know who to contact"""
     users = user_repository.get_user_manager_list(schema=user_context.schema)
+
+    return [{"id": u.id, "name": u.name, "email": u.email} for u in users]
+
+
+# roles a user may look up to know who to ask for a change. Kept as an explicit
+# allowlist so this endpoint cannot be used to enumerate users by any role.
+CONTACTABLE_ROLES = [Role.USER_MANAGER, Role.CONFIG_MANAGER]
+
+
+@has_permission(Permission.READ_BASIC_FEATURES, Permission.READ_USERS)
+def get_contact_list(role: str, user_context: User):
+    """get active users of a contactable role, so users without write
+    permission know who to ask for a change"""
+    target_role = next((r for r in CONTACTABLE_ROLES if r.value == role), None)
+
+    if target_role is None:
+        raise ValidationError(
+            "Perfil inválido",
+            "errors.invalidParams",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    users = user_repository.get_active_users_by_role(
+        schema=user_context.schema, role=target_role
+    )
 
     return [{"id": u.id, "name": u.name, "email": u.email} for u in users]
 
@@ -118,7 +148,21 @@ def upsert_user(data: dict, user_context: User, user_permissions: list[Permissio
         user_name = data.get("name", None)
 
         if user_email:
-            user_email = user_email.lower()
+            user_email = user_email.strip().lower()
+
+        if not user_email:
+            raise ValidationError(
+                "O campo Email é de preenchimento obrigatório",
+                "errors.businessRules",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not emailutils.is_valid_email(user_email):
+            raise ValidationError(
+                "Email inválido",
+                "errors.businessRules",
+                status.HTTP_400_BAD_REQUEST,
+            )
 
         email_exists = user_repository.get_user_by_email(email=user_email)
 
@@ -181,6 +225,16 @@ def upsert_user(data: dict, user_context: User, user_permissions: list[Permissio
             user=new_user,
             responsible=user_context,
         )
+
+        if Config.FEATURE_USER_ONBOARDING:
+            # this row drives the welcome modal and also marks the user as new,
+            # which is what a training with audiencia='new_users' targets
+            user_attribute_repository.set_value(
+                id_user=new_user.id,
+                kind=UserAttributeEnum.ONBOARDING.value,
+                value=UserOnboardingStatusEnum.PENDING.value,
+                responsible_id=user_context.id,
+            )
 
         user_service.create_audit(
             auditType=UserAuditTypeEnum.CREATE,

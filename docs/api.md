@@ -349,17 +349,6 @@ All endpoints in this section require administrator-level authorization.
 | `GET` | `/admin/substance/<id>` | Get substance detail. |
 | `POST` | `/admin/substance` | Create or update a substance. |
 
-### Unit Conversion Management
-
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/admin/unit-conversion/list` | List unit conversions. |
-| `POST` | `/admin/unit-conversion/predictions` | Get AI-predicted conversions. |
-| `POST` | `/admin/unit-conversion/save` | Save unit conversions. |
-| `POST` | `/admin/unit-conversion/add-default-units` | Add default units for a drug. |
-| `POST` | `/admin/unit-conversion/copy-unit-conversion` | Copy unit conversions between drugs. |
-| `POST` | `/admin/unit-conversion/llm-suggest` | Get LLM-suggested unit conversions. |
-
 ### Exam Management
 
 | Method | Path | Description |
@@ -416,8 +405,6 @@ All endpoints in this section require administrator-level authorization.
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/admin/report/list` | List custom reports. |
-| `POST` | `/admin/report` | Create or update a custom report. |
 | `PATCH` | `/admin/report/<idReport>/graphs` | Update report graph configuration. |
 | `GET` | `/reports/integration/nifilint` | Download NiFi lint archive. |
 

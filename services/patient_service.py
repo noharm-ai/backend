@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import List
 
 from flask import g
-from sqlalchemy import asc, cast, desc, func
+from sqlalchemy import asc, cast, desc, func, or_
 from sqlalchemy.dialects.postgresql import ARRAY, INTERVAL
 from sqlalchemy.orm import undefer
 
@@ -186,7 +186,7 @@ def save_patient(
         first_prescription = (
             db.session.query(Prescription)
             .filter(Prescription.admissionNumber == admission_number)
-            .filter(Prescription.agg == None)
+            .filter(or_(Prescription.agg == None, Prescription.agg == False))
             .filter(Prescription.concilia == None)
             .filter(Prescription.idSegment != None)
             .order_by(asc(Prescription.date))

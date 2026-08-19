@@ -716,7 +716,7 @@ def _outcome_calc(list, user: User, date_base_economy, destination=False):
             agg_presc = (
                 db.session.query(Prescription)
                 .filter(Prescription.admissionNumber == prescription.admissionNumber)
-                .filter(Prescription.agg != None)
+                .filter(Prescription.agg == True)
                 .filter(func.date(Prescription.date) >= func.date(prescription.date))
                 .first()
             )

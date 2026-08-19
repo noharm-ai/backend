@@ -2,7 +2,7 @@
 
 from typing import Union
 
-from sqlalchemy import desc
+from sqlalchemy import desc, or_
 
 from models.main import db
 from models.prescription import Prescription
@@ -36,7 +36,7 @@ def get_last_prescription(
     if agg:
         query = query.filter(Prescription.agg == True)
     else:
-        query = query.filter(Prescription.agg == None)
+        query = query.filter(or_(Prescription.agg == None, Prescription.agg == False))
 
     if cpoe is not None:
         query = query.filter(Segment.cpoe == cpoe)

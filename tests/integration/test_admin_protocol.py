@@ -13,6 +13,7 @@ from utils import status
 LIST_URL = "/admin/protocol/list"
 GET_URL = "/admin/protocol"
 UPSERT_URL = "/admin/protocol/upsert"
+DEPARTMENT_LIST_URL = "/admin/protocol/department/list"
 
 # Rows live in the shared public.protocolo table. The 9901xx range is reserved
 # for this module so it never collides with test_protocol.py (9900xx) or real
@@ -25,6 +26,15 @@ _OTHER = (990103, "other-schema", "ZZAdmin Other Schema")
 
 _ALL_ROWS = (_GLOBAL, _OWN, _OTHER)
 _ALL_IDS = tuple(row[0] for row in _ALL_ROWS)
+
+# Department fixtures live in demo.setor / demo.segmento, whose ids are their
+# own sequences: 9901xx for setor, and 99xx for segmento (idsegmento is a
+# smallint). Both ranges are well past the seed data.
+_DEPT_MAPPED = 990101
+_DEPT_UNMAPPED = 990102
+# ordered by name: the listing sorts a department's segments alphabetically
+_SEGMENT_A = (9901, "ZZTest Segmento A")
+_SEGMENT_B = (9902, "ZZTest Segmento B")
 
 _VALID_CONFIG = {
     "variables": [{"name": "v1", "field": "age", "operator": ">", "value": "60"}],
@@ -61,6 +71,69 @@ def seed_protocols():
             bindparam("ids", expanding=True)
         ),
         {"ids": list(_ALL_IDS)},
+    )
+    session_commit()
+
+
+@pytest.fixture
+def seed_departments():
+    """Seed setores in demo: one mapped to a segment in two hospitals, one
+    mapped to none. Own ids so the test never depends on the seed data."""
+    for id_segment, name in (_SEGMENT_A, _SEGMENT_B):
+        session.execute(
+            text(
+                "INSERT INTO demo.segmento (idsegmento, nome, status, cpoe) "
+                "VALUES (:id, :name, 1, false)"
+            ),
+            {"id": id_segment, "name": name},
+        )
+
+    for id_hospital, id_department, name in (
+        (1, _DEPT_MAPPED, "ZZTest Setor Mapeado"),
+        (2, _DEPT_MAPPED, "ZZTest Setor Mapeado (H2)"),
+        (1, _DEPT_UNMAPPED, "ZZTest Setor Sem Segmento"),
+    ):
+        session.execute(
+            text(
+                "INSERT INTO demo.setor (fkhospital, fksetor, nome) "
+                "VALUES (:hospital, :department, :name)"
+            ),
+            {"hospital": id_hospital, "department": id_department, "name": name},
+        )
+
+    for id_segment, id_hospital in ((_SEGMENT_A[0], 1), (_SEGMENT_B[0], 2)):
+        session.execute(
+            text(
+                "INSERT INTO demo.segmentosetor (idsegmento, fkhospital, fksetor) "
+                "VALUES (:segment, :hospital, :department)"
+            ),
+            {
+                "segment": id_segment,
+                "hospital": id_hospital,
+                "department": _DEPT_MAPPED,
+            },
+        )
+    session_commit()
+
+    yield
+
+    session.execute(
+        text("DELETE FROM demo.segmentosetor WHERE fksetor IN :ids").bindparams(
+            bindparam("ids", expanding=True)
+        ),
+        {"ids": [_DEPT_MAPPED, _DEPT_UNMAPPED]},
+    )
+    session.execute(
+        text("DELETE FROM demo.setor WHERE fksetor IN :ids").bindparams(
+            bindparam("ids", expanding=True)
+        ),
+        {"ids": [_DEPT_MAPPED, _DEPT_UNMAPPED]},
+    )
+    session.execute(
+        text("DELETE FROM demo.segmento WHERE idsegmento IN :ids").bindparams(
+            bindparam("ids", expanding=True)
+        ),
+        {"ids": [_SEGMENT_A[0], _SEGMENT_B[0]]},
     )
     session_commit()
 
@@ -212,3 +285,29 @@ def test_upsert_other_schema_protocol_is_rejected(
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert "schema" in response.get_json()["message"]
+
+
+def test_department_list_carries_its_segments(client, admin_headers, seed_departments):
+    """Each setor is listed once, carrying every segment it belongs to.
+
+    segmentosetor is unique per (fkhospital, fksetor), so a setor only gets
+    more than one segment by being mapped in more than one hospital — which
+    is exactly what the seeded rows do. The unmapped setor pins that a setor
+    without any segment stays in the list: the select must keep offering it.
+    """
+    response = client.get(DEPARTMENT_LIST_URL, headers=admin_headers)
+
+    assert response.status_code == status.HTTP_200_OK
+
+    departments = response.get_json()["data"]
+    ids = [d["idDepartment"] for d in departments]
+    assert len(ids) == len(set(ids)), "a setor must not be listed twice"
+
+    by_id = {d["idDepartment"]: d for d in departments}
+
+    mapped = by_id[str(_DEPT_MAPPED)]
+    assert mapped["segments"] == [
+        {"id": _SEGMENT_A[0], "name": _SEGMENT_A[1]},
+        {"id": _SEGMENT_B[0], "name": _SEGMENT_B[1]},
+    ]
+    assert by_id[str(_DEPT_UNMAPPED)]["segments"] == []

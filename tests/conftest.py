@@ -96,15 +96,20 @@ def _cleanup():
 
     session.execute(text("DELETE FROM demo.checkedindex"))
 
+    # patients created for conciliation flows (seed admissions stay below 100000)
+    session.execute(text("DELETE FROM demo.pessoa WHERE nratendimento >= 100000"))
+
     session.execute(text("DELETE FROM demo.usuario WHERE email LIKE 'test%@noharm.ai'"))
 
     session.execute(
         text("UPDATE demo.prescricao set status = '0' WHERE fkprescricao in (9199, 20)")
     )
 
+    # every kind inserted by _setup_test_data, so a re-run does not stack duplicates
     session.execute(
         text(
-            "DELETE FROM demo.memoria WHERE tipo IN ('map-origin-solution', 'map-origin-diet')"
+            "DELETE FROM demo.memoria WHERE tipo IN "
+            "('map-origin-solution', 'map-origin-diet', 'map-origin-procedure')"
         )
     )
 
@@ -112,8 +117,31 @@ def _cleanup():
         text("DELETE FROM demo.prescricao_evolucao WHERE fkprescricao = 20")
     )
 
+    # Admin global-memory test records (reserved kind prefix, includes _bkp rows)
+    session.execute(text("DELETE FROM public.memoria WHERE tipo LIKE 'zztest-gm%'"))
+
+    # Admin schema-memory test records (reserved kind prefix, includes _bkp rows)
+    session.execute(text("DELETE FROM demo.memoria WHERE tipo LIKE 'zztest-am%'"))
+
+    # Admin custom-report test records (reserved uppercase name prefix)
+    session.execute(
+        text("DELETE FROM demo.relatorio WHERE nome LIKE 'ZZTEST!_RPT%' ESCAPE '!'")
+    )
+
+    # Admin tag test records (reserved uppercase name prefixes)
+    session.execute(
+        text(
+            "DELETE FROM demo.marcador "
+            "WHERE nome LIKE 'ZZTEST!_ADMIN%' ESCAPE '!' "
+            "OR nome LIKE 'NAVEGACAO!_ZZTEST%' ESCAPE '!'"
+        )
+    )
+
     # Unit-conversion test records (IDs >= 90000)
     session.execute(text("DELETE FROM demo.medatributos WHERE fkmedicamento >= 90000"))
+    session.execute(
+        text("DELETE FROM demo.medatributos_audit WHERE fkmedicamento >= 90000")
+    )
     session.execute(
         text("DELETE FROM demo.unidadeconverte WHERE fkmedicamento >= 90000")
     )

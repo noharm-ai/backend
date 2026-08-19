@@ -11,16 +11,20 @@ class Permission(Enum):
         "ADMIN_DRUGS__OVERWRITE_ATTRIBUTES"  # "permits overwriting attributes on copy"
     )
 
-    ADMIN_EXAMS = "ADMIN_EXAMS"  # "admin exams"
+    # deprecated: split into READ_CONFIG_EXAMS/WRITE_CONFIG_EXAMS, kept as fallback
+    # for one release. The two ADMIN_EXAMS__* below are NOT part of this deprecation.
+    ADMIN_EXAMS = "ADMIN_EXAMS"
     ADMIN_EXAMS__COPY = "ADMIN_EXAMS__COPY"  # "copy exams from other segments"
     ADMIN_EXAMS__MOST_FREQUENT = (
         "ADMIN_EXAMS__MOST_FREQUENT"  # "get most frequent exams"
     )
 
+    READ_CONFIG_EXAMS = "READ_CONFIG_EXAMS"  # "view exams configuration"
+    WRITE_CONFIG_EXAMS = "WRITE_CONFIG_EXAMS"  # "create and edit exams configuration"
+
     ADMIN_ROUTES = "ADMIN_ROUTES"  # "admin routes configs"
     ADMIN_SUBSTANCES = "ADMIN_SUBSTANCES"  # "admin substances"
     ADMIN_SEGMENTS = "ADMIN_SEGMENTS"  # "admin segments"
-    ADMIN_UNIT_CONVERSION = "ADMIN_UNIT_CONVERSION"  # "admin unit conversions"
 
     ADMIN_PATIENT = "ADMIN_PATIENT"  # "admin extra patient configs"
 
@@ -92,6 +96,7 @@ class Permission(Enum):
     READ_REGULATION = "READ_REGULATION"  # grants access to read regulation data
     WRITE_REGULATION = "WRITE_REGULATION"  # grants access to write regulation data
 
+    READ_TAGS = "READ_TAGS"  # permission to view tags configuration
     WRITE_TAGS = "WRITE_TAGS"  # permission to create and edit tags
 
     READ_PROTOCOLS = "READ_PROTOCOLS"  # permission to view protocols

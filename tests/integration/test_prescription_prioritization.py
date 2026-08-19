@@ -1,3 +1,16 @@
+from datetime import datetime
+
+from tests.utils.utils_test_prescription import (
+    create_prescription,
+    create_prescription_drug,
+    test_counters,
+)
+
+
+# Seed prescriptions in the test database are dated 2020-12-31
+SEED_DATE = datetime(2020, 12, 31, 10, 0)
+
+
 def test_get_prescriptions_response_structure(client, analyst_headers):
     """GET /prescriptions deve retornar lista com campos obrigatórios"""
     response = client.get(
@@ -70,3 +83,57 @@ def test_get_prescriptions_filter_concilia(client, analyst_headers):
     assert response.status_code == 200
     for item in data:
         assert item.get("concilia") is not None
+
+
+def test_get_prescriptions_includes_agg_false(client, analyst_headers):
+    """Prescrições com agg=False devem ser tratadas como não agregadas (agg NULL ou False)"""
+    id_pres = test_counters["id_prescription"]
+    adm = test_counters["admission_number"]
+
+    create_prescription(
+        id=id_pres,
+        admissionNumber=adm,
+        idPatient=1,
+        agg=False,
+        date=SEED_DATE,
+    )
+    create_prescription_drug(
+        id=int(f"{id_pres}001"),
+        idPrescription=id_pres,
+        idDrug=3,
+    )
+    test_counters["id_prescription"] += 1
+    test_counters["admission_number"] += 1
+
+    response = client.get(
+        "/prescriptions?startDate=2020-12-31", headers=analyst_headers
+    )
+    data = response.get_json()["data"]
+
+    assert response.status_code == 200
+    assert id_pres in [int(i["idPrescription"]) for i in data]
+
+
+def test_get_prescriptions_filter_agg_excludes_agg_false(client, analyst_headers):
+    """GET /prescriptions?agg=true não deve retornar prescrições com agg=False"""
+    id_pres = test_counters["id_prescription"]
+    adm = test_counters["admission_number"]
+
+    create_prescription(
+        id=id_pres,
+        admissionNumber=adm,
+        idPatient=1,
+        agg=False,
+        date=SEED_DATE,
+    )
+    test_counters["id_prescription"] += 1
+    test_counters["admission_number"] += 1
+
+    response = client.get(
+        "/prescriptions?agg=true&startDate=2020-12-31",
+        headers=analyst_headers,
+    )
+    data = response.get_json()["data"]
+
+    assert response.status_code == 200
+    assert id_pres not in [int(i["idPrescription"]) for i in data]

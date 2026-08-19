@@ -1,48 +1,15 @@
 """Repository for unit conversion"""
 
-from sqlalchemy import and_, case, func
+from sqlalchemy import and_, func
 
 from models.appendix import MeasureUnit, MeasureUnitConvert
-from models.enums import DefaultMeasureUnitEnum
 from models.main import (
     Drug,
     DrugAttributes,
-    Outlier,
     PrescriptionAgg,
     Substance,
     db,
 )
-
-_DEFAULT_MEASURE_UNIT_DESCRIPTIONS = {
-    DefaultMeasureUnitEnum.MG: "Miligrama",
-    DefaultMeasureUnitEnum.ML: "Mililitro",
-    DefaultMeasureUnitEnum.MCG: "Micrograma",
-    DefaultMeasureUnitEnum.UI: "Unidade Internacional",
-    DefaultMeasureUnitEnum.UN: "Unidade",
-}
-
-
-def ensure_default_measure_units():
-    """Ensures that the 5 NH default measure units exist in unidademedida (idempotent upsert)."""
-    existing = {
-        row.id: row
-        for row in db.session.query(MeasureUnit)
-        .filter(MeasureUnit.id.in_([u.value for u in DefaultMeasureUnitEnum]))
-        .all()
-    }
-
-    for unit in DefaultMeasureUnitEnum:
-        if unit.value not in existing:
-            new_unit = MeasureUnit()
-            new_unit.id = unit.value
-            new_unit.idHospital = 1
-            new_unit.description = _DEFAULT_MEASURE_UNIT_DESCRIPTIONS[unit]
-            new_unit.measureunit_nh = unit.value
-            db.session.add(new_unit)
-        elif existing[unit.value].measureunit_nh != unit.value:
-            existing[unit.value].measureunit_nh = unit.value
-
-    db.session.flush()
 
 
 def _build_units_cte(id_drug=None):
@@ -84,92 +51,6 @@ def _build_units_cte(id_drug=None):
         price_units = price_units.filter(DrugAttributes.idDrug == id_drug)
 
     return prescribed_units.union(price_units, current_units).cte("units")
-
-
-def get_unit_conversion_list():
-    """Returns a list of unit conversions for all drugs with outlier records"""
-
-    active_drugs = (
-        db.session.query(
-            Outlier.idDrug.label("idDrug"),
-            func.sum(Outlier.countNum).label("prescribed_quantity"),
-        )
-        .group_by(Outlier.idDrug)
-        .cte("active_drugs")
-    )
-
-    units = _build_units_cte()
-
-    min_convert = (
-        db.session.query(
-            MeasureUnitConvert.idDrug.label("idDrug"),
-            MeasureUnitConvert.idMeasureUnit.label("idMeasureUnit"),
-            func.min(MeasureUnitConvert.factor).label("factor"),
-        )
-        .group_by(MeasureUnitConvert.idDrug, MeasureUnitConvert.idMeasureUnit)
-        .subquery()
-    )
-
-    drug_attrs_uniformity = (
-        db.session.query(
-            DrugAttributes.idDrug.label("idDrug"),
-            func.count(func.distinct(DrugAttributes.idMeasureUnit)).label(
-                "distinct_units_count"
-            ),
-            func.min(MeasureUnit.measureunit_nh).label("measureunit_nh"),
-        )
-        .outerjoin(MeasureUnit, MeasureUnit.id == DrugAttributes.idMeasureUnit)
-        .filter(DrugAttributes.idMeasureUnit.is_not(None))
-        .filter(DrugAttributes.idMeasureUnit != "")
-        .group_by(DrugAttributes.idDrug)
-        .subquery("drug_attrs_uniformity")
-    )
-
-    conversion_query = (
-        db.session.query(
-            func.count().over(),
-            Drug.id,
-            Drug.name,
-            units.c.idMeasureUnit,
-            min_convert.c.factor,
-            MeasureUnit.description,
-            Drug.sctid,
-            Substance.default_measureunit,
-            MeasureUnit.measureunit_nh,
-            active_drugs.c.prescribed_quantity,
-            Substance.tags,
-            case(
-                (
-                    and_(
-                        drug_attrs_uniformity.c.distinct_units_count == 1,
-                        drug_attrs_uniformity.c.measureunit_nh
-                        == func.coalesce(Substance.default_measureunit, "un"),
-                    ),
-                    True,
-                ),
-                else_=False,
-            ).label("uniform_measure_unit"),
-            Substance.name.label("substance_name"),
-        )
-        .join(active_drugs, Drug.id == active_drugs.c.idDrug)
-        .join(units, Drug.id == units.c.idDrug)
-        .join(Substance, Drug.sctid == Substance.id)
-        .outerjoin(
-            min_convert,
-            and_(
-                min_convert.c.idDrug == Drug.id,
-                min_convert.c.idMeasureUnit == units.c.idMeasureUnit,
-            ),
-        )
-        .outerjoin(MeasureUnit, MeasureUnit.id == units.c.idMeasureUnit)
-        .outerjoin(
-            drug_attrs_uniformity,
-            drug_attrs_uniformity.c.idDrug == Drug.id,
-        )
-        .filter(active_drugs.c.prescribed_quantity > 5)
-    )
-
-    return conversion_query.order_by(Drug.name, min_convert.c.factor).all()
 
 
 def get_drugattributes_default_measure_unit_for_drug(id_drug: int):

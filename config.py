@@ -9,7 +9,7 @@ from models.enums import NoHarmENV
 class Config:
     """Configuration class for the application."""
 
-    VERSION = "v6.53-beta"
+    VERSION = "v6.54-beta"
     FRONTEND_VERSION = "5.1.6"
     ENV = getenv("ENV") or NoHarmENV.DEVELOPMENT.value
     SECRET_KEY = getenv("SECRET_KEY") or "secret_key"
@@ -72,6 +72,9 @@ class Config:
     PROTOCOL_AGENT_REGION = getenv("PROTOCOL_AGENT_REGION", "us-east-1")
     PROTOCOL_AGENT_MAX_TURNS = int(getenv("PROTOCOL_AGENT_MAX_TURNS", "8"))
 
-    SERVICE_INFERENCE = getenv("SERVICE_INFERENCE", None)
 
     FEATURE_CONCILIATION_ALGORITHM = getenv("FEATURE_CONCILIATION_ALGORITHM", "FUZZY")
+    # enable only after the onboarding/training app version is released
+    FEATURE_USER_ONBOARDING = (
+        getenv("FEATURE_USER_ONBOARDING", "false").lower() == "true"
+    )

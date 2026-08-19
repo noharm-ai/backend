@@ -130,7 +130,7 @@ def _build_base_query(request: PrioritizationRequest):
             )
         )
     else:
-        q = q.filter(Prescription.agg == None)
+        q = q.filter(or_(Prescription.agg == None, Prescription.agg == False))
 
         if not request.concilia:
             q = q.filter(Segment.cpoe == False)

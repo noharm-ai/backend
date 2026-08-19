@@ -85,13 +85,18 @@ def get_admin_users_list(schema: str):
     return _remove_staff_users(query).order_by(desc(User.active), asc(User.name)).all()
 
 
-def get_user_manager_list(schema: str):
-    """Get active user managers, removing staff users"""
+def get_active_users_by_role(schema: str, role: Role):
+    """Get active users with the given role, removing staff users"""
     query = (
         db.session.query(User)
         .filter(User.schema == schema)
         .filter(User.active == True)
-        .filter(User.config["roles"].astext.contains(Role.USER_MANAGER.value))
+        .filter(User.config["roles"].astext.contains(role.value))
     )
 
     return _remove_staff_users(query).order_by(asc(User.name)).all()
+
+
+def get_user_manager_list(schema: str):
+    """Get active user managers, removing staff users"""
+    return get_active_users_by_role(schema=schema, role=Role.USER_MANAGER)

@@ -330,7 +330,6 @@ Key configuration via environment variables (see `config.py`):
 **Optional but Important:**
 - `ENCRYPTION_KEY`: For sensitive data encryption
 - `API_KEY`: Internal API authentication
-- `SERVICE_INFERENCE`: ML service endpoint
 - `FEATURE_CONCILIATION_ALGORITHM`: Algorithm selection (default: FUZZY)
 
 ### Feature Flags
@@ -495,11 +494,6 @@ pylint services/
 - Services: `llm_service.py`, `agents/`
 - Providers: OpenAI/Azure OpenAI, Maritaca
 - Use cases: Clinical notes summarization, drug name normalization
-
-### Inference Service
-- External ML service for predictions
-- Configuration: `SERVICE_INFERENCE` environment variable
-- Used for conversion predictions, risk scoring
 
 ## Security Considerations
 

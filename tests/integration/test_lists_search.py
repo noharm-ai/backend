@@ -55,7 +55,7 @@ def _data(response):
 
 def test_find_icds_permission_denied(client):
     """A user without READ_BASIC_FEATURES cannot search ICDs [401]."""
-    headers = make_headers(get_access(client, roles=[Role.SUPPORT_REQUESTER.value]))
+    headers = make_headers(get_access(client, roles=[Role.DISPENSING_MANAGER.value]))
     response = client.get("/lists/icds/find?term=YZTest", headers=headers)
 
     assert response.status_code == 401
@@ -112,7 +112,7 @@ def test_find_icds_empty_term_is_rejected(client, analyst_headers):
 
 def test_resolve_icds_permission_denied(client):
     """A user without READ_BASIC_FEATURES cannot resolve ICDs [401]."""
-    headers = make_headers(get_access(client, roles=[Role.SUPPORT_REQUESTER.value]))
+    headers = make_headers(get_access(client, roles=[Role.DISPENSING_MANAGER.value]))
     response = client.get(f"/lists/icds/resolve?ids={_ICD_ACTIVE_A[1]}", headers=headers)
 
     assert response.status_code == 401

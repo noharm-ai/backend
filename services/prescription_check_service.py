@@ -182,7 +182,7 @@ def _clean_checkedindex(user_context: User):
         text(
             f"""DELETE FROM {user_context.schema}.checkedindex WHERE created_at < :maxDate"""
         ),
-        {"maxDate": (datetime.today() - timedelta(days=15))},
+        {"maxDate": (datetime.today() - timedelta(days=4))},
     )
 
 
@@ -215,7 +215,7 @@ def _update_agg_status(prescription: Prescription, user: User, extra={}):
         db.session.query(Prescription)
         .filter(Prescription.admissionNumber == prescription.admissionNumber)
         .filter(Prescription.idSegment == prescription.idSegment)
-        .filter(Prescription.agg != None)
+        .filter(Prescription.agg == True)
         .filter(func.date(Prescription.date) == func.date(prescription.date))
         .first()
     )

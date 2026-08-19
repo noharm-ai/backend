@@ -3,7 +3,8 @@
 from sqlalchemy import asc, func, or_
 
 from models.main import db
-from models.appendix import Department, Protocol
+from models.appendix import Department, Protocol, SegmentDepartment
+from models.segment import Segment
 from models.requests.protocol_request import ProtocolListRequest
 from models.enums import ProtocolTypeEnum, ProtocolStatusTypeEnum, NoHarmENV
 from config import Config
@@ -66,6 +67,29 @@ def list_departments():
         )
         .group_by(Department.id)
         .order_by(asc(func.min(Department.name)))
+        .all()
+    )
+
+
+def list_department_segments():
+    """List the segments each department (fksetor) belongs to.
+
+    Kept apart from list_departments so the department list stays one row per
+    fksetor. Like there, the hospital is ignored: the same fksetor may be
+    mapped in more than one hospital, so the pairs are deduped by
+    (fksetor, idsegmento).
+    """
+    return (
+        db.session.query(
+            SegmentDepartment.idDepartment,
+            SegmentDepartment.id,
+            func.min(Segment.description).label("segment_name"),
+        )
+        # SegmentDepartment.id is the idsegmento column (not a row id), so it
+        # joins straight onto Segment.id; segmento has no hospital column.
+        .join(Segment, Segment.id == SegmentDepartment.id)
+        .group_by(SegmentDepartment.idDepartment, SegmentDepartment.id)
+        .order_by(asc(func.min(Segment.description)))
         .all()
     )
 

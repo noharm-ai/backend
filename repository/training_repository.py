@@ -2,15 +2,23 @@
 
 from datetime import datetime
 
-from sqlalchemy import and_, case, func
+from sqlalchemy import and_, case, func, or_
 
 from models.main import db
-from models.appendix import Training, TrainingItem, TrainingItemUser, TrainingUser
+from models.enums import TrainingScopeEnum
+from models.appendix import (
+    Training,
+    TrainingItem,
+    TrainingItemUser,
+    TrainingSchema,
+    TrainingUser,
+)
 
 
-def list_trainings(user_id: int) -> list:
-    """List all active training records ordered by position, paired with the
-    total number of active lessons and how many of those the user finished"""
+def list_trainings(user_id: int, schema: str) -> list:
+    """List the active training records visible to the given schema, ordered by
+    position, paired with the total number of active lessons, how many of those
+    the user finished, and whether the module is mandatory for that schema"""
     total_lessons = (
         db.session.query(func.count(TrainingItem.id))
         .filter(
@@ -33,9 +41,31 @@ def list_trainings(user_id: int) -> list:
         .scalar_subquery()
     )
 
+    scope_mandatory = case(
+        (Training.scope == TrainingScopeEnum.SCHEMAS.value, TrainingSchema.mandatory),
+        else_=Training.mandatory,
+    )
+
     return (
-        db.session.query(Training, total_lessons, total_lessons_finished)
+        db.session.query(
+            Training, total_lessons, total_lessons_finished, scope_mandatory
+        )
+        .outerjoin(
+            TrainingSchema,
+            and_(
+                TrainingSchema.training_id == Training.id,
+                TrainingSchema.schema_name == schema,
+            ),
+        )
         .filter(Training.active == True)
+        # fail closed: a scope=schemas module with no row for this schema drops
+        # out here, which is also why scope_mandatory never sees a NULL join row
+        .filter(
+            or_(
+                Training.scope == TrainingScopeEnum.GLOBAL.value,
+                TrainingSchema.schema_name != None,
+            )
+        )
         .order_by(Training.position)
         .all()
     )

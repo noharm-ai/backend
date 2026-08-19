@@ -300,6 +300,26 @@ class Training(db.Model):
     description = db.Column("resumo", db.Text, nullable=True)
     position = db.Column("posicao", db.Integer, nullable=False)
     active = db.Column("ativo", db.Boolean, nullable=False)
+    # mandatory is only consulted when scope is TrainingScopeEnum.GLOBAL; for
+    # scope=schemas the TrainingSchema row carries it
+    mandatory = db.Column("obrigatorio", db.Boolean, nullable=False)
+    scope = db.Column("escopo", db.String(20), nullable=False)
+    audience = db.Column("audiencia", db.String(20), nullable=False)
+    updated_at = db.Column("updated_at", db.DateTime, nullable=True)
+    updated_by = db.Column("updated_by", db.BigInteger, nullable=True)
+    created_at = db.Column("created_at", db.DateTime, nullable=False)
+    created_by = db.Column("created_by", db.BigInteger, nullable=False)
+
+
+class TrainingSchema(db.Model):
+    """Schemas a scope=schemas training module applies to, with the
+    mandatory flag for each one"""
+
+    __tablename__ = "treinamento_esquema"
+    __table_args__ = {"schema": "public"}
+
+    training_id = db.Column("idtreinamento", db.Integer, primary_key=True)
+    schema_name = db.Column("schema_name", db.String(25), primary_key=True)
     mandatory = db.Column("obrigatorio", db.Boolean, nullable=False)
     updated_at = db.Column("updated_at", db.DateTime, nullable=True)
     updated_by = db.Column("updated_by", db.BigInteger, nullable=True)

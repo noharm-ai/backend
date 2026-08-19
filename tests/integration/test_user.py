@@ -1,5 +1,6 @@
 import json
 
+import pytest
 from sqlalchemy import text
 
 from tests.conftest import session, session_commit
@@ -77,6 +78,43 @@ def test_get_user_manager_list_ignores_staff(client, analyst_headers):
         session_commit()
 
 
+def test_get_contact_list(client, analyst_headers):
+    """Teste get /user-admin/contact-list - Deve listar os gestores de configurações ativos"""
+    response = client.get(
+        f"/user-admin/contact-list?role={Role.CONFIG_MANAGER.value}",
+        headers=analyst_headers,
+    )
+
+    assert response.status_code == 200
+
+    data = response.get_json()["data"]
+    assert isinstance(data, list)
+
+    for contact in data:
+        assert set(contact.keys()) == {"id", "name", "email"}
+
+        user = session.query(User).filter(User.id == contact["id"]).first()
+        assert user.active
+        assert Role.CONFIG_MANAGER.value in user.config["roles"]
+
+
+def test_get_contact_list_invalid_role(client, analyst_headers):
+    """Teste get /user-admin/contact-list - Não deve permitir listar usuários de um papel fora da allowlist"""
+    for role in ["ADMIN", "CURATOR", "ORGANIZATION_MANAGER", "config_manager"]:
+        response = client.get(
+            f"/user-admin/contact-list?role={role}", headers=analyst_headers
+        )
+
+        assert response.status_code == 400
+
+
+def test_get_contact_list_missing_role(client, analyst_headers):
+    """Teste get /user-admin/contact-list - Deve exigir o parâmetro role"""
+    response = client.get("/user-admin/contact-list", headers=analyst_headers)
+
+    assert response.status_code == 400
+
+
 def test_put_user(client, user_manager_headers):
     """Teste put /editUser - Compara o response.data e cria o usuário"""
     data = {
@@ -93,6 +131,69 @@ def test_put_user(client, user_manager_headers):
 
     assert response.status_code == 200
     assert user_id == user.id
+
+
+def test_create_user_trims_email(client, user_manager_headers):
+    """Teste put /editUser - Espaços em volta do email devem ser removidos na criação"""
+    email = "trim@noharm.ai"
+    _delete_user(email)
+
+    data = {
+        "email": "  Trim@noharm.ai  ",
+        "name": "trimTest",
+        "external": "trimTest",
+        "active": "true",
+        "roles": [Role.PRESCRIPTION_ANALYST.value],
+    }
+
+    response = client.post("/editUser", json=data, headers=user_manager_headers)
+    assert response.status_code == 200
+
+    session_commit()
+
+    user = session.query(User).filter(User.id == response.get_json()["data"]["id"]).first()
+    assert user.email == email
+
+
+def test_create_user_blank_email(client, user_manager_headers):
+    """Teste put /editUser - Email em branco deve retornar erro [400 BAD REQUEST]"""
+    data = {
+        "email": "   ",
+        "name": "blankEmailTest",
+        "external": "blankEmailTest",
+        "active": "true",
+        "roles": [Role.PRESCRIPTION_ANALYST.value],
+    }
+
+    response = client.post("/editUser", json=data, headers=user_manager_headers)
+    assert response.status_code == 400
+
+
+@pytest.mark.parametrize(
+    "email",
+    [
+        "joão@noharm.ai",
+        "invalid email@noharm.ai",
+        "Nome Sobrenome <invalid@noharm.ai>",
+        "invalid@noharm.ai,other@noharm.ai",
+        "invalid@localhost",
+        "invalid",
+    ],
+)
+def test_create_user_invalid_email(client, user_manager_headers, email):
+    """Teste put /editUser - Email com formato inválido deve retornar erro [400 BAD REQUEST]"""
+    data = {
+        "email": email,
+        "name": "invalidEmailTest",
+        "external": "invalidEmailTest",
+        "active": "true",
+        "roles": [Role.PRESCRIPTION_ANALYST.value],
+    }
+
+    response = client.post("/editUser", json=data, headers=user_manager_headers)
+    assert response.status_code == 400
+
+    assert session.query(User).filter(User.email == email).first() is None
 
 
 def test_put_editUser(client, user_manager_headers):

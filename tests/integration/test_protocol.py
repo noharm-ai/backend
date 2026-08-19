@@ -70,7 +70,7 @@ def _by_id(response):
 
 def test_list_protocols_permission_denied(client):
     """A user without READ_BASIC_FEATURES cannot list protocols [401 UNAUTHORIZED]."""
-    headers = make_headers(get_access(client, roles=[Role.SUPPORT_REQUESTER.value]))
+    headers = make_headers(get_access(client, roles=[Role.DISPENSING_MANAGER.value]))
     response = client.get("/protocol/list", headers=headers)
 
     assert response.status_code == 401
@@ -240,7 +240,7 @@ def seed_described_protocol():
 
 def test_describe_protocol_permission_denied(client, seed_described_protocol):
     """A user without READ_PRESCRIPTION cannot describe a protocol [401]."""
-    headers = make_headers(get_access(client, roles=[Role.SUPPORT_REQUESTER.value]))
+    headers = make_headers(get_access(client, roles=[Role.DISPENSING_MANAGER.value]))
     response = client.get(f"/protocol/{_DESC_PROTOCOL_ID}/description", headers=headers)
 
     assert response.status_code == 401

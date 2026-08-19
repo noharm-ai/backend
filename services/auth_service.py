@@ -25,6 +25,7 @@ from models.enums import (
     IntegrationStatusEnum,
     MemoryEnum,
     NoHarmENV,
+    UserAttributeEnum,
     UserAuditTypeEnum,
 )
 from models.main import User, UserExtra, db, dbSession
@@ -32,10 +33,11 @@ from models.segment import Segment
 from repository import (
     notification_repository,
     user_activity_repository,
+    user_attribute_repository,
     user_repository,
 )
 from security.role import Role
-from services import memory_service, user_service
+from services import memory_service, training_service, user_service
 from services.admin import admin_integration_status_service
 from utils import logger, status
 
@@ -295,6 +297,11 @@ def _auth_user(
             [FeatureEnum.DISABLE_GETNAME.value]
             if Config.ENV == NoHarmENV.TEST.value
             else []
+        )
+        + (
+            [FeatureEnum.USER_ONBOARDING.value]
+            if Config.FEATURE_USER_ONBOARDING
+            else []
         ),
         "preferences": preferences.value if preferences is not None else None,
         "nameUrl": nameUrl["value"] if "value" in nameUrl else None,
@@ -317,6 +324,14 @@ def _auth_user(
         "permissions": [p.name for p in permissions],
         "oauth": is_oauth,
         "signature": signature,
+        "onboardingStatus": user_attribute_repository.get_value(
+            id_user=user.id, kind=UserAttributeEnum.ONBOARDING.value
+        ),
+        # the effective schema: force_schema has already been applied to
+        # user_schema above, so a switched session reports the target's modules
+        "training": training_service.get_mandatory_summary(
+            user_id=user.id, schema=user_schema
+        ),
     }
 
 
@@ -365,11 +380,34 @@ def get_switch_schema_data(user_permissions: list[Permission], user_context: Use
 
 
 @has_permission(Permission.MULTI_SCHEMA)
-def switch_schema(switch_to_schema: str, extra_features: list[str], user_context: User):
+def switch_schema(
+    switch_to_schema: str,
+    extra_features: list[str],
+    user_context: User,
+    run_as_role: str = None,
+):
     """Switch to other schema"""
     user = db.session.query(User).filter(User.id == user_context.id).first()
 
     user = _prepare_user(user=user)
+
+    if run_as_role is not None:
+        if run_as_role != Role.TRAINING.value:
+            raise ValidationError(
+                "Papel inválido",
+                "errors.invalidParams",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+        user_roles = user.config.get("roles", [])
+        if Role.ADMIN.value not in user_roles and Role.CURATOR.value not in user_roles:
+            raise ValidationError(
+                "Usuário não autorizado neste recurso",
+                "errors.unauthorizedUser",
+                status.HTTP_401_UNAUTHORIZED,
+            )
+
+        user.config = dict(user.config, roles=[Role.TRAINING.value])
 
     return _auth_user(
         user=user, force_schema=switch_to_schema, extra_features=extra_features

@@ -192,7 +192,8 @@ def build_tools(schema: str, validate_config, normalize_config) -> list:
     @tool(
         name="list_departments",
         description=(
-            "Lista os setores do hospital. Retorna idDepartment e nome. "
+            "Lista os setores do hospital. Retorna idDepartment, nome e os "
+            "segmentos aos quais o setor pertence. "
             "Use o idDepartment em variáveis do tipo idDepartment."
         ),
     )
