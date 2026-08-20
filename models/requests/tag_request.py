@@ -10,7 +10,7 @@ class TagListRequest(BaseModel):
 
 
 class TagUpsertRequest(BaseModel):
-    name: str = Field(min_length=2, max_length=40)
+    name: str = Field(max_length=40)
     tagType: int
     active: bool
     new: bool = False

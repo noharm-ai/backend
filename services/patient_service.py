@@ -400,11 +400,19 @@ def _get_tags(tags: list[str], user_context: User):
         found_tags = [t.name for t in current_tags]
 
     MAX_CHARS = admin_tag_service.MAX_TAG_CHARS
+    MIN_CHARS = 3
     for tag in tags_uppercase:
         if tag not in found_tags:
             if len(tag) > MAX_CHARS:
                 raise ValidationError(
                     f"Marcador: Limite de caracteres atingido ({MAX_CHARS})",
+                    "errors.businessRules",
+                    status.HTTP_400_BAD_REQUEST,
+                )
+
+            if len(tag) < MIN_CHARS:
+                raise ValidationError(
+                    f"Marcador: Mínimo de caracteres não atingido ({MIN_CHARS})",
                     "errors.businessRules",
                     status.HTTP_400_BAD_REQUEST,
                 )

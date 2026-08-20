@@ -10,6 +10,7 @@ from repository import tag_repository
 from utils import dateutils, status
 
 MAX_TAG_CHARS = 40
+MIN_TAG_CHARS = 3
 
 
 @has_permission(
@@ -66,6 +67,13 @@ def upsert_tag(
     )
 
     if not tag:
+        if len(request_data.name) < MIN_TAG_CHARS:
+            raise ValidationError(
+                f"Mínimo de caracteres para a Tag não atingido ({MIN_TAG_CHARS})",
+                "errors.businessRules",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
         tag = Tag()
         tag.name = request_data.name.upper()
         tag.tag_type = request_data.tagType
