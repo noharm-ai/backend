@@ -76,6 +76,7 @@ class FeatureEnum(Enum):
     DISCHARGE_SUMMARY = "DISCHARGE_SUMMARY"
     # driven by the FEATURE_USER_ONBOARDING env var, not by the schema config
     USER_ONBOARDING = "USER_ONBOARDING"
+    MULTI_CLINICAL_NOTES = "MULTI_CLINICAL_NOTES"
 
 
 class PrescriptionAuditTypeEnum(Enum):

@@ -412,6 +412,9 @@ def get_user_last_clinical_notes(admission_number: int):
 @has_permission(Permission.READ_PRESCRIPTION)
 def get_user_last_clinical_notes_list(admission_number: int):
     """Return the last 5 clinical notes for the given admission number."""
+    if memory_service.has_feature(FeatureEnum.MULTI_CLINICAL_NOTES.value):
+        return _get_last_prescription_clinical_notes(admission_number=admission_number)
+
     notes = (
         db.session.query(Prescription.notes, Prescription.date)
         .filter(Prescription.admissionNumber == admission_number)
@@ -422,6 +425,24 @@ def get_user_last_clinical_notes_list(admission_number: int):
     )
 
     return [{"text": n.notes, "date": n.date.isoformat()} for n in notes]
+
+
+def _get_last_prescription_clinical_notes(admission_number: int):
+    """Return the last 5 prescricao_evolucao notes for the given admission number."""
+    note_date = func.coalesce(
+        PrescriptionClinicalNote.updatedAt, PrescriptionClinicalNote.createdAt
+    ).label("date")
+
+    notes = (
+        db.session.query(PrescriptionClinicalNote.text.label("text"), note_date)
+        .filter(PrescriptionClinicalNote.admission_number == admission_number)
+        .filter(PrescriptionClinicalNote.text.isnot(None))
+        .order_by(desc(note_date))
+        .limit(5)
+        .all()
+    )
+
+    return [{"text": n.text, "date": n.date.isoformat()} for n in notes]
 
 
 def get_count(admission_number: int, admission_date: datetime) -> int:
