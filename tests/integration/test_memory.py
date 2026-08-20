@@ -27,7 +27,7 @@ def _delete_memory(key):
 
 
 def _delete_memory_by_kind(kind):
-    session.execute(text(f"DELETE FROM demo.memoria WHERE tipo = :kind"), {"kind": kind})
+    session.execute(text("DELETE FROM demo.memoria WHERE tipo = :kind"), {"kind": kind})
     session_commit()
 
 

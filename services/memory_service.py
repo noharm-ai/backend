@@ -78,7 +78,7 @@ def has_feature(feature: str):
         user_features = (
             user.config["features"] if user.config and "features" in user.config else []
         )
-    except:
+    except Exception:
         user_features = []
 
     if feature in user_features:

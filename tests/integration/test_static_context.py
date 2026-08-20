@@ -11,7 +11,6 @@ a pure unit test.
 
 import json
 
-import pytest
 
 from exception.authorization_error import AuthorizationError
 from exception.validation_error import ValidationError

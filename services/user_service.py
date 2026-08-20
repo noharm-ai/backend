@@ -90,7 +90,7 @@ def reset_password(token: str, password: str):
 
     try:
         user_token = decode_token(token)
-    except:
+    except Exception:
         raise ValidationError(
             "Token expirado. Você precisa fazer uma nova solicitação de troca de senha.",
             "errors.businessRules",

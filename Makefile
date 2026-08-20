@@ -1,4 +1,4 @@
-.PHONY: dev test-setup test test-unit test-integration test-file test-cov db-start db-stop db-reset
+.PHONY: dev lint test-setup test test-unit test-integration test-file test-cov db-start db-stop db-reset
 
 COMPOSE = docker compose -f docker-compose.test.yml
 
@@ -6,6 +6,10 @@ COMPOSE = docker compose -f docker-compose.test.yml
 dev:
 	@test -f .env || (echo ".env not found — copy .env.example to .env and fill in values" && exit 1)
 	. env/bin/activate && set -a && . .env && set +a && python3 mobile.py
+
+## Run the linter (same check as CI)
+lint:
+	ruff check .
 
 ## First-time setup: start Docker and load the database
 test-setup:

@@ -35,6 +35,6 @@ def sendEmail(subject, sender, emails, html):
         msg.recipients = emails
         msg.html = html
         mail.send(msg)
-    except:
+    except Exception:
         logger = logging.getLogger("noharm.backend")
         logger.error("Could not send new user email")

@@ -216,8 +216,8 @@ def find_relations(drug_list, id_patient: int, is_cpoe: bool):
                     uniq_invert_key = f"""{invert_key}-{drug_from["expireDate"]}"""
 
                 if (
-                    not uniq_key in unique_relations
-                    and not uniq_invert_key in unique_relations
+                    uniq_key not in unique_relations
+                    and uniq_invert_key not in unique_relations
                 ):
                     stats[kind] += 1
                     unique_relations[uniq_key] = 1
