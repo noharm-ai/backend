@@ -21,7 +21,14 @@ SOAP_INPUT_MAX_CHARS = 60000
 def generate_soap(request_data: GenerateSoapRequest, user_context: User):
     """Generate a SOAP-format pharmaceutical evolution from a clinical note via LLM."""
 
-    config = _get_config()
+    prompts_config = _get_prompts_config()
+
+    if prompts_config:
+        config, prompt_key, prompt_options = _resolve_prompt_variant(
+            config=prompts_config, prompt_key=request_data.prompt_key
+        )
+    else:
+        config, prompt_key, prompt_options = _get_config(), None, []
 
     note = (
         db.session.query(ClinicalNotes)
@@ -48,7 +55,11 @@ def generate_soap(request_data: GenerateSoapRequest, user_context: User):
         messages=messages, system=config.get("prompt"), config=config
     )
 
-    return {"text": generated_text}
+    return {
+        "text": generated_text,
+        "prompt_key": prompt_key,
+        "prompt_options": prompt_options,
+    }
 
 
 def _get_config() -> dict:
@@ -73,6 +84,76 @@ def _get_config() -> dict:
         )
 
     return config.value
+
+
+def _get_prompts_config() -> dict | None:
+    """Load the multi-prompt SOAP config from global memory, if it exists."""
+
+    config = (
+        db.session.query(GlobalMemory)
+        .filter(GlobalMemory.kind == GlobalMemoryEnum.NAV_SOAP_CONFIG_V2.value)
+        .first()
+    )
+
+    if not config:
+        return None
+
+    prompts = (config.value or {}).get("prompts")
+
+    if not prompts or not isinstance(prompts, list):
+        raise ValidationError(
+            "Configuração da evolução SOAP não encontrada.",
+            "errors.businessRules",
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+    return config.value
+
+
+def _resolve_prompt_variant(
+    config: dict, prompt_key: str | None
+) -> tuple[dict, str, list]:
+    """Resolve the prompt variant to use and the list of available options."""
+
+    prompts = config.get("prompts")
+    options = [{"key": p.get("key"), "label": p.get("label")} for p in prompts]
+
+    key = prompt_key or config.get("default_key") or prompts[0].get("key")
+
+    variant = next((p for p in prompts if p.get("key") == key), None)
+
+    if prompt_key and not variant:
+        raise ValidationError(
+            "Versão de prompt inválida",
+            "errors.invalidParam",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    if not variant or not variant.get("prompt"):
+        raise ValidationError(
+            "Configuração da evolução SOAP não encontrada.",
+            "errors.businessRules",
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+    model_id = variant.get("model_id") or config.get("model_id")
+
+    if not model_id:
+        raise ValidationError(
+            "Configuração da evolução SOAP não encontrada.",
+            "errors.businessRules",
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+    resolved = {
+        "prompt": variant.get("prompt"),
+        "model_id": model_id,
+        "max_tokens": variant.get("max_tokens")
+        or config.get("max_tokens")
+        or SOAP_DEFAULT_MAX_TOKENS,
+    }
+
+    return resolved, key, options
 
 
 def _get_note_content(note: ClinicalNotes) -> str:

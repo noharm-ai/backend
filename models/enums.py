@@ -36,6 +36,7 @@ class GlobalMemoryEnum(Enum):
     N0_AGENT = "n0-agent"
     USER_KB = "user-kb"
     NAV_SOAP_CONFIG = "nav-soap-config"
+    NAV_SOAP_CONFIG_V2 = "nav-soap-config-v2"
 
 
 class NoHarmENV(Enum):
@@ -75,6 +76,7 @@ class FeatureEnum(Enum):
     DISCHARGE_SUMMARY = "DISCHARGE_SUMMARY"
     # driven by the FEATURE_USER_ONBOARDING env var, not by the schema config
     USER_ONBOARDING = "USER_ONBOARDING"
+    MULTI_CLINICAL_NOTES = "MULTI_CLINICAL_NOTES"
 
 
 class PrescriptionAuditTypeEnum(Enum):
