@@ -7,7 +7,11 @@ the database or the Bedrock client, so they run as fast unit tests.
 
 import json
 
+import pytest
+
+from exception.validation_error import ValidationError
 from services import soap_service
+from utils import status
 
 
 class _Note:
@@ -125,6 +129,118 @@ class TestGetFormContent:
         form = {"known": "sim", "empty": ""}
         result = soap_service._get_form_content(form=form, template=template)
         assert "Pergunta: empty" not in result
+
+
+class TestResolvePromptVariant:
+    """Tests for soap_service._resolve_prompt_variant (multi-prompt config)."""
+
+    def _config(self, **overrides):
+        """Build a valid multi-prompt config dict, allowing per-test overrides."""
+        config = {
+            "model_id": "top-model",
+            "max_tokens": 2048,
+            "default_key": "guide",
+            "prompts": [
+                {"key": "guide", "label": "Novo formato", "prompt": "guide prompt"},
+                {"key": "classic", "label": "Padrão", "prompt": "classic prompt"},
+            ],
+        }
+        config.update(overrides)
+        return config
+
+    def test_explicit_key_selects_variant(self):
+        """An explicit prompt_key picks the matching variant."""
+        resolved, key, _ = soap_service._resolve_prompt_variant(
+            config=self._config(), prompt_key="classic"
+        )
+        assert key == "classic"
+        assert resolved["prompt"] == "classic prompt"
+
+    def test_default_key_used_when_no_key(self):
+        """Without a prompt_key the config's default_key is used."""
+        resolved, key, _ = soap_service._resolve_prompt_variant(
+            config=self._config(), prompt_key=None
+        )
+        assert key == "guide"
+        assert resolved["prompt"] == "guide prompt"
+
+    def test_first_variant_used_without_default_key(self):
+        """Without default_key the first prompts entry is the default."""
+        config = self._config()
+        del config["default_key"]
+        _, key, _ = soap_service._resolve_prompt_variant(config=config, prompt_key=None)
+        assert key == "guide"
+
+    def test_options_list_all_variants(self):
+        """The options list exposes key/label of every configured variant."""
+        _, _, options = soap_service._resolve_prompt_variant(
+            config=self._config(), prompt_key=None
+        )
+        assert options == [
+            {"key": "guide", "label": "Novo formato"},
+            {"key": "classic", "label": "Padrão"},
+        ]
+
+    def test_unknown_explicit_key_raises_400(self):
+        """A prompt_key not present in the config is a client error."""
+        with pytest.raises(ValidationError) as error:
+            soap_service._resolve_prompt_variant(
+                config=self._config(), prompt_key="nope"
+            )
+        assert error.value.httpStatus == status.HTTP_400_BAD_REQUEST
+
+    def test_broken_default_key_raises_500(self):
+        """A default_key pointing to no variant is a config error, not a 400."""
+        with pytest.raises(ValidationError) as error:
+            soap_service._resolve_prompt_variant(
+                config=self._config(default_key="ghost"), prompt_key=None
+            )
+        assert error.value.httpStatus == status.HTTP_500_INTERNAL_SERVER_ERROR
+
+    def test_variant_model_id_overrides_top_level(self):
+        """A variant-level model_id wins over the top-level one."""
+        config = self._config()
+        config["prompts"][0]["model_id"] = "variant-model"
+        resolved, _, _ = soap_service._resolve_prompt_variant(
+            config=config, prompt_key="guide"
+        )
+        assert resolved["model_id"] == "variant-model"
+
+    def test_top_level_model_id_fallback(self):
+        """Variants without model_id inherit the top-level model_id."""
+        resolved, _, _ = soap_service._resolve_prompt_variant(
+            config=self._config(), prompt_key="guide"
+        )
+        assert resolved["model_id"] == "top-model"
+
+    def test_missing_model_id_raises_500(self):
+        """No resolvable model_id anywhere is a config error."""
+        config = self._config()
+        del config["model_id"]
+        with pytest.raises(ValidationError) as error:
+            soap_service._resolve_prompt_variant(config=config, prompt_key="guide")
+        assert error.value.httpStatus == status.HTTP_500_INTERNAL_SERVER_ERROR
+
+    def test_max_tokens_fallback_chain(self):
+        """max_tokens resolves variant -> top-level -> module default."""
+        config = self._config()
+        config["prompts"][0]["max_tokens"] = 1024
+        resolved, _, _ = soap_service._resolve_prompt_variant(
+            config=config, prompt_key="guide"
+        )
+        assert resolved["max_tokens"] == 1024
+
+        resolved, _, _ = soap_service._resolve_prompt_variant(
+            config=self._config(), prompt_key="guide"
+        )
+        assert resolved["max_tokens"] == 2048
+
+        config = self._config()
+        del config["max_tokens"]
+        resolved, _, _ = soap_service._resolve_prompt_variant(
+            config=config, prompt_key="guide"
+        )
+        assert resolved["max_tokens"] == soap_service.SOAP_DEFAULT_MAX_TOKENS
 
 
 class TestGetNoteContent:
