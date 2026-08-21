@@ -10,7 +10,7 @@ from exception.authorization_error import AuthorizationError
 from exception.validation_error import ValidationError
 from mobile import app
 from models.main import User, db
-from utils import logger, status
+from utils import logger, post_commit, status
 
 
 def _handle_validation_error(e: ValidationError, user_context: User):
@@ -144,6 +144,8 @@ def execute_with_static_context(schema: str, operation_func, params: dict):
             db.session.commit()
             db.session.close()
             db.session.remove()
+
+            post_commit.run_post_commit_callbacks()
 
             return json.dumps(
                 {"status": "success", "data": result, "httpCode": status.HTTP_200_OK}
