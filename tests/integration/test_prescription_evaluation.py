@@ -18,8 +18,8 @@ that is what these tests pin down:
 * whatever the store returns is normalised before it reaches the client.
 
 ``status-list`` is the cheap companion poll, and it has its own contract: it
-never joins, it drops ids that are not numbers, and it stays silent about
-prescriptions that do not exist.
+runs on every screen refresh, so unusable input is answered with an empty list
+rather than an error, and it stays silent about prescriptions that do not exist.
 """
 
 import json
@@ -40,7 +40,7 @@ CALLER_ID = 1
 CALLER_NAME = "Demonstração"
 CALLER_SCHEMA = "demo"
 
-# far outside the seed range and outside the >= 100000 range the test helpers use
+# above every id the test helpers hand out, so no run can make it exist
 MISSING_PRESCRIPTION = 999999999
 
 # demo.prescricao.status, as set by /prescriptions/status
