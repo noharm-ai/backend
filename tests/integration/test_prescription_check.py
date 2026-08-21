@@ -1,9 +1,11 @@
 """Tests: Prescription Check related operations"""
 
+import json
 import threading
 import time
+from contextlib import contextmanager
 from datetime import datetime
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from mobile import app as flask_app
 from tests.conftest import session, session_commit
@@ -11,6 +13,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 
 import services.prescription_check_service as prescription_check_service
+from config import Config
 from models.enums import DrugTypeEnum, PrescriptionAuditTypeEnum
 from models.prescription import Prescription, PrescriptionAudit, PrescriptionDrug
 from static import prescalc
@@ -36,6 +39,26 @@ def _check_payload(id_prescription, status="s"):
     }
 
 
+@contextmanager
+def _mock_presmed_dispatch(function_name="test-backend-function"):
+    """Patch BACKEND_FUNCTION_NAME and the lambda client so tests can assert
+    the async presmed 'checado' dispatch without touching AWS"""
+    lambda_client = MagicMock()
+    with patch.object(Config, "BACKEND_FUNCTION_NAME", function_name), patch(
+        "services.prescription_check_service.aws.get_client",
+        return_value=lambda_client,
+    ):
+        yield lambda_client
+
+
+def _dispatched_payloads(lambda_client):
+    """Return the decoded payloads of every lambda invoke performed"""
+    return [
+        json.loads(call.kwargs["Payload"])
+        for call in lambda_client.invoke.call_args_list
+    ]
+
+
 def test_check_prescription_sets_status(client, analyst_headers):
     """Check prescription: sets prescription status to 's'"""
     prescription = create_basic_prescription()
@@ -52,17 +75,30 @@ def test_check_prescription_sets_status(client, analyst_headers):
     assert p.status == "s"
 
 
-def test_check_prescription_sets_checado_on_active_drugs(client, analyst_headers):
-    """Check prescription: sets checado=true on all active presmed rows"""
+def test_check_prescription_dispatches_presmed_event(client, analyst_headers):
+    """Check prescription: dispatches an async event to mark presmed as
+    checado instead of updating presmed inside the check transaction"""
     prescription = create_basic_prescription()
     id_pres = prescription.id
 
-    response = client.post(
-        CHECK_URL, json=_check_payload(id_pres), headers=analyst_headers
-    )
+    with _mock_presmed_dispatch() as lambda_client:
+        response = client.post(
+            CHECK_URL, json=_check_payload(id_pres), headers=analyst_headers
+        )
 
     assert response.status_code == 200
 
+    assert lambda_client.invoke.call_count == 1
+    invoke_kwargs = lambda_client.invoke.call_args.kwargs
+    assert invoke_kwargs["FunctionName"] == "test-backend-function"
+    assert invoke_kwargs["InvocationType"] == "Event"
+
+    payload = _dispatched_payloads(lambda_client)[0]
+    assert payload["command"] == "lambda_check.mark_presmed_checked"
+    assert payload["schema"] == "demo"
+    assert payload["id_prescription_list"] == [str(id_pres)]
+
+    # presmed itself must NOT be touched in-process anymore
     session.expire_all()
     drugs = (
         session.query(PrescriptionDrug)
@@ -70,10 +106,51 @@ def test_check_prescription_sets_checado_on_active_drugs(client, analyst_headers
         .filter(PrescriptionDrug.suspendedDate == None)
         .all()
     )
-
     assert len(drugs) > 0
     for drug in drugs:
-        assert drug.checked is True
+        assert drug.checked is not True
+
+
+def test_check_prescription_no_dispatch_without_function_name(
+    client, analyst_headers
+):
+    """Check prescription: when BACKEND_FUNCTION_NAME is not configured the
+    presmed marking is skipped entirely and the check still succeeds"""
+    prescription = create_basic_prescription()
+    id_pres = prescription.id
+
+    with _mock_presmed_dispatch(function_name="") as lambda_client:
+        response = client.post(
+            CHECK_URL, json=_check_payload(id_pres), headers=analyst_headers
+        )
+
+    assert response.status_code == 200
+    lambda_client.invoke.assert_not_called()
+
+    session.expire_all()
+    p = session.query(Prescription).filter(Prescription.id == id_pres).first()
+    assert p.status == "s"
+
+
+def test_check_prescription_dispatch_failure_does_not_fail_request(
+    client, analyst_headers
+):
+    """Check prescription: a lambda dispatch failure is logged but the check
+    is already committed and the request succeeds"""
+    prescription = create_basic_prescription()
+    id_pres = prescription.id
+
+    with _mock_presmed_dispatch() as lambda_client:
+        lambda_client.invoke.side_effect = Exception("lambda unavailable")
+        response = client.post(
+            CHECK_URL, json=_check_payload(id_pres), headers=analyst_headers
+        )
+
+    assert response.status_code == 200
+
+    session.expire_all()
+    p = session.query(Prescription).filter(Prescription.id == id_pres).first()
+    assert p.status == "s"
 
 
 def test_check_prescription_audit_total_itens_excludes_diet(client, analyst_headers):
@@ -148,7 +225,9 @@ def test_check_prescription_audit_total_itens_excludes_diet(client, analyst_head
 
 
 def test_check_prescription_skips_suspended_drugs(client, analyst_headers):
-    """Check prescription: does not set checado on suspended presmed rows"""
+    """Check prescription: suspended presmed rows are excluded from
+    checkedindex (the checado marking of suspended rows is handled by the
+    async lambda handler, tested in backend-private)"""
 
     id_pres = test_counters["id_prescription"]
     admission = test_counters["admission_number"]
@@ -182,12 +261,19 @@ def test_check_prescription_skips_suspended_drugs(client, analyst_headers):
     assert response.status_code == 200
 
     session.expire_all()
-    suspended = (
-        session.query(PrescriptionDrug)
-        .filter(PrescriptionDrug.id == id_suspended)
-        .first()
+    result = session.execute(
+        text(
+            "SELECT COUNT(*) FROM demo.checkedindex WHERE fkprescricao = :id AND fkmedicamento = 44"
+        ),
+        {"id": id_pres},
     )
-    assert suspended.checked is not True
+    assert result.scalar() == 0
+
+    result = session.execute(
+        text("SELECT COUNT(*) FROM demo.checkedindex WHERE fkprescricao = :id"),
+        {"id": id_pres},
+    )
+    assert result.scalar() == 1
 
 
 def test_check_prescription_already_checked_returns_error(client, analyst_headers):
@@ -207,38 +293,31 @@ def test_check_prescription_already_checked_returns_error(client, analyst_header
     assert response.status_code == 400
 
 
-def test_uncheck_preserves_checado(client, analyst_headers):
-    """Uncheck prescription: checado flag on presmed rows is preserved after unchecking"""
+def test_uncheck_does_not_dispatch_presmed_event(client, analyst_headers):
+    """Uncheck prescription: the presmed checado event is only dispatched on
+    check, never on uncheck (checado is preserved on uncheck)"""
 
     prescription = create_basic_prescription()
     id_pres = prescription.id
 
-    # Check first
-    client.post(
-        CHECK_URL, json=_check_payload(id_pres, status="s"), headers=analyst_headers
-    )
+    with _mock_presmed_dispatch() as lambda_client:
+        # Check first — dispatches the event
+        client.post(
+            CHECK_URL, json=_check_payload(id_pres, status="s"), headers=analyst_headers
+        )
+        assert lambda_client.invoke.call_count == 1
 
-    # Then uncheck
-    response = client.post(
-        CHECK_URL, json=_check_payload(id_pres, status="0"), headers=analyst_headers
-    )
+        # Then uncheck — must not dispatch again
+        response = client.post(
+            CHECK_URL, json=_check_payload(id_pres, status="0"), headers=analyst_headers
+        )
 
     assert response.status_code == 200
+    assert lambda_client.invoke.call_count == 1
 
     session.expire_all()
     p = session.query(Prescription).filter(Prescription.id == id_pres).first()
     assert p.status == "0"
-
-    drugs = (
-        session.query(PrescriptionDrug)
-        .filter(PrescriptionDrug.idPrescription == id_pres)
-        .filter(PrescriptionDrug.suspendedDate == None)
-        .all()
-    )
-
-    assert len(drugs) > 0
-    for drug in drugs:
-        assert drug.checked is True
 
 
 def test_check_prescription_viewer_unauthorized(client, viewer_headers):
@@ -270,11 +349,18 @@ def test_check_aggregate_prescription(client, analyst_headers):
     )
 
     # Check the aggregate prescription
-    client.post(
-        CHECK_URL,
-        json={"status": "s", "idPrescription": id},
-        headers=analyst_headers,
-    )
+    with _mock_presmed_dispatch() as lambda_client:
+        client.post(
+            CHECK_URL,
+            json={"status": "s", "idPrescription": id},
+            headers=analyst_headers,
+        )
+
+    # the presmed event carries only the internal prescription that was
+    # checked — never the agg record nor prescriptions outside the agg
+    payloads = _dispatched_payloads(lambda_client)
+    assert len(payloads) == 1
+    assert payloads[0]["id_prescription_list"] == [str(prescriptionid1)]
 
     pInAg = (
         session.query(Prescription)
