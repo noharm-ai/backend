@@ -15,7 +15,7 @@ from exception.authorization_error import AuthorizationError
 from exception.validation_error import ValidationError
 from models.enums import NoHarmENV
 from models.main import User, db, dbSession
-from utils import logger, status
+from utils import logger, post_commit, status
 
 
 def api_endpoint(download_headers=None, is_admin=False):
@@ -46,6 +46,8 @@ def api_endpoint(download_headers=None, is_admin=False):
                 db.session.commit()
                 db.session.close()
                 db.session.remove()
+
+                post_commit.run_post_commit_callbacks()
 
                 # Handle download response with custom headers
                 if download_headers:
