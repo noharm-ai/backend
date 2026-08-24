@@ -98,6 +98,7 @@ def _cleanup():
 
     # patients created for conciliation flows (seed admissions stay below 100000)
     session.execute(text("DELETE FROM demo.pessoa WHERE nratendimento >= 100000"))
+    session.execute(text("DELETE FROM demo.pessoa_audit WHERE nratendimento >= 100000"))
 
     session.execute(text("DELETE FROM demo.usuario WHERE email LIKE 'test%@noharm.ai'"))
 
