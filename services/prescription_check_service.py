@@ -1,9 +1,11 @@
 """Service: Prescription Check related operations"""
 
-from datetime import datetime, timedelta
+import json
+from datetime import datetime
 
 from sqlalchemy import func, text
 
+from config import Config
 from decorators.has_permission_decorator import Permission, has_permission
 from decorators.timed_decorator import timed
 from exception.validation_error import ValidationError
@@ -28,7 +30,7 @@ from services import (
     segment_service,
     user_service,
 )
-from utils import status
+from utils import aws, logger, post_commit, status
 from utils.db_utils import run_with_deadlock_retry
 
 
@@ -48,15 +50,22 @@ def check_prescription(
     """
     Check or uncheck a prescription.
 
-    The presmed UPDATE inside this flow can deadlock against the external
-    integration process that writes to the same table concurrently.
-    run_with_deadlock_retry handles PostgreSQL deadlock errors (40P01) by
-    rolling back and retrying up to 3 times with exponential back-off.
-    with_for_update() on the initial prescription read serialises concurrent
-    requests from this application on the same prescription row.
+    The presmed "checado" marking is NOT done here: presmed rows are also
+    written by the external integration process, so updating them inside
+    this transaction blocks on (and deadlocks against) that process. The
+    marking is dispatched after commit as an async event to the internal
+    lambda (see _dispatch_presmed_checked); everything clinically
+    authoritative (prescription status, audit record, checkedindex insert)
+    stays in this single transaction.
+
+    run_with_deadlock_retry is kept as a safety net for PostgreSQL deadlock
+    errors (40P01): it rolls back and retries up to 3 times with exponential
+    back-off. with_for_update() on the initial prescription read serialises
+    concurrent requests from this application on the same prescription row.
     """
 
     def _do_check():
+        presmed_mark_ids = []
         p = (
             db.session.query(Prescription)
             .filter(Prescription.id == idPrescription)
@@ -134,6 +143,7 @@ def check_prescription(
                 user=user_context,
                 has_lock_feature=has_lock_feature,
                 extra=extra_info,
+                presmed_mark_ids=presmed_mark_ids,
             )
             single = _check_single_prescription(
                 prescription=p,
@@ -141,6 +151,7 @@ def check_prescription(
                 user=user_context,
                 has_lock_feature=has_lock_feature,
                 extra=extra_info,
+                presmed_mark_ids=presmed_mark_ids,
             )
 
             for i in internals:
@@ -155,35 +166,75 @@ def check_prescription(
                 user=user_context,
                 has_lock_feature=has_lock_feature,
                 extra=extra_info,
+                presmed_mark_ids=presmed_mark_ids,
             )
             _update_agg_status(prescription=p, user=user_context, extra=extra_info)
 
             if single:
                 results.append(single)
 
-        _clean_checkedindex(user_context=user_context)
-
         if p_status == "s":
             user_activity_repository.increment_checks(user_context.id)
 
-        return results
+        return results, presmed_mark_ids
 
-    return run_with_deadlock_retry(
+    results, presmed_mark_ids = run_with_deadlock_retry(
         _do_check,
         on_retry=lambda: dbSession.setSchema(user_context.schema),
     )
 
+    # dispatched only after the transaction commits, so presmed is never
+    # marked for a check that ends up rolled back
+    if presmed_mark_ids:
+        post_commit.on_commit(
+            lambda: _dispatch_presmed_checked(
+                user_context=user_context, id_prescription_list=presmed_mark_ids
+            )
+        )
 
-@timed()
-def _clean_checkedindex(user_context: User):
-    """delete old checked index records to force revalidation"""
+    return results
 
-    db.session.execute(
-        text(
-            f"""DELETE FROM {user_context.schema}.checkedindex WHERE created_at < :maxDate"""
-        ),
-        {"maxDate": (datetime.today() - timedelta(days=4))},
-    )
+
+def _dispatch_presmed_checked(user_context: User, id_prescription_list: list):
+    """
+    Fire-and-forget async event to mark presmed rows as checked
+    (checado = true). Runs outside the check transaction because presmed is
+    written concurrently by the external integration process. A dispatch
+    failure is logged but never fails the request: the check itself is
+    already committed.
+    """
+    if not id_prescription_list:
+        return
+
+    if not Config.BACKEND_FUNCTION_NAME:
+        logger.backend_logger.warning(
+            "BACKEND_FUNCTION_NAME not configured; skipping presmed checado marking for prescriptions: %s",
+            id_prescription_list,
+        )
+        return
+
+    try:
+        lambda_client = aws.get_client(
+            "lambda", region_name=Config.NIFI_SQS_QUEUE_REGION
+        )
+        lambda_client.invoke(
+            FunctionName=Config.BACKEND_FUNCTION_NAME,
+            InvocationType="Event",
+            Payload=json.dumps(
+                {
+                    "command": "lambda_check.mark_presmed_checked",
+                    "schema": user_context.schema,
+                    "id_user": user_context.id,
+                    "id_prescription_list": [str(i) for i in id_prescription_list],
+                }
+            ),
+        )
+    except Exception:
+        logger.backend_logger.exception(
+            "failed to dispatch presmed checado event | schema: %s | prescriptions: %s",
+            user_context.schema,
+            id_prescription_list,
+        )
 
 
 def _update_agg_status(prescription: Prescription, user: User, extra={}):
@@ -228,7 +279,7 @@ def _update_agg_status(prescription: Prescription, user: User, extra={}):
 
 @timed()
 def _check_agg_internal_prescriptions(
-    prescription, p_status, user, has_lock_feature=False, extra={}
+    prescription, p_status, user, has_lock_feature=False, extra={}, presmed_mark_ids=None
 ):
     is_pmc = memory_service.has_feature_nouser(FeatureEnum.PRIMARY_CARE.value)
     is_cpoe = segment_service.is_cpoe(id_segment=prescription.idSegment)
@@ -257,6 +308,7 @@ def _check_agg_internal_prescriptions(
             parent_agg_date=prescription.date,
             has_lock_feature=has_lock_feature,
             extra=extra,
+            presmed_mark_ids=presmed_mark_ids,
         )
 
         if result:
@@ -267,7 +319,13 @@ def _check_agg_internal_prescriptions(
 
 @timed()
 def _check_single_prescription(
-    prescription, p_status, user, parent_agg_date=None, has_lock_feature=False, extra={}
+    prescription,
+    p_status,
+    user,
+    parent_agg_date=None,
+    has_lock_feature=False,
+    extra={},
+    presmed_mark_ids=None,
 ):
     if p_status == "0" and prescription.user != user.id:
         if has_lock_feature:
@@ -285,7 +343,9 @@ def _check_single_prescription(
         extra=extra,
     )
 
-    _add_checkedindex(prescription=prescription, user=user)
+    indexed_id = _add_checkedindex(prescription=prescription, user=user)
+    if indexed_id is not None and presmed_mark_ids is not None:
+        presmed_mark_ids.append(indexed_id)
 
     db.session.flush()
 
@@ -294,21 +354,15 @@ def _check_single_prescription(
 
 @timed()
 def _add_checkedindex(prescription: Prescription, user: User):
+    """
+    Insert checkedindex records for the prescription and return its id when
+    it qualifies (checked, not agg, not concilia), None otherwise. The
+    returned ids feed the async presmed "checado" marking dispatched after
+    commit (_dispatch_presmed_checked) — presmed is not updated here to
+    avoid lock contention with the external integration process.
+    """
     if prescription.status != "s" or prescription.agg or prescription.concilia != None:
-        return
-
-    # first update presmed to mark as checked
-    db.session.execute(
-        text(
-            f"""
-                UPDATE {user.schema}.presmed
-                SET checado = true
-                WHERE fkprescricao = :idPrescription
-                  AND dtsuspensao IS NULL
-                """
-        ),
-        {"idPrescription": prescription.id},
-    )
+        return None
 
     query = text(
         f"""
@@ -352,6 +406,8 @@ def _add_checkedindex(prescription: Prescription, user: User):
             "idPrescription": prescription.id,
         },
     )
+
+    return prescription.id
 
 
 @timed()

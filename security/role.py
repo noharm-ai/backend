@@ -282,7 +282,7 @@ class Role(Enum):
             try:
                 role = Role(str(r).upper())
                 user_permissions = user_permissions + role.permissions
-            except:
+            except Exception:
                 pass
 
         return user_permissions

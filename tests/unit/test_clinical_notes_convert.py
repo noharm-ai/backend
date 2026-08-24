@@ -16,7 +16,6 @@ from datetime import datetime
 from types import SimpleNamespace
 from unittest.mock import patch
 
-import pytest
 
 from services import clinical_notes_service
 

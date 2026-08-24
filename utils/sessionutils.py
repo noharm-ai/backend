@@ -20,7 +20,7 @@ def tryCommit(db, recId, allow=True):
         db.session.remove()
 
         return {"status": "success", "data": recId}, status.HTTP_200_OK
-    except AuthorizationError as e:
+    except AuthorizationError:
         db.session.rollback()
         db.session.close()
         db.session.remove()
