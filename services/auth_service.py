@@ -128,6 +128,22 @@ def _schema_exists(schema: str) -> bool:
     )
 
 
+def can_read_foreign_schema_as_maintainer(user: User, target_schema: str) -> bool:
+    """Check whether the user may read data from another schema.
+
+    The user's own schema is always allowed. Any other schema requires MAINTAINER
+    and must be configured: the existence check is what keeps an arbitrary string
+    out of a schema_translate_map, so it runs for every foreign schema.
+    """
+    if target_schema == user.schema:
+        return True
+
+    if Permission.MAINTAINER not in Role.get_permissions_from_user(user=user):
+        return False
+
+    return _schema_exists(schema=target_schema)
+
+
 def _auth_user(
     user,
     force_schema=None,
