@@ -18,7 +18,11 @@ from models.enums import (
     UserOnboardingStatusEnum,
 )
 from models.main import User, UserAudit, db
-from repository import user_attribute_repository, user_repository
+from repository import (
+    user_attribute_repository,
+    user_audit_repository,
+    user_repository,
+)
 from services import email_service
 from utils import status
 
@@ -167,8 +171,29 @@ def admin_get_reset_token(id_user: int, user_context: User):
             status.HTTP_400_BAD_REQUEST,
         )
 
+    # the manual link is a fallback: require a same-day email delivery attempt
+    # (delivered or not) before exposing a copyable token
+    email_attempts = (
+        db.session.query(UserAudit)
+        .filter(UserAudit.idUser == reset_user.id)
+        .filter(UserAudit.auditType == UserAuditTypeEnum.FORGOT_PASSWORD.value)
+        .filter(func.date(UserAudit.createdAt) == datetime.today().date())
+        .filter(UserAudit.extra["origin"].astext == "email")
+        .count()
+    )
+
+    if email_attempts == 0:
+        raise ValidationError(
+            "Envie o email de redefinição de senha antes de gerar o link manual.",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
     return get_reset_token(
-        email=reset_user.email, send_email=False, responsible=user_context
+        email=reset_user.email,
+        send_email=False,
+        responsible=user_context,
+        extra={"origin": "link"},
     )
 
 
@@ -189,25 +214,72 @@ def send_reset_password_email(id_user: int, user_context: User):
         )
 
     reset_token = get_reset_token(
-        email=reset_user.email, send_email=False, responsible=user_context
+        email=reset_user.email,
+        send_email=False,
+        responsible=user_context,
+        extra={"origin": "email", "delivered": False},
     )
 
-    email_service.send_email(
-        to=[reset_user.email],
-        subject="NoHarm: Redefinição de senha",
-        html=render_template(
-            "reset_email.html",
-            user=reset_user.name,
-            email=reset_user.email,
-            token=reset_token,
-            host=Config.MAIL_HOST,
-        ),
+    try:
+        email_service.send_email(
+            to=[reset_user.email],
+            subject="NoHarm: Redefinição de senha",
+            html=render_template(
+                "reset_email.html",
+                user=reset_user.name,
+                email=reset_user.email,
+                token=reset_token,
+                host=Config.MAIL_HOST,
+            ),
+        )
+    except ValidationError as exception:
+        if exception.httpStatus != status.HTTP_502_BAD_GATEWAY:
+            raise
+
+        # a delivery failure must not roll back the audit trail: the recorded
+        # attempt unlocks the manual-link fallback and shows up in the history
+        return {"email": reset_user.email, "delivered": False}
+
+    db.session.query(UserAudit).filter(UserAudit.pwToken == reset_token).update(
+        {"extra": {"origin": "email", "delivered": True}}, synchronize_session="fetch"
     )
 
-    return {"email": reset_user.email}
+    return {"email": reset_user.email, "delivered": True}
 
 
-def get_reset_token(email: str, send_email=True, responsible: User = None):
+@has_permission(Permission.READ_RESET_PASSWORD_HISTORY)
+def get_reset_password_history(id_user: int, user_context: User):
+    """List a user's password reset requests and whether each link was used."""
+    reset_user = db.session.query(User).filter(User.id == id_user).first()
+    if not reset_user or reset_user.schema != user_context.schema:
+        raise ValidationError(
+            "Usuário inexistente.",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    results = user_audit_repository.get_reset_password_history(id_user=id_user)
+
+    history = []
+    for audit, responsible_name, used_at in results:
+        extra = audit.extra or {}
+        history.append(
+            {
+                "requestedAt": audit.createdAt.isoformat() if audit.createdAt else None,
+                "requestedBy": responsible_name,
+                "origin": extra.get("origin"),
+                "delivered": extra.get("delivered"),
+                "used": used_at is not None,
+                "usedAt": used_at.isoformat() if used_at else None,
+            }
+        )
+
+    return history
+
+
+def get_reset_token(
+    email: str, send_email=True, responsible: User = None, extra: dict = None
+):
     user = (
         db.session.query(User)
         .filter(User.email == email)
@@ -241,6 +313,7 @@ def get_reset_token(email: str, send_email=True, responsible: User = None):
         id_user=user.id,
         responsible=responsible if responsible != None else user,
         pw_token=reset_token,
+        extra=extra,
     )
 
     if send_email:

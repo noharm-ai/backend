@@ -43,7 +43,9 @@ def forgot_password():
     email = request.args.get("email", None)
 
     try:
-        user_service.get_reset_token(email=email, send_email=True)
+        user_service.get_reset_token(
+            email=email, send_email=True, extra={"origin": "self"}
+        )
     except ValidationError as e:
         return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
 

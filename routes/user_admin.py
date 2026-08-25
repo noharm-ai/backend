@@ -58,3 +58,10 @@ def send_reset_password_email():
     data = request.get_json()
 
     return user_service.send_reset_password_email(id_user=data.get("idUser", None))
+
+
+@app_user_admin.route("/user-admin/reset-history/<int:id_user>", methods=["GET"])
+@api_endpoint()
+def get_reset_password_history(id_user: int):
+    """Get a user's password reset request history"""
+    return user_service.get_reset_password_history(id_user=id_user)

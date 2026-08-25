@@ -10,6 +10,8 @@ which had prior coverage:
   (``admin_get_reset_token``)
 * ``POST /user-admin/send-reset-email`` — email the reset link through ODOO
   (``send_reset_password_email``)
+* ``GET /user-admin/reset-history/<id>`` — reset request history with usage
+  status (``get_reset_password_history``)
 
 Every write is audited in ``public.usuario_audit``; the tests assert the audit
 trail as well as the effect on the stored password.
@@ -87,7 +89,7 @@ def _audits(id_user: int, audit_type: UserAuditTypeEnum) -> list:
     session_commit()
     return session.execute(
         text(
-            "SELECT pw_token, created_by, audit_ip FROM public.usuario_audit"
+            "SELECT pw_token, created_by, audit_ip, extra FROM public.usuario_audit"
             " WHERE idusuario = :id AND tp_audit = :type ORDER BY idusuario_audit"
         ),
         {"id": id_user, "type": audit_type.value},
@@ -197,6 +199,7 @@ def test_forget_password_issues_a_token(client):
     audits = _audits(_USER_ID, UserAuditTypeEnum.FORGOT_PASSWORD)
     assert len(audits) == 1
     assert audits[0].pw_token
+    assert audits[0].extra == {"origin": "self"}
 
 
 def test_forget_password_is_silent_for_unknown_email(client):
@@ -326,6 +329,10 @@ def test_admin_reset_token_issues_a_token_for_another_user(client, admin_headers
     _upsert_user(_USER_ID, _USER_EMAIL, _USER_PASSWORD)
     _delete_audits(_USER_ID)
 
+    # the manual link only unlocks after a same-day email delivery attempt
+    email_attempt, _, _ = _send_reset_email(client, admin_headers, _USER_ID)
+    assert email_attempt.status_code == 200
+
     response = client.post(
         "/user-admin/reset-token", headers=admin_headers, json={"idUser": _USER_ID}
     )
@@ -334,10 +341,12 @@ def test_admin_reset_token_issues_a_token_for_another_user(client, admin_headers
 
     token = response.get_json()["data"]
     audits = _audits(_USER_ID, UserAuditTypeEnum.FORGOT_PASSWORD)
-    assert len(audits) == 1
-    assert audits[0].pw_token == token
+    assert len(audits) == 2
+    # the second audit belongs to the manual link and is stamped as such
+    assert audits[1].pw_token == token
+    assert audits[1].extra == {"origin": "link"}
     # the audit points at the admin who issued it, not at the target user
-    assert audits[0].created_by != _USER_ID
+    assert audits[1].created_by != _USER_ID
 
     reset = client.post(
         "/user/reset", json={"reset_token": token, "newpassword": _NEW_PASSWORD}
@@ -345,6 +354,38 @@ def test_admin_reset_token_issues_a_token_for_another_user(client, admin_headers
 
     assert reset.status_code == 200
     assert _can_authenticate(client, _USER_EMAIL, _NEW_PASSWORD)
+
+
+def test_admin_reset_token_requires_prior_email_attempt(client, admin_headers):
+    """POST /user-admin/reset-token - refused before a same-day email attempt [400]"""
+    _upsert_user(_USER_ID, _USER_EMAIL, _USER_PASSWORD)
+    _delete_audits(_USER_ID)
+
+    response = client.post(
+        "/user-admin/reset-token", headers=admin_headers, json={"idUser": _USER_ID}
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["code"] == "errors.businessRules"
+    assert _audits(_USER_ID, UserAuditTypeEnum.FORGOT_PASSWORD) == []
+
+
+def test_admin_reset_token_unlocked_by_failed_email_attempt(client, admin_headers):
+    """POST /user-admin/reset-token - a failed delivery still unlocks the link"""
+    _upsert_user(_USER_ID, _USER_EMAIL, _USER_PASSWORD)
+    _delete_audits(_USER_ID)
+
+    failed_attempt, _, _ = _send_reset_email(
+        client, admin_headers, _USER_ID, unreachable=True
+    )
+    assert failed_attempt.status_code == 200
+    assert failed_attempt.get_json()["data"]["delivered"] is False
+
+    response = client.post(
+        "/user-admin/reset-token", headers=admin_headers, json={"idUser": _USER_ID}
+    )
+
+    assert response.status_code == 200
 
 
 def test_admin_reset_token_rejects_unknown_user(client, admin_headers):
@@ -419,11 +460,12 @@ def test_send_reset_email_delivers_the_link(client, curator_headers):
     response, stub, _ = _send_reset_email(client, curator_headers, _USER_ID)
 
     assert response.status_code == 200
-    assert response.get_json()["data"]["email"] == _USER_EMAIL
+    assert response.get_json()["data"] == {"email": _USER_EMAIL, "delivered": True}
 
     audits = _audits(_USER_ID, UserAuditTypeEnum.FORGOT_PASSWORD)
     assert len(audits) == 1
     assert audits[0].pw_token
+    assert audits[0].extra == {"origin": "email", "delivered": True}
     # the audit points at the curator who sent it, not at the target user
     assert audits[0].created_by != _USER_ID
 
@@ -486,21 +528,25 @@ def test_send_reset_email_rejects_inactive_user(client, curator_headers):
     assert _audits(_INACTIVE_ID, UserAuditTypeEnum.FORGOT_PASSWORD) == []
 
 
-def test_send_reset_email_surfaces_unreachable_odoo(client, curator_headers):
-    """POST /user-admin/send-reset-email - an ODOO timeout rolls back [502 BAD GATEWAY]"""
+def test_send_reset_email_records_unreachable_odoo(client, curator_headers):
+    """POST /user-admin/send-reset-email - an ODOO timeout keeps the audited attempt"""
     _upsert_user(_USER_ID, _USER_EMAIL, _USER_PASSWORD)
     _delete_audits(_USER_ID)
 
     response, _, _ = _send_reset_email(client, curator_headers, _USER_ID, unreachable=True)
 
-    assert response.status_code == 502
-    assert response.get_json()["code"] == "errors.businessRules"
-    # the failed send is rolled back, so no reset token is left behind
-    assert _audits(_USER_ID, UserAuditTypeEnum.FORGOT_PASSWORD) == []
+    assert response.status_code == 200
+    assert response.get_json()["data"] == {"email": _USER_EMAIL, "delivered": False}
+
+    # the failed attempt stays audited: it unlocks the manual-link fallback and
+    # shows up in the reset history
+    audits = _audits(_USER_ID, UserAuditTypeEnum.FORGOT_PASSWORD)
+    assert len(audits) == 1
+    assert audits[0].extra == {"origin": "email", "delivered": False}
 
 
-def test_send_reset_email_surfaces_delivery_failure(client, curator_headers):
-    """POST /user-admin/send-reset-email - an ODOO send fault rolls back [502]"""
+def test_send_reset_email_records_delivery_failure(client, curator_headers):
+    """POST /user-admin/send-reset-email - an ODOO send fault keeps the audited attempt"""
     _upsert_user(_USER_ID, _USER_EMAIL, _USER_PASSWORD)
     _delete_audits(_USER_ID)
 
@@ -508,9 +554,82 @@ def test_send_reset_email_surfaces_delivery_failure(client, curator_headers):
         client, curator_headers, _USER_ID, stub=_OdooEmailStub(send_fault=True)
     )
 
-    assert response.status_code == 502
+    assert response.status_code == 200
+    assert response.get_json()["data"]["delivered"] is False
+
+    audits = _audits(_USER_ID, UserAuditTypeEnum.FORGOT_PASSWORD)
+    assert len(audits) == 1
+    assert audits[0].extra == {"origin": "email", "delivered": False}
+
+
+def test_reset_history_shows_requests_and_usage(client, curator_headers):
+    """GET /user-admin/reset-history - lists attempts with origin and usage status"""
+    _upsert_user(_USER_ID, _USER_EMAIL, _USER_PASSWORD)
+    _delete_audits(_USER_ID)
+
+    send, _, _ = _send_reset_email(client, curator_headers, _USER_ID)
+    assert send.status_code == 200
+
+    token = _audits(_USER_ID, UserAuditTypeEnum.FORGOT_PASSWORD)[0].pw_token
+    reset = client.post(
+        "/user/reset", json={"reset_token": token, "newpassword": _NEW_PASSWORD}
+    )
+    assert reset.status_code == 200
+
+    response = client.get(
+        f"/user-admin/reset-history/{_USER_ID}", headers=curator_headers
+    )
+
+    assert response.status_code == 200
+
+    rows = response.get_json()["data"]
+    assert len(rows) == 1
+    assert rows[0]["origin"] == "email"
+    assert rows[0]["delivered"] is True
+    assert rows[0]["requestedBy"]
+    assert rows[0]["used"] is True
+    assert rows[0]["usedAt"]
+    # the reset token itself must never leave the backend through the history
+    assert "pw_token" not in rows[0] and "token" not in rows[0]
+
+
+def test_reset_history_shows_pending_requests(client, curator_headers):
+    """GET /user-admin/reset-history - an unused link shows as not used"""
+    _upsert_user(_USER_ID, _USER_EMAIL, _USER_PASSWORD)
+    _delete_audits(_USER_ID)
+
+    send, _, _ = _send_reset_email(client, curator_headers, _USER_ID, unreachable=True)
+    assert send.status_code == 200
+
+    response = client.get(
+        f"/user-admin/reset-history/{_USER_ID}", headers=curator_headers
+    )
+
+    assert response.status_code == 200
+
+    rows = response.get_json()["data"]
+    assert len(rows) == 1
+    assert rows[0]["origin"] == "email"
+    assert rows[0]["delivered"] is False
+    assert rows[0]["used"] is False
+    assert rows[0]["usedAt"] is None
+
+
+def test_reset_history_requires_permission(client, user_manager_headers):
+    """GET /user-admin/reset-history - USER_MANAGER is not enough [401 UNAUTHORIZED]"""
+    response = client.get(
+        f"/user-admin/reset-history/{_USER_ID}", headers=user_manager_headers
+    )
+
+    assert response.status_code == 401
+
+
+def test_reset_history_rejects_unknown_user(client, curator_headers):
+    """GET /user-admin/reset-history - unknown user is rejected [400 BAD REQUEST]"""
+    response = client.get("/user-admin/reset-history/99999", headers=curator_headers)
+
+    assert response.status_code == 400
     assert response.get_json()["code"] == "errors.businessRules"
-    assert _audits(_USER_ID, UserAuditTypeEnum.FORGOT_PASSWORD) == []
 
 
 def test_send_reset_email_requires_configured_odoo(client, curator_headers):
