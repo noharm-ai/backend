@@ -8,7 +8,7 @@ which had prior coverage:
 * ``POST /user/reset`` — consume the token (``reset_password``)
 * ``POST /user-admin/reset-token`` — issue a token on the user's behalf
   (``admin_get_reset_token``)
-* ``POST /user-admin/send-reset-email`` — email the reset link through Resend
+* ``POST /user-admin/send-reset-email`` — email the reset link through ODOO
   (``send_reset_password_email``)
 
 Every write is audited in ``public.usuario_audit``; the tests assert the audit
@@ -19,6 +19,7 @@ The test users live in the reserved ``>= 99000`` id range and use
 fixture removes afterwards.
 """
 
+import xmlrpc.client
 from unittest import mock
 
 import pytest
@@ -369,28 +370,45 @@ def test_admin_reset_token_requires_admin_users_permission(
     assert response.status_code == 401
 
 
-def _mock_resend_response(status_code: int = 200) -> mock.Mock:
-    """Build a fake HTTP response for the Resend API."""
-    response = mock.Mock()
-    response.status_code = status_code
-    response.json.return_value = {"id": "test-resend-email-id"}
-    return response
+class _OdooEmailStub:
+    """Fake ODOO execute callable that records the mail.mail calls it receives."""
+
+    def __init__(self, create_result: int = 101, send_fault: bool = False):
+        self.calls = []
+        self.create_result = create_result
+        self.send_fault = send_fault
+
+    def __call__(self, model, action, payload, options):
+        self.calls.append((model, action, payload, options))
+        if action == "create":
+            return self.create_result
+        if action == "send" and self.send_fault:
+            raise xmlrpc.client.Fault(1, "delivery refused")
+        return True
+
+    def created_mail(self) -> dict:
+        """Return the values dict passed to the mail.mail create call."""
+        return next(c[2][0] for c in self.calls if c[1] == "create")
 
 
-def _send_reset_email(client, headers, id_user: int, resend_status: int = 200):
-    """Call the send-reset-email endpoint with the Resend API mocked out."""
+def _send_reset_email(
+    client, headers, id_user: int, stub: _OdooEmailStub = None, unreachable: bool = False
+):
+    """Call the send-reset-email endpoint with the ODOO client mocked out."""
+    stub = stub if stub is not None else _OdooEmailStub()
+
     with (
-        mock.patch.object(Config, "RESEND_API_KEY", "test-api-key"),
+        mock.patch.object(Config, "ODOO_API_URL", "http://odoo.test/"),
         mock.patch(
-            "services.email_service.requests.post",
-            return_value=_mock_resend_response(resend_status),
-        ) as post,
+            "services.email_service.odoo_client.get_client",
+            return_value=None if unreachable else stub,
+        ) as get_client,
     ):
         response = client.post(
             "/user-admin/send-reset-email", headers=headers, json={"idUser": id_user}
         )
 
-    return response, post
+    return response, stub, get_client
 
 
 def test_send_reset_email_delivers_the_link(client, curator_headers):
@@ -398,7 +416,7 @@ def test_send_reset_email_delivers_the_link(client, curator_headers):
     _upsert_user(_USER_ID, _USER_EMAIL, _USER_PASSWORD)
     _delete_audits(_USER_ID)
 
-    response, post = _send_reset_email(client, curator_headers, _USER_ID)
+    response, stub, _ = _send_reset_email(client, curator_headers, _USER_ID)
 
     assert response.status_code == 200
     assert response.get_json()["data"]["email"] == _USER_EMAIL
@@ -409,11 +427,14 @@ def test_send_reset_email_delivers_the_link(client, curator_headers):
     # the audit points at the curator who sent it, not at the target user
     assert audits[0].created_by != _USER_ID
 
-    post.assert_called_once()
-    payload = post.call_args.kwargs["json"]
-    assert payload["to"] == [_USER_EMAIL]
+    mail = stub.created_mail()
+    assert mail["email_to"] == _USER_EMAIL
     # the delivered email carries the exact token that was audited
-    assert audits[0].pw_token in payload["html"]
+    assert audits[0].pw_token in mail["body_html"]
+    # the created mail.mail record is the one told to send
+    assert ("mail.mail", "send", [[stub.create_result]]) in [
+        c[:3] for c in stub.calls
+    ]
 
     reset = client.post(
         "/user/reset",
@@ -429,46 +450,48 @@ def test_send_reset_email_allows_admin(client, admin_headers):
     _upsert_user(_USER_ID, _USER_EMAIL, _USER_PASSWORD)
     _delete_audits(_USER_ID)
 
-    response, post = _send_reset_email(client, admin_headers, _USER_ID)
+    response, stub, _ = _send_reset_email(client, admin_headers, _USER_ID)
 
     assert response.status_code == 200
-    post.assert_called_once()
+    assert stub.created_mail()["email_to"] == _USER_EMAIL
 
 
 def test_send_reset_email_requires_permission(client, user_manager_headers):
     """POST /user-admin/send-reset-email - USER_MANAGER is not enough [401]"""
-    response, post = _send_reset_email(client, user_manager_headers, _USER_ID)
+    response, _, get_client = _send_reset_email(
+        client, user_manager_headers, _USER_ID
+    )
 
     assert response.status_code == 401
-    post.assert_not_called()
+    get_client.assert_not_called()
 
 
 def test_send_reset_email_rejects_unknown_user(client, curator_headers):
     """POST /user-admin/send-reset-email - unknown user is rejected [400 BAD REQUEST]"""
-    response, post = _send_reset_email(client, curator_headers, 99999)
+    response, _, get_client = _send_reset_email(client, curator_headers, 99999)
 
     assert response.status_code == 400
     assert response.get_json()["code"] == "errors.businessRules"
-    post.assert_not_called()
+    get_client.assert_not_called()
 
 
 def test_send_reset_email_rejects_inactive_user(client, curator_headers):
     """POST /user-admin/send-reset-email - inactive user is rejected [400 BAD REQUEST]"""
     _delete_audits(_INACTIVE_ID)
 
-    response, post = _send_reset_email(client, curator_headers, _INACTIVE_ID)
+    response, _, get_client = _send_reset_email(client, curator_headers, _INACTIVE_ID)
 
     assert response.status_code == 400
-    post.assert_not_called()
+    get_client.assert_not_called()
     assert _audits(_INACTIVE_ID, UserAuditTypeEnum.FORGOT_PASSWORD) == []
 
 
-def test_send_reset_email_surfaces_delivery_failure(client, curator_headers):
-    """POST /user-admin/send-reset-email - a Resend error rolls back [502 BAD GATEWAY]"""
+def test_send_reset_email_surfaces_unreachable_odoo(client, curator_headers):
+    """POST /user-admin/send-reset-email - an ODOO timeout rolls back [502 BAD GATEWAY]"""
     _upsert_user(_USER_ID, _USER_EMAIL, _USER_PASSWORD)
     _delete_audits(_USER_ID)
 
-    response, _ = _send_reset_email(client, curator_headers, _USER_ID, resend_status=422)
+    response, _, _ = _send_reset_email(client, curator_headers, _USER_ID, unreachable=True)
 
     assert response.status_code == 502
     assert response.get_json()["code"] == "errors.businessRules"
@@ -476,12 +499,26 @@ def test_send_reset_email_surfaces_delivery_failure(client, curator_headers):
     assert _audits(_USER_ID, UserAuditTypeEnum.FORGOT_PASSWORD) == []
 
 
-def test_send_reset_email_requires_configured_api_key(client, curator_headers):
-    """POST /user-admin/send-reset-email - missing Resend key is refused [400]"""
+def test_send_reset_email_surfaces_delivery_failure(client, curator_headers):
+    """POST /user-admin/send-reset-email - an ODOO send fault rolls back [502]"""
     _upsert_user(_USER_ID, _USER_EMAIL, _USER_PASSWORD)
     _delete_audits(_USER_ID)
 
-    with mock.patch.object(Config, "RESEND_API_KEY", ""):
+    response, _, _ = _send_reset_email(
+        client, curator_headers, _USER_ID, stub=_OdooEmailStub(send_fault=True)
+    )
+
+    assert response.status_code == 502
+    assert response.get_json()["code"] == "errors.businessRules"
+    assert _audits(_USER_ID, UserAuditTypeEnum.FORGOT_PASSWORD) == []
+
+
+def test_send_reset_email_requires_configured_odoo(client, curator_headers):
+    """POST /user-admin/send-reset-email - missing ODOO config is refused [400]"""
+    _upsert_user(_USER_ID, _USER_EMAIL, _USER_PASSWORD)
+    _delete_audits(_USER_ID)
+
+    with mock.patch.object(Config, "ODOO_API_URL", ""):
         response = client.post(
             "/user-admin/send-reset-email",
             headers=curator_headers,

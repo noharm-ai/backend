@@ -174,7 +174,7 @@ def admin_get_reset_token(id_user: int, user_context: User):
 
 @has_permission(Permission.SEND_RESET_PASSWORD_EMAIL)
 def send_reset_password_email(id_user: int, user_context: User):
-    """Generate a reset token and email its link to the user through Resend."""
+    """Generate a reset token and email its link to the user through ODOO."""
     reset_user = (
         db.session.query(User)
         .filter(User.id == id_user)
