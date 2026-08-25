@@ -36,6 +36,10 @@ class Config:
     MAIL_SENDER = getenv("MAIL_SENDER") or "user@gmail.com"
     MAIL_HOST = getenv("MAIL_HOST") or "localhost"
 
+    RESEND_API_URL = getenv("RESEND_API_URL") or "https://api.resend.com/emails"
+    RESEND_API_KEY = getenv("RESEND_API_KEY") or ""
+    RESEND_SENDER = getenv("RESEND_SENDER") or MAIL_SENDER
+
     NIFI_BUCKET_NAME = getenv("NIFI_BUCKET_NAME") or ""
     NIFI_SQS_QUEUE_REGION = getenv("NIFI_SQS_QUEUE_REGION") or ""
     NIFI_LOG_GROUP_NAME = getenv("NIFI_LOG_GROUP_NAME") or ""

@@ -8,6 +8,8 @@ which had prior coverage:
 * ``POST /user/reset`` — consume the token (``reset_password``)
 * ``POST /user-admin/reset-token`` — issue a token on the user's behalf
   (``admin_get_reset_token``)
+* ``POST /user-admin/send-reset-email`` — email the reset link through Resend
+  (``send_reset_password_email``)
 
 Every write is audited in ``public.usuario_audit``; the tests assert the audit
 trail as well as the effect on the stored password.
@@ -17,9 +19,12 @@ The test users live in the reserved ``>= 99000`` id range and use
 fixture removes afterwards.
 """
 
+from unittest import mock
+
 import pytest
 from sqlalchemy import text
 
+from config import Config
 from models.enums import UserAuditTypeEnum
 from security.role import Role
 from tests.conftest import get_access, make_headers, session, session_commit
@@ -362,3 +367,126 @@ def test_admin_reset_token_requires_admin_users_permission(
     )
 
     assert response.status_code == 401
+
+
+def _mock_resend_response(status_code: int = 200) -> mock.Mock:
+    """Build a fake HTTP response for the Resend API."""
+    response = mock.Mock()
+    response.status_code = status_code
+    response.json.return_value = {"id": "test-resend-email-id"}
+    return response
+
+
+def _send_reset_email(client, headers, id_user: int, resend_status: int = 200):
+    """Call the send-reset-email endpoint with the Resend API mocked out."""
+    with (
+        mock.patch.object(Config, "RESEND_API_KEY", "test-api-key"),
+        mock.patch(
+            "services.email_service.requests.post",
+            return_value=_mock_resend_response(resend_status),
+        ) as post,
+    ):
+        response = client.post(
+            "/user-admin/send-reset-email", headers=headers, json={"idUser": id_user}
+        )
+
+    return response, post
+
+
+def test_send_reset_email_delivers_the_link(client, curator_headers):
+    """POST /user-admin/send-reset-email - a curator emails a usable reset link"""
+    _upsert_user(_USER_ID, _USER_EMAIL, _USER_PASSWORD)
+    _delete_audits(_USER_ID)
+
+    response, post = _send_reset_email(client, curator_headers, _USER_ID)
+
+    assert response.status_code == 200
+    assert response.get_json()["data"]["email"] == _USER_EMAIL
+
+    audits = _audits(_USER_ID, UserAuditTypeEnum.FORGOT_PASSWORD)
+    assert len(audits) == 1
+    assert audits[0].pw_token
+    # the audit points at the curator who sent it, not at the target user
+    assert audits[0].created_by != _USER_ID
+
+    post.assert_called_once()
+    payload = post.call_args.kwargs["json"]
+    assert payload["to"] == [_USER_EMAIL]
+    # the delivered email carries the exact token that was audited
+    assert audits[0].pw_token in payload["html"]
+
+    reset = client.post(
+        "/user/reset",
+        json={"reset_token": audits[0].pw_token, "newpassword": _NEW_PASSWORD},
+    )
+
+    assert reset.status_code == 200
+    assert _can_authenticate(client, _USER_EMAIL, _NEW_PASSWORD)
+
+
+def test_send_reset_email_allows_admin(client, admin_headers):
+    """POST /user-admin/send-reset-email - ADMIN can also send the email"""
+    _upsert_user(_USER_ID, _USER_EMAIL, _USER_PASSWORD)
+    _delete_audits(_USER_ID)
+
+    response, post = _send_reset_email(client, admin_headers, _USER_ID)
+
+    assert response.status_code == 200
+    post.assert_called_once()
+
+
+def test_send_reset_email_requires_permission(client, user_manager_headers):
+    """POST /user-admin/send-reset-email - USER_MANAGER is not enough [401]"""
+    response, post = _send_reset_email(client, user_manager_headers, _USER_ID)
+
+    assert response.status_code == 401
+    post.assert_not_called()
+
+
+def test_send_reset_email_rejects_unknown_user(client, curator_headers):
+    """POST /user-admin/send-reset-email - unknown user is rejected [400 BAD REQUEST]"""
+    response, post = _send_reset_email(client, curator_headers, 99999)
+
+    assert response.status_code == 400
+    assert response.get_json()["code"] == "errors.businessRules"
+    post.assert_not_called()
+
+
+def test_send_reset_email_rejects_inactive_user(client, curator_headers):
+    """POST /user-admin/send-reset-email - inactive user is rejected [400 BAD REQUEST]"""
+    _delete_audits(_INACTIVE_ID)
+
+    response, post = _send_reset_email(client, curator_headers, _INACTIVE_ID)
+
+    assert response.status_code == 400
+    post.assert_not_called()
+    assert _audits(_INACTIVE_ID, UserAuditTypeEnum.FORGOT_PASSWORD) == []
+
+
+def test_send_reset_email_surfaces_delivery_failure(client, curator_headers):
+    """POST /user-admin/send-reset-email - a Resend error rolls back [502 BAD GATEWAY]"""
+    _upsert_user(_USER_ID, _USER_EMAIL, _USER_PASSWORD)
+    _delete_audits(_USER_ID)
+
+    response, _ = _send_reset_email(client, curator_headers, _USER_ID, resend_status=422)
+
+    assert response.status_code == 502
+    assert response.get_json()["code"] == "errors.businessRules"
+    # the failed send is rolled back, so no reset token is left behind
+    assert _audits(_USER_ID, UserAuditTypeEnum.FORGOT_PASSWORD) == []
+
+
+def test_send_reset_email_requires_configured_api_key(client, curator_headers):
+    """POST /user-admin/send-reset-email - missing Resend key is refused [400]"""
+    _upsert_user(_USER_ID, _USER_EMAIL, _USER_PASSWORD)
+    _delete_audits(_USER_ID)
+
+    with mock.patch.object(Config, "RESEND_API_KEY", ""):
+        response = client.post(
+            "/user-admin/send-reset-email",
+            headers=curator_headers,
+            json={"idUser": _USER_ID},
+        )
+
+    assert response.status_code == 400
+    assert response.get_json()["code"] == "errors.businessRules"

@@ -19,6 +19,7 @@ from models.enums import (
 )
 from models.main import User, UserAudit, db
 from repository import user_attribute_repository, user_repository
+from services import email_service
 from utils import status
 
 
@@ -169,6 +170,41 @@ def admin_get_reset_token(id_user: int, user_context: User):
     return get_reset_token(
         email=reset_user.email, send_email=False, responsible=user_context
     )
+
+
+@has_permission(Permission.SEND_RESET_PASSWORD_EMAIL)
+def send_reset_password_email(id_user: int, user_context: User):
+    """Generate a reset token and email its link to the user through Resend."""
+    reset_user = (
+        db.session.query(User)
+        .filter(User.id == id_user)
+        .filter(User.active == True)
+        .first()
+    )
+    if not reset_user:
+        raise ValidationError(
+            "Usuário inexistente ou inativo.",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    reset_token = get_reset_token(
+        email=reset_user.email, send_email=False, responsible=user_context
+    )
+
+    email_service.send_email(
+        to=[reset_user.email],
+        subject="NoHarm: Redefinição de senha",
+        html=render_template(
+            "reset_email.html",
+            user=reset_user.name,
+            email=reset_user.email,
+            token=reset_token,
+            host=Config.MAIL_HOST,
+        ),
+    )
+
+    return {"email": reset_user.email}
 
 
 def get_reset_token(email: str, send_email=True, responsible: User = None):

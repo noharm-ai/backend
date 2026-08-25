@@ -30,6 +30,8 @@ class Permission(Enum):
 
     ADMIN_USERS = "ADMIN_USERS"  # "admin users"
 
+    SEND_RESET_PASSWORD_EMAIL = "SEND_RESET_PASSWORD_EMAIL"  # "send a password reset link to a user's email"
+
     ADMIN_INTERVENTION_REASON = (
         "ADMIN_INTERVENTION_REASON"  # "admin intervention reason recordss"
     )

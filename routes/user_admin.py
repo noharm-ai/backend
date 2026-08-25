@@ -49,3 +49,12 @@ def get_reset_token():
     data = request.get_json()
 
     return user_service.admin_get_reset_token(data.get("idUser", None))
+
+
+@app_user_admin.route("/user-admin/send-reset-email", methods=["POST"])
+@api_endpoint()
+def send_reset_password_email():
+    """Send a password reset link to the user's email"""
+    data = request.get_json()
+
+    return user_service.send_reset_password_email(id_user=data.get("idUser", None))
