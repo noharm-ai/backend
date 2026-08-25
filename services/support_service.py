@@ -489,6 +489,10 @@ def list_tickets_v2(user_context: User, user_permissions: list[Permission]):
             options=options,
         )
 
+        # ODOO answers False, not [], when a search matches nothing
+        my_tickets = my_tickets if my_tickets else []
+        following_all = following_all if following_all else []
+
         my_tickets_ids = [t.get("id") for t in my_tickets]
         following = []
         for f in following_all:
@@ -591,7 +595,8 @@ def list_pending_action(user_context: User):
             options=options,
         )
 
-    return pending_tickets
+    # ODOO answers False, not [], when a search matches nothing
+    return pending_tickets if pending_tickets else []
 
 
 @has_permission(Permission.WRITE_SUPPORT)
