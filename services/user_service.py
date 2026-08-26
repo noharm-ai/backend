@@ -161,34 +161,27 @@ def is_valid_password(password):
     return re.fullmatch(r"^(?=.*[A-Z])(?=.*[0-9])(?=.*[a-z]).{8,}$", password)
 
 
-@has_permission(Permission.ADMIN_USERS)
+@has_permission(Permission.GENERATE_RESET_PASSWORD_LINK, Permission.ADMIN_USERS)
 def admin_get_reset_token(id_user: int, user_context: User):
-    reset_user = db.session.query(User).filter(User.id == id_user).first()
+    # get_reset_token silently returns None for an inactive user, which would
+    # surface as a link ending in /reset/null. Refuse explicitly instead, the
+    # same way send_reset_password_email does.
+    reset_user = (
+        db.session.query(User)
+        .filter(User.id == id_user)
+        .filter(User.active == True)
+        .first()
+    )
     if not reset_user:
         raise ValidationError(
-            "Usuário inexistente.",
+            "Usuário inexistente ou inativo.",
             "errors.businessRules",
             status.HTTP_400_BAD_REQUEST,
         )
 
-    # the manual link is a fallback: require a same-day email delivery attempt
-    # (delivered or not) before exposing a copyable token
-    email_attempts = (
-        db.session.query(UserAudit)
-        .filter(UserAudit.idUser == reset_user.id)
-        .filter(UserAudit.auditType == UserAuditTypeEnum.FORGOT_PASSWORD.value)
-        .filter(func.date(UserAudit.createdAt) == datetime.today().date())
-        .filter(UserAudit.extra["origin"].astext == "email")
-        .count()
-    )
-
-    if email_attempts == 0:
-        raise ValidationError(
-            "Envie o email de redefinição de senha antes de gerar o link manual.",
-            "errors.businessRules",
-            status.HTTP_400_BAD_REQUEST,
-        )
-
+    # the manual link no longer requires a prior email attempt: the caller may
+    # skip straight to it. What still guards the operation is the permission,
+    # the caller retyping the registered address, and the audited trail below.
     return get_reset_token(
         email=reset_user.email,
         send_email=False,
@@ -217,7 +210,7 @@ def send_reset_password_email(id_user: int, user_context: User):
         email=reset_user.email,
         send_email=False,
         responsible=user_context,
-        extra={"origin": "email", "delivered": False},
+        extra={"origin": "email"},
     )
 
     try:
@@ -237,19 +230,18 @@ def send_reset_password_email(id_user: int, user_context: User):
             raise
 
         # a delivery failure must not roll back the audit trail: the recorded
-        # attempt unlocks the manual-link fallback and shows up in the history
+        # attempt unlocks the manual-link fallback and shows up in the history.
+        # usuario_audit is insert-only, so the outcome is reported to the caller
+        # rather than written back onto the row.
         return {"email": reset_user.email, "delivered": False}
-
-    db.session.query(UserAudit).filter(UserAudit.pwToken == reset_token).update(
-        {"extra": {"origin": "email", "delivered": True}}, synchronize_session="fetch"
-    )
 
     return {"email": reset_user.email, "delivered": True}
 
 
 @has_permission(Permission.READ_RESET_PASSWORD_HISTORY)
 def get_reset_password_history(id_user: int, user_context: User):
-    """List a user's password reset requests and whether each link was used."""
+    """List a user's password reset requests, whether each link was used, and
+    when the user last logged in (the audit trail's end-to-end success signal)."""
     reset_user = db.session.query(User).filter(User.id == id_user).first()
     if not reset_user or reset_user.schema != user_context.schema:
         raise ValidationError(
@@ -259,6 +251,7 @@ def get_reset_password_history(id_user: int, user_context: User):
         )
 
     results = user_audit_repository.get_reset_password_history(id_user=id_user)
+    last_login = user_audit_repository.get_last_login(id_user=id_user)
 
     history = []
     for audit, responsible_name, used_at in results:
@@ -268,13 +261,15 @@ def get_reset_password_history(id_user: int, user_context: User):
                 "requestedAt": audit.createdAt.isoformat() if audit.createdAt else None,
                 "requestedBy": responsible_name,
                 "origin": extra.get("origin"),
-                "delivered": extra.get("delivered"),
                 "used": used_at is not None,
                 "usedAt": used_at.isoformat() if used_at else None,
             }
         )
 
-    return history
+    return {
+        "lastLogin": last_login.isoformat() if last_login else None,
+        "history": history,
+    }
 
 
 def get_reset_token(

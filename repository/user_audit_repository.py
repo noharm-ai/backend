@@ -1,6 +1,6 @@
 """Repository: read queries over the public.usuario_audit table."""
 
-from sqlalchemy import desc
+from sqlalchemy import desc, func
 from sqlalchemy.orm import aliased
 
 from models.enums import UserAuditTypeEnum
@@ -31,4 +31,18 @@ def get_reset_password_history(id_user: int, limit: int = 50):
         .order_by(desc(UserAudit.createdAt))
         .limit(limit)
         .all()
+    )
+
+
+def get_last_login(id_user: int):
+    """Return the user's most recent LOGIN audit date, or None if never logged in.
+
+    Note that auth_service only writes this audit outside the DEVELOPMENT env,
+    so a local backend always reports None here.
+    """
+    return (
+        db.session.query(func.max(UserAudit.createdAt))
+        .filter(UserAudit.idUser == id_user)
+        .filter(UserAudit.auditType == UserAuditTypeEnum.LOGIN.value)
+        .scalar()
     )
