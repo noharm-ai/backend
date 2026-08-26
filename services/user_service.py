@@ -222,7 +222,7 @@ def send_reset_password_email(id_user: int, user_context: User):
                 user=reset_user.name,
                 email=reset_user.email,
                 token=reset_token,
-                host=Config.MAIL_HOST,
+                host=Config.MAIL_TEMPLATE_HOST,
             ),
         )
     except ValidationError as exception:
@@ -331,7 +331,7 @@ def get_reset_token(
             user=user.name,
             email=user.email,
             token=reset_token,
-            host=Config.MAIL_HOST,
+            host=Config.MAIL_TEMPLATE_HOST,
         )
 
         if recent_attempt:
