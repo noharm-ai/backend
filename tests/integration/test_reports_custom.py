@@ -32,7 +32,7 @@ _SEED_USER_ID = 1
 _SEED_USER_NAME = "Demonstração"
 
 # reserved user placed in another schema to play the cross-schema processor
-_OTHER_SCHEMA_EMAIL = "zztest_rptlist_other@noharm.ai"
+_OTHER_SCHEMA_EMAIL = "zztest_rptlist_other@example.com"
 _OTHER_SCHEMA_NAME = "ZZTEST_RPTLIST Other Schema User"
 
 

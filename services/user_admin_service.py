@@ -252,7 +252,7 @@ def upsert_user(data: dict, user_context: User, user_permissions: list[Permissio
                 user=user_name,
                 email=user_email,
                 password=password,
-                host=Config.MAIL_HOST,
+                host=Config.MAIL_TEMPLATE_HOST,
                 schema=user_context.schema,
             ),
         )

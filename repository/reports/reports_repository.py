@@ -3,6 +3,7 @@
 from sqlalchemy import and_
 
 from models.appendix import Report
+from models.enums import ReportTypeEnum
 from models.main import User, db
 
 
@@ -27,3 +28,23 @@ def get_custom_reports(schema: str, all: bool = False):
 def get_report(id_report: int):
     """Get single report by ID."""
     return db.session.query(Report).filter(Report.id == id_report).first()
+
+
+def get_active_custom_reports_from_session(db_session):
+    """List the active custom reports visible through an explicitly scoped session.
+
+    The schema comes from the session's schema_translate_map, so a caller reading
+    another schema never builds a schema name into the query.
+    """
+    return (
+        db_session.query(Report)
+        .filter(Report.active)
+        .filter(Report.report_type == ReportTypeEnum.CUSTOM.value)
+        .order_by(Report.name)
+        .all()
+    )
+
+
+def get_report_from_session(db_session, id_report: int):
+    """Get a single report by ID through an explicitly scoped session."""
+    return db_session.query(Report).filter(Report.id == id_report).first()

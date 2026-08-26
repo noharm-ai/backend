@@ -100,7 +100,9 @@ def _cleanup():
     session.execute(text("DELETE FROM demo.pessoa WHERE nratendimento >= 100000"))
     session.execute(text("DELETE FROM demo.pessoa_audit WHERE nratendimento >= 100000"))
 
-    session.execute(text("DELETE FROM demo.usuario WHERE email LIKE 'test%@noharm.ai'"))
+    session.execute(
+        text("DELETE FROM demo.usuario WHERE email LIKE 'test%@example.com'")
+    )
 
     session.execute(
         text("UPDATE demo.prescricao set status = '0' WHERE fkprescricao in (9199, 20)")

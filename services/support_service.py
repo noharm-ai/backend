@@ -1,12 +1,8 @@
 """Service: support related operations"""
 
 import base64
-import http.client
-import socket
-import xmlrpc.client
 
 from agents import n0_agent
-from config import Config
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
 from models.appendix import GlobalMemory
@@ -17,60 +13,13 @@ from models.requests.knowledge_base_request import (
 )
 from repository import knowledge_base_repository, user_repository
 from security.role import Role
-from services import training_service, vector_search_service
-from utils import logger, status
-
-
-class TimeoutTransport(xmlrpc.client.Transport):
-    """ODOO integration transport class"""
-
-    def __init__(self, timeout, *args, **kwargs):
-        self.timeout = timeout
-        super().__init__(*args, **kwargs)
-
-    def make_connection(self, host):
-        return http.client.HTTPConnection(host, timeout=self.timeout)
+from services import odoo_client, training_service, vector_search_service
+from utils import status
 
 
 def _get_client():
-    transport = TimeoutTransport(timeout=15)
-
-    common = xmlrpc.client.ServerProxy(
-        Config.ODOO_API_URL + "common", transport=transport
-    )
-    try:
-        uid = common.authenticate(
-            Config.ODOO_API_DB, Config.ODOO_API_USER, Config.ODOO_API_KEY, {}
-        )
-    except socket.timeout:
-        logger.backend_logger.warning(
-            "ODOO: Timeout connecting to ODOO API (support service)"
-        )
-
-        return None
-
-    models = xmlrpc.client.ServerProxy(
-        Config.ODOO_API_URL + "object", transport=transport
-    )
-
-    def execute(model, action, payload, options):
-        try:
-            return models.execute_kw(
-                Config.ODOO_API_DB,
-                uid,
-                Config.ODOO_API_KEY,
-                model,
-                action,
-                payload,
-                options,
-            )
-        except socket.timeout:
-            logger.backend_logger.warning(
-                "ODOO: Timeout connecting to ODOO API (support service)"
-            )
-            return None
-
-    return execute
+    """Authenticate on the ODOO API and return an execute callable (None on timeout)."""
+    return odoo_client.get_client(context="support service")
 
 
 @has_permission(Permission.READ_SUPPORT)
@@ -489,6 +438,10 @@ def list_tickets_v2(user_context: User, user_permissions: list[Permission]):
             options=options,
         )
 
+        # ODOO answers False, not [], when a search matches nothing
+        my_tickets = my_tickets if my_tickets else []
+        following_all = following_all if following_all else []
+
         my_tickets_ids = [t.get("id") for t in my_tickets]
         following = []
         for f in following_all:
@@ -591,7 +544,8 @@ def list_pending_action(user_context: User):
             options=options,
         )
 
-    return pending_tickets
+    # ODOO answers False, not [], when a search matches nothing
+    return pending_tickets if pending_tickets else []
 
 
 @has_permission(Permission.WRITE_SUPPORT)

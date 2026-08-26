@@ -118,7 +118,7 @@ def test_get_contact_list_missing_role(client, analyst_headers):
 def test_put_user(client, user_manager_headers):
     """Teste put /editUser - Compara o response.data e cria o usuário"""
     data = {
-        "email": "test@noharm.ai",
+        "email": "test@example.com",
         "name": "test3",
         "external": "test",
         "active": "true",
@@ -135,11 +135,11 @@ def test_put_user(client, user_manager_headers):
 
 def test_create_user_trims_email(client, user_manager_headers):
     """Teste put /editUser - Espaços em volta do email devem ser removidos na criação"""
-    email = "trim@noharm.ai"
+    email = "trim@example.com"
     _delete_user(email)
 
     data = {
-        "email": "  Trim@noharm.ai  ",
+        "email": "  Trim@example.com  ",
         "name": "trimTest",
         "external": "trimTest",
         "active": "true",
@@ -172,10 +172,10 @@ def test_create_user_blank_email(client, user_manager_headers):
 @pytest.mark.parametrize(
     "email",
     [
-        "joão@noharm.ai",
-        "invalid email@noharm.ai",
-        "Nome Sobrenome <invalid@noharm.ai>",
-        "invalid@noharm.ai,other@noharm.ai",
+        "joão@example.com",
+        "invalid email@example.com",
+        "Nome Sobrenome <invalid@example.com>",
+        "invalid@example.com,other@example.com",
         "invalid@localhost",
         "invalid",
     ],
@@ -199,7 +199,7 @@ def test_create_user_invalid_email(client, user_manager_headers, email):
 def test_put_editUser(client, user_manager_headers):
     """Teste put /editUser/<int:idUser> - Compara o response.data e edita o usuário"""
     create_data = {
-        "email": "test@noharm.ai",
+        "email": "test@example.com",
         "name": "test3",
         "external": "test",
         "active": "true",
@@ -234,7 +234,7 @@ def test_put_editUser(client, user_manager_headers):
 
 def test_create_user_check_roles(client, user_manager_headers):
     """Teste put /editUser - Verifica roles criadas"""
-    email = "test3@noharm.ai"
+    email = "test3@example.com"
     _delete_user(email)
 
     data = {
@@ -259,7 +259,7 @@ def test_create_user_check_roles(client, user_manager_headers):
 def test_update_user_invalid_role(client, user_manager_headers):
     """Teste put /editUser/<int:idUser> - Compara o response.data e edita o usuário"""
     create_data = {
-        "email": "test4@noharm.ai",
+        "email": "test4@example.com",
         "name": "test3",
         "external": "test",
         "active": "true",
@@ -295,7 +295,7 @@ def test_update_user_invalid_role(client, user_manager_headers):
 
 def test_create_user_invalid_role_perimission(client, user_manager_headers):
     """Teste put /editUser - Roles inválidas"""
-    email = "test5@noharm.ai"
+    email = "test5@example.com"
     _delete_user(email)
 
     data = {
@@ -313,7 +313,7 @@ def test_create_user_invalid_role_perimission(client, user_manager_headers):
 def test_update_user_invalid_role_permission(client, user_manager_headers):
     """Teste put /editUser/<int:idUser> - Edição com roles inválidas"""
     create_data = {
-        "email": "test6@noharm.ai",
+        "email": "test6@example.com",
         "name": "test3",
         "external": "test",
         "active": "true",
@@ -341,7 +341,7 @@ def test_update_user_invalid_role_permission(client, user_manager_headers):
 
 def test_create_user_invalid_authorization(client, user_manager_headers):
     """Teste put /editUser - Verifica autorizacao de segmento"""
-    email = "test3@noharm.ai"
+    email = "test3@example.com"
     _delete_user(email)
 
     data = {
@@ -359,7 +359,7 @@ def test_create_user_invalid_authorization(client, user_manager_headers):
 
 def test_update_user_authorization(client, user_manager_headers):
     """Teste put /editUser/<int:idUser> - Testa permissao de ediçao de autorizacoes"""
-    email = "test7@noharm.ai"
+    email = "test7@example.com"
     _delete_user(email)
 
     create_data = {

@@ -9,7 +9,7 @@ from models.enums import NoHarmENV
 class Config:
     """Configuration class for the application."""
 
-    VERSION = "v6.56-beta"
+    VERSION = "v6.57-beta"
     FRONTEND_VERSION = "5.1.6"
     ENV = getenv("ENV") or NoHarmENV.DEVELOPMENT.value
     SECRET_KEY = getenv("SECRET_KEY") or "secret_key"
@@ -35,6 +35,10 @@ class Config:
     MAIL_PASSWORD = getenv("MAIL_PASSWORD") or "password"
     MAIL_SENDER = getenv("MAIL_SENDER") or "user@gmail.com"
     MAIL_HOST = getenv("MAIL_HOST") or "localhost"
+    # base url used to build the links rendered inside email templates
+    MAIL_TEMPLATE_HOST = (
+        getenv("MAIL_TEMPLATE_HOST") or getenv("MAIL_HOST") or "localhost"
+    )
 
     NIFI_BUCKET_NAME = getenv("NIFI_BUCKET_NAME") or ""
     NIFI_SQS_QUEUE_REGION = getenv("NIFI_SQS_QUEUE_REGION") or ""

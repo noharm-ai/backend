@@ -19,7 +19,7 @@ from services.admin import admin_drug_service
 from utils import aws, status
 
 
-@has_permission(Permission.WRITE_DRUG_ATTRIBUTES)
+@has_permission(Permission.WRITE_DRUG_ATTRIBUTES, Permission.TRAINING_RECORDING)
 def get_unit_conversion_for_drug(id_drug: int):
     """Returns unit conversion possibilities for a single drug"""
 
