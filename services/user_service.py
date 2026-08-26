@@ -24,7 +24,7 @@ from repository import (
     user_repository,
 )
 from services import email_service
-from utils import status
+from utils import logger, status
 
 
 def create_audit(
@@ -303,6 +303,20 @@ def get_reset_token(
             status.HTTP_400_BAD_REQUEST,
         )
 
+    # a new request less than one hour after the previous one usually means the
+    # first email never reached the user, so the retry goes out through ODOO
+    # instead of the default SMTP provider. Taken before create_audit: the
+    # autoflush of the new row would otherwise make every request look like a
+    # retry of itself.
+    recent_attempt = send_email and (
+        db.session.query(UserAudit)
+        .filter(UserAudit.idUser == user.id)
+        .filter(UserAudit.auditType == UserAuditTypeEnum.FORGOT_PASSWORD.value)
+        .filter(UserAudit.createdAt > datetime.today() - timedelta(hours=1))
+        .first()
+        != None
+    )
+
     create_audit(
         auditType=UserAuditTypeEnum.FORGOT_PASSWORD,
         id_user=user.id,
@@ -312,11 +326,7 @@ def get_reset_token(
     )
 
     if send_email:
-        msg = Message()
-        msg.subject = "NoHarm: Esqueci a senha"
-        msg.sender = Config.MAIL_SENDER
-        msg.recipients = [user.email]
-        msg.html = render_template(
+        html = render_template(
             "reset_email.html",
             user=user.name,
             email=user.email,
@@ -324,8 +334,32 @@ def get_reset_token(
             host=Config.MAIL_HOST,
         )
 
-        mail = Mail()
-        mail.send(msg)
+        if recent_attempt:
+            try:
+                email_service.send_email(
+                    to=[user.email],
+                    subject="NoHarm: Esqueci a senha",
+                    html=html,
+                )
+            except ValidationError as exception:
+                # this endpoint answers 200 to everyone on purpose (unknown
+                # email, inactive user, success), so a delivery error must not
+                # escape and turn into an account-enumeration signal. It would
+                # also roll back the audit row that holds this token.
+                logger.backend_logger.warning(
+                    "Reset password: ODOO retry delivery failed for user %s: %s",
+                    user.id,
+                    exception,
+                )
+        else:
+            msg = Message()
+            msg.subject = "NoHarm: Esqueci a senha"
+            msg.sender = Config.MAIL_SENDER
+            msg.recipients = [user.email]
+            msg.html = html
+
+            mail = Mail()
+            mail.send(msg)
 
     return reset_token
 

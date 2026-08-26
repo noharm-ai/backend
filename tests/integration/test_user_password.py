@@ -226,6 +226,9 @@ def test_forget_password_enforces_daily_limit(client):
     # get_reset_token counts the audits already stored for today and refuses when
     # that count is > 5. The count is taken before the current request is audited,
     # so the 6th request still sees only 5 predecessors and succeeds.
+    # requests 2..6 land inside the one-hour retry window and are handed to
+    # email_service, which refuses because ODOO is not configured here. That
+    # error is swallowed on purpose, so they still answer 200.
     for _ in range(_DAILY_TOKEN_LIMIT):
         response = client.get(f"/user/forget?email={_RATE_LIMITED_EMAIL}")
         assert response.status_code == 200
@@ -747,3 +750,71 @@ def test_send_reset_email_requires_configured_odoo(client, curator_headers):
 
     assert response.status_code == 400
     assert response.get_json()["code"] == "errors.businessRules"
+
+
+# --- GET /user/forget: retry delivery -----------------------------------------
+# A request made less than one hour after the previous one is treated as "the
+# first email never arrived" and goes out through ODOO instead of SMTP. These
+# tests live down here because they reuse the _OdooEmailStub defined above.
+
+
+def _forget_password(client, email: str, stub: _OdooEmailStub):
+    """Call /user/forget with the ODOO client mocked out."""
+    with (
+        mock.patch.object(Config, "ODOO_API_URL", "http://odoo.test/"),
+        mock.patch("services.email_service.odoo_client.get_client", return_value=stub),
+    ):
+        return client.get(f"/user/forget?email={email}")
+
+
+def test_forget_password_uses_smtp_on_the_first_request(client):
+    """GET /user/forget - a first request in the hour does not touch ODOO"""
+    _upsert_user(_USER_ID, _USER_EMAIL, _USER_PASSWORD)
+    _delete_audits(_USER_ID)
+    stub = _OdooEmailStub()
+
+    response = _forget_password(client, _USER_EMAIL, stub)
+
+    assert response.status_code == 200
+    assert stub.calls == []
+
+
+def test_forget_password_retry_within_an_hour_uses_odoo(client):
+    """GET /user/forget - the second request in the hour is delivered by ODOO"""
+    _upsert_user(_USER_ID, _USER_EMAIL, _USER_PASSWORD)
+    _delete_audits(_USER_ID)
+    stub = _OdooEmailStub()
+
+    assert _forget_password(client, _USER_EMAIL, stub).status_code == 200
+    response = _forget_password(client, _USER_EMAIL, stub)
+
+    assert response.status_code == 200
+
+    audits = _audits(_USER_ID, UserAuditTypeEnum.FORGOT_PASSWORD)
+    assert len(audits) == 2
+
+    mail = stub.created_mail()
+    assert mail["email_to"] == _USER_EMAIL
+    # the retry carries the token audited by the retry, not the first one
+    assert audits[1].pw_token in mail["body_html"]
+    assert audits[0].pw_token not in mail["body_html"]
+
+
+def test_forget_password_retry_survives_an_odoo_failure(client):
+    """GET /user/forget - a failed ODOO retry still answers 200 and keeps the audit"""
+    _upsert_user(_USER_ID, _USER_EMAIL, _USER_PASSWORD)
+    _delete_audits(_USER_ID)
+
+    assert _forget_password(client, _USER_EMAIL, _OdooEmailStub()).status_code == 200
+    # an unreachable ODOO must not leak a 502: /user/forget answers 200 to
+    # everyone, and the audit row holding the token must survive the failure
+    with (
+        mock.patch.object(Config, "ODOO_API_URL", "http://odoo.test/"),
+        mock.patch("services.email_service.odoo_client.get_client", return_value=None),
+    ):
+        response = client.get(f"/user/forget?email={_USER_EMAIL}")
+
+    assert response.status_code == 200
+    audits = _audits(_USER_ID, UserAuditTypeEnum.FORGOT_PASSWORD)
+    assert len(audits) == 2
+    assert audits[1].pw_token
