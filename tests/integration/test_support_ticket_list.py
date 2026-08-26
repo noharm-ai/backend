@@ -183,7 +183,7 @@ def _add_user(name: str, suffix: str, roles: list, schema=DEMO_SCHEMA, active=Tr
         ),
         {
             "name": name,
-            "email": f"{_EMAIL_PREFIX}{suffix}@noharm.ai",
+            "email": f"{_EMAIL_PREFIX}{suffix}@example.com",
             "schema": schema,
             "config": json.dumps({"roles": roles}),
             "active": active,
@@ -543,8 +543,8 @@ def test_list_requesters_returns_both_support_roles(client):
 
     emails = _requester_emails(client, headers)
 
-    assert f"{_EMAIL_PREFIX}req@noharm.ai" in emails
-    assert f"{_EMAIL_PREFIX}man@noharm.ai" in emails
+    assert f"{_EMAIL_PREFIX}req@example.com" in emails
+    assert f"{_EMAIL_PREFIX}man@example.com" in emails
 
 
 def test_list_requesters_omits_users_without_a_support_role(client):
@@ -552,7 +552,7 @@ def test_list_requesters_omits_users_without_a_support_role(client):
     _add_user("ZZTEST C Viewer", "viewer", [Role.VIEWER.value])
     headers = _headers(client, MANAGER_ROLES)
 
-    assert f"{_EMAIL_PREFIX}viewer@noharm.ai" not in _requester_emails(client, headers)
+    assert f"{_EMAIL_PREFIX}viewer@example.com" not in _requester_emails(client, headers)
 
 
 def test_list_requesters_omits_deactivated_users(client):
@@ -562,7 +562,7 @@ def test_list_requesters_omits_deactivated_users(client):
     )
     headers = _headers(client, MANAGER_ROLES)
 
-    assert f"{_EMAIL_PREFIX}inactive@noharm.ai" not in _requester_emails(
+    assert f"{_EMAIL_PREFIX}inactive@example.com" not in _requester_emails(
         client, headers
     )
 
@@ -577,7 +577,7 @@ def test_list_requesters_is_scoped_to_the_callers_schema(client):
     )
     headers = _headers(client, MANAGER_ROLES)
 
-    assert f"{_EMAIL_PREFIX}other@noharm.ai" not in _requester_emails(client, headers)
+    assert f"{_EMAIL_PREFIX}other@example.com" not in _requester_emails(client, headers)
 
 
 def test_list_requesters_exposes_only_the_name_and_email(client):
@@ -587,12 +587,12 @@ def test_list_requesters_exposes_only_the_name_and_email(client):
 
     data = _data(client.get(REQUESTERS_URL, headers=headers))
     entry = next(
-        r for r in data["requesters"] if r["email"] == f"{_EMAIL_PREFIX}req@noharm.ai"
+        r for r in data["requesters"] if r["email"] == f"{_EMAIL_PREFIX}req@example.com"
     )
 
     assert entry == {
         "name": "ZZTEST A Requester",
-        "email": f"{_EMAIL_PREFIX}req@noharm.ai",
+        "email": f"{_EMAIL_PREFIX}req@example.com",
     }
 
 

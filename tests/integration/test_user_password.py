@@ -17,7 +17,7 @@ Every write is audited in ``public.usuario_audit``; the tests assert the audit
 trail as well as the effect on the stored password.
 
 The test users live in the reserved ``>= 99000`` id range and use
-``test...@noharm.ai`` e-mails, which the session-scoped ``clean_test_artifacts``
+``test...@example.com`` e-mails, which the session-scoped ``clean_test_artifacts``
 fixture removes afterwards.
 """
 
@@ -33,16 +33,16 @@ from security.role import Role
 from tests.conftest import get_access, make_headers, session, session_commit
 
 _USER_ID = 99001
-_USER_EMAIL = "testpassword@noharm.ai"
+_USER_EMAIL = "testpassword@example.com"
 _USER_PASSWORD = "InitialPass1"
 
 _RATE_LIMITED_ID = 99002
-_RATE_LIMITED_EMAIL = "testratelimit@noharm.ai"
+_RATE_LIMITED_EMAIL = "testratelimit@example.com"
 
 _INACTIVE_ID = 99003
-_INACTIVE_EMAIL = "testinactivepwd@noharm.ai"
+_INACTIVE_EMAIL = "testinactivepwd@example.com"
 
-_UNKNOWN_EMAIL = "testnobody@noharm.ai"
+_UNKNOWN_EMAIL = "testnobody@example.com"
 
 _NEW_PASSWORD = "ChangedPass9"
 _WEAK_PASSWORD = "weak"
