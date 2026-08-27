@@ -210,6 +210,7 @@ class Role(Enum):
             Permission.MULTI_SCHEMA,
             Permission.READ_CONFIG_EXAMS,
             Permission.READ_TAGS,
+            Permission.WRITE_DRUG_ATTRIBUTES,
             Permission.TRAINING_RECORDING,
         ],
     )
