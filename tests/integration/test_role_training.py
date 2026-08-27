@@ -1,4 +1,4 @@
-"""Tests for the TRAINING role: read-only app access plus MULTI_SCHEMA."""
+"""Tests for the TRAINING role: read app access, drug attributes and MULTI_SCHEMA."""
 
 from models.appendix import SchemaConfig
 from models.enums import FeatureEnum
@@ -11,7 +11,7 @@ PRESCRIPTIONDRUG = "20"
 
 
 def test_training_role_permissions():
-    """TRAINING grants only read permissions plus MULTI_SCHEMA"""
+    """TRAINING grants read permissions, drug attributes writing and MULTI_SCHEMA"""
     permissions = Role.TRAINING.permissions
 
     assert Permission.MULTI_SCHEMA in permissions
@@ -24,6 +24,7 @@ def test_training_role_permissions():
         Permission.MULTI_SCHEMA,
         Permission.READ_CONFIG_EXAMS,
         Permission.READ_TAGS,
+        Permission.WRITE_DRUG_ATTRIBUTES,
         Permission.TRAINING_RECORDING,
     }
 
@@ -36,10 +37,17 @@ def test_training_role_bypasses_oauth_gate_without_maintainer():
     assert Permission.MAINTAINER not in permissions
 
 
-def test_training_role_has_no_write_permissions():
-    """TRAINING must not hold any write/admin permission"""
+def test_training_role_write_permissions_are_limited_to_drug_attributes():
+    """TRAINING only writes drug attributes and holds no admin permission"""
+    write_permissions = [
+        permission
+        for permission in Role.TRAINING.permissions
+        if permission.value.startswith("WRITE_")
+    ]
+
+    assert write_permissions == [Permission.WRITE_DRUG_ATTRIBUTES]
+
     for permission in Role.TRAINING.permissions:
-        assert not permission.value.startswith("WRITE_")
         assert not permission.value.startswith("ADMIN_")
 
 

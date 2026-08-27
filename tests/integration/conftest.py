@@ -24,7 +24,7 @@ def navigator_headers(client):
 
 @pytest.fixture
 def training_headers(client):
-    """Headers with TRAINING role — read-only user used to record training videos"""
+    """Headers with TRAINING role — user used to record training videos"""
     return make_headers(get_access(client, roles=[Role.TRAINING.value]))
 
 
