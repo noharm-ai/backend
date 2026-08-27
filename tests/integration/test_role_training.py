@@ -23,6 +23,7 @@ def test_training_role_permissions():
         Permission.READ_USERS,
         Permission.MULTI_SCHEMA,
         Permission.READ_CONFIG_EXAMS,
+        Permission.WRITE_CONFIG_EXAMS,
         Permission.READ_TAGS,
         Permission.WRITE_DRUG_ATTRIBUTES,
         Permission.TRAINING_RECORDING,
@@ -38,14 +39,17 @@ def test_training_role_bypasses_oauth_gate_without_maintainer():
 
 
 def test_training_role_write_permissions_are_limited_to_drug_attributes():
-    """TRAINING only writes drug attributes and holds no admin permission"""
+    """TRAINING only writes drug attributes and exams config, no admin permission"""
     write_permissions = [
         permission
         for permission in Role.TRAINING.permissions
         if permission.value.startswith("WRITE_")
     ]
 
-    assert write_permissions == [Permission.WRITE_DRUG_ATTRIBUTES]
+    assert set(write_permissions) == {
+        Permission.WRITE_CONFIG_EXAMS,
+        Permission.WRITE_DRUG_ATTRIBUTES,
+    }
 
     for permission in Role.TRAINING.permissions:
         assert not permission.value.startswith("ADMIN_")
