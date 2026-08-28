@@ -39,11 +39,21 @@ class ProtocolTraceRequest(BaseModel):
 
 
 class ProtocolConfig(BaseModel):
-    """Protocol: structure of a protocol configuration"""
+    """Protocol: structure of a protocol configuration
+
+    onlyLatestExpireDate restricts what reaches the prescription summary: the
+    protocol keeps being tested against every expire date group, but it is only
+    counted in the summary when it fires on a group holding drugs prescribed on
+    the aggregated prescription date; for item protocols, the prescription date
+    of the matched item is what decides. It defaults to false so that configs
+    stored before the field existed, which do not carry the key, keep the
+    previous behavior.
+    """
 
     result: dict
     trigger: str
     variables: list[dict]
+    onlyLatestExpireDate: bool = False
 
 
 class ProtocolTestSampleRequest(BaseModel):

@@ -62,21 +62,56 @@ def _drug(id: int, expire_date=None, prescription_date=_PRESCRIPTION_DATE):
     return row._replace(expire=expire_date, prescription_date=prescription_date)
 
 
-def _protocol(id: int, protocol_type: ProtocolTypeEnum):
-    """Build an active-protocol row as returned by protocol_repository."""
+def _protocol(
+    id: int, protocol_type: ProtocolTypeEnum, only_latest_expire_date: bool = None
+):
+    """Build an active-protocol row as returned by protocol_repository.
+
+    ``only_latest_expire_date`` left as None reproduces a config stored before
+    the field existed: the key is simply absent."""
+    config = {"id": id}
+    if only_latest_expire_date is not None:
+        config["onlyLatestExpireDate"] = only_latest_expire_date
+
     return SimpleNamespace(
         id=id,
         protocol_type=protocol_type.value,
-        config={"id": id},
+        config=config,
     )
+
+
+def _fires_on_items(*drug_ids: int):
+    """Alert callback of an item protocol: fires on the date groups holding one
+    of the given prescription drug ids and reports them back in
+    ``related_items``, the way the engine reports a combination match."""
+
+    def fire(drugs):
+        ids = [d[0].id for d in drugs if d[0].id in drug_ids]
+        return {"message": "fired", "related_items": ids} if ids else None
+
+    return fire
+
+
+def _fires_on(*drug_ids: int):
+    """Alert callback that fires only on the date groups holding one of the
+    given prescription drug ids, so a test can activate a protocol in one
+    expire date group and not in another."""
+
+    def fire(drugs):
+        ids = {d[0].id for d in drugs}
+        return {"message": "fired"} if ids & set(drug_ids) else None
+
+    return fire
 
 
 class _FakeAlertProtocol:
     """Stand-in for the rule engine: replays a canned answer per protocol config.
 
     ``alerts_by_protocol`` maps a protocol config id to the alert dict the
-    engine should return (``None`` for "protocol did not fire"). Every instance
-    records the drug group it was built with, so tests can assert the grouping.
+    engine should return (``None`` for "protocol did not fire"), or to a
+    callable receiving the drug group, for protocols that must fire in some
+    date groups only. Every instance records the drug group it was built with,
+    so tests can assert the grouping.
     """
 
     instances = []
@@ -93,6 +128,9 @@ class _FakeAlertProtocol:
 
     def get_protocol_alerts(self, protocol: dict):
         alert = _FakeAlertProtocol.alerts_by_protocol.get(protocol.get("id"))
+
+        if callable(alert):
+            alert = alert(self.drugs)
 
         # the real engine returns a fresh dict per call; copy so the service
         # writing "id" into it cannot leak between date groups
@@ -427,3 +465,314 @@ class TestFindProtocolsResults:
 
         assert result == {"items": [], "summary": []}
         assert fake_engine.instances == []
+
+
+class TestOnlyLatestExpireDate:
+    """config.onlyLatestExpireDate — reach the summary from current groups only
+
+    An aggregated prescription is evaluated once per expire-date group and also
+    carries drugs prescribed on previous days; ``summary`` feeds the
+    prescription alert count. Some protocols only make sense against what is
+    prescribed today, so the config can ask to be counted only when it fires on
+    a group holding drugs whose prescription date is the aggregated prescription
+    date. The protocol is still tested against every group and its alert still
+    shows inside the group where it fired: the flag changes the summary alone.
+    It is read per protocol, and a config without the key always reaches the
+    summary.
+    """
+
+    @pytest.mark.parametrize(
+        "config, expected",
+        [
+            (None, False),
+            ({}, False),
+            ({"id": 1}, False),
+            ({"onlyLatestExpireDate": False}, False),
+            ({"onlyLatestExpireDate": True}, True),
+        ],
+    )
+    def test_flag_reading_defaults_to_false(self, config, expected):
+        """A config without the key behaves as it did before the field existed"""
+        assert alert_protocol_service.is_summary_restricted(config=config) is expected
+
+    def test_flagged_protocol_firing_on_a_current_group_is_summarized(
+        self, fake_engine
+    ):
+        """The newest expire date does not decide it: what counts is that the
+        group holds drugs prescribed on the aggregated prescription date"""
+        fake_engine.alerts_by_protocol = {5: _fires_on(1)}
+
+        result, _ = _run(
+            protocols=[
+                _protocol(
+                    5, ProtocolTypeEnum.PRESCRIPTION_AGG, only_latest_expire_date=True
+                )
+            ],
+            drug_list=[
+                # prescribed today, expires first
+                _drug(1, expire_date=datetime(2024, 3, 11, 10, 0)),
+                # left over from a previous day, expires later
+                _drug(
+                    2,
+                    expire_date=datetime(2024, 3, 12, 10, 0),
+                    prescription_date=datetime(2024, 3, 9, 8, 0),
+                ),
+            ],
+            prescription=_prescription(agg=True),
+        )
+
+        assert result["2024-03-11"] == [{"message": "fired", "id": 5}]
+        assert result["2024-03-12"] == []
+        assert result["summary"] == [5]
+
+    def test_flagged_protocol_firing_on_an_older_group_is_not_summarized(
+        self, fake_engine
+    ):
+        """The alert is still reported inside the group of the previous day, but
+        it does not count in the summary (which feeds the alert count)"""
+        fake_engine.alerts_by_protocol = {5: _fires_on(2)}
+
+        result, _ = _run(
+            protocols=[
+                _protocol(
+                    5, ProtocolTypeEnum.PRESCRIPTION_AGG, only_latest_expire_date=True
+                )
+            ],
+            drug_list=[
+                _drug(1, expire_date=datetime(2024, 3, 11, 10, 0)),
+                _drug(
+                    2,
+                    expire_date=datetime(2024, 3, 12, 10, 0),
+                    prescription_date=datetime(2024, 3, 9, 8, 0),
+                ),
+            ],
+            prescription=_prescription(agg=True),
+        )
+
+        assert result["2024-03-12"] == [{"message": "fired", "id": 5}]
+        assert result["2024-03-11"] == []
+        assert result["summary"] == []
+
+    def test_a_group_mixing_dates_counts_as_current(self, fake_engine):
+        """One drug of the prescription date is enough: the group is part of
+        what is prescribed today"""
+        fake_engine.alerts_by_protocol = {5: {"message": "fired"}}
+
+        result, _ = _run(
+            protocols=[
+                _protocol(
+                    5, ProtocolTypeEnum.PRESCRIPTION_AGG, only_latest_expire_date=True
+                )
+            ],
+            drug_list=[
+                _drug(1, expire_date=datetime(2024, 3, 11, 10, 0)),
+                _drug(
+                    2,
+                    expire_date=datetime(2024, 3, 11, 10, 0),
+                    prescription_date=datetime(2024, 3, 9, 8, 0),
+                ),
+            ],
+            prescription=_prescription(agg=True),
+        )
+
+        assert result["summary"] == [5]
+
+    def test_unflagged_protocol_firing_on_an_older_group_is_summarized(
+        self, fake_engine
+    ):
+        """Back compatibility: without the flag, firing anywhere counts"""
+        fake_engine.alerts_by_protocol = {5: _fires_on(2)}
+
+        result, _ = _run(
+            protocols=[_protocol(5, ProtocolTypeEnum.PRESCRIPTION_AGG)],
+            drug_list=[
+                _drug(1, expire_date=datetime(2024, 3, 11, 10, 0)),
+                _drug(
+                    2,
+                    expire_date=datetime(2024, 3, 12, 10, 0),
+                    prescription_date=datetime(2024, 3, 9, 8, 0),
+                ),
+            ],
+            prescription=_prescription(agg=True),
+        )
+
+        assert result["2024-03-12"] == [{"message": "fired", "id": 5}]
+        assert result["summary"] == [5]
+
+    def test_flag_is_read_per_protocol(self, fake_engine):
+        """A flagged and an unflagged protocol coexist in the same prescription:
+        both alert on the previous day group, only the unflagged one is counted"""
+        fake_engine.alerts_by_protocol = {5: _fires_on(2), 6: _fires_on(2)}
+
+        result, _ = _run(
+            protocols=[
+                _protocol(
+                    5, ProtocolTypeEnum.PRESCRIPTION_AGG, only_latest_expire_date=True
+                ),
+                _protocol(
+                    6, ProtocolTypeEnum.PRESCRIPTION_AGG, only_latest_expire_date=False
+                ),
+            ],
+            drug_list=[
+                _drug(1, expire_date=datetime(2024, 3, 11, 10, 0)),
+                _drug(
+                    2,
+                    expire_date=datetime(2024, 3, 12, 10, 0),
+                    prescription_date=datetime(2024, 3, 9, 8, 0),
+                ),
+            ],
+            prescription=_prescription(agg=True),
+        )
+
+        assert result["2024-03-12"] == [
+            {"message": "fired", "id": 5},
+            {"message": "fired", "id": 6},
+        ]
+        assert result["summary"] == [6]
+
+    def test_flagged_item_protocol_is_judged_by_its_own_item(self, fake_engine):
+        """An item alert belongs to the items that matched it: the date of those
+        items decides the summary, not the dates of the whole group"""
+        fake_engine.alerts_by_protocol = {7: _fires_on_items(2)}
+
+        result, _ = _run(
+            protocols=[
+                _protocol(
+                    7, ProtocolTypeEnum.PRESCRIPTION_ITEM, only_latest_expire_date=True
+                )
+            ],
+            drug_list=[
+                # same expire date group, prescribed on different days
+                _drug(1, expire_date=datetime(2024, 3, 11, 10, 0)),
+                _drug(
+                    2,
+                    expire_date=datetime(2024, 3, 11, 10, 0),
+                    prescription_date=datetime(2024, 3, 9, 8, 0),
+                ),
+            ],
+            prescription=_prescription(agg=True),
+        )
+
+        # the alert is reported, but the item it points at is not of today
+        assert result["items"] == [
+            {"message": "fired", "related_items": [2], "id": 7}
+        ]
+        assert result["summary"] == []
+
+    def test_flagged_item_protocol_of_a_current_item_is_summarized(self, fake_engine):
+        """The same group counts when the matched item is of the current date"""
+        fake_engine.alerts_by_protocol = {7: _fires_on_items(1)}
+
+        result, _ = _run(
+            protocols=[
+                _protocol(
+                    7, ProtocolTypeEnum.PRESCRIPTION_ITEM, only_latest_expire_date=True
+                )
+            ],
+            drug_list=[
+                _drug(1, expire_date=datetime(2024, 3, 11, 10, 0)),
+                _drug(
+                    2,
+                    expire_date=datetime(2024, 3, 11, 10, 0),
+                    prescription_date=datetime(2024, 3, 9, 8, 0),
+                ),
+            ],
+            prescription=_prescription(agg=True),
+        )
+
+        assert result["summary"] == [7]
+
+    def test_flagged_item_alert_without_related_items_falls_back_to_the_group(
+        self, fake_engine
+    ):
+        """An item alert that reports no item cannot be attributed to one, so
+        the group answers for it"""
+        fake_engine.alerts_by_protocol = {7: {"message": "fired"}}
+
+        result, _ = _run(
+            protocols=[
+                _protocol(
+                    7, ProtocolTypeEnum.PRESCRIPTION_ITEM, only_latest_expire_date=True
+                )
+            ],
+            drug_list=[_drug(1, prescription_date=datetime(2024, 3, 9, 8, 0))],
+            prescription=_prescription(agg=True),
+        )
+
+        assert result["summary"] == []
+
+    def test_flagged_item_alert_without_related_items_counts_on_a_current_group(
+        self, fake_engine
+    ):
+        """The fallback is the group rule, not a refusal: an unattributable item
+        alert still counts when the group is of the current date"""
+        fake_engine.alerts_by_protocol = {7: {"message": "fired"}}
+
+        result, _ = _run(
+            protocols=[
+                _protocol(
+                    7, ProtocolTypeEnum.PRESCRIPTION_ITEM, only_latest_expire_date=True
+                )
+            ],
+            drug_list=[_drug(1)],
+            prescription=_prescription(agg=True),
+        )
+
+        assert result["summary"] == [7]
+
+    def test_unflagged_item_protocol_ignores_the_item_date(self, fake_engine):
+        """Back compatibility: without the flag, an item alert always counts"""
+        fake_engine.alerts_by_protocol = {7: _fires_on_items(2)}
+
+        result, _ = _run(
+            protocols=[_protocol(7, ProtocolTypeEnum.PRESCRIPTION_ITEM)],
+            drug_list=[
+                _drug(1, expire_date=datetime(2024, 3, 11, 10, 0)),
+                _drug(
+                    2,
+                    expire_date=datetime(2024, 3, 11, 10, 0),
+                    prescription_date=datetime(2024, 3, 9, 8, 0),
+                ),
+            ],
+            prescription=_prescription(agg=True),
+        )
+
+        assert result["summary"] == [7]
+
+    def test_single_group_prescription_is_unaffected(self, fake_engine):
+        """An individual prescription has one group, holding its own drugs"""
+        fake_engine.alerts_by_protocol = {5: {"message": "fired"}}
+
+        result, _ = _run(
+            protocols=[
+                _protocol(
+                    5,
+                    ProtocolTypeEnum.PRESCRIPTION_INDIVIDUAL,
+                    only_latest_expire_date=True,
+                )
+            ],
+            drug_list=[_drug(1)],
+            prescription=_prescription(agg=False),
+        )
+
+        assert result["2024-03-10"] == [{"message": "fired", "id": 5}]
+        assert result["summary"] == [5]
+
+    def test_cpoe_group_of_previous_days_only_is_not_summarized(self, fake_engine):
+        """A cpoe prescription is a single group keyed by its own date, but its
+        drugs may all come from previous days: the flag still applies"""
+        fake_engine.alerts_by_protocol = {5: {"message": "fired"}}
+
+        result, _ = _run(
+            protocols=[
+                _protocol(
+                    5, ProtocolTypeEnum.PRESCRIPTION_AGG, only_latest_expire_date=True
+                )
+            ],
+            drug_list=[_drug(1, prescription_date=datetime(2024, 3, 9, 8, 0))],
+            prescription=_prescription(agg=True),
+            is_cpoe=True,
+        )
+
+        assert result["2024-03-10"] == [{"message": "fired", "id": 5}]
+        assert result["summary"] == []

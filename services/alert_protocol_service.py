@@ -65,13 +65,69 @@ def find_protocols(
                 alert["id"] = protocol.id
                 if protocol.protocol_type == ProtocolTypeEnum.PRESCRIPTION_ITEM.value:
                     results["items"].append(alert)
+                    # an item alert belongs to the items that matched it, so the
+                    # summary decision looks at those items alone
+                    summary_drugs = get_related_drugs(drugs=drugs, alert=alert)
                 else:
                     results[expire_date].append(alert)
-                summary.add(protocol.id)
+                    summary_drugs = drugs
+
+                if counts_to_summary(
+                    config=protocol.config,
+                    drugs=summary_drugs,
+                    prescription=prescription,
+                ):
+                    summary.add(protocol.id)
 
     results["summary"] = list(summary)
-
+    
     return results
+
+
+def counts_to_summary(config: dict, drugs: list, prescription: Prescription) -> bool:
+    """Tells if an alert raised on these drugs must be counted in the summary.
+
+    Every protocol is tested against every date group, but a protocol flagged
+    with onlyLatestExpireDate only reaches the summary (which feeds the
+    prescription alert count) when it fires on drugs prescribed on the current
+    prescription date. Each drug row carries the date of the prescription it
+    came from, and an aggregated prescription also carries drugs prescribed on
+    previous days."""
+
+    if not is_summary_restricted(config=config):
+        return True
+
+    prescription_date = prescription.date.date()
+
+    return any(d[13] is not None and d[13].date() == prescription_date for d in drugs)
+
+
+def get_related_drugs(drugs: list, alert: dict) -> list:
+    """Drug rows an item alert points at.
+
+    An item protocol always carries a combination variable, so its alert reports
+    the items that matched it. When it reports none (a trigger activated by the
+    absence of a match), the alert cannot be attributed to an item and the whole
+    group answers for it."""
+
+    related_items = alert.get("related_items") or []
+
+    if not related_items:
+        return drugs
+
+    return [d for d in drugs if d[0].id in related_items]
+
+
+def is_summary_restricted(config: dict) -> bool:
+    """Tells if a protocol config asks to reach the summary only when it fires
+    on drugs of the current prescription date. Stored as onlyLatestExpireDate;
+    configs saved before the field existed do not have the key and always reach
+    the summary."""
+
+    if not config:
+        return False
+
+    return bool(config.get("onlyLatestExpireDate", False))
 
 
 def split_drugs_by_date(drug_list: dict, prescription: Prescription):

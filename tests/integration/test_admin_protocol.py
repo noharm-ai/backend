@@ -273,6 +273,48 @@ def test_upsert_own_schema_protocol(client, admin_headers, seed_protocols):
     assert _list(client, admin_headers)[_OWN[0]]["name"] == "ZZAdmin Demo Editado"
 
 
+def test_upsert_persists_only_latest_expire_date(
+    client, admin_headers, analyst_headers, seed_protocols
+):
+    """The flag survives the save and comes back on both read endpoints.
+
+    It is the field that decides whether a protocol firing on an older expire
+    date group counts in the prescription summary, so the editor and the
+    prescription view must both see the value that was saved."""
+    payload = _upsert_payload(_OWN[0], "ZZAdmin Demo Ultimo Grupo")
+    payload["config"] = {**_VALID_CONFIG, "onlyLatestExpireDate": True}
+
+    response = client.post(UPSERT_URL, data=json.dumps(payload), headers=admin_headers)
+
+    assert response.status_code == status.HTTP_200_OK
+
+    stored = client.get(f"{GET_URL}/{_OWN[0]}", headers=admin_headers)
+    assert stored.get_json()["data"]["config"]["onlyLatestExpireDate"] is True
+
+    described = client.get(f"/protocol/{_OWN[0]}/description", headers=analyst_headers)
+    assert described.get_json()["data"]["onlyLatestExpireDate"] is True
+
+
+def test_upsert_defaults_only_latest_expire_date_to_false(
+    client, admin_headers, analyst_headers, seed_protocols
+):
+    """A config saved without the field keeps counting in the summary from any
+    date group"""
+    response = client.post(
+        UPSERT_URL,
+        data=json.dumps(_upsert_payload(_OWN[0], "ZZAdmin Demo Todos Grupos")),
+        headers=admin_headers,
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+
+    stored = client.get(f"{GET_URL}/{_OWN[0]}", headers=admin_headers)
+    assert stored.get_json()["data"]["config"]["onlyLatestExpireDate"] is False
+
+    described = client.get(f"/protocol/{_OWN[0]}/description", headers=analyst_headers)
+    assert described.get_json()["data"]["onlyLatestExpireDate"] is False
+
+
 def test_upsert_other_schema_protocol_is_rejected(
     client, admin_headers, seed_protocols
 ):
