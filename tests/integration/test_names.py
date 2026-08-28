@@ -35,10 +35,12 @@ from tests.conftest import session, session_commit
 # Any patient id works: nothing about the lookup touches the local patient row.
 PATIENT_ID = 1
 
-# HS256 keys, long enough not to trip PyJWT's short-key warning.
-GETNAME_SECRET = "zztest-getname-secret-0123456789abcdef"
-CLIENT_SECRET = "zztest-client-secret-0123456789abcdef"
-WRONG_SECRET = "zztest-wrong-secret-0123456789abcdef"
+# HS256 keys, long enough not to trip PyJWT's short-key warning. They are
+# literals invented for this file, never a real credential — the gitleaks
+# annotations keep the secret scan from reading them as one.
+GETNAME_SECRET = "zztest-getname-secret-0123456789abcdef"  # gitleaks:allow
+CLIENT_SECRET = "zztest-client-secret-0123456789abcdef"  # gitleaks:allow
+WRONG_SECRET = "zztest-wrong-secret-0123456789abcdef"  # gitleaks:allow
 
 
 @pytest.fixture
