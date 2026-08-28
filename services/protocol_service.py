@@ -80,7 +80,6 @@ def describe_protocol(request_data: ProtocolDescriptionRequest, user_context: Us
         "name": protocol.name,
         "protocolType": protocol.protocol_type,
         "trigger": config.get("trigger"),
-        "onlyLatestExpireDate": bool(config.get("onlyLatestExpireDate", False)),
         "variables": variables,
         "labels": _build_variable_labels(variables),
     }

@@ -102,11 +102,7 @@ AGENT_SYSTEM_PROMPT = (
     "Nothing else is allowed — no literals, no comparisons, no function "
     "calls. Write the operators in LOWER CASE. Maximum 500 characters.\n"
     '- config.result: {"type": "SHOW_MESSAGE", "level": "low"|"medium"|"high", '
-    '"message": "<short alert>", "description": "<longer explanation>"}.\n'
-    "- config.onlyLatestExpireDate (optional, default false): an aggregated "
-    "prescription is evaluated once per expire date group of its items; set it "
-    "to true when the protocol must be tested only against the most recent "
-    "expire date group.\n\n"
+    '"message": "<short alert>", "description": "<longer explanation>"}.\n\n'
     "VARIABLE FIELDS (field → operator → value)\n"
     "- substance → IN/NOTIN → list of sctid strings (resolve with "
     "search_substances).\n"
