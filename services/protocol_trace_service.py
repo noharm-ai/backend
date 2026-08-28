@@ -163,6 +163,16 @@ def _evaluate_date_groups(
     When compact, returns only date/activated/summary per group."""
 
     date_groups = []
+
+    if alert_protocol_service.only_latest_expire_date(config=config):
+        # mirrors production: this protocol only runs on the most recent group
+        latest = alert_protocol_service.get_latest_expire_date(
+            drugs_by_expire_date=drugs_by_expire_date
+        )
+        drugs_by_expire_date = (
+            {latest: drugs_by_expire_date[latest]} if latest is not None else {}
+        )
+
     for expire_date, drugs in drugs_by_expire_date.items():
         alert_protocol = AlertProtocol(
             drugs=drugs,

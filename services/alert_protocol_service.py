@@ -45,6 +45,9 @@ def find_protocols(
     drugs_by_expire_date = split_drugs_by_date(
         drug_list=drug_list, prescription=prescription
     )
+    latest_expire_date = get_latest_expire_date(
+        drugs_by_expire_date=drugs_by_expire_date
+    )
 
     # protocols must be applied inside each date group
     for expire_date, drugs in drugs_by_expire_date.items():
@@ -60,6 +63,12 @@ def find_protocols(
         )
 
         for protocol in protocols:
+            if (
+                only_latest_expire_date(config=protocol.config)
+                and expire_date != latest_expire_date
+            ):
+                continue
+
             alert = alert_protocol.get_protocol_alerts(protocol=protocol.config)
             if alert:
                 alert["id"] = protocol.id
@@ -72,6 +81,29 @@ def find_protocols(
     results["summary"] = list(summary)
 
     return results
+
+
+def only_latest_expire_date(config: dict) -> bool:
+    """Tells if a protocol config asks to be tested only against the most recent
+    expire date drug group. Configs stored before this field existed do not have
+    the key and keep being tested against every date group."""
+
+    if not config:
+        return False
+
+    return bool(config.get("onlyLatestExpireDate", False))
+
+
+def get_latest_expire_date(drugs_by_expire_date: dict):
+    """Most recent group key of a split_drugs_by_date result.
+
+    Group keys are always zero padded ISO dates (YYYY-MM-DD), so the
+    lexicographic max is also the chronological one."""
+
+    if not drugs_by_expire_date:
+        return None
+
+    return max(drugs_by_expire_date.keys())
 
 
 def split_drugs_by_date(drug_list: dict, prescription: Prescription):
