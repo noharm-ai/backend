@@ -191,7 +191,12 @@ def _validate_report(
     if Permission.WRITE_CUSTOM_REPORTS in user_permissions:
         return True
 
-    if report_data.active is False:
+    # READ_CUSTOM_REPORTS already lists inactive reports (see get_report_list), so
+    # the same permission also opens them; the report config check below still applies
+    if (
+        report_data.active is False
+        and Permission.READ_CUSTOM_REPORTS not in user_permissions
+    ):
         raise ValidationError(
             "Relatório não está ativo",
             "errors.invalidRecord",
