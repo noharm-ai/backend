@@ -94,6 +94,35 @@ class TestGetPermissionsFromUser:
         assert Permission.WRITE_SUPPORT in result
 
 
+class TestCustomReportPermissions:
+    """Teste security.role - which roles reach inactive custom reports"""
+
+    def test_only_admin_and_curator_read_custom_reports(self):
+        """READ_CUSTOM_REPORTS opens inactive custom reports, so it stays privileged.
+
+        reports_custom_service._validate_report lets this permission past the
+        "report is not active" check, so widening it to another role would also
+        expose inactive reports to that role.
+        """
+        holders = {
+            role.value for role in Role if Permission.READ_CUSTOM_REPORTS in role.permissions
+        }
+
+        assert holders == {Role.ADMIN.value, Role.CURATOR.value}
+
+    def test_report_reader_roles_do_not_read_custom_reports(self):
+        """The ordinary READ_REPORTS roles stay out of inactive custom reports."""
+        for role in (
+            Role.PRESCRIPTION_ANALYST,
+            Role.VIEWER,
+            Role.RESEARCHER,
+            Role.TRAINING,
+            Role.REGULATOR,
+        ):
+            assert Permission.READ_CUSTOM_REPORTS not in role.permissions
+            assert Permission.WRITE_CUSTOM_REPORTS not in role.permissions
+
+
 class TestGetSpecialRoles:
     """Teste security.role - get_special_roles (non-assignable roles)"""
 

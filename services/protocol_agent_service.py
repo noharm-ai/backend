@@ -102,7 +102,15 @@ AGENT_SYSTEM_PROMPT = (
     "Nothing else is allowed — no literals, no comparisons, no function "
     "calls. Write the operators in LOWER CASE. Maximum 500 characters.\n"
     '- config.result: {"type": "SHOW_MESSAGE", "level": "low"|"medium"|"high", '
-    '"message": "<short alert>", "description": "<longer explanation>"}.\n\n'
+    '"message": "<short alert>", "description": "<longer explanation>"}.\n'
+    "- config.onlyLatestExpireDate (optional, default false): an aggregated "
+    "prescription is evaluated once per expire date group of its items, and it "
+    "also carries items prescribed on previous days; the protocol always runs "
+    "on every group, but setting it to true makes the alert count in the "
+    "prescription summary only when it fires on a group holding items "
+    "prescribed on the current prescription date; for a PRESCRIPTION_ITEM "
+    "protocol, the item that matched the combination is the one whose "
+    "prescription date must be the current one.\n\n"
     "VARIABLE FIELDS (field → operator → value)\n"
     "- substance → IN/NOTIN → list of sctid strings (resolve with "
     "search_substances).\n"

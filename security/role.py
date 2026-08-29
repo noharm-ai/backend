@@ -209,7 +209,9 @@ class Role(Enum):
             Permission.READ_USERS,
             Permission.MULTI_SCHEMA,
             Permission.READ_CONFIG_EXAMS,
+            Permission.WRITE_CONFIG_EXAMS,
             Permission.READ_TAGS,
+            Permission.WRITE_DRUG_ATTRIBUTES,
             Permission.TRAINING_RECORDING,
         ],
     )
