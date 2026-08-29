@@ -1,8 +1,12 @@
-"""Integration tests for the /reports/custom/list endpoint.
+"""Integration tests for the /reports/custom list and download endpoints.
 
 The list endpoint resolves the user who last processed each report. That name
 only makes sense for users of the caller's own schema: a NoHarm user from
 another schema must stay anonymous, and the report itself must still be listed.
+
+Inactive reports are visible only to the privileged roles that hold
+READ_CUSTOM_REPORTS (ADMIN and CURATOR): they are listed for those users and
+they can also be downloaded, while a regular reader is refused.
 
 Custom reports live in the schema-local demo.relatorio table. Every row created
 here is named with the reserved prefix below, so a single LIKE clause isolates
@@ -20,6 +24,11 @@ from tests.conftest import session, session_commit
 from utils import status
 
 LIST_URL = "/reports/custom/list"
+DOWNLOAD_URL = "/reports/custom/download"
+
+# any name accepted by the resource path validation
+_FILENAME = "20240101.csv"
+_PRESIGNED_LINK = "https://example.com/zztest_rptlist.csv"
 
 # every report written by this module is named with this prefix
 _PREFIX = "ZZTEST_RPTLIST"
@@ -95,6 +104,16 @@ def stub_report_cache(monkeypatch):
 
 
 @pytest.fixture
+def stub_report_link(monkeypatch):
+    """Return a fixed presigned link instead of reaching S3."""
+    monkeypatch.setattr(
+        reports_cache_service,
+        "generate_link",
+        lambda resource_path: _PRESIGNED_LINK,  # noqa: ARG005
+    )
+
+
+@pytest.fixture
 def other_schema_user() -> int:
     """A user that belongs to a schema other than the caller's."""
     result = session.execute(
@@ -161,3 +180,88 @@ def test_list_returns_no_name_when_the_report_was_never_processed(
 
     assert report is not None
     assert report["processed_by_name"] is None
+
+
+def test_list_hides_inactive_reports_from_a_regular_reader(client, analyst_headers):
+    """Without READ_CUSTOM_REPORTS an inactive report is not listed [200 OK]."""
+    name = f"{_PREFIX} inactive for analyst"
+    _insert_report(name=name, processed_by=_SEED_USER_ID, active=False)
+
+    assert _get_report(client, analyst_headers, name) is None
+
+
+def test_list_shows_inactive_reports_to_curator(client, curator_headers):
+    """CURATOR holds READ_CUSTOM_REPORTS, so inactive reports are listed [200 OK]."""
+    name = f"{_PREFIX} inactive for curator"
+    _insert_report(name=name, processed_by=_SEED_USER_ID, active=False)
+
+    report = _get_report(client, curator_headers, name)
+
+    assert report is not None
+    assert report["active"] is False
+
+
+def _download(client, headers, id_report: int):
+    """Call the download endpoint for a report."""
+    return client.get(f"{DOWNLOAD_URL}/{id_report}/{_FILENAME}", headers=headers)
+
+
+def test_download_inactive_report_is_allowed_for_curator(
+    client, curator_headers, stub_report_link
+):
+    """CURATOR opens an inactive report, same as ADMIN [200 OK]."""
+    id_report = _insert_report(
+        name=f"{_PREFIX} inactive download curator",
+        processed_by=_SEED_USER_ID,
+        active=False,
+    )
+
+    response = _download(client, curator_headers, id_report)
+
+    assert response.status_code == status.HTTP_200_OK
+    assert json.loads(response.data)["data"]["url"] == _PRESIGNED_LINK
+
+
+def test_download_inactive_report_is_allowed_for_admin(
+    client, admin_headers, stub_report_link
+):
+    """ADMIN keeps its access to inactive reports [200 OK]."""
+    id_report = _insert_report(
+        name=f"{_PREFIX} inactive download admin",
+        processed_by=_SEED_USER_ID,
+        active=False,
+    )
+
+    response = _download(client, admin_headers, id_report)
+
+    assert response.status_code == status.HTTP_200_OK
+    assert json.loads(response.data)["data"]["url"] == _PRESIGNED_LINK
+
+
+def test_download_inactive_report_is_refused_for_a_regular_reader(
+    client, analyst_headers, stub_report_link
+):
+    """Without READ_CUSTOM_REPORTS an inactive report stays closed [400 BAD REQUEST]."""
+    id_report = _insert_report(
+        name=f"{_PREFIX} inactive download analyst",
+        processed_by=_SEED_USER_ID,
+        active=False,
+    )
+
+    response = _download(client, analyst_headers, id_report)
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+def test_download_active_report_is_allowed_for_a_regular_reader(
+    client, analyst_headers, stub_report_link
+):
+    """An active report is still open to every report reader [200 OK]."""
+    id_report = _insert_report(
+        name=f"{_PREFIX} active download analyst", processed_by=_SEED_USER_ID
+    )
+
+    response = _download(client, analyst_headers, id_report)
+
+    assert response.status_code == status.HTTP_200_OK
+    assert json.loads(response.data)["data"]["url"] == _PRESIGNED_LINK
