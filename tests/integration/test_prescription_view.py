@@ -7,6 +7,7 @@ Covers the prescription_view_service._internal_get_prescription() pipeline:
 - Aggregated vs non-aggregated prescriptions
 - Prescription status variants
 - Review data structure
+- Pending release integration errors (prescricao_audit)
 - Patient data sub-object
 - Interventions and exams structure
 - Date field ISO formatting
@@ -15,8 +16,11 @@ Covers the prescription_view_service._internal_get_prescription() pipeline:
 
 from datetime import datetime, timedelta
 
-from models.enums import DrugTypeEnum
-from tests.conftest import session
+from sqlalchemy import text
+
+from models.enums import DrugTypeEnum, PrescriptionAuditTypeEnum
+from models.prescription import Prescription, PrescriptionAudit
+from tests.conftest import session, session_commit
 from tests.utils.utils_test_prescription import (
     create_prescription,
     create_prescription_drug,
@@ -512,3 +516,200 @@ def test_get_prescription_view_unauthenticated(client):
     """Request without auth headers must return HTTP 401."""
     response = client.get(f"/prescriptions/{SEED_PRESCRIPTION_ID}")
     assert response.status_code == 401
+
+
+# ===========================================================================
+# Group 11 - Pending release integration errors
+# ===========================================================================
+
+
+def _mark_as_checked(id_prescription: int):
+    """Set the prescription status to checked without going through the check flow."""
+    session.execute(
+        text("UPDATE demo.prescricao SET status = 's' WHERE fkprescricao = :id"),
+        {"id": id_prescription},
+    )
+    session_commit()
+
+
+def _audit(prescription, audit_type: PrescriptionAuditTypeEnum, created_at, extra=None):
+    """Write a prescricao_audit row for the given prescription."""
+    audit = PrescriptionAudit()
+    audit.auditType = audit_type.value
+    audit.admissionNumber = prescription.admissionNumber
+    audit.idPrescription = prescription.id
+    audit.prescriptionDate = prescription.date
+    audit.idDepartment = prescription.idDepartment
+    audit.idSegment = prescription.idSegment
+    audit.totalItens = 0
+    audit.agg = prescription.agg
+    audit.bed = prescription.bed
+    audit.extra = extra
+    audit.createdAt = created_at
+    audit.createdBy = 1
+
+    session.add(audit)
+    session_commit()
+
+    return audit
+
+
+def _create_checked_prescription(agg: bool = None, admission_number: int = None):
+    """Create a checked prescription with one drug and return it."""
+    id_pres = _next_prescription_id()
+    adm = admission_number or _next_admission_number()
+
+    prescription = create_prescription(
+        id=id_pres,
+        admissionNumber=adm,
+        idPatient=1,
+        agg=agg,
+        date=datetime.now(),
+        expire=datetime.now() + timedelta(days=1),
+    )
+    create_prescription_drug(
+        id=int(f"{id_pres}001"),
+        idPrescription=id_pres,
+        idDrug=3,
+        source=DrugTypeEnum.DRUG.value,
+    )
+    _inc_counters()
+    _mark_as_checked(id_pres)
+
+    return prescription
+
+
+def test_integration_errors_absent_when_nothing_failed(client, analyst_headers):
+    """A checked prescription with no audit trail must report no integration error."""
+    prescription = _create_checked_prescription()
+
+    response = client.get(f"/prescriptions/{prescription.id}", headers=analyst_headers)
+    assert response.status_code == 200
+
+    assert response.get_json()["data"]["integrationErrors"] == []
+
+
+def test_integration_error_is_reported(client, analyst_headers):
+    """The last release error of a checked prescription is exposed in the main view."""
+    prescription = _create_checked_prescription()
+    check_date = datetime.now() - timedelta(minutes=10)
+    error_date = datetime.now() - timedelta(minutes=5)
+
+    _audit(prescription, PrescriptionAuditTypeEnum.CHECK, check_date)
+    _audit(
+        prescription,
+        PrescriptionAuditTypeEnum.ERROR_INTEGRATION_PRESCRIPTION_RELEASE,
+        error_date,
+        extra={"message": "timeout ao enviar a checagem"},
+    )
+
+    response = client.get(f"/prescriptions/{prescription.id}", headers=analyst_headers)
+    assert response.status_code == 200
+
+    errors = response.get_json()["data"]["integrationErrors"]
+    assert len(errors) == 1
+    assert errors[0]["idPrescription"] == str(prescription.id)
+    assert errors[0]["message"] == "timeout ao enviar a checagem"
+    assert datetime.fromisoformat(errors[0]["date"]) == error_date
+    assert errors[0]["extra"] == {"message": "timeout ao enviar a checagem"}
+
+
+def test_integration_error_solved_by_a_new_check_is_ignored(client, analyst_headers):
+    """An error followed by a new check event was retried and must not be reported."""
+    prescription = _create_checked_prescription()
+    base_date = datetime.now() - timedelta(minutes=30)
+
+    _audit(prescription, PrescriptionAuditTypeEnum.CHECK, base_date)
+    _audit(
+        prescription,
+        PrescriptionAuditTypeEnum.ERROR_INTEGRATION_PRESCRIPTION_RELEASE,
+        base_date + timedelta(minutes=5),
+        extra={"message": "falha temporaria"},
+    )
+    _audit(
+        prescription,
+        PrescriptionAuditTypeEnum.CHECK,
+        base_date + timedelta(minutes=10),
+    )
+
+    response = client.get(f"/prescriptions/{prescription.id}", headers=analyst_headers)
+    assert response.status_code == 200
+
+    assert response.get_json()["data"]["integrationErrors"] == []
+
+
+def test_integration_error_ignores_unrelated_audit_events(client, analyst_headers):
+    """Events other than check/release error must not hide a pending error."""
+    prescription = _create_checked_prescription()
+    base_date = datetime.now() - timedelta(minutes=30)
+
+    _audit(prescription, PrescriptionAuditTypeEnum.CHECK, base_date)
+    _audit(
+        prescription,
+        PrescriptionAuditTypeEnum.ERROR_INTEGRATION_PRESCRIPTION_RELEASE,
+        base_date + timedelta(minutes=5),
+    )
+    _audit(
+        prescription,
+        PrescriptionAuditTypeEnum.REVISION,
+        base_date + timedelta(minutes=10),
+    )
+
+    response = client.get(f"/prescriptions/{prescription.id}", headers=analyst_headers)
+    assert response.status_code == 200
+
+    errors = response.get_json()["data"]["integrationErrors"]
+    assert len(errors) == 1
+    assert errors[0]["message"] is None
+
+
+def test_integration_error_not_queried_when_prescription_is_not_checked(
+    client, analyst_headers
+):
+    """An unchecked prescription never had a release: the error must not be reported."""
+    id_pres = _create_prescription_with_sources([DrugTypeEnum.DRUG.value])
+    prescription = session.get(Prescription, id_pres)
+
+    _audit(
+        prescription,
+        PrescriptionAuditTypeEnum.ERROR_INTEGRATION_PRESCRIPTION_RELEASE,
+        datetime.now(),
+        extra={"message": "falha"},
+    )
+
+    response = client.get(f"/prescriptions/{id_pres}", headers=analyst_headers)
+    assert response.status_code == 200
+
+    assert response.get_json()["data"]["status"] == "0"
+    assert response.get_json()["data"]["integrationErrors"] == []
+
+
+def test_integration_error_of_internal_prescription_shows_on_the_agg_view(
+    client, analyst_headers
+):
+    """The aggregated view reports the errors of the prescriptions it aggregates."""
+    agg_prescription = _create_checked_prescription(agg=True)
+    internal_prescription = _create_checked_prescription(
+        admission_number=agg_prescription.admissionNumber
+    )
+    error_date = datetime.now() - timedelta(minutes=5)
+
+    _audit(
+        internal_prescription,
+        PrescriptionAuditTypeEnum.ERROR_INTEGRATION_PRESCRIPTION_RELEASE,
+        error_date,
+        extra={"erro": "PEP indisponivel"},
+    )
+
+    response = client.get(
+        f"/prescriptions/{agg_prescription.id}", headers=analyst_headers
+    )
+    assert response.status_code == 200
+
+    data = response.get_json()["data"]
+    assert str(internal_prescription.id) in [str(k) for k in data["headers"].keys()]
+
+    errors = data["integrationErrors"]
+    assert len(errors) == 1
+    assert errors[0]["idPrescription"] == str(internal_prescription.id)
+    assert errors[0]["message"] == "PEP indisponivel"

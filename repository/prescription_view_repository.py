@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import and_, asc, between, case, desc, func, literal, or_
+from sqlalchemy import and_, asc, between, case, desc, func, literal, or_, select
 from sqlalchemy.dialects.postgresql import INTERVAL
 from sqlalchemy.sql.expression import literal_column
 
@@ -13,8 +13,9 @@ from models.appendix import (
     MeasureUnitConvert,
     Notes,
 )
+from models.enums import PrescriptionAuditTypeEnum
 from models.main import Drug, DrugAttributes, Outlier, Substance, User, db
-from models.prescription import Prescription, PrescriptionDrug
+from models.prescription import Prescription, PrescriptionAudit, PrescriptionDrug
 
 
 def _get_period_filter(query, model, agg_date, is_pmc, is_cpoe, ignore_segments=None):
@@ -394,3 +395,61 @@ def get_query_prescriptions_by_agg(
         q = q.filter(active_count > 0)
 
     return q
+
+
+def get_pending_integration_errors(id_prescriptions: list[int]):
+    """
+    List the prescriptions whose release to the origin system failed and was
+    never succeeded by a new check.
+
+    Only the most recent event of each prescription is taken into account: an
+    error followed by another check event means the release was retried, so it
+    must not be reported anymore.
+    """
+
+    if not id_prescriptions:
+        return []
+
+    relevant_events = (
+        select(
+            PrescriptionAudit.idPrescription.label("id_prescription"),
+            PrescriptionAudit.auditType.label("audit_type"),
+            PrescriptionAudit.createdAt.label("created_at"),
+            PrescriptionAudit.extra.label("extra"),
+            func.row_number()
+            .over(
+                partition_by=PrescriptionAudit.idPrescription,
+                order_by=(
+                    PrescriptionAudit.createdAt.desc(),
+                    PrescriptionAudit.id.desc(),
+                ),
+            )
+            .label("event_order"),
+        )
+        .where(PrescriptionAudit.idPrescription.in_(id_prescriptions))
+        .where(
+            PrescriptionAudit.auditType.in_(
+                [
+                    PrescriptionAuditTypeEnum.CHECK.value,
+                    PrescriptionAuditTypeEnum.ERROR_INTEGRATION_PRESCRIPTION_RELEASE.value,
+                ]
+            )
+        )
+        .subquery()
+    )
+
+    query = (
+        select(
+            relevant_events.c.id_prescription,
+            relevant_events.c.created_at,
+            relevant_events.c.extra,
+        )
+        .where(relevant_events.c.event_order == 1)
+        .where(
+            relevant_events.c.audit_type
+            == PrescriptionAuditTypeEnum.ERROR_INTEGRATION_PRESCRIPTION_RELEASE.value
+        )
+        .order_by(relevant_events.c.created_at.desc())
+    )
+
+    return db.session.execute(query).all()
