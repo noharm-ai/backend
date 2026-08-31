@@ -1,6 +1,6 @@
 """Service: protocol alerts"""
 
-from datetime import datetime
+from datetime import date, datetime
 
 from decorators.has_permission_decorator import Permission, has_permission
 from models.enums import ProtocolTypeEnum
@@ -97,9 +97,17 @@ def counts_to_summary(config: dict, drugs: list, prescription: Prescription) -> 
     if not is_summary_restricted(config=config):
         return True
 
-    prescription_date = prescription.date.date()
+    # an aggregated prescription created in this same request carries the date
+    # it was assigned in memory, which may be a plain date
+    prescription_date = _as_date(prescription.date)
 
-    return any(d[13] is not None and d[13].date() == prescription_date for d in drugs)
+    return any(d[13] is not None and _as_date(d[13]) == prescription_date for d in drugs)
+
+
+def _as_date(value) -> date:
+    """Date part of a value that may be a datetime or already a date"""
+
+    return value.date() if isinstance(value, datetime) else value
 
 
 def get_related_drugs(drugs: list, alert: dict) -> list:
