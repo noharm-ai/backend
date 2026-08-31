@@ -27,6 +27,15 @@ def list_training_items(id_training: int):
     return training_service.list_training_items(training_id=id_training)
 
 
+@app_training.route("/training/<int:id_training>/certificate", methods=["GET"])
+@api_endpoint(
+    is_admin=True
+)  # TODO: remove is_admin=True when the training is available to all users
+def get_training_certificate(id_training: int):
+    """Certificate data for a training module the current user finished"""
+    return training_service.get_training_certificate(training_id=id_training)
+
+
 @app_training.route("/training/item/<int:id_training_item>/finish", methods=["POST"])
 @api_endpoint(
     is_admin=True

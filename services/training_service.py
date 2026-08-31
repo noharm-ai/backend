@@ -6,6 +6,8 @@ from models.enums import TrainingAudienceEnum, UserAttributeEnum
 from models.main import User, db
 from models.requests.training_request import TrainingItemFinishRequest
 from decorators.has_permission_decorator import has_permission, Permission
+from exception.validation_error import ValidationError
+from utils import dateutils, status
 
 
 def _list_user_trainings(user_id: int, schema: str) -> list:
@@ -137,4 +139,51 @@ def finish_training_item(
         "training": get_mandatory_summary(
             user_id=user_context.id, schema=user_context.schema
         ),
+    }
+
+
+@has_permission(Permission.READ_BASIC_FEATURES)
+def get_training_certificate(training_id: int, user_context: User):
+    """Certificate data for a training module the current user finished: who
+    finished which module, when, and over how many lessons. Refuses while any
+    active lesson is pending, so a certificate can never be issued for an
+    unfinished module."""
+    training = training_repository.get_training(training_id=training_id)
+
+    if training is None:
+        raise ValidationError(
+            "Treinamento inválido",
+            "errors.invalidRecord",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    total_lessons, finished_lessons, last_lesson_finished_at = (
+        training_repository.get_lesson_completion_stats(
+            training_id=training_id, user_id=user_context.id
+        )
+    )
+
+    if not total_lessons or finished_lessons != total_lessons:
+        raise ValidationError(
+            "Módulo de treinamento ainda não concluído",
+            "errors.trainingNotFinished",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    # user_context is a JWT stub without the name column
+    user = db.session.query(User).filter(User.id == user_context.id).first()
+
+    # the module-level record carries the official completion date; completions
+    # recorded before it existed fall back to the last lesson-finish date
+    record = training_repository.get_training_user(
+        training_id=training_id, user_id=user_context.id
+    )
+    completed_at = record.created_at if record is not None else last_lesson_finished_at
+
+    return {
+        "userName": user.name,
+        "trainingId": training.id,
+        "trainingTitle": training.title,
+        "totalLessons": total_lessons,
+        "completedAt": dateutils.to_iso(completed_at),
     }

@@ -383,6 +383,97 @@ def test_finish_item_requires_basic_features_permission(client):
     assert response.status_code == 401
 
 
+# --- GET /training/<id>/certificate ---
+
+
+def _finish_module(client, headers):
+    """Finish both active items of the seeded training module."""
+    client.post(f"/training/item/{ITEM_1_ID}/finish", json={}, headers=headers)
+    client.post(f"/training/item/{ITEM_2_ID}/finish", json={}, headers=headers)
+
+
+def test_certificate_for_finished_module(client, analyst_headers):
+    """GET certificate returns the data needed to render one after completion."""
+    _finish_module(client, analyst_headers)
+
+    response = client.get(
+        f"/training/{TRAINING_ID}/certificate", headers=analyst_headers
+    )
+    data = response.get_json()["data"]
+
+    assert response.status_code == 200
+    assert data["trainingId"] == TRAINING_ID
+    assert data["trainingTitle"] == "Training %d" % TRAINING_ID
+    assert data["totalLessons"] == 2
+    assert data["userName"]
+    assert data["completedAt"] is not None
+
+
+def test_certificate_refused_while_lessons_are_pending(client, analyst_headers):
+    """No certificate while any active lesson of the module is unfinished."""
+    client.post(
+        f"/training/item/{ITEM_1_ID}/finish", json={}, headers=analyst_headers
+    )
+
+    response = client.get(
+        f"/training/{TRAINING_ID}/certificate", headers=analyst_headers
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["code"] == "errors.trainingNotFinished"
+
+
+def test_certificate_for_unknown_module_is_refused(client, analyst_headers):
+    """GET certificate returns 400 for a training id that does not exist."""
+    response = client.get("/training/888888/certificate", headers=analyst_headers)
+
+    assert response.status_code == 400
+    assert response.get_json()["code"] == "errors.invalidRecord"
+
+
+def test_certificate_for_inactive_module_is_refused(client, analyst_headers):
+    """An inactive module cannot issue certificates, whatever the progress."""
+    response = client.get(
+        f"/training/{INACTIVE_TRAINING_ID}/certificate", headers=analyst_headers
+    )
+
+    assert response.status_code == 400
+
+
+def test_certificate_falls_back_to_the_last_lesson_finish_date(
+    client, analyst_headers
+):
+    """Completions recorded without a treinamento_usuario row (older flow) still
+    get a certificate, dated by the last lesson-finish record."""
+    _finish_module(client, analyst_headers)
+    session.execute(
+        text(
+            "DELETE FROM public.treinamento_usuario "
+            "WHERE idtreinamento = :id AND idusuario = :uid"
+        ),
+        {"id": TRAINING_ID, "uid": DEMO_USER_ID},
+    )
+    session_commit()
+
+    response = client.get(
+        f"/training/{TRAINING_ID}/certificate", headers=analyst_headers
+    )
+    data = response.get_json()["data"]
+
+    assert response.status_code == 200
+    assert data["completedAt"] is not None
+
+
+def test_certificate_requires_basic_features_permission(client):
+    """GET certificate returns 401 for a role without READ_BASIC_FEATURES."""
+    headers = make_headers(
+        get_access(client, roles=[Role.DISPENSING_MANAGER.value])
+    )
+    response = client.get(f"/training/{TRAINING_ID}/certificate", headers=headers)
+
+    assert response.status_code == 401
+
+
 
 
 # --- schema scope and audience targeting ---

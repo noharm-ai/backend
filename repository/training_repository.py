@@ -123,30 +123,52 @@ def get_training_id_for_item(training_item_id: int) -> int:
     )
 
 
-def is_training_finished(training_id: int, user_id: int) -> bool:
-    """Check whether the user has finished every active item of a training"""
-    total_items = (
-        db.session.query(func.count(TrainingItem.id))
+def get_training(training_id: int) -> Training:
+    """Return the active training record with the given id, if any"""
+    return (
+        db.session.query(Training)
+        .filter(Training.id == training_id, Training.active == True)
+        .first()
+    )
+
+
+def get_lesson_completion_stats(training_id: int, user_id: int) -> tuple:
+    """Return, for a training module, the total number of active lessons, how
+    many of those the given user finished, and when the last one was finished"""
+    return (
+        db.session.query(
+            func.count(TrainingItem.id),
+            func.count(TrainingItemUser.training_item_id),
+            func.max(TrainingItemUser.created_at),
+        )
+        .outerjoin(
+            TrainingItemUser,
+            and_(
+                TrainingItemUser.training_item_id == TrainingItem.id,
+                TrainingItemUser.user_id == user_id,
+            ),
+        )
         .filter(
             TrainingItem.training_id == training_id,
             TrainingItem.active == True,
         )
-        .scalar()
+        .first()
+    )
+
+
+def get_training_user(training_id: int, user_id: int) -> TrainingUser:
+    """Return the record marking a training module as finished by a user, if any"""
+    return TrainingUser.query.get((training_id, user_id))
+
+
+def is_training_finished(training_id: int, user_id: int) -> bool:
+    """Check whether the user has finished every active item of a training"""
+    total_items, finished_items, _ = get_lesson_completion_stats(
+        training_id=training_id, user_id=user_id
     )
 
     if not total_items:
         return False
-
-    finished_items = (
-        db.session.query(func.count(TrainingItemUser.training_item_id))
-        .join(TrainingItem, TrainingItem.id == TrainingItemUser.training_item_id)
-        .filter(
-            TrainingItem.training_id == training_id,
-            TrainingItem.active == True,
-            TrainingItemUser.user_id == user_id,
-        )
-        .scalar()
-    )
 
     return finished_items == total_items
 
