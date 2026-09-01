@@ -30,9 +30,9 @@ def _add_mandatory_training():
         text(
             "INSERT INTO public.treinamento "
             "(idtreinamento, pagina, titulo, resumo, posicao, ativo, obrigatorio, "
-            "escopo, audiencia, created_at, created_by) "
+            "escopo, audiencia, tempo_horas, created_at, created_by) "
             "VALUES (:id, :pagina, 'Gate', 'Gate', 80, true, true, "
-            "'global', 'all', now(), :uid)"
+            "'global', 'all', 0, now(), :uid)"
         ),
         {"id": TRAINING_ID, "pagina": ["gate"], "uid": DEMO_USER_ID},
     )

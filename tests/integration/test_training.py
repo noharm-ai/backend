@@ -34,15 +34,16 @@ def _add_training(
     mandatory=False,
     scope="global",
     audience="all",
+    total_hours=0,
 ):
     """Insert a training module in the public schema (``pagina`` is an array)."""
     session.execute(
         text(
             "INSERT INTO public.treinamento "
             "(idtreinamento, pagina, titulo, resumo, posicao, ativo, obrigatorio, "
-            "escopo, audiencia, created_at, created_by) "
+            "escopo, audiencia, tempo_horas, created_at, created_by) "
             "VALUES (:id, :pagina, :titulo, :resumo, :posicao, :ativo, :obrigatorio, "
-            ":escopo, :audiencia, now(), :created_by)"
+            ":escopo, :audiencia, :tempo_horas, now(), :created_by)"
         ),
         {
             "id": training_id,
@@ -54,6 +55,7 @@ def _add_training(
             "obrigatorio": mandatory,
             "escopo": scope,
             "audiencia": audience,
+            "tempo_horas": total_hours,
             "created_by": DEMO_USER_ID,
         },
     )
@@ -409,6 +411,22 @@ def test_certificate_for_finished_module(client, analyst_headers):
     assert data["totalLessons"] == 2
     assert data["userName"]
     assert data["completedAt"] is not None
+    # the seeded module declares no workload, so nothing to print
+    assert data["totalHours"] == 0
+
+
+def test_certificate_reports_the_module_workload(
+    client, analyst_headers, module_factory
+):
+    """A module with a declared carga horaria carries it on the certificate."""
+    module_factory(990018, 990018, total_hours=8)
+
+    client.post("/training/item/990018/finish", json={}, headers=analyst_headers)
+
+    response = client.get("/training/990018/certificate", headers=analyst_headers)
+
+    assert response.status_code == 200
+    assert response.get_json()["data"]["totalHours"] == 8
 
 
 def test_certificate_refused_while_lessons_are_pending(client, analyst_headers):

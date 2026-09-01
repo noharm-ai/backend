@@ -184,6 +184,9 @@ def get_training_certificate(training_id: int, user_context: User):
         "userName": user.name,
         "trainingId": training.id,
         "trainingTitle": training.title,
+        # the module's official workload, a property of the module itself, so
+        # unlike the lesson count it is not snapshotted at completion time
+        "totalHours": training.total_hours,
         # what the user completed back then, not the module's current content
         "totalLessons": training_repository.count_finished_lessons(
             training_id=training_id, user_id=user_context.id
