@@ -10,6 +10,7 @@ from models.requests.prioritization_request import PrioritizationRequest
 from services import (
     prescription_check_service,
     prescription_drug_service,
+    prescription_integration_service,
     prescription_service,
     prescription_view_service,
     prioritization_service,
@@ -128,6 +129,30 @@ def get_prescriptions():
 def getPrescriptionAuth(idPrescription):
     return prescription_view_service.route_get_prescription(
         id_prescription=idPrescription
+    )
+
+
+@app_pres.route(
+    "/prescriptions/<int:idPrescription>/integration-errors", methods=["GET"]
+)
+@api_endpoint()
+def get_prescription_integration_errors(idPrescription):
+    """List release errors still pending for a checked prescription
+
+    idPrescriptionList: comma separated ids the caller already has on screen
+    (the prescriptions inside an agg one), inspected together with this one.
+    """
+    try:
+        id_prescription_list = [
+            int(i)
+            for i in (request.args.get("idPrescriptionList", "") or "").split(",")
+            if i
+        ]
+    except ValueError:
+        id_prescription_list = []
+
+    return prescription_integration_service.route_get_integration_errors(
+        id_prescription=idPrescription, id_prescription_list=id_prescription_list
     )
 
 

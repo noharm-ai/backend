@@ -133,12 +133,6 @@ def _internal_get_prescription(
 
     review_data = _get_review_data(prescription=prescription, is_complete=is_complete)
 
-    integration_errors = _get_integration_errors(
-        prescription=prescription,
-        headers=drug_data["headers"],
-        is_complete=is_complete,
-    )
-
     return _format(
         prescription=prescription,
         patient=patient,
@@ -154,7 +148,6 @@ def _internal_get_prescription(
         review_data=review_data,
         alerts_data=alerts_data,
         icd=icd,
-        integration_errors=integration_errors,
     )
 
 
@@ -892,65 +885,6 @@ def _get_review_data(prescription: Prescription, is_complete: bool):
     }
 
 
-# keys used by the origin system integration to describe why the release failed
-_INTEGRATION_ERROR_MESSAGE_KEYS = (
-    "message",
-    "error",
-    "erro",
-    "descricao",
-    "description",
-)
-
-
-def _get_integration_error_message(extra):
-    """Extract a readable message from the audit ``extra`` payload, if there is one."""
-
-    if not isinstance(extra, dict):
-        return None
-
-    for key in _INTEGRATION_ERROR_MESSAGE_KEYS:
-        value = extra.get(key)
-        if value:
-            return str(value)
-
-    return None
-
-
-@timed()
-def _get_integration_errors(prescription: Prescription, headers, is_complete: bool):
-    """
-    List the release integration errors that are still pending for this prescription.
-
-    The release message is only sent to the origin system after a check, so an
-    unchecked prescription can never have a pending error: the audit table is
-    only queried when the prescription is checked (and only for the complete
-    view). Aggregated prescriptions are released one internal prescription at a
-    time, so the errors of the prescriptions listed in the headers are reported
-    together with the aggregated one.
-    """
-
-    if not is_complete or prescription.status != "s":
-        return []
-
-    id_prescriptions = [prescription.id]
-    if prescription.agg and headers:
-        id_prescriptions.extend(headers.keys())
-
-    errors = prescription_view_repository.get_pending_integration_errors(
-        id_prescriptions=id_prescriptions
-    )
-
-    return [
-        {
-            "idPrescription": str(error.id_prescription),
-            "date": dateutils.to_iso(error.created_at),
-            "message": _get_integration_error_message(error.extra),
-            "extra": error.extra,
-        }
-        for error in errors
-    ]
-
-
 @timed()
 def _format(
     prescription: Prescription,
@@ -967,7 +901,6 @@ def _format(
     review_data: dict,
     alerts_data: dict,
     icd: ICDTable,
-    integration_errors: list,
 ):
 
     hide_names = feature_service.has_user_feature(FeatureEnum.HIDE_NAMES)
@@ -1089,6 +1022,4 @@ def _format(
         ),
         "review": review_data,
         "protocolAlerts": alerts_data.get("protocols", {}),
-        # integration
-        "integrationErrors": integration_errors,
     }

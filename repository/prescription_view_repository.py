@@ -397,7 +397,7 @@ def get_query_prescriptions_by_agg(
     return q
 
 
-def get_pending_integration_errors(id_prescriptions: list[int]):
+def get_pending_integration_errors(id_prescriptions: list[int], admission_number: int):
     """
     List the prescriptions whose release to the origin system failed and was
     never succeeded by a new check.
@@ -405,6 +405,9 @@ def get_pending_integration_errors(id_prescriptions: list[int]):
     Only the most recent event of each prescription is taken into account: an
     error followed by another check event means the release was retried, so it
     must not be reported anymore.
+
+    The ids come from the prescriptions the caller has open, so the admission
+    is enforced here: an id from another admission reports nothing.
     """
 
     if not id_prescriptions:
@@ -426,6 +429,8 @@ def get_pending_integration_errors(id_prescriptions: list[int]):
             )
             .label("event_order"),
         )
+        .join(Prescription, Prescription.id == PrescriptionAudit.idPrescription)
+        .where(Prescription.admissionNumber == admission_number)
         .where(PrescriptionAudit.idPrescription.in_(id_prescriptions))
         .where(
             PrescriptionAudit.auditType.in_(
