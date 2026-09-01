@@ -6,6 +6,12 @@ The flow mirrors the standard ODOO Sign integration:
 3. sign.item            -> places the signature field (fractions of the page, 0-1)
 4. sign.send.request    -> defines the signer and triggers the e-mail
 5. sign.request.item    -> access_token used to build the direct signing link
+
+Two Sign model layouts are supported (detected at runtime via fields_get):
+- up to ODOO 18: the PDF lives on sign.template.attachment_id and sign.item
+  points to template_id;
+- ODOO 19+: sign.template holds sign.document records (document_ids), the PDF
+  lives on sign.document.attachment_id and sign.item points to document_id.
 """
 
 import base64
@@ -219,6 +225,86 @@ def _odoo_execute(client, **kwargs):
     return result
 
 
+def _get_model_fields(client, model: str) -> set:
+    """Lists the field names of an ODOO model (used for version introspection)."""
+    fields = _odoo_execute(
+        client,
+        model=model,
+        action="fields_get",
+        payload=[],
+        options={"attributes": ["type"]},
+    )
+
+    return set(fields.keys())
+
+
+def _create_sign_template(client, document_name: str, pdf_bytes: bytes) -> dict:
+    """Uploads the PDF and creates the sign.template for it.
+
+    Returns {"template_id", "document_id"}; document_id is None on ODOO <= 18,
+    where the attachment lives directly on the template.
+    """
+    template_fields = _get_model_fields(client, "sign.template")
+    use_documents = "attachment_id" not in template_fields
+
+    attachment_id = _odoo_execute(
+        client,
+        model="ir.attachment",
+        action="create",
+        payload=[
+            {
+                "name": f"{document_name}.pdf",
+                "type": "binary",
+                "datas": base64.b64encode(pdf_bytes).decode("ascii"),
+                "mimetype": "application/pdf",
+                "res_model": "sign.document" if use_documents else "sign.template",
+            }
+        ],
+        options={},
+    )
+
+    if not use_documents:
+        template_id = _odoo_execute(
+            client,
+            model="sign.template",
+            action="create",
+            payload=[{"name": document_name, "attachment_id": attachment_id}],
+            options={},
+        )
+
+        return {"template_id": template_id, "document_id": None}
+
+    template_id = _odoo_execute(
+        client,
+        model="sign.template",
+        action="create",
+        payload=[
+            {
+                "name": document_name,
+                "document_ids": [[0, 0, {"attachment_id": attachment_id}]],
+            }
+        ],
+        options={},
+    )
+
+    document_ids = _odoo_execute(
+        client,
+        model="sign.document",
+        action="search",
+        payload=[[["template_id", "=", template_id]]],
+        options={"limit": 1},
+    )
+
+    if not document_ids:
+        raise ValidationError(
+            "O documento não foi criado no serviço de assinatura digital.",
+            "errors.invalidRecord",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    return {"template_id": template_id, "document_id": document_ids[0]}
+
+
 def _get_signer_partner_id(client, signer_name: str, signer_email: str) -> int:
     """Finds (or creates) the res.partner record for the signer."""
     partners = _odoo_execute(
@@ -329,52 +415,40 @@ def request_signature(
 
     document_name = f"Evolução {note.id} - {note.date.strftime('%d/%m/%Y %H:%M')}"
 
-    # 1) upload the PDF
-    attachment_id = _odoo_execute(
-        client,
-        model="ir.attachment",
-        action="create",
-        payload=[
-            {
-                "name": f"{document_name}.pdf",
-                "type": "binary",
-                "datas": base64.b64encode(pdf_bytes).decode("ascii"),
-                "mimetype": "application/pdf",
-                "res_model": "sign.template",
-            }
-        ],
-        options={},
+    # 1) + 2) upload the PDF and create the template pointing to it
+    template = _create_sign_template(
+        client, document_name=document_name, pdf_bytes=pdf_bytes
     )
-
-    # 2) template pointing to the attachment
-    template_id = _odoo_execute(
-        client,
-        model="sign.template",
-        action="create",
-        payload=[{"name": document_name, "attachment_id": attachment_id}],
-        options={},
-    )
+    template_id = template["template_id"]
+    document_id = template["document_id"]
 
     role_id = _get_default_role_id(client)
 
-    # 3) signature field (position as fractions of the page)
+    # 3) signature field (position as fractions of the page); on ODOO 19+ the
+    # field is anchored on the sign.document instead of the template
+    item_values = {
+        "type_id": _get_signature_item_type_id(client),
+        "responsible_id": role_id,
+        "required": True,
+        "page": sign_page,
+        "posX": _SIGN_ITEM_POS_X,
+        "posY": sign_pos_y,
+        "width": _SIGN_ITEM_WIDTH,
+        "height": _SIGN_ITEM_HEIGHT,
+    }
+
+    if document_id is not None and "document_id" in _get_model_fields(
+        client, "sign.item"
+    ):
+        item_values["document_id"] = document_id
+    else:
+        item_values["template_id"] = template_id
+
     _odoo_execute(
         client,
         model="sign.item",
         action="create",
-        payload=[
-            {
-                "template_id": template_id,
-                "type_id": _get_signature_item_type_id(client),
-                "responsible_id": role_id,
-                "required": True,
-                "page": sign_page,
-                "posX": _SIGN_ITEM_POS_X,
-                "posY": sign_pos_y,
-                "width": _SIGN_ITEM_WIDTH,
-                "height": _SIGN_ITEM_HEIGHT,
-            }
-        ],
+        payload=[item_values],
         options={},
     )
 

@@ -46,19 +46,43 @@ def sign_test_data():
 
 
 class FakeOdooClient:
-    """Records every ODOO call and returns canned responses per model/action."""
+    """Records every ODOO call and returns canned responses per model/action.
 
-    def __init__(self):
+    layout="legacy" mimics ODOO <= 18 (sign.template.attachment_id);
+    layout="v19" mimics ODOO 19+ (sign.document + sign.item.document_id).
+    """
+
+    def __init__(self, layout="legacy"):
         self.calls = []
+        self.layout = layout
 
     def __call__(self, model, action, payload, options):
         self.calls.append(
             {"model": model, "action": action, "payload": payload, "options": options}
         )
 
+        if self.layout == "legacy":
+            fields_get = {
+                ("sign.template", "fields_get"): {
+                    "name": {"type": "char"},
+                    "attachment_id": {"type": "many2one"},
+                },
+                ("sign.item", "fields_get"): {"template_id": {"type": "many2one"}},
+            }
+        else:
+            fields_get = {
+                ("sign.template", "fields_get"): {
+                    "name": {"type": "char"},
+                    "document_ids": {"type": "one2many"},
+                },
+                ("sign.item", "fields_get"): {"document_id": {"type": "many2one"}},
+            }
+
         responses = {
+            **fields_get,
             ("ir.attachment", "create"): 501,
             ("sign.template", "create"): 601,
+            ("sign.document", "search"): [321],
             ("sign.item.type", "search"): [11],
             ("sign.item.role", "search"): [1],
             ("sign.item", "create"): 701,
@@ -169,6 +193,42 @@ def test_digital_signature(client, navigator_headers, sign_test_data, monkeypatc
     assert wizard["payload"][0]["signer_ids"][0][2]["partner_id"] == 801
 
     assert fake_client.find_call("sign.send.request", "send_request") is not None
+
+
+def test_digital_signature_odoo_v19(
+    client, navigator_headers, sign_test_data, monkeypatch
+):
+    """POST /notes/digital-signature — ODOO 19+ layout (sign.document based)"""
+    fake_client = FakeOdooClient(layout="v19")
+
+    monkeypatch.setattr(
+        clinical_notes_sign_service.odoo_client,
+        "get_client",
+        lambda context=None: fake_client,
+    )
+
+    response = client.post(
+        URL, json={"id": SIGN_NOTE_ID, **SIGNER}, headers=navigator_headers
+    )
+
+    assert response.status_code == 200
+    data = response.get_json()["data"]
+    assert data["idSignRequest"] == 1001
+    assert data["link"].endswith("/sign/document/1001/tok123")
+
+    # the template embeds the attachment through a sign.document record
+    template = fake_client.find_call("sign.template", "create")
+    template_values = template["payload"][0]
+    assert "attachment_id" not in template_values
+    assert template_values["document_ids"] == [[0, 0, {"attachment_id": 501}]]
+
+    # the signature field is anchored on the sign.document, not the template
+    sign_item = fake_client.find_call("sign.item", "create")
+    item = sign_item["payload"][0]
+    assert item["document_id"] == 321
+    assert "template_id" not in item
+    assert 0 < item["posX"] < 1
+    assert 0 < item["posY"] < 1
 
 
 def test_digital_signature_odoo_timeout(
