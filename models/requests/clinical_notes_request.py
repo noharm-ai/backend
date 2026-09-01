@@ -8,3 +8,11 @@ class GenerateSoapRequest(BaseModel):
 
     id: int
     prompt_key: Optional[str] = None
+
+
+class ClinicalNoteSignRequest(BaseModel):
+    """Request model for requesting a digital signature of a clinical note"""
+
+    id: int
+    signer_name: str
+    signer_email: str
