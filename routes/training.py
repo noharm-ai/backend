@@ -3,8 +3,11 @@
 from flask import Blueprint, request
 
 from decorators.api_endpoint_decorator import api_endpoint
+from exception.validation_error import ValidationError
+from models.main import db
 from models.requests.training_request import TrainingItemFinishRequest
 from services import training_service
+from utils import sessionutils
 
 app_training = Blueprint("app_training", __name__)
 
@@ -46,3 +49,22 @@ def finish_training_item(id_training_item: int):
         training_item_id=id_training_item,
         request_data=TrainingItemFinishRequest(**(request.get_json() or {})),
     )
+
+
+@app_training.route("/public/certificate/<string:code>", methods=["GET"])
+def validate_certificate(code: str):
+    """PUBLIC - no authentication. Confirms a printed certificate is genuine.
+
+    Deliberately not decorated with @api_endpoint: that decorator has no public
+    mode, it always calls verify_jwt_in_request() and always demands that a
+    permission check ran. This follows the /user/reset pattern instead. The
+    /public/ prefix keeps "what is reachable anonymously" a one-line grep.
+    """
+    try:
+        result = training_service.validate_certificate(validation_code=code)
+    except ValidationError as e:
+        return {"status": "error", "message": str(e), "code": e.code}, e.httpStatus
+
+    # commits (a no-op for this read) and, more to the point, closes and removes
+    # the session on an endpoint anyone can hit
+    return sessionutils.tryCommit(db, result)

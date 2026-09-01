@@ -7,7 +7,7 @@ from models.main import User, db
 from models.requests.training_request import TrainingItemFinishRequest
 from decorators.has_permission_decorator import has_permission, Permission
 from exception.validation_error import ValidationError
-from utils import dateutils, status
+from utils import certificateutils, dateutils, status, stringutils
 
 
 def _list_user_trainings(user_id: int, schema: str) -> list:
@@ -151,6 +151,50 @@ def finish_training_item(
     }
 
 
+def validate_certificate(validation_code: str) -> dict:
+    """Public certificate confirmation. Deliberately undecorated and without a
+    user_context: this is the only training entry point reachable anonymously,
+    and has_permission would try to resolve a user that is not logged in.
+
+    Confirmation-only by design. It returns a masked name and never the full
+    one, never the user id, e-mail, schema or training id: whoever calls this
+    already holds the printed certificate, so the endpoint only has to say
+    "yes, this is genuine" - it is not a place to hand out anything new.
+
+    An unknown or malformed code answers valid=False with HTTP 200 rather than
+    404: on a public page a typo is the expected case, not an error, and one
+    shape of answer leaves no oracle separating "well formed but unknown" from
+    "junk".
+    """
+    normalized = certificateutils.normalize_code(validation_code)
+
+    if len(normalized) != certificateutils.CODE_LENGTH:
+        return {"valid": False}
+
+    result = training_repository.get_training_user_by_code(validation_code=normalized)
+
+    if result is None:
+        return {"valid": False}
+
+    record, training, user = result
+
+    # the count comes from the list rather than its own query, so the number
+    # and the lessons behind it can never disagree
+    lessons = training_repository.list_finished_lessons(
+        training_id=training.id, user_id=user.id
+    )
+
+    return {
+        "valid": True,
+        "maskedName": stringutils.mask_person_name(user.name),
+        "trainingTitle": training.title,
+        "totalHours": training.total_hours,
+        "totalLessons": len(lessons),
+        "lessons": lessons,
+        "completedAt": dateutils.to_iso(record.created_at),
+    }
+
+
 @has_permission(Permission.READ_BASIC_FEATURES)
 def get_training_certificate(training_id: int, user_context: User):
     """Certificate data for a training module the current user finished. The
@@ -192,4 +236,6 @@ def get_training_certificate(training_id: int, user_context: User):
             training_id=training_id, user_id=user_context.id
         ),
         "completedAt": dateutils.to_iso(record.created_at),
+        # grouped for printing; the public lookup normalizes the dashes away
+        "validationCode": certificateutils.format_code(record.validation_code),
     }

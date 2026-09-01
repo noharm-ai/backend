@@ -4,7 +4,7 @@ from datetime import datetime
 
 from sqlalchemy import and_, case, func, or_
 
-from models.main import db
+from models.main import User, db
 from models.enums import TrainingScopeEnum
 from models.appendix import (
     Training,
@@ -13,6 +13,8 @@ from models.appendix import (
     TrainingSchema,
     TrainingUser,
 )
+from exception.validation_error import ValidationError
+from utils import certificateutils, status
 
 
 def list_trainings(user_id: int, schema: str) -> list:
@@ -152,6 +154,22 @@ def get_training_user(training_id: int, user_id: int) -> TrainingUser:
     return TrainingUser.query.get((training_id, user_id))
 
 
+def get_training_user_by_code(validation_code: str):
+    """Completion record, its module and its holder, for a public validation
+    code. Returns None when the code matches nothing.
+
+    Inactive modules and users are deliberately not filtered, for the reason
+    already documented on get_training: deactivating a module must not void the
+    certificates it already issued"""
+    return (
+        db.session.query(TrainingUser, Training, User)
+        .join(Training, Training.id == TrainingUser.training_id)
+        .join(User, User.id == TrainingUser.user_id)
+        .filter(TrainingUser.validation_code == validation_code)
+        .first()
+    )
+
+
 def count_finished_lessons(training_id: int, user_id: int) -> int:
     """Number of lessons of a training module the given user finished, whether
     or not those lessons are still active: it reports what the user actually
@@ -165,6 +183,25 @@ def count_finished_lessons(training_id: int, user_id: int) -> int:
         )
         .scalar()
     )
+
+
+def list_finished_lessons(training_id: int, user_id: int) -> list:
+    """Titles of the lessons the user finished in a module, in module order.
+
+    Same filters as count_finished_lessons, inactive lessons included: it
+    reports what the user actually did, not the module's current content"""
+    results = (
+        db.session.query(TrainingItem.title)
+        .join(TrainingItemUser, TrainingItemUser.training_item_id == TrainingItem.id)
+        .filter(
+            TrainingItem.training_id == training_id,
+            TrainingItemUser.user_id == user_id,
+        )
+        .order_by(TrainingItem.position)
+        .all()
+    )
+
+    return [title for (title,) in results]
 
 
 def is_training_finished(training_id: int, user_id: int) -> bool:
@@ -195,6 +232,37 @@ def is_training_finished(training_id: int, user_id: int) -> bool:
     return finished_items == total_items
 
 
+CODE_CANDIDATES = 10
+
+
+def _generate_unique_validation_code() -> str:
+    """A validation code no other completion record holds.
+
+    Ten candidates are drawn up front and checked in a single query, so the
+    common case (all ten free) costs one round trip instead of one per attempt.
+    At 60 bits none of them will ever be taken; the check exists so the unique
+    index on codigo_validacao is a guarantee rather than a 500 some far future
+    day"""
+    candidates = [certificateutils.generate_code() for _ in range(CODE_CANDIDATES)]
+
+    taken = {
+        code
+        for (code,) in db.session.query(TrainingUser.validation_code)
+        .filter(TrainingUser.validation_code.in_(candidates))
+        .all()
+    }
+
+    for code in candidates:
+        if code not in taken:
+            return code
+
+    raise ValidationError(
+        "Não foi possível gerar o código de validação do certificado",
+        "errors.businessRules",
+        status.HTTP_500_INTERNAL_SERVER_ERROR,
+    )
+
+
 def finish_training(training_id: int, user_id: int) -> bool:
     """Create the record marking a training module as finished by a user, if
     not already present. Returns True the first time it's created for this user"""
@@ -206,6 +274,9 @@ def finish_training(training_id: int, user_id: int) -> bool:
     record = TrainingUser()
     record.training_id = training_id
     record.user_id = user_id
+    # minted here rather than on first print: the column is NOT NULL, and the
+    # code belongs to the completion itself, not to the act of printing it
+    record.validation_code = _generate_unique_validation_code()
     record.created_at = datetime.today()
     db.session.add(record)
 

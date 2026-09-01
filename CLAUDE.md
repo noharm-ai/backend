@@ -388,6 +388,18 @@ make db-reset
 ### Test Ordering
 Use `@pytest.mark.order(n)` for test execution order
 
+### Test Data — Never Use Real People
+**Never put a real person's data in code, tests, fixtures, comments, docstrings or commit messages.** This covers names, e-mail addresses, phone numbers, CPF, CNS, addresses, patient records and login credentials — and it explicitly includes the maintainers' and the user's own names. Do not reach for the name of whoever you are talking to, the git author, or anyone appearing in the repo as convenient sample data.
+
+Always invent obviously fictitious data instead:
+
+- **People:** `Fulano Beltrano`, `Ciclano de Tal`, `Maria Teste`
+- **E-mail:** `fulano@example.com` (the `example.com` / `example.org` domains are reserved for exactly this)
+- **Documents:** clearly invalid placeholders, never a real or checksum-valid CPF/CNS
+- **Patients:** synthetic names and identifiers only — this is a healthcare product, so real patient data in a repository is a compliance problem, not just a style one
+
+The rule holds even when the real value would be convenient or is already visible to you in the environment.
+
 ## Common Gotchas
 
 1. **Schema Context Required:** Most queries need proper schema context set. Services usually handle this, but be aware in repository layer.

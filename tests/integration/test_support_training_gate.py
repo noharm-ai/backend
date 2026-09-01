@@ -60,9 +60,10 @@ def _finish_the_training():
     session.execute(
         text(
             "INSERT INTO public.treinamento_usuario "
-            "(idtreinamento, idusuario, created_at) VALUES (:id, :uid, now())"
+            "(idtreinamento, idusuario, codigo_validacao, created_at) "
+            "VALUES (:id, :uid, :code, now())"
         ),
-        {"id": TRAINING_ID, "uid": DEMO_USER_ID},
+        {"id": TRAINING_ID, "uid": DEMO_USER_ID, "code": "GATEGATEGATE"},
     )
     session_commit()
 

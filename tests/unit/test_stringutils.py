@@ -214,3 +214,28 @@ class TestSlugify:
     def test_strips_accents_before_slugifying(self):
         """Accented characters are stripped before the slug is built."""
         assert stringutils.slugify("Ação Média") == "b-acao-media-"
+
+
+@pytest.mark.parametrize(
+    "name, masked",
+    [
+        ("Fulano Beltrano", "F***** B*******"),
+        # a single-word name is still masked
+        ("Ana", "A**"),
+        # particles carry no identifying information and stay readable
+        ("Ana Paula de Souza", "A** P**** de S****"),
+        # NFC keeps the accented initial a single character
+        ("João Álvares", "J*** Á******"),
+        # some HIS feeds store names upper-cased; leave the case alone so it
+        # still matches the printed certificate
+        ("FULANO BELTRANO", "F***** B*******"),
+        ("Li", "L*"),
+        ("J", "J"),
+        ("  Ana   Paula  ", "A** P****"),
+        ("", ""),
+        (None, ""),
+    ],
+)
+def test_mask_person_name(name, masked):
+    """Teste stringutils - mask_person_name"""
+    assert stringutils.mask_person_name(name) == masked

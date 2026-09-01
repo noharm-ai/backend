@@ -8,10 +8,15 @@ is the user behind the ``analyst_headers`` fixture; that user's schema is
 ``demo``, which is what schema-scoped modules are targeted at here.
 """
 
+import re
+
 import pytest
 from sqlalchemy import text
 
 from config import Config
+from exception.validation_error import ValidationError
+from mobile import app
+from repository import training_repository
 from security.role import Role
 from tests.conftest import get_access, make_headers, session, session_commit
 
@@ -429,6 +434,258 @@ def test_certificate_reports_the_module_workload(
     assert response.get_json()["data"]["totalHours"] == 8
 
 
+CODE_PATTERN = r"^[0-9A-HJ-NP-TV-Z]{4}-[0-9A-HJ-NP-TV-Z]{4}-[0-9A-HJ-NP-TV-Z]{4}$"
+
+
+def _issue_certificate(client, headers, training_id=TRAINING_ID):
+    """Finish the seeded module and return its certificate payload."""
+    _finish_module(client, headers)
+
+    return client.get(
+        f"/training/{training_id}/certificate", headers=headers
+    ).get_json()["data"]
+
+
+def test_certificate_carries_a_validation_code(client, analyst_headers):
+    """Issuing a certificate mints the public validation code."""
+    data = _issue_certificate(client, analyst_headers)
+
+    assert re.match(CODE_PATTERN, data["validationCode"])
+
+
+def test_validation_code_is_stable_across_prints(client, analyst_headers):
+    """Re-printing must return the SAME code. A regression that re-mints on
+    every print would silently invalidate every certificate already on paper."""
+    first = _issue_certificate(client, analyst_headers)["validationCode"]
+
+    second = client.get(
+        f"/training/{TRAINING_ID}/certificate", headers=analyst_headers
+    ).get_json()["data"]["validationCode"]
+
+    assert first == second
+
+
+def test_public_validation_needs_no_authentication(client, analyst_headers):
+    """The whole point of the feature: no headers at all, and it answers."""
+    code = _issue_certificate(client, analyst_headers)["validationCode"]
+
+    response = client.get(f"/public/certificate/{code}")
+
+    assert response.status_code == 200
+    assert response.get_json()["data"]["valid"] is True
+
+
+def test_public_validation_confirms_the_certificate(client, analyst_headers):
+    """The confirmation carries what a validator needs to check against paper."""
+    certificate = _issue_certificate(client, analyst_headers)
+
+    data = client.get(
+        f"/public/certificate/{certificate['validationCode']}"
+    ).get_json()["data"]
+
+    assert data["valid"] is True
+    assert data["trainingTitle"] == certificate["trainingTitle"]
+    assert data["totalLessons"] == certificate["totalLessons"]
+    assert data["totalHours"] == certificate["totalHours"]
+    assert data["completedAt"] == certificate["completedAt"]
+    assert "*" in data["maskedName"]
+
+
+def test_public_validation_lists_the_lessons_taken(client, analyst_headers):
+    """The lessons themselves, in module order, so a validator sees what the
+    certificate actually covered rather than just how many there were."""
+    certificate = _issue_certificate(client, analyst_headers)
+
+    data = client.get(
+        f"/public/certificate/{certificate['validationCode']}"
+    ).get_json()["data"]
+
+    assert data["lessons"] == ["Item %d" % ITEM_1_ID, "Item %d" % ITEM_2_ID]
+    # the count is derived from the list, so the two cannot drift apart
+    assert data["totalLessons"] == len(data["lessons"])
+
+
+def test_listed_lessons_survive_a_lesson_being_deactivated(
+    client, analyst_headers
+):
+    """Deactivating a lesson must not rewrite history: the certificate reports
+    what the user did, not the module's current content."""
+    _finish_module(client, analyst_headers)
+    certificate = client.get(
+        f"/training/{TRAINING_ID}/certificate", headers=analyst_headers
+    ).get_json()["data"]
+
+    session.execute(
+        text(
+            "UPDATE public.treinamento_item SET ativo = false "
+            "WHERE idtreinamento_item = :id"
+        ),
+        {"id": ITEM_2_ID},
+    )
+    session_commit()
+
+    data = client.get(
+        f"/public/certificate/{certificate['validationCode']}"
+    ).get_json()["data"]
+
+    assert data["lessons"] == ["Item %d" % ITEM_1_ID, "Item %d" % ITEM_2_ID]
+
+    session.execute(
+        text(
+            "UPDATE public.treinamento_item SET ativo = true "
+            "WHERE idtreinamento_item = :id"
+        ),
+        {"id": ITEM_2_ID},
+    )
+    session_commit()
+
+
+def test_lessons_are_listed_in_module_order(client, analyst_headers):
+    """Order follows the module's positions, not the order they were finished."""
+    # finish the second lesson first
+    client.post(f"/training/item/{ITEM_2_ID}/finish", json={}, headers=analyst_headers)
+    client.post(f"/training/item/{ITEM_1_ID}/finish", json={}, headers=analyst_headers)
+
+    certificate = client.get(
+        f"/training/{TRAINING_ID}/certificate", headers=analyst_headers
+    ).get_json()["data"]
+
+    data = client.get(
+        f"/public/certificate/{certificate['validationCode']}"
+    ).get_json()["data"]
+
+    assert data["lessons"] == ["Item %d" % ITEM_1_ID, "Item %d" % ITEM_2_ID]
+
+
+def test_public_validation_never_leaks_the_full_name(client, analyst_headers):
+    """A substring check on the raw body, so it also catches someone helpfully
+    adding userName back to the payload."""
+    certificate = _issue_certificate(client, analyst_headers)
+
+    response = client.get(f"/public/certificate/{certificate['validationCode']}")
+    body = response.get_data(as_text=True)
+
+    assert certificate["userName"] not in body
+    for leaked in ("userId", "trainingId", "email", "schema", "userName"):
+        assert leaked not in response.get_json()["data"]
+
+
+@pytest.mark.parametrize(
+    "mangle",
+    [
+        lambda code: code.lower(),
+        lambda code: code.replace("-", ""),
+        lambda code: code.replace("-", " ").strip(),
+    ],
+)
+def test_public_validation_normalizes_what_a_human_types(
+    client, analyst_headers, mangle
+):
+    """Case and grouping are display concerns, not part of the code."""
+    code = _issue_certificate(client, analyst_headers)["validationCode"]
+
+    response = client.get(f"/public/certificate/{mangle(code)}")
+
+    assert response.get_json()["data"]["valid"] is True
+
+
+@pytest.mark.parametrize(
+    "code", ["ZZZZ-ZZZZ-ZZZZ", "nope", "ABCD-EFGH-JKMN-PQRS"]
+)
+def test_public_validation_answers_valid_false_not_404(client, code):
+    """Unknown and malformed codes get the same HTTP 200 / valid=False answer:
+    a typo is the expected case on a public page, and one shape of response
+    leaves no oracle separating 'well formed but unknown' from 'junk'."""
+    response = client.get(f"/public/certificate/{code}")
+
+    assert response.status_code == 200
+    assert response.get_json()["data"] == {"valid": False}
+
+
+def test_completing_a_module_mints_the_code_before_any_print(
+    client, analyst_headers
+):
+    """The code belongs to the completion, not to the act of printing: it is
+    already on the record before anyone asks for a certificate."""
+    _finish_module(client, analyst_headers)
+
+    record = session.execute(
+        text(
+            "SELECT codigo_validacao FROM public.treinamento_usuario "
+            "WHERE idtreinamento = :id AND idusuario = :uid"
+        ),
+        {"id": TRAINING_ID, "uid": DEMO_USER_ID},
+    ).first()
+
+    assert record[0] is not None
+    assert len(record[0]) == 12
+
+    # and it is the same one the certificate goes on to print
+    printed = client.get(
+        f"/training/{TRAINING_ID}/certificate", headers=analyst_headers
+    ).get_json()["data"]["validationCode"]
+
+    assert printed.replace("-", "") == record[0]
+
+
+def test_code_generation_refuses_rather_than_reusing_a_code(
+    client, analyst_headers, monkeypatch
+):
+    """The single batched lookup is a real guard, not decoration: if every
+    candidate were already taken it raises instead of writing a duplicate."""
+    _finish_module(client, analyst_headers)
+
+    existing = session.execute(
+        text(
+            "SELECT codigo_validacao FROM public.treinamento_usuario "
+            "WHERE idtreinamento = :id AND idusuario = :uid"
+        ),
+        {"id": TRAINING_ID, "uid": DEMO_USER_ID},
+    ).first()[0]
+
+    # force every candidate to collide
+    monkeypatch.setattr(
+        training_repository.certificateutils, "generate_code", lambda: existing
+    )
+
+    with app.app_context():
+        with pytest.raises(ValidationError):
+            training_repository._generate_unique_validation_code()
+
+
+def test_each_completion_gets_its_own_code(
+    client, analyst_headers, module_factory
+):
+    """Two completions never share a code. The unique index depends on it, and
+    so does the premise that a code identifies one certificate."""
+    _finish_module(client, analyst_headers)
+    module_factory(990019, 990019)
+    client.post("/training/item/990019/finish", json={}, headers=analyst_headers)
+
+    first = client.get(
+        f"/training/{TRAINING_ID}/certificate", headers=analyst_headers
+    ).get_json()["data"]["validationCode"]
+    second = client.get(
+        "/training/990019/certificate", headers=analyst_headers
+    ).get_json()["data"]["validationCode"]
+
+    assert first != second
+
+    # and each resolves to its own module
+    assert (
+        client.get(f"/public/certificate/{first}").get_json()["data"][
+            "trainingTitle"
+        ]
+        == "Training %d" % TRAINING_ID
+    )
+    assert (
+        client.get(f"/public/certificate/{second}").get_json()["data"][
+            "trainingTitle"
+        ]
+        == "Training 990019"
+    )
+
+
 def test_certificate_refused_while_lessons_are_pending(client, analyst_headers):
     """No certificate while any active lesson of the module is unfinished."""
     client.post(
@@ -511,9 +768,14 @@ def test_certificate_survives_module_deactivation(client, analyst_headers):
     session.execute(
         text(
             "INSERT INTO public.treinamento_usuario "
-            "(idtreinamento, idusuario, created_at) VALUES (:id, :uid, now())"
+            "(idtreinamento, idusuario, codigo_validacao, created_at) "
+            "VALUES (:id, :uid, :code, now())"
         ),
-        {"id": INACTIVE_TRAINING_ID, "uid": DEMO_USER_ID},
+        {
+            "id": INACTIVE_TRAINING_ID,
+            "uid": DEMO_USER_ID,
+            "code": "ZZZZZZZZZZZ9",
+        },
     )
     session_commit()
 
