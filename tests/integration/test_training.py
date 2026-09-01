@@ -257,6 +257,7 @@ def test_list_trainings_returns_active_module(client, analyst_headers):
     assert training["totalLessons"] == 2
     assert training["totalLessonsFinished"] == 0
     assert training["finished"] is False
+    assert training["certificateAvailable"] is False
 
 
 def test_list_trainings_excludes_inactive_module(client, analyst_headers):
@@ -351,6 +352,7 @@ def test_finishing_all_items_completes_module(client, analyst_headers):
     training = _find_training(list_data, TRAINING_ID)
     assert training["totalLessonsFinished"] == 2
     assert training["finished"] is True
+    assert training["certificateAvailable"] is True
 
 
 def test_finishing_completed_module_again_returns_false(client, analyst_headers):
@@ -431,20 +433,9 @@ def test_certificate_for_unknown_module_is_refused(client, analyst_headers):
     assert response.get_json()["code"] == "errors.invalidRecord"
 
 
-def test_certificate_for_inactive_module_is_refused(client, analyst_headers):
-    """An inactive module cannot issue certificates, whatever the progress."""
-    response = client.get(
-        f"/training/{INACTIVE_TRAINING_ID}/certificate", headers=analyst_headers
-    )
-
-    assert response.status_code == 400
-
-
-def test_certificate_falls_back_to_the_last_lesson_finish_date(
-    client, analyst_headers
-):
-    """Completions recorded without a treinamento_usuario row (older flow) still
-    get a certificate, dated by the last lesson-finish record."""
+def test_certificate_requires_the_completion_record(client, analyst_headers):
+    """The treinamento_usuario record is the single proof of completion:
+    without it there is no certificate, whatever the lesson counts say."""
     _finish_module(client, analyst_headers)
     session.execute(
         text(
@@ -458,10 +449,63 @@ def test_certificate_falls_back_to_the_last_lesson_finish_date(
     response = client.get(
         f"/training/{TRAINING_ID}/certificate", headers=analyst_headers
     )
+
+    assert response.status_code == 400
+    assert response.get_json()["code"] == "errors.trainingNotFinished"
+
+
+def test_certificate_survives_new_lessons_added_after_completion(
+    client, analyst_headers, module_factory
+):
+    """Publishing extra lessons reopens the module but never revokes the
+    certificate: the completion record alone decides eligibility."""
+    module_factory(990016, 990016, mandatory=False, scope="global", audience="all")
+
+    finish = client.post(
+        "/training/item/990016/finish", json={}, headers=analyst_headers
+    )
+    assert finish.get_json()["data"]["moduleFinished"] is True
+
+    # a new lesson ships after the user already finished the module
+    _add_item(990017, 990016, position=2, active=True)
+    session_commit()
+
+    training = _find_training(_list(client, analyst_headers), 990016)
+    assert training["finished"] is False
+    assert training["certificateAvailable"] is True
+
+    response = client.get("/training/990016/certificate", headers=analyst_headers)
     data = response.get_json()["data"]
 
     assert response.status_code == 200
     assert data["completedAt"] is not None
+    # the certificate reports what the user completed back then
+    assert data["totalLessons"] == 1
+
+    session.execute(
+        text("DELETE FROM public.treinamento_item WHERE idtreinamento_item = 990017")
+    )
+    session_commit()
+
+
+def test_certificate_survives_module_deactivation(client, analyst_headers):
+    """Deactivating a module must not void certificates already earned."""
+    session.execute(
+        text(
+            "INSERT INTO public.treinamento_usuario "
+            "(idtreinamento, idusuario, created_at) VALUES (:id, :uid, now())"
+        ),
+        {"id": INACTIVE_TRAINING_ID, "uid": DEMO_USER_ID},
+    )
+    session_commit()
+
+    response = client.get(
+        f"/training/{INACTIVE_TRAINING_ID}/certificate", headers=analyst_headers
+    )
+    data = response.get_json()["data"]
+
+    assert response.status_code == 200
+    assert data["trainingTitle"] == "Training %d" % INACTIVE_TRAINING_ID
 
 
 def test_certificate_requires_basic_features_permission(client):

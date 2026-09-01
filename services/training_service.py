@@ -43,8 +43,17 @@ def _list_user_trainings(user_id: int, schema: str) -> list:
             "totalLessonsFinished": total_lessons_finished,
             "finished": total_lessons > 0
             and total_lessons_finished == total_lessons,
+            # backed by the completion record, not the counts above: new
+            # lessons reopen the module but never revoke the certificate
+            "certificateAvailable": certificate_available > 0,
         }
-        for item, total_lessons, total_lessons_finished, scope_mandatory in results
+        for (
+            item,
+            total_lessons,
+            total_lessons_finished,
+            scope_mandatory,
+            certificate_available,
+        ) in results
     ]
 
 
@@ -144,10 +153,10 @@ def finish_training_item(
 
 @has_permission(Permission.READ_BASIC_FEATURES)
 def get_training_certificate(training_id: int, user_context: User):
-    """Certificate data for a training module the current user finished: who
-    finished which module, when, and over how many lessons. Refuses while any
-    active lesson is pending, so a certificate can never be issued for an
-    unfinished module."""
+    """Certificate data for a training module the current user finished. The
+    treinamento_usuario record is the single proof of completion: once earned,
+    the certificate stays valid even if the module later gains new lessons or
+    is deactivated — the current lesson counts are deliberately not checked."""
     training = training_repository.get_training(training_id=training_id)
 
     if training is None:
@@ -157,13 +166,11 @@ def get_training_certificate(training_id: int, user_context: User):
             status.HTTP_400_BAD_REQUEST,
         )
 
-    total_lessons, finished_lessons, last_lesson_finished_at = (
-        training_repository.get_lesson_completion_stats(
-            training_id=training_id, user_id=user_context.id
-        )
+    record = training_repository.get_training_user(
+        training_id=training_id, user_id=user_context.id
     )
 
-    if not total_lessons or finished_lessons != total_lessons:
+    if record is None:
         raise ValidationError(
             "Módulo de treinamento ainda não concluído",
             "errors.trainingNotFinished",
@@ -173,17 +180,13 @@ def get_training_certificate(training_id: int, user_context: User):
     # user_context is a JWT stub without the name column
     user = db.session.query(User).filter(User.id == user_context.id).first()
 
-    # the module-level record carries the official completion date; completions
-    # recorded before it existed fall back to the last lesson-finish date
-    record = training_repository.get_training_user(
-        training_id=training_id, user_id=user_context.id
-    )
-    completed_at = record.created_at if record is not None else last_lesson_finished_at
-
     return {
         "userName": user.name,
         "trainingId": training.id,
         "trainingTitle": training.title,
-        "totalLessons": total_lessons,
-        "completedAt": dateutils.to_iso(completed_at),
+        # what the user completed back then, not the module's current content
+        "totalLessons": training_repository.count_finished_lessons(
+            training_id=training_id, user_id=user_context.id
+        ),
+        "completedAt": dateutils.to_iso(record.created_at),
     }
