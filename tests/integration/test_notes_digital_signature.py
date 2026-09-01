@@ -84,6 +84,10 @@ class FakeOdooClient:
                     "name": {"type": "char"},
                     "document_ids": {"type": "one2many"},
                 },
+                ("sign.document", "fields_get"): {
+                    "template_id": {"type": "many2one"},
+                    "attachment_id": {"type": "many2one"},
+                },
                 ("sign.item", "fields_get"): {"document_id": {"type": "many2one"}},
             }
 
@@ -261,9 +265,12 @@ def test_digital_signature_upload_helper(
     data = response.get_json()["data"]
     assert data["idSignRequest"] == 1001
 
-    # the helper receives the PDF directly; no manual attachment/template create
+    # the helper receives the PDF directly (v19 list-of-files shape is tried
+    # first); no manual attachment/template create
     helper = fake_client.find_call("sign.template", "create_with_attachment_data")
-    assert base64.b64decode(helper["payload"][1]).startswith(b"%PDF")
+    uploaded_file = helper["payload"][0][0]
+    assert uploaded_file["name"].endswith(".pdf")
+    assert base64.b64decode(uploaded_file["datas"]).startswith(b"%PDF")
     assert fake_client.find_call("ir.attachment", "create") is None
     assert fake_client.find_call("sign.template", "create") is None
 

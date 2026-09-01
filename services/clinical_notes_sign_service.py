@@ -213,8 +213,21 @@ def _build_note_pdf(note: ClinicalNotes) -> tuple[bytes, int, float]:
 
 
 def _odoo_execute(client, **kwargs):
-    """Executes an ODOO call and converts a timeout (None) into a 504 error."""
-    result = client(**kwargs)
+    """Executes an ODOO call and converts a timeout (None) into a 504 error.
+
+    Business errors raised by ODOO (xmlrpc fault code 2, e.g. UserError)
+    surface as a 400 with the original message instead of a raw fault.
+    """
+    try:
+        result = client(**kwargs)
+    except xmlrpc.client.Fault as fault:
+        if fault.faultCode == 2:
+            raise ValidationError(
+                f"Serviço de assinatura digital: {fault.faultString}",
+                "errors.invalidParam",
+                status.HTTP_400_BAD_REQUEST,
+            ) from fault
+        raise
 
     if result is None:
         raise ValidationError(
@@ -243,24 +256,38 @@ def _create_template_with_helper(client, document_name: str, pdf_b64: str):
     """Tries sign.template.create_with_attachment_data (the helper used by the
     ODOO UI upload, which handles attachment linking and PDF processing).
 
-    Returns the template id, or None when the helper is unavailable or
-    rejected the file (some versions return 0 instead of raising).
+    The signature changed across versions, so both shapes are attempted:
+    a list of file dicts (multi-document layout) and (name, data). Returns
+    the template id, or None when the helper is unavailable or rejected the
+    file (some versions return 0 instead of raising).
     """
-    try:
-        template_id = client(
-            model="sign.template",
-            action="create_with_attachment_data",
-            payload=[f"{document_name}.pdf", pdf_b64],
-            options={},
-        )
-    except xmlrpc.client.Fault as fault:
-        logger.backend_logger.warning(
-            "ODOO Sign: create_with_attachment_data unavailable/failed (%s)",
-            fault.faultString,
-        )
-        return None
+    filename = f"{document_name}.pdf"
 
-    return template_id or None
+    payloads = [
+        [[{"name": filename, "datas": pdf_b64}]],
+        [filename, pdf_b64],
+    ]
+
+    for payload_index, payload in enumerate(payloads):
+        try:
+            template_id = client(
+                model="sign.template",
+                action="create_with_attachment_data",
+                payload=payload,
+                options={},
+            )
+        except xmlrpc.client.Fault as fault:
+            logger.backend_logger.warning(
+                "ODOO Sign: create_with_attachment_data shape %s failed (%s)",
+                payload_index,
+                fault.faultString,
+            )
+            continue
+
+        if isinstance(template_id, int) and template_id:
+            return template_id
+
+    return None
 
 
 def _create_sign_template(client, document_name: str, pdf_bytes: bytes) -> dict:
@@ -296,6 +323,12 @@ def _create_sign_template(client, document_name: str, pdf_bytes: bytes) -> dict:
         )
 
         if use_documents:
+            # logged to help diagnose ODOO version differences in production
+            logger.backend_logger.info(
+                "ODOO Sign: sign.document fields: %s",
+                sorted(_get_model_fields(client, "sign.document")),
+            )
+
             template_id = _odoo_execute(
                 client,
                 model="sign.template",
