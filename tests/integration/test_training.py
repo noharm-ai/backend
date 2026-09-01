@@ -981,3 +981,223 @@ def test_login_summary_reports_obligations_when_the_feature_flag_is_on(
         "mandatoryTotal": 1,
         "mandatoryFinished": 0,
     }
+
+
+# --- GET /training/overview ---
+#
+# The manager overview resolves progress for many users at once, through its own
+# set based queries, so these tests exist mostly to pin it against the per-user
+# reading: whatever a user sees on their own Training Central page (and whatever
+# the support-ticket gate enforces) is what the manager must read for them.
+
+
+OVERVIEW_LESSON_ID = 990020
+
+
+def _overview(client, headers):
+    """GET /training/overview payload."""
+    return client.get("/training/overview", headers=headers).get_json()["data"]
+
+
+def _overview_user(data, user_id):
+    """Return one user entry from an overview payload."""
+    return next((u for u in data["users"] if u["id"] == user_id), None)
+
+
+def _overview_module(entry, training_id):
+    """Return one module entry from a user's overview entry."""
+    return next((m for m in entry["modules"] if m["id"] == training_id), None)
+
+
+@pytest.fixture
+def extra_lesson():
+    """Add a lesson to the seeded module after the fact, and remove it again.
+
+    This is what "reopens" an already finished module: the completion record
+    stays, the active-lesson count moves.
+    """
+    yield lambda: (
+        _add_item(OVERVIEW_LESSON_ID, TRAINING_ID, position=4, active=True),
+        session_commit(),
+    )
+
+    session.execute(
+        text(
+            "DELETE FROM public.treinamento_item_usuario "
+            "WHERE idtreinamento_item = :item"
+        ),
+        {"item": OVERVIEW_LESSON_ID},
+    )
+    session.execute(
+        text("DELETE FROM public.treinamento_item WHERE idtreinamento_item = :item"),
+        {"item": OVERVIEW_LESSON_ID},
+    )
+    session_commit()
+
+
+def test_overview_lists_the_schema_modules_and_its_users(client, user_manager_headers):
+    """The payload carries the module catalogue and one entry per user."""
+    response = client.get("/training/overview", headers=user_manager_headers)
+    data = response.get_json()["data"]
+
+    assert response.status_code == 200
+
+    module = _find_training(data["modules"], TRAINING_ID)
+    assert module is not None
+    assert module["title"] == "Training %d" % TRAINING_ID
+    assert module["audience"] == "new_users"
+
+    entry = _overview_user(data, DEMO_USER_ID)
+    assert entry is not None
+    assert _overview_module(entry, TRAINING_ID) is not None
+
+
+def test_overview_omits_inactive_modules(client, user_manager_headers):
+    """An inactive module is out of the catalogue and out of every user entry."""
+    data = _overview(client, user_manager_headers)
+
+    assert _find_training(data["modules"], INACTIVE_TRAINING_ID) is None
+    assert (
+        _overview_module(_overview_user(data, DEMO_USER_ID), INACTIVE_TRAINING_ID)
+        is None
+    )
+
+
+def test_overview_omits_modules_targeting_another_schema(
+    client, user_manager_headers, module_factory
+):
+    """The visibility rule is shared with the per-user list: fail closed."""
+    module_factory(990016, 990016, mandatory=True, scope="schemas", audience="all")
+    _add_training_schema(990016, OTHER_SCHEMA, mandatory=True)
+    session_commit()
+
+    data = _overview(client, user_manager_headers)
+
+    assert _find_training(data["modules"], 990016) is None
+    assert _overview_module(_overview_user(data, DEMO_USER_ID), 990016) is None
+
+
+def test_overview_counts_only_active_lessons(client, user_manager_headers):
+    """The seeded module has two active lessons and one inactive one."""
+    data = _overview(client, user_manager_headers)
+    module = _overview_module(_overview_user(data, DEMO_USER_ID), TRAINING_ID)
+
+    assert module["totalLessons"] == 2
+
+
+def test_overview_starts_a_user_with_no_progress(client, user_manager_headers):
+    """A user who never opened the training reads as untouched, not as missing."""
+    entry = _overview_user(_overview(client, user_manager_headers), DEMO_USER_ID)
+    module = _overview_module(entry, TRAINING_ID)
+
+    assert module["totalLessonsFinished"] == 0
+    assert module["finished"] is False
+    assert module["completedAt"] is None
+    assert entry["totalLessonsFinished"] == 0
+    assert entry["lastActivityAt"] is None
+
+
+def test_overview_follows_a_user_through_a_module(client, user_manager_headers):
+    """Partial progress, then completion, as the manager would watch it happen."""
+    _set_onboarding_attribute("pending")
+
+    client.post(
+        f"/training/item/{ITEM_1_ID}/finish", json={}, headers=user_manager_headers
+    )
+
+    entry = _overview_user(_overview(client, user_manager_headers), DEMO_USER_ID)
+    module = _overview_module(entry, TRAINING_ID)
+    assert module["totalLessonsFinished"] == 1
+    assert module["finished"] is False
+    assert module["completedAt"] is None
+    assert entry["mandatoryFinished"] == 0
+    assert entry["lastActivityAt"] is not None
+
+    client.post(
+        f"/training/item/{ITEM_2_ID}/finish", json={}, headers=user_manager_headers
+    )
+
+    entry = _overview_user(_overview(client, user_manager_headers), DEMO_USER_ID)
+    module = _overview_module(entry, TRAINING_ID)
+    assert module["totalLessonsFinished"] == 2
+    assert module["finished"] is True
+    assert module["completedAt"] is not None
+    assert entry["mandatoryTotal"] == 1
+    assert entry["mandatoryFinished"] == 1
+
+
+def test_overview_mandatory_matches_the_users_own_page(client, user_manager_headers):
+    """The invariant that matters: the manager must not read "done" for someone
+    the support-ticket gate still considers pending.
+
+    audiencia='new_users' is only mandatory for a user carrying the onboarding
+    row, and both readings go through training_service._is_mandatory.
+    """
+    _set_onboarding_attribute(None)
+
+    own = _find_training(_list(client, user_manager_headers), TRAINING_ID)
+    entry = _overview_user(_overview(client, user_manager_headers), DEMO_USER_ID)
+
+    assert own["mandatory"] is False
+    assert _overview_module(entry, TRAINING_ID)["mandatory"] is False
+    assert entry["newUser"] is False
+    assert entry["mandatoryTotal"] == 0
+
+    _set_onboarding_attribute("pending")
+
+    own = _find_training(_list(client, user_manager_headers), TRAINING_ID)
+    entry = _overview_user(_overview(client, user_manager_headers), DEMO_USER_ID)
+
+    assert own["mandatory"] is True
+    assert _overview_module(entry, TRAINING_ID)["mandatory"] is True
+    assert entry["newUser"] is True
+    assert entry["mandatoryTotal"] == 1
+
+
+def test_overview_shows_a_reopened_module_as_pending_but_keeps_the_date(
+    client, user_manager_headers, extra_lesson
+):
+    """A module that gained a lesson goes back to pending while completedAt
+    stays: the certificate was earned, the module is not done again."""
+    client.post(
+        f"/training/item/{ITEM_1_ID}/finish", json={}, headers=user_manager_headers
+    )
+    client.post(
+        f"/training/item/{ITEM_2_ID}/finish", json={}, headers=user_manager_headers
+    )
+
+    extra_lesson()
+
+    module = _overview_module(
+        _overview_user(_overview(client, user_manager_headers), DEMO_USER_ID),
+        TRAINING_ID,
+    )
+
+    assert module["totalLessons"] == 3
+    assert module["totalLessonsFinished"] == 2
+    assert module["finished"] is False
+    assert module["completedAt"] is not None
+
+
+def test_overview_zeroes_obligations_when_the_feature_flag_is_off(
+    monkeypatch, client, user_manager_headers
+):
+    """The flag gates obligations, not content: the modules are still listed and
+    still tagged mandatory, nobody owes them."""
+    _set_onboarding_attribute("pending")
+    monkeypatch.setattr(Config, "FEATURE_USER_ONBOARDING", False)
+
+    data = _overview(client, user_manager_headers)
+    entry = _overview_user(data, DEMO_USER_ID)
+
+    assert _find_training(data["modules"], TRAINING_ID) is not None
+    assert _overview_module(entry, TRAINING_ID)["mandatory"] is True
+    assert entry["mandatoryTotal"] == 0
+    assert entry["mandatoryFinished"] == 0
+
+
+def test_overview_requires_read_users_permission(client, analyst_headers):
+    """PRESCRIPTION_ANALYST holds no READ_USERS, so the overview is out of reach."""
+    response = client.get("/training/overview", headers=analyst_headers)
+
+    assert response.status_code == 401

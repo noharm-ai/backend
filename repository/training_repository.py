@@ -17,12 +17,9 @@ from exception.validation_error import ValidationError
 from utils import certificateutils, status
 
 
-def list_trainings(user_id: int, schema: str) -> list:
-    """List the active training records visible to the given schema, ordered by
-    position, paired with the total number of active lessons, how many of those
-    the user finished, whether the module is mandatory for that schema, and
-    whether the user holds a completion record (certificate) for it"""
-    total_lessons = (
+def _active_lessons_subquery():
+    """Correlated count of a module's active lessons"""
+    return (
         db.session.query(func.count(TrainingItem.id))
         .filter(
             TrainingItem.training_id == Training.id,
@@ -32,44 +29,27 @@ def list_trainings(user_id: int, schema: str) -> list:
         .scalar_subquery()
     )
 
-    total_lessons_finished = (
-        db.session.query(func.count(TrainingItemUser.training_item_id))
-        .join(TrainingItem, TrainingItem.id == TrainingItemUser.training_item_id)
-        .filter(
-            TrainingItem.training_id == Training.id,
-            TrainingItem.active == True,
-            TrainingItemUser.user_id == user_id,
-        )
-        .correlate(Training)
-        .scalar_subquery()
-    )
 
-    scope_mandatory = case(
+def _scope_mandatory_case():
+    """The mandatory flag that applies to a module: for scope=schemas it lives
+    on the joined TrainingSchema row, for scope=global on the module itself.
+
+    Only valid on a query built through _visible_to_schema(), which is what
+    guarantees the join row exists whenever it is consulted"""
+    return case(
         (Training.scope == TrainingScopeEnum.SCHEMAS.value, TrainingSchema.mandatory),
         else_=Training.mandatory,
     )
 
-    # the completion record outlives lesson-count changes, so a module that
-    # gained lessons after the user finished it still offers its certificate
-    certificate_available = (
-        db.session.query(func.count(TrainingUser.training_id))
-        .filter(
-            TrainingUser.training_id == Training.id,
-            TrainingUser.user_id == user_id,
-        )
-        .correlate(Training)
-        .scalar_subquery()
-    )
 
+def _visible_to_schema(query, schema: str):
+    """Restrict a query over Training to the active modules the given schema
+    sees, joining that schema's TrainingSchema row.
+
+    The single place this rule lives: the per-user list and the manager overview
+    must never disagree about which modules exist for a schema"""
     return (
-        db.session.query(
-            Training,
-            total_lessons,
-            total_lessons_finished,
-            scope_mandatory,
-            certificate_available,
-        )
-        .outerjoin(
+        query.outerjoin(
             TrainingSchema,
             and_(
                 TrainingSchema.training_id == Training.id,
@@ -85,7 +65,142 @@ def list_trainings(user_id: int, schema: str) -> list:
                 TrainingSchema.schema_name != None,
             )
         )
+    )
+
+
+def list_trainings(user_id: int, schema: str) -> list:
+    """List the active training records visible to the given schema, ordered by
+    position, paired with the total number of active lessons, how many of those
+    the user finished, whether the module is mandatory for that schema, and
+    whether the user holds a completion record (certificate) for it"""
+    total_lessons_finished = (
+        db.session.query(func.count(TrainingItemUser.training_item_id))
+        .join(TrainingItem, TrainingItem.id == TrainingItemUser.training_item_id)
+        .filter(
+            TrainingItem.training_id == Training.id,
+            TrainingItem.active == True,
+            TrainingItemUser.user_id == user_id,
+        )
+        .correlate(Training)
+        .scalar_subquery()
+    )
+
+    # the completion record outlives lesson-count changes, so a module that
+    # gained lessons after the user finished it still offers its certificate
+    certificate_available = (
+        db.session.query(func.count(TrainingUser.training_id))
+        .filter(
+            TrainingUser.training_id == Training.id,
+            TrainingUser.user_id == user_id,
+        )
+        .correlate(Training)
+        .scalar_subquery()
+    )
+
+    return (
+        _visible_to_schema(
+            db.session.query(
+                Training,
+                _active_lessons_subquery(),
+                total_lessons_finished,
+                _scope_mandatory_case(),
+                certificate_available,
+            ),
+            schema=schema,
+        )
         .order_by(Training.position)
+        .all()
+    )
+
+
+def list_schema_trainings(schema: str) -> list:
+    """The active modules a schema sees, ordered by position, paired with their
+    active-lesson count and the mandatory flag that applies to the schema.
+
+    The user-independent half of list_trainings: the manager overview resolves
+    progress for many users at once, so it cannot use per-user subqueries"""
+    return (
+        _visible_to_schema(
+            db.session.query(
+                Training,
+                _active_lessons_subquery(),
+                _scope_mandatory_case(),
+            ),
+            schema=schema,
+        )
+        .order_by(Training.position)
+        .all()
+    )
+
+
+def list_lessons_finished_by_user(training_ids: list, user_ids: list) -> list:
+    """(user_id, training_id, finished lessons) for every pair with at least one
+    finished lesson, counting active lessons only.
+
+    Same filters as list_trainings' total_lessons_finished, so a manager and the
+    user themselves always read the same progress. Deliberately not
+    count_finished_lessons, which counts inactive lessons too because a
+    certificate reports what the user did, not the module's current content"""
+    if not training_ids or not user_ids:
+        return []
+
+    return (
+        db.session.query(
+            TrainingItemUser.user_id,
+            TrainingItem.training_id,
+            func.count(TrainingItemUser.training_item_id),
+        )
+        .join(TrainingItem, TrainingItem.id == TrainingItemUser.training_item_id)
+        .filter(
+            TrainingItem.training_id.in_(training_ids),
+            TrainingItem.active == True,
+            TrainingItemUser.user_id.in_(user_ids),
+        )
+        .group_by(TrainingItemUser.user_id, TrainingItem.training_id)
+        .all()
+    )
+
+
+def list_training_completions(training_ids: list, user_ids: list) -> list:
+    """(user_id, training_id, completed_at) for every completion record among
+    the given modules and users"""
+    if not training_ids or not user_ids:
+        return []
+
+    return (
+        db.session.query(
+            TrainingUser.user_id,
+            TrainingUser.training_id,
+            TrainingUser.created_at,
+        )
+        .filter(
+            TrainingUser.training_id.in_(training_ids),
+            TrainingUser.user_id.in_(user_ids),
+        )
+        .all()
+    )
+
+
+def list_last_activity(training_ids: list, user_ids: list) -> list:
+    """(user_id, most recent lesson activity) among the given modules.
+
+    Inactive lessons count here: the question is when the user last touched the
+    training, and that happened whether or not the lesson still exists"""
+    if not training_ids or not user_ids:
+        return []
+
+    last_activity = func.max(
+        func.coalesce(TrainingItemUser.updated_at, TrainingItemUser.created_at)
+    )
+
+    return (
+        db.session.query(TrainingItemUser.user_id, last_activity)
+        .join(TrainingItem, TrainingItem.id == TrainingItemUser.training_item_id)
+        .filter(
+            TrainingItem.training_id.in_(training_ids),
+            TrainingItemUser.user_id.in_(user_ids),
+        )
+        .group_by(TrainingItemUser.user_id)
         .all()
     )
 

@@ -21,6 +21,15 @@ def list_trainings():
     return training_service.list_trainings()
 
 
+@app_training.route("/training/overview", methods=["GET"])
+@api_endpoint(
+    is_admin=True
+)  # TODO: remove is_admin=True when the training is available to all users
+def get_training_overview():
+    """Training progress of every user of the schema, for user managers"""
+    return training_service.get_training_overview()
+
+
 @app_training.route("/training/<int:id_training>/items", methods=["GET"])
 @api_endpoint(
     is_admin=True
