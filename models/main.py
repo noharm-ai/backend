@@ -17,10 +17,6 @@ def redis_cert_reqs(env: str):
     """
     return None if env == NoHarmENV.DEVELOPMENT.value else "required"
 
-def redis_timeout(env: str):
-    """redis timeout based on env"""
-    return 0 if env == NoHarmENV.DEVELOPMENT.value else 2
-
 
 redis_client = redis.StrictRedis(
     host=Config.REDIS_HOST,
@@ -29,8 +25,8 @@ redis_client = redis.StrictRedis(
     decode_responses=True,
     ssl=True,
     ssl_cert_reqs=redis_cert_reqs(Config.ENV),
-    socket_timeout=redis_timeout(Config.ENV),
-    socket_connect_timeout=redis_timeout(Config.ENV),
+    socket_timeout=2,
+    socket_connect_timeout=2,
 )
 
 
