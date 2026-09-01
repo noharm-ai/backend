@@ -16,6 +16,7 @@ Two Sign model layouts are supported (detected at runtime via fields_get):
 
 import base64
 import re
+import xmlrpc.client
 from html.parser import HTMLParser
 
 from fpdf import FPDF
@@ -29,7 +30,7 @@ from models.main import User, db
 from models.notes import ClinicalNotes
 from models.requests.clinical_notes_request import ClinicalNoteSignRequest
 from services import odoo_client
-from utils import status
+from utils import logger, status
 
 _EMAIL_REGEX = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
@@ -238,54 +239,86 @@ def _get_model_fields(client, model: str) -> set:
     return set(fields.keys())
 
 
+def _create_template_with_helper(client, document_name: str, pdf_b64: str):
+    """Tries sign.template.create_with_attachment_data (the helper used by the
+    ODOO UI upload, which handles attachment linking and PDF processing).
+
+    Returns the template id, or None when the helper is unavailable or
+    rejected the file (some versions return 0 instead of raising).
+    """
+    try:
+        template_id = client(
+            model="sign.template",
+            action="create_with_attachment_data",
+            payload=[f"{document_name}.pdf", pdf_b64],
+            options={},
+        )
+    except xmlrpc.client.Fault as fault:
+        logger.backend_logger.warning(
+            "ODOO Sign: create_with_attachment_data unavailable/failed (%s)",
+            fault.faultString,
+        )
+        return None
+
+    return template_id or None
+
+
 def _create_sign_template(client, document_name: str, pdf_bytes: bytes) -> dict:
     """Uploads the PDF and creates the sign.template for it.
 
     Returns {"template_id", "document_id"}; document_id is None on ODOO <= 18,
     where the attachment lives directly on the template.
     """
+    pdf_b64 = base64.b64encode(pdf_bytes).decode("ascii")
     template_fields = _get_model_fields(client, "sign.template")
     use_documents = "attachment_id" not in template_fields
 
-    attachment_id = _odoo_execute(
-        client,
-        model="ir.attachment",
-        action="create",
-        payload=[
-            {
-                "name": f"{document_name}.pdf",
-                "type": "binary",
-                "datas": base64.b64encode(pdf_bytes).decode("ascii"),
-                "mimetype": "application/pdf",
-                "res_model": "sign.document" if use_documents else "sign.template",
-            }
-        ],
-        options={},
+    template_id = _create_template_with_helper(
+        client, document_name=document_name, pdf_b64=pdf_b64
     )
 
-    if not use_documents:
-        template_id = _odoo_execute(
+    if template_id is None:
+        # manual fallback: unattached upload (linked afterwards by ODOO),
+        # exactly like the web client does before creating the template
+        attachment_id = _odoo_execute(
             client,
-            model="sign.template",
+            model="ir.attachment",
             action="create",
-            payload=[{"name": document_name, "attachment_id": attachment_id}],
+            payload=[
+                {
+                    "name": f"{document_name}.pdf",
+                    "type": "binary",
+                    "datas": pdf_b64,
+                    "mimetype": "application/pdf",
+                }
+            ],
             options={},
         )
 
-        return {"template_id": template_id, "document_id": None}
+        if use_documents:
+            template_id = _odoo_execute(
+                client,
+                model="sign.template",
+                action="create",
+                payload=[
+                    {
+                        "name": document_name,
+                        "document_ids": [[0, 0, {"attachment_id": attachment_id}]],
+                    }
+                ],
+                options={},
+            )
+        else:
+            template_id = _odoo_execute(
+                client,
+                model="sign.template",
+                action="create",
+                payload=[{"name": document_name, "attachment_id": attachment_id}],
+                options={},
+            )
 
-    template_id = _odoo_execute(
-        client,
-        model="sign.template",
-        action="create",
-        payload=[
-            {
-                "name": document_name,
-                "document_ids": [[0, 0, {"attachment_id": attachment_id}]],
-            }
-        ],
-        options={},
-    )
+    if not use_documents:
+        return {"template_id": template_id, "document_id": None}
 
     document_ids = _odoo_execute(
         client,
@@ -405,6 +438,16 @@ def request_signature(
 
     pdf_bytes, sign_page, sign_pos_y = _build_note_pdf(note=note)
 
+    document_name = f"Evolução {note.id} - {note.date.strftime('%d/%m/%Y %H:%M')}"
+
+    if request_data.preview:
+        # debugging aid: return the generated PDF without contacting ODOO
+        return {
+            "preview": True,
+            "filename": f"{document_name}.pdf",
+            "pdf": base64.b64encode(pdf_bytes).decode("ascii"),
+        }
+
     client = odoo_client.get_client(context="clinical notes sign service")
     if client is None:
         raise ValidationError(
@@ -412,8 +455,6 @@ def request_signature(
             "errors.connectionTimeout",
             status.HTTP_504_GATEWAY_TIMEOUT,
         )
-
-    document_name = f"Evolução {note.id} - {note.date.strftime('%d/%m/%Y %H:%M')}"
 
     # 1) + 2) upload the PDF and create the template pointing to it
     template = _create_sign_template(

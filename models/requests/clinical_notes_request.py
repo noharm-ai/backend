@@ -16,3 +16,5 @@ class ClinicalNoteSignRequest(BaseModel):
     id: int
     signer_name: str
     signer_email: str
+    # debugging aid: return the generated PDF (base64) without contacting ODOO
+    preview: Optional[bool] = False

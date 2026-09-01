@@ -1,4 +1,5 @@
 import base64
+import xmlrpc.client
 
 import pytest
 from sqlalchemy import text
@@ -50,16 +51,24 @@ class FakeOdooClient:
 
     layout="legacy" mimics ODOO <= 18 (sign.template.attachment_id);
     layout="v19" mimics ODOO 19+ (sign.document + sign.item.document_id).
+    with_helper=True exposes sign.template.create_with_attachment_data
+    (the official upload helper); otherwise calling it raises a Fault.
     """
 
-    def __init__(self, layout="legacy"):
+    def __init__(self, layout="legacy", with_helper=False):
         self.calls = []
         self.layout = layout
+        self.with_helper = with_helper
 
     def __call__(self, model, action, payload, options):
         self.calls.append(
             {"model": model, "action": action, "payload": payload, "options": options}
         )
+
+        if (model, action) == ("sign.template", "create_with_attachment_data"):
+            if self.with_helper:
+                return 601
+            raise xmlrpc.client.Fault(1, "AttributeError: create_with_attachment_data")
 
         if self.layout == "legacy":
             fields_get = {
@@ -168,10 +177,11 @@ def test_digital_signature(client, navigator_headers, sign_test_data, monkeypatc
     assert data["link"].endswith("/sign/document/1001/tok123")
     assert data["signerEmail"] == SIGNER["signer_email"]
 
-    # the uploaded attachment must be a valid PDF
+    # the uploaded attachment must be a valid, unattached PDF
     attachment = fake_client.find_call("ir.attachment", "create")
     pdf_bytes = base64.b64decode(attachment["payload"][0]["datas"])
     assert pdf_bytes.startswith(b"%PDF")
+    assert "res_model" not in attachment["payload"][0]
 
     # the template points to the uploaded attachment
     template = fake_client.find_call("sign.template", "create")
@@ -229,6 +239,52 @@ def test_digital_signature_odoo_v19(
     assert "template_id" not in item
     assert 0 < item["posX"] < 1
     assert 0 < item["posY"] < 1
+
+
+def test_digital_signature_upload_helper(
+    client, navigator_headers, sign_test_data, monkeypatch
+):
+    """POST /notes/digital-signature — uses create_with_attachment_data when available"""
+    fake_client = FakeOdooClient(layout="v19", with_helper=True)
+
+    monkeypatch.setattr(
+        clinical_notes_sign_service.odoo_client,
+        "get_client",
+        lambda context=None: fake_client,
+    )
+
+    response = client.post(
+        URL, json={"id": SIGN_NOTE_ID, **SIGNER}, headers=navigator_headers
+    )
+
+    assert response.status_code == 200
+    data = response.get_json()["data"]
+    assert data["idSignRequest"] == 1001
+
+    # the helper receives the PDF directly; no manual attachment/template create
+    helper = fake_client.find_call("sign.template", "create_with_attachment_data")
+    assert base64.b64decode(helper["payload"][1]).startswith(b"%PDF")
+    assert fake_client.find_call("ir.attachment", "create") is None
+    assert fake_client.find_call("sign.template", "create") is None
+
+    # the signature field is still anchored on the sign.document
+    sign_item = fake_client.find_call("sign.item", "create")
+    assert sign_item["payload"][0]["document_id"] == 321
+
+
+def test_digital_signature_preview(client, navigator_headers, sign_test_data):
+    """POST /notes/digital-signature — preview returns the PDF without ODOO"""
+    response = client.post(
+        URL,
+        json={"id": SIGN_NOTE_ID, "preview": True, **SIGNER},
+        headers=navigator_headers,
+    )
+
+    assert response.status_code == 200
+    data = response.get_json()["data"]
+    assert data["preview"] is True
+    assert data["filename"].endswith(".pdf")
+    assert base64.b64decode(data["pdf"]).startswith(b"%PDF")
 
 
 def test_digital_signature_odoo_timeout(
