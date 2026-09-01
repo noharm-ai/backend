@@ -265,13 +265,13 @@ def summary_fixtures():
         )
 
     # an allergy named by its substance, one named by free text, one inactive
+    # only the name is read back (the allergy list coalesces to it), so the
+    # substance is left unclassified rather than borrowing a seed class
     session.execute(
         text(
-            "INSERT INTO public.substancia (sctid, nome, link, idclasse, ativo, "
-            "  update_at, update_by) "
-            "VALUES (:id, 'ZZDIPIRONA', '', "
-            "  (SELECT idclasse FROM public.substancia WHERE sctid < 90000 LIMIT 1), "
-            "  true, now(), 1)"
+            "INSERT INTO public.substancia "
+            "  (sctid, nome, link, ativo, update_at, update_by) "
+            "VALUES (:id, 'ZZDIPIRONA', '', true, now(), 1)"
         ),
         {"id": SUBSTANCE_ID},
     )
