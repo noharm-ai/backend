@@ -1,9 +1,11 @@
 """Repository: training related operations"""
 
+import secrets
 from datetime import datetime
 
 from sqlalchemy import and_, case, func, or_
 
+from exception.validation_error import ValidationError
 from models.main import db
 from models.enums import TrainingScopeEnum
 from models.appendix import (
@@ -13,6 +15,14 @@ from models.appendix import (
     TrainingSchema,
     TrainingUser,
 )
+from utils import status
+
+# Certificate validation codes are read off a printed certificate and typed
+# back in, so the alphabet leaves out the character pairs that get confused
+# (0/O and 1/I). 12 characters is what the column holds.
+_VALIDATION_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+_VALIDATION_CODE_LENGTH = 12
+_VALIDATION_CODE_ATTEMPTS = 5
 
 
 def list_trainings(user_id: int, schema: str) -> list:
@@ -206,7 +216,36 @@ def finish_training(training_id: int, user_id: int) -> bool:
     record = TrainingUser()
     record.training_id = training_id
     record.user_id = user_id
+    record.validation_code = _generate_validation_code()
     record.created_at = datetime.today()
     db.session.add(record)
 
     return True
+
+
+def _generate_validation_code() -> str:
+    """Draw a validation code no other completion record is using.
+
+    The column carries a unique index, so a repeat would only surface as an
+    integrity error on flush; the collision check turns that into another draw.
+    """
+    for _ in range(_VALIDATION_CODE_ATTEMPTS):
+        code = "".join(
+            secrets.choice(_VALIDATION_CODE_ALPHABET)
+            for _ in range(_VALIDATION_CODE_LENGTH)
+        )
+
+        taken = (
+            db.session.query(TrainingUser.validation_code)
+            .filter(TrainingUser.validation_code == code)
+            .first()
+        )
+
+        if taken is None:
+            return code
+
+    raise ValidationError(
+        "Não foi possível gerar o código de validação do certificado",
+        "errors.businessRules",
+        status.HTTP_500_INTERNAL_SERVER_ERROR,
+    )

@@ -375,6 +375,50 @@ def test_finishing_completed_module_again_returns_false(client, analyst_headers)
     assert again.get_json()["data"]["moduleFinished"] is False
 
 
+def _validation_code(training_id, user_id=DEMO_USER_ID):
+    """The validation code stored on a module's completion record."""
+    return session.execute(
+        text(
+            "SELECT codigo_validacao FROM public.treinamento_usuario "
+            "WHERE idtreinamento = :id AND idusuario = :uid"
+        ),
+        {"id": training_id, "uid": user_id},
+    ).scalar()
+
+
+def test_completing_a_module_stamps_a_validation_code(client, analyst_headers):
+    """Completion writes the code the certificate is verified by.
+
+    ``codigo_validacao`` is NOT NULL with a unique index, so a completion that
+    left it unset would fail the insert instead of finishing the module.
+    """
+    _finish_module(client, analyst_headers)
+
+    code = _validation_code(TRAINING_ID)
+
+    assert code is not None
+    assert len(code) == 12
+    # the alphabet leaves out the characters that get confused when a code is
+    # read off a printed certificate and typed back in
+    assert set(code) <= set("ABCDEFGHJKLMNPQRSTUVWXYZ23456789")
+
+
+def test_each_completion_gets_its_own_validation_code(
+    client, analyst_headers, module_factory
+):
+    """Two modules finished by the same user do not share a code.
+
+    The column is uniquely indexed, so a reused code would make the second
+    completion fail outright.
+    """
+    module_factory(990019, 990019)
+
+    _finish_module(client, analyst_headers)
+    client.post("/training/item/990019/finish", json={}, headers=analyst_headers)
+
+    assert _validation_code(TRAINING_ID) != _validation_code(990019)
+
+
 def test_finish_item_requires_basic_features_permission(client):
     """POST finish returns 401 for a role without READ_BASIC_FEATURES."""
     headers = make_headers(
@@ -511,9 +555,14 @@ def test_certificate_survives_module_deactivation(client, analyst_headers):
     session.execute(
         text(
             "INSERT INTO public.treinamento_usuario "
-            "(idtreinamento, idusuario, created_at) VALUES (:id, :uid, now())"
+            "(idtreinamento, idusuario, codigo_validacao, created_at) "
+            "VALUES (:id, :uid, :code, now())"
         ),
-        {"id": INACTIVE_TRAINING_ID, "uid": DEMO_USER_ID},
+        {
+            "id": INACTIVE_TRAINING_ID,
+            "uid": DEMO_USER_ID,
+            "code": "ZZTESTINACT1",
+        },
     )
     session_commit()
 

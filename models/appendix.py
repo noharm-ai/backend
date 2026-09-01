@@ -370,6 +370,8 @@ class TrainingUser(db.Model):
 
     training_id = db.Column("idtreinamento", db.Integer, primary_key=True)
     user_id = db.Column("idusuario", db.Integer, primary_key=True)
+    # unique across every completion record: identifies the certificate earned
+    validation_code = db.Column("codigo_validacao", db.String(12), nullable=False)
     created_at = db.Column("created_at", db.DateTime, nullable=False)
     updated_at = db.Column("updated_at", db.DateTime, nullable=True)
 
