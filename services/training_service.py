@@ -6,6 +6,8 @@ from models.enums import TrainingAudienceEnum, UserAttributeEnum
 from models.main import User, db
 from models.requests.training_request import TrainingItemFinishRequest
 from decorators.has_permission_decorator import has_permission, Permission
+from exception.validation_error import ValidationError
+from utils import dateutils, status
 
 
 def _list_user_trainings(user_id: int, schema: str) -> list:
@@ -41,8 +43,17 @@ def _list_user_trainings(user_id: int, schema: str) -> list:
             "totalLessonsFinished": total_lessons_finished,
             "finished": total_lessons > 0
             and total_lessons_finished == total_lessons,
+            # backed by the completion record, not the counts above: new
+            # lessons reopen the module but never revoke the certificate
+            "certificateAvailable": certificate_available > 0,
         }
-        for item, total_lessons, total_lessons_finished, scope_mandatory in results
+        for (
+            item,
+            total_lessons,
+            total_lessons_finished,
+            scope_mandatory,
+            certificate_available,
+        ) in results
     ]
 
 
@@ -137,4 +148,45 @@ def finish_training_item(
         "training": get_mandatory_summary(
             user_id=user_context.id, schema=user_context.schema
         ),
+    }
+
+
+@has_permission(Permission.READ_BASIC_FEATURES)
+def get_training_certificate(training_id: int, user_context: User):
+    """Certificate data for a training module the current user finished. The
+    treinamento_usuario record is the single proof of completion: once earned,
+    the certificate stays valid even if the module later gains new lessons or
+    is deactivated — the current lesson counts are deliberately not checked."""
+    training = training_repository.get_training(training_id=training_id)
+
+    if training is None:
+        raise ValidationError(
+            "Treinamento inválido",
+            "errors.invalidRecord",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    record = training_repository.get_training_user(
+        training_id=training_id, user_id=user_context.id
+    )
+
+    if record is None:
+        raise ValidationError(
+            "Módulo de treinamento ainda não concluído",
+            "errors.trainingNotFinished",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    # user_context is a JWT stub without the name column
+    user = db.session.query(User).filter(User.id == user_context.id).first()
+
+    return {
+        "userName": user.name,
+        "trainingId": training.id,
+        "trainingTitle": training.title,
+        # what the user completed back then, not the module's current content
+        "totalLessons": training_repository.count_finished_lessons(
+            training_id=training_id, user_id=user_context.id
+        ),
+        "completedAt": dateutils.to_iso(record.created_at),
     }

@@ -257,6 +257,7 @@ def test_list_trainings_returns_active_module(client, analyst_headers):
     assert training["totalLessons"] == 2
     assert training["totalLessonsFinished"] == 0
     assert training["finished"] is False
+    assert training["certificateAvailable"] is False
 
 
 def test_list_trainings_excludes_inactive_module(client, analyst_headers):
@@ -351,6 +352,7 @@ def test_finishing_all_items_completes_module(client, analyst_headers):
     training = _find_training(list_data, TRAINING_ID)
     assert training["totalLessonsFinished"] == 2
     assert training["finished"] is True
+    assert training["certificateAvailable"] is True
 
 
 def test_finishing_completed_module_again_returns_false(client, analyst_headers):
@@ -379,6 +381,139 @@ def test_finish_item_requires_basic_features_permission(client):
     response = client.post(
         f"/training/item/{ITEM_1_ID}/finish", json={}, headers=headers
     )
+
+    assert response.status_code == 401
+
+
+# --- GET /training/<id>/certificate ---
+
+
+def _finish_module(client, headers):
+    """Finish both active items of the seeded training module."""
+    client.post(f"/training/item/{ITEM_1_ID}/finish", json={}, headers=headers)
+    client.post(f"/training/item/{ITEM_2_ID}/finish", json={}, headers=headers)
+
+
+def test_certificate_for_finished_module(client, analyst_headers):
+    """GET certificate returns the data needed to render one after completion."""
+    _finish_module(client, analyst_headers)
+
+    response = client.get(
+        f"/training/{TRAINING_ID}/certificate", headers=analyst_headers
+    )
+    data = response.get_json()["data"]
+
+    assert response.status_code == 200
+    assert data["trainingId"] == TRAINING_ID
+    assert data["trainingTitle"] == "Training %d" % TRAINING_ID
+    assert data["totalLessons"] == 2
+    assert data["userName"]
+    assert data["completedAt"] is not None
+
+
+def test_certificate_refused_while_lessons_are_pending(client, analyst_headers):
+    """No certificate while any active lesson of the module is unfinished."""
+    client.post(
+        f"/training/item/{ITEM_1_ID}/finish", json={}, headers=analyst_headers
+    )
+
+    response = client.get(
+        f"/training/{TRAINING_ID}/certificate", headers=analyst_headers
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["code"] == "errors.trainingNotFinished"
+
+
+def test_certificate_for_unknown_module_is_refused(client, analyst_headers):
+    """GET certificate returns 400 for a training id that does not exist."""
+    response = client.get("/training/888888/certificate", headers=analyst_headers)
+
+    assert response.status_code == 400
+    assert response.get_json()["code"] == "errors.invalidRecord"
+
+
+def test_certificate_requires_the_completion_record(client, analyst_headers):
+    """The treinamento_usuario record is the single proof of completion:
+    without it there is no certificate, whatever the lesson counts say."""
+    _finish_module(client, analyst_headers)
+    session.execute(
+        text(
+            "DELETE FROM public.treinamento_usuario "
+            "WHERE idtreinamento = :id AND idusuario = :uid"
+        ),
+        {"id": TRAINING_ID, "uid": DEMO_USER_ID},
+    )
+    session_commit()
+
+    response = client.get(
+        f"/training/{TRAINING_ID}/certificate", headers=analyst_headers
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["code"] == "errors.trainingNotFinished"
+
+
+def test_certificate_survives_new_lessons_added_after_completion(
+    client, analyst_headers, module_factory
+):
+    """Publishing extra lessons reopens the module but never revokes the
+    certificate: the completion record alone decides eligibility."""
+    module_factory(990016, 990016, mandatory=False, scope="global", audience="all")
+
+    finish = client.post(
+        "/training/item/990016/finish", json={}, headers=analyst_headers
+    )
+    assert finish.get_json()["data"]["moduleFinished"] is True
+
+    # a new lesson ships after the user already finished the module
+    _add_item(990017, 990016, position=2, active=True)
+    session_commit()
+
+    training = _find_training(_list(client, analyst_headers), 990016)
+    assert training["finished"] is False
+    assert training["certificateAvailable"] is True
+
+    response = client.get("/training/990016/certificate", headers=analyst_headers)
+    data = response.get_json()["data"]
+
+    assert response.status_code == 200
+    assert data["completedAt"] is not None
+    # the certificate reports what the user completed back then
+    assert data["totalLessons"] == 1
+
+    session.execute(
+        text("DELETE FROM public.treinamento_item WHERE idtreinamento_item = 990017")
+    )
+    session_commit()
+
+
+def test_certificate_survives_module_deactivation(client, analyst_headers):
+    """Deactivating a module must not void certificates already earned."""
+    session.execute(
+        text(
+            "INSERT INTO public.treinamento_usuario "
+            "(idtreinamento, idusuario, created_at) VALUES (:id, :uid, now())"
+        ),
+        {"id": INACTIVE_TRAINING_ID, "uid": DEMO_USER_ID},
+    )
+    session_commit()
+
+    response = client.get(
+        f"/training/{INACTIVE_TRAINING_ID}/certificate", headers=analyst_headers
+    )
+    data = response.get_json()["data"]
+
+    assert response.status_code == 200
+    assert data["trainingTitle"] == "Training %d" % INACTIVE_TRAINING_ID
+
+
+def test_certificate_requires_basic_features_permission(client):
+    """GET certificate returns 401 for a role without READ_BASIC_FEATURES."""
+    headers = make_headers(
+        get_access(client, roles=[Role.DISPENSING_MANAGER.value])
+    )
+    response = client.get(f"/training/{TRAINING_ID}/certificate", headers=headers)
 
     assert response.status_code == 401
 

@@ -18,7 +18,8 @@ from models.appendix import (
 def list_trainings(user_id: int, schema: str) -> list:
     """List the active training records visible to the given schema, ordered by
     position, paired with the total number of active lessons, how many of those
-    the user finished, and whether the module is mandatory for that schema"""
+    the user finished, whether the module is mandatory for that schema, and
+    whether the user holds a completion record (certificate) for it"""
     total_lessons = (
         db.session.query(func.count(TrainingItem.id))
         .filter(
@@ -46,9 +47,25 @@ def list_trainings(user_id: int, schema: str) -> list:
         else_=Training.mandatory,
     )
 
+    # the completion record outlives lesson-count changes, so a module that
+    # gained lessons after the user finished it still offers its certificate
+    certificate_available = (
+        db.session.query(func.count(TrainingUser.training_id))
+        .filter(
+            TrainingUser.training_id == Training.id,
+            TrainingUser.user_id == user_id,
+        )
+        .correlate(Training)
+        .scalar_subquery()
+    )
+
     return (
         db.session.query(
-            Training, total_lessons, total_lessons_finished, scope_mandatory
+            Training,
+            total_lessons,
+            total_lessons_finished,
+            scope_mandatory,
+            certificate_available,
         )
         .outerjoin(
             TrainingSchema,
@@ -119,6 +136,33 @@ def get_training_id_for_item(training_item_id: int) -> int:
     return (
         db.session.query(TrainingItem.training_id)
         .filter(TrainingItem.id == training_item_id)
+        .scalar()
+    )
+
+
+def get_training(training_id: int) -> Training:
+    """Return the training record with the given id, if any. Inactive modules
+    are included on purpose: deactivating a module must not void the
+    certificates its completion records already earned"""
+    return db.session.query(Training).filter(Training.id == training_id).first()
+
+
+def get_training_user(training_id: int, user_id: int) -> TrainingUser:
+    """Return the record marking a training module as finished by a user, if any"""
+    return TrainingUser.query.get((training_id, user_id))
+
+
+def count_finished_lessons(training_id: int, user_id: int) -> int:
+    """Number of lessons of a training module the given user finished, whether
+    or not those lessons are still active: it reports what the user actually
+    did, not the module's current content"""
+    return (
+        db.session.query(func.count(TrainingItemUser.training_item_id))
+        .join(TrainingItem, TrainingItem.id == TrainingItemUser.training_item_id)
+        .filter(
+            TrainingItem.training_id == training_id,
+            TrainingItemUser.user_id == user_id,
+        )
         .scalar()
     )
 
