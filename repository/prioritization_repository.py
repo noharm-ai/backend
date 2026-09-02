@@ -274,6 +274,23 @@ def _build_base_query(request: PrioritizationRequest):
         else:
             q = q.filter(Prescription.notes == None)
 
+    if request.has_next_prescription is not None:
+        # features.prescriptionDates is a sorted list of ISO strings, so the
+        # last element is the most recent inner prescription date and a plain
+        # string comparison against "now" (also ISO) is chronological
+        last_prescription_date = Prescription.features["prescriptionDates"][-1].astext
+        now_iso = datetime.now().isoformat()
+
+        if request.has_next_prescription:
+            q = q.filter(last_prescription_date >= now_iso)
+        else:
+            q = q.filter(
+                or_(
+                    last_prescription_date == None,
+                    last_prescription_date < now_iso,
+                )
+            )
+
     if request.pending_interventions is not None:
         if request.pending_interventions:
             q = q.filter(

@@ -105,12 +105,19 @@ def getFeatures(result, agg_date: datetime = None, intervals_for_agg_date=False)
     alert_levels = []
     alert_level = "low"
     department_list = set()
+    prescription_dates = set()
 
     for attr in get_numeric_drug_attributes_list():
         drug_attributes[attr] = 0
 
     for d in drugList:
         drugIDs.append(d["idDrug"])
+
+        # individual prescription dates inside the agg prescription: used to
+        # prioritize agg prescriptions by their inner prescription dates
+        prescription_date = d.get("prescriptionDate", None)
+        if prescription_date:
+            prescription_dates.add(prescription_date)
         if d["idSubstance"] != None:
             substanceIDs.append(d["idSubstance"])
         if d["idSubstanceClass"] != None:
@@ -229,6 +236,7 @@ def getFeatures(result, agg_date: datetime = None, intervals_for_agg_date=False)
         "departmentList": list(department_list),
         "globalScore": global_score,
         "protocolAlerts": protocol_alerts,
+        "prescriptionDates": sorted(prescription_dates),
     }
 
 

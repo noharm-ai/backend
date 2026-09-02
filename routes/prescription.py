@@ -100,6 +100,7 @@ def get_prescriptions():
         alert_level=request.args.get("alertLevel", None),
         tags=request.args.getlist("tags[]") or None,
         has_clinical_notes=to_optional_bool(request.args.get("hasClinicalNotes")),
+        has_next_prescription=to_optional_bool(request.args.get("hasNextPrescription")),
         protocols=to_int_list(request.args.getlist("protocols[]")) or None,
         age_min=to_optional_int(request.args.get("ageMin")),
         age_max=to_optional_int(request.args.get("ageMax")),

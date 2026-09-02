@@ -36,6 +36,7 @@ class PrioritizationRequest(BaseModel):
     alert_level: Optional[str] = None
     tags: Optional[list[str]] = None
     has_clinical_notes: Optional[bool] = None
+    has_next_prescription: Optional[bool] = None
     protocols: Optional[list[int]] = None
     age_min: Optional[int] = None
     age_max: Optional[int] = None

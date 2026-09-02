@@ -383,6 +383,38 @@ class TestGetFeatures:
         assert features["drugAttributes"]["antimicro"] == 2
         assert features["totalItens"] == 1
 
+    def test_collects_inner_prescription_dates(self):
+        """Inner prescription dates are de-duplicated and sorted, even for
+        whitelisted/suspended items, and missing dates are ignored."""
+        later = _make_drug(idDrug=1, prescriptionDate="2026-09-02T14:00:00")
+        earlier = _make_drug(idDrug=2, prescriptionDate="2026-09-01T08:00:00")
+        duplicate = _make_drug(
+            idDrug=3, whiteList=True, prescriptionDate="2026-09-02T14:00:00"
+        )
+        suspended = _make_drug(
+            idDrug=4, suspended=True, prescriptionDate="2026-09-02T20:00:00"
+        )
+        no_date = _make_drug(idDrug=5, prescriptionDate=None)
+        legacy = _make_drug(idDrug=6)  # header calls may not carry the key
+
+        features = prescriptionutils.getFeatures(
+            _make_result(
+                prescription=[later, earlier, duplicate],
+                solution=[suspended],
+                procedures=[no_date, legacy],
+            )
+        )
+        assert features["prescriptionDates"] == [
+            "2026-09-01T08:00:00",
+            "2026-09-02T14:00:00",
+            "2026-09-02T20:00:00",
+        ]
+
+    def test_prescription_dates_empty_when_absent(self):
+        """A prescription without inner dates yields an empty list."""
+        features = prescriptionutils.getFeatures(_make_result())
+        assert features["prescriptionDates"] == []
+
     def test_agg_path_uses_alert_stats(self):
         """When alertStats is present it drives the alert total and level."""
         drug = _make_drug(alertsComplete=[{"level": "high"}])
