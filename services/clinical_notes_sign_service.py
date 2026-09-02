@@ -10,10 +10,10 @@ The flow mirrors the standard ODOO Sign integration:
 Two Sign model layouts are supported (detected at runtime via fields_get):
 - up to ODOO 18: the PDF lives on sign.template.attachment_id and sign.item
   points to template_id;
-- ODOO 19+: sign.template holds sign.document records (document_ids); each
-  document needs its attachment_id (storage) plus the binary "raw" field,
-  which ODOO parses at create time (num_pages/validation), and sign.item
-  points to document_id.
+- ODOO 19+: sign.template holds sign.document records (document_ids); the
+  upload goes through sign.template.create_from_attachment_data (list of
+  {"name", "datas"} dicts), documents point to their attachment and
+  sign.item points to document_id.
 """
 
 import base64
@@ -172,6 +172,8 @@ def _build_note_pdf(note: ClinicalNotes) -> tuple[bytes, int, float]:
     and its vertical position as a fraction (0-1) of the page height.
     """
     pdf = FPDF(format="A4")
+    # some PDF validators refuse files declaring the ancient 1.3 spec
+    pdf.pdf_version = "1.7"
     pdf.set_auto_page_break(auto=True, margin=20)
     pdf.add_page()
 
@@ -282,6 +284,10 @@ def _try_template_upload_method(client, method: str, payload: list):
         )
         return None
 
+    # ODOO 19 returns {"id": ..., "name": ...}; older versions return the id
+    if isinstance(result, dict):
+        result = result.get("id")
+
     if isinstance(result, int) and result:
         return result
 
@@ -301,58 +307,43 @@ def _create_sign_template(client, document_name: str, pdf_bytes: bytes) -> dict:
     filename = f"{document_name}.pdf"
 
     if use_documents:
-        # ODOO 19+: probe the upload helpers used by the web client first
-        # (name changed across versions); each candidate is tried with the
-        # (name, data) and the list-of-files signatures
-        for method in ("create_from_attachment_data", "upload_template"):
-            for payload in (
-                [filename, pdf_b64],
-                [[{"name": filename, "datas": pdf_b64}]],
-            ):
-                template_id = _try_template_upload_method(client, method, payload)
-                if template_id:
-                    return _resolve_template_document(client, template_id)
-
-        # manual fallback: sign.document requires the attachment (storage)
-        # AND the binary "raw" field, which its create-time processing parses
-        # to validate the PDF and compute num_pages
-        attachment_id = _odoo_execute(
+        # ODOO 19+: official upload entrypoint (the one the web client calls);
+        # it creates the attachment and the sign.document records internally
+        # and returns {"id": template_id, "name": ...}
+        template_id = _try_template_upload_method(
             client,
-            model="ir.attachment",
-            action="create",
-            payload=[
-                {
-                    "name": filename,
-                    "type": "binary",
-                    "datas": pdf_b64,
-                    "mimetype": "application/pdf",
-                }
-            ],
-            options={},
+            "create_from_attachment_data",
+            [[{"name": filename, "datas": pdf_b64}]],
         )
 
-        template_id = _odoo_execute(
-            client,
-            model="sign.template",
-            action="create",
-            payload=[
-                {
-                    "name": document_name,
-                    "document_ids": [
-                        [
-                            0,
-                            0,
-                            {
-                                "name": filename,
-                                "attachment_id": attachment_id,
-                                "raw": pdf_b64,
-                            },
-                        ]
-                    ],
-                }
-            ],
-            options={},
-        )
+        if template_id is None:
+            # manual fallback mirroring sign.document.create_from_attachment_data:
+            # attachment from name+datas, then document from attachment_id +
+            # sequence. Never write the document's own binary field: on some
+            # builds it maps to the attachment's *raw bytes*, so a base64
+            # string would corrupt the stored PDF.
+            attachment_id = _odoo_execute(
+                client,
+                model="ir.attachment",
+                action="create",
+                payload=[{"name": filename, "datas": pdf_b64}],
+                options={},
+            )
+
+            template_id = _odoo_execute(
+                client,
+                model="sign.template",
+                action="create",
+                payload=[
+                    {
+                        "name": document_name,
+                        "document_ids": [
+                            [0, 0, {"attachment_id": attachment_id, "sequence": 1}]
+                        ],
+                    }
+                ],
+                options={},
+            )
 
         return _resolve_template_document(client, template_id)
 

@@ -65,14 +65,13 @@ class FakeOdooClient:
             {"model": model, "action": action, "payload": payload, "options": options}
         )
 
-        upload_helpers = (
-            "create_with_attachment_data",
-            "create_from_attachment_data",
-            "upload_template",
-        )
+        upload_helpers = ("create_with_attachment_data", "create_from_attachment_data")
         if model == "sign.template" and action in upload_helpers:
             if self.with_helper and action == "create_with_attachment_data":
                 return 601
+            if self.with_helper and action == "create_from_attachment_data":
+                # ODOO 19 returns a dict instead of the raw id
+                return {"id": 601, "name": "Doc"}
             raise xmlrpc.client.Fault(1, f"AttributeError: {action}")
 
         if self.layout == "legacy":
@@ -238,20 +237,17 @@ def test_digital_signature_odoo_v19(
     assert data["idSignRequest"] == 1001
     assert data["link"].endswith("/sign/document/1001/tok123")
 
-    # the document carries the attachment (storage) plus the raw PDF, which
-    # ODOO parses at create time
+    # manual fallback mirrors sign.document.create_from_attachment_data:
+    # attachment from name+datas, document from attachment_id+sequence
     attachment = fake_client.find_call("ir.attachment", "create")
+    assert set(attachment["payload"][0].keys()) == {"name", "datas"}
     assert base64.b64decode(attachment["payload"][0]["datas"]).startswith(b"%PDF")
-    assert "res_model" not in attachment["payload"][0]
 
     template = fake_client.find_call("sign.template", "create")
     template_values = template["payload"][0]
     assert "attachment_id" not in template_values
     document_command = template_values["document_ids"][0]
-    assert document_command[0] == 0
-    assert document_command[2]["name"].endswith(".pdf")
-    assert document_command[2]["attachment_id"] == 501
-    assert base64.b64decode(document_command[2]["raw"]).startswith(b"%PDF")
+    assert document_command == [0, 0, {"attachment_id": 501, "sequence": 1}]
 
     # the signature field is anchored on the sign.document, not the template
     sign_item = fake_client.find_call("sign.item", "create")
@@ -260,6 +256,40 @@ def test_digital_signature_odoo_v19(
     assert "template_id" not in item
     assert 0 < item["posX"] < 1
     assert 0 < item["posY"] < 1
+
+
+def test_digital_signature_odoo_v19_upload_helper(
+    client, navigator_headers, sign_test_data, monkeypatch
+):
+    """POST /notes/digital-signature — ODOO 19 create_from_attachment_data path"""
+    fake_client = FakeOdooClient(layout="v19", with_helper=True)
+
+    monkeypatch.setattr(
+        clinical_notes_sign_service.odoo_client,
+        "get_client",
+        lambda context=None: fake_client,
+    )
+
+    response = client.post(
+        URL, json={"id": SIGN_NOTE_ID, **SIGNER}, headers=navigator_headers
+    )
+
+    assert response.status_code == 200
+    data = response.get_json()["data"]
+    assert data["idSignRequest"] == 1001
+
+    # the helper receives [{"name", "datas"}] and handles everything itself
+    helper = fake_client.find_call("sign.template", "create_from_attachment_data")
+    file_entry = helper["payload"][0][0]
+    assert set(file_entry.keys()) == {"name", "datas"}
+    assert file_entry["name"].endswith(".pdf")
+    assert base64.b64decode(file_entry["datas"]).startswith(b"%PDF")
+    assert fake_client.find_call("ir.attachment", "create") is None
+    assert fake_client.find_call("sign.template", "create") is None
+
+    # the signature field is anchored on the sign.document
+    sign_item = fake_client.find_call("sign.item", "create")
+    assert sign_item["payload"][0]["document_id"] == 321
 
 
 def test_digital_signature_upload_helper(
