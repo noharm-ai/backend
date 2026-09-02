@@ -5,6 +5,11 @@ name: debug-sign-source
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - claude/clinical-notes-digital-signature-1pz3gh
+    paths:
+      - .github/workflows/debug-sign-source.yml
 
 jobs:
   extract:
