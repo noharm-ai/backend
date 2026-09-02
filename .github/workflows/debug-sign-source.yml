@@ -1,0 +1,39 @@
+# Temporary debug workflow: extracts the ODOO 19 sign module source from a
+# public docker image so we can integrate with the Sign RPC API correctly.
+# Remove after the clinical-notes digital signature integration is done.
+name: debug-sign-source
+
+on:
+  workflow_dispatch:
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Extract sign module from image
+        run: |
+          docker pull willianbrognoli/odoo-enterprise:19.0
+          cid=$(docker create willianbrognoli/odoo-enterprise:19.0)
+          mkdir -p /tmp/sign
+          for p in /mnt/extra-addons/sign /usr/lib/python3/dist-packages/odoo/addons/sign /opt/odoo/enterprise/sign /odoo/enterprise/sign; do
+            if docker cp "$cid:$p" /tmp/sign/ 2>/dev/null; then
+              echo "FOUND at $p"
+              break
+            fi
+          done
+          if [ ! -d /tmp/sign/sign ]; then
+            echo "sign module not found at known paths; searching filesystem..."
+            docker export "$cid" | tar -t | grep -E '/sign/models/sign_template.py$' | head -5
+            path=$(docker export "$cid" | tar -t | grep -E '/sign/models/sign_template.py$' | head -1 | sed 's#/models/sign_template.py##')
+            docker cp "$cid:/$path" /tmp/sign/
+          fi
+          ls /tmp/sign/sign/models/
+
+      - name: Print create_from_attachment_data and document create
+        run: |
+          echo "=============== sign_template.py: create_from_attachment_data ==============="
+          grep -n "def create_from_attachment_data" -A 80 /tmp/sign/sign/models/sign_template.py
+          echo "=============== sign_document.py (full) ==============="
+          cat -n /tmp/sign/sign/models/sign_document.py || true
+          echo "=============== JS callers of create_from_attachment_data ==============="
+          grep -rn "create_from_attachment_data" -B 5 -A 30 /tmp/sign/sign/static/src/ || true
