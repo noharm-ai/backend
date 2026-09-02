@@ -233,16 +233,20 @@ def test_digital_signature_odoo_v19(
     assert data["idSignRequest"] == 1001
     assert data["link"].endswith("/sign/document/1001/tok123")
 
-    # the PDF goes through sign.document's binary "raw" field; no manual
-    # ir.attachment is created (ODOO builds it from raw)
+    # the document carries the attachment (storage) plus the raw PDF, which
+    # ODOO parses at create time
+    attachment = fake_client.find_call("ir.attachment", "create")
+    assert base64.b64decode(attachment["payload"][0]["datas"]).startswith(b"%PDF")
+    assert "res_model" not in attachment["payload"][0]
+
     template = fake_client.find_call("sign.template", "create")
     template_values = template["payload"][0]
     assert "attachment_id" not in template_values
     document_command = template_values["document_ids"][0]
     assert document_command[0] == 0
     assert document_command[2]["name"].endswith(".pdf")
+    assert document_command[2]["attachment_id"] == 501
     assert base64.b64decode(document_command[2]["raw"]).startswith(b"%PDF")
-    assert fake_client.find_call("ir.attachment", "create") is None
 
     # the signature field is anchored on the sign.document, not the template
     sign_item = fake_client.find_call("sign.item", "create")

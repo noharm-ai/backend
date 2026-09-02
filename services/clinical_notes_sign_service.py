@@ -10,9 +10,10 @@ The flow mirrors the standard ODOO Sign integration:
 Two Sign model layouts are supported (detected at runtime via fields_get):
 - up to ODOO 18: the PDF lives on sign.template.attachment_id and sign.item
   points to template_id;
-- ODOO 19+: sign.template holds sign.document records (document_ids), the PDF
-  is uploaded through sign.document's binary "raw" field (ODOO creates the
-  attachment and computes num_pages) and sign.item points to document_id.
+- ODOO 19+: sign.template holds sign.document records (document_ids); each
+  document needs its attachment_id (storage) plus the binary "raw" field,
+  which ODOO parses at create time (num_pages/validation), and sign.item
+  points to document_id.
 """
 
 import base64
@@ -291,9 +292,24 @@ def _create_sign_template(client, document_name: str, pdf_bytes: bytes) -> dict:
     use_documents = "attachment_id" not in template_fields
 
     if use_documents:
-        # ODOO 19+: the PDF goes through sign.document's binary "raw" field
-        # (like the web form's file widget); ODOO parses it, computes
-        # num_pages and creates the attachment itself
+        # ODOO 19+: sign.document requires the attachment (storage) AND the
+        # binary "raw" field, which its create-time processing parses to
+        # validate the PDF and compute num_pages
+        attachment_id = _odoo_execute(
+            client,
+            model="ir.attachment",
+            action="create",
+            payload=[
+                {
+                    "name": f"{document_name}.pdf",
+                    "type": "binary",
+                    "datas": pdf_b64,
+                    "mimetype": "application/pdf",
+                }
+            ],
+            options={},
+        )
+
         template_id = _odoo_execute(
             client,
             model="sign.template",
@@ -302,7 +318,15 @@ def _create_sign_template(client, document_name: str, pdf_bytes: bytes) -> dict:
                 {
                     "name": document_name,
                     "document_ids": [
-                        [0, 0, {"name": f"{document_name}.pdf", "raw": pdf_b64}]
+                        [
+                            0,
+                            0,
+                            {
+                                "name": f"{document_name}.pdf",
+                                "attachment_id": attachment_id,
+                                "raw": pdf_b64,
+                            },
+                        ]
                     ],
                 }
             ],
