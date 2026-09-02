@@ -65,10 +65,15 @@ class FakeOdooClient:
             {"model": model, "action": action, "payload": payload, "options": options}
         )
 
-        if (model, action) == ("sign.template", "create_with_attachment_data"):
-            if self.with_helper:
+        upload_helpers = (
+            "create_with_attachment_data",
+            "create_from_attachment_data",
+            "upload_template",
+        )
+        if model == "sign.template" and action in upload_helpers:
+            if self.with_helper and action == "create_with_attachment_data":
                 return 601
-            raise xmlrpc.client.Fault(1, "AttributeError: create_with_attachment_data")
+            raise xmlrpc.client.Fault(1, f"AttributeError: {action}")
 
         if self.layout == "legacy":
             fields_get = {
