@@ -1,7 +1,5 @@
 """Service: prescription prioritization operations"""
 
-from datetime import datetime
-
 from decorators.has_permission_decorator import Permission, has_permission
 from models.enums import FeatureEnum
 from models.prescription import Patient
@@ -28,55 +26,6 @@ def _get_first_administration_hour(intervals):
     return hour
 
 
-def _parse_prescription_date(value) -> datetime | None:
-    """Parse an ISO prescription date stored in features; None when invalid"""
-    if not isinstance(value, str) or not value:
-        return None
-
-    try:
-        parsed = datetime.fromisoformat(value)
-    except ValueError:
-        return None
-
-    # features store naive local (America/Sao_Paulo) datetimes; drop tzinfo
-    # so the comparison with datetime.now() never mixes aware and naive values
-    return parsed.replace(tzinfo=None)
-
-
-def _get_prescription_dates_summary(prescription_dates, now: datetime = None):
-    """Summarize the inner prescription dates of an agg prescription.
-
-    Returns the sorted list of valid ISO dates, the most recent one
-    (lastPrescriptionDate) and the first one at or after `now`
-    (nextPrescriptionDate), which is the next prescription to be reviewed
-    relative to the current date.
-    """
-    if now is None:
-        now = datetime.now()
-
-    parsed_dates = []
-    for value in prescription_dates or []:
-        parsed = _parse_prescription_date(value)
-        if parsed is not None:
-            parsed_dates.append(parsed)
-
-    parsed_dates = sorted(set(parsed_dates))
-
-    next_date = None
-    for d in parsed_dates:
-        if d >= now:
-            next_date = d
-            break
-
-    return {
-        "prescriptionDates": [d.isoformat() for d in parsed_dates],
-        "lastPrescriptionDate": (
-            parsed_dates[-1].isoformat() if parsed_dates else None
-        ),
-        "nextPrescriptionDate": next_date.isoformat() if next_date else None,
-    }
-
-
 @has_permission(Permission.READ_PRESCRIPTION)
 def get_prioritization_list(request: PrioritizationRequest):
     """List prescription prioritization results"""
@@ -88,7 +37,6 @@ def get_prioritization_list(request: PrioritizationRequest):
 
     results = []
     hide_names = feature_service.has_user_feature(FeatureEnum.HIDE_NAMES)
-    now = datetime.now()
     for p in prioritization_results:
         patient = p[1]
         if patient is None:
@@ -145,11 +93,9 @@ def get_prioritization_list(request: PrioritizationRequest):
                 p[0].features.get("intervals", [])
             )
 
-            features.update(
-                _get_prescription_dates_summary(
-                    p[0].features.get("prescriptionDates", []), now=now
-                )
-            )
+            # inner (individual) prescription dates of the agg prescription;
+            # the frontend derives next/last dates from the user's clock
+            features["prescriptionDates"] = p[0].features.get("prescriptionDates", [])
 
         else:
             features["processed"] = False
@@ -158,8 +104,6 @@ def get_prioritization_list(request: PrioritizationRequest):
             features["class"] = "blue"
             features["firstAdministrationHour"] = None
             features["prescriptionDates"] = []
-            features["lastPrescriptionDate"] = None
-            features["nextPrescriptionDate"] = None
 
         # p.observation is truncated to 301 chars in SQL (func.left); a length
         # over 300 means the original text overflows and gets an ellipsis
