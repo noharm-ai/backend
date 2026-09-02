@@ -11,7 +11,8 @@ Two Sign model layouts are supported (detected at runtime via fields_get):
 - up to ODOO 18: the PDF lives on sign.template.attachment_id and sign.item
   points to template_id;
 - ODOO 19+: sign.template holds sign.document records (document_ids), the PDF
-  lives on sign.document.attachment_id and sign.item points to document_id.
+  is uploaded through sign.document's binary "raw" field (ODOO creates the
+  attachment and computes num_pages) and sign.item points to document_id.
 """
 
 import base64
@@ -253,39 +254,28 @@ def _get_model_fields(client, model: str) -> set:
 
 
 def _create_template_with_helper(client, document_name: str, pdf_b64: str):
-    """Tries sign.template.create_with_attachment_data (the helper used by the
-    ODOO UI upload, which handles attachment linking and PDF processing).
+    """Tries sign.template.create_with_attachment_data (the upload helper on
+    ODOO <= 18, which handles attachment linking and PDF processing).
 
-    The signature changed across versions, so both shapes are attempted:
-    a list of file dicts (multi-document layout) and (name, data). Returns
-    the template id, or None when the helper is unavailable or rejected the
-    file (some versions return 0 instead of raising).
+    Returns the template id, or None when the helper is unavailable or
+    rejected the file (some versions return 0 instead of raising).
     """
-    filename = f"{document_name}.pdf"
+    try:
+        template_id = client(
+            model="sign.template",
+            action="create_with_attachment_data",
+            payload=[f"{document_name}.pdf", pdf_b64],
+            options={},
+        )
+    except xmlrpc.client.Fault as fault:
+        logger.backend_logger.warning(
+            "ODOO Sign: create_with_attachment_data unavailable/failed (%s)",
+            fault.faultString,
+        )
+        return None
 
-    payloads = [
-        [[{"name": filename, "datas": pdf_b64}]],
-        [filename, pdf_b64],
-    ]
-
-    for payload_index, payload in enumerate(payloads):
-        try:
-            template_id = client(
-                model="sign.template",
-                action="create_with_attachment_data",
-                payload=payload,
-                options={},
-            )
-        except xmlrpc.client.Fault as fault:
-            logger.backend_logger.warning(
-                "ODOO Sign: create_with_attachment_data shape %s failed (%s)",
-                payload_index,
-                fault.faultString,
-            )
-            continue
-
-        if isinstance(template_id, int) and template_id:
-            return template_id
+    if isinstance(template_id, int) and template_id:
+        return template_id
 
     return None
 
@@ -300,13 +290,48 @@ def _create_sign_template(client, document_name: str, pdf_bytes: bytes) -> dict:
     template_fields = _get_model_fields(client, "sign.template")
     use_documents = "attachment_id" not in template_fields
 
+    if use_documents:
+        # ODOO 19+: the PDF goes through sign.document's binary "raw" field
+        # (like the web form's file widget); ODOO parses it, computes
+        # num_pages and creates the attachment itself
+        template_id = _odoo_execute(
+            client,
+            model="sign.template",
+            action="create",
+            payload=[
+                {
+                    "name": document_name,
+                    "document_ids": [
+                        [0, 0, {"name": f"{document_name}.pdf", "raw": pdf_b64}]
+                    ],
+                }
+            ],
+            options={},
+        )
+
+        document_ids = _odoo_execute(
+            client,
+            model="sign.document",
+            action="search",
+            payload=[[["template_id", "=", template_id]]],
+            options={"limit": 1},
+        )
+
+        if not document_ids:
+            raise ValidationError(
+                "O documento não foi criado no serviço de assinatura digital.",
+                "errors.invalidRecord",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+        return {"template_id": template_id, "document_id": document_ids[0]}
+
+    # ODOO <= 18: official upload helper first, manual create as fallback
     template_id = _create_template_with_helper(
         client, document_name=document_name, pdf_b64=pdf_b64
     )
 
     if template_id is None:
-        # manual fallback: unattached upload (linked afterwards by ODOO),
-        # exactly like the web client does before creating the template
         attachment_id = _odoo_execute(
             client,
             model="ir.attachment",
@@ -322,53 +347,15 @@ def _create_sign_template(client, document_name: str, pdf_bytes: bytes) -> dict:
             options={},
         )
 
-        if use_documents:
-            # logged to help diagnose ODOO version differences in production
-            logger.backend_logger.info(
-                "ODOO Sign: sign.document fields: %s",
-                sorted(_get_model_fields(client, "sign.document")),
-            )
-
-            template_id = _odoo_execute(
-                client,
-                model="sign.template",
-                action="create",
-                payload=[
-                    {
-                        "name": document_name,
-                        "document_ids": [[0, 0, {"attachment_id": attachment_id}]],
-                    }
-                ],
-                options={},
-            )
-        else:
-            template_id = _odoo_execute(
-                client,
-                model="sign.template",
-                action="create",
-                payload=[{"name": document_name, "attachment_id": attachment_id}],
-                options={},
-            )
-
-    if not use_documents:
-        return {"template_id": template_id, "document_id": None}
-
-    document_ids = _odoo_execute(
-        client,
-        model="sign.document",
-        action="search",
-        payload=[[["template_id", "=", template_id]]],
-        options={"limit": 1},
-    )
-
-    if not document_ids:
-        raise ValidationError(
-            "O documento não foi criado no serviço de assinatura digital.",
-            "errors.invalidRecord",
-            status.HTTP_400_BAD_REQUEST,
+        template_id = _odoo_execute(
+            client,
+            model="sign.template",
+            action="create",
+            payload=[{"name": document_name, "attachment_id": attachment_id}],
+            options={},
         )
 
-    return {"template_id": template_id, "document_id": document_ids[0]}
+    return {"template_id": template_id, "document_id": None}
 
 
 def _get_signer_partner_id(client, signer_name: str, signer_email: str) -> int:

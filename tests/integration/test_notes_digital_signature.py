@@ -87,6 +87,9 @@ class FakeOdooClient:
                 ("sign.document", "fields_get"): {
                     "template_id": {"type": "many2one"},
                     "attachment_id": {"type": "many2one"},
+                    "name": {"type": "char"},
+                    "raw": {"type": "binary"},
+                    "num_pages": {"type": "integer"},
                 },
                 ("sign.item", "fields_get"): {"document_id": {"type": "many2one"}},
             }
@@ -230,11 +233,16 @@ def test_digital_signature_odoo_v19(
     assert data["idSignRequest"] == 1001
     assert data["link"].endswith("/sign/document/1001/tok123")
 
-    # the template embeds the attachment through a sign.document record
+    # the PDF goes through sign.document's binary "raw" field; no manual
+    # ir.attachment is created (ODOO builds it from raw)
     template = fake_client.find_call("sign.template", "create")
     template_values = template["payload"][0]
     assert "attachment_id" not in template_values
-    assert template_values["document_ids"] == [[0, 0, {"attachment_id": 501}]]
+    document_command = template_values["document_ids"][0]
+    assert document_command[0] == 0
+    assert document_command[2]["name"].endswith(".pdf")
+    assert base64.b64decode(document_command[2]["raw"]).startswith(b"%PDF")
+    assert fake_client.find_call("ir.attachment", "create") is None
 
     # the signature field is anchored on the sign.document, not the template
     sign_item = fake_client.find_call("sign.item", "create")
@@ -248,8 +256,8 @@ def test_digital_signature_odoo_v19(
 def test_digital_signature_upload_helper(
     client, navigator_headers, sign_test_data, monkeypatch
 ):
-    """POST /notes/digital-signature — uses create_with_attachment_data when available"""
-    fake_client = FakeOdooClient(layout="v19", with_helper=True)
+    """POST /notes/digital-signature — legacy layout uses create_with_attachment_data"""
+    fake_client = FakeOdooClient(layout="legacy", with_helper=True)
 
     monkeypatch.setattr(
         clinical_notes_sign_service.odoo_client,
@@ -265,18 +273,16 @@ def test_digital_signature_upload_helper(
     data = response.get_json()["data"]
     assert data["idSignRequest"] == 1001
 
-    # the helper receives the PDF directly (v19 list-of-files shape is tried
-    # first); no manual attachment/template create
+    # the helper receives the PDF directly; no manual attachment/template create
     helper = fake_client.find_call("sign.template", "create_with_attachment_data")
-    uploaded_file = helper["payload"][0][0]
-    assert uploaded_file["name"].endswith(".pdf")
-    assert base64.b64decode(uploaded_file["datas"]).startswith(b"%PDF")
+    assert helper["payload"][0].endswith(".pdf")
+    assert base64.b64decode(helper["payload"][1]).startswith(b"%PDF")
     assert fake_client.find_call("ir.attachment", "create") is None
     assert fake_client.find_call("sign.template", "create") is None
 
-    # the signature field is still anchored on the sign.document
+    # the signature field is anchored on the template on the legacy layout
     sign_item = fake_client.find_call("sign.item", "create")
-    assert sign_item["payload"][0]["document_id"] == 321
+    assert sign_item["payload"][0]["template_id"] == 601
 
 
 def test_digital_signature_preview(client, navigator_headers, sign_test_data):
