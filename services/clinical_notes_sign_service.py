@@ -12,8 +12,13 @@ Two Sign model layouts are supported (detected at runtime via fields_get):
   points to template_id;
 - ODOO 19+: sign.template holds sign.document records (document_ids); the
   upload goes through sign.template.create_from_attachment_data (list of
-  {"name", "datas"} dicts), documents point to their attachment and
+  {"name", "raw"} dicts), documents point to their attachment and
   sign.item points to document_id.
+
+ODOO 19 also removed ir.attachment.datas: the file content is written through
+"raw" (still a base64 string over XML-RPC). Writing an unknown field on create
+is silently ignored, so using "datas" there yields a 0-byte attachment and the
+misleading "we're not able to process one of the uploaded pdf" error.
 """
 
 import base64
@@ -264,6 +269,18 @@ def _get_model_fields(client, model: str) -> set:
     return set(fields.keys())
 
 
+def _get_attachment_data_field(client) -> str:
+    """Returns the ir.attachment field that carries the file content.
+
+    ODOO <= 18 exposes "datas"; ODOO 19 dropped it and keeps only "raw".
+    Both take a base64 string over XML-RPC.
+    """
+    if "datas" in _get_model_fields(client, "ir.attachment"):
+        return "datas"
+
+    return "raw"
+
+
 def _try_template_upload_method(client, method: str, payload: list):
     """Calls one of the sign.template upload helpers (they vary per ODOO
     version) and returns the created template id, or None when the method is
@@ -303,6 +320,7 @@ def _create_sign_template(client, document_name: str, pdf_bytes: bytes) -> dict:
     pdf_b64 = base64.b64encode(pdf_bytes).decode("ascii")
     template_fields = _get_model_fields(client, "sign.template")
     use_documents = "attachment_id" not in template_fields
+    data_field = _get_attachment_data_field(client)
 
     filename = f"{document_name}.pdf"
 
@@ -313,12 +331,12 @@ def _create_sign_template(client, document_name: str, pdf_bytes: bytes) -> dict:
         template_id = _try_template_upload_method(
             client,
             "create_from_attachment_data",
-            [[{"name": filename, "datas": pdf_b64}]],
+            [[{"name": filename, data_field: pdf_b64}]],
         )
 
         if template_id is None:
             # manual fallback mirroring sign.document.create_from_attachment_data:
-            # attachment from name+datas, then document from attachment_id +
+            # attachment from name + content, then document from attachment_id +
             # sequence. Never write the document's own binary field: on some
             # builds it maps to the attachment's *raw bytes*, so a base64
             # string would corrupt the stored PDF.
@@ -326,7 +344,14 @@ def _create_sign_template(client, document_name: str, pdf_bytes: bytes) -> dict:
                 client,
                 model="ir.attachment",
                 action="create",
-                payload=[{"name": filename, "datas": pdf_b64}],
+                payload=[
+                    {
+                        "name": filename,
+                        "type": "binary",
+                        data_field: pdf_b64,
+                        "mimetype": "application/pdf",
+                    }
+                ],
                 options={},
             )
 
@@ -361,7 +386,7 @@ def _create_sign_template(client, document_name: str, pdf_bytes: bytes) -> dict:
                 {
                     "name": filename,
                     "type": "binary",
-                    "datas": pdf_b64,
+                    data_field: pdf_b64,
                     "mimetype": "application/pdf",
                 }
             ],
