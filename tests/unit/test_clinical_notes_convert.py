@@ -40,6 +40,7 @@ def _note(
     prescriber="Dr. House",
     position="ENFERMARIA",
     annotations=None,
+    id_sign_request=None,
 ):
     """Build a ClinicalNotes-like row for convert_notes."""
     return SimpleNamespace(
@@ -52,6 +53,7 @@ def _note(
         prescriber=prescriber,
         position=position,
         annotations=annotations,
+        idSignRequest=id_sign_request,
     )
 
 
@@ -102,6 +104,20 @@ class TestConvertNotes:
         with _patch_hide_names(True):
             result = clinical_notes_service.convert_notes(_note(), False, [])
         assert result["prescriber"] == "***"
+
+    def test_sign_request_id_passed_through_as_number(self):
+        """The stored ODOO sign request id is exposed unchanged, not stringified."""
+        with _patch_hide_names(False):
+            result = clinical_notes_service.convert_notes(
+                _note(id_sign_request=1001), False, []
+            )
+        assert result["idSignRequest"] == 1001
+
+    def test_sign_request_id_null_when_never_signed(self):
+        """A note that was never sent for signature reports a null id."""
+        with _patch_hide_names(False):
+            result = clinical_notes_service.convert_notes(_note(), False, [])
+        assert result["idSignRequest"] is None
 
     def test_primary_care_fields_included_when_enabled(self):
         """form/template are passed through when has_primary_care is True."""
@@ -196,6 +212,9 @@ class TestConvertPrescriptionNote:
         assert result["position"] == "EVOLUÇÃO CRIADA NA NOHARM"
         assert result["form"] is None
         assert result["template"] is None
+        # same key as convert_notes so the frontend sees one shape; always null
+        # because prescription notes live in another table
+        assert result["idSignRequest"] is None
 
     def test_scalar_fields_copied(self):
         """Identifier, status and prescription id are copied through."""

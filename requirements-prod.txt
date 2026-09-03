@@ -14,4 +14,5 @@ cryptography==49.0.0
 boto3==1.43.56
 redis==8.0.1
 pydantic==2.13.4
+fpdf2==2.8.5
 strands-agents==1.50.1

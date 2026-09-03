@@ -8,3 +8,15 @@ class GenerateSoapRequest(BaseModel):
 
     id: int
     prompt_key: Optional[str] = None
+
+
+class ClinicalNoteSignRequest(BaseModel):
+    """Request model for requesting a digital signature of a clinical note"""
+
+    id: int
+    signer_name: str
+    signer_email: str
+    # debugging aid: return the generated PDF (base64) without contacting ODOO
+    preview: Optional[bool] = False
+    # forces a brand-new ODOO request even when one is already stored on the note
+    force: Optional[bool] = False
