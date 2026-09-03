@@ -53,12 +53,15 @@ class FakeOdooClient:
     layout="v19" mimics ODOO 19+ (sign.document + sign.item.document_id).
     with_helper=True exposes sign.template.create_with_attachment_data
     (the official upload helper); otherwise calling it raises a Fault.
+    known_requests holds the sign.request ids that still exist in ODOO, so the
+    reuse path can be told apart from a purged (stale) stored id.
     """
 
-    def __init__(self, layout="legacy", with_helper=False):
+    def __init__(self, layout="legacy", with_helper=False, known_requests=(1001,)):
         self.calls = []
         self.layout = layout
         self.with_helper = with_helper
+        self.known_requests = set(known_requests)
 
     def __call__(self, model, action, payload, options):
         self.calls.append(
@@ -81,6 +84,11 @@ class FakeOdooClient:
                     "attachment_id": {"type": "many2one"},
                 },
                 ("sign.item", "fields_get"): {"template_id": {"type": "many2one"}},
+                # ODOO <= 18 carries the file content on ir.attachment.datas
+                ("ir.attachment", "fields_get"): {
+                    "name": {"type": "char"},
+                    "datas": {"type": "binary"},
+                },
             }
         else:
             fields_get = {
@@ -96,7 +104,23 @@ class FakeOdooClient:
                     "num_pages": {"type": "integer"},
                 },
                 ("sign.item", "fields_get"): {"document_id": {"type": "many2one"}},
+                # ODOO 19 dropped ir.attachment.datas and keeps only raw
+                ("ir.attachment", "fields_get"): {
+                    "name": {"type": "char"},
+                    "raw": {"type": "binary"},
+                },
             }
+
+        # domain-aware: the reuse path looks the stored id up directly, so an id
+        # that is not in known_requests must come back empty instead of matching
+        # the canned create-path response
+        if model == "sign.request.item" and action == "search_read":
+            domain = payload[0] if payload else []
+            for condition in domain:
+                if condition[0] == "sign_request_id":
+                    if condition[2] not in self.known_requests:
+                        return []
+            return [{"access_token": "tok123"}]
 
         responses = {
             **fields_get,
@@ -354,3 +378,127 @@ def test_digital_signature_odoo_timeout(
     )
 
     assert response.status_code == 504
+
+
+def _stored_sign_request_id():
+    """Reads back evolucao.fkassinatura, past the test session's own snapshot."""
+    session_commit()
+
+    return session.execute(
+        text("SELECT fkassinatura FROM demo.evolucao WHERE fkevolucao = :id"),
+        {"id": SIGN_NOTE_ID},
+    ).scalar()
+
+
+def _seed_sign_request_id(sign_request_id):
+    """Marks the note as already sent for signature."""
+    session.execute(
+        text("UPDATE demo.evolucao SET fkassinatura = :sid WHERE fkevolucao = :id"),
+        {"sid": sign_request_id, "id": SIGN_NOTE_ID},
+    )
+    session_commit()
+
+
+def test_digital_signature_persists_sign_request_id(
+    client, navigator_headers, sign_test_data, monkeypatch
+):
+    """POST /notes/digital-signature — stores the ODOO sign.request id on the note"""
+    fake_client = FakeOdooClient()
+
+    monkeypatch.setattr(
+        clinical_notes_sign_service.odoo_client,
+        "get_client",
+        lambda context=None: fake_client,
+    )
+
+    response = client.post(
+        URL, json={"id": SIGN_NOTE_ID, **SIGNER}, headers=navigator_headers
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["data"]["reused"] is False
+    assert _stored_sign_request_id() == 1001
+
+
+def test_digital_signature_reuses_existing_request(
+    client, navigator_headers, sign_test_data, monkeypatch
+):
+    """POST /notes/digital-signature — an already signed note reuses the request"""
+    _seed_sign_request_id(1001)
+    fake_client = FakeOdooClient()
+
+    monkeypatch.setattr(
+        clinical_notes_sign_service.odoo_client,
+        "get_client",
+        lambda context=None: fake_client,
+    )
+
+    response = client.post(
+        URL, json={"id": SIGN_NOTE_ID, **SIGNER}, headers=navigator_headers
+    )
+
+    assert response.status_code == 200
+    data = response.get_json()["data"]
+    assert data["idSignRequest"] == 1001
+    assert data["reused"] is True
+    assert data["link"].endswith("/sign/document/1001/tok123")
+
+    # nothing was created and — the whole point — no second e-mail was sent
+    assert fake_client.find_call("sign.send.request", "send_request") is None
+    assert fake_client.find_call("sign.template", "create") is None
+    assert fake_client.find_call("sign.item", "create") is None
+    assert fake_client.find_call("ir.attachment", "create") is None
+
+
+def test_digital_signature_force_creates_new_request(
+    client, navigator_headers, sign_test_data, monkeypatch
+):
+    """POST /notes/digital-signature — force bypasses the stored request"""
+    _seed_sign_request_id(555)
+    fake_client = FakeOdooClient(known_requests=(555, 1001))
+
+    monkeypatch.setattr(
+        clinical_notes_sign_service.odoo_client,
+        "get_client",
+        lambda context=None: fake_client,
+    )
+
+    response = client.post(
+        URL,
+        json={"id": SIGN_NOTE_ID, "force": True, **SIGNER},
+        headers=navigator_headers,
+    )
+
+    assert response.status_code == 200
+    data = response.get_json()["data"]
+    assert data["reused"] is False
+    assert data["idSignRequest"] == 1001
+
+    assert fake_client.find_call("sign.send.request", "send_request") is not None
+    assert fake_client.find_call("sign.item", "create") is not None
+    assert _stored_sign_request_id() == 1001
+
+
+def test_digital_signature_stale_id_returns_error(
+    client, navigator_headers, sign_test_data, monkeypatch
+):
+    """POST /notes/digital-signature — a purged stored request does not re-sign"""
+    _seed_sign_request_id(999999)
+    fake_client = FakeOdooClient()
+
+    monkeypatch.setattr(
+        clinical_notes_sign_service.odoo_client,
+        "get_client",
+        lambda context=None: fake_client,
+    )
+
+    response = client.post(
+        URL, json={"id": SIGN_NOTE_ID, **SIGNER}, headers=navigator_headers
+    )
+
+    assert response.status_code == 400
+
+    # it must not silently create a new request and e-mail the signer again
+    assert fake_client.find_call("sign.send.request", "send_request") is None
+    assert fake_client.find_call("sign.item", "create") is None
+    assert _stored_sign_request_id() == 999999

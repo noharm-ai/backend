@@ -24,6 +24,7 @@ misleading "we're not able to process one of the uploaded pdf" error.
 import base64
 import re
 import xmlrpc.client
+from datetime import datetime
 from html.parser import HTMLParser
 
 from fpdf import FPDF
@@ -486,6 +487,37 @@ def _get_default_role_id(client) -> int:
     return role_ids[0]
 
 
+def _build_sign_link(sign_request_id: int, access_token: str) -> str:
+    """Builds the direct signing URL from a sign.request id and its access token."""
+    base_url = Config.ODOO_API_URL.split("/xmlrpc")[0].rstrip("/")
+
+    return f"{base_url}/sign/document/{sign_request_id}/{access_token}"
+
+
+def _load_existing_sign_link(client, sign_request_id: int):
+    """Rebuilds the signing link of an already created sign.request.
+
+    Returns None when the request no longer resolves in ODOO (deleted or purged),
+    which is what tells the caller the stored id went stale.
+
+    Uses search_read rather than read on purpose: read on a purged id raises an
+    XML-RPC Fault that _odoo_execute turns into a user-facing 400, while search_read
+    simply comes back empty.
+    """
+    request_items = _odoo_execute(
+        client,
+        model="sign.request.item",
+        action="search_read",
+        payload=[[["sign_request_id", "=", sign_request_id]]],
+        options={"fields": ["access_token"], "limit": 1},
+    )
+
+    if not request_items or not request_items[0].get("access_token"):
+        return None
+
+    return _build_sign_link(sign_request_id, request_items[0]["access_token"])
+
+
 @has_permission(Permission.READ_NAV)
 def request_signature(
     request_data: ClinicalNoteSignRequest, user_context: User
@@ -522,12 +554,11 @@ def request_signature(
             status.HTTP_400_BAD_REQUEST,
         )
 
-    pdf_bytes, sign_page, sign_pos_y = _build_note_pdf(note=note)
-
     document_name = f"Evolução {note.id} - {note.date.strftime('%d/%m/%Y %H:%M')}"
 
     if request_data.preview:
         # debugging aid: return the generated PDF without contacting ODOO
+        pdf_bytes, _, _ = _build_note_pdf(note=note)
         return {
             "preview": True,
             "filename": f"{document_name}.pdf",
@@ -541,6 +572,31 @@ def request_signature(
             "errors.connectionTimeout",
             status.HTTP_504_GATEWAY_TIMEOUT,
         )
+
+    # 0) this note was already sent for signature: rebuild the link for the stored
+    # request instead of creating a new one (which would e-mail the signer again).
+    # "force" is the explicit "sign again" action.
+    if note.idSignRequest and not request_data.force:
+        link = _load_existing_sign_link(client, note.idSignRequest)
+
+        if not link:
+            raise ValidationError(
+                "A solicitação de assinatura anterior não existe mais no serviço de "
+                'assinatura digital. Use "Assinar novamente" para gerar uma nova.',
+                "errors.signRequestNotFound",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+        return {
+            "idSignRequest": note.idSignRequest,
+            "link": link,
+            "signerName": signer_name,
+            "signerEmail": signer_email,
+            "reused": True,
+        }
+
+    # only rendered when a request is actually going to be created
+    pdf_bytes, sign_page, sign_pos_y = _build_note_pdf(note=note)
 
     # 1) + 2) upload the PDF and create the template pointing to it
     template = _create_sign_template(
@@ -624,25 +680,23 @@ def request_signature(
 
     sign_request_id = sign_requests[0]["id"]
 
-    request_items = _odoo_execute(
-        client,
-        model="sign.request.item",
-        action="search_read",
-        payload=[[["sign_request_id", "=", sign_request_id]]],
-        options={"fields": ["access_token"], "limit": 1},
-    )
+    # Store it as soon as it resolves: at this point the request exists in ODOO and
+    # the signer e-mail has already gone out, so a failure further down must not lose
+    # the id -- otherwise the next attempt would duplicate both.
+    note.idSignRequest = sign_request_id
+    note.update = datetime.today()
+    note.user = user_context.id
+    db.session.flush()
 
-    link = None
-    if request_items and request_items[0].get("access_token"):
-        base_url = Config.ODOO_API_URL.split("/xmlrpc")[0].rstrip("/")
-        link = (
-            f"{base_url}/sign/document/{sign_request_id}/"
-            f"{request_items[0]['access_token']}"
-        )
+    # Same helper as the reuse branch, but a missing token means something different
+    # here: the request was just created, so we still return 200 with link=None (the
+    # historical behaviour) instead of the 400 the reuse branch raises for a stale id.
+    link = _load_existing_sign_link(client, sign_request_id)
 
     return {
         "idSignRequest": sign_request_id,
         "link": link,
         "signerName": signer_name,
         "signerEmail": signer_email,
+        "reused": False,
     }

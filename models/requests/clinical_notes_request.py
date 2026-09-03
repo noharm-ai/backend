@@ -18,3 +18,5 @@ class ClinicalNoteSignRequest(BaseModel):
     signer_email: str
     # debugging aid: return the generated PDF (base64) without contacting ODOO
     preview: Optional[bool] = False
+    # forces a brand-new ODOO request even when one is already stored on the note
+    force: Optional[bool] = False
