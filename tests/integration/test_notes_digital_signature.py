@@ -262,10 +262,11 @@ def test_digital_signature_odoo_v19(
     assert data["link"].endswith("/sign/document/1001/tok123")
 
     # manual fallback mirrors sign.document.create_from_attachment_data:
-    # attachment from name+datas, document from attachment_id+sequence
+    # attachment from name+content, document from attachment_id+sequence.
+    # ODOO 19 dropped ir.attachment.datas, so the content goes through raw
     attachment = fake_client.find_call("ir.attachment", "create")
-    assert set(attachment["payload"][0].keys()) == {"name", "datas"}
-    assert base64.b64decode(attachment["payload"][0]["datas"]).startswith(b"%PDF")
+    assert set(attachment["payload"][0].keys()) == {"name", "type", "raw", "mimetype"}
+    assert base64.b64decode(attachment["payload"][0]["raw"]).startswith(b"%PDF")
 
     template = fake_client.find_call("sign.template", "create")
     template_values = template["payload"][0]
@@ -302,12 +303,12 @@ def test_digital_signature_odoo_v19_upload_helper(
     data = response.get_json()["data"]
     assert data["idSignRequest"] == 1001
 
-    # the helper receives [{"name", "datas"}] and handles everything itself
+    # the helper receives [{"name", "raw"}] and handles everything itself
     helper = fake_client.find_call("sign.template", "create_from_attachment_data")
     file_entry = helper["payload"][0][0]
-    assert set(file_entry.keys()) == {"name", "datas"}
+    assert set(file_entry.keys()) == {"name", "raw"}
     assert file_entry["name"].endswith(".pdf")
-    assert base64.b64decode(file_entry["datas"]).startswith(b"%PDF")
+    assert base64.b64decode(file_entry["raw"]).startswith(b"%PDF")
     assert fake_client.find_call("ir.attachment", "create") is None
     assert fake_client.find_call("sign.template", "create") is None
 
