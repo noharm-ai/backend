@@ -22,10 +22,12 @@ misleading "we're not able to process one of the uploaded pdf" error.
 """
 
 import base64
+import os
 import re
 import xmlrpc.client
 from datetime import datetime
 from html.parser import HTMLParser
+from itertools import groupby
 
 from fpdf import FPDF
 from sqlalchemy.orm import undefer
@@ -44,14 +46,31 @@ _EMAIL_REGEX = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 _A4_HEIGHT_MM = 297
 
-# signature field footprint (fractions of the page, as expected by sign.item)
-_SIGN_ITEM_POS_X = 0.35
+# logo printed above the institution header (width as a fraction of the page)
+_LOGO_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "assets",
+    "logo512.png",
+)
+_LOGO_WIDTH_RATIO = 0.05
+
+# style markers understood by FPDF's markdown mode
+_MARKDOWN_MARKERS = ("**", "__", "~~", "--")
+
+# signature field footprint (fractions of the page, as expected by sign.item).
+# posX left-aligns the field with the 10mm left margin FPDF gives the text.
+_SIGN_ITEM_POS_X = 10 / 210
 _SIGN_ITEM_WIDTH = 0.3
 _SIGN_ITEM_HEIGHT = 0.05
 
 
 class _HtmlTextExtractor(HTMLParser):
-    """Converts the clinical note HTML into plain text suitable for the PDF."""
+    """Converts the clinical note HTML into text runs suitable for the PDF.
+
+    A run is a (text, bold) pair: the emphasis used by the note editor
+    (<b>, <strong>, inline font-weight and headings) is kept so the PDF looks
+    like what the user typed.
+    """
 
     _BLOCK_TAGS = {
         "p",
@@ -72,56 +91,126 @@ class _HtmlTextExtractor(HTMLParser):
         "blockquote",
     }
 
+    _BOLD_TAGS = {"b", "strong", "th", "h1", "h2", "h3", "h4", "h5", "h6"}
+
+    _VOID_TAGS = {"br", "hr", "img", "input", "meta", "link", "col", "source"}
+
+    _BOLD_STYLE_REGEX = re.compile(
+        r"font-weight\s*:\s*(bold|bolder|[6-9]00)", re.IGNORECASE
+    )
+
     def __init__(self):
         super().__init__(convert_charrefs=True)
-        self._parts: list[str] = []
+        self._parts: list[tuple[str, bool]] = []
         self._skip_anchor = False
+        # open elements as (tag, bold), used to know the style of each text run
+        self._open_tags: list[tuple[str, bool]] = []
+
+    def _is_bold(self) -> bool:
+        """Tells whether the current position is inside a bold element."""
+        return any(bold for _, bold in self._open_tags)
 
     def handle_starttag(self, tag, attrs):
-        """Handles opening tags: line breaks and annotation close buttons."""
+        """Handles opening tags: line breaks, emphasis and close buttons."""
+        attrs_dict = dict(attrs)
+
         if tag == "br":
-            self._parts.append("\n")
+            self._parts.append(("\n", self._is_bold()))
         elif tag == "a":
             # annotation close buttons ("X") must not leak into the document
-            attrs_dict = dict(attrs)
             if "close-btn" in (attrs_dict.get("class") or ""):
                 self._skip_anchor = True
 
+        if tag not in self._VOID_TAGS:
+            bold = tag in self._BOLD_TAGS or bool(
+                self._BOLD_STYLE_REGEX.search(attrs_dict.get("style") or "")
+            )
+            self._open_tags.append((tag, bold))
+
     def handle_endtag(self, tag):
         """Handles closing tags: block tags become line breaks."""
+        for index in range(len(self._open_tags) - 1, -1, -1):
+            if self._open_tags[index][0] == tag:
+                # closes the innermost matching element (and anything left open
+                # inside it, so unbalanced markup does not leak its style)
+                self._open_tags = self._open_tags[:index]
+                break
+
         if tag == "a":
             self._skip_anchor = False
         elif tag in self._BLOCK_TAGS:
-            self._parts.append("\n")
+            self._parts.append(("\n", False))
 
     def handle_data(self, data):
         """Collects text content outside skipped elements."""
         if not self._skip_anchor:
-            self._parts.append(data)
+            self._parts.append((data, self._is_bold()))
 
-    def get_text(self) -> str:
-        """Returns the extracted text with collapsed blank lines."""
-        text = "".join(self._parts)
-        text = re.sub(r"[ \t]+\n", "\n", text)
-        text = re.sub(r"\n{3,}", "\n\n", text)
-        return text.strip()
+    def get_runs(self) -> list[tuple[str, bool]]:
+        """Returns the extracted (text, bold) runs with collapsed blank lines."""
+        return _normalize_runs(self._parts)
+
+def _normalize_runs(parts: list[tuple[str, bool]]) -> list[tuple[str, bool]]:
+    """Trims the text, collapses blank lines and merges same-styled parts."""
+    chars: list[tuple[str, bool]] = []
+
+    for text, bold in parts:
+        for char in text:
+            if char == "\n":
+                # drop trailing spaces and never keep more than one blank line
+                while chars and chars[-1][0] in " \t":
+                    chars.pop()
+                if len(chars) > 1 and chars[-1][0] == "\n" == chars[-2][0]:
+                    continue
+
+            chars.append((char, bold))
+
+    start, end = 0, len(chars)
+    while start < end and chars[start][0].isspace():
+        start += 1
+    while end > start and chars[end - 1][0].isspace():
+        end -= 1
+
+    return [
+        ("".join([char for char, _ in group]), bold)
+        for bold, group in groupby(chars[start:end], key=lambda item: item[1])
+    ]
 
 
-def _html_to_text(html: str) -> str:
-    """Converts an HTML fragment into plain text."""
+def _html_to_runs(html: str) -> list[tuple[str, bool]]:
+    """Converts an HTML fragment into (text, bold) runs."""
     if not html:
-        return ""
+        return []
 
     parser = _HtmlTextExtractor()
     parser.feed(html)
     parser.close()
 
-    return parser.get_text()
+    return parser.get_runs()
 
 
 def _to_latin1(text: str) -> str:
     """Coerces text to latin-1 (PDF core fonts), replacing unsupported chars."""
     return (text or "").encode("latin-1", "replace").decode("latin-1")
+
+
+def _runs_to_markdown(runs: list[tuple[str, bool]]) -> str:
+    """Renders runs in the markdown subset FPDF understands (bold only).
+
+    Used where the text must also be aligned (FPDF only honors align in
+    multi_cell, which takes markdown instead of per-run font changes). Marker
+    sequences already present in the text are escaped so they get printed
+    instead of toggling a style.
+    """
+    parts = []
+
+    for text, bold in runs:
+        for marker in _MARKDOWN_MARKERS:
+            text = text.replace(marker, f"\\{marker}")
+
+        parts.append(f"**{text}**" if bold else text)
+
+    return "".join(parts)
 
 
 def _format_form_value(value) -> str:
@@ -138,37 +227,69 @@ def _format_form_value(value) -> str:
     return str(value)
 
 
-def _get_note_body(note: ClinicalNotes) -> str:
-    """Extracts the printable body of a clinical note (free text or custom form)."""
+def _get_note_runs(note: ClinicalNotes) -> list[tuple[str, bool]]:
+    """Extracts the printable body of a clinical note (free text or custom form)
+    as (text, bold) runs."""
     if note.text:
-        return _html_to_text(note.text)
+        return _html_to_runs(note.text)
 
     if note.template:
-        lines = []
+        parts: list[tuple[str, bool]] = []
         form = note.form or {}
 
+        # a single group carries no grouping information, so its name is omitted
+        print_group_names = len(note.template) > 1
+
         for group in note.template:
-            lines.append(str(group.get("group", "")))
+            group_name = str(group.get("group", ""))
+            if group_name and print_group_names:
+                parts.append((f"{group_name}\n", False))
 
             for question in group.get("questions", []):
+                label = str(question.get("label", "") or "")
                 value = _format_form_value(form.get(str(question.get("id"))))
-                lines.append(f"{question.get('label', '')}: {_html_to_text(value)}")
 
-            lines.append("")
+                # unlabeled questions (free letters, for instance) are printed
+                # without the "label: " prefix
+                if label:
+                    parts.append((f"{label}: ", False))
 
-        return "\n".join(lines).strip()
+                parts.extend(_html_to_runs(value))
+                parts.append(("\n", False))
 
-    return ""
+            parts.append(("\n", False))
+
+        return _normalize_runs(parts)
+
+    return []
 
 
-def _get_institution_header() -> str:
+def _get_institution_header_runs() -> list[tuple[str, bool]]:
     """Gets the institution header configured in the nav-header memory record."""
     memory = db.session.query(Memory).filter(Memory.kind == "nav-header").first()
 
     if memory and memory.value:
-        return _html_to_text(memory.value.get("header", ""))
+        return _html_to_runs(memory.value.get("header", ""))
 
-    return ""
+    return []
+
+
+def _add_logo(pdf: FPDF) -> None:
+    """Draws the logo centered on the line above the institution header.
+
+    Best effort: a missing or unreadable file only costs the document its logo.
+    """
+    try:
+        width = pdf.w * _LOGO_WIDTH_RATIO
+        image = pdf.image(_LOGO_PATH, x=(pdf.w - width) / 2, y=pdf.get_y(), w=width)
+
+        # pdf.image() does not move the cursor
+        pdf.set_y(pdf.get_y() + image.rendered_height)
+        pdf.ln(3)
+    except Exception as error:  # pylint: disable=broad-except
+        logger.backend_logger.warning(
+            "ODOO Sign: could not add the logo from %s (%s)", _LOGO_PATH, error
+        )
 
 
 def _build_note_pdf(note: ClinicalNotes) -> tuple[bytes, int, float]:
@@ -183,41 +304,37 @@ def _build_note_pdf(note: ClinicalNotes) -> tuple[bytes, int, float]:
     pdf.set_auto_page_break(auto=True, margin=20)
     pdf.add_page()
 
-    institution_header = _get_institution_header()
+    _add_logo(pdf)
+
+    institution_header = _get_institution_header_runs()
     if institution_header:
         pdf.set_font("helvetica", size=9)
-        pdf.multi_cell(w=0, h=4.5, text=_to_latin1(institution_header), align="C")
+        pdf.multi_cell(
+            w=0,
+            h=4.5,
+            text=_to_latin1(_runs_to_markdown(institution_header)),
+            align="C",
+            markdown=True,
+        )
         pdf.ln(2)
         pdf.line(pdf.l_margin, pdf.get_y(), pdf.w - pdf.r_margin, pdf.get_y())
         pdf.ln(6)
 
-    note_header = (
-        f"{note.date.strftime('%d/%m/%Y %H:%M')} - {note.prescriber or ''}".strip(" -")
-    )
-    pdf.set_font("helvetica", style="B", size=11)
-    pdf.multi_cell(w=0, h=6, text=_to_latin1(note_header))
-    pdf.ln(4)
+    # written run by run (instead of a single multi_cell) so the emphasis used
+    # in the note is preserved
+    body_line_height = 5
+    for text, bold in _get_note_runs(note):
+        pdf.set_font("helvetica", style="B" if bold else "", size=10)
+        pdf.write(h=body_line_height, text=_to_latin1(text))
 
-    pdf.set_font("helvetica", size=10)
-    pdf.multi_cell(w=0, h=5, text=_to_latin1(_get_note_body(note)))
+    # write() leaves the cursor on the last line: close it like multi_cell does
+    pdf.ln(body_line_height)
 
-    # dedicated signature area: keep it on the page where the content ended
-    # (or on a new one when there is no room left)
-    pdf.ln(14)
-    if pdf.get_y() > _A4_HEIGHT_MM - 55:
-        pdf.add_page()
-        pdf.ln(10)
-
+    # the note text carries its own signature block, so nothing is drawn here:
+    # the signature field is anchored right where the body ended. The auto page
+    # break keeps the body above the bottom margin, so the field always fits.
     sign_page = pdf.page_no()
     sign_pos_y = pdf.get_y() / _A4_HEIGHT_MM
-
-    pdf.ln(22)
-    line_start = pdf.w * _SIGN_ITEM_POS_X
-    line_end = pdf.w * (_SIGN_ITEM_POS_X + _SIGN_ITEM_WIDTH)
-    pdf.line(line_start, pdf.get_y(), line_end, pdf.get_y())
-    pdf.ln(2)
-    pdf.set_font("helvetica", size=8)
-    pdf.multi_cell(w=0, h=4, text=_to_latin1(note.prescriber or ""), align="C")
 
     return bytes(pdf.output()), sign_page, sign_pos_y
 
