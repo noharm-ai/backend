@@ -93,6 +93,7 @@ FIELD_LABELS = {
     "dischargeReason": "motivo de alta",
     "insurance": "convênio",
     "idSegment": "segmento",
+    "tags": "marcador do paciente",
     "combination": "combinação de critérios do item",
 }
 

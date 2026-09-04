@@ -9,11 +9,13 @@ result so a broken lookup never aborts the chat turn.
 from strands import tool
 
 from models.main import dbSession
+from models.enums import TagTypeEnum
 from models.requests.protocol_request import (
     ProtocolTestRequest,
     ProtocolTestSampleRequest,
 )
-from repository import exams_repository
+from models.requests.tag_request import TagListRequest
+from repository import exams_repository, tag_repository
 from services import (
     clinical_notes_service,
     drug_service,
@@ -231,6 +233,31 @@ def build_tools(schema: str, validate_config, normalize_config) -> list:
         return _run(lists_service.list_routes)
 
     @tool(
+        name="list_tags",
+        description=(
+            "Lista os marcadores de paciente ativos. Retorna name (nome do "
+            "marcador). Use o name em variáveis do tipo tags."
+        ),
+    )
+    def list_tags() -> dict:
+        """List active patient tags."""
+
+        def _list():
+            request_data = TagListRequest(
+                active=True,
+                tagTypeList=[
+                    TagTypeEnum.PATIENT.value,
+                    TagTypeEnum.PATIENT_NAVIGATION.value,
+                ],
+            )
+            return [
+                {"name": t.name, "tagType": t.tag_type}
+                for t in tag_repository.list_tags(request_data=request_data)
+            ]
+
+        return _run(_list)
+
+    @tool(
         name="list_stats_types",
         description=(
             "Lista os indicadores NoHarm Care. Retorna statsType e nome. "
@@ -316,6 +343,7 @@ def build_tools(schema: str, validate_config, normalize_config) -> list:
         list_departments,
         list_segments,
         list_routes,
+        list_tags,
         list_stats_types,
         validate_protocol,
         test_protocol,
