@@ -5,10 +5,33 @@ from decorators.has_permission_decorator import Permission, has_permission
 from models.enums import NoHarmENV
 from models.main import User
 from models.requests.reports_consolidated_request import (
+    EconomyReportRequest,
     PatientDayReportRequest,
     PrescriptionReportRequest,
 )
 from utils import aws
+
+
+def _invoke_report_lambda(payload: dict, report_name: str) -> dict:
+    """Invoke the private backend lambda and return the parsed report payload."""
+    lambda_client = aws.get_client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
+    response = lambda_client.invoke(
+        FunctionName=Config.BACKEND_FUNCTION_NAME,
+        InvocationType="RequestResponse",
+        Payload=json.dumps(payload),
+    )
+
+    response_json = json.loads(response["Payload"].read().decode("utf-8"))
+
+    if isinstance(response_json, str):
+        response_json = json.loads(response_json)
+
+    if response_json.get("error", False):
+        raise Exception(
+            f"Consolidated {report_name} report ERROR: {response_json.get('message', 'Erro inesperado. Consulte os logs')}"
+        )
+
+    return response_json
 
 
 @has_permission(Permission.READ_REPORTS)
@@ -35,24 +58,7 @@ def get_patient_day_report(request_data: PatientDayReportRequest, user_context: 
         "weekdays_only": request_data.weekdays_only,
     }
 
-    lambda_client = aws.get_client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
-    response = lambda_client.invoke(
-        FunctionName=Config.BACKEND_FUNCTION_NAME,
-        InvocationType="RequestResponse",
-        Payload=json.dumps(payload),
-    )
-
-    response_json = json.loads(response["Payload"].read().decode("utf-8"))
-
-    if isinstance(response_json, str):
-        response_json = json.loads(response_json)
-
-    if response_json.get("error", False):
-        raise Exception(
-            f"Consolidated patient-day report ERROR: {response_json.get('message', 'Erro inesperado. Consulte os logs')}"
-        )
-
-    return response_json
+    return _invoke_report_lambda(payload=payload, report_name="patient-day")
 
 
 @has_permission(Permission.READ_REPORTS)
@@ -79,21 +85,32 @@ def get_prescription_report(request_data: PrescriptionReportRequest, user_contex
         "remove_prescription_at_discharge_date": request_data.remove_prescription_at_discharge_date,
     }
 
-    lambda_client = aws.get_client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
-    response = lambda_client.invoke(
-        FunctionName=Config.BACKEND_FUNCTION_NAME,
-        InvocationType="RequestResponse",
-        Payload=json.dumps(payload),
-    )
+    return _invoke_report_lambda(payload=payload, report_name="prescription")
 
-    response_json = json.loads(response["Payload"].read().decode("utf-8"))
 
-    if isinstance(response_json, str):
-        response_json = json.loads(response_json)
+@has_permission(Permission.READ_REPORTS)
+def get_economy_report(request_data: EconomyReportRequest, user_context: User):
+    if Config.ENV == NoHarmENV.TEST.value:
+        return {}
 
-    if response_json.get("error", False):
-        raise Exception(
-            f"Consolidated prescription report ERROR: {response_json.get('message', 'Erro inesperado. Consulte os logs')}"
-        )
+    payload = {
+        "command": "lambda_query_reports.get_economy_report",
+        "schema": user_context.schema,
+        "year": request_data.year,
+        "department": request_data.department if request_data.department else None,
+        "segment": request_data.segment if request_data.segment else None,
+        "start_date": (
+            request_data.start_date.isoformat() if request_data.start_date else None
+        ),
+        "end_date": (
+            request_data.end_date.isoformat() if request_data.end_date else None
+        ),
+        "economy_type": request_data.economy_type if request_data.economy_type else None,
+        "status": request_data.status if request_data.status else None,
+        "responsible": request_data.responsible if request_data.responsible else None,
+        "economy_value_type": request_data.economy_value_type
+        if request_data.economy_value_type
+        else None,
+    }
 
-    return response_json
+    return _invoke_report_lambda(payload=payload, report_name="economy")
