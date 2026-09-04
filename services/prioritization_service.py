@@ -93,9 +93,14 @@ def get_prioritization_list(request: PrioritizationRequest):
                 p[0].features.get("intervals", [])
             )
 
-            # inner (individual) prescription dates of the agg prescription;
-            # the frontend derives next/last dates from the user's clock
+            # inner (individual) prescription dates of the agg prescription,
+            # limited to a window around the agg date; the frontend derives
+            # next/last dates from the user's clock
             features["prescriptionDates"] = p[0].features.get("prescriptionDates", [])
+            # tells the frontend the date list hit the hard cap and is partial
+            features["prescriptionDatesTruncated"] = p[0].features.get(
+                "prescriptionDatesTruncated", False
+            )
 
         else:
             features["processed"] = False
@@ -104,6 +109,7 @@ def get_prioritization_list(request: PrioritizationRequest):
             features["class"] = "blue"
             features["firstAdministrationHour"] = None
             features["prescriptionDates"] = []
+            features["prescriptionDatesTruncated"] = False
 
         # p.observation is truncated to 301 chars in SQL (func.left); a length
         # over 300 means the original text overflows and gets an ellipsis

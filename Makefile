@@ -7,6 +7,10 @@ dev:
 	@test -f .env || (echo ".env not found — copy .env.example to .env and fill in values" && exit 1)
 	. env/bin/activate && set -a && . .env && set +a && python3 mobile.py
 
+prescalc:
+	@test -f .env || (echo ".env not found — copy .env.example to .env and fill in values" && exit 1)
+	. env/bin/activate && set -a && . .env && set +a && python3 static.py
+
 ## Run the linter (same check as CI)
 lint:
 	ruff check .

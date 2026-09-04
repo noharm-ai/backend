@@ -180,6 +180,9 @@ def create_agg_prescription_by_prescription(
     pAgg.features = features
     pAgg.aggDrugs = pAgg.features["drugIDs"]
     pAgg.aggDeps = pAgg.features["departmentList"]
+    _log_truncated_prescription_dates(
+        prescription=pAgg, features=features, schema=schema
+    )
 
     if p.concilia is None and (pAgg.status == "s" or p.status == "s"):
         prescalc_user = User()
@@ -389,6 +392,9 @@ def create_agg_prescription_by_date(
     agg_p.features = features
     agg_p.aggDrugs = agg_p.features["drugIDs"]
     agg_p.aggDeps = agg_p.features["departmentList"]
+    _log_truncated_prescription_dates(
+        prescription=agg_p, features=features, schema=schema
+    )
     agg_p.update = datetime.today()
     db.session.flush()
 
@@ -396,6 +402,29 @@ def create_agg_prescription_by_date(
     _automatic_check(prescription=agg_p, features=features, user_context=user_context)
     _update_patient_conciliation_status(
         admission_number=agg_p.admissionNumber, is_concilia=False
+    )
+
+
+def _log_truncated_prescription_dates(prescription, features, schema):
+    """Warn when the inner prescription dates of an agg hit the hard cap.
+
+    The flag also travels in the features, but it lives inside a json column
+    that cannot be queried without a full scan, so extreme cases are logged.
+    """
+    if not features.get("prescriptionDatesTruncated", False):
+        return
+
+    logger.backend_logger.warning(
+        json.dumps(
+            {
+                "event": "prescription_dates_truncated",
+                "path": "prescription_agg_service._log_truncated_prescription_dates",
+                "schema": schema,
+                "message": "Lista de datas das prescrições internas atingiu o limite",
+                "id_prescription": prescription.id,
+                "limit": prescriptionutils.PRESCRIPTION_DATES_LIMIT,
+            }
+        )
     )
 
 

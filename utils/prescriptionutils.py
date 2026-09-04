@@ -1,6 +1,6 @@
 """Prescription utils functions."""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Union
 
 from utils import dateutils, numberutils, stringutils
@@ -79,6 +79,47 @@ def get_numeric_drug_attributes_list():
     ]
 
 
+# window of inner prescription dates kept in the agg features, in days relative
+# to the agg date. mirrors the drug query horizon in
+# prescription_view_repository._get_period_filter (cpoe lists prescriptions that
+# start up to 2 days ahead) and keeps primary care aggs, which have no period
+# filter at all, from growing with the whole admission
+PRESCRIPTION_DATES_DAYS_BEHIND = 2
+PRESCRIPTION_DATES_DAYS_AHEAD = 2
+
+# hard cap for extreme cases. the most recent dates are kept, since both the next
+# and the last prescription date are derived from the end of the list
+PRESCRIPTION_DATES_LIMIT = 50
+
+
+def _get_prescription_dates_window(agg_date):
+    """Day bounds ("YYYY-MM-DD") for the inner prescription dates of an agg.
+
+    Returns None when there is no agg date, meaning every date is kept.
+    """
+    if agg_date is None:
+        return None
+
+    # datetime subclasses date: out patient aggs store a plain date
+    base = agg_date.date() if isinstance(agg_date, datetime) else agg_date
+
+    return (
+        (base - timedelta(days=PRESCRIPTION_DATES_DAYS_BEHIND)).isoformat(),
+        (base + timedelta(days=PRESCRIPTION_DATES_DAYS_AHEAD)).isoformat(),
+    )
+
+
+def _is_in_prescription_dates_window(prescription_date: str, window):
+    """Whether an ISO prescription date falls inside the agg date window"""
+    if window is None:
+        return True
+
+    # dates are naive local ISO strings, so the day part compares as plain text
+    day = prescription_date.split("T")[0]
+
+    return window[0] <= day <= window[1]
+
+
 def get_internal_prescription_ids(result: dict):
     id_prescription_list = set()
 
@@ -106,6 +147,7 @@ def getFeatures(result, agg_date: datetime = None, intervals_for_agg_date=False)
     alert_level = "low"
     department_list = set()
     prescription_dates = set()
+    prescription_dates_window = _get_prescription_dates_window(agg_date)
 
     for attr in get_numeric_drug_attributes_list():
         drug_attributes[attr] = 0
@@ -114,9 +156,14 @@ def getFeatures(result, agg_date: datetime = None, intervals_for_agg_date=False)
         drugIDs.append(d["idDrug"])
 
         # individual prescription dates inside the agg prescription: used to
-        # prioritize agg prescriptions by their inner prescription dates
+        # prioritize agg prescriptions by their inner prescription dates. dates
+        # outside the window are dropped: an old prescription stays in the drug
+        # list while it does not expire and would grow the list without ever
+        # being the next or the last date
         prescription_date = d.get("prescriptionDate", None)
-        if prescription_date:
+        if prescription_date and _is_in_prescription_dates_window(
+            prescription_date, prescription_dates_window
+        ):
             prescription_dates.add(prescription_date)
         if d["idSubstance"] != None:
             substanceIDs.append(d["idSubstance"])
@@ -204,6 +251,15 @@ def getFeatures(result, agg_date: datetime = None, intervals_for_agg_date=False)
 
     global_score = pScore + av + am + exams + alerts + diff
 
+    sorted_prescription_dates = sorted(prescription_dates)
+    prescription_dates_truncated = (
+        len(sorted_prescription_dates) > PRESCRIPTION_DATES_LIMIT
+    )
+    if prescription_dates_truncated:
+        sorted_prescription_dates = sorted_prescription_dates[
+            -PRESCRIPTION_DATES_LIMIT:
+        ]
+
     return {
         "alergy": allergy,
         "allergy": allergy,
@@ -236,7 +292,8 @@ def getFeatures(result, agg_date: datetime = None, intervals_for_agg_date=False)
         "departmentList": list(department_list),
         "globalScore": global_score,
         "protocolAlerts": protocol_alerts,
-        "prescriptionDates": sorted(prescription_dates),
+        "prescriptionDates": sorted_prescription_dates,
+        "prescriptionDatesTruncated": prescription_dates_truncated,
     }
 
 
