@@ -6,6 +6,7 @@ from models.enums import NoHarmENV
 from models.main import User
 from models.requests.reports_consolidated_request import (
     EconomyReportRequest,
+    InterventionReportRequest,
     PatientDayReportRequest,
     PrescriptionReportRequest,
 )
@@ -114,3 +115,32 @@ def get_economy_report(request_data: EconomyReportRequest, user_context: User):
     }
 
     return _invoke_report_lambda(payload=payload, report_name="economy")
+
+
+@has_permission(Permission.READ_REPORTS)
+def get_intervention_report(
+    request_data: InterventionReportRequest, user_context: User
+):
+    if Config.ENV == NoHarmENV.TEST.value:
+        return {}
+
+    payload = {
+        "command": "lambda_query_reports.get_intervention_report",
+        "schema": user_context.schema,
+        "year": request_data.year,
+        "department": request_data.department if request_data.department else None,
+        "segment": request_data.segment if request_data.segment else None,
+        "start_date": (
+            request_data.start_date.isoformat() if request_data.start_date else None
+        ),
+        "end_date": (
+            request_data.end_date.isoformat() if request_data.end_date else None
+        ),
+        "status": request_data.status if request_data.status else None,
+        "responsible": request_data.responsible if request_data.responsible else None,
+        "prescriber": request_data.prescriber if request_data.prescriber else None,
+        "insurance": request_data.insurance if request_data.insurance else None,
+        "reason": request_data.reason if request_data.reason else None,
+    }
+
+    return _invoke_report_lambda(payload=payload, report_name="intervention")

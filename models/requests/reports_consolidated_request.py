@@ -38,3 +38,16 @@ class EconomyReportRequest(BaseModel):
     status: Optional[list[str]] = None
     responsible: Optional[list[str]] = None
     economy_value_type: Optional[str] = None
+
+
+class InterventionReportRequest(BaseModel):
+    year: int
+    department: Optional[list[str]] = None
+    segment: Optional[list[str]] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    status: Optional[list[str]] = None
+    responsible: Optional[list[str]] = None
+    prescriber: Optional[list[str]] = None
+    insurance: Optional[list[str]] = None
+    reason: Optional[list[str]] = None

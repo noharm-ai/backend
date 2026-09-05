@@ -3,6 +3,7 @@ from flask import Blueprint, request
 from decorators.api_endpoint_decorator import api_endpoint
 from models.requests.reports_consolidated_request import (
     EconomyReportRequest,
+    InterventionReportRequest,
     PatientDayReportRequest,
     PrescriptionReportRequest,
 )
@@ -32,4 +33,12 @@ def get_prescription_report():
 def get_economy_report():
     return reports_consolidated_service.get_economy_report(
         request_data=EconomyReportRequest(**request.get_json())
+    )
+
+
+@app_rpt_consolidated.route("/reports/consolidated/intervention", methods=["POST"])
+@api_endpoint()
+def get_intervention_report():
+    return reports_consolidated_service.get_intervention_report(
+        request_data=InterventionReportRequest(**request.get_json())
     )
