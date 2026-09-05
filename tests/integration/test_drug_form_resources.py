@@ -15,6 +15,7 @@ from contextlib import contextmanager
 import pytest
 from sqlalchemy import text
 
+from models.appendix import Frequency, MeasureUnit
 from models.enums import MemoryEnum
 from models.main import Drug, PrescriptionAgg
 from security.role import Role
@@ -155,11 +156,25 @@ def test_drug_resources_sorts_the_catalogues_by_description(client, analyst_head
     """GET /drugs/resources - ordena unidades e frequências por descrição"""
     data = _get(client, analyst_headers).get_json()["data"]
 
-    unit_names = [u["description"] for u in data["units"]]
-    frequency_names = [f["description"] for f in data["frequencies"]]
+    # compared against what the database itself returns rather than against a
+    # Python sort: ordering by description is the database's, and it differs
+    # between collations ('UI' sorts before 'mcg' under C, after it under en_US)
+    expected_units = [
+        row.description
+        for row in session.query(MeasureUnit).order_by(MeasureUnit.description).all()
+    ]
+    expected_frequencies = [
+        row.description
+        for row in session.query(Frequency).order_by(Frequency.description).all()
+    ]
 
-    assert unit_names == sorted(unit_names)
-    assert frequency_names == sorted(frequency_names)
+    # the catalogue is appended after the previously prescribed entries
+    assert [u["description"] for u in data["units"]][
+        -len(expected_units) :
+    ] == expected_units
+    assert [f["description"] for f in data["frequencies"]][
+        -len(expected_frequencies) :
+    ] == expected_frequencies
 
 
 def test_drug_resources_counts_previously_prescribed_units_and_frequencies(
