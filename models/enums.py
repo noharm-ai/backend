@@ -313,6 +313,7 @@ class ProtocolVariableFieldEnum(Enum):
     DISCHARGE_REASON = "dischargeReason"
     SEGMENT_TYPE = "segmentType"
     INSURANCE = "insurance"
+    TAGS = "tags"
 
 
 class SchemaConfigAuditTypeEnum(Enum):
