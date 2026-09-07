@@ -36,3 +36,21 @@ def set_value(id_user: int, kind: str, value: str, responsible_id: int):
     )
 
     db.session.execute(stmt)
+
+
+def list_users_with_attribute(user_ids: list, kind: str) -> set:
+    """Ids of the given users that hold an attribute row of this kind.
+
+    Presence only, in a single query: callers resolving a whole list must not
+    fall back to get_value() per user"""
+    if not user_ids:
+        return set()
+
+    results = (
+        db.session.query(UserAttribute.idUser)
+        .filter(UserAttribute.idUser.in_(user_ids))
+        .filter(UserAttribute.kind == kind)
+        .all()
+    )
+
+    return {id_user for (id_user,) in results}

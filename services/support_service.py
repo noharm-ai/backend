@@ -22,6 +22,38 @@ def _get_client():
     return odoo_client.get_client(context="support service")
 
 
+# ODOO ticket type ids, as sent by the "Tipo de chamado" select. ODOO resolves the
+# id itself; these labels only title the ticket.
+TICKET_TYPE_LABELS = {
+    1: "Solicitação",
+    2: "Erro",
+    4: "Dúvida",
+    5: "Validação",
+    6: "Integração fora do ar",
+    9: "Sugestão",
+}
+
+
+def _ticket_type_fields(category):
+    """Map the ``category`` form field onto the right ODOO field, plus its label.
+
+    Older frontends send the type as a label string (``"Erro"``) bound to
+    ``x_studio_tipo_de_chamado``; current ones send the ODOO id (``2``, as a
+    string — the request is multipart) bound to ``x_studio_tipo_chamado``. None of
+    the legacy labels parse as an int, so ``int()`` tells the two apart with no
+    ambiguity for any value either version can send.
+
+    The legacy branch has to stay reachable: ``SupportFormAI`` still sends labels,
+    and a user's browser may hold a stale bundle.
+    """
+    try:
+        type_id = int(category)
+    except (TypeError, ValueError):
+        return {"x_studio_tipo_de_chamado": category}, category
+
+    return {"x_studio_tipo_chamado": type_id}, TICKET_TYPE_LABELS.get(type_id)
+
+
 @has_permission(Permission.READ_SUPPORT)
 def ask_n0(question: str, user_context: User = None):
     """Ask a question to the n0 agent and return the response"""
@@ -162,13 +194,15 @@ def create_ticket(
         options={"fields": ["id", "name", "parent_id"]},
     )
 
+    type_fields, type_label = _ticket_type_fields(category)
+
     ticket = {
-        "name": f"[{category or 'Geral'}] {title or db_user.name}",
+        "name": f"[{type_label or 'Geral'}] {title or db_user.name}",
         "description": description,
         "x_studio_schema_1": user_context.schema,
         "x_studio_fromurl": from_url,
-        "x_studio_tipo_de_chamado": category,
         "team_id": 1,
+        **type_fields,
     }
 
     if partner and partner[0].get("id", None) is not None:

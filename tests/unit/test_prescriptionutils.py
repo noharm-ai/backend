@@ -1,6 +1,6 @@
 """Unit tests for utils.prescriptionutils prescription helper functions."""
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 import pytest
 
@@ -382,6 +382,102 @@ class TestGetFeatures:
         assert features["drugIDs"] == [9]
         assert features["drugAttributes"]["antimicro"] == 2
         assert features["totalItens"] == 1
+
+    def test_collects_inner_prescription_dates(self):
+        """Inner prescription dates are de-duplicated and sorted, even for
+        whitelisted/suspended items, and missing dates are ignored."""
+        later = _make_drug(idDrug=1, prescriptionDate="2026-09-02T14:00:00")
+        earlier = _make_drug(idDrug=2, prescriptionDate="2026-09-01T08:00:00")
+        duplicate = _make_drug(
+            idDrug=3, whiteList=True, prescriptionDate="2026-09-02T14:00:00"
+        )
+        suspended = _make_drug(
+            idDrug=4, suspended=True, prescriptionDate="2026-09-02T20:00:00"
+        )
+        no_date = _make_drug(idDrug=5, prescriptionDate=None)
+        legacy = _make_drug(idDrug=6)  # header calls may not carry the key
+
+        features = prescriptionutils.getFeatures(
+            _make_result(
+                prescription=[later, earlier, duplicate],
+                solution=[suspended],
+                procedures=[no_date, legacy],
+            )
+        )
+        assert features["prescriptionDates"] == [
+            "2026-09-01T08:00:00",
+            "2026-09-02T14:00:00",
+            "2026-09-02T20:00:00",
+        ]
+
+    def test_prescription_dates_empty_when_absent(self):
+        """A prescription without inner dates yields an empty list."""
+        features = prescriptionutils.getFeatures(_make_result())
+        assert features["prescriptionDates"] == []
+        assert features["prescriptionDatesTruncated"] is False
+
+    def test_prescription_dates_limited_to_agg_date_window(self):
+        """With an agg date, only dates inside the window are kept: dates before
+        and after it are dropped while the ones in range survive."""
+        too_old = _make_drug(idDrug=1, prescriptionDate="2026-09-07T23:00:00")
+        oldest_kept = _make_drug(idDrug=2, prescriptionDate="2026-09-08T08:00:00")
+        agg_day = _make_drug(idDrug=3, prescriptionDate="2026-09-10T10:00:00")
+        newest_kept = _make_drug(idDrug=4, prescriptionDate="2026-09-12T07:00:00")
+        too_new = _make_drug(idDrug=5, prescriptionDate="2026-09-13T07:00:00")
+
+        features = prescriptionutils.getFeatures(
+            _make_result(
+                prescription=[too_old, oldest_kept, agg_day, newest_kept, too_new]
+            ),
+            agg_date=datetime(2026, 9, 10, 15, 30),
+        )
+        assert features["prescriptionDates"] == [
+            "2026-09-08T08:00:00",
+            "2026-09-10T10:00:00",
+            "2026-09-12T07:00:00",
+        ]
+        assert features["prescriptionDatesTruncated"] is False
+
+    def test_prescription_dates_empty_when_every_date_is_out_of_window(self):
+        """A primary care agg lists old prescriptions that did not expire: when
+        none of them started near the agg date the list comes back empty, which
+        means "nothing upcoming", not "no drugs"."""
+        old_but_valid = _make_drug(idDrug=1, prescriptionDate="2026-08-20T10:00:00")
+
+        features = prescriptionutils.getFeatures(
+            _make_result(prescription=[old_but_valid]),
+            agg_date=datetime(2026, 9, 10),
+        )
+        assert features["prescriptionDates"] == []
+        assert features["totalItens"] == 1
+
+    def test_prescription_dates_window_accepts_plain_date(self):
+        """Out patient aggs store a plain date, which bounds the window too."""
+        kept = _make_drug(idDrug=1, prescriptionDate="2026-09-09T10:00:00")
+        dropped = _make_drug(idDrug=2, prescriptionDate="2026-09-01T10:00:00")
+
+        features = prescriptionutils.getFeatures(
+            _make_result(prescription=[kept, dropped]),
+            agg_date=date(2026, 9, 10),
+        )
+        assert features["prescriptionDates"] == ["2026-09-09T10:00:00"]
+
+    def test_prescription_dates_truncated_keeps_most_recent(self):
+        """Over the hard limit the list is cut to its most recent dates and the
+        truncated flag is raised."""
+        extra = 5
+        dates = [
+            f"2026-09-10T00:{i:02}:00"
+            for i in range(prescriptionutils.PRESCRIPTION_DATES_LIMIT + extra)
+        ]
+        drugs = [_make_drug(idDrug=i, prescriptionDate=d) for i, d in enumerate(dates)]
+
+        features = prescriptionutils.getFeatures(
+            _make_result(prescription=drugs),
+            agg_date=datetime(2026, 9, 10),
+        )
+        assert features["prescriptionDatesTruncated"] is True
+        assert features["prescriptionDates"] == dates[extra:]
 
     def test_agg_path_uses_alert_stats(self):
         """When alertStats is present it drives the alert total and level."""

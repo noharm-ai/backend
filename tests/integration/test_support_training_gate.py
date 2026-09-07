@@ -30,9 +30,9 @@ def _add_mandatory_training():
         text(
             "INSERT INTO public.treinamento "
             "(idtreinamento, pagina, titulo, resumo, posicao, ativo, obrigatorio, "
-            "escopo, audiencia, created_at, created_by) "
+            "escopo, audiencia, tempo_horas, created_at, created_by) "
             "VALUES (:id, :pagina, 'Gate', 'Gate', 80, true, true, "
-            "'global', 'all', now(), :uid)"
+            "'global', 'all', 0, now(), :uid)"
         ),
         {"id": TRAINING_ID, "pagina": ["gate"], "uid": DEMO_USER_ID},
     )
@@ -60,9 +60,10 @@ def _finish_the_training():
     session.execute(
         text(
             "INSERT INTO public.treinamento_usuario "
-            "(idtreinamento, idusuario, created_at) VALUES (:id, :uid, now())"
+            "(idtreinamento, idusuario, codigo_validacao, created_at) "
+            "VALUES (:id, :uid, :code, now())"
         ),
-        {"id": TRAINING_ID, "uid": DEMO_USER_ID},
+        {"id": TRAINING_ID, "uid": DEMO_USER_ID, "code": "GATEGATEGATE"},
     )
     session_commit()
 

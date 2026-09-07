@@ -961,6 +961,66 @@ from utils.alert_protocol import AlertProtocol, ProtocolExtraInfo
                 "variables": [
                     {
                         "name": "v1",
+                        "field": "tags",
+                        "operator": "IN",
+                        "value": ["oncologia"],
+                    },
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            True,
+        ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
+                        "field": "tags",
+                        "operator": "IN",
+                        "value": ["DIALISE", "TRANSPLANTE"],
+                    },
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            False,
+        ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
+                        "field": "tags",
+                        "operator": "NOTIN",
+                        "value": ["DIALISE"],
+                    },
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            True,
+        ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
+                        "field": "tags",
+                        "operator": "NOTIN",
+                        "value": ["PALIATIVO"],
+                    },
+                ],
+                "trigger": "{{v1}}",
+                "result": {"message": "result"},
+            },
+            False,
+        ),
+        (
+            {
+                "variables": [
+                    {
+                        "name": "v1",
                         "field": "exam_ref",
                         "examRefType": "ckd21_nh",
                         "operator": ">",
@@ -1175,6 +1235,7 @@ def test_trigger(protocol, has_result):
     patient.st_conciliation = 1
     patient.id_icd = "A00"
     patient.dischargeReason = "Alta melhorado"
+    patient.tags = ["ONCOLOGIA", "PALIATIVO"]
 
     protocol_extra_info = ProtocolExtraInfo()
     protocol_extra_info.segment_type = 1
@@ -1193,6 +1254,91 @@ def test_trigger(protocol, has_result):
         assert results is not None
     else:
         assert results is None
+
+
+def _tags_protocol(operator: str, value: list) -> dict:
+    """Protocol with a single patient tags variable"""
+
+    return {
+        "variables": [
+            {"name": "v1", "field": "tags", "operator": operator, "value": value}
+        ],
+        "trigger": "{{v1}}",
+        "result": {"message": "result"},
+    }
+
+
+def _tags_alert_protocol(patient: Patient) -> AlertProtocol:
+    """AlertProtocol with no drugs, bound to the given patient"""
+
+    return AlertProtocol(
+        drugs=[],
+        exams={},
+        prescription=Prescription(),
+        patient=patient,
+        cn_stats={},
+    )
+
+
+@pytest.mark.parametrize(
+    "tags, operator, has_result",
+    [
+        # a patient without tags never matches IN and always matches NOTIN
+        (None, "IN", False),
+        (None, "NOTIN", True),
+        ([], "IN", False),
+        ([], "NOTIN", True),
+        # comparison ignores case on both sides
+        (["Oncologia"], "IN", True),
+        (["Oncologia"], "NOTIN", False),
+    ],
+)
+def test_tags_variable(tags, operator, has_result):
+    """Protocols: patient tags variable against patients with and without tags"""
+
+    patient = Patient()
+    patient.tags = tags
+
+    alert_protocol = _tags_alert_protocol(patient=patient)
+    results = alert_protocol.get_protocol_alerts(
+        protocol=_tags_protocol(operator=operator, value=["oncologia"])
+    )
+
+    assert (results is not None) == has_result
+
+
+def test_tags_variable_unsupported_operator():
+    """Protocols: patient tags variable only accepts list operators"""
+
+    patient = Patient()
+    patient.tags = ["ONCOLOGIA"]
+
+    alert_protocol = _tags_alert_protocol(patient=patient)
+    trace = alert_protocol.evaluate_with_trace(
+        protocol=_tags_protocol(operator="=", value=["ONCOLOGIA"])
+    )
+
+    assert trace["activated"] is False
+    assert trace["variables"][0].reason == "OPERATOR_NOT_SUPPORTED"
+
+
+def test_tags_variable_trace():
+    """Protocols: patient tags variable trace reports the matched tags"""
+
+    patient = Patient()
+    patient.tags = ["ONCOLOGIA", "PALIATIVO"]
+
+    alert_protocol = _tags_alert_protocol(patient=patient)
+    trace = alert_protocol.evaluate_with_trace(
+        protocol=_tags_protocol(operator="IN", value=["paliativo", "DIALISE"])
+    )
+
+    assert trace["activated"] is True
+    variable = trace["variables"][0]
+    assert variable.result is True
+    assert variable.reason == "COMPARED"
+    assert variable.actual_value == ["ONCOLOGIA", "PALIATIVO"]
+    assert variable.details["matched"] == ["PALIATIVO"]
 
 
 @pytest.mark.parametrize(

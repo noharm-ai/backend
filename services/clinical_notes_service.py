@@ -350,6 +350,7 @@ def convert_notes(notes, has_primary_care, tags):
         "date": notes.date.isoformat(),
         "prescriber": "***" if hide_names else notes.prescriber,
         "position": notes.position,
+        "idSignRequest": notes.idSignRequest,
     }
 
     for tag in tags:
@@ -380,6 +381,8 @@ def convert_prescription_note(note, creator_name, tags):
         "date": note.updatedAt.isoformat(),
         "prescriber": "***" if hide_names else (creator_name or ""),
         "position": "EVOLUÇÃO CRIADA NA NOHARM",
+        # prescricao_evolucao rows cannot be signed: they live in another table
+        "idSignRequest": None,
         "source": "prescription",
         "integrationStatus": note.tpStatus,
         "idPrescription": note.idPrescription,

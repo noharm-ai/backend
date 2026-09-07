@@ -305,6 +305,8 @@ class Training(db.Model):
     mandatory = db.Column("obrigatorio", db.Boolean, nullable=False)
     scope = db.Column("escopo", db.String(20), nullable=False)
     audience = db.Column("audiencia", db.String(20), nullable=False)
+    # official workload ("carga horária total") of the module, in whole hours
+    total_hours = db.Column("tempo_horas", db.Integer, nullable=False)
     updated_at = db.Column("updated_at", db.DateTime, nullable=True)
     updated_by = db.Column("updated_by", db.BigInteger, nullable=True)
     created_at = db.Column("created_at", db.DateTime, nullable=False)
@@ -368,6 +370,9 @@ class TrainingUser(db.Model):
 
     training_id = db.Column("idtreinamento", db.Integer, primary_key=True)
     user_id = db.Column("idusuario", db.Integer, primary_key=True)
+    # opaque public code that proves this certificate is genuine, minted when
+    # the module is completed and never changed afterwards
+    validation_code = db.Column("codigo_validacao", db.String(12), nullable=False)
     created_at = db.Column("created_at", db.DateTime, nullable=False)
     updated_at = db.Column("updated_at", db.DateTime, nullable=True)
 

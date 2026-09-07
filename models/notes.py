@@ -16,6 +16,9 @@ class ClinicalNotes(db.Model):
     update = db.Column("update_at", db.DateTime, nullable=True)
     user = db.Column("update_by", db.BigInteger, nullable=True)
 
+    # ODOO sign.request id of the digital signature generated for this note
+    idSignRequest = db.Column("fkassinatura", db.BigInteger, nullable=True)
+
     allergy = db.Column("alergia", db.Integer, nullable=True)
     dialysis = db.Column("dialise", db.Integer, nullable=True)
 

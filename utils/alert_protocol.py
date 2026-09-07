@@ -526,6 +526,25 @@ class AlertProtocol:
 
             return self._trace_compare(op=operator, value1=id_icd, value2=value)
 
+        if field == "tags":
+            if not self.patient:
+                return self._trace_miss(TraceReasonEnum.NO_PATIENT)
+
+            if operator not in ["IN", "NOTIN"]:
+                return self._trace_miss(
+                    TraceReasonEnum.OPERATOR_NOT_SUPPORTED, operator=operator
+                )
+
+            # tags are stored upper case (see patient_service._get_tags); a
+            # patient without tags has an empty list, so IN is false and NOTIN
+            # is true
+            patient_tags = [
+                str(t).upper() for t in (self.patient.tags or []) if t is not None
+            ]
+            value = [str(v).upper() for v in (value or []) if v is not None]
+
+            return self._trace_compare(op=operator, value1=patient_tags, value2=value)
+
         if field == "dischargeReason":
             return self._trace_compare(
                 op="CONTAINS", value1=self.patient.dischargeReason, value2=value

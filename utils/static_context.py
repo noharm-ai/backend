@@ -72,6 +72,8 @@ def _handle_exception(e: Exception, user_context: User):
         )
     )
 
+    logger.backend_logger.exception(str(e))
+
     return {
         "status": "error",
         "message": "Erro inesperado",

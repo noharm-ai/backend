@@ -298,3 +298,35 @@ def truncate(
     truncated = unicodedata.normalize("NFC", truncated)
 
     return truncated + ellipsis
+
+
+# particles carry no identifying information, and masking them only makes the
+# result unreadable
+NAME_PARTICLES = {"de", "da", "das", "do", "dos", "e", "del", "di", "du"}
+
+
+def mask_person_name(name: str) -> str:
+    """First letter of each name token, the rest replaced by asterisks:
+    "Fulano Beltrano" -> "F***** B*******".
+
+    Length is preserved on purpose. It reads like a leak and is in fact the
+    whole mechanism: whoever validates a certificate is holding the printed
+    page with the full name on it, and matching the word lengths is what lets
+    them confirm it is the same person. A fixed number of asterisks would
+    confirm nothing.
+    """
+    if not name:
+        return ""
+
+    # NFC first, so an accented initial stays a single character instead of
+    # being split into letter + combining mark by the slice below
+    tokens = unicodedata.normalize("NFC", name).split()
+
+    masked = []
+    for token in tokens:
+        if token.lower() in NAME_PARTICLES or len(token) <= 1:
+            masked.append(token)
+        else:
+            masked.append(token[0] + ("*" * (len(token) - 1)))
+
+    return " ".join(masked)
