@@ -36,6 +36,7 @@ from services import (
     alert_protocol_service,
     alert_service,
     clinical_notes_service,
+    culture_service,
     exams_service,
     feature_service,
     intervention_service,
@@ -99,6 +100,8 @@ def _internal_get_prescription(
         user_context=user_context,
     )
 
+    culture_data = _get_cultures(patient=patient, user_context=user_context)
+
     last_dept = _get_last_dept(prescription=prescription, is_complete=is_complete)
 
     drug_list = _get_drug_list(
@@ -143,6 +146,7 @@ def _internal_get_prescription(
         drug_data=drug_data,
         interventions=interventions,
         exams_data=exam_data,
+        culture_data=culture_data,
         last_dept=last_dept,
         cn_data=cn_data,
         review_data=review_data,
@@ -615,6 +619,15 @@ def _get_exams(
 
 
 @timed()
+def _get_cultures(patient: Patient, user_context: User):
+    """Culture summary (antibiogram + prediction) of the patient, grouped by drug"""
+
+    return culture_service.get_culture_summary(
+        schema=user_context.schema, id_patient=patient.idPatient
+    )
+
+
+@timed()
 def _get_drug_list(
     prescription: Prescription, patient: Patient, config_data: dict, user_context: User
 ):
@@ -896,6 +909,7 @@ def _format(
     drug_data: dict,
     interventions,
     exams_data: dict,
+    culture_data: list,
     last_dept,
     cn_data: dict,
     review_data: dict,
@@ -991,6 +1005,8 @@ def _format(
         # exams
         "alertExams": exams_data["alerts"],
         "exams": exams_data["exams_card"],
+        # cultures
+        "cultures": culture_data,
         # clinical notes
         "clinicalNotes": cn_data["cn_count"],
         "clinicalNotesStats": cn_data["cn_stats"],
