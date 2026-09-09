@@ -927,3 +927,227 @@ def test_fasting():
     assert alert1[0].get("level", None) == "medium"
 
     assert stats.get("fasting", 0) == 1
+
+
+def _culture(
+    drug: str,
+    sctid: str,
+    id_substance_class: str = None,
+    result: str = "Resistente",
+    result_type: str = "R",
+    prediction: str = None,
+    microorganism: str = "Microorganismo Teste",
+):
+    """A drug of the culture summary (services/culture_service)"""
+
+    return {
+        "drug": drug,
+        "sctid": sctid,
+        "idSubstanceClass": id_substance_class,
+        "items": [
+            {
+                "key": f"SANGUE TOTAL#MICROORGANISMO TESTE#{drug}",
+                "microorganism": microorganism,
+                "material": "Sangue Total",
+                "result": result,
+                "resultType": result_type,
+                "prediction": prediction,
+                "predictionType": prediction,
+                "collectionDate": "2024-03-01T12:17:03",
+                "releaseDate": "2024-03-08T07:17:02",
+            }
+        ],
+    }
+
+
+def test_culture_resistant():
+    """Culture alerts: a resistant antibiogram for the prescribed substance"""
+
+    drugs = [
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=61,
+            dose=10,
+            frequency=1,
+            sctid="1111",
+            drug_class="K1B1",
+        )
+    ]
+
+    alerts = alert_service.find_alerts(
+        drug_list=drugs,
+        exams={"weight": 80},
+        dialisys=None,
+        pregnant=None,
+        lactating=None,
+        schedules_fasting=None,
+        cn_data=None,
+        protocols=None,
+        is_cpoe=False,
+        cultures=[_culture(drug="AMICACINA", sctid="1111", id_substance_class="K1B1")],
+    )
+
+    stats = alerts.get("stats")
+    alert1 = alerts.get("alerts").get("61", [])
+
+    assert len(alert1) == 1
+
+    assert alert1[0].get("type", None) == "cultureResistant"
+    assert alert1[0].get("level", None) == "high"
+    assert "Microorganismo Teste" in alert1[0].get("text", "")
+    assert "01/03/2024" in alert1[0].get("text", "")
+
+    assert stats.get("cultureResistant", 0) == 1
+    # the substance itself is the stronger statement, the class alert would
+    # only repeat it
+    assert stats.get("cultureResistantClass", 0) == 0
+
+
+def test_culture_resistant_class():
+    """Culture alerts: a resistant antibiogram for another drug of the class"""
+
+    drugs = [
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=61,
+            dose=10,
+            frequency=1,
+            sctid="2222",
+            drug_class="K1B1",
+        )
+    ]
+
+    alerts = alert_service.find_alerts(
+        drug_list=drugs,
+        exams={"weight": 80},
+        dialisys=None,
+        pregnant=None,
+        lactating=None,
+        schedules_fasting=None,
+        cn_data=None,
+        protocols=None,
+        is_cpoe=False,
+        cultures=[_culture(drug="AMICACINA", sctid="1111", id_substance_class="K1B1")],
+    )
+
+    stats = alerts.get("stats")
+    alert1 = alerts.get("alerts").get("61", [])
+
+    assert len(alert1) == 1
+
+    assert alert1[0].get("type", None) == "cultureResistantClass"
+    assert alert1[0].get("level", None) == "medium"
+    # the alert names the drug that was tested, the prescribed one was not
+    assert "AMICACINA" in alert1[0].get("text", "")
+
+    assert stats.get("cultureResistantClass", 0) == 1
+    assert stats.get("cultureResistant", 0) == 0
+
+
+def test_culture_susceptible_raises_no_alert():
+    """Culture alerts: a susceptible result is not an alert"""
+
+    drugs = [
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=61,
+            dose=10,
+            frequency=1,
+            sctid="1111",
+            drug_class="K1B1",
+        )
+    ]
+
+    alerts = alert_service.find_alerts(
+        drug_list=drugs,
+        exams={"weight": 80},
+        dialisys=None,
+        pregnant=None,
+        lactating=None,
+        schedules_fasting=None,
+        cn_data=None,
+        protocols=None,
+        is_cpoe=False,
+        cultures=[
+            _culture(
+                drug="AMICACINA",
+                sctid="1111",
+                id_substance_class="K1B1",
+                result="Sensível",
+                result_type="S",
+            )
+        ],
+    )
+
+    assert alerts.get("alerts").get("61", []) == []
+    assert alerts.get("stats").get("cultureResistant", 0) == 0
+
+
+def test_culture_prediction_raises_no_alert():
+    """Culture alerts: a predicted resistance is not a lab result.
+
+    While the collection is pending the culture is represented by a NoHarm
+    prediction, which the alert must not state as if it were the antibiogram.
+    """
+
+    drugs = [
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=61,
+            dose=10,
+            frequency=1,
+            sctid="1111",
+            drug_class="K1B1",
+        )
+    ]
+
+    alerts = alert_service.find_alerts(
+        drug_list=drugs,
+        exams={"weight": 80},
+        dialisys=None,
+        pregnant=None,
+        lactating=None,
+        schedules_fasting=None,
+        cn_data=None,
+        protocols=None,
+        is_cpoe=False,
+        cultures=[
+            _culture(
+                drug="AMICACINA",
+                sctid="1111",
+                id_substance_class="K1B1",
+                result=None,
+                result_type=None,
+                prediction="R",
+            )
+        ],
+    )
+
+    assert alerts.get("alerts").get("61", []) == []
+    assert alerts.get("stats").get("cultureResistant", 0) == 0
+
+
+def test_culture_without_cultures():
+    """Culture alerts: a patient with no culture raises no culture alert"""
+
+    drugs = [
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=61,
+            dose=10,
+            frequency=1,
+            sctid="1111",
+            drug_class="K1B1",
+        )
+    ]
+
+    alerts = alert_service.find_alerts(
+        drug_list=drugs,
+        exams={"weight": 80},
+        dialisys=None,
+        pregnant=None,
+        lactating=None,
+        schedules_fasting=None,
+        cn_data=None,
+        protocols=None,
+        is_cpoe=False,
+    )
+
+    assert alerts.get("alerts").get("61", []) == []
+    assert alerts.get("stats").get("cultureResistant", 0) == 0
+    assert alerts.get("stats").get("cultureResistantClass", 0) == 0

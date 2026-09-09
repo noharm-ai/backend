@@ -1,11 +1,17 @@
 """Service: module for drug alerts"""
 
 import re
+from datetime import datetime
 from typing import List, Union
 
 from models.appendix import Frequency
-from models.enums import DrugAlertLevelEnum, DrugAlertTypeEnum, DrugTypeEnum
-from models.main import Drug, DrugAttributes
+from models.enums import (
+    CultureResultTypeEnum,
+    DrugAlertLevelEnum,
+    DrugAlertTypeEnum,
+    DrugTypeEnum,
+)
+from models.main import Drug, DrugAttributes, Substance
 from models.prescription import PrescriptionDrug
 from utils import numberutils, prescriptionutils, stringutils
 
@@ -20,11 +26,15 @@ def find_alerts(
     cn_data: dict,
     protocols: Union[List[dict], None],
     is_cpoe: bool,
+    cultures: Union[List[dict], None] = None,
 ):
     """
     Find alerts for a list of drugs
-    :param drug_list: list of drugs"""
+    :param drug_list: list of drugs
+    :param cultures: culture summary of the patient, grouped by drug
+        (services/culture_service.get_culture_summary)"""
     filtered_list = _filter_drug_list(drug_list=drug_list)
+    resistant_cultures = _index_resistant_cultures(cultures=cultures)
     dose_total = _get_dose_total(drug_list=filtered_list, exams=exams)
     alerts = {}
     stats = _get_empty_stats()
@@ -56,6 +66,7 @@ def find_alerts(
         frequency = item[3]
         handling_types = item.substance_handling_types
         cpoe_period = item[12]
+        substance: Substance = item[11]
 
         if protocols:
             add_alert(
@@ -118,6 +129,27 @@ def find_alerts(
             _alert_allergy(prescription_drug=prescription_drug),
             handling_types=handling_types,
         )
+
+        # culture: resistant to this very substance
+        culture_alert = _alert_culture_resistant(
+            prescription_drug=prescription_drug,
+            substance=substance,
+            resistant_cultures=resistant_cultures,
+        )
+        add_alert(culture_alert, handling_types=handling_types)
+
+        # culture: resistant to another substance of the same class. Only worth
+        # saying when the substance itself was not tested as resistant, which
+        # is the stronger statement of the two
+        if culture_alert is None:
+            add_alert(
+                _alert_culture_resistant_class(
+                    prescription_drug=prescription_drug,
+                    substance=substance,
+                    resistant_cultures=resistant_cultures,
+                ),
+                handling_types=handling_types,
+            )
 
         # maximum treatment period
         add_alert(
@@ -577,6 +609,149 @@ def _alert_allergy(prescription_drug: PrescriptionDrug):
         return alert
 
     return None
+
+
+def _format_collection_date(date):
+    """The culture summary hands dates over as ISO strings (culture_service)"""
+
+    if not date:
+        return None
+
+    try:
+        return datetime.fromisoformat(date).strftime("%d/%m/%Y")
+    except ValueError:
+        return None
+
+
+def _sctid(value):
+    """Both sides of the comparison can carry the substance id as a string"""
+
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _index_resistant_cultures(cultures: Union[List[dict], None]):
+    """Index the resistant cultures of the patient by substance and by class.
+
+    Only a released antibiogram is indexed: while the lab result is pending the
+    culture is represented by a NoHarm prediction, and a prediction must not be
+    stated as if it were the result (same invariant the culture card follows).
+    """
+
+    by_substance = {}
+    by_class = {}
+
+    for drug in cultures or []:
+        sctid = _sctid(drug.get("sctid"))
+
+        if sctid is None:
+            # without the substance there is nothing to compare a prescribed
+            # item to
+            continue
+
+        resistant = [
+            item
+            for item in drug.get("items", [])
+            if item.get("result") is not None
+            and item.get("resultType") == CultureResultTypeEnum.RESISTANT.value
+        ]
+
+        if not resistant:
+            continue
+
+        microorganisms = []
+        for item in resistant:
+            name = item.get("microorganism")
+            if name and name not in microorganisms:
+                microorganisms.append(name)
+
+        entry = {
+            "drug": drug.get("drug"),
+            "microorganisms": microorganisms,
+            # items come sorted by collection date desc (culture_service), so
+            # the first one is the most recent resistant result
+            "collectionDate": resistant[0].get("collectionDate"),
+        }
+
+        by_substance.setdefault(sctid, []).append(entry)
+
+        if drug.get("idSubstanceClass") is not None:
+            by_class.setdefault(drug["idSubstanceClass"], []).append(entry)
+
+    return {"by_substance": by_substance, "by_class": by_class}
+
+
+def _culture_details(entry: dict):
+    """What the pharmacist needs to judge the result: which bug, collected when"""
+
+    details = []
+
+    if entry["microorganisms"]:
+        details.append(", ".join(entry["microorganisms"]))
+
+    collection_date = _format_collection_date(entry["collectionDate"])
+    if collection_date:
+        details.append(f"coleta em {collection_date}")
+
+    return ", ".join(details)
+
+
+def _alert_culture_resistant(
+    prescription_drug: PrescriptionDrug,
+    substance: Substance,
+    resistant_cultures: dict,
+):
+    if substance is None:
+        return None
+
+    entries = resistant_cultures["by_substance"].get(_sctid(substance.id))
+    if not entries:
+        return None
+
+    details = "; ".join(filter(None, [_culture_details(e) for e in entries]))
+
+    return _create_alert(
+        id_prescription_drug=str(prescription_drug.id),
+        key="",
+        alert_type=DrugAlertTypeEnum.CULTURE_RESISTANT,
+        alert_level=DrugAlertLevelEnum.HIGH,
+        text=(
+            f"Cultura com resultado resistente para este medicamento ({details})."
+            if details
+            else "Cultura com resultado resistente para este medicamento."
+        ),
+    )
+
+
+def _alert_culture_resistant_class(
+    prescription_drug: PrescriptionDrug,
+    substance: Substance,
+    resistant_cultures: dict,
+):
+    if substance is None or substance.idclass is None:
+        return None
+
+    entries = resistant_cultures["by_class"].get(substance.idclass)
+    if not entries:
+        return None
+
+    described = []
+    for entry in entries:
+        details = _culture_details(entry)
+        described.append(f"{entry['drug']} ({details})" if details else entry["drug"])
+
+    return _create_alert(
+        id_prescription_drug=str(prescription_drug.id),
+        key="",
+        alert_type=DrugAlertTypeEnum.CULTURE_RESISTANT_CLASS,
+        alert_level=DrugAlertLevelEnum.MEDIUM,
+        text=(
+            "Cultura com resultado resistente para medicamento da mesma classe: "
+            f"{'; '.join(described)}."
+        ),
+    )
 
 
 def _alert_tube(prescription_drug: PrescriptionDrug, drug_attributes: DrugAttributes):

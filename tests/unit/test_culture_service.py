@@ -27,6 +27,8 @@ def _item(**overrides):
         "datacoleta": "2024-03-01T12:17:03",
         "dataliberacao": "2024-03-08T07:17:02",
         "chave": "SANGUE TOTAL#MICROORGANISMO TESTE#OXACILINA",
+        "sctid": Decimal("1111"),
+        "idclasse": "K1B1",
     }
     item.update(overrides)
     return item
@@ -305,3 +307,52 @@ class TestGroupedResultType:
         result = culture_service._group_by_drug([_item(predict="R")])
 
         assert result[0]["items"][0]["predictionType"] == "R"
+
+
+class TestSubstanceLink:
+    """The substance is what lets a culture be compared to a prescribed item."""
+
+    def test_sctid_is_passed_through_as_int(self):
+        """A Decimal sctid would break json serialization."""
+        result = culture_service._group_by_drug([_item()])
+
+        assert result[0]["sctid"] == 1111
+        assert isinstance(result[0]["sctid"], int)
+
+    def test_string_sctid_is_converted(self):
+        """DynamoDB may store the id as a string, and it has to key an int."""
+        result = culture_service._group_by_drug([_item(sctid="1111")])
+
+        assert result[0]["sctid"] == 1111
+
+    @pytest.mark.parametrize("sctid", [None, "", "not-a-number"])
+    def test_unusable_sctid_becomes_none(self, sctid):
+        """A drug the pipeline could not map stays on the card, without alerts."""
+        result = culture_service._group_by_drug([_item(sctid=sctid)])
+
+        assert result[0]["sctid"] is None
+
+    def test_substance_class_is_passed_through(self):
+        """The class is what raises the "same class" alert."""
+        result = culture_service._group_by_drug([_item()])
+
+        assert result[0]["idSubstanceClass"] == "K1B1"
+
+    def test_missing_substance_class_becomes_none(self):
+        """A drug without a class only raises the alert of its own substance."""
+        result = culture_service._group_by_drug([_item(idclasse=None)])
+
+        assert result[0]["idSubstanceClass"] is None
+
+    def test_mapping_is_taken_from_the_row_that_has_one(self):
+        """Only some collections of a drug may carry the mapping."""
+        result = culture_service._group_by_drug(
+            [
+                _item(chave="a", sctid=None, idclasse=None),
+                _item(chave="b"),
+            ]
+        )
+
+        assert len(result) == 1
+        assert result[0]["sctid"] == 1111
+        assert result[0]["idSubstanceClass"] == "K1B1"

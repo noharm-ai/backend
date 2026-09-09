@@ -187,6 +187,8 @@ class DrugAlertTypeEnum(Enum):
     LACTATING = "lactating"
     FASTING = "fasting"
     PROTOCOL = "protocol"
+    CULTURE_RESISTANT = "cultureResistant"
+    CULTURE_RESISTANT_CLASS = "cultureResistantClass"
 
 
 class DrugAlertLevelEnum(Enum):

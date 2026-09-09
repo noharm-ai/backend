@@ -120,6 +120,7 @@ def _internal_get_prescription(
         cn_data=cn_data,
         user_context=user_context,
         segment=segment,
+        culture_data=culture_data,
     )
 
     drug_data = _get_drug_data(
@@ -652,6 +653,7 @@ def _get_alerts(
     cn_data: dict,
     user_context: User,
     segment: Segment,
+    culture_data: list,
 ):
     relations = alert_interaction_service.find_relations(
         drug_list=drug_list,
@@ -684,6 +686,7 @@ def _get_alerts(
         cn_data=cn_data,
         protocols=protocols.get("items", None) if protocols else None,
         is_cpoe=config_data["is_cpoe"],
+        cultures=culture_data,
     )
 
     return {"relations": relations, "alerts": alerts, "protocols": protocols}

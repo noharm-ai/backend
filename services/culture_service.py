@@ -120,6 +120,19 @@ def _to_int(value):
     return value
 
 
+def _to_sctid(value):
+    """The substance id keys the culture against the prescription, and DynamoDB
+    can hand it over as a number or as a string"""
+
+    if value is None or value == "":
+        return None
+
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def _clean_result(result):
     """A blank lab result means pending, same as a missing one"""
 
@@ -167,7 +180,19 @@ def _group_by_drug(items: list):
             continue
 
         if drug not in drugs:
-            drugs[drug] = {"drug": drug, "items": []}
+            drugs[drug] = {
+                "drug": drug,
+                # the substance the lab tested and its class, which is what
+                # lets a culture be compared to a prescribed item
+                # (services/alert_service)
+                "sctid": _to_sctid(item.get("sctid")),
+                "idSubstanceClass": item.get("idclasse"),
+                "items": [],
+            }
+        elif drugs[drug]["sctid"] is None:
+            # only some collections of a drug may carry the mapping
+            drugs[drug]["sctid"] = _to_sctid(item.get("sctid"))
+            drugs[drug]["idSubstanceClass"] = item.get("idclasse")
 
         drugs[drug]["items"].append(
             {
