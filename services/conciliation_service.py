@@ -60,6 +60,7 @@ def create_conciliation(admission_number: int, user_context: User):
     prescription.admissionNumber = ref.admissionNumber
     prescription.idPatient = ref.idPatient
     prescription.prescriber = user_context.name
+    prescription.bed = ref.bed
     prescription.concilia = "s"
     prescription.agg = None
     prescription.update = datetime.today()
