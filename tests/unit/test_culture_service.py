@@ -7,6 +7,9 @@ between a lab result and a model prediction is enforced.
 
 from decimal import Decimal
 
+import pytest
+
+from models.enums import CultureResultTypeEnum
 from services import culture_service
 
 
@@ -55,6 +58,65 @@ class TestGroupByDrug:
         )
 
         assert [i["key"] for i in result[0]["items"]] == ["new", "old"]
+
+    def test_released_result_comes_before_a_pending_collection(self):
+        """A drug with an antibiogram is never represented by a prediction.
+
+        The card reads the first item of the drug, so a newer collection that
+        is still pending must not push the released result out of it.
+        """
+        result = culture_service._group_by_drug(
+            [
+                _item(
+                    chave="pending",
+                    datacoleta="2024-03-10T12:17:03",
+                    resultado=None,
+                ),
+                _item(
+                    chave="released",
+                    datacoleta="2024-03-01T12:17:03",
+                    resultado="Resistente",
+                ),
+            ]
+        )
+
+        items = result[0]["items"]
+        assert [i["key"] for i in items] == ["released", "pending"]
+        assert items[0]["resultType"] == "R"
+
+    def test_collection_date_still_orders_items_of_the_same_kind(self):
+        """Results are ordered among themselves, and so are the pending ones."""
+        result = culture_service._group_by_drug(
+            [
+                _item(
+                    chave="old-result",
+                    datacoleta="2024-03-01T12:17:03",
+                    resultado="Sensível",
+                ),
+                _item(
+                    chave="new-pending",
+                    datacoleta="2024-03-12T12:17:03",
+                    resultado=None,
+                ),
+                _item(
+                    chave="new-result",
+                    datacoleta="2024-03-05T12:17:03",
+                    resultado="Resistente",
+                ),
+                _item(
+                    chave="old-pending",
+                    datacoleta="2024-03-02T12:17:03",
+                    resultado=None,
+                ),
+            ]
+        )
+
+        assert [i["key"] for i in result[0]["items"]] == [
+            "new-result",
+            "old-result",
+            "new-pending",
+            "old-pending",
+        ]
 
     def test_drugs_are_sorted_alphabetically(self):
         """Drugs come out in alphabetical order."""
@@ -119,3 +181,127 @@ class TestGroupByDrug:
     def test_empty_input(self):
         """A patient with no cultures returns an empty list."""
         assert culture_service._group_by_drug([]) == []
+
+
+class TestClassifyResult:
+    """Tests for culture_service.classify_result.
+
+    The wordings below are the ones the hospitals send today; adding a new one
+    to RESULT_TYPES must not require touching the screen that shows it.
+    """
+
+    @pytest.mark.parametrize(
+        "result",
+        [
+            "S",
+            "Sensível",
+            "Sensível,aumentando exposição",
+            "Sensível Dose-Dependente",
+            "intermediário",
+        ],
+    )
+    def test_susceptible_wordings(self, result):
+        """Every wording that means susceptible is classified as such."""
+        assert (
+            culture_service.classify_result(result) == CultureResultTypeEnum.SUSCEPTIBLE
+        )
+
+    @pytest.mark.parametrize(
+        "result",
+        [
+            "R",
+            "RESISTENTE",
+            "resistente",
+            "Resistente",
+        ],
+    )
+    def test_resistant_wordings(self, result):
+        """Every wording that means resistant is classified as such."""
+        assert (
+            culture_service.classify_result(result) == CultureResultTypeEnum.RESISTANT
+        )
+
+    @pytest.mark.parametrize(
+        "result, expected",
+        [
+            ("  resistente  ", CultureResultTypeEnum.RESISTANT),
+            ("SENSIVEL", CultureResultTypeEnum.SUSCEPTIBLE),
+            ("Sensível  Dose-Dependente", CultureResultTypeEnum.SUSCEPTIBLE),
+        ],
+    )
+    def test_accent_case_and_spacing_are_ignored(self, result, expected):
+        """The same wording written differently reaches the same type."""
+        assert culture_service.classify_result(result) == expected
+
+    @pytest.mark.parametrize(
+        "result, expected",
+        [
+            ("Resistente Induzível", CultureResultTypeEnum.RESISTANT),
+            ("Sensivel - vide observação", CultureResultTypeEnum.SUSCEPTIBLE),
+            ("Suscetível", CultureResultTypeEnum.SUSCEPTIBLE),
+        ],
+    )
+    def test_unenumerated_variants_fall_back_to_the_prefix(self, result, expected):
+        """A wording nobody listed is still readable when it starts the same."""
+        assert culture_service.classify_result(result) == expected
+
+    @pytest.mark.parametrize("result", [None, "Não realizado", "*"])
+    def test_unreadable_result_is_unknown(self, result):
+        """A result that means neither one nor the other is not guessed."""
+        assert culture_service.classify_result(result) == CultureResultTypeEnum.UNKNOWN
+
+
+class TestResultDetail:
+    """Tests for culture_service.result_detail."""
+
+    @pytest.mark.parametrize("result", ["S", "Sensível", "R", "RESISTENTE"])
+    def test_plain_wording_has_no_detail(self, result):
+        """The group header already says it, the card does not repeat it."""
+        result_type = culture_service.classify_result(result)
+
+        assert culture_service.result_detail(result, result_type) is None
+
+    @pytest.mark.parametrize(
+        "result",
+        ["intermediário", "Sensível Dose-Dependente", "Não realizado"],
+    )
+    def test_meaningful_wording_is_kept(self, result):
+        """A wording the type does not convey stays visible on the card."""
+        result_type = culture_service.classify_result(result)
+
+        assert culture_service.result_detail(result, result_type) == result
+
+
+class TestGroupedResultType:
+    """The classification reaches the payload the prescription carries."""
+
+    def test_result_is_classified(self):
+        """The card groups by resultType, never by the free text."""
+        result = culture_service._group_by_drug([_item(resultado="RESISTENTE")])
+
+        item = result[0]["items"][0]
+        assert item["resultType"] == "R"
+        assert item["resultDetail"] is None
+
+    def test_intermediate_result_is_susceptible_and_keeps_its_wording(self):
+        """ "intermediário" is susceptible, but the card still spells it out."""
+        result = culture_service._group_by_drug([_item(resultado="intermediário")])
+
+        item = result[0]["items"][0]
+        assert item["resultType"] == "S"
+        assert item["resultDetail"] == "intermediário"
+
+    def test_pending_culture_has_no_result_type(self):
+        """A pending culture is described by its prediction alone."""
+        result = culture_service._group_by_drug([_item()])
+
+        item = result[0]["items"][0]
+        assert item["resultType"] is None
+        assert item["resultDetail"] is None
+        assert item["predictionType"] == "S"
+
+    def test_prediction_shares_the_result_alphabet(self):
+        """The card groups predictions with the same rule it groups results."""
+        result = culture_service._group_by_drug([_item(predict="R")])
+
+        assert result[0]["items"][0]["predictionType"] == "R"

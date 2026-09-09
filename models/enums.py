@@ -396,6 +396,14 @@ class TpPepEnum(Enum):
     WARELINE = "WARELINE"
 
 
+class CultureResultTypeEnum(Enum):
+    """Enum: antibiogram result type (culture)"""
+
+    RESISTANT = "R"
+    SUSCEPTIBLE = "S"
+    UNKNOWN = "U"
+
+
 class PrescriptionClinicalNoteStatusEnum(Enum):
     PENDING = 0
     SENT = 1
