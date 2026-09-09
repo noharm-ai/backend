@@ -59,13 +59,18 @@ def restore_pep_setup():
     Both are seed-level records shared with every other test, so each test here
     puts them back exactly as it found them.
     """
-    original_config = (
-        session.query(SchemaConfig)
-        .filter(SchemaConfig.schemaName == SCHEMA)
-        .first()
-        .config
+    schema_config = (
+        session.query(SchemaConfig).filter(SchemaConfig.schemaName == SCHEMA).first()
     )
-    original_external = session.query(User).filter(User.id == DEMO_USER_ID).first().external
+    user = session.query(User).filter(User.id == DEMO_USER_ID).first()
+
+    # both are seeded by noharm-ai/database; say so plainly rather than failing
+    # on an attribute of None if the test database was loaded incompletely
+    assert schema_config is not None, f"missing seed data: schema_config '{SCHEMA}'"
+    assert user is not None, f"missing seed data: user {DEMO_USER_ID}"
+
+    original_config = schema_config.config
+    original_external = user.external
 
     # the setup a configured tenant has; individual tests narrow it down
     _set_schema_config({"pepLink": PEP_TEMPLATE})
