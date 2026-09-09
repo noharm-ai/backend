@@ -683,6 +683,28 @@ def _index_resistant_cultures(cultures: Union[List[dict], None]):
     return {"by_substance": by_substance, "by_class": by_class}
 
 
+def flag_prescribed_cultures(cultures: Union[List[dict], None], drug_list):
+    """Mark every culture whose substance is currently prescribed.
+
+    The culture card reads this flag and the culture alerts read the same
+    comparison, so both have to see the same drug list: a drug the alerts
+    ignore, suspended or not a drug at all, must not read as prescribed.
+    """
+
+    prescribed = set()
+    for item in _filter_drug_list(drug_list=drug_list):
+        substance: Substance = item[11]
+        sctid = _sctid(substance.id) if substance is not None else None
+
+        if sctid is not None:
+            prescribed.add(sctid)
+
+    for drug in cultures or []:
+        drug["prescribed"] = _sctid(drug.get("sctid")) in prescribed
+
+    return cultures
+
+
 def _culture_details(entry: dict):
     """What the pharmacist needs to judge the result: which bug, collected when"""
 

@@ -1151,3 +1151,72 @@ def test_culture_without_cultures():
     assert alerts.get("alerts").get("61", []) == []
     assert alerts.get("stats").get("cultureResistant", 0) == 0
     assert alerts.get("stats").get("cultureResistantClass", 0) == 0
+
+
+def test_flag_prescribed_cultures():
+    """The card marks the cultures of the drugs in use"""
+
+    drugs = [
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=61, dose=10, frequency=1, sctid="1111"
+        )
+    ]
+
+    cultures = [
+        _culture(drug="AMICACINA", sctid="1111"),
+        _culture(drug="OXACILINA", sctid="2222"),
+    ]
+
+    alert_service.flag_prescribed_cultures(cultures=cultures, drug_list=drugs)
+
+    assert cultures[0]["prescribed"] is True
+    assert cultures[1]["prescribed"] is False
+
+
+def test_flag_prescribed_cultures_ignores_suspended_drugs():
+    """The flag and the alert read the same drug list.
+
+    A suspended item raises no culture alert, so the card must not present it
+    as in use either.
+    """
+
+    drug = utils_test_prescription.get_prescription_drug_mock_row(
+        id_prescription_drug=61, dose=10, frequency=1, sctid="1111"
+    )
+    drug.prescription_drug.suspendedDate = datetime.now()
+
+    cultures = [_culture(drug="AMICACINA", sctid="1111")]
+
+    alerts = alert_service.find_alerts(
+        drug_list=[drug],
+        exams={"weight": 80},
+        dialisys=None,
+        pregnant=None,
+        lactating=None,
+        schedules_fasting=None,
+        cn_data=None,
+        protocols=None,
+        is_cpoe=False,
+        cultures=cultures,
+    )
+
+    alert_service.flag_prescribed_cultures(cultures=cultures, drug_list=[drug])
+
+    assert alerts.get("stats").get("cultureResistant", 0) == 0
+    assert cultures[0]["prescribed"] is False
+
+
+def test_flag_prescribed_cultures_without_sctid():
+    """A culture the pipeline could not map is never in use"""
+
+    drugs = [
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=61, dose=10, frequency=1, sctid="1111"
+        )
+    ]
+
+    cultures = [_culture(drug="AMICACINA", sctid=None)]
+
+    alert_service.flag_prescribed_cultures(cultures=cultures, drug_list=drugs)
+
+    assert cultures[0]["prescribed"] is False

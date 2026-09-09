@@ -111,6 +111,12 @@ def _internal_get_prescription(
         user_context=user_context,
     )
 
+    # the card marks the cultures of the drugs in use, by the same comparison
+    # that raises the culture alerts
+    culture_data = alert_service.flag_prescribed_cultures(
+        cultures=culture_data, drug_list=drug_list
+    )
+
     alerts_data = _get_alerts(
         prescription=prescription,
         drug_list=drug_list,
