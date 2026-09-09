@@ -545,6 +545,28 @@ class AlertProtocol:
 
             return self._trace_compare(op=operator, value1=patient_tags, value2=value)
 
+        if field == "admissionNumber":
+            if not self.patient or self.patient.admissionNumber is None:
+                return self._trace_miss(TraceReasonEnum.NO_PATIENT)
+
+            if operator not in ["IN", "NOTIN"]:
+                return self._trace_miss(
+                    TraceReasonEnum.OPERATOR_NOT_SUPPORTED, operator=operator
+                )
+
+            # the list is typed by the user, so compare as trimmed strings to be
+            # tolerant to ints vs strings and stray whitespace
+            admission_number = [str(self.patient.admissionNumber).strip()]
+            value = [
+                str(v).strip()
+                for v in (value or [])
+                if v is not None and str(v).strip() != ""
+            ]
+
+            return self._trace_compare(
+                op=operator, value1=admission_number, value2=value
+            )
+
         if field == "dischargeReason":
             return self._trace_compare(
                 op="CONTAINS", value1=self.patient.dischargeReason, value2=value

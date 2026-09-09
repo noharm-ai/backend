@@ -314,6 +314,7 @@ class ProtocolVariableFieldEnum(Enum):
     SEGMENT_TYPE = "segmentType"
     INSURANCE = "insurance"
     TAGS = "tags"
+    ADMISSION_NUMBER = "admissionNumber"
 
 
 class SchemaConfigAuditTypeEnum(Enum):
