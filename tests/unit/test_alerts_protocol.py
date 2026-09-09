@@ -1341,6 +1341,92 @@ def test_tags_variable_trace():
     assert variable.details["matched"] == ["PALIATIVO"]
 
 
+def _admission_number_protocol(operator: str, value: list) -> dict:
+    """Protocol with a single admission number variable"""
+
+    return {
+        "variables": [
+            {
+                "name": "v1",
+                "field": "admissionNumber",
+                "operator": operator,
+                "value": value,
+            }
+        ],
+        "trigger": "{{v1}}",
+        "result": {"message": "result"},
+    }
+
+
+@pytest.mark.parametrize(
+    "admission_number, value, operator, has_result",
+    [
+        # exact match, typed as string or number
+        (123456, ["123456"], "IN", True),
+        (123456, [123456], "IN", True),
+        (123456, ["123456"], "NOTIN", False),
+        # stray whitespace typed by the user is ignored
+        (123456, [" 123456 "], "IN", True),
+        # not in the list
+        (123456, ["654321", "111"], "IN", False),
+        (123456, ["654321", "111"], "NOTIN", True),
+        # empty list never matches IN and always matches NOTIN
+        (123456, [], "IN", False),
+        (123456, [], "NOTIN", True),
+        (123456, None, "IN", False),
+        # patient without admission number never activates the protocol
+        (None, ["123456"], "IN", False),
+        (None, ["123456"], "NOTIN", False),
+    ],
+)
+def test_admission_number_variable(admission_number, value, operator, has_result):
+    """Protocols: admission number variable tested against Patient.admissionNumber"""
+
+    patient = Patient()
+    patient.admissionNumber = admission_number
+
+    alert_protocol = _tags_alert_protocol(patient=patient)
+    results = alert_protocol.get_protocol_alerts(
+        protocol=_admission_number_protocol(operator=operator, value=value)
+    )
+
+    assert (results is not None) == has_result
+
+
+def test_admission_number_variable_unsupported_operator():
+    """Protocols: admission number variable only accepts list operators"""
+
+    patient = Patient()
+    patient.admissionNumber = 123456
+
+    alert_protocol = _tags_alert_protocol(patient=patient)
+    trace = alert_protocol.evaluate_with_trace(
+        protocol=_admission_number_protocol(operator="=", value=["123456"])
+    )
+
+    assert trace["activated"] is False
+    assert trace["variables"][0].reason == "OPERATOR_NOT_SUPPORTED"
+
+
+def test_admission_number_variable_trace():
+    """Protocols: admission number variable trace reports the matched number"""
+
+    patient = Patient()
+    patient.admissionNumber = 123456
+
+    alert_protocol = _tags_alert_protocol(patient=patient)
+    trace = alert_protocol.evaluate_with_trace(
+        protocol=_admission_number_protocol(operator="IN", value=["999", "123456"])
+    )
+
+    assert trace["activated"] is True
+    variable = trace["variables"][0]
+    assert variable.result is True
+    assert variable.reason == "COMPARED"
+    assert variable.actual_value == ["123456"]
+    assert variable.details["matched"] == ["123456"]
+
+
 @pytest.mark.parametrize(
     "protocol, related_items",
     [
