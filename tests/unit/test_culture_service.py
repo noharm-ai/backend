@@ -20,6 +20,7 @@ def _item(**overrides):
         "resultado": None,
         "predict": "S",
         "predict_proba": Decimal("0.7"),
+        "fkitemexame": Decimal("172435010004"),
         "datacoleta": "2024-03-01T12:17:03",
         "dataliberacao": "2024-03-08T07:17:02",
         "chave": "SANGUE TOTAL#MICROORGANISMO TESTE#OXACILINA",
@@ -72,6 +73,13 @@ class TestGroupByDrug:
 
         assert result[0]["items"][0]["probability"] == 0.7
         assert isinstance(result[0]["items"][0]["probability"], float)
+
+    def test_decimal_exam_item_becomes_int(self):
+        """The culture identifier is a Decimal too, and is what the card counts."""
+        result = culture_service._group_by_drug([_item()])
+
+        assert result[0]["items"][0]["idExamItem"] == 172435010004
+        assert isinstance(result[0]["items"][0]["idExamItem"], int)
 
     def test_lab_result_suppresses_the_prediction(self):
         """A released result is never presented alongside a prediction."""

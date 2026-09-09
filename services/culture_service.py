@@ -37,6 +37,15 @@ def _to_float(value):
     return value
 
 
+def _to_int(value):
+    """DynamoDB numbers are deserialized as Decimal, which flask cannot serialize"""
+
+    if isinstance(value, Decimal):
+        return int(value)
+
+    return value
+
+
 def _clean_result(result):
     """A blank lab result means pending, same as a missing one"""
 
@@ -88,6 +97,9 @@ def _group_by_drug(items: list):
         drugs[drug]["items"].append(
             {
                 "key": item.get("chave"),
+                # identifies the culture itself: every drug tested against the
+                # same specimen shares it
+                "idExamItem": _to_int(item.get("fkitemexame")),
                 "microorganism": item.get("microorganismo"),
                 "material": item.get("nomematerial"),
                 "result": result,
