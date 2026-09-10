@@ -581,7 +581,7 @@ def test_multiple_names_are_requested_in_configured_chunks(
     with patch.object(
         name_service.DynamoDBNameService, "get_multiple_names"
     ) as get_multiple:
-        get_multiple.side_effect = lambda ids: [
+        get_multiple.side_effect = lambda ids, deadline=None: [
             {"status": "success", "idPatient": i, "name": f"Paciente {i}"} for i in ids
         ]
 
@@ -604,7 +604,7 @@ def test_multiple_names_use_a_default_chunk_size(
     with patch.object(
         name_service.DynamoDBNameService, "get_multiple_names"
     ) as get_multiple:
-        get_multiple.side_effect = lambda ids: [
+        get_multiple.side_effect = lambda ids, deadline=None: [
             {"status": "success", "idPatient": i, "name": f"Paciente {i}"} for i in ids
         ]
 
@@ -679,6 +679,165 @@ def test_multiple_names_fills_placeholders_for_unknown_patients(
             "data": None,
         },
     ]
+
+
+# --------------------------------------------------------------------------
+# batch lookup — time budget (the endpoint must answer under the Lambda limit)
+# --------------------------------------------------------------------------
+
+
+def _dynamo_names(ids, deadline=None):
+    """Strategy stub: every requested id resolves."""
+    return [{"status": "success", "idPatient": i, "name": f"Paciente {i}"} for i in ids]
+
+
+def test_multiple_names_stop_issuing_chunks_once_the_deadline_is_reached(
+    client, analyst_headers, getname_config
+):
+    """Chunks not attempted before the deadline are omitted, not turned into
+    placeholders (a placeholder means "not found")."""
+    getname_config(
+        {
+            "token": {"url": "dy:zztest-names", "params": {}},
+            "params": {},
+            "chunk_size": 2,
+        }
+    )
+
+    # monotonic() is read once to set the deadline and once before each chunk:
+    # t=0 deadline, t=1 first chunk goes ahead, t=30 second chunk is skipped.
+    with (
+        patch.object(
+            name_service.DynamoDBNameService, "get_multiple_names"
+        ) as get_multiple,
+        patch("services.name_service.time") as mock_time,
+    ):
+        get_multiple.side_effect = _dynamo_names
+        mock_time.monotonic.side_effect = [0, 1, 30]
+
+        response = client.post(
+            "/names", headers=analyst_headers, json={"patients": [1, 2, 3, 4, 5]}
+        )
+
+    assert response.status_code == 200
+    assert [c.args[0] for c in get_multiple.call_args_list] == [[1, 2]]
+    assert [p["idPatient"] for p in response.get_json()] == [1, 2]
+
+
+def test_multiple_names_pass_the_deadline_to_the_strategy(
+    client, analyst_headers, getname_config
+):
+    """Each chunk receives the request deadline so upstream timeouts can shrink."""
+    getname_config({"token": {"url": "dy:zztest-names", "params": {}}, "params": {}})
+
+    with patch.object(
+        name_service.DynamoDBNameService, "get_multiple_names"
+    ) as get_multiple:
+        get_multiple.side_effect = _dynamo_names
+
+        response = client.post(
+            "/names", headers=analyst_headers, json={"patients": [1, 2]}
+        )
+
+    assert response.status_code == 200
+    deadline = get_multiple.call_args.kwargs["deadline"]
+    assert isinstance(deadline, float)
+
+
+def test_external_multiple_names_fetch_the_oauth_token_once(
+    client, analyst_headers, getname_config
+):
+    """The OAuth token is requested once per request, not once per chunk."""
+    getname_config(
+        {
+            "url": "https://ext.example/getname",
+            "token": {
+                "url": "https://ext.example/oauth",
+                "params": {"client_id": "zztest"},
+            },
+            "params": {"tenant": "demo"},
+            "authPrefix": "Bearer ",
+            "chunk_size": 1,
+        }
+    )
+
+    with patch("services.name_service.requests") as mock_requests:
+        mock_requests.post.return_value = _ok_response({"access_token": "zztest-token"})
+        mock_requests.get.side_effect = lambda url, **kwargs: _ok_response(
+            {
+                "data": [
+                    {
+                        "idPatient": int(kwargs["params"]["cd_paciente"]),
+                        "name": "Ana Maria",
+                    }
+                ]
+            }
+        )
+
+        response = client.post(
+            "/names", headers=analyst_headers, json={"patients": [1, 2, 3]}
+        )
+
+    assert response.status_code == 200
+    assert [p["idPatient"] for p in response.get_json()] == [1, 2, 3]
+    assert mock_requests.post.call_count == 1
+    assert mock_requests.get.call_count == 3
+    for call in mock_requests.get.call_args_list:
+        assert call.kwargs["headers"] == {"Authorization": "Bearer zztest-token"}
+
+
+def test_external_multiple_names_shrink_upstream_timeouts_to_the_remaining_budget(
+    client, analyst_headers, getname_config
+):
+    """Upstream calls never get more time than is left before the deadline."""
+    getname_config(
+        {
+            "url": "https://ext.example/getname",
+            "token": {
+                "url": "https://ext.example/oauth",
+                "params": {"client_id": "zztest"},
+            },
+            "params": {"tenant": "demo"},
+        }
+    )
+
+    # t=0 deadline (22s budget), t=1 chunk check, t=10 token call (12s left),
+    # t=17 data call (5s left).
+    with (
+        patch("services.name_service.requests") as mock_requests,
+        patch("services.name_service.time") as mock_time,
+    ):
+        mock_time.monotonic.side_effect = [0, 1, 10, 17]
+        mock_requests.post.return_value = _ok_response({"access_token": "zztest-token"})
+        mock_requests.get.return_value = _ok_response({"data": []})
+
+        response = client.post(
+            "/names", headers=analyst_headers, json={"patients": [1, 2]}
+        )
+
+    assert response.status_code == 200
+    assert mock_requests.post.call_args.kwargs["timeout"] == 12
+    assert mock_requests.get.call_args.kwargs["timeout"] == 5
+
+
+def test_multiple_names_reject_lists_over_the_cap(
+    client, analyst_headers, getname_config
+):
+    """An oversized id list is refused up front, before any upstream call."""
+    getname_config({"token": {"url": "dy:zztest-names", "params": {}}, "params": {}})
+
+    with patch.object(
+        name_service.DynamoDBNameService, "get_multiple_names"
+    ) as get_multiple:
+        response = client.post(
+            "/names",
+            headers=analyst_headers,
+            json={"patients": list(range(name_service.MAX_MULTIPLE_IDS + 1))},
+        )
+
+    assert response.status_code == 400
+    assert response.get_json()["status"] == "error"
+    get_multiple.assert_not_called()
 
 
 # --------------------------------------------------------------------------
