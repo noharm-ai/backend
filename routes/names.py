@@ -48,6 +48,12 @@ def proxy_multiple():
     data = request.get_json()
     ids_list = data.get("patients", [])
 
+    if len(ids_list) > name_service.MAX_MULTIPLE_IDS:
+        return {
+            "status": "error",
+            "message": "Lista de pacientes excede o limite",
+        }, status.HTTP_400_BAD_REQUEST
+
     try:
         names = name_service.get_multiple_patient_names(ids_list=ids_list, user=user)
         return names, status.HTTP_200_OK

@@ -1,5 +1,6 @@
 """Service: name related operations with Strategy pattern for different service types"""
 
+import time
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta, timezone
 from urllib.parse import quote as _url_quote
@@ -18,6 +19,15 @@ from security.permission import Permission
 from utils import aws, logger, status
 
 TIMEOUT = 15
+# Total budget for one multiple-names request. API Gateway cuts the Lambda off at
+# ~29s, so the loop stops issuing upstream calls well before that and the caller
+# gets whatever was resolved in time instead of a gateway timeout.
+DEADLINE_SECONDS = 22
+# Smallest timeout ever handed to `requests`; also the floor below which a new
+# chunk is not attempted.
+MIN_UPSTREAM_TIMEOUT = 1
+# Defensive cap on the ids list accepted by POST /names.
+MAX_MULTIPLE_IDS = 5000
 MAX_SEARCH_RESULTS = 150
 EXTRA_DATA_ALLOWED_KEYS = {"fone"}
 
@@ -35,8 +45,12 @@ class NameServiceStrategy(ABC):
         pass
 
     @abstractmethod
-    def get_multiple_names(self, ids_list: list) -> list:
-        """Get multiple patient names"""
+    def get_multiple_names(self, ids_list: list, deadline: float | None = None) -> list:
+        """Get multiple patient names.
+
+        ``deadline`` is a ``time.monotonic()`` timestamp; upstream calls must not
+        use a timeout longer than what is left until it (see ``_timeout_until``).
+        """
         pass
 
     @abstractmethod
@@ -53,6 +67,18 @@ class NameServiceStrategy(ABC):
             if Config.ENV == NoHarmENV.DEVELOPMENT.value and url_dev
             else url_prod
         )
+
+    @staticmethod
+    def _timeout_until(deadline: float | None) -> float:
+        """Timeout for the next upstream call: TIMEOUT capped by the time left.
+
+        ``requests`` applies the timeout per connect/read, not to the whole
+        exchange, so a server trickling bytes can still overrun it; that is
+        accepted and unchanged from before.
+        """
+        if deadline is None:
+            return TIMEOUT
+        return max(MIN_UPSTREAM_TIMEOUT, min(TIMEOUT, deadline - time.monotonic()))
 
     @staticmethod
     def _escape_str(value) -> str:
@@ -114,8 +140,12 @@ class DynamoDBNameService(NameServiceStrategy):
             )
             return self._create_error_response(id_patient)
 
-    def get_multiple_names(self, ids_list: list) -> list:
-        """Get multiple names from DynamoDB using batch_get_item (max 100 keys per request)."""
+    def get_multiple_names(self, ids_list: list, deadline: float | None = None) -> list:
+        """Get multiple names from DynamoDB using batch_get_item (max 100 keys per request).
+
+        ``deadline`` is accepted for interface parity but not applied: the boto3
+        client is shared (``aws.get_resource`` is cached) and batch reads are fast.
+        """
         if not ids_list:
             return []
 
@@ -278,7 +308,7 @@ class NHInternalNameService(NameServiceStrategy):
 
         return self._create_error_response(id_patient)
 
-    def get_multiple_names(self, ids_list: list) -> list:
+    def get_multiple_names(self, ids_list: list, deadline: float | None = None) -> list:
         url = self._get_url()
         url += "patient-name/multiple"
         token = self._get_token()
@@ -299,7 +329,7 @@ class NHInternalNameService(NameServiceStrategy):
                 },
                 json=params,
                 verify=False,
-                timeout=TIMEOUT,
+                timeout=self._timeout_until(deadline),
             )
 
             if response.status_code == status.HTTP_200_OK:
@@ -374,13 +404,27 @@ class NHInternalNameService(NameServiceStrategy):
 class ExternalNameService(NameServiceStrategy):
     """External name service (with OAuth token)"""
 
-    def _get_token(self) -> str:
-        """Get OAuth token from external service"""
+    _token: str | None = None
+
+    def _get_token(self, deadline: float | None = None) -> str:
+        """Get OAuth token from external service.
+
+        The token is memoised on the instance so a multiple-names request that
+        spans several chunks pays for one token round-trip, not one per chunk.
+        A new instance is created per HTTP request, so it is never reused past
+        its short lifetime.
+        """
+        if self._token:
+            return self._token
+
         token_url = self.config["getname"]["token"]["url"]
         params = self.config["getname"]["token"]["params"]
 
         response = requests.post(
-            url=token_url, data=params, verify=False, timeout=TIMEOUT
+            url=token_url,
+            data=params,
+            verify=False,
+            timeout=self._timeout_until(deadline),
         )
 
         if response.status_code != status.HTTP_200_OK:
@@ -391,7 +435,8 @@ class ExternalNameService(NameServiceStrategy):
             )
 
         token_data = response.json()
-        return token_data["access_token"]
+        self._token = token_data["access_token"]
+        return self._token
 
     def get_single_name(self, id_patient: int) -> dict:
         url = self._get_url()
@@ -430,10 +475,10 @@ class ExternalNameService(NameServiceStrategy):
 
         return self._create_error_response(id_patient)
 
-    def get_multiple_names(self, ids_list: list) -> list:
+    def get_multiple_names(self, ids_list: list, deadline: float | None = None) -> list:
         url = self._get_url()
         auth_prefix = self.config["getname"].get("authPrefix", "")
-        token = self._get_token()
+        token = self._get_token(deadline=deadline)
         params = dict(
             self.config["getname"]["params"],
             **{"cd_paciente": " ".join(str(id) for id in ids_list)},
@@ -448,7 +493,7 @@ class ExternalNameService(NameServiceStrategy):
                 headers={"Authorization": f"{auth_prefix}{token}"},
                 params=params,
                 verify=False,
-                timeout=TIMEOUT,
+                timeout=self._timeout_until(deadline),
             )
 
             if response.status_code == status.HTTP_200_OK:
@@ -526,7 +571,7 @@ class GetNameProxyService(ExternalNameService):
 
         return self._create_error_response(id_patient)
 
-    def get_multiple_names(self, ids_list: list) -> list:
+    def get_multiple_names(self, ids_list: list, deadline: float | None = None) -> list:
         url = self._get_url()
         params = dict(
             self.config["getname"]["params"],
@@ -542,7 +587,7 @@ class GetNameProxyService(ExternalNameService):
                 headers={"X-API-Key": api_key},
                 params=params,
                 verify=False,
-                timeout=TIMEOUT,
+                timeout=self._timeout_until(deadline),
             )
 
             if response.status_code == status.HTTP_200_OK:
@@ -633,13 +678,27 @@ def get_multiple_patient_names(ids_list: list, user: User) -> list:
     service = NameServiceFactory.create_service(config, user.schema)
 
     chunk_size = config["getname"].get("chunk_size", 200)
+    deadline = time.monotonic() + DEADLINE_SECONDS
 
-    # Process in chunks
-    chunks = [ids_list[i : i + chunk_size] for i in range(0, len(ids_list), chunk_size)]
+    # Process in chunks, sequentially, until the time budget is spent. Ids whose
+    # chunk was never attempted are omitted from the result (a placeholder would
+    # mean "not found"); the frontend shows a reload control for them.
     names = []
+    processed = 0
 
-    for chunk in chunks:
-        names += service.get_multiple_names(chunk)
+    for i in range(0, len(ids_list), chunk_size):
+        if deadline - time.monotonic() <= MIN_UPSTREAM_TIMEOUT:
+            break
+
+        chunk = ids_list[i : i + chunk_size]
+        names += service.get_multiple_names(chunk, deadline=deadline)
+        processed += len(chunk)
+
+    if processed < len(ids_list):
+        logger.backend_logger.warning(
+            f"names deadline reached for schema {user.schema}: "
+            f"{len(ids_list) - processed} of {len(ids_list)} ids not processed"
+        )
 
     return names
 
