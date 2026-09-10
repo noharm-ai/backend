@@ -47,17 +47,20 @@ MISSING_PRESCRIPTION = 999999999
 CHECKED = "s"
 OPEN = "0"
 
+# demo.prescricao.tp_revisao, as set by /prescriptions/review
+REVIEWED = 1
 
-def _create_prescription(prescription_status: str) -> int:
+
+def _create_prescription(prescription_status: str, review_type: int = None) -> int:
     """Write a prescription in a known status and return its id.
 
     Written rather than taken from the seed dump: the poll asserts on the status,
     and the seed statuses are mutated by other modules. The id comes from the
     shared >= 100000 counter, so tests.conftest cleans it up.
 
-    The status is set with an UPDATE because the BEFORE INSERT trigger on
-    demo.prescricao rewrites the row through public.upsert_prescricao, which
-    normalises a new prescription back to "not checked".
+    Status and review type are set with an UPDATE because the BEFORE INSERT
+    trigger on demo.prescricao rewrites the row through public.upsert_prescricao,
+    which normalises a new prescription back to "not checked".
     """
     id_prescription = utils_test_prescription.test_counters["id_prescription"]
     utils_test_prescription.test_counters["id_prescription"] += 1
@@ -69,8 +72,15 @@ def _create_prescription(prescription_status: str) -> int:
     )
 
     session.execute(
-        text("UPDATE demo.prescricao SET status = :status WHERE fkprescricao = :id"),
-        {"status": prescription_status, "id": id_prescription},
+        text(
+            "UPDATE demo.prescricao SET status = :status, tp_revisao = :review_type"
+            " WHERE fkprescricao = :id"
+        ),
+        {
+            "status": prescription_status,
+            "review_type": review_type,
+            "id": id_prescription,
+        },
     )
     session_commit()
 
@@ -87,6 +97,12 @@ def open_prescription() -> int:
 def checked_prescription() -> int:
     """A prescription a pharmacist has already checked."""
     return _create_prescription(CHECKED)
+
+
+@pytest.fixture
+def reviewed_prescription() -> int:
+    """A prescription a pharmacist has already marked as reviewed."""
+    return _create_prescription(OPEN, review_type=REVIEWED)
 
 
 @pytest.fixture(autouse=True)
@@ -279,6 +295,25 @@ def test_status_list_returns_the_status_of_each_prescription(
     }
 
 
+def test_status_list_returns_the_review_type_of_each_prescription(
+    client, analyst_headers, open_prescription, reviewed_prescription
+):
+    """A review made elsewhere reaches the list through the same poll, so the
+    row carries the review type alongside the status. Never reviewed is null,
+    not a missing key: the frontend merges the whole row into the list item."""
+    response = _status(
+        client, analyst_headers, [open_prescription, reviewed_prescription]
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+
+    by_id = {r["idPrescription"]: r["reviewType"] for r in _data(response)}
+    assert by_id == {
+        str(open_prescription): None,
+        str(reviewed_prescription): REVIEWED,
+    }
+
+
 def test_status_list_stays_silent_about_prescriptions_that_do_not_exist(
     client, analyst_headers, open_prescription
 ):
@@ -322,7 +357,11 @@ def test_status_list_accepts_ids_sent_as_strings(
     response = _status(client, analyst_headers, [str(open_prescription)])
 
     assert _data(response) == [
-        {"idPrescription": str(open_prescription), "status": OPEN}
+        {
+            "idPrescription": str(open_prescription),
+            "status": OPEN,
+            "reviewType": None,
+        }
     ]
 
 

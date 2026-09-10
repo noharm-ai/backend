@@ -223,12 +223,19 @@ def get_prescriptions_status(id_prescription_list: list):
         return []
 
     results = (
-        db.session.query(Prescription.id, Prescription.status)
+        db.session.query(Prescription.id, Prescription.status, Prescription.reviewType)
         .filter(Prescription.id.in_(id_prescription_list))
         .all()
     )
 
-    return [{"idPrescription": str(r.id), "status": r.status} for r in results]
+    return [
+        {
+            "idPrescription": str(r.id),
+            "status": r.status,
+            "reviewType": r.reviewType,
+        }
+        for r in results
+    ]
 
 
 def is_being_evaluated(features):
