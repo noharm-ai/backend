@@ -58,6 +58,7 @@ Tokens are obtained from `POST /authenticate`. Endpoints marked **[admin]** addi
 |---|---|---|
 | `GET` | `/prescriptions` | List and prioritize prescriptions. See query params below. |
 | `GET` | `/prescriptions/<idPrescription>` | Get a single prescription with all drugs and alerts. |
+| `GET` | `/prescriptions/<idPrescription>/cultures` | Get the patient's recent cultures flagged against the prescription drugs (the culture card). |
 | `PUT` | `/prescriptions/<idPrescription>` | Update prescription fields. |
 | `POST` | `/prescriptions/status` | Set prescription checked/unchecked status. |
 | `POST` | `/prescriptions/review` | Mark prescription as reviewed. |

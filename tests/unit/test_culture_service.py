@@ -356,3 +356,112 @@ class TestSubstanceLink:
         assert len(result) == 1
         assert result[0]["sctid"] == 1111
         assert result[0]["idSubstanceClass"] == "K1B1"
+
+
+def _drug(prescribed=True, result="Resistente", result_type="R", items=None):
+    """A drug of the flagged summary (alert_service.flag_prescribed_cultures)"""
+
+    if items is None:
+        items = [
+            {
+                "key": "SANGUE TOTAL#MICROORGANISMO TESTE#OXACILINA",
+                "idExamItem": 172435010004,
+                "result": result,
+                "resultType": result_type,
+                "prediction": None,
+                "predictionType": None,
+            }
+        ]
+
+    return {
+        "drug": "OXACILINA",
+        "sctid": 1111,
+        "idSubstanceClass": "K1B1",
+        "prescribed": prescribed,
+        "items": items,
+    }
+
+
+class TestCultureStats:
+    """Tests for culture_service.get_culture_stats: the summary the prescription
+    view carries instead of the cultures themselves."""
+
+    def test_counts_resistant_drugs_in_use(self):
+        cultures = [
+            _drug(prescribed=True),
+            _drug(prescribed=True),
+            _drug(prescribed=False),
+        ]
+
+        assert culture_service.get_culture_stats(cultures) == {"resistantInUse": 2}
+
+    def test_susceptible_drug_in_use_does_not_count(self):
+        cultures = [_drug(prescribed=True, result="Sensível", result_type="S")]
+
+        assert culture_service.get_culture_stats(cultures) == {"resistantInUse": 0}
+
+    def test_predicted_resistance_does_not_count(self):
+        """The collection is pending: a prediction must not be stated as the
+        lab result, so it never flags the tab."""
+        items = [
+            {
+                "key": "a",
+                "result": None,
+                "resultType": None,
+                "prediction": "R",
+                "predictionType": "R",
+            }
+        ]
+
+        assert culture_service.get_culture_stats([_drug(items=items)]) == {
+            "resistantInUse": 0
+        }
+
+    def test_drug_is_read_by_its_first_item(self):
+        """A released resistance comes first, ahead of a pending prediction of
+        a newer collection (_group_by_drug)."""
+        items = [
+            {"key": "a", "result": "Resistente", "resultType": "R"},
+            {"key": "b", "result": None, "resultType": None, "prediction": "S"},
+        ]
+
+        assert culture_service.get_culture_stats([_drug(items=items)]) == {
+            "resistantInUse": 1
+        }
+
+    @pytest.mark.parametrize("cultures", [None, []])
+    def test_no_cultures(self, cultures):
+        assert culture_service.get_culture_stats(cultures) == {"resistantInUse": 0}
+
+
+class TestToCard:
+    """Tests for culture_service.to_card: the shape served to the culture card."""
+
+    def test_hides_the_substance_mapping_and_exam_item(self):
+        card = culture_service.to_card([_drug()])
+
+        assert len(card) == 1
+        assert "sctid" not in card[0]
+        assert "idSubstanceClass" not in card[0]
+        assert "idExamItem" not in card[0]["items"][0]
+
+    def test_keeps_what_the_card_reads(self):
+        card = culture_service.to_card([_drug()])
+
+        assert card[0]["drug"] == "OXACILINA"
+        assert card[0]["prescribed"] is True
+        assert card[0]["items"][0]["result"] == "Resistente"
+        assert card[0]["items"][0]["resultType"] == "R"
+
+    def test_does_not_mutate_the_summary(self):
+        """The alerts still read the mapping from the same list"""
+        cultures = [_drug()]
+
+        culture_service.to_card(cultures)
+
+        assert cultures[0]["sctid"] == 1111
+        assert cultures[0]["items"][0]["idExamItem"] == 172435010004
+
+    @pytest.mark.parametrize("cultures", [None, []])
+    def test_no_cultures(self, cultures):
+        assert culture_service.to_card(cultures) == []

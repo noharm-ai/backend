@@ -65,6 +65,38 @@ def static_get_prescription(id_prescription: int, user_context: User = None):
     )
 
 
+@has_permission(Permission.READ_PRESCRIPTION)
+def route_get_prescription_cultures(id_prescription: int, user_context: User = None):
+    """Cultures of the patient, flagged against the drugs of this prescription.
+
+    The prescription view only carries a summary of them (cultureStats): the
+    culture card sits behind a tab and the full list weighed on every load of
+    the screen, so it is fetched here when the tab is opened.
+    """
+
+    prescription, patient, _, _, _, _ = _get_prescription_data(
+        id_prescription=id_prescription
+    )
+
+    cultures = _get_cultures(patient=patient, user_context=user_context)
+
+    if not cultures:
+        return []
+
+    # the "prescribed" flag compares the cultures to the same drug list the
+    # alerts read, so the list is loaded the same way the view loads it
+    drug_list = _get_drug_list(
+        prescription=prescription,
+        patient=patient,
+        config_data=_get_drug_list_configs(prescription=prescription),
+        user_context=user_context,
+    )
+
+    return culture_service.to_card(
+        alert_service.flag_prescribed_cultures(cultures=cultures, drug_list=drug_list)
+    )
+
+
 def _internal_get_prescription(
     id_prescription: int,
     user_context: User,
@@ -356,6 +388,29 @@ def _get_prescription_data(
     return prescription, patient, department, segment, prescription_user, icd
 
 
+def _get_segment_configs(prescription: Prescription) -> dict:
+    is_cpoe = segment_service.is_cpoe(id_segment=prescription.idSegment)
+
+    return {
+        "is_cpoe": is_cpoe,
+        "ignore_segments": segment_service.get_ignored_segments(is_cpoe_flag=is_cpoe),
+    }
+
+
+def _get_drug_list_configs(prescription: Prescription) -> dict:
+    """Only what _get_drug_list reads, for the endpoints that do not assemble
+    the whole view (the same keys _get_configs fills)"""
+
+    features = memory_service.get_by_kind([MemoryEnum.FEATURES.value]).get(
+        MemoryEnum.FEATURES.value, []
+    )
+
+    return {
+        "is_pmc": FeatureEnum.PRIMARY_CARE.value in features,
+        **_get_segment_configs(prescription=prescription),
+    }
+
+
 @timed()
 def _get_configs(prescription: Prescription, patient: Patient, is_complete: bool):
     data = {}
@@ -388,9 +443,8 @@ def _get_configs(prescription: Prescription, patient: Patient, is_complete: bool
         in memory_itens.get(MemoryEnum.FEATURES.value, [])
     )
 
-    data["is_cpoe"] = segment_service.is_cpoe(id_segment=prescription.idSegment)
-    data["ignore_segments"] = segment_service.get_ignored_segments(
-        is_cpoe_flag=data["is_cpoe"]
+    data.update(
+        _get_segment_configs(prescription=prescription),
     )
 
     # patient data
@@ -1014,8 +1068,9 @@ def _format(
         # exams
         "alertExams": exams_data["alerts"],
         "exams": exams_data["exams_card"],
-        # cultures
-        "cultures": culture_data,
+        # cultures: only the summary the screen needs before the card is
+        # opened, the list itself comes from route_get_prescription_cultures
+        "cultureStats": culture_service.get_culture_stats(culture_data),
         # clinical notes
         "clinicalNotes": cn_data["cn_count"],
         "clinicalNotesStats": cn_data["cn_stats"],

@@ -236,3 +236,63 @@ def _group_by_drug(items: list):
         results.append(drugs[drug])
 
     return sorted(results, key=lambda d: d["drug"])
+
+
+def is_resistant_in_use(drug: dict) -> bool:
+    """A released resistant antibiogram for a drug the prescription carries.
+
+    The same comparison that raises the cultureResistant alert
+    (services/alert_service), read from the flagged summary. A predicted
+    resistance never qualifies: the collection is still pending and the
+    prediction must not be read as the lab result.
+    """
+
+    items = drug.get("items") or []
+    if not items:
+        return False
+
+    # the first item represents the drug (_group_by_drug puts released
+    # results first)
+    current = items[0]
+
+    return bool(
+        drug.get("prescribed")
+        and current.get("result") is not None
+        and current.get("resultType") == CultureResultTypeEnum.RESISTANT.value
+    )
+
+
+def get_culture_stats(cultures: list) -> dict:
+    """What the prescription screen needs from the cultures without loading
+    them: the culture card sits behind a tab, and the tab itself has to say
+    that a resistant drug is in use. The cultures themselves are served by
+    prescription_view_service.route_get_prescription_cultures on demand.
+    """
+
+    return {
+        "resistantInUse": sum(1 for drug in cultures or [] if is_resistant_in_use(drug))
+    }
+
+
+# the substance mapping keys the culture against the prescription
+# (services/alert_service) and is resolved into "prescribed" before the card
+# reads it; the exam item id only tells rows of the same specimen apart, which
+# the card never does
+CARD_HIDDEN_DRUG_FIELDS = ("sctid", "idSubstanceClass")
+CARD_HIDDEN_ITEM_FIELDS = ("idExamItem",)
+
+
+def to_card(cultures: list) -> list:
+    """The summary in the shape the culture card reads (features/culture)."""
+
+    card = []
+
+    for drug in cultures or []:
+        entry = {k: v for k, v in drug.items() if k not in CARD_HIDDEN_DRUG_FIELDS}
+        entry["items"] = [
+            {k: v for k, v in item.items() if k not in CARD_HIDDEN_ITEM_FIELDS}
+            for item in drug.get("items") or []
+        ]
+        card.append(entry)
+
+    return card
