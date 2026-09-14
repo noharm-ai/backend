@@ -77,6 +77,9 @@ class FeatureEnum(Enum):
     # driven by the FEATURE_USER_ONBOARDING env var, not by the schema config
     USER_ONBOARDING = "USER_ONBOARDING"
     MULTI_CLINICAL_NOTES = "MULTI_CLINICAL_NOTES"
+    # the culture card and the culture alerts; depends on the antibiogram
+    # integration, so it is enabled per schema
+    CULTURE = "CULTURE"
 
 
 class PrescriptionAuditTypeEnum(Enum):

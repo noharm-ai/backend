@@ -4,6 +4,10 @@ The culture card loads its data here, on demand, instead of through the
 prescription view. DynamoDB is skipped in the TEST env
 (repository/culture_repository), so the summary is always empty: what these
 tests reach is the route, its permission and the contract with the view.
+
+The CULTURE feature gate that precedes the lookup is covered by
+tests/unit/test_prescription_cultures_feature.py -- with DynamoDB skipped the
+route answers the same empty list either way, so only the unit test can see it.
 """
 
 from security.role import Role
