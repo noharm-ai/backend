@@ -35,6 +35,11 @@ from tests.conftest import session, session_commit
 # Any patient id works: nothing about the lookup touches the local patient row.
 PATIENT_ID = 1
 
+# The write-back does go through the local patient row: it resolves the
+# admission number to the seeded patient id before calling the name service.
+WRITE_ADMISSION = 5
+WRITE_PATIENT_ID = 5
+
 # HS256 keys, long enough not to trip PyJWT's short-key warning. They are
 # literals invented for this file, never a real credential — the gitleaks
 # annotations keep the secret scan from reading them as one.
@@ -879,6 +884,189 @@ def test_auth_token_unexpected_failure_is_reported_as_an_error(
     body = response.get_json()
     assert body["status"] == "error"
     assert "boom" not in body["message"]
+
+
+# --------------------------------------------------------------------------
+# write-back — POST /patient/<admission> carrying a ``name`` block
+# --------------------------------------------------------------------------
+# Names are read through /names, but they are written through the patient
+# endpoint: ``patient_service.save_patient`` hands a ``name`` block over to
+# ``name_service.update_patient_name``. Only DynamoDB tenants accept a write —
+# every other strategy is read-only — and the write needs WRITE_NAME on top of
+# whatever permission opened the patient endpoint.
+
+
+def _dynamo_write_config(getname_config):
+    """Configure ``demo`` with the only strategy that accepts a write."""
+    getname_config({"token": {"url": "dy:zztest-names", "params": {}}, "params": {}})
+
+
+def test_patient_name_update_requires_write_name(
+    client, analyst_headers, getname_config
+):
+    """WRITE_PRESCRIPTION opens the patient endpoint but not the name [401]."""
+    _dynamo_write_config(getname_config)
+
+    with patch("services.name_service.aws") as mock_aws:
+        response = client.post(
+            f"/patient/{WRITE_ADMISSION}",
+            headers=analyst_headers,
+            json={"name": {"name": "Fulano Beltrano"}},
+        )
+
+    assert response.status_code == 401
+    assert response.get_json()["code"] == "error.authorizationError"
+    mock_aws.get_resource.assert_not_called()
+
+
+def test_patient_name_update_without_configuration_is_rejected(
+    client, navigator_headers, no_getname_config
+):
+    """An unconfigured tenant has nowhere to write the name to [400]."""
+    response = client.post(
+        f"/patient/{WRITE_ADMISSION}",
+        headers=navigator_headers,
+        json={"name": {"name": "Fulano Beltrano"}},
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["status"] == "error"
+
+
+@pytest.mark.parametrize(
+    "getname,description",
+    [
+        ({"internal": True, "url": "https://names.example/", "params": {}}, "internal"),
+        (
+            {
+                "type": "getname-proxy",
+                "url": "https://proxy.example/getname",
+                "xapikey": "zztest-api-key",
+                "params": {},
+            },
+            "proxy",
+        ),
+        (
+            {
+                "token": {"url": "https://external.example/oauth/token", "params": {}},
+                "url": "https://external.example/patients",
+                "params": {},
+            },
+            "external",
+        ),
+    ],
+)
+def test_patient_name_update_is_only_supported_on_dynamodb(
+    client, navigator_headers, getname_config, getname, description
+):
+    """Every read-only strategy refuses the write instead of ignoring it [400]."""
+    getname_config(getname)
+
+    response = client.post(
+        f"/patient/{WRITE_ADMISSION}",
+        headers=navigator_headers,
+        json={"name": {"name": "Fulano Beltrano"}},
+    )
+
+    assert response.status_code == 400, f"{description} should refuse the write"
+    assert response.get_json()["status"] == "error"
+
+
+def test_patient_name_update_writes_the_name_to_dynamodb(
+    client, navigator_headers, getname_config
+):
+    """The name reaches DynamoDB keyed by the patient id, not the admission."""
+    _dynamo_write_config(getname_config)
+
+    with patch("services.name_service.aws") as mock_aws:
+        table = mock_aws.get_resource.return_value.Table.return_value
+
+        response = client.post(
+            f"/patient/{WRITE_ADMISSION}",
+            headers=navigator_headers,
+            json={"name": {"name": "Fulano Beltrano"}},
+        )
+
+    assert response.status_code == 200
+    mock_aws.get_resource.return_value.Table.assert_called_once_with("zztest-names")
+
+    kwargs = table.update_item.call_args.kwargs
+    assert kwargs["Key"] == {"schema_fkpessoa": str(WRITE_PATIENT_ID)}
+    assert kwargs["ExpressionAttributeValues"] == {":nome": "Fulano Beltrano"}
+
+
+def test_patient_name_update_forwards_allowed_extra_data(
+    client, navigator_headers, getname_config
+):
+    """A ``data`` block rides along with the name in the same write."""
+    _dynamo_write_config(getname_config)
+
+    with patch("services.name_service.aws") as mock_aws:
+        table = mock_aws.get_resource.return_value.Table.return_value
+
+        response = client.post(
+            f"/patient/{WRITE_ADMISSION}",
+            headers=navigator_headers,
+            json={
+                "name": {
+                    "name": "Fulano Beltrano",
+                    "data": {"fone": "(00) 90000-0000"},
+                }
+            },
+        )
+
+    assert response.status_code == 200
+    assert table.update_item.call_args.kwargs["ExpressionAttributeValues"] == {
+        ":nome": "Fulano Beltrano",
+        ":v0": "(00) 90000-0000",
+    }
+
+
+def test_patient_name_update_drops_unknown_extra_data_keys(
+    client, navigator_headers, getname_config
+):
+    """An unexpected ``data`` key cancels the write, and the caller still gets 200.
+
+    The name service swallows its own failures so a name lookup never takes a
+    patient screen down; the same handling applies to the write, so the refusal
+    is silent. Pinning it here keeps the leniency deliberate: nothing at all is
+    written, including the name that came with it.
+    """
+    _dynamo_write_config(getname_config)
+
+    with patch("services.name_service.aws") as mock_aws:
+        table = mock_aws.get_resource.return_value.Table.return_value
+
+        response = client.post(
+            f"/patient/{WRITE_ADMISSION}",
+            headers=navigator_headers,
+            json={
+                "name": {
+                    "name": "Fulano Beltrano",
+                    "data": {"endereco": "Rua Teste, 1"},
+                }
+            },
+        )
+
+    assert response.status_code == 200
+    table.update_item.assert_not_called()
+
+
+def test_patient_update_without_a_name_block_never_calls_the_name_service(
+    client, navigator_headers, getname_config
+):
+    """Ordinary patient edits must not touch the external name system."""
+    _dynamo_write_config(getname_config)
+
+    with patch("services.name_service.aws") as mock_aws:
+        response = client.post(
+            f"/patient/{WRITE_ADMISSION}",
+            headers=navigator_headers,
+            json={"tags": []},
+        )
+
+    assert response.status_code == 200
+    mock_aws.get_resource.assert_not_called()
 
 
 # --------------------------------------------------------------------------
