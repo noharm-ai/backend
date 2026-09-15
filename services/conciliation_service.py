@@ -25,8 +25,13 @@ def create_conciliation(admission_number: int, user_context: User):
         )
 
     ref = prescription_repository.get_last_prescription(
-        admission_number=admission_number, cpoe=None, agg=False
+        admission_number=admission_number, cpoe=None, agg=True
     )
+
+    if ref is None:
+        ref = prescription_repository.get_last_prescription(
+            admission_number=admission_number, cpoe=None, agg=False
+        )
 
     if ref is None:
         raise ValidationError(
