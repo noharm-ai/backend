@@ -139,6 +139,19 @@ def get_prescription_cultures(idPrescription):
     )
 
 
+@app_pres.route(
+    "/prescriptions/<int:idPrescription>/cultures/alternatives", methods=["GET"]
+)
+@api_endpoint()
+def get_prescription_culture_alternatives(idPrescription):
+    """Susceptible alternatives to a prescribed antimicrobial (by sctid)"""
+
+    return prescription_view_service.route_get_prescription_culture_alternatives(
+        id_prescription=idPrescription,
+        sctid=request.args.get("sctid", type=int),
+    )
+
+
 @app_pres.route("/prescriptions/<int:idPrescription>", methods=["PUT"])
 @api_endpoint()
 def setPrescriptionData(idPrescription):

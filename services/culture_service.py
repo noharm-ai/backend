@@ -4,8 +4,8 @@ import re
 import unicodedata
 from decimal import Decimal
 
-from models.enums import CultureResultTypeEnum
-from repository import culture_repository
+from models.enums import CultureAlternativeModeEnum, CultureResultTypeEnum
+from repository import culture_repository, substance_repository
 from utils import dateutils, logger
 
 # a prediction below this confidence is not shown to the user. Mirrors the
@@ -274,11 +274,12 @@ def get_culture_stats(cultures: list) -> dict:
     }
 
 
-# the substance mapping keys the culture against the prescription
-# (services/alert_service) and is resolved into "prescribed" before the card
-# reads it; the exam item id only tells rows of the same specimen apart, which
-# the card never does
-CARD_HIDDEN_DRUG_FIELDS = ("sctid", "idSubstanceClass")
+# the class keys the culture against the prescription (services/alert_service)
+# and is resolved into "prescribed" before the card reads it; the exam item id
+# only tells rows of the same specimen apart, which the card never does. The
+# substance id stays: it is what the card asks the alternatives of a
+# prescribed drug by (route_get_prescription_culture_alternatives)
+CARD_HIDDEN_DRUG_FIELDS = ("idSubstanceClass",)
 CARD_HIDDEN_ITEM_FIELDS = ("idExamItem",)
 
 
@@ -296,3 +297,246 @@ def to_card(cultures: list) -> list:
         card.append(entry)
 
     return card
+
+
+def culture_sctids(cultures: list) -> list:
+    """Every substance the antibiograms tested, for the level lookup"""
+
+    return [drug["sctid"] for drug in cultures or [] if drug.get("sctid") is not None]
+
+
+def _specimen_key(item: dict):
+    """What tells one culture apart from another: the antibiogram of a specimen
+    tests many drugs against the same microorganism, and an alternative only
+    counts when it was tested in that very specimen. The exam item id says it;
+    without one, the collection itself has to."""
+
+    if item.get("idExamItem") is not None:
+        return ("exam", item["idExamItem"])
+
+    return (
+        "collection",
+        item.get("microorganism"),
+        item.get("material"),
+        item.get("collectionDate"),
+    )
+
+
+def _released_type(item: dict):
+    """The result type of a released antibiogram, never of a prediction"""
+
+    if item.get("result") is None:
+        return None
+
+    return item.get("resultType")
+
+
+def _level_of(substances: dict, sctid) -> int | None:
+    entry = substances.get(_sctid_key(sctid)) if sctid is not None else None
+
+    return entry.get("atbLevel") if entry else None
+
+
+def _sctid_key(value):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _alternative_sort_key(alternative: dict):
+    # the least aggressive option first, the unclassified ones last: they
+    # cannot be placed on the scale, and the card says so instead of guessing
+    level = alternative.get("atbLevel")
+
+    return (level is None, level if level is not None else 0, alternative["drug"])
+
+
+def _susceptible_in_specimen(
+    cultures: list, specimen, sctid: int, substances: dict
+) -> list:
+    """Every other drug that tested susceptible in the same specimen"""
+
+    found = {}
+
+    for drug in cultures or []:
+        if _sctid_key(drug.get("sctid")) == sctid:
+            continue
+
+        for item in drug.get("items") or []:
+            print("drugitem", drug["drug"])
+            if _specimen_key(item) != specimen:
+                print("removed 1", _specimen_key(item), specimen)
+                continue
+
+            if _released_type(item) != CultureResultTypeEnum.SUSCEPTIBLE.value:
+                print("removed 2", _released_type(item))
+                continue
+
+            # a drug tested twice in the same specimen is still one option
+            found.setdefault(
+                drug["drug"],
+                {
+                    "drug": drug["drug"],
+                    "sctid": _sctid_key(drug.get("sctid")),
+                    "atbLevel": _level_of(substances, drug.get("sctid")),
+                    "result": item.get("result"),
+                    "resultDetail": item.get("resultDetail"),
+                },
+            )
+
+    return sorted(found.values(), key=_alternative_sort_key)
+
+
+def build_alternatives(cultures: list, sctid, substances: dict) -> dict:
+    """What the antibiograms suggest in place of a prescribed antimicrobial.
+
+    For every released result of the substance: resistant, the susceptible
+    drugs of the same specimen, in AWaRe order (escalation); susceptible, the
+    susceptible drugs of the same specimen that are less aggressive on the
+    AWaRe scale (de-escalation). A prediction never suggests anything: the
+    collection is still pending, and the prediction is not the lab result.
+
+    :param cultures: the culture summary (get_culture_summary)
+    :param sctid: the prescribed substance
+    :param substances: {sctid: {"name", "atbLevel"}} of the substances involved
+        (repository/substance_repository.get_antimicrobial_levels)
+    """
+
+    sctid = _sctid_key(sctid)
+    level = _level_of(substances, sctid)
+    substance = substances.get(sctid) or {}
+
+    result = {
+        "sctid": sctid,
+        "substance": {"name": substance.get("name"), "atbLevel": level},
+        "drug": None,
+        "cultures": [],
+    }
+
+    if sctid is None:
+        return result
+
+    seen_specimens = set()
+
+    for drug in cultures or []:
+        if _sctid_key(drug.get("sctid")) != sctid:
+            continue
+
+        # the lab may call the substance by more than one name: the first is
+        # the one the card shows
+        if result["drug"] is None:
+            result["drug"] = drug.get("drug")
+
+        for item in drug.get("items") or []:
+            result_type = _released_type(item)
+
+            if result_type == CultureResultTypeEnum.RESISTANT.value:
+                mode = CultureAlternativeModeEnum.ESCALATION
+            elif result_type == CultureResultTypeEnum.SUSCEPTIBLE.value:
+                mode = CultureAlternativeModeEnum.DEESCALATION
+            else:
+                # pending, or a wording the classifier could not read: nothing
+                # to compare the other drugs to
+                continue
+
+            print("item", item)
+            print("result_type", result_type)
+            print("mode", mode.value)
+
+            specimen = _specimen_key(item)
+            if specimen in seen_specimens:
+                continue
+            seen_specimens.add(specimen)
+
+            alternatives = _susceptible_in_specimen(
+                cultures=cultures, specimen=specimen, sctid=sctid, substances=substances
+            )
+
+            print("alternatives", alternatives)
+
+            if mode == CultureAlternativeModeEnum.DEESCALATION:
+                # without a level on either side nothing is "less aggressive"
+                alternatives = [
+                    a
+                    for a in alternatives
+                    if level is not None
+                    and a["atbLevel"] is not None
+                    and a["atbLevel"] < level
+                ]
+
+            result["cultures"].append(
+                {
+                    "idExamItem": item.get("idExamItem"),
+                    "microorganism": item.get("microorganism"),
+                    "material": item.get("material"),
+                    "collectionDate": item.get("collectionDate"),
+                    "releaseDate": item.get("releaseDate"),
+                    "result": item.get("result"),
+                    "resultType": result_type,
+                    "mode": mode.value,
+                    "alternatives": alternatives,
+                }
+            )
+
+    # the most recent specimen first, whatever drug entry it came from
+    result["cultures"].sort(key=lambda c: c["collectionDate"] or "", reverse=True)
+
+    return result
+
+
+def has_alternatives(cultures: list, sctid, substances: dict) -> bool:
+    """Whether build_alternatives has anything to suggest for the substance"""
+
+    return any(
+        len(culture["alternatives"]) > 0
+        for culture in build_alternatives(
+            cultures=cultures, sctid=sctid, substances=substances
+        )["cultures"]
+    )
+
+
+def flag_alternatives(cultures: list, substances: dict) -> list:
+    """Tell the card which prescribed drugs have an alternative to offer.
+
+    The alternatives themselves are fetched on demand
+    (route_get_prescription_culture_alternatives): the card only needs to
+    know whether to offer the button, and a susceptible drug with nothing
+    less aggressive to step down to must not offer it.
+    """
+
+    for drug in cultures or []:
+        if not drug.get("prescribed"):
+            continue
+
+        print("PRESCRIBED: ", drug.get("drug"))
+
+        drug["hasAlternatives"] = has_alternatives(
+            cultures=cultures, sctid=drug.get("sctid"), substances=substances
+        )
+
+        print("hasalternatives", drug["hasAlternatives"])
+
+    return cultures
+
+
+def get_antimicrobial_levels(cultures: list, sctid=None) -> dict:
+    """The AWaRe levels of every substance the antibiograms tested, plus the
+    prescribed one, which the lab may not have tested by that name"""
+
+    sctids = culture_sctids(cultures)
+
+    if sctid is not None:
+        sctids.append(sctid)
+
+    return substance_repository.get_antimicrobial_levels(sctids=sctids)
+
+
+def get_alternatives(cultures: list, sctid) -> dict:
+    """build_alternatives with the levels read from the database"""
+
+    return build_alternatives(
+        cultures=cultures,
+        sctid=sctid,
+        substances=get_antimicrobial_levels(cultures=cultures, sctid=sctid),
+    )
