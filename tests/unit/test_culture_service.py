@@ -120,6 +120,118 @@ class TestGroupByDrug:
             "old-pending",
         ]
 
+    def test_resistant_result_is_read_ahead_of_a_newer_susceptible_one(self):
+        """The reading of a drug is its worst released result, not its latest.
+
+        Susceptible for the Klebsiella of a newer blood culture and resistant
+        for the Pseudomonas of an older tracheal aspirate: the drug does not
+        cover the patient, so the card must not group it as susceptible just
+        because the susceptible result came last.
+        """
+        result = culture_service._group_by_drug(
+            [
+                _item(
+                    chave="susceptible",
+                    microorganismo="Klebsiella Teste",
+                    nomematerial="Hemocultura",
+                    datacoleta="2024-03-11T23:53:00",
+                    resultado="Sensível",
+                ),
+                _item(
+                    chave="resistant",
+                    microorganismo="Pseudomonas Teste",
+                    nomematerial="Aspirado Traqueal",
+                    datacoleta="2024-03-07T11:24:00",
+                    resultado="Resistente",
+                ),
+            ]
+        )
+
+        items = result[0]["items"]
+        assert [i["key"] for i in items] == ["resistant", "susceptible"]
+        assert items[0]["resultType"] == "R"
+
+    def test_unreadable_result_outranks_a_susceptible_one_but_not_a_resistance(
+        self,
+    ):
+        """A wording the classifier could not read must not be hidden under a
+        susceptible result, and must not be stated as a resistance either: the
+        card shows it, spelled out."""
+        result = culture_service._group_by_drug(
+            [
+                _item(
+                    chave="susceptible",
+                    datacoleta="2024-03-09T12:17:03",
+                    resultado="Sensível",
+                ),
+                _item(
+                    chave="unknown",
+                    datacoleta="2024-03-05T12:17:03",
+                    resultado="Ver observação",
+                ),
+            ]
+        )
+
+        assert [i["key"] for i in result[0]["items"]] == ["unknown", "susceptible"]
+
+        result = culture_service._group_by_drug(
+            [
+                _item(
+                    chave="unknown",
+                    datacoleta="2024-03-09T12:17:03",
+                    resultado="Ver observação",
+                ),
+                _item(
+                    chave="resistant",
+                    datacoleta="2024-03-05T12:17:03",
+                    resultado="Resistente",
+                ),
+            ]
+        )
+
+        assert [i["key"] for i in result[0]["items"]] == ["resistant", "unknown"]
+
+    def test_collection_date_orders_results_of_the_same_kind(self):
+        """Worst first, and inside each kind the most recent collection first:
+        the order the modal reads. Pending collections stay last."""
+        result = culture_service._group_by_drug(
+            [
+                _item(
+                    chave="old-resistant",
+                    datacoleta="2024-03-01T12:17:03",
+                    resultado="Resistente",
+                ),
+                _item(
+                    chave="new-susceptible",
+                    datacoleta="2024-03-09T12:17:03",
+                    resultado="Sensível",
+                ),
+                _item(
+                    chave="old-susceptible",
+                    datacoleta="2024-03-03T12:17:03",
+                    resultado="Sensível",
+                ),
+                _item(
+                    chave="new-resistant",
+                    datacoleta="2024-03-07T12:17:03",
+                    resultado="Resistente",
+                ),
+                _item(
+                    chave="pending",
+                    datacoleta="2024-03-12T12:17:03",
+                    resultado=None,
+                ),
+            ]
+        )
+
+        assert [i["key"] for i in result[0]["items"]] == [
+            "new-resistant",
+            "old-resistant",
+            "new-susceptible",
+            "old-susceptible",
+            "pending",
+        ]
+
     def test_drugs_are_sorted_alphabetically(self):
         """Drugs come out in alphabetical order."""
         result = culture_service._group_by_drug(

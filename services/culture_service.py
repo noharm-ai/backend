@@ -222,20 +222,55 @@ def _group_by_drug(items: list):
 
     results = []
     for drug in drugs:
-        by_date = sorted(
-            drugs[drug]["items"],
-            key=lambda i: i["collectionDate"] if i["collectionDate"] else "",
-            reverse=True,
-        )
-        # the first item represents the drug wherever it is shown, and a
-        # released result always describes it better than a prediction: a drug
-        # with an antibiogram must not be read as a prediction just because a
-        # newer collection of it is still pending. The sort is stable, so the
-        # most recent collection still comes first inside each half.
-        drugs[drug]["items"] = sorted(by_date, key=lambda i: i["result"] is None)
+        drugs[drug]["items"] = _order_items(drugs[drug]["items"])
         results.append(drugs[drug])
 
     return sorted(results, key=lambda d: d["drug"])
+
+
+# how bad a released result is, for the reading of a drug that has more than
+# one: a wording the classifier could not read sits between the two, so that
+# it is neither hidden under a susceptible result nor stated as a resistance
+_RESULT_SEVERITY = {
+    CultureResultTypeEnum.RESISTANT.value: 2,
+    CultureResultTypeEnum.UNKNOWN.value: 1,
+    CultureResultTypeEnum.SUSCEPTIBLE.value: 0,
+}
+
+
+def _item_rank(item: dict):
+    # the released results before the pending collections; among the released,
+    # the worst first. Every tie keeps the collection date order (the sort is
+    # stable), so the most recent collection still comes first inside each
+    # group.
+    if item["result"] is None:
+        return (1, 0)
+
+    return (0, -_RESULT_SEVERITY[item["resultType"]])
+
+
+def _order_items(items: list) -> list:
+    """Order the items of a drug so that the first one is the reading of the
+    drug wherever it is shown (the card groups by it, is_resistant_in_use and
+    alert_service compare it to the prescription).
+
+    The reading of a drug with several antibiograms is its worst released
+    result, not its latest: resistant for one microorganism and susceptible
+    for another, the drug does not cover the patient, whichever result came
+    last. It is the same reading alert_service makes when it flags a
+    prescribed drug by any resistant result. A released result always
+    describes the drug better than a prediction: a drug with an antibiogram
+    must not be read as a prediction just because a newer collection of it is
+    still pending.
+    """
+
+    by_date = sorted(
+        items,
+        key=lambda i: i["collectionDate"] if i["collectionDate"] else "",
+        reverse=True,
+    )
+
+    return sorted(by_date, key=_item_rank)
 
 
 def is_resistant_in_use(drug: dict) -> bool:
@@ -251,8 +286,8 @@ def is_resistant_in_use(drug: dict) -> bool:
     if not items:
         return False
 
-    # the first item represents the drug (_group_by_drug puts released
-    # results first)
+    # the first item is the reading of the drug (_order_items): its worst
+    # released result
     current = items[0]
 
     return bool(
