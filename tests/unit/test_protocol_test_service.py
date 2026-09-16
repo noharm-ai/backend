@@ -170,3 +170,47 @@ def test_protocol_type_to_agg():
     assert _protocol_type_to_agg(ProtocolTypeEnum.PRESCRIPTION_AGG.value) is True
     assert _protocol_type_to_agg(ProtocolTypeEnum.PRESCRIPTION_ALL.value) is True
     assert _protocol_type_to_agg(ProtocolTypeEnum.PRESCRIPTION_ITEM.value) is True
+
+
+def test_evaluate_date_groups_marks_discarded_group():
+    """Protocol test: a flagged aggregated protocol that activates outside the
+    latest expire date group is traced as discarded, because the prescription
+    generates no alert for it"""
+
+    drug_list = _folfox_drug_list()
+    config = {**_folfox_config(), "onlyLatestExpireDate": True}
+
+    groups = _evaluate_date_groups(
+        config=config,
+        protocol_name="FOLFOX",
+        context=_get_context(drug_list=drug_list),
+        drugs_by_expire_date={"2026-07-30": drug_list, "2026-07-31": []},
+        name_lookup=None,
+        compact=True,
+        protocol_type=ProtocolTypeEnum.PRESCRIPTION_AGG.value,
+    )
+
+    older = next(g for g in groups if g["date"] == "2026-07-30")
+    assert older["activated"] is True
+    assert older["discarded"] is True
+    assert "descartado" in older["summary"]
+
+    latest = next(g for g in groups if g["date"] == "2026-07-31")
+    assert latest["discarded"] is False
+
+
+def test_evaluate_date_groups_keeps_unflagged_group():
+    """Protocol test: without the flag no group is discarded"""
+
+    drug_list = _folfox_drug_list()
+    groups = _evaluate_date_groups(
+        config=_folfox_config(),
+        protocol_name="FOLFOX",
+        context=_get_context(drug_list=drug_list),
+        drugs_by_expire_date={"2026-07-30": drug_list, "2026-07-31": []},
+        name_lookup=None,
+        compact=True,
+        protocol_type=ProtocolTypeEnum.PRESCRIPTION_AGG.value,
+    )
+
+    assert [g["discarded"] for g in groups] == [False, False]

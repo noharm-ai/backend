@@ -468,17 +468,23 @@ class TestFindProtocolsResults:
 
 
 class TestOnlyLatestExpireDate:
-    """config.onlyLatestExpireDate — reach the summary from current groups only
+    """config.onlyLatestExpireDate — restrict a protocol to what is current
 
     An aggregated prescription is evaluated once per expire-date group and also
     carries drugs prescribed on previous days; ``summary`` feeds the
     prescription alert count. Some protocols only make sense against what is
-    prescribed today, so the config can ask to be counted only when it fires on
-    a group holding drugs whose prescription date is the aggregated prescription
-    date. The protocol is still tested against every group and its alert still
-    shows inside the group where it fired: the flag changes the summary alone.
-    It is read per protocol, and a config without the key always reaches the
-    summary.
+    current, and the flag says so in two ways, depending on the protocol type:
+
+    * a ``PRESCRIPTION_AGG`` protocol is restricted to the **latest expire-date
+      group** — an alert it raises on an earlier group is discarded outright, so
+      it neither shows in that group nor reaches the summary;
+    * every other type keeps alerting inside the group where it fired, but only
+      reaches the summary when that group holds drugs whose prescription date is
+      the aggregated prescription date (for item protocols, the matched item's
+      date decides).
+
+    The flag is read per protocol, and a config without the key keeps the
+    previous behavior in both respects.
     """
 
     @pytest.mark.parametrize(
@@ -495,11 +501,12 @@ class TestOnlyLatestExpireDate:
         """A config without the key behaves as it did before the field existed"""
         assert alert_protocol_service.is_summary_restricted(config=config) is expected
 
-    def test_flagged_protocol_firing_on_a_current_group_is_summarized(
+    def test_flagged_agg_protocol_firing_on_an_earlier_group_is_discarded(
         self, fake_engine
     ):
-        """The newest expire date does not decide it: what counts is that the
-        group holds drugs prescribed on the aggregated prescription date"""
+        """An aggregated protocol is restricted to the latest expire date: an
+        alert raised on an earlier group is dropped, even when that group holds
+        drugs prescribed on the aggregated prescription date"""
         fake_engine.alerts_by_protocol = {5: _fires_on(1)}
 
         result, _ = _run(
@@ -521,15 +528,71 @@ class TestOnlyLatestExpireDate:
             prescription=_prescription(agg=True),
         )
 
-        assert result["2024-03-11"] == [{"message": "fired", "id": 5}]
+        assert result["2024-03-11"] == []
         assert result["2024-03-12"] == []
+        assert result["summary"] == []
+
+    def test_flagged_agg_protocol_firing_on_the_latest_group_is_reported(
+        self, fake_engine
+    ):
+        """The latest expire date group is the one the flagged protocol keeps"""
+        fake_engine.alerts_by_protocol = {5: _fires_on(1)}
+
+        result, _ = _run(
+            protocols=[
+                _protocol(
+                    5, ProtocolTypeEnum.PRESCRIPTION_AGG, only_latest_expire_date=True
+                )
+            ],
+            drug_list=[
+                # prescribed today and expiring last
+                _drug(1, expire_date=datetime(2024, 3, 12, 10, 0)),
+                _drug(
+                    2,
+                    expire_date=datetime(2024, 3, 11, 10, 0),
+                    prescription_date=datetime(2024, 3, 9, 8, 0),
+                ),
+            ],
+            prescription=_prescription(agg=True),
+        )
+
+        assert result["2024-03-12"] == [{"message": "fired", "id": 5}]
+        assert result["2024-03-11"] == []
         assert result["summary"] == [5]
+
+    def test_flagged_item_protocol_still_alerts_on_an_earlier_group(self, fake_engine):
+        """The discard is for aggregated protocols only: an item protocol keeps
+        reporting its alert outside the latest expire date group"""
+        fake_engine.alerts_by_protocol = {7: _fires_on_items(1)}
+
+        result, _ = _run(
+            protocols=[
+                _protocol(
+                    7, ProtocolTypeEnum.PRESCRIPTION_ITEM, only_latest_expire_date=True
+                )
+            ],
+            drug_list=[
+                _drug(1, expire_date=datetime(2024, 3, 11, 10, 0)),
+                _drug(
+                    2,
+                    expire_date=datetime(2024, 3, 12, 10, 0),
+                    prescription_date=datetime(2024, 3, 9, 8, 0),
+                ),
+            ],
+            prescription=_prescription(agg=True),
+        )
+
+        assert result["items"] == [
+            {"message": "fired", "related_items": [1], "id": 7}
+        ]
+        assert result["summary"] == [7]
 
     def test_flagged_protocol_firing_on_an_older_group_is_not_summarized(
         self, fake_engine
     ):
-        """The alert is still reported inside the group of the previous day, but
-        it does not count in the summary (which feeds the alert count)"""
+        """The group is the latest expire date, so the alert is kept, but it
+        holds no drug of today: it does not count in the summary (which feeds
+        the alert count)"""
         fake_engine.alerts_by_protocol = {5: _fires_on(2)}
 
         result, _ = _run(

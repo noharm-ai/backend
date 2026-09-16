@@ -496,7 +496,13 @@ def test_test_protocol_compact_result(client, admin_headers, traced_prescription
     assert result["error"] is None
     # the compact shape carries no trace and no variable detail
     assert "trace" not in result
-    assert set(result["dateGroups"][0]) == {"date", "activated", "summary", "error"}
+    assert set(result["dateGroups"][0]) == {
+        "date",
+        "activated",
+        "discarded",
+        "summary",
+        "error",
+    }
 
 
 def test_test_protocol_not_activated(client, admin_headers, traced_prescription):

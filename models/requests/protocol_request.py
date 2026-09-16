@@ -41,9 +41,13 @@ class ProtocolTraceRequest(BaseModel):
 class ProtocolConfig(BaseModel):
     """Protocol: structure of a protocol configuration
 
-    onlyLatestExpireDate restricts what reaches the prescription summary: the
-    protocol keeps being tested against every expire date group, but it is only
-    counted in the summary when it fires on a group holding drugs prescribed on
+    onlyLatestExpireDate restricts the protocol to what is current in an
+    aggregated prescription, which is evaluated once per expire date group and
+    also carries drugs prescribed on previous days. For a PRESCRIPTION_AGG
+    protocol, an alert raised on a group other than the last expire date group
+    is discarded and never shown. For the other protocol types the alert is
+    still reported in the group where it fired, but it only reaches the
+    prescription summary when it fires on a group holding drugs prescribed on
     the aggregated prescription date; for item protocols, the prescription date
     of the matched item is what decides. It defaults to false so that configs
     stored before the field existed, which do not carry the key, keep the

@@ -45,6 +45,7 @@ def find_protocols(
     drugs_by_expire_date = split_drugs_by_date(
         drug_list=drug_list, prescription=prescription
     )
+    latest_expire_date = max(drugs_by_expire_date) if drugs_by_expire_date else None
 
     # protocols must be applied inside each date group
     for expire_date, drugs in drugs_by_expire_date.items():
@@ -62,6 +63,14 @@ def find_protocols(
         for protocol in protocols:
             alert = alert_protocol.get_protocol_alerts(protocol=protocol.config)
             if alert:
+                if is_discarded_group(
+                    protocol_type=protocol.protocol_type,
+                    config=protocol.config,
+                    expire_date=expire_date,
+                    latest_expire_date=latest_expire_date,
+                ):
+                    continue
+
                 alert["id"] = protocol.id
                 if protocol.protocol_type == ProtocolTypeEnum.PRESCRIPTION_ITEM.value:
                     results["items"].append(alert)
@@ -80,8 +89,27 @@ def find_protocols(
                     summary.add(protocol.id)
 
     results["summary"] = list(summary)
-    
+
     return results
+
+
+def is_discarded_group(
+    protocol_type: int, config: dict, expire_date: str, latest_expire_date: str
+) -> bool:
+    """Tells if an alert raised on this date group must be dropped entirely.
+
+    An aggregated protocol flagged with onlyLatestExpireDate only makes sense
+    against the last expire date group of the prescription, so an alert it
+    raises on an earlier group is not reported at all (and therefore never
+    reaches the summary). Other protocol types keep alerting on every group."""
+
+    if protocol_type != ProtocolTypeEnum.PRESCRIPTION_AGG.value:
+        return False
+
+    if not is_summary_restricted(config=config):
+        return False
+
+    return expire_date != latest_expire_date
 
 
 def counts_to_summary(config: dict, drugs: list, prescription: Prescription) -> bool:
