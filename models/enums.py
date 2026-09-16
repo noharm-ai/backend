@@ -409,30 +409,6 @@ class CultureResultTypeEnum(Enum):
     UNKNOWN = "U"
 
 
-class AntimicrobialLevelEnum(Enum):
-    """Enum: AWaRe classification of an antimicrobial (substancia.tp_nivel_atb)
-
-    How aggressive the antimicrobial is, from the WHO AWaRe groups: an
-    antibiogram that finds the prescribed drug resistant calls for a
-    susceptible option, one that finds it susceptible may allow a step down
-    to a less aggressive one (services/culture_service.build_alternatives).
-    """
-
-    ACCESS = 1
-    WATCH = 2
-    RESERVE = 3
-
-
-class CultureAlternativeModeEnum(Enum):
-    """Enum: why a culture suggests other antimicrobials (culture_service)"""
-
-    # the prescribed drug tested resistant: any susceptible option applies
-    ESCALATION = "escalation"
-    # the prescribed drug tested susceptible: only a less aggressive
-    # susceptible option is worth suggesting
-    DEESCALATION = "deescalation"
-
-
 class PrescriptionClinicalNoteStatusEnum(Enum):
     PENDING = 0
     SENT = 1

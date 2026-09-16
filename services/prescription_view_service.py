@@ -94,45 +94,9 @@ def route_get_prescription_cultures(id_prescription: int, user_context: User = N
         user_context=user_context,
     )
 
-    cultures = alert_service.flag_prescribed_cultures(
-        cultures=cultures, drug_list=drug_list
+    return culture_service.to_card(
+        alert_service.flag_prescribed_cultures(cultures=cultures, drug_list=drug_list)
     )
-
-    # the card offers the alternatives of a prescribed drug (below) only when
-    # there is one to offer, which takes the AWaRe level of every substance
-    # the antibiograms tested: one lookup, and only when the tab is opened
-    if any(drug.get("prescribed") for drug in cultures):
-        cultures = culture_service.flag_alternatives(
-            cultures=cultures,
-            substances=culture_service.get_antimicrobial_levels(cultures=cultures),
-        )
-
-    return culture_service.to_card(cultures)
-
-
-@has_permission(Permission.READ_PRESCRIPTION)
-def route_get_prescription_culture_alternatives(
-    id_prescription: int, sctid: int, user_context: User = None
-):
-    """What the antibiograms suggest in place of a prescribed antimicrobial.
-
-    Fetched on demand, from the culture card or from the culture alert of the
-    item: the AWaRe comparison behind it (culture_service.build_alternatives)
-    has no place in the prescription payload, which is loaded on every screen.
-    """
-
-    if sctid is None:
-        raise ValidationError(
-            "Substância inválida",
-            "errors.invalidParams",
-            status.HTTP_400_BAD_REQUEST,
-        )
-
-    _, patient, _, _, _, _ = _get_prescription_data(id_prescription=id_prescription)
-
-    cultures = _get_cultures(patient=patient, user_context=user_context)
-
-    return culture_service.get_alternatives(cultures=cultures, sctid=sctid)
 
 
 def _internal_get_prescription(
