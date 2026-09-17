@@ -48,6 +48,7 @@ SENTINEL_CHECKED_FIELDS = {
     ProtocolVariableFieldEnum.EXAM.value,
     ProtocolVariableFieldEnum.EXAM_REF.value,
     ProtocolVariableFieldEnum.CN_STATS.value,
+    ProtocolVariableFieldEnum.CULTURE_RELEASE_TIME.value,
 }
 SENTINEL_VALUE_THRESHOLD = -999
 
@@ -132,6 +133,13 @@ AGENT_SYSTEM_PROMPT = (
     "instead whenever the exam exists in search_reference_exams.\n"
     "- age, weight, admissionTime (hours since admission), stConcilia → "
     "> < >= <= = != → number.\n"
+    "- cultureReleaseTime → > < >= <= = != → number. Hours elapsed since the "
+    "patient's most recent RELEASED antibiogram (the culture card states the "
+    "same date). '< 48' means a culture released in the last 48 hours; '> 72' "
+    "means the newest one is already older than 72 hours. A pending collection "
+    "never counts, and a patient with no released culture at all makes the "
+    "variable false under EVERY operator — to ask for the absence of a "
+    "culture, use the ABSENCE OF DATA pattern below.\n"
     "- imc → > < >= <= = != → number. Body mass index in kg/m², computed "
     "automatically as weight / (height/100)² from the patient's registered "
     "weight (kg) and height (cm). Do NOT create a combination of weight and "
@@ -175,7 +183,7 @@ AGENT_SYSTEM_PROMPT = (
     '"doseOperator": ">", "defaultMeasureUnit": "mg"}\n'
     'WRONG (criteria are lost): {"name": "...", "field": "combination", '
     '"operator": "PRESENT", "value": {"substance": ["22165008"]}}\n\n'
-    "ABSENCE OF DATA (exam, exam_ref, cn_stats)\n"
+    "ABSENCE OF DATA (exam, exam_ref, cn_stats, cultureReleaseTime)\n"
     "When the user asks about the ABSENCE of an exam or indicator — 'paciente "
     "sem creatinina', 'não tem hemograma', 'nenhum exame de função renal' — "
     "there is NO value that means absent. NEVER invent an impossible number "
@@ -194,7 +202,8 @@ AGENT_SYSTEM_PROMPT = (
     "Name the variable after what it detects when TRUE (tem_..., possui_...), "
     "because the trigger is what inverts it. Combine it freely with other "
     "variables, e.g. \"{{idoso}} and not {{tem_creatinina}}\".\n"
-    "This trick is ONLY for the numeric fields (exam, exam_ref, cn_stats), which "
+    "This trick is ONLY for the numeric fields (exam, exam_ref, cn_stats, "
+    "cultureReleaseTime), which "
     "have no negative operator. For list fields (substance, class, idDrug, "
     "route, idDepartment, idSegment, idIcd, tags, admissionNumber) use the NOTIN "
     "operator directly on "

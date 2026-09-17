@@ -187,6 +187,7 @@ def _evaluate_date_groups(
             patient=context["patient"],
             cn_stats=context["cn_stats"],
             protocol_extra_info=context["protocol_extra_info"],
+            cultures=context.get("cultures"),
         )
 
         try:

@@ -315,6 +315,19 @@ def _test_protocol(protocol: dict):
     cn_stats = {"diliexc": 1, "complication": 0}
     patient = Patient()
     patient.admissionDate = datetime.today() - timedelta(days=3)
+    # one released antibiogram, so a cultureReleaseTime variable has a date to
+    # compare against instead of exiting early as "patient without cultures"
+    cultures = [
+        {
+            "drug": "Drug A",
+            "items": [
+                {
+                    "result": "Resistente",
+                    "releaseDate": (datetime.now() - timedelta(hours=6)).isoformat(),
+                }
+            ],
+        }
+    ]
 
     alert_protocol = AlertProtocol(
         drugs=drug_list,
@@ -322,6 +335,7 @@ def _test_protocol(protocol: dict):
         prescription=prescription,
         patient=patient,
         cn_stats=cn_stats,
+        cultures=cultures,
     )
     try:
         alert_protocol.get_protocol_alerts(protocol=protocol)

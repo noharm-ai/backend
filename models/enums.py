@@ -320,6 +320,7 @@ class ProtocolVariableFieldEnum(Enum):
     INSURANCE = "insurance"
     TAGS = "tags"
     ADMISSION_NUMBER = "admissionNumber"
+    CULTURE_RELEASE_TIME = "cultureReleaseTime"
 
 
 class SchemaConfigAuditTypeEnum(Enum):

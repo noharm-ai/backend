@@ -23,6 +23,8 @@ class TraceReasonEnum(Enum):
     VALUE_NOT_NUMERIC = "VALUE_NOT_NUMERIC"
     NO_PATIENT = "NO_PATIENT"
     NO_ADMISSION_DATE = "NO_ADMISSION_DATE"
+    NO_CULTURE_RELEASE = "NO_CULTURE_RELEASE"
+    CULTURE_DATE_INVALID = "CULTURE_DATE_INVALID"
     AGE_MISSING = "AGE_MISSING"
     WEIGHT_MISSING = "WEIGHT_MISSING"
     HEIGHT_MISSING = "HEIGHT_MISSING"
@@ -140,6 +142,8 @@ REASON_TEMPLATES = {
     TraceReasonEnum.VALUE_NOT_NUMERIC.value: "o valor configurado no protocolo não é numérico",
     TraceReasonEnum.NO_PATIENT.value: "não há dados do paciente disponíveis",
     TraceReasonEnum.NO_ADMISSION_DATE.value: "o paciente não possui data de internação registrada",
+    TraceReasonEnum.NO_CULTURE_RELEASE.value: "o paciente não possui nenhuma cultura com resultado liberado",
+    TraceReasonEnum.CULTURE_DATE_INVALID.value: "não foi possível interpretar a data de liberação da cultura ({releaseDate})",
     TraceReasonEnum.AGE_MISSING.value: "o paciente não possui idade registrada",
     TraceReasonEnum.WEIGHT_MISSING.value: "o paciente não possui peso registrado",
     TraceReasonEnum.HEIGHT_MISSING.value: "o paciente não possui altura registrada",

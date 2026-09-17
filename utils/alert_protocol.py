@@ -9,6 +9,7 @@ from models.appendix import MeasureUnit
 from models.enums import DrugTypeEnum
 from models.main import DrugAttributes, Substance
 from models.prescription import Patient, Prescription, PrescriptionDrug
+from services import culture_service
 from utils import prescriptionutils
 from utils.alert_protocol_trace import (
     CombinationCriterionTrace,
@@ -42,6 +43,7 @@ class AlertProtocol:
     exams = None
     exams_by_ref = None
     cn_stats = None
+    cultures = None
     protocol_variables = None
     protocol_msgs = None
     related_items = None  # list of prescriptions items who were related to the protocol being active
@@ -56,6 +58,7 @@ class AlertProtocol:
         patient: Patient,
         cn_stats: dict,
         protocol_extra_info: Union[ProtocolExtraInfo, None] = None,
+        cultures: Union[list, None] = None,
     ):
         self.prescription = prescription
         self.patient = patient
@@ -81,6 +84,7 @@ class AlertProtocol:
                     self.exams_by_ref[ref] = exam_data
 
         self.cn_stats = cn_stats
+        self.cultures = cultures
 
         self.substance_list = []
         self.class_list = []
@@ -424,6 +428,45 @@ class AlertProtocol:
                 value1=hours_diff,
                 value2=value,
                 admissionDate=self.patient.admissionDate.isoformat(),
+            )
+
+        if field == "cultureReleaseTime":
+            release_date = culture_service.latest_release_date(self.cultures)
+
+            # a patient with no released antibiogram has no age to compare: the
+            # variable is false, and a protocol that needs "no culture" negates
+            # it in the trigger (the same pattern the exam fields follow)
+            if not release_date:
+                return self._trace_miss(TraceReasonEnum.NO_CULTURE_RELEASE)
+
+            try:
+                # unlike the exam fields, the time of day matters here, so the
+                # date is not truncated to the day
+                release_datetime = datetime.fromisoformat(release_date)
+            except (TypeError, ValueError):
+                return self._trace_miss(
+                    TraceReasonEnum.CULTURE_DATE_INVALID, releaseDate=release_date
+                )
+
+            # the integration may or may not carry an offset, and now() has to
+            # be read in the same frame of reference to subtract
+            now = (
+                datetime.now(release_datetime.tzinfo)
+                if release_datetime.tzinfo
+                else datetime.now()
+            )
+            hours_diff = (now - release_datetime).total_seconds() / 3600
+
+            try:
+                value = float(value)
+            except (TypeError, ValueError):
+                return self._trace_miss(TraceReasonEnum.VALUE_NOT_NUMERIC)
+
+            return self._trace_compare(
+                op=operator,
+                value1=hours_diff,
+                value2=value,
+                releaseDate=release_date,
             )
 
         if field == "stConcilia":

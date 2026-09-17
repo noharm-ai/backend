@@ -750,6 +750,7 @@ def _get_alerts(
         user_context=user_context,
         cn_stats=cn_data["cn_stats"],
         protocol_extra_info=protocol_extra_info,
+        cultures=culture_data,
     )
 
     alerts = alert_service.find_alerts(
@@ -803,6 +804,14 @@ def get_protocol_evaluation_context(id_prescription: int, user_context: User) ->
         user_context=user_context,
     )
 
+    # the cultures reach the protocols through the same flagging the
+    # prescription view applies, so a replayed evaluation reads exactly what
+    # the screening one read
+    culture_data = alert_service.flag_prescribed_cultures(
+        cultures=_get_cultures(patient=patient, user_context=user_context),
+        drug_list=drug_list,
+    )
+
     protocol_extra_info = ProtocolExtraInfo()
     protocol_extra_info.is_cpoe = config_data["is_cpoe"]
     if segment:
@@ -815,6 +824,7 @@ def get_protocol_evaluation_context(id_prescription: int, user_context: User) ->
         "drug_list": drug_list,
         "exams": exam_data["exams"],
         "cn_stats": cn_data["cn_stats"],
+        "cultures": culture_data,
         "protocol_extra_info": protocol_extra_info,
     }
 

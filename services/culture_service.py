@@ -297,6 +297,37 @@ def is_resistant_in_use(drug: dict) -> bool:
     )
 
 
+def latest_release_date(cultures: list):
+    """The newest release date across every culture of the patient, as ISO text.
+
+    Only released results count: a pending collection may carry a release date
+    of its own, but it has no antibiogram yet, and what this answers is how
+    recent the newest antibiogram is. It is the same reading the culture card
+    footer states to the pharmacist (features/culture/CultureCardFooter), and
+    the protocol variable cultureReleaseTime (utils/alert_protocol) has to
+    agree with the date shown on the very same screen.
+
+    Returns None when the patient has no released antibiogram at all.
+    """
+
+    latest = None
+
+    for drug in cultures or []:
+        for item in drug.get("items") or []:
+            # a prediction is not a result: the collection is still pending
+            if item.get("result") is None:
+                continue
+
+            release_date = item.get("releaseDate")
+
+            # the dates share one format (dateutils.to_iso), so the text order
+            # is the chronological order
+            if release_date and (latest is None or release_date > latest):
+                latest = release_date
+
+    return latest
+
+
 def get_culture_stats(cultures: list) -> dict:
     """What the prescription screen needs from the cultures without loading
     them: the culture card sits behind a tab, and the tab itself has to say

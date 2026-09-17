@@ -577,3 +577,54 @@ class TestToCard:
     @pytest.mark.parametrize("cultures", [None, []])
     def test_no_cultures(self, cultures):
         assert culture_service.to_card(cultures) == []
+
+
+class TestLatestReleaseDate:
+    """Tests for culture_service.latest_release_date: the reading the culture
+    card footer states and the cultureReleaseTime protocol variable compares
+    against (utils/alert_protocol)."""
+
+    def _released(self, release_date, result="Resistente"):
+        return _drug(
+            items=[
+                {
+                    "key": release_date,
+                    "result": result,
+                    "resultType": "R" if result else None,
+                    "releaseDate": release_date,
+                }
+            ]
+        )
+
+    def test_takes_the_newest_release(self):
+        cultures = [
+            self._released("2024-03-01T07:17:02"),
+            self._released("2024-03-08T07:17:02"),
+            self._released("2024-03-05T07:17:02"),
+        ]
+
+        assert culture_service.latest_release_date(cultures) == "2024-03-08T07:17:02"
+
+    def test_ignores_a_pending_collection(self):
+        """A pending collection may carry a release date, but it has no
+        antibiogram yet: the card states the newest released one."""
+        cultures = [
+            self._released("2024-03-20T07:17:02", result=None),
+            self._released("2024-03-08T07:17:02"),
+        ]
+
+        assert culture_service.latest_release_date(cultures) == "2024-03-08T07:17:02"
+
+    def test_no_released_culture(self):
+        cultures = [self._released("2024-03-20T07:17:02", result=None)]
+
+        assert culture_service.latest_release_date(cultures) is None
+
+    def test_released_result_without_a_date(self):
+        cultures = [self._released(None)]
+
+        assert culture_service.latest_release_date(cultures) is None
+
+    @pytest.mark.parametrize("cultures", [None, []])
+    def test_no_cultures(self, cultures):
+        assert culture_service.latest_release_date(cultures) is None
