@@ -77,6 +77,9 @@ class FeatureEnum(Enum):
     # driven by the FEATURE_USER_ONBOARDING env var, not by the schema config
     USER_ONBOARDING = "USER_ONBOARDING"
     MULTI_CLINICAL_NOTES = "MULTI_CLINICAL_NOTES"
+    # the culture card and the culture alerts; depends on the antibiogram
+    # integration, so it is enabled per schema
+    CULTURE = "CULTURE"
 
 
 class PrescriptionAuditTypeEnum(Enum):
@@ -187,6 +190,8 @@ class DrugAlertTypeEnum(Enum):
     LACTATING = "lactating"
     FASTING = "fasting"
     PROTOCOL = "protocol"
+    CULTURE_RESISTANT = "cultureResistant"
+    CULTURE_RESISTANT_CLASS = "cultureResistantClass"
 
 
 class DrugAlertLevelEnum(Enum):
@@ -395,6 +400,14 @@ class TpPepEnum(Enum):
     TASY_CPOE = "TASY_CPOE"
     VITAI = "VITAI"
     WARELINE = "WARELINE"
+
+
+class CultureResultTypeEnum(Enum):
+    """Enum: antibiogram result type (culture)"""
+
+    RESISTANT = "R"
+    SUSCEPTIBLE = "S"
+    UNKNOWN = "U"
 
 
 class PrescriptionClinicalNoteStatusEnum(Enum):
