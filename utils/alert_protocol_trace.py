@@ -94,6 +94,7 @@ FIELD_LABELS = {
     "insurance": "convênio",
     "idSegment": "segmento",
     "tags": "marcador do paciente",
+    "admissionNumber": "número de atendimento",
     "combination": "combinação de critérios do item",
 }
 

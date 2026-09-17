@@ -25,8 +25,13 @@ def create_conciliation(admission_number: int, user_context: User):
         )
 
     ref = prescription_repository.get_last_prescription(
-        admission_number=admission_number, cpoe=None, agg=False
+        admission_number=admission_number, cpoe=None, agg=True
     )
+
+    if ref is None:
+        ref = prescription_repository.get_last_prescription(
+            admission_number=admission_number, cpoe=None, agg=False
+        )
 
     if ref is None:
         raise ValidationError(
@@ -62,6 +67,7 @@ def create_conciliation(admission_number: int, user_context: User):
     prescription.prescriber = user_context.name
     prescription.bed = ref.bed
     prescription.concilia = "s"
+    prescription.bed = ref.bed
     prescription.agg = None
     prescription.update = datetime.today()
     prescription.user = user_context.id
@@ -142,7 +148,7 @@ def copy_conciliation(id_prescription: int, user_context: User):
         db.session.query(Patient)
         .filter(Patient.idPatient == prescription.idPatient)
         .order_by(desc(Patient.admissionDate))
-        .limit(20)
+        .limit(50)
         .all()
     )
 

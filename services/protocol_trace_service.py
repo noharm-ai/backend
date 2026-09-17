@@ -138,6 +138,7 @@ def _trace_single_protocol(
         context=context,
         drugs_by_expire_date=drugs_by_expire_date,
         name_lookup=name_lookup,
+        protocol_type=protocol.protocol_type,
     )
 
     return {
@@ -158,12 +159,27 @@ def _evaluate_date_groups(
     drugs_by_expire_date: dict,
     name_lookup: dict | None = None,
     compact: bool = False,
+    protocol_type: int | None = None,
 ) -> list[dict]:
     """Evaluates a protocol config with tracing inside each expire-date group.
-    When compact, returns only date/activated/summary per group."""
+    When compact, returns only date/activated/summary per group.
+
+    A group the protocol is restricted away from (onlyLatestExpireDate on an
+    aggregated protocol) is still evaluated and traced, but reported as
+    discarded: the prescription shows no alert for it, and the trace must say
+    so instead of claiming an activation the pharmacist never sees."""
+
+    latest_expire_date = max(drugs_by_expire_date) if drugs_by_expire_date else None
 
     date_groups = []
     for expire_date, drugs in drugs_by_expire_date.items():
+        discarded = alert_protocol_service.is_discarded_group(
+            protocol_type=protocol_type,
+            config=config,
+            expire_date=expire_date,
+            latest_expire_date=latest_expire_date,
+        )
+
         alert_protocol = AlertProtocol(
             drugs=drugs,
             exams=context["exams"],
@@ -184,14 +200,24 @@ def _evaluate_date_groups(
             )
             continue
 
+        summary = build_summary(
+            activated=trace["activated"],
+            protocol_name=protocol_name,
+            substituted_trigger=trace["substituted_trigger"],
+        )
+
+        if discarded:
+            summary += (
+                " Este grupo foi descartado: o protocolo está configurado para "
+                "valer somente na última data de validade da prescrição "
+                f"({latest_expire_date}), portanto nenhum alerta é gerado aqui."
+            )
+
         group = {
             "date": expire_date,
             "activated": trace["activated"],
-            "summary": build_summary(
-                activated=trace["activated"],
-                protocol_name=protocol_name,
-                substituted_trigger=trace["substituted_trigger"],
-            ),
+            "discarded": discarded,
+            "summary": summary,
         }
 
         if not compact:
@@ -364,16 +390,22 @@ def _test_single_prescription(
         drugs_by_expire_date=drugs_by_expire_date,
         name_lookup=name_lookup,
         compact=not request_data.detailed,
+        protocol_type=request_data.protocolType,
     )
 
     result = {
         "idPrescription": str(prescription.id),
         "typeMatch": type_match,
-        "activated": any(g.get("activated") for g in date_groups),
+        # a discarded group generates no alert, so it does not make the
+        # protocol activated for this prescription
+        "activated": any(
+            g.get("activated") and not g.get("discarded") for g in date_groups
+        ),
         "dateGroups": [
             {
                 "date": g.get("date"),
                 "activated": g.get("activated"),
+                "discarded": g.get("discarded"),
                 "summary": g.get("summary"),
                 "error": g.get("error"),
             }

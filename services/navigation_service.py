@@ -6,7 +6,10 @@ from config import Config
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
 from models.main import User, db
-from models.requests.navigation_request import NavCopyPatientRequest
+from models.requests.navigation_request import (
+    NavCopyPatientRequest,
+    NavCreateDischargeSummaryRequest,
+)
 from repository import prescription_view_repository
 from services import prescription_agg_service, segment_service
 from utils import aws, cryptutils, lambdautils, logger, status, stringutils
@@ -116,6 +119,65 @@ def copy_patient(request_data: NavCopyPatientRequest, user_context: User):
 
         raise ValidationError(
             "Ocorreu um erro ao copiar a prescrição do paciente. Consulte o administrador do sistema.",
+            "errors.businessRules",
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+    return response_json
+
+
+@has_permission(Permission.NAV_COPY_PATIENT)
+def create_discharge_summary(
+    request_data: NavCreateDischargeSummaryRequest, user_context: User
+):
+    """Send the discharge summary of an admission already copied to a navigation schema"""
+    user = db.session.query(User).filter(User.id == user_context.id).first()
+
+    if not user:
+        raise ValidationError(
+            "Usuário inválido",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    payload = {
+        "command": "lambda_navigation.create_discharge_summary",
+        "from_schema": user_context.schema,
+        "from_admission_number": request_data.admission_number,
+        "to_schema": user.schema,
+        "clinical_notes": _encrypt_clinical_notes(request_data.clinical_notes),
+        "encrypted": True,
+    }
+
+    lambda_client = aws.get_client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
+    response = lambda_client.invoke(
+        FunctionName=Config.BACKEND_FUNCTION_NAME,
+        InvocationType="RequestResponse",
+        Payload=json.dumps(payload),
+    )
+
+    response_json = lambdautils.response_to_json(response)
+
+    # the admission must have been copied to the navigation schema beforehand
+    if response_json.get("error_code") == "ADMISSION_NOT_FOUND":
+        logger.backend_logger.warning(
+            "Navigation discharge summary: %s", response_json.get("message")
+        )
+
+        raise ValidationError(
+            "Este paciente ainda não foi copiado para a navegação. Utilize a opção Navegar Paciente na prescrição antes de enviar o sumário de alta.",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    if "error" in response_json or not response_json.get("success"):
+        logger.backend_logger.error(
+            "Error creating navigation discharge summary: %s",
+            response_json.get("message"),
+        )
+
+        raise ValidationError(
+            "Ocorreu um erro ao enviar o sumário de alta. Consulte o administrador do sistema.",
             "errors.businessRules",
             status.HTTP_500_INTERNAL_SERVER_ERROR,
         )

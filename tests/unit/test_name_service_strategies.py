@@ -5,10 +5,13 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 
 from services.name_service import (
+    MIN_UPSTREAM_TIMEOUT,
+    TIMEOUT,
     DynamoDBNameService,
     ExternalNameService,
     GetNameProxyService,
     NameServiceFactory,
+    NameServiceStrategy,
     NHInternalNameService,
 )
 
@@ -216,6 +219,58 @@ class TestExternalNameService:
 
         with pytest.raises(Exception):
             service._get_token()
+
+    @patch("services.name_service.requests.post")
+    def test_token_is_fetched_once_per_instance(self, mock_post, service):
+        """Repeated lookups on one instance reuse the first OAuth token"""
+        mock_token_response = Mock()
+        mock_token_response.status_code = 200
+        mock_token_response.json.return_value = {"access_token": "oauth_token_123"}
+        mock_post.return_value = mock_token_response
+
+        assert service._get_token() == "oauth_token_123"
+        assert service._get_token() == "oauth_token_123"
+
+        mock_post.assert_called_once()
+
+    @patch("services.name_service.requests.post")
+    def test_token_error_is_not_memoised(self, mock_post, service):
+        """A failed token call leaves nothing cached, so the next call retries"""
+        mock_token_response = Mock()
+        mock_token_response.status_code = 401
+        mock_post.return_value = mock_token_response
+
+        with pytest.raises(Exception):
+            service._get_token()
+        with pytest.raises(Exception):
+            service._get_token()
+
+        assert mock_post.call_count == 2
+
+
+class TestTimeoutUntil:
+    """Test the per-call timeout derived from the request deadline"""
+
+    def test_no_deadline_uses_the_default_timeout(self):
+        assert NameServiceStrategy._timeout_until(None) == TIMEOUT
+
+    @patch("services.name_service.time")
+    def test_far_deadline_is_capped_at_the_default_timeout(self, mock_time):
+        mock_time.monotonic.return_value = 100.0
+
+        assert NameServiceStrategy._timeout_until(100.0 + 60) == TIMEOUT
+
+    @patch("services.name_service.time")
+    def test_near_deadline_returns_the_remaining_time(self, mock_time):
+        mock_time.monotonic.return_value = 100.0
+
+        assert NameServiceStrategy._timeout_until(100.0 + 4.5) == 4.5
+
+    @patch("services.name_service.time")
+    def test_past_deadline_never_goes_below_the_floor(self, mock_time):
+        mock_time.monotonic.return_value = 100.0
+
+        assert NameServiceStrategy._timeout_until(100.0 - 3) == MIN_UPSTREAM_TIMEOUT
 
 
 class TestGetNameProxyService:

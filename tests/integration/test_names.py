@@ -35,6 +35,11 @@ from tests.conftest import session, session_commit
 # Any patient id works: nothing about the lookup touches the local patient row.
 PATIENT_ID = 1
 
+# The write-back does go through the local patient row: it resolves the
+# admission number to the seeded patient id before calling the name service.
+WRITE_ADMISSION = 5
+WRITE_PATIENT_ID = 5
+
 # HS256 keys, long enough not to trip PyJWT's short-key warning. They are
 # literals invented for this file, never a real credential — the gitleaks
 # annotations keep the secret scan from reading them as one.
@@ -581,7 +586,7 @@ def test_multiple_names_are_requested_in_configured_chunks(
     with patch.object(
         name_service.DynamoDBNameService, "get_multiple_names"
     ) as get_multiple:
-        get_multiple.side_effect = lambda ids: [
+        get_multiple.side_effect = lambda ids, deadline=None: [
             {"status": "success", "idPatient": i, "name": f"Paciente {i}"} for i in ids
         ]
 
@@ -604,7 +609,7 @@ def test_multiple_names_use_a_default_chunk_size(
     with patch.object(
         name_service.DynamoDBNameService, "get_multiple_names"
     ) as get_multiple:
-        get_multiple.side_effect = lambda ids: [
+        get_multiple.side_effect = lambda ids, deadline=None: [
             {"status": "success", "idPatient": i, "name": f"Paciente {i}"} for i in ids
         ]
 
@@ -682,6 +687,165 @@ def test_multiple_names_fills_placeholders_for_unknown_patients(
 
 
 # --------------------------------------------------------------------------
+# batch lookup — time budget (the endpoint must answer under the Lambda limit)
+# --------------------------------------------------------------------------
+
+
+def _dynamo_names(ids, deadline=None):
+    """Strategy stub: every requested id resolves."""
+    return [{"status": "success", "idPatient": i, "name": f"Paciente {i}"} for i in ids]
+
+
+def test_multiple_names_stop_issuing_chunks_once_the_deadline_is_reached(
+    client, analyst_headers, getname_config
+):
+    """Chunks not attempted before the deadline are omitted, not turned into
+    placeholders (a placeholder means "not found")."""
+    getname_config(
+        {
+            "token": {"url": "dy:zztest-names", "params": {}},
+            "params": {},
+            "chunk_size": 2,
+        }
+    )
+
+    # monotonic() is read once to set the deadline and once before each chunk:
+    # t=0 deadline, t=1 first chunk goes ahead, t=30 second chunk is skipped.
+    with (
+        patch.object(
+            name_service.DynamoDBNameService, "get_multiple_names"
+        ) as get_multiple,
+        patch("services.name_service.time") as mock_time,
+    ):
+        get_multiple.side_effect = _dynamo_names
+        mock_time.monotonic.side_effect = [0, 1, 30]
+
+        response = client.post(
+            "/names", headers=analyst_headers, json={"patients": [1, 2, 3, 4, 5]}
+        )
+
+    assert response.status_code == 200
+    assert [c.args[0] for c in get_multiple.call_args_list] == [[1, 2]]
+    assert [p["idPatient"] for p in response.get_json()] == [1, 2]
+
+
+def test_multiple_names_pass_the_deadline_to_the_strategy(
+    client, analyst_headers, getname_config
+):
+    """Each chunk receives the request deadline so upstream timeouts can shrink."""
+    getname_config({"token": {"url": "dy:zztest-names", "params": {}}, "params": {}})
+
+    with patch.object(
+        name_service.DynamoDBNameService, "get_multiple_names"
+    ) as get_multiple:
+        get_multiple.side_effect = _dynamo_names
+
+        response = client.post(
+            "/names", headers=analyst_headers, json={"patients": [1, 2]}
+        )
+
+    assert response.status_code == 200
+    deadline = get_multiple.call_args.kwargs["deadline"]
+    assert isinstance(deadline, float)
+
+
+def test_external_multiple_names_fetch_the_oauth_token_once(
+    client, analyst_headers, getname_config
+):
+    """The OAuth token is requested once per request, not once per chunk."""
+    getname_config(
+        {
+            "url": "https://ext.example/getname",
+            "token": {
+                "url": "https://ext.example/oauth",
+                "params": {"client_id": "zztest"},
+            },
+            "params": {"tenant": "demo"},
+            "authPrefix": "Bearer ",
+            "chunk_size": 1,
+        }
+    )
+
+    with patch("services.name_service.requests") as mock_requests:
+        mock_requests.post.return_value = _ok_response({"access_token": "zztest-token"})
+        mock_requests.get.side_effect = lambda url, **kwargs: _ok_response(
+            {
+                "data": [
+                    {
+                        "idPatient": int(kwargs["params"]["cd_paciente"]),
+                        "name": "Ana Maria",
+                    }
+                ]
+            }
+        )
+
+        response = client.post(
+            "/names", headers=analyst_headers, json={"patients": [1, 2, 3]}
+        )
+
+    assert response.status_code == 200
+    assert [p["idPatient"] for p in response.get_json()] == [1, 2, 3]
+    assert mock_requests.post.call_count == 1
+    assert mock_requests.get.call_count == 3
+    for call in mock_requests.get.call_args_list:
+        assert call.kwargs["headers"] == {"Authorization": "Bearer zztest-token"}
+
+
+def test_external_multiple_names_shrink_upstream_timeouts_to_the_remaining_budget(
+    client, analyst_headers, getname_config
+):
+    """Upstream calls never get more time than is left before the deadline."""
+    getname_config(
+        {
+            "url": "https://ext.example/getname",
+            "token": {
+                "url": "https://ext.example/oauth",
+                "params": {"client_id": "zztest"},
+            },
+            "params": {"tenant": "demo"},
+        }
+    )
+
+    # t=0 deadline (22s budget), t=1 chunk check, t=10 token call (12s left),
+    # t=17 data call (5s left).
+    with (
+        patch("services.name_service.requests") as mock_requests,
+        patch("services.name_service.time") as mock_time,
+    ):
+        mock_time.monotonic.side_effect = [0, 1, 10, 17]
+        mock_requests.post.return_value = _ok_response({"access_token": "zztest-token"})
+        mock_requests.get.return_value = _ok_response({"data": []})
+
+        response = client.post(
+            "/names", headers=analyst_headers, json={"patients": [1, 2]}
+        )
+
+    assert response.status_code == 200
+    assert mock_requests.post.call_args.kwargs["timeout"] == 12
+    assert mock_requests.get.call_args.kwargs["timeout"] == 5
+
+
+def test_multiple_names_reject_lists_over_the_cap(
+    client, analyst_headers, getname_config
+):
+    """An oversized id list is refused up front, before any upstream call."""
+    getname_config({"token": {"url": "dy:zztest-names", "params": {}}, "params": {}})
+
+    with patch.object(
+        name_service.DynamoDBNameService, "get_multiple_names"
+    ) as get_multiple:
+        response = client.post(
+            "/names",
+            headers=analyst_headers,
+            json={"patients": list(range(name_service.MAX_MULTIPLE_IDS + 1))},
+        )
+
+    assert response.status_code == 400
+    assert response.get_json()["status"] == "error"
+    get_multiple.assert_not_called()
+
+
+# --------------------------------------------------------------------------
 # unexpected failures never escape as a 500 HTML page
 # --------------------------------------------------------------------------
 
@@ -720,6 +884,189 @@ def test_auth_token_unexpected_failure_is_reported_as_an_error(
     body = response.get_json()
     assert body["status"] == "error"
     assert "boom" not in body["message"]
+
+
+# --------------------------------------------------------------------------
+# write-back — POST /patient/<admission> carrying a ``name`` block
+# --------------------------------------------------------------------------
+# Names are read through /names, but they are written through the patient
+# endpoint: ``patient_service.save_patient`` hands a ``name`` block over to
+# ``name_service.update_patient_name``. Only DynamoDB tenants accept a write —
+# every other strategy is read-only — and the write needs WRITE_NAME on top of
+# whatever permission opened the patient endpoint.
+
+
+def _dynamo_write_config(getname_config):
+    """Configure ``demo`` with the only strategy that accepts a write."""
+    getname_config({"token": {"url": "dy:zztest-names", "params": {}}, "params": {}})
+
+
+def test_patient_name_update_requires_write_name(
+    client, analyst_headers, getname_config
+):
+    """WRITE_PRESCRIPTION opens the patient endpoint but not the name [401]."""
+    _dynamo_write_config(getname_config)
+
+    with patch("services.name_service.aws") as mock_aws:
+        response = client.post(
+            f"/patient/{WRITE_ADMISSION}",
+            headers=analyst_headers,
+            json={"name": {"name": "Fulano Beltrano"}},
+        )
+
+    assert response.status_code == 401
+    assert response.get_json()["code"] == "error.authorizationError"
+    mock_aws.get_resource.assert_not_called()
+
+
+def test_patient_name_update_without_configuration_is_rejected(
+    client, navigator_headers, no_getname_config
+):
+    """An unconfigured tenant has nowhere to write the name to [400]."""
+    response = client.post(
+        f"/patient/{WRITE_ADMISSION}",
+        headers=navigator_headers,
+        json={"name": {"name": "Fulano Beltrano"}},
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["status"] == "error"
+
+
+@pytest.mark.parametrize(
+    "getname,description",
+    [
+        ({"internal": True, "url": "https://names.example/", "params": {}}, "internal"),
+        (
+            {
+                "type": "getname-proxy",
+                "url": "https://proxy.example/getname",
+                "xapikey": "zztest-api-key",
+                "params": {},
+            },
+            "proxy",
+        ),
+        (
+            {
+                "token": {"url": "https://external.example/oauth/token", "params": {}},
+                "url": "https://external.example/patients",
+                "params": {},
+            },
+            "external",
+        ),
+    ],
+)
+def test_patient_name_update_is_only_supported_on_dynamodb(
+    client, navigator_headers, getname_config, getname, description
+):
+    """Every read-only strategy refuses the write instead of ignoring it [400]."""
+    getname_config(getname)
+
+    response = client.post(
+        f"/patient/{WRITE_ADMISSION}",
+        headers=navigator_headers,
+        json={"name": {"name": "Fulano Beltrano"}},
+    )
+
+    assert response.status_code == 400, f"{description} should refuse the write"
+    assert response.get_json()["status"] == "error"
+
+
+def test_patient_name_update_writes_the_name_to_dynamodb(
+    client, navigator_headers, getname_config
+):
+    """The name reaches DynamoDB keyed by the patient id, not the admission."""
+    _dynamo_write_config(getname_config)
+
+    with patch("services.name_service.aws") as mock_aws:
+        table = mock_aws.get_resource.return_value.Table.return_value
+
+        response = client.post(
+            f"/patient/{WRITE_ADMISSION}",
+            headers=navigator_headers,
+            json={"name": {"name": "Fulano Beltrano"}},
+        )
+
+    assert response.status_code == 200
+    mock_aws.get_resource.return_value.Table.assert_called_once_with("zztest-names")
+
+    kwargs = table.update_item.call_args.kwargs
+    assert kwargs["Key"] == {"schema_fkpessoa": str(WRITE_PATIENT_ID)}
+    assert kwargs["ExpressionAttributeValues"] == {":nome": "Fulano Beltrano"}
+
+
+def test_patient_name_update_forwards_allowed_extra_data(
+    client, navigator_headers, getname_config
+):
+    """A ``data`` block rides along with the name in the same write."""
+    _dynamo_write_config(getname_config)
+
+    with patch("services.name_service.aws") as mock_aws:
+        table = mock_aws.get_resource.return_value.Table.return_value
+
+        response = client.post(
+            f"/patient/{WRITE_ADMISSION}",
+            headers=navigator_headers,
+            json={
+                "name": {
+                    "name": "Fulano Beltrano",
+                    "data": {"fone": "(00) 90000-0000"},
+                }
+            },
+        )
+
+    assert response.status_code == 200
+    assert table.update_item.call_args.kwargs["ExpressionAttributeValues"] == {
+        ":nome": "Fulano Beltrano",
+        ":v0": "(00) 90000-0000",
+    }
+
+
+def test_patient_name_update_drops_unknown_extra_data_keys(
+    client, navigator_headers, getname_config
+):
+    """An unexpected ``data`` key cancels the write, and the caller still gets 200.
+
+    The name service swallows its own failures so a name lookup never takes a
+    patient screen down; the same handling applies to the write, so the refusal
+    is silent. Pinning it here keeps the leniency deliberate: nothing at all is
+    written, including the name that came with it.
+    """
+    _dynamo_write_config(getname_config)
+
+    with patch("services.name_service.aws") as mock_aws:
+        table = mock_aws.get_resource.return_value.Table.return_value
+
+        response = client.post(
+            f"/patient/{WRITE_ADMISSION}",
+            headers=navigator_headers,
+            json={
+                "name": {
+                    "name": "Fulano Beltrano",
+                    "data": {"endereco": "Rua Teste, 1"},
+                }
+            },
+        )
+
+    assert response.status_code == 200
+    table.update_item.assert_not_called()
+
+
+def test_patient_update_without_a_name_block_never_calls_the_name_service(
+    client, navigator_headers, getname_config
+):
+    """Ordinary patient edits must not touch the external name system."""
+    _dynamo_write_config(getname_config)
+
+    with patch("services.name_service.aws") as mock_aws:
+        response = client.post(
+            f"/patient/{WRITE_ADMISSION}",
+            headers=navigator_headers,
+            json={"tags": []},
+        )
+
+    assert response.status_code == 200
+    mock_aws.get_resource.assert_not_called()
 
 
 # --------------------------------------------------------------------------

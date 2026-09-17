@@ -6,3 +6,8 @@ class NavCopyPatientRequest(BaseModel):
     name: str
     phone: str
     clinical_notes: dict
+
+
+class NavCreateDischargeSummaryRequest(BaseModel):
+    admission_number: int
+    clinical_notes: dict
