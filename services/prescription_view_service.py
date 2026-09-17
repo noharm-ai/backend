@@ -78,8 +78,9 @@ def route_get_prescription_cultures(id_prescription: int, user_context: User = N
         id_prescription=id_prescription
     )
 
-    # empty for a schema without the CULTURE feature, the same answer a patient
-    # with no culture gets: the card is not offered there (models/Feature)
+    # empty without the CULTURE feature (schema or user), the same answer a
+    # patient with no culture gets: the card is not offered there
+    # (models/Feature)
     cultures = _get_cultures(patient=patient, user_context=user_context)
 
     if not cultures:
@@ -686,11 +687,16 @@ def _get_cultures(patient: Patient, user_context: User):
     """Culture summary (antibiogram + prediction) of the patient, grouped by drug.
 
     The culture card depends on the antibiogram integration, so it is enabled
-    per schema: without the feature there is nothing to summarize, and the
-    lookup itself (DynamoDB, on every prescription load) is skipped.
+    per schema, or per user (config features) while a schema is being rolled
+    out: without the feature there is nothing to summarize, and the lookup
+    itself (DynamoDB, on every prescription load) is skipped.
     """
 
-    if not feature_service.has_feature(FeatureEnum.CULTURE):
+    has_culture = feature_service.has_user_feature(
+        FeatureEnum.CULTURE
+    ) or feature_service.has_feature(FeatureEnum.CULTURE)
+
+    if not has_culture:
         return []
 
     return culture_service.get_culture_summary(
