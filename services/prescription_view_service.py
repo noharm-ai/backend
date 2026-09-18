@@ -30,6 +30,7 @@ from repository import (
     clinical_notes_type_repository,
     patient_repository,
     prescription_view_repository,
+    substance_repository,
 )
 from services import (
     alert_interaction_service,
@@ -95,9 +96,21 @@ def route_get_prescription_cultures(id_prescription: int, user_context: User = N
         user_context=user_context,
     )
 
-    return culture_service.to_card(
-        alert_service.flag_prescribed_cultures(cultures=cultures, drug_list=drug_list)
+    cultures = alert_service.flag_prescribed_cultures(
+        cultures=cultures, drug_list=drug_list
     )
+
+    # how aggressive each antimicrobial of the antibiogram is (AWaRe): one
+    # lookup, and only here — the summary the prescription view carries
+    # (cultureStats) is loaded on every screening and has no place for it
+    cultures = culture_service.flag_antimicrobial_levels(
+        cultures=cultures,
+        levels=substance_repository.get_antimicrobial_levels(
+            sctids=culture_service.antimicrobial_sctids(cultures=cultures)
+        ),
+    )
+
+    return culture_service.to_card(cultures)
 
 
 def _internal_get_prescription(

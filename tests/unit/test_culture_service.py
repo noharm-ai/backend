@@ -546,6 +546,63 @@ class TestCultureStats:
         assert culture_service.get_culture_stats(cultures) == {"resistantInUse": 0}
 
 
+class TestAntimicrobialLevels:
+    """Tests for culture_service.flag_antimicrobial_levels / antimicrobial_sctids:
+    the AWaRe classification the card states next to each drug."""
+
+    def test_states_the_level_of_each_drug(self):
+        cultures = [_drug(), {**_drug(), "drug": "VANCOMICINA", "sctid": 2222}]
+
+        result = culture_service.flag_antimicrobial_levels(
+            cultures=cultures, levels={1111: 1, 2222: 3}
+        )
+
+        assert [drug["atbLevel"] for drug in result] == [1, 3]
+
+    def test_a_substance_without_a_curated_level(self):
+        """The column is curated apart from the card: an antimicrobial nobody
+        classified yet is left off the scale instead of being guessed onto it."""
+        result = culture_service.flag_antimicrobial_levels(
+            cultures=[_drug()], levels={1111: None}
+        )
+
+        assert result[0]["atbLevel"] is None
+
+    def test_a_drug_the_antibiogram_did_not_map(self):
+        cultures = [{**_drug(), "sctid": None}]
+
+        result = culture_service.flag_antimicrobial_levels(
+            cultures=cultures, levels={1111: 2}
+        )
+
+        assert result[0]["atbLevel"] is None
+
+    @pytest.mark.parametrize("levels", [None, {}])
+    def test_no_level_at_all(self, levels):
+        result = culture_service.flag_antimicrobial_levels(
+            cultures=[_drug()], levels=levels
+        )
+
+        assert result[0]["atbLevel"] is None
+
+    @pytest.mark.parametrize("cultures", [None, []])
+    def test_no_cultures(self, cultures):
+        assert culture_service.flag_antimicrobial_levels(cultures, {}) == []
+
+    def test_sctids_of_the_antibiograms(self):
+        cultures = [
+            _drug(),
+            {**_drug(), "sctid": 2222},
+            {**_drug(), "sctid": None},
+        ]
+
+        assert culture_service.antimicrobial_sctids(cultures) == [1111, 2222]
+
+    @pytest.mark.parametrize("cultures", [None, []])
+    def test_sctids_without_cultures(self, cultures):
+        assert culture_service.antimicrobial_sctids(cultures) == []
+
+
 class TestToCard:
     """Tests for culture_service.to_card: the shape served to the culture card."""
 
@@ -564,6 +621,17 @@ class TestToCard:
         assert card[0]["prescribed"] is True
         assert card[0]["items"][0]["result"] == "Resistente"
         assert card[0]["items"][0]["resultType"] == "R"
+
+    def test_keeps_the_aware_level(self):
+        """The level is read from the substance, but the sctid it came from is
+        not served to the card: the classification itself has to survive it."""
+        cultures = culture_service.flag_antimicrobial_levels(
+            cultures=[_drug()], levels={1111: 2}
+        )
+
+        card = culture_service.to_card(cultures)
+
+        assert card[0]["atbLevel"] == 2
 
     def test_does_not_mutate_the_summary(self):
         """The alerts still read the mapping from the same list"""

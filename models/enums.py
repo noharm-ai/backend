@@ -411,6 +411,19 @@ class CultureResultTypeEnum(Enum):
     UNKNOWN = "U"
 
 
+class AntimicrobialLevelEnum(Enum):
+    """Enum: AWaRe classification of an antimicrobial (substancia.tp_nivel_atb)
+
+    How aggressive the antimicrobial is, from the WHO AWaRe groups. The culture
+    card states it next to the drug (features/culture): Access is the least
+    aggressive, Reserve the one kept for last resort.
+    """
+
+    ACCESS = 1
+    WATCH = 2
+    RESERVE = 3
+
+
 class PrescriptionClinicalNoteStatusEnum(Enum):
     PENDING = 0
     SENT = 1

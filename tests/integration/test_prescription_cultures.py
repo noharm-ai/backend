@@ -10,11 +10,18 @@ tests/unit/test_prescription_cultures_feature.py -- with DynamoDB skipped the
 route answers the same empty list either way, so only the unit test can see it.
 """
 
+from mobile import app as flask_app
+from models.enums import AntimicrobialLevelEnum
+from models.main import Substance
+from repository import substance_repository
 from security.role import Role
-from tests.conftest import get_access, make_headers
+from tests.conftest import get_access, make_headers, session, session_commit
 
 # Seed prescription already in the test database (from noharm-ai/database fixtures)
 SEED_PRESCRIPTION_ID = "199"
+# Seed substances already in the test database
+SEED_SUBSTANCE_ID = 10001
+SEED_SUBSTANCE_ID_UNCLASSIFIED = 10002
 
 
 def test_get_cultures_returns_the_card_list(client, analyst_headers):
@@ -57,3 +64,38 @@ def test_prescription_view_carries_only_the_culture_summary(client, analyst_head
     data = response.get_json()["data"]
     assert "cultures" not in data
     assert data["cultureStats"] == {"resistantInUse": 0}
+
+
+def test_antimicrobial_levels_read_the_curated_column(client):  # noqa: ARG001
+    """The AWaRe classification the card states comes from substancia.tp_nivel_atb.
+
+    The column is curated outside the app, so what this asserts is the mapping
+    and the query: a substance that was never classified answers None, and one
+    that is not in the antibiogram is not in the answer at all.
+    """
+    with flask_app.app_context():
+        session.query(Substance).filter(Substance.id == SEED_SUBSTANCE_ID).update(
+            {"atb_level": AntimicrobialLevelEnum.RESERVE.value}
+        )
+        session_commit()
+
+        try:
+            levels = substance_repository.get_antimicrobial_levels(
+                sctids=[SEED_SUBSTANCE_ID, SEED_SUBSTANCE_ID_UNCLASSIFIED, 999999]
+            )
+        finally:
+            # the seed is shared with every other test of the suite
+            session.query(Substance).filter(Substance.id == SEED_SUBSTANCE_ID).update(
+                {"atb_level": None}
+            )
+            session_commit()
+
+    assert levels[SEED_SUBSTANCE_ID] == AntimicrobialLevelEnum.RESERVE.value
+    assert levels[SEED_SUBSTANCE_ID_UNCLASSIFIED] is None
+    assert 999999 not in levels
+
+
+def test_antimicrobial_levels_without_substances():
+    with flask_app.app_context():
+        assert substance_repository.get_antimicrobial_levels(sctids=[]) == {}
+        assert substance_repository.get_antimicrobial_levels(sctids=None) == {}

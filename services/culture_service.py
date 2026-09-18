@@ -297,6 +297,35 @@ def is_resistant_in_use(drug: dict) -> bool:
     )
 
 
+def flag_antimicrobial_levels(cultures: list, levels: dict) -> list:
+    """State the AWaRe level of each drug of the antibiogram (atbLevel).
+
+    How aggressive the antimicrobial is, from the WHO AWaRe groups
+    (models.enums.AntimicrobialLevelEnum), read from the substance the lab
+    tested (repository.substance_repository.get_antimicrobial_levels). A drug
+    the antibiogram could not be mapped to a substance, and one whose substance
+    was never curated, stays without a level: the card says nothing rather than
+    placing it on the scale by guess.
+
+    Kept out of _group_by_drug, which reads the DynamoDB summary alone: the
+    levels come from the database and are only worth a query on the endpoint
+    that serves the card.
+    """
+
+    for drug in cultures or []:
+        drug["atbLevel"] = (levels or {}).get(drug.get("sctid"))
+
+    return cultures or []
+
+
+def antimicrobial_sctids(cultures: list) -> list:
+    """The substances the antibiograms tested, to read their AWaRe level"""
+
+    return [
+        drug.get("sctid") for drug in cultures or [] if drug.get("sctid") is not None
+    ]
+
+
 def latest_release_date(cultures: list):
     """The newest release date across every culture of the patient, as ISO text.
 

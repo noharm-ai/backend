@@ -155,6 +155,10 @@ class Substance(db.Model):
     lactating = db.Column("lactante", db.String, nullable=True)
     platelets = db.Column("plaquetas", db.Integer, nullable=True)
     division_range = db.Column("divisor_faixa", db.Float, nullable=True)
+    # AWaRe classification of an antimicrobial (models.enums.AntimicrobialLevelEnum):
+    # how aggressive it is, 1 (access) to 3 (reserve). Null for anything that
+    # is not an antimicrobial or was not classified yet
+    atb_level = db.Column("tp_nivel_atb", db.Integer, nullable=True)
 
 
 class SubstanceClass(db.Model):
