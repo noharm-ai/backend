@@ -15,8 +15,9 @@ Covers the prescription_view_service._internal_get_prescription() pipeline:
 
 from datetime import datetime, timedelta
 
-from models.enums import DrugTypeEnum
-from tests.conftest import session
+from models.enums import AntimicrobialLevelEnum, DrugTypeEnum
+from models.main import Drug, Substance
+from tests.conftest import session, session_commit
 from tests.utils.utils_test_prescription import (
     create_prescription,
     create_prescription_drug,
@@ -27,6 +28,8 @@ from tests.utils.utils_test_prescription import (
 # Seed prescriptions already in the test database (from noharm-ai/database fixtures)
 SEED_PRESCRIPTION_ID = "20"
 SEED_PRESCRIPTION_WITH_BIRTHDATE = "199"
+# Seed substance already in the test database
+SEED_SUBSTANCE_ID = 10001
 
 
 # ---------------------------------------------------------------------------
@@ -82,7 +85,9 @@ def _create_prescription_with_sources(sources: list[str]):
 
 def test_get_prescription_view_permission_denied(client, user_manager_headers):
     """USER_MANAGER lacks READ_PRESCRIPTION → must return 401."""
-    response = client.get(f"/prescriptions/{SEED_PRESCRIPTION_ID}", headers=user_manager_headers)
+    response = client.get(
+        f"/prescriptions/{SEED_PRESCRIPTION_ID}", headers=user_manager_headers
+    )
     assert response.status_code == 401
 
 
@@ -93,7 +98,9 @@ def test_get_prescription_view_permission_denied(client, user_manager_headers):
 
 def test_get_prescription_view_response_structure(client, analyst_headers):
     """All expected top-level keys must be present in the response."""
-    response = client.get(f"/prescriptions/{SEED_PRESCRIPTION_ID}", headers=analyst_headers)
+    response = client.get(
+        f"/prescriptions/{SEED_PRESCRIPTION_ID}", headers=analyst_headers
+    )
     assert response.status_code == 200
 
     data = response.get_json()["data"]
@@ -135,7 +142,9 @@ def test_get_prescription_view_response_structure(client, analyst_headers):
 
 def test_get_prescription_view_field_types(client, analyst_headers):
     """Key fields must have the correct types."""
-    response = client.get(f"/prescriptions/{SEED_PRESCRIPTION_ID}", headers=analyst_headers)
+    response = client.get(
+        f"/prescriptions/{SEED_PRESCRIPTION_ID}", headers=analyst_headers
+    )
     data = response.get_json()["data"]
 
     assert isinstance(data["idPrescription"], str)
@@ -157,7 +166,9 @@ def test_get_prescription_view_db_match(client, analyst_headers):
     """idPrescription, bed, status and admissionNumber must match the DB record."""
     from models.prescription import Prescription
 
-    response = client.get(f"/prescriptions/{SEED_PRESCRIPTION_ID}", headers=analyst_headers)
+    response = client.get(
+        f"/prescriptions/{SEED_PRESCRIPTION_ID}", headers=analyst_headers
+    )
     data = response.get_json()["data"]
 
     prescription = session.get(Prescription, SEED_PRESCRIPTION_ID)
@@ -175,7 +186,9 @@ def test_get_prescription_view_db_match(client, analyst_headers):
 
 def test_get_prescription_view_date_fields_iso_format(client, analyst_headers):
     """date and expire must be ISO 8601 strings; birthdate must be 'YYYY-MM-DD'."""
-    response = client.get(f"/prescriptions/{SEED_PRESCRIPTION_WITH_BIRTHDATE}", headers=analyst_headers)
+    response = client.get(
+        f"/prescriptions/{SEED_PRESCRIPTION_WITH_BIRTHDATE}", headers=analyst_headers
+    )
     assert response.status_code == 200
     data = response.get_json()["data"]
 
@@ -306,9 +319,7 @@ def test_get_prescription_view_pending_status(client, analyst_headers):
     """Prescription with status='0' (pending) must be returned as-is."""
     id_pres = _next_prescription_id()
     adm = _next_admission_number()
-    create_prescription(
-        id=id_pres, admissionNumber=adm, idPatient=1, status="0"
-    )
+    create_prescription(id=id_pres, admissionNumber=adm, idPatient=1, status="0")
     _inc_counters()
 
     response = client.get(f"/prescriptions/{id_pres}", headers=analyst_headers)
@@ -421,7 +432,9 @@ def test_get_prescription_view_new_prescription_not_reviewed(client, analyst_hea
 
 def test_get_prescription_view_patient_sub_object_keys(client, analyst_headers):
     """patient sub-object must contain lactating, pregnant and tags."""
-    response = client.get(f"/prescriptions/{SEED_PRESCRIPTION_ID}", headers=analyst_headers)
+    response = client.get(
+        f"/prescriptions/{SEED_PRESCRIPTION_ID}", headers=analyst_headers
+    )
     data = response.get_json()["data"]
 
     patient = data["patient"]
@@ -432,7 +445,9 @@ def test_get_prescription_view_patient_sub_object_keys(client, analyst_headers):
 
 def test_get_prescription_view_patient_demographics(client, analyst_headers):
     """birthdate from seed prescription 199 must match the expected value."""
-    response = client.get(f"/prescriptions/{SEED_PRESCRIPTION_WITH_BIRTHDATE}", headers=analyst_headers)
+    response = client.get(
+        f"/prescriptions/{SEED_PRESCRIPTION_WITH_BIRTHDATE}", headers=analyst_headers
+    )
     data = response.get_json()["data"]
 
     assert data["birthdate"] == "1941-02-05"
@@ -442,10 +457,20 @@ def test_get_prescription_view_patient_demographics(client, analyst_headers):
 
 def test_get_prescription_view_patient_fields_present(client, analyst_headers):
     """Top-level patient demographic fields must all be present."""
-    response = client.get(f"/prescriptions/{SEED_PRESCRIPTION_ID}", headers=analyst_headers)
+    response = client.get(
+        f"/prescriptions/{SEED_PRESCRIPTION_ID}", headers=analyst_headers
+    )
     data = response.get_json()["data"]
 
-    for key in ["birthdate", "gender", "weight", "height", "age", "dialysis", "admissionDate"]:
+    for key in [
+        "birthdate",
+        "gender",
+        "weight",
+        "height",
+        "age",
+        "dialysis",
+        "admissionDate",
+    ]:
         assert key in data, f"Missing patient field: {key}"
 
 
@@ -512,3 +537,44 @@ def test_get_prescription_view_unauthenticated(client):
     """Request without auth headers must return HTTP 401."""
     response = client.get(f"/prescriptions/{SEED_PRESCRIPTION_ID}")
     assert response.status_code == 401
+
+
+def test_get_prescription_view_drug_carries_the_aware_level(client, analyst_headers):
+    """The drug list states the AWaRe group of an antimicrobial (atbLevel).
+
+    Read from the substance of the drug, the same classification the culture
+    card carries: the list shows the tag beside the drug name
+    (components/AwareTag). A drug with no substance, or a substance nobody
+    classified yet, answers None instead of being placed on the scale.
+    """
+    id_pres = _create_prescription_with_sources([DrugTypeEnum.DRUG.value])
+
+    session.query(Drug).filter(Drug.id == 3).update({"sctid": SEED_SUBSTANCE_ID})
+    session.query(Substance).filter(Substance.id == SEED_SUBSTANCE_ID).update(
+        {"atb_level": AntimicrobialLevelEnum.WATCH.value}
+    )
+    session_commit()
+
+    try:
+        response = client.get(f"/prescriptions/{id_pres}", headers=analyst_headers)
+
+        assert response.status_code == 200
+        item = response.get_json()["data"]["prescription"][0]
+        assert item["atbLevel"] == AntimicrobialLevelEnum.WATCH.value
+
+        # the same drug, with the substance left unclassified
+        session.query(Substance).filter(Substance.id == SEED_SUBSTANCE_ID).update(
+            {"atb_level": None}
+        )
+        session_commit()
+
+        response = client.get(f"/prescriptions/{id_pres}", headers=analyst_headers)
+
+        assert response.get_json()["data"]["prescription"][0]["atbLevel"] is None
+    finally:
+        # the drug and the substance are shared with every other test
+        session.query(Drug).filter(Drug.id == 3).update({"sctid": None})
+        session.query(Substance).filter(Substance.id == SEED_SUBSTANCE_ID).update(
+            {"atb_level": None}
+        )
+        session_commit()
