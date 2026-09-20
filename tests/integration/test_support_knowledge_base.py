@@ -64,30 +64,8 @@ _ALL_ROWS = (_PRESCRIPTION, _SHARED, _REPORTS, _RETIRED)
 _ALL_IDS = tuple(row[0] for row in _ALL_ROWS)
 
 
-@pytest.fixture(autouse=True)
-def seed_articles():
-    """Insert the knowledge-base rows and remove them after the test."""
-    for id_kb, paths, link, title, description, active in _ALL_ROWS:
-        session.execute(
-            text(
-                "INSERT INTO public.base_conhecimento "
-                "(idbase_conhecimento, pagina, link, titulo, resumo, ativo, "
-                "created_at, created_by) "
-                "VALUES (:id, :paths, :link, :title, :description, :active, now(), 1)"
-            ),
-            {
-                "id": id_kb,
-                "paths": paths,
-                "link": link,
-                "title": title,
-                "description": description,
-                "active": active,
-            },
-        )
-    session_commit()
-
-    yield
-
+def _remove_seeded_articles():
+    """Drop the seeded rows, whether or not they are all there."""
     session.execute(
         text(
             "DELETE FROM public.base_conhecimento WHERE idbase_conhecimento IN :ids"
@@ -95,6 +73,44 @@ def seed_articles():
         {"ids": list(_ALL_IDS)},
     )
     session_commit()
+
+
+@pytest.fixture(autouse=True)
+def seed_articles():
+    """Insert the knowledge-base rows and remove them after the test.
+
+    ``base_conhecimento`` is global, so residue would be visible to every
+    client: clean up on the way in as well, so a run interrupted mid-seed
+    cannot leave rows behind for the next one, and in a ``finally`` so a
+    failing insert still tears down what it managed to write.
+    """
+    _remove_seeded_articles()
+
+    try:
+        for id_kb, paths, link, title, description, active in _ALL_ROWS:
+            session.execute(
+                text(
+                    "INSERT INTO public.base_conhecimento "
+                    "(idbase_conhecimento, pagina, link, titulo, resumo, ativo, "
+                    "created_at, created_by) "
+                    "VALUES (:id, :paths, :link, :title, :description, :active, "
+                    "now(), 1)"
+                ),
+                {
+                    "id": id_kb,
+                    "paths": paths,
+                    "link": link,
+                    "title": title,
+                    "description": description,
+                    "active": active,
+                },
+            )
+        session_commit()
+
+        yield
+    finally:
+        session.rollback()
+        _remove_seeded_articles()
 
 
 def _titles(response):
