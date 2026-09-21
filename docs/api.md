@@ -1,5 +1,10 @@
 # NoHarm API Reference
 
+> Part of the [NoHarm backend documentation](README.md). See the
+> [user guide](user-guide.md) for authentication, tenants and the common
+> workflows, and [architecture.md](architecture.md) for how requests are
+> processed.
+
 All endpoints are JSON REST. Authenticated endpoints require a JWT Bearer token in the `Authorization` header:
 
 ```
@@ -43,7 +48,7 @@ Tokens are obtained from `POST /authenticate`. Endpoints marked **[admin]** addi
 ### POST /authenticate
 ```json
 {
-  "email": "pharmacist@hospital.br",
+  "email": "fulano@example.com",
   "password": "...",
   "schema": null,
   "extraFeatures": []
