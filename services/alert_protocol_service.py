@@ -1,6 +1,7 @@
 """Service: protocol alerts"""
 
 from datetime import date, datetime
+from typing import List, Union
 
 from decorators.has_permission_decorator import Permission, has_permission
 from models.enums import ProtocolTypeEnum
@@ -20,6 +21,7 @@ def find_protocols(
     cn_stats: dict,
     protocol_extra_info: ProtocolExtraInfo,
     user_context: User = None,
+    cultures: Union[List[dict], None] = None,
 ):
     """Gets all prescription protocols and test against a prescription"""
 
@@ -58,6 +60,7 @@ def find_protocols(
             patient=patient,
             cn_stats=cn_stats,
             protocol_extra_info=protocol_extra_info,
+            cultures=cultures,
         )
 
         for protocol in protocols:

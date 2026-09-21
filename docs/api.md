@@ -1,5 +1,10 @@
 # NoHarm API Reference
 
+> Part of the [NoHarm backend documentation](README.md). See the
+> [user guide](user-guide.md) for authentication, tenants and the common
+> workflows, and [architecture.md](architecture.md) for how requests are
+> processed.
+
 All endpoints are JSON REST. Authenticated endpoints require a JWT Bearer token in the `Authorization` header:
 
 ```
@@ -43,7 +48,7 @@ Tokens are obtained from `POST /authenticate`. Endpoints marked **[admin]** addi
 ### POST /authenticate
 ```json
 {
-  "email": "pharmacist@hospital.br",
+  "email": "fulano@example.com",
   "password": "...",
   "schema": null,
   "extraFeatures": []
@@ -58,6 +63,7 @@ Tokens are obtained from `POST /authenticate`. Endpoints marked **[admin]** addi
 |---|---|---|
 | `GET` | `/prescriptions` | List and prioritize prescriptions. See query params below. |
 | `GET` | `/prescriptions/<idPrescription>` | Get a single prescription with all drugs and alerts. |
+| `GET` | `/prescriptions/<idPrescription>/cultures` | Get the patient's recent cultures flagged against the prescription drugs (the culture card). Empty without the `CULTURE` schema feature. |
 | `PUT` | `/prescriptions/<idPrescription>` | Update prescription fields. |
 | `POST` | `/prescriptions/status` | Set prescription checked/unchecked status. |
 | `POST` | `/prescriptions/review` | Mark prescription as reviewed. |

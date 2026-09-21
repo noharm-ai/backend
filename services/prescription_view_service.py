@@ -30,12 +30,14 @@ from repository import (
     clinical_notes_type_repository,
     patient_repository,
     prescription_view_repository,
+    substance_repository,
 )
 from services import (
     alert_interaction_service,
     alert_protocol_service,
     alert_service,
     clinical_notes_service,
+    culture_service,
     exams_service,
     feature_service,
     intervention_service,
@@ -62,6 +64,53 @@ def static_get_prescription(id_prescription: int, user_context: User = None):
     return _internal_get_prescription(
         id_prescription=id_prescription, is_complete=False, user_context=user_context
     )
+
+
+@has_permission(Permission.READ_PRESCRIPTION)
+def route_get_prescription_cultures(id_prescription: int, user_context: User = None):
+    """Cultures of the patient, flagged against the drugs of this prescription.
+
+    The prescription view only carries a summary of them (cultureStats): the
+    culture card sits behind a tab and the full list weighed on every load of
+    the screen, so it is fetched here when the tab is opened.
+    """
+
+    prescription, patient, _, _, _, _ = _get_prescription_data(
+        id_prescription=id_prescription
+    )
+
+    # empty without the CULTURE feature (schema or user), the same answer a
+    # patient with no culture gets: the card is not offered there
+    # (models/Feature)
+    cultures = _get_cultures(patient=patient, user_context=user_context)
+
+    if not cultures:
+        return []
+
+    # the "prescribed" flag compares the cultures to the same drug list the
+    # alerts read, so the list is loaded the same way the view loads it
+    drug_list = _get_drug_list(
+        prescription=prescription,
+        patient=patient,
+        config_data=_get_drug_list_configs(prescription=prescription),
+        user_context=user_context,
+    )
+
+    cultures = alert_service.flag_prescribed_cultures(
+        cultures=cultures, drug_list=drug_list
+    )
+
+    # how aggressive each antimicrobial of the antibiogram is (AWaRe): one
+    # lookup, and only here — the summary the prescription view carries
+    # (cultureStats) is loaded on every screening and has no place for it
+    cultures = culture_service.flag_antimicrobial_levels(
+        cultures=cultures,
+        levels=substance_repository.get_antimicrobial_levels(
+            sctids=culture_service.antimicrobial_sctids(cultures=cultures)
+        ),
+    )
+
+    return culture_service.to_card(cultures)
 
 
 def _internal_get_prescription(
@@ -99,6 +148,8 @@ def _internal_get_prescription(
         user_context=user_context,
     )
 
+    culture_data = _get_cultures(patient=patient, user_context=user_context)
+
     last_dept = _get_last_dept(prescription=prescription, is_complete=is_complete)
 
     drug_list = _get_drug_list(
@@ -106,6 +157,12 @@ def _internal_get_prescription(
         patient=patient,
         config_data=config_data,
         user_context=user_context,
+    )
+
+    # the card marks the cultures of the drugs in use, by the same comparison
+    # that raises the culture alerts
+    culture_data = alert_service.flag_prescribed_cultures(
+        cultures=culture_data, drug_list=drug_list
     )
 
     alerts_data = _get_alerts(
@@ -117,6 +174,7 @@ def _internal_get_prescription(
         cn_data=cn_data,
         user_context=user_context,
         segment=segment,
+        culture_data=culture_data,
     )
 
     drug_data = _get_drug_data(
@@ -143,6 +201,7 @@ def _internal_get_prescription(
         drug_data=drug_data,
         interventions=interventions,
         exams_data=exam_data,
+        culture_data=culture_data,
         last_dept=last_dept,
         cn_data=cn_data,
         review_data=review_data,
@@ -345,6 +404,29 @@ def _get_prescription_data(
     return prescription, patient, department, segment, prescription_user, icd
 
 
+def _get_segment_configs(prescription: Prescription) -> dict:
+    is_cpoe = segment_service.is_cpoe(id_segment=prescription.idSegment)
+
+    return {
+        "is_cpoe": is_cpoe,
+        "ignore_segments": segment_service.get_ignored_segments(is_cpoe_flag=is_cpoe),
+    }
+
+
+def _get_drug_list_configs(prescription: Prescription) -> dict:
+    """Only what _get_drug_list reads, for the endpoints that do not assemble
+    the whole view (the same keys _get_configs fills)"""
+
+    features = memory_service.get_by_kind([MemoryEnum.FEATURES.value]).get(
+        MemoryEnum.FEATURES.value, []
+    )
+
+    return {
+        "is_pmc": FeatureEnum.PRIMARY_CARE.value in features,
+        **_get_segment_configs(prescription=prescription),
+    }
+
+
 @timed()
 def _get_configs(prescription: Prescription, patient: Patient, is_complete: bool):
     data = {}
@@ -377,9 +459,8 @@ def _get_configs(prescription: Prescription, patient: Patient, is_complete: bool
         in memory_itens.get(MemoryEnum.FEATURES.value, [])
     )
 
-    data["is_cpoe"] = segment_service.is_cpoe(id_segment=prescription.idSegment)
-    data["ignore_segments"] = segment_service.get_ignored_segments(
-        is_cpoe_flag=data["is_cpoe"]
+    data.update(
+        _get_segment_configs(prescription=prescription),
     )
 
     # patient data
@@ -615,6 +696,28 @@ def _get_exams(
 
 
 @timed()
+def _get_cultures(patient: Patient, user_context: User):
+    """Culture summary (antibiogram + prediction) of the patient, grouped by drug.
+
+    The culture card depends on the antibiogram integration, so it is enabled
+    per schema, or per user (config features) while a schema is being rolled
+    out: without the feature there is nothing to summarize, and the lookup
+    itself (DynamoDB, on every prescription load) is skipped.
+    """
+
+    has_culture = feature_service.has_user_feature(
+        FeatureEnum.CULTURE
+    ) or feature_service.has_feature(FeatureEnum.CULTURE)
+
+    if not has_culture:
+        return []
+
+    return culture_service.get_culture_summary(
+        schema=user_context.schema, id_patient=patient.idPatient
+    )
+
+
+@timed()
 def _get_drug_list(
     prescription: Prescription, patient: Patient, config_data: dict, user_context: User
 ):
@@ -639,6 +742,7 @@ def _get_alerts(
     cn_data: dict,
     user_context: User,
     segment: Segment,
+    culture_data: list,
 ):
     relations = alert_interaction_service.find_relations(
         drug_list=drug_list,
@@ -659,6 +763,7 @@ def _get_alerts(
         user_context=user_context,
         cn_stats=cn_data["cn_stats"],
         protocol_extra_info=protocol_extra_info,
+        cultures=culture_data,
     )
 
     alerts = alert_service.find_alerts(
@@ -671,6 +776,7 @@ def _get_alerts(
         cn_data=cn_data,
         protocols=protocols.get("items", None) if protocols else None,
         is_cpoe=config_data["is_cpoe"],
+        cultures=culture_data,
     )
 
     return {"relations": relations, "alerts": alerts, "protocols": protocols}
@@ -711,6 +817,14 @@ def get_protocol_evaluation_context(id_prescription: int, user_context: User) ->
         user_context=user_context,
     )
 
+    # the cultures reach the protocols through the same flagging the
+    # prescription view applies, so a replayed evaluation reads exactly what
+    # the screening one read
+    culture_data = alert_service.flag_prescribed_cultures(
+        cultures=_get_cultures(patient=patient, user_context=user_context),
+        drug_list=drug_list,
+    )
+
     protocol_extra_info = ProtocolExtraInfo()
     protocol_extra_info.is_cpoe = config_data["is_cpoe"]
     if segment:
@@ -723,6 +837,7 @@ def get_protocol_evaluation_context(id_prescription: int, user_context: User) ->
         "drug_list": drug_list,
         "exams": exam_data["exams"],
         "cn_stats": cn_data["cn_stats"],
+        "cultures": culture_data,
         "protocol_extra_info": protocol_extra_info,
     }
 
@@ -896,6 +1011,7 @@ def _format(
     drug_data: dict,
     interventions,
     exams_data: dict,
+    culture_data: list,
     last_dept,
     cn_data: dict,
     review_data: dict,
@@ -991,6 +1107,9 @@ def _format(
         # exams
         "alertExams": exams_data["alerts"],
         "exams": exams_data["exams_card"],
+        # cultures: only the summary the screen needs before the card is
+        # opened, the list itself comes from route_get_prescription_cultures
+        "cultureStats": culture_service.get_culture_stats(culture_data),
         # clinical notes
         "clinicalNotes": cn_data["cn_count"],
         "clinicalNotesStats": cn_data["cn_stats"],

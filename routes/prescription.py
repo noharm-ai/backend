@@ -131,6 +131,14 @@ def getPrescriptionAuth(idPrescription):
     )
 
 
+@app_pres.route("/prescriptions/<int:idPrescription>/cultures", methods=["GET"])
+@api_endpoint()
+def get_prescription_cultures(idPrescription):
+    return prescription_view_service.route_get_prescription_cultures(
+        id_prescription=idPrescription
+    )
+
+
 @app_pres.route("/prescriptions/<int:idPrescription>", methods=["PUT"])
 @api_endpoint()
 def setPrescriptionData(idPrescription):

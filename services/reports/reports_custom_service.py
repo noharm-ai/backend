@@ -9,7 +9,7 @@ from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
 from models.appendix import Report
 from models.enums import ReportStatusEnum
-from models.main import User
+from models.main import User, db
 from models.requests.reports_custom_request import SuggestGraphsRequest
 from repository.reports import reports_repository
 from services.reports import reports_cache_service
@@ -203,11 +203,13 @@ def _validate_report(
             status.HTTP_400_BAD_REQUEST,
         )
 
-    # user_context is already a User object, no need to query again
+    # user_context comes from User.find(), which builds the user out of the JWT
+    # claims and therefore carries no reports_config; the per-user ignore list
+    # only exists in the database, so it is read from there (same as
+    # reports_general_service does for the internal reports)
+    user = db.session.query(User).filter(User.id == user_context.id).first()
     ignored_reports = (
-        user_context.reports_config.get("ignore", [])
-        if user_context.reports_config
-        else []
+        user.reports_config.get("ignore", []) if user and user.reports_config else []
     )
 
     if "CUSTOM" in ignored_reports:

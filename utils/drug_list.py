@@ -422,6 +422,10 @@ class DrugList:
                     "idSubstance": pd[11].id if pd[11] is not None else None,
                     "substanceName": pd[11].name if pd[11] is not None else None,
                     "idSubstanceClass": pd[11].idclass if pd[11] is not None else None,
+                    # AWaRe group of an antimicrobial (models.enums.AntimicrobialLevelEnum):
+                    # the drug list states it beside the drug name, the same tag
+                    # the culture card carries (features/culture/awareLevel)
+                    "atbLevel": pd[11].atb_level if pd[11] is not None else None,
                     "cpoe_group": pd[0].cpoe_group,
                     "infusionKey": self.getInfusionKey(pd),
                     "formValues": pd[0].form,

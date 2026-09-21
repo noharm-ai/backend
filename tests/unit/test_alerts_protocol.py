@@ -1762,3 +1762,198 @@ def test_folfox():
         result.get("variableMessages")[0]
         == "Prescrição deve conter um medicamento ANTIEMETICO"
     )
+
+
+def _culture_release_protocol(operator: str, value) -> dict:
+    """Protocol with a single culture release time variable"""
+
+    return {
+        "variables": [
+            {
+                "name": "v1",
+                "field": "cultureReleaseTime",
+                "operator": operator,
+                "value": value,
+            }
+        ],
+        "trigger": "{{v1}}",
+        "result": {"message": "result"},
+    }
+
+
+def _culture(result, hours_ago: float, drug: str = "Drug A") -> dict:
+    """One culture of a drug, released the given number of hours ago.
+
+    A pending collection is one with no result (culture_service): it may still
+    carry a release date of its own, which is exactly what must not be read as
+    the age of the newest antibiogram.
+    """
+
+    return {
+        "drug": drug,
+        "items": [
+            {
+                "result": result,
+                "releaseDate": (
+                    datetime.now() - timedelta(hours=hours_ago)
+                ).isoformat(),
+            }
+        ],
+    }
+
+
+def _culture_alert_protocol(cultures) -> AlertProtocol:
+    """AlertProtocol with no drugs, bound to the given cultures"""
+
+    return AlertProtocol(
+        drugs=[],
+        exams={},
+        prescription=Prescription(),
+        patient=Patient(),
+        cn_stats={},
+        cultures=cultures,
+    )
+
+
+@pytest.mark.parametrize(
+    "hours_ago, operator, value, has_result",
+    [
+        # released 6 hours ago: recent under "<", not old under ">"
+        (6, "<", 48, True),
+        (6, ">", 48, False),
+        # released 5 days ago: the other way around
+        (120, "<", 48, False),
+        (120, ">", 48, True),
+        # the comparison keeps the time of day, so a threshold between two
+        # whole days still decides correctly
+        (30, ">", 24, True),
+        (30, "<", 24, False),
+        # the configured value may arrive as text from the protocol form
+        (6, "<", "48", True),
+    ],
+)
+def test_culture_release_time_variable(hours_ago, operator, value, has_result):
+    """Protocols: hours elapsed since the newest released antibiogram"""
+
+    alert_protocol = _culture_alert_protocol(
+        cultures=[_culture(result="Resistente", hours_ago=hours_ago)]
+    )
+    results = alert_protocol.get_protocol_alerts(
+        protocol=_culture_release_protocol(operator=operator, value=value)
+    )
+
+    assert (results is not None) == has_result
+
+
+@pytest.mark.parametrize("operator", ["<", ">", "=", "!="])
+def test_culture_release_time_without_cultures(operator):
+    """Protocols: a patient with no culture is false under every operator.
+
+    There is no value that means "no culture": a protocol that needs the
+    absence of one declares the variable positively and negates it in the
+    trigger, like the exam fields do.
+    """
+
+    alert_protocol = _culture_alert_protocol(cultures=None)
+    trace = alert_protocol.evaluate_with_trace(
+        protocol=_culture_release_protocol(operator=operator, value=48)
+    )
+
+    assert trace["activated"] is False
+    assert trace["variables"][0].reason == "NO_CULTURE_RELEASE"
+
+
+def test_culture_release_time_ignores_pending_collection():
+    """Protocols: only a released antibiogram dates the newest culture.
+
+    A pending collection carries a release date but no result, and the culture
+    card states the newest RELEASED date to the pharmacist
+    (features/culture/CultureCardFooter). Reading the pending one here would
+    make the protocol disagree with the date on the same screen.
+    """
+
+    cultures = [
+        # the newest date belongs to a collection still waiting for its result
+        _culture(result=None, hours_ago=1, drug="Drug A"),
+        _culture(result="Sensível", hours_ago=72, drug="Drug B"),
+    ]
+
+    alert_protocol = _culture_alert_protocol(cultures=cultures)
+
+    # 72h old, not 1h old
+    assert (
+        alert_protocol.get_protocol_alerts(
+            protocol=_culture_release_protocol(operator=">", value=48)
+        )
+        is not None
+    )
+    assert (
+        alert_protocol.get_protocol_alerts(
+            protocol=_culture_release_protocol(operator="<", value=48)
+        )
+        is None
+    )
+
+
+def test_culture_release_time_only_pending_collections():
+    """Protocols: cultures that are all pending count as no released culture"""
+
+    alert_protocol = _culture_alert_protocol(
+        cultures=[_culture(result=None, hours_ago=1)]
+    )
+    trace = alert_protocol.evaluate_with_trace(
+        protocol=_culture_release_protocol(operator="<", value=48)
+    )
+
+    assert trace["activated"] is False
+    assert trace["variables"][0].reason == "NO_CULTURE_RELEASE"
+
+
+def test_culture_release_time_uses_the_newest_release():
+    """Protocols: several released antibiograms are dated by the newest one"""
+
+    alert_protocol = _culture_alert_protocol(
+        cultures=[
+            _culture(result="Resistente", hours_ago=200, drug="Drug A"),
+            _culture(result="Sensível", hours_ago=10, drug="Drug B"),
+        ]
+    )
+    trace = alert_protocol.evaluate_with_trace(
+        protocol=_culture_release_protocol(operator="<", value=48)
+    )
+
+    assert trace["activated"] is True
+    assert trace["variables"][0].reason == "COMPARED"
+
+
+def test_culture_release_time_invalid_date():
+    """Protocols: an unreadable release date is a traced miss, not a crash"""
+
+    cultures = [
+        {
+            "drug": "Drug A",
+            "items": [{"result": "Resistente", "releaseDate": "not-a-date"}],
+        }
+    ]
+
+    alert_protocol = _culture_alert_protocol(cultures=cultures)
+    trace = alert_protocol.evaluate_with_trace(
+        protocol=_culture_release_protocol(operator="<", value=48)
+    )
+
+    assert trace["activated"] is False
+    assert trace["variables"][0].reason == "CULTURE_DATE_INVALID"
+
+
+def test_culture_release_time_non_numeric_value():
+    """Protocols: a non-numeric threshold is reported as a configuration miss"""
+
+    alert_protocol = _culture_alert_protocol(
+        cultures=[_culture(result="Resistente", hours_ago=6)]
+    )
+    trace = alert_protocol.evaluate_with_trace(
+        protocol=_culture_release_protocol(operator="<", value="quarenta e oito")
+    )
+
+    assert trace["activated"] is False
+    assert trace["variables"][0].reason == "VALUE_NOT_NUMERIC"

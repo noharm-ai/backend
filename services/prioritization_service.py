@@ -60,6 +60,10 @@ def get_prioritization_list(request: PrioritizationRequest):
             "interventions",
             "complication",
             "alertLevel",
+            # the protocols that alerted on the prescription (the summary of
+            # services/alert_protocol_service.find_protocols): the card shows
+            # how many of them there are
+            "protocolAlerts",
         ]
 
         features = {"processed": True}
