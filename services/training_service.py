@@ -309,6 +309,29 @@ def finish_training_item(
     }
 
 
+def _validate_external_certificate(validation_code: str) -> dict:
+    """Same answer shape as a training certificate, for one issued outside
+    NoHarm (NoHarm Aulas) and imported into certificado_externo."""
+    external = training_repository.get_external_certificate_by_code(
+        validation_code=validation_code
+    )
+
+    if external is None or external.revoked_at is not None:
+        return {"valid": False}
+
+    lessons = external.lessons or []
+
+    return {
+        "valid": True,
+        "maskedName": stringutils.mask_person_name(external.holder_name),
+        "trainingTitle": external.title,
+        "totalHours": external.total_hours,
+        "totalLessons": len(lessons),
+        "lessons": lessons,
+        "completedAt": dateutils.to_iso(external.completed_at),
+    }
+
+
 def validate_certificate(validation_code: str) -> dict:
     """Public certificate confirmation. Deliberately undecorated and without a
     user_context: this is the only training entry point reachable anonymously,
@@ -325,6 +348,11 @@ def validate_certificate(validation_code: str) -> dict:
     "junk".
     """
     normalized = certificateutils.normalize_code(validation_code)
+
+    # the length routes the code: the two kinds never share one, so neither
+    # table can shadow the other
+    if len(normalized) == certificateutils.EXTERNAL_CODE_LENGTH:
+        return _validate_external_certificate(normalized)
 
     if len(normalized) != certificateutils.CODE_LENGTH:
         return {"valid": False}
