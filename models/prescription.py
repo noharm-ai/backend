@@ -175,6 +175,7 @@ class PrescriptionDrug(db.Model):
     schedule = db.Column("aprazamento", postgresql.ARRAY(db.DateTime), nullable=True)
     order_number = db.Column("nr_ordem", db.Integer, nullable=True)
     tp_period = db.Column("tp_periodo", db.Integer, nullable=True)
+    differentiated_dose = db.Column("dose_diferenciada", db.String(100), nullable=True)
 
 
 class PrescriptionDrugAudit(db.Model):

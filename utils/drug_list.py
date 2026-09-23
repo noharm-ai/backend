@@ -337,6 +337,7 @@ class DrugList:
                     "doseWeightDayValue": doseWeightDayValue,
                     "doseBodySurface": doseBodySurfaceStr,
                     "dose": pd[0].dose,
+                    "differentiatedDose": pd[0].differentiated_dose,
                     "measureUnit": (
                         {"value": pd[2].id, "label": pd[2].description}
                         if pd[2]
