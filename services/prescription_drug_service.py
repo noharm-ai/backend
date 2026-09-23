@@ -157,6 +157,7 @@ def prescriptionDrugToDTO(pd):
         "idDrug": pd[0].idDrug,
         "drug": pd[1].name if pd[1] is not None else "Medicamento " + str(pd[0].idDrug),
         "dose": pd[0].dose,
+        "differentiatedDose": pd[0].differentiated_dose,
         "measureUnit": {"value": pd[2].id, "label": pd[2].description} if pd[2] else "",
         "frequency": {"value": pd[3].id, "label": pd[3].description} if pd[3] else "",
         "dayFrequency": pd[0].frequency,

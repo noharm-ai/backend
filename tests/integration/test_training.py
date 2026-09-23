@@ -1201,3 +1201,118 @@ def test_overview_requires_read_users_permission(client, analyst_headers):
     response = client.get("/training/overview", headers=analyst_headers)
 
     assert response.status_code == 401
+
+
+# --- certificates issued by NoHarm Aulas (public.certificado_externo) ---
+
+EXTERNAL_CODE = "7K2M9PQ4"
+
+
+def _delete_external_certificates():
+    session.execute(
+        text("DELETE FROM public.certificado_externo WHERE origem = 'test'")
+    )
+    session_commit()
+
+
+@pytest.fixture
+def external_certificate():
+    """One imported certificate, removed afterwards."""
+    _delete_external_certificates()
+    session.execute(
+        text(
+            "INSERT INTO public.certificado_externo "
+            "(codigo_validacao, origem, referencia_externa, nome, titulo, "
+            "tempo_horas, licoes, concluido_em, created_at) "
+            "VALUES (:code, 'test', 'ref-1', 'Fulano Beltrano', "
+            "'Curso X — Turma 1', 8, CAST(:lessons AS jsonb), "
+            "'2026-09-22T12:00:00-03:00', now())"
+        ),
+        {"code": EXTERNAL_CODE, "lessons": '["Aula 1", "Aula 2"]'},
+    )
+    session_commit()
+
+    yield EXTERNAL_CODE
+
+    _delete_external_certificates()
+
+
+def test_public_validation_confirms_an_external_certificate(
+    client, external_certificate
+):
+    """A code imported from NoHarm Aulas validates like a training one."""
+    response = client.get(f"/public/certificate/{external_certificate}")
+
+    assert response.status_code == 200
+    data = response.get_json()["data"]
+    assert data["valid"] is True
+    assert data["trainingTitle"] == "Curso X — Turma 1"
+    assert data["totalHours"] == 8
+    assert data["lessons"] == ["Aula 1", "Aula 2"]
+    assert data["totalLessons"] == 2
+    assert data["completedAt"] is not None
+    assert data["completedAt"].startswith("2026-09-22")
+    assert data["maskedName"] != "Fulano Beltrano"
+    assert "Beltrano" not in response.get_data(as_text=True)
+
+
+def test_external_certificate_code_is_normalized(client, external_certificate):
+    """Grouping and case are display concerns for external codes as well."""
+    response = client.get("/public/certificate/7k2m-9pq4")
+
+    assert response.get_json()["data"]["valid"] is True
+
+
+def test_revoked_external_certificate_is_invalid(client, external_certificate):
+    """Setting revogado_em voids an imported certificate."""
+    session.execute(
+        text(
+            "UPDATE public.certificado_externo SET revogado_em = now() "
+            "WHERE codigo_validacao = :code"
+        ),
+        {"code": external_certificate},
+    )
+    session_commit()
+
+    response = client.get(f"/public/certificate/{external_certificate}")
+
+    assert response.get_json()["data"] == {"valid": False}
+
+
+def test_unknown_external_code_is_invalid(client, external_certificate):
+    """An external-length code that was never imported answers valid=False."""
+    response = client.get("/public/certificate/7K2M9PQX")
+
+    assert response.status_code == 200
+    assert response.get_json()["data"] == {"valid": False}
+
+
+def test_training_length_code_never_reads_the_external_table(
+    client, external_certificate
+):
+    """The length routes the lookup: a 12-character code goes to
+    treinamento_usuario only, even if certificado_externo holds that code."""
+    session.execute(
+        text(
+            "UPDATE public.certificado_externo SET codigo_validacao = :code "
+            "WHERE codigo_validacao = :old"
+        ),
+        {"code": "7K2M9PQ4XTZZ", "old": external_certificate},
+    )
+    session_commit()
+
+    response = client.get("/public/certificate/7K2M-9PQ4-XTZZ")
+
+    assert response.get_json()["data"] == {"valid": False}
+
+
+def test_training_certificate_still_validates_alongside_external(
+    client, analyst_headers, external_certificate
+):
+    """Training certificates keep validating with external rows present."""
+    code = _issue_certificate(client, analyst_headers)["validationCode"]
+
+    data = client.get(f"/public/certificate/{code}").get_json()["data"]
+
+    assert data["valid"] is True
+    assert data["trainingTitle"] == "Training %d" % TRAINING_ID
