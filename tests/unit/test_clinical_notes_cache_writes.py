@@ -101,9 +101,24 @@ class FakeRedis:
         return [call for call in self.calls if call[0] == name]
 
     def members(self, key):
-        """The entries of a sorted set, decoded, highest score first."""
+        """The entries of a sorted set, decoded, highest score first.
+
+        A member that does not decode means the refresher stored something the
+        read side could never parse, which is a failure worth naming rather
+        than a bare decode error pointing at this helper.
+        """
         items = sorted(self.sorted_sets.get(key, {}).items(), key=lambda i: -i[1])
-        return [json.loads(raw) for raw, _ in items]
+        decoded = []
+
+        for raw, _ in items:
+            try:
+                decoded.append(json.loads(raw))
+            except json.JSONDecodeError as error:
+                raise AssertionError(
+                    f"{key} holds a member that is not JSON: {raw!r} ({error})"
+                ) from error
+
+        return decoded
 
     def scores(self, key):
         """The scores of a sorted set, in insertion order."""
