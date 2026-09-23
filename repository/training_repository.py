@@ -7,6 +7,7 @@ from sqlalchemy import and_, case, func, or_
 from models.main import User, db
 from models.enums import TrainingScopeEnum
 from models.appendix import (
+    ExternalCertificate,
     Training,
     TrainingItem,
     TrainingItemUser,
@@ -281,6 +282,15 @@ def get_training_user_by_code(validation_code: str):
         .join(Training, Training.id == TrainingUser.training_id)
         .join(User, User.id == TrainingUser.user_id)
         .filter(TrainingUser.validation_code == validation_code)
+        .first()
+    )
+
+
+def get_external_certificate_by_code(validation_code: str) -> ExternalCertificate:
+    """Certificate issued outside NoHarm for a public validation code, if any"""
+    return (
+        db.session.query(ExternalCertificate)
+        .filter(ExternalCertificate.validation_code == validation_code)
         .first()
     )
 

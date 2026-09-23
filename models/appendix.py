@@ -377,6 +377,32 @@ class TrainingUser(db.Model):
     updated_at = db.Column("updated_at", db.DateTime, nullable=True)
 
 
+class ExternalCertificate(db.Model):
+    """Certificate issued outside NoHarm (e.g. NoHarm Aulas) and imported so it
+    can be confirmed by the same public validation endpoint. Standalone on
+    purpose: its holder is not a NoHarm user"""
+
+    __tablename__ = "certificado_externo"
+    __table_args__ = {"schema": "public"}
+
+    validation_code = db.Column(
+        "codigo_validacao", db.String(12), primary_key=True
+    )
+    origin = db.Column("origem", db.String(32), nullable=False)
+    # id of the certificate in the issuing system; (origin, external_ref) is
+    # what a re-import upserts on
+    external_ref = db.Column("referencia_externa", db.String(64), nullable=False)
+    # full name, masked before it leaves the API
+    holder_name = db.Column("nome", db.String(255), nullable=False)
+    title = db.Column("titulo", db.String(255), nullable=False)
+    total_hours = db.Column("tempo_horas", db.Integer, nullable=True)
+    lessons = db.Column("licoes", postgresql.JSONB, nullable=True)
+    completed_at = db.Column("concluido_em", db.DateTime(timezone=True), nullable=False)
+    revoked_at = db.Column("revogado_em", db.DateTime(timezone=True), nullable=True)
+    created_at = db.Column("created_at", db.DateTime(timezone=True), nullable=False)
+    updated_at = db.Column("updated_at", db.DateTime(timezone=True), nullable=True)
+
+
 class KnowledgeBase(db.Model):
     """Knowledge Base links table"""
 

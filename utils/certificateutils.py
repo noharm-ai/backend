@@ -9,6 +9,10 @@ import secrets
 ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 CODE_LENGTH = 12
 GROUP_SIZE = 4
+# codes issued by NoHarm Aulas are shorter than training codes, so the length
+# alone says which table holds a code: certificado_externo, never
+# treinamento_usuario. Same alphabet.
+EXTERNAL_CODE_LENGTH = 8
 
 _FOLD = str.maketrans({"I": "1", "L": "1", "O": "0"})
 _NOT_ALPHABET = re.compile(f"[^{ALPHABET}]")
