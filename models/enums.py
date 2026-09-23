@@ -416,12 +416,14 @@ class AntimicrobialLevelEnum(Enum):
 
     How aggressive the antimicrobial is, from the WHO AWaRe groups. The culture
     card states it next to the drug (features/culture): Access is the least
-    aggressive, Reserve the one kept for last resort.
+    aggressive, Reserve the one kept for last resort. Not recommended is a
+    group apart: the antimicrobials whose use WHO advises against.
     """
 
     ACCESS = 1
     WATCH = 2
     RESERVE = 3
+    NOT_RECOMMENDED = 4
 
 
 class PrescriptionClinicalNoteStatusEnum(Enum):
