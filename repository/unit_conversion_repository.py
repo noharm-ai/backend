@@ -10,6 +10,10 @@ from models.main import (
     Substance,
     db,
 )
+from models.prescription import Prescription, PrescriptionDrug
+from models.segment import Segment
+
+RECENT_PRESCRIBED_UNITS_DAYS = 15
 
 
 def _build_units_cte(id_drug=None):
@@ -50,7 +54,35 @@ def _build_units_cte(id_drug=None):
         current_units = current_units.filter(MeasureUnitConvert.idDrug == id_drug)
         price_units = price_units.filter(DrugAttributes.idDrug == id_drug)
 
+        # presmed is too big to scan for every drug, only for a single one
+        return prescribed_units.union(
+            price_units,
+            current_units,
+            _build_recent_prescribed_units(id_drug=id_drug),
+        ).cte("units")
+
     return prescribed_units.union(price_units, current_units).cte("units")
+
+
+def _build_recent_prescribed_units(id_drug: int):
+    """Measure units used in recent presmed records for a drug.
+
+    Filters by fkmedicamento and idsegmento so the (fkmedicamento, idsegmento)
+    index is used instead of a full scan on presmed.
+    """
+    return (
+        db.session.query(
+            PrescriptionDrug.idDrug.label("idDrug"),
+            PrescriptionDrug.idMeasureUnit.label("idMeasureUnit"),
+        )
+        .join(Prescription, Prescription.id == PrescriptionDrug.idPrescription)
+        .filter(PrescriptionDrug.idDrug == id_drug)
+        .filter(PrescriptionDrug.idSegment.in_(db.session.query(Segment.id)))
+        .filter(Prescription.date > func.current_date() - RECENT_PRESCRIBED_UNITS_DAYS)
+        .filter(PrescriptionDrug.idMeasureUnit != None)
+        .filter(PrescriptionDrug.idMeasureUnit != "")
+        .group_by(PrescriptionDrug.idDrug, PrescriptionDrug.idMeasureUnit)
+    )
 
 
 def get_drugattributes_default_measure_unit_for_drug(id_drug: int):
