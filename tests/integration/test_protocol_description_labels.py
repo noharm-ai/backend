@@ -88,6 +88,18 @@ def _delete_protocol() -> None:
     session_commit()
 
 
+def _reset_session() -> None:
+    """Roll back a failed statement and restore the schema mapping.
+
+    ``tests/conftest.py`` hands out one session for the whole run, so a
+    statement that errors while a fixture is setting up would otherwise leave
+    the transaction aborted and fail every later test — here and in unrelated
+    modules — with "current transaction is aborted".
+    """
+    session.rollback()
+    session.connection(execution_options={"schema_translate_map": {None: "demo"}})
+
+
 def _clear_owned_rows() -> None:
     """Remove every row this module creates, in dependency order."""
     session.execute(
@@ -135,94 +147,99 @@ def seed_label_rows():
     of the session-wide cleanup, so a run that died before its teardown must
     not leave duplicate keys behind.
     """
-    _clear_owned_rows()
+    # setup and teardown are inside try/finally so that a statement failing
+    # here still rolls the session back and still cleans up: none of these
+    # tables are part of the session-wide cleanup in tests/conftest.py
+    try:
+        _clear_owned_rows()
 
-    session.execute(
-        text(
-            "INSERT INTO public.substancia (sctid, nome, link, ativo) "
-            "VALUES (:id, :name, '', true)"
-        ),
-        {"id": _SUBSTANCE[0], "name": _SUBSTANCE[1]},
-    )
-    # a class with a parent renders as "parent - child"; one without renders bare
-    for id_class, name, id_parent in (
-        (_PARENT_CLASS[0], _PARENT_CLASS[1], None),
-        (_CHILD_CLASS[0], _CHILD_CLASS[1], _PARENT_CLASS[0]),
-        (_ORPHAN_CLASS[0], _ORPHAN_CLASS[1], None),
-    ):
         session.execute(
             text(
-                "INSERT INTO public.classe (idclasse, idclassemae, nome) "
-                "VALUES (:id, :id_parent, :name)"
+                "INSERT INTO public.substancia (sctid, nome, link, ativo) "
+                "VALUES (:id, :name, '', true)"
             ),
-            {"id": id_class, "id_parent": id_parent, "name": name},
+            {"id": _SUBSTANCE[0], "name": _SUBSTANCE[1]},
         )
-    session.execute(
-        text(
-            "INSERT INTO demo.medicamento "
-            "(fkmedicamento, fkhospital, nome, created_at) "
-            "VALUES (:id, 1, :name, now())"
-        ),
-        {"id": _DRUG[0], "name": _DRUG[1]},
-    )
-    session.execute(
-        text(
-            "INSERT INTO public.tb_cid10 "
-            "(co_cid10, nu_cid10, tp_agravo, no_cid10, no_cid10_filtro, st_ativo) "
-            "VALUES (:id_int, :id_str, 0, :name, :name, 1)"
-        ),
-        {"id_int": _ICD[0], "id_str": _ICD[1], "name": _ICD[2]},
-    )
-    session.execute(
-        text(
-            "INSERT INTO demo.setor (fksetor, fkhospital, nome) "
-            "VALUES (:id, 1, :name)"
-        ),
-        {"id": _DEPARTMENT[0], "name": _DEPARTMENT[1]},
-    )
-    session.execute(
-        text(
-            "INSERT INTO demo.segmento "
-            "(idsegmento, nome, status, cpoe, cpoe_ambulatorio) "
-            "VALUES (:id, :name, 1, false, false)"
-        ),
-        {"id": _SEGMENT[0], "name": _SEGMENT[1]},
-    )
-    session.execute(
-        text(
-            "INSERT INTO demo.segmentoexame "
-            "(idsegmento, tpexame, abrev, nome, min, max, referencia, posicao, "
-            "ativo, update_at, update_by) "
-            "VALUES (:id_segment, :type_exam, 'ZZ', :name, 1, 10, 'ref', 1, true, "
-            "now(), 1)"
-        ),
-        {
-            "id_segment": _SEGMENT[0],
-            "type_exam": _EXAM_TYPE[0],
-            "name": _EXAM_TYPE[1],
-        },
-    )
-    session.execute(
-        text(
-            "INSERT INTO public.exame "
-            "(tpexame, nome, abrev, unidade, ativo, min_adulto, max_adulto, "
-            "referencia_adulto, created_at, created_by) "
-            "VALUES (:type_exam, :name, 'ZZG', 'mg', true, 1, 10, 'ref', now(), 1)"
-        ),
-        {"type_exam": _GLOBAL_EXAM[0], "name": _GLOBAL_EXAM[1]},
-    )
-    session.execute(
-        text(
-            "INSERT INTO demo.memoria (tipo, valor, update_at, update_by) "
-            "VALUES ('map-routes', CAST(:value AS json), now(), 1)"
-        ),
-        {"value": json.dumps(_MAP_ROUTES)},
-    )
-    session_commit()
+        # a class with a parent renders as "parent - child"; one without renders bare
+        for id_class, name, id_parent in (
+            (_PARENT_CLASS[0], _PARENT_CLASS[1], None),
+            (_CHILD_CLASS[0], _CHILD_CLASS[1], _PARENT_CLASS[0]),
+            (_ORPHAN_CLASS[0], _ORPHAN_CLASS[1], None),
+        ):
+            session.execute(
+                text(
+                    "INSERT INTO public.classe (idclasse, idclassemae, nome) "
+                    "VALUES (:id, :id_parent, :name)"
+                ),
+                {"id": id_class, "id_parent": id_parent, "name": name},
+            )
+        session.execute(
+            text(
+                "INSERT INTO demo.medicamento "
+                "(fkmedicamento, fkhospital, nome, created_at) "
+                "VALUES (:id, 1, :name, now())"
+            ),
+            {"id": _DRUG[0], "name": _DRUG[1]},
+        )
+        session.execute(
+            text(
+                "INSERT INTO public.tb_cid10 "
+                "(co_cid10, nu_cid10, tp_agravo, no_cid10, no_cid10_filtro, st_ativo) "
+                "VALUES (:id_int, :id_str, 0, :name, :name, 1)"
+            ),
+            {"id_int": _ICD[0], "id_str": _ICD[1], "name": _ICD[2]},
+        )
+        session.execute(
+            text(
+                "INSERT INTO demo.setor (fksetor, fkhospital, nome) "
+                "VALUES (:id, 1, :name)"
+            ),
+            {"id": _DEPARTMENT[0], "name": _DEPARTMENT[1]},
+        )
+        session.execute(
+            text(
+                "INSERT INTO demo.segmento "
+                "(idsegmento, nome, status, cpoe, cpoe_ambulatorio) "
+                "VALUES (:id, :name, 1, false, false)"
+            ),
+            {"id": _SEGMENT[0], "name": _SEGMENT[1]},
+        )
+        session.execute(
+            text(
+                "INSERT INTO demo.segmentoexame "
+                "(idsegmento, tpexame, abrev, nome, min, max, referencia, posicao, "
+                "ativo, update_at, update_by) "
+                "VALUES (:id_segment, :type_exam, 'ZZ', :name, 1, 10, 'ref', 1, true, "
+                "now(), 1)"
+            ),
+            {
+                "id_segment": _SEGMENT[0],
+                "type_exam": _EXAM_TYPE[0],
+                "name": _EXAM_TYPE[1],
+            },
+        )
+        session.execute(
+            text(
+                "INSERT INTO public.exame "
+                "(tpexame, nome, abrev, unidade, ativo, min_adulto, max_adulto, "
+                "referencia_adulto, created_at, created_by) "
+                "VALUES (:type_exam, :name, 'ZZG', 'mg', true, 1, 10, 'ref', now(), 1)"
+            ),
+            {"type_exam": _GLOBAL_EXAM[0], "name": _GLOBAL_EXAM[1]},
+        )
+        session.execute(
+            text(
+                "INSERT INTO demo.memoria (tipo, valor, update_at, update_by) "
+                "VALUES ('map-routes', CAST(:value AS json), now(), 1)"
+            ),
+            {"value": json.dumps(_MAP_ROUTES)},
+        )
+        session_commit()
 
-    yield
-
-    _clear_owned_rows()
+        yield
+    finally:
+        _reset_session()
+        _clear_owned_rows()
 
 
 @pytest.fixture

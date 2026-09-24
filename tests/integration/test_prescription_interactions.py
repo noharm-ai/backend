@@ -90,6 +90,18 @@ def _add_relation(sctid_a: int, sctid_b: int, kind: str, level: str, active=True
     session_commit()
 
 
+def _reset_session():
+    """Roll back a failed statement and restore the schema mapping.
+
+    ``tests/conftest.py`` hands out one session for the whole run, so a
+    statement that errors while a fixture is setting up would otherwise leave
+    the transaction aborted and fail every later test — here and in unrelated
+    modules — with "current transaction is aborted".
+    """
+    session.rollback()
+    session.connection(execution_options={"schema_translate_map": {None: "demo"}})
+
+
 def _clear_owned_rows():
     """Remove every row this module creates, in dependency order."""
     session.execute(text("DELETE FROM public.relacao WHERE sctida >= 90000"))
@@ -108,36 +120,39 @@ def seed_substances_and_drugs():
     The seed catalogue carries no sctid at all, so drug-interaction analysis
     skips every seeded drug — these rows are what makes it run.
     """
-    # public.relacao is not part of the session-wide cleanup, so a run that
-    # died before its teardown must not leak a relation into the next test
-    _clear_owned_rows()
+    # setup and teardown are inside try/finally so that a statement failing
+    # here still rolls the session back and still cleans up: none of these
+    # tables are part of the session-wide cleanup in tests/conftest.py
+    try:
+        _clear_owned_rows()
 
-    for sctid, name in (_SUBSTANCE_A, _SUBSTANCE_B, _SUBSTANCE_ALLERGEN):
+        for sctid, name in (_SUBSTANCE_A, _SUBSTANCE_B, _SUBSTANCE_ALLERGEN):
+            session.execute(
+                text(
+                    "INSERT INTO public.substancia (sctid, nome, link, ativo) "
+                    "VALUES (:id, :name, '', true)"
+                ),
+                {"id": sctid, "name": name},
+            )
+
+        _create_drug(_DRUG_A[0], _DRUG_A[1], _SUBSTANCE_A[0])
+        _create_drug(_DRUG_B[0], _DRUG_B[1], _SUBSTANCE_B[0])
+        _create_drug(_DRUG_ALLERGEN[0], _DRUG_ALLERGEN[1], _SUBSTANCE_ALLERGEN[0])
+        _create_drug(_DRUG_NO_SUBSTANCE[0], _DRUG_NO_SUBSTANCE[1], None)
+
         session.execute(
             text(
-                "INSERT INTO public.substancia (sctid, nome, link, ativo) "
-                "VALUES (:id, :name, '', true)"
+                "INSERT INTO demo.memoria (tipo, valor, update_at, update_by) "
+                "VALUES ('map-iv', CAST(:value AS json), now(), 1)"
             ),
-            {"id": sctid, "name": name},
+            {"value": json.dumps([_IV_ROUTE])},
         )
+        session_commit()
 
-    _create_drug(_DRUG_A[0], _DRUG_A[1], _SUBSTANCE_A[0])
-    _create_drug(_DRUG_B[0], _DRUG_B[1], _SUBSTANCE_B[0])
-    _create_drug(_DRUG_ALLERGEN[0], _DRUG_ALLERGEN[1], _SUBSTANCE_ALLERGEN[0])
-    _create_drug(_DRUG_NO_SUBSTANCE[0], _DRUG_NO_SUBSTANCE[1], None)
-
-    session.execute(
-        text(
-            "INSERT INTO demo.memoria (tipo, valor, update_at, update_by) "
-            "VALUES ('map-iv', CAST(:value AS json), now(), 1)"
-        ),
-        {"value": json.dumps([_IV_ROUTE])},
-    )
-    session_commit()
-
-    yield
-
-    _clear_owned_rows()
+        yield
+    finally:
+        _reset_session()
+        _clear_owned_rows()
 
 
 def _prescription_with(client, headers, drugs: list[dict], cpoe=False):
