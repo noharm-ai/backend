@@ -487,7 +487,7 @@ def _update_patient_conciliation_status(admission_number: int, is_concilia: bool
 
 
 def _get_score_variation(prescription: Prescription, features: dict):
-    new_score = int(features.get("globalScore", 0))
+    new_score = int(features.get("globalScore") or 0)
     initial_value = {
         "variation": 100,
         "currentGlobalScore": new_score,
@@ -507,10 +507,10 @@ def _get_score_variation(prescription: Prescription, features: dict):
         .first()
     )
 
-    if not previous_prescription:
+    if not previous_prescription or not previous_prescription.features:
         return initial_value
 
-    previous_score = int(previous_prescription.features.get("globalScore", 0))
+    previous_score = int(previous_prescription.features.get("globalScore") or 0)
     if previous_score == 0:
         return initial_value
 
