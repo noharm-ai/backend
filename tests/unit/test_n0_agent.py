@@ -513,3 +513,88 @@ def test_kb_tool_caches_the_error_result_too(aws_clients):
     assert first["status"] == "error"
     assert second == first
     bedrock.invoke_model.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# retrieval from the articles registered in NoHarm (knowledge_base.source)
+# ---------------------------------------------------------------------------
+
+DB_CONFIG = {
+    **N0_CONFIG,
+    "knowledge_base": {"source": "database", "max_articles": 3},
+}
+
+
+def _kb(id_article, content="<p>Clique em <b>Checar</b>.</p>", link=None):
+    """A knowledge base row, as the repository search returns it."""
+    return SimpleNamespace(
+        id=id_article,
+        title=f"Artigo {id_article}",
+        description="Resumo do artigo",
+        path=["Prescrição"],
+        section=["prescricao.exames"],
+        content=content,
+        link=link,
+    )
+
+
+def test_database_source_searches_the_registered_articles(aws_clients):
+    """With source=database the tool reads public.base_conhecimento, not S3"""
+    get_client, _, _, _ = aws_clients
+
+    with patch.object(
+        n0_agent.knowledge_base_repository, "search", return_value=[_kb(7)]
+    ) as search:
+        result = n0_agent._get_knowledge_base(query="pergunta", config=DB_CONFIG)
+
+    search.assert_called_once_with(query="pergunta", limit=3)
+    get_client.assert_not_called()
+
+    payload = result["content"][0]["json"]
+    assert result["status"] == "success"
+    assert payload["total"] == 1
+    assert payload["articles"][0]["article_id"] == 7
+    assert payload["articles"][0]["pages"] == ["Prescrição"]
+    assert payload["articles"][0]["sections"] == ["prescricao.exames"]
+
+
+def test_database_source_hands_the_agent_plain_text(aws_clients):
+    """The article body reaches the agent without the editor markup"""
+    article = _kb(7, link="https://kb.example.com/artigo")
+
+    with patch.object(
+        n0_agent.knowledge_base_repository, "search", return_value=[article]
+    ):
+        result = n0_agent._get_knowledge_base(query="pergunta", config=DB_CONFIG)
+
+    content = result["content"][0]["json"]["articles"][0]["content"]
+    assert "Artigo 7" in content
+    assert "Resumo do artigo" in content
+    assert "Clique em Checar." in content
+    assert "<" not in content
+    assert "https://kb.example.com/artigo" in content
+
+
+def test_database_source_default_article_limit(aws_clients):
+    """Without max_articles the search is capped at the default"""
+    config = {**N0_CONFIG, "knowledge_base": {"source": "database"}}
+
+    with patch.object(
+        n0_agent.knowledge_base_repository, "search", return_value=[]
+    ) as search:
+        n0_agent._get_knowledge_base(query="pergunta", config=config)
+
+    search.assert_called_once_with(
+        query="pergunta", limit=n0_agent.DEFAULT_MAX_ARTICLES
+    )
+
+
+def test_database_source_failure_degrades_into_a_message(aws_clients):
+    """A failing database search still answers the agent with the error payload"""
+    with patch.object(
+        n0_agent.knowledge_base_repository, "search", side_effect=RuntimeError("db")
+    ):
+        result = n0_agent._get_knowledge_base(query="pergunta", config=DB_CONFIG)
+
+    assert result["status"] == "error"
+    assert "text" in result["content"][0]

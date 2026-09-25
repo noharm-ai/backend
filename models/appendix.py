@@ -404,16 +404,18 @@ class ExternalCertificate(db.Model):
 
 
 class KnowledgeBase(db.Model):
-    """Knowledge Base links table"""
+    """Knowledge Base articles: authored here (content) or pointing elsewhere (link)"""
 
     __tablename__ = "base_conhecimento"
     __table_args__ = {"schema": "public"}
 
     id = db.Column("idbase_conhecimento", db.Integer, primary_key=True)
     path = db.Column("pagina", postgresql.ARRAY(db.String), nullable=False)
-    link = db.Column("link", db.String, nullable=False)
+    section = db.Column("secao", postgresql.ARRAY(db.String), nullable=True)
+    link = db.Column("link", db.String, nullable=True)
     title = db.Column("titulo", db.String, nullable=False)
     description = db.Column("resumo", db.String, nullable=True)
+    content = db.Column("conteudo", db.Text, nullable=True)
     active = db.Column("ativo", db.Boolean, nullable=False)
     updated_at = db.Column("updated_at", db.DateTime, nullable=True)
     updated_by = db.Column("updated_by", db.BigInteger, nullable=True)

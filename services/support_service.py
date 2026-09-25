@@ -640,13 +640,21 @@ def list_requesters(user_context: User):
 
 @has_permission(Permission.READ_BASIC_FEATURES)
 def list_knowledge_base_articles(request_data: KnowledgeBaseListRequest):
+    """List the help articles of a screen (or of its sections) for the panel.
+
+    The body is not sent: ``hasContent`` tells the panel the article can be
+    read in the app (GET /knowledge-base/<id>), ``link`` that it lives elsewhere.
+    """
     results = knowledge_base_repository.list_knowledge_base(request_data=request_data)
 
     return [
         {
+            "id": kb.id,
             "link": kb.link,
             "title": kb.title,
             "description": kb.description,
+            "section": kb.section or [],
+            "hasContent": bool(kb.content),
         }
         for kb in results
     ]

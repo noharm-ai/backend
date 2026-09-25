@@ -69,6 +69,7 @@ class Role(Enum):
             Permission.WRITE_CUSTOM_FORMS,
             Permission.ADMIN_APP_FEATURES,
             Permission.WRITE_HELP_TEXT,
+            Permission.WRITE_KNOWLEDGE_BASE,
         ],
     )
 
@@ -118,6 +119,7 @@ class Role(Enum):
             Permission.ADMIN_APP_FEATURES,
             Permission.WRITE_PROTOCOLS,
             Permission.WRITE_HELP_TEXT,
+            Permission.WRITE_KNOWLEDGE_BASE,
         ],
     )
 

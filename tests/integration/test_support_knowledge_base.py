@@ -10,10 +10,15 @@ draft article out of the product, and ``path`` is an array *overlap* — an
 article pinned to several screens must show up on each of them, and a request
 naming several screens must get the union. Neither is obvious from the query,
 so both are pinned down here, together with the alphabetical ordering the panel
-relies on and the narrow payload (an article's internal id is never exposed).
+relies on and the narrow payload (the article body is never sent: the panel
+opens it by id through GET /knowledge-base/<id>).
 
-Rows are seeded directly into the table: it is global (public schema), shared
-by every client, and has no write endpoint of its own.
+Articles can also be pinned to *sections* of a screen (``section``, another
+text array): asking for a screen and its sections returns the union.
+
+Rows are seeded directly into the table: it is global (public schema) and
+shared by every client. The write endpoints are covered in
+test_knowledge_base.py.
 """
 
 import pytest
@@ -211,15 +216,68 @@ def test_knowledge_base_combines_both_filters(client, analyst_headers):
 
 
 def test_knowledge_base_exposes_only_the_panel_fields(client, analyst_headers):
-    """POST /support/knowledge-base-articles - only link, title and description"""
+    """POST /support/knowledge-base-articles - the panel fields, never the body"""
     response = client.post(
         URL, json={"path": ["/relatorios"], "active": True}, headers=analyst_headers
     )
 
     articles = {item["title"]: item for item in response.get_json()["data"]}
-    assert set(articles[_REPORTS[3]].keys()) == {"link", "title", "description"}
+    assert set(articles[_REPORTS[3]].keys()) == {
+        "id",
+        "link",
+        "title",
+        "description",
+        "section",
+        "hasContent",
+    }
+    assert articles[_REPORTS[3]]["id"] == _REPORTS[0]
     assert articles[_REPORTS[3]]["link"] == _REPORTS[2]
     assert articles[_REPORTS[3]]["description"] == _REPORTS[4]
+    assert articles[_REPORTS[3]]["section"] == []
+    assert articles[_REPORTS[3]]["hasContent"] is False
+
+
+def test_knowledge_base_section_filter_selects_the_section(client, analyst_headers):
+    """POST /support/knowledge-base-articles - section returns the articles
+    pinned to that section of a screen"""
+    session.execute(
+        text(
+            "UPDATE public.base_conhecimento SET secao = :sections, "
+            "conteudo = '<p>corpo</p>' WHERE idbase_conhecimento = :id"
+        ),
+        {"sections": ["prescricao.exames"], "id": _PRESCRIPTION[0]},
+    )
+    session_commit()
+
+    response = client.post(
+        URL, json={"section": ["prescricao.exames"]}, headers=analyst_headers
+    )
+
+    data = response.get_json()["data"]
+    assert [item["title"] for item in data] == [_PRESCRIPTION[3]]
+    assert data[0]["section"] == ["prescricao.exames"]
+    assert data[0]["hasContent"] is True
+
+
+def test_knowledge_base_path_and_section_filters_are_a_union(client, analyst_headers):
+    """POST /support/knowledge-base-articles - a screen plus a section returns
+    the articles of either"""
+    session.execute(
+        text(
+            "UPDATE public.base_conhecimento SET pagina = '{}', secao = :sections "
+            "WHERE idbase_conhecimento = :id"
+        ),
+        {"sections": ["prescricao.exames"], "id": _PRESCRIPTION[0]},
+    )
+    session_commit()
+
+    response = client.post(
+        URL,
+        json={"path": ["/relatorios"], "section": ["prescricao.exames"]},
+        headers=analyst_headers,
+    )
+
+    assert set(_titles(response)) == {_PRESCRIPTION[3], _SHARED[3], _REPORTS[3]}
 
 
 def test_knowledge_base_article_without_a_description(client, analyst_headers):

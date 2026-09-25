@@ -120,3 +120,6 @@ class Permission(Enum):
     WRITE_PATIENT_TAGS = "WRITE_PATIENT_TAGS"  # permission to write patient tags
 
     WRITE_HELP_TEXT = "WRITE_HELP_TEXT"  # permission to create and edit help texts
+    WRITE_KNOWLEDGE_BASE = (
+        "WRITE_KNOWLEDGE_BASE"  # permission to create and edit knowledge base articles
+    )

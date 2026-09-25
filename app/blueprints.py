@@ -19,6 +19,7 @@ from routes.conciliation import app_conciliation
 from routes.drugs import app_drugs
 from routes.exams import app_exams
 from routes.help_text import app_help_text
+from routes.knowledge_base import app_knowledge_base
 from routes.intervention import app_itrv
 from routes.lists import app_lists
 from routes.memory import app_mem
@@ -94,6 +95,7 @@ def register_blueprints(app):
     app.register_blueprint(app_pres_crud)
     app.register_blueprint(app_pres_clinical_note)
     app.register_blueprint(app_help_text)
+    app.register_blueprint(app_knowledge_base)
 
     # Admin blueprints
     app.register_blueprint(app_admin_memory)

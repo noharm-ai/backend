@@ -5,6 +5,7 @@ import logging
 
 from botocore.config import Config
 from botocore.exceptions import ReadTimeoutError
+from flask import current_app, has_app_context
 from strands import Agent, tool
 from strands.models import BedrockModel
 
@@ -13,10 +14,17 @@ from models.appendix import GlobalMemory
 from models.enums import GlobalMemoryEnum
 from models.main import User, db
 from models.response.agents.n0_response import TicketForm
-from utils import aws, status
+from repository import knowledge_base_repository
+from utils import aws, htmlutils, status
 
 logging.basicConfig()
 logger = logging.getLogger("noharm.backend")
+
+# knowledge_base.source: where the agent looks the articles up
+KB_SOURCE_DATABASE = "database"  # articles registered in public.base_conhecimento
+KB_SOURCE_VECTOR_INDEX = "vector_index"  # ODOO articles indexed on S3 vectors
+
+DEFAULT_MAX_ARTICLES = 5
 
 
 def _get_config():
@@ -112,6 +120,10 @@ def wrap_kb(config: dict):
 
     call_state = {"called": False, "result": None}
 
+    # strands runs the tool on a worker thread: keep a handle on the app so the
+    # database lookup can open its own context (and session) there
+    app = current_app._get_current_object() if has_app_context() else None
+
     @tool(
         name="buscar_conhecimento",
         description="Busca informações na base de conhecimento da NoHarm. IMPORTANTE: Esta ferramenta pode ser chamada apenas UMA VEZ por consulta. Planeje sua busca cuidadosamente para obter todas as informações necessárias.",
@@ -125,7 +137,12 @@ def wrap_kb(config: dict):
             )
             return call_state["result"]
 
-        result = _get_knowledge_base(query=query, config=config)
+        if app is not None:
+            with app.app_context():
+                result = _get_knowledge_base(query=query, config=config)
+        else:
+            result = _get_knowledge_base(query=query, config=config)
+
         call_state["called"] = True
         call_state["result"] = result
 
@@ -135,7 +152,96 @@ def wrap_kb(config: dict):
 
 
 def _get_knowledge_base(query: str, config: dict) -> dict:
-    """Get the knowledge base for the agent."""
+    """Get the knowledge base for the agent, from the configured source."""
+
+    source = config.get("knowledge_base", {}).get("source", KB_SOURCE_VECTOR_INDEX)
+
+    if source == KB_SOURCE_DATABASE:
+        return _get_knowledge_base_from_database(query=query, config=config)
+
+    return _get_knowledge_base_from_vector_index(query=query, config=config)
+
+
+def _kb_success(articles: list[dict]) -> dict:
+    """The tool result the agent receives for the found articles."""
+    return {
+        "status": "success",
+        "content": [
+            {
+                "json": {
+                    "articles": articles,
+                    "total": len(articles),
+                },
+            }
+        ],
+    }
+
+
+def _kb_error() -> dict:
+    """The tool result the agent receives when the lookup failed."""
+    return {
+        "status": "error",
+        "content": [
+            {
+                "text": "Desculpe, ocorreu um erro ao buscar informações na base de conhecimento. Por favor, tente novamente mais tarde.",
+            }
+        ],
+    }
+
+
+def _article_text(kb) -> str:
+    """The article as plain text for the agent: title, summary, body, link."""
+    parts = [kb.title]
+
+    if kb.description:
+        parts.append(kb.description)
+
+    body = "".join(text for text, _ in htmlutils.html_to_runs(kb.content or ""))
+    if body:
+        parts.append(body)
+
+    if kb.link:
+        parts.append(f"Link do artigo: {kb.link}")
+
+    return "\n\n".join(parts)
+
+
+def _get_knowledge_base_from_database(query: str, config: dict) -> dict:
+    """Search the articles registered in public.base_conhecimento."""
+
+    try:
+        logger.info("Iniciando busca na base de conhecimento com a consulta: %s", query)
+
+        max_articles = config.get("knowledge_base", {}).get(
+            "max_articles", DEFAULT_MAX_ARTICLES
+        )
+
+        results = knowledge_base_repository.search(query=query, limit=max_articles)
+
+        logger.info(
+            "Encontrados %d artigos correspondentes na base de conhecimento.",
+            len(results),
+        )
+
+        return _kb_success(
+            [
+                {
+                    "article_id": kb.id,
+                    "title": kb.title,
+                    "pages": kb.path or [],
+                    "sections": kb.section or [],
+                    "content": _article_text(kb),
+                }
+                for kb in results
+            ]
+        )
+    except Exception as e:
+        logger.error("Error in _get_knowledge_base_from_database: %s", str(e))
+        return _kb_error()
+
+
+def _get_knowledge_base_from_vector_index(query: str, config: dict) -> dict:
+    """Search the ODOO articles indexed on S3 vectors."""
 
     try:
         logger.info("Iniciando busca na base de conhecimento com a consulta: %s", query)
@@ -198,24 +304,7 @@ def _get_knowledge_base(query: str, config: dict) -> dict:
                 }
             )
 
-        return {
-            "status": "success",
-            "content": [
-                {
-                    "json": {
-                        "articles": articles,
-                        "total": len(articles),
-                    },
-                }
-            ],
-        }
+        return _kb_success(articles)
     except Exception as e:
         logger.error("Error in _get_knowledge_base: %s", str(e))
-        return {
-            "status": "error",
-            "content": [
-                {
-                    "text": "Desculpe, ocorreu um erro ao buscar informações na base de conhecimento. Por favor, tente novamente mais tarde.",
-                }
-            ],
-        }
+        return _kb_error()
