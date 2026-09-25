@@ -535,3 +535,54 @@ def test_find_relations_drug_interaction_kind_dt_freq_sn_keeps_level(monkeypatch
     results = find_relations(drug_list, id_patient=1, is_cpoe=False)
 
     assert results["alerts"]["2"][0]["level"] == "high"
+
+
+def _relation_item(**overrides) -> dict:
+    """Comparable item as built by build_relation_item"""
+    item = {
+        "id": "1",
+        "drug": "Drug A",
+        "sctid": "111111",
+        "intravenous": False,
+        "group": None,
+        "prescriptionDate": "2026-01-01T08:00:00",
+        "expireDate": "2026-01-02T08:00:00",
+        "frequency": 1,
+        "rx": False,
+        "interval": None,
+    }
+    item.update(overrides)
+    return item
+
+
+def test_evaluate_kind_rules_reports_every_rule():
+    """Alertas interação: trace lista todas as regras do tipo, não só a primeira"""
+    from services.alert_interaction_service import evaluate_kind_rules
+
+    rules = evaluate_kind_rules(
+        kind="dm",
+        drug_from=_relation_item(frequency=66),
+        drug_to=_relation_item(id="2", drug="Drug B", expireDate="2026-01-01T07:00:00"),
+    )
+
+    assert {r["rule"]: r["passed"] for r in rules} == {
+        "not_allergy": True,
+        "not_now_frequency": False,
+        "time_overlap": True,
+    }
+
+
+def test_build_alert_explains_level_adjustments():
+    """Alertas interação: ajustes de nível são explicados"""
+    from services.alert_interaction_service import build_alert
+
+    alert = build_alert(
+        kind="dm",
+        relation={"text": "texto", "level": "high"},
+        drug_from=_relation_item(frequency=33),
+        drug_to=_relation_item(id="2", drug="Drug B"),
+    )
+
+    assert alert["level"] == "medium"
+    assert alert["ids"] == ["1"]
+    assert len(alert["level_notes"]) == 1
