@@ -1,9 +1,10 @@
 """Unit tests for ``exams_service.DynamoExam``.
 
 Exams reach the backend from two places: the ``exame`` table in PostgreSQL and
-the ``noharm_exame`` DynamoDB table the integration writes to. ``DynamoExam``
-is the adapter that makes a raw DynamoDB item look like an ``Exams`` row, so
-the rest of ``get_exams_by_admission`` can treat both sources alike.
+the DynamoDB table the integration writes to (see
+``exams_repository.get_exams_by_patient_from_dynamodb``). ``DynamoExam`` is the
+adapter that makes a raw DynamoDB item look like an ``Exams`` row, so the rest
+of ``get_exams_by_admission`` can treat both sources alike.
 
 It has to be forgiving: DynamoDB items are schemaless, results arrive as
 strings (or not at all) and the exam date may be a string, a real datetime or

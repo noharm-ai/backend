@@ -1,8 +1,9 @@
 """Tests: GET /exams/<admission> merging DynamoDB results with PostgreSQL ones
 
-Exam results reach the backend twice. The integration writes them to the
-``noharm_exame`` DynamoDB table as soon as they are released, and they land in
-the ``exame`` table in PostgreSQL later. ``exams_service.get_exams_by_admission``
+Exam results reach the backend twice. The integration writes them to DynamoDB
+as soon as they are released (see
+``exams_repository.get_exams_by_patient_from_dynamodb``), and they land in the
+``exame`` table in PostgreSQL later. ``exams_service.get_exams_by_admission``
 reads both and merges them, keyed by ``(fkexame, tpexame)``:
 
 * a result only DynamoDB knows about is reported right away, tagged
