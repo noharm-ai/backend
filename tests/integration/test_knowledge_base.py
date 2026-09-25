@@ -527,3 +527,86 @@ def test_reindex_article(client, curator_headers, analyst_headers):
         "id": article["id"],
         "vectorIndex": "disabled",
     }
+
+
+# --- knowledge base page (every user) ----------------------------------------
+
+
+def _browse(client, headers, **payload):
+    """POST /knowledge-base/articles, keeping only the test articles."""
+    response = client.post("/knowledge-base/articles", json=payload, headers=headers)
+    assert response.status_code == status.HTTP_200_OK
+
+    return [
+        article
+        for article in response.get_json()["data"]
+        if article["title"].startswith(TITLE_PREFIX)
+    ]
+
+
+def test_browse_lists_the_published_articles(client, curator_headers, analyst_headers):
+    """POST /knowledge-base/articles - published articles only, by title,
+    without the body or the maintenance fields"""
+    _create(client, curator_headers, title=f"{TITLE_PREFIX} B Relatórios")
+    _create(client, curator_headers, title=f"{TITLE_PREFIX} A Prescrição")
+    _create(client, curator_headers, title=f"{TITLE_PREFIX} C Rascunho", active=False)
+
+    articles = _browse(client, analyst_headers)
+
+    assert [a["title"] for a in articles] == [
+        f"{TITLE_PREFIX} A Prescrição",
+        f"{TITLE_PREFIX} B Relatórios",
+    ]
+    assert "content" not in articles[0]
+    assert "active" not in articles[0]
+    assert articles[0]["path"] == ["Prescrição"]
+    assert articles[0]["hasContent"] is True
+
+
+def test_browse_searches_like_the_agent(client, curator_headers, analyst_headers):
+    """POST /knowledge-base/articles - a term runs the accent insensitive full
+    text search, best match first, drafts excluded"""
+    _create(
+        client,
+        curator_headers,
+        title=f"{TITLE_PREFIX} Tela inicial",
+        description=None,
+        content="<p>As intervenções aparecem aqui.</p>",
+    )
+    _create(
+        client,
+        curator_headers,
+        title=f"{TITLE_PREFIX} Registrar intervenções",
+        description=None,
+        content="<p>Passo a passo.</p>",
+    )
+    _create(
+        client,
+        curator_headers,
+        title=f"{TITLE_PREFIX} Intervenção antiga",
+        active=False,
+    )
+    _create(client, curator_headers, title=f"{TITLE_PREFIX} Outro assunto")
+
+    articles = _browse(client, analyst_headers, term="intervencoes")
+
+    assert [a["title"] for a in articles] == [
+        f"{TITLE_PREFIX} Registrar intervenções",
+        f"{TITLE_PREFIX} Tela inicial",
+    ]
+
+
+def test_browse_blank_term_lists_everything(client, curator_headers, analyst_headers):
+    """POST /knowledge-base/articles - a blank term is no search"""
+    _create(client, curator_headers)
+
+    assert len(_browse(client, analyst_headers, term="   ")) == 1
+
+
+def test_browse_requires_read_basic_features(client):
+    """POST /knowledge-base/articles - no READ_BASIC_FEATURES, no page [401]"""
+    headers = make_headers(get_access(client, roles=[Role.DISPENSING_MANAGER.value]))
+
+    response = client.post("/knowledge-base/articles", json={}, headers=headers)
+
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED

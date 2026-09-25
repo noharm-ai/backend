@@ -23,6 +23,12 @@ class KnowledgeBaseManageListRequest(BaseModel):
     term: Optional[str] = None
 
 
+class KnowledgeBaseBrowseRequest(BaseModel):
+    """Filters for the knowledge base page every user browses"""
+
+    term: Optional[str] = Field(default=None, max_length=500)
+
+
 class KnowledgeBaseUpsertRequest(BaseModel):
     """Create (no id) or update (id) a knowledge base article"""
 

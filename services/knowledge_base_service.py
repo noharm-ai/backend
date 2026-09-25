@@ -7,6 +7,8 @@ from exception.validation_error import ValidationError
 from models.appendix import KnowledgeBase
 from models.main import User
 from models.requests.knowledge_base_request import (
+    KnowledgeBaseBrowseRequest,
+    KnowledgeBaseListRequest,
     KnowledgeBaseManageListRequest,
     KnowledgeBaseUpsertRequest,
 )
@@ -96,6 +98,38 @@ def list_articles(request_data: KnowledgeBaseManageListRequest):
     results = knowledge_base_repository.list_for_maintenance(request_data=request_data)
 
     return [_to_dict(kb, with_content=False) for kb in results]
+
+
+# a search returns the best matches only: past this they stop being relevant
+BROWSE_SEARCH_LIMIT = 50
+
+
+def _reader_dict(kb: KnowledgeBase) -> dict:
+    """An article summary for readers: no drafts, no maintenance fields"""
+    article = _to_dict(kb, with_content=False)
+    del article["active"]
+
+    return article
+
+
+@has_permission(Permission.READ_BASIC_FEATURES)
+def browse_articles(request_data: KnowledgeBaseBrowseRequest):
+    """The published articles for the knowledge base page.
+
+    Without a term: every published article, by title. With a term: the full
+    text search the n0 agent uses (accent insensitive, title weighted), best
+    match first.
+    """
+    if request_data.term and request_data.term.strip():
+        results = knowledge_base_repository.search(
+            query=request_data.term, limit=BROWSE_SEARCH_LIMIT
+        )
+    else:
+        results = knowledge_base_repository.list_knowledge_base(
+            request_data=KnowledgeBaseListRequest(active=True)
+        )
+
+    return [_reader_dict(kb) for kb in results]
 
 
 @has_permission(Permission.READ_BASIC_FEATURES, Permission.WRITE_KNOWLEDGE_BASE)

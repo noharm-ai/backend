@@ -4,6 +4,7 @@ from flask import Blueprint, request
 
 from decorators.api_endpoint_decorator import api_endpoint
 from models.requests.knowledge_base_request import (
+    KnowledgeBaseBrowseRequest,
     KnowledgeBaseManageListRequest,
     KnowledgeBaseUpsertRequest,
 )
@@ -22,6 +23,15 @@ def list_articles():
     """List articles for the maintenance screen"""
     return knowledge_base_service.list_articles(
         request_data=KnowledgeBaseManageListRequest(**(request.get_json() or {}))
+    )
+
+
+@app_knowledge_base.route("/knowledge-base/articles", methods=["POST"])
+@api_endpoint()
+def browse_articles():
+    """List (or search) the published articles for the knowledge base page"""
+    return knowledge_base_service.browse_articles(
+        request_data=KnowledgeBaseBrowseRequest(**(request.get_json() or {}))
     )
 
 
