@@ -27,17 +27,19 @@ def find_relations(drug_list, id_patient: int, is_cpoe: bool):
     allergies = _get_allergies(id_patient=id_patient)
     overlap_drugs = []
 
+    # built once per item: the pairs below only compare them
+    relation_items = []
     for item in filtered_list:
-        drug_from = build_relation_item(item=item, is_cpoe=is_cpoe)
+        relation_item = build_relation_item(item=item, is_cpoe=is_cpoe)
+        relation_items.append((item[0].id, relation_item, _period_dates(relation_item)))
 
-        for compare_item in filtered_list:
-            if item[0].id == compare_item[0].id:
+    for id_from, drug_from, dates_from in relation_items:
+        for id_to, drug_to, dates_to in relation_items:
+            if id_from == id_to:
                 continue
 
-            drug_to = build_relation_item(item=compare_item, is_cpoe=is_cpoe)
-
-            if get_period_mismatch(
-                drug_from=drug_from, drug_to=drug_to, is_cpoe=is_cpoe
+            if not _periods_compared(
+                dates1=dates_from, dates2=dates_to, is_cpoe=is_cpoe
             ):
                 continue
 
@@ -165,34 +167,53 @@ def build_relation_item(item, is_cpoe: bool) -> dict:
     }
 
 
-def get_period_mismatch(drug_from: dict, drug_to: dict, is_cpoe: bool) -> str | None:
-    """Checks if two prescribed drugs are compared at all.
-    Returns a user-friendly reason when they are not, None when they are"""
-    start1 = datetime.fromisoformat(drug_from["prescriptionDate"]).date()
-    end1 = datetime.fromisoformat(drug_from["expireDate"]).date()
-    start2 = datetime.fromisoformat(drug_to["prescriptionDate"]).date()
-    end2 = datetime.fromisoformat(drug_to["expireDate"]).date()
+def _period_dates(relation_item: dict) -> tuple:
+    """(start, end) days of a relation item, as compared between items"""
+    return (
+        datetime.fromisoformat(relation_item["prescriptionDate"]).date(),
+        datetime.fromisoformat(relation_item["expireDate"]).date(),
+    )
+
+
+def _periods_compared(dates1: tuple, dates2: tuple, is_cpoe: bool) -> bool:
+    """Two prescribed items are compared only when their periods match"""
+    start1, end1 = dates1
+    start2, end2 = dates2
 
     if is_cpoe:
         # period overlap
-        if not (start1 <= end2 and start2 <= end1):
-            return (
-                "Os períodos de vigência não se sobrepõem "
-                f"({drug_from['drug']}: {start1:%d/%m/%Y} a {end1:%d/%m/%Y}; "
-                f"{drug_to['drug']}: {start2:%d/%m/%Y} a {end2:%d/%m/%Y}). "
-                "Em CPOE, só são comparados itens com vigências sobrepostas."
-            )
-    else:
-        # same expire date
-        if end1 != end2:
-            return (
-                "Os itens têm datas de vigência diferentes "
-                f"({drug_from['drug']}: {end1:%d/%m/%Y}; "
-                f"{drug_to['drug']}: {end2:%d/%m/%Y}). "
-                "Só são comparados itens com a mesma data de vigência."
-            )
+        return start1 <= end2 and start2 <= end1
 
-    return None
+    # same expire date
+    return end1 == end2
+
+
+def get_period_mismatch(drug_from: dict, drug_to: dict, is_cpoe: bool) -> str | None:
+    """Checks if two prescribed drugs are compared at all.
+    Returns a user-friendly reason when they are not, None when they are"""
+    dates1 = _period_dates(drug_from)
+    dates2 = _period_dates(drug_to)
+
+    if _periods_compared(dates1=dates1, dates2=dates2, is_cpoe=is_cpoe):
+        return None
+
+    start1, end1 = dates1
+    start2, end2 = dates2
+
+    if is_cpoe:
+        return (
+            "Os períodos de vigência não se sobrepõem "
+            f"({drug_from['drug']}: {start1:%d/%m/%Y} a {end1:%d/%m/%Y}; "
+            f"{drug_to['drug']}: {start2:%d/%m/%Y} a {end2:%d/%m/%Y}). "
+            "Em CPOE, só são comparados itens com vigências sobrepostas."
+        )
+
+    return (
+        "Os itens têm datas de vigência diferentes "
+        f"({drug_from['drug']}: {end1:%d/%m/%Y}; "
+        f"{drug_to['drug']}: {end2:%d/%m/%Y}). "
+        "Só são comparados itens com a mesma data de vigência."
+    )
 
 
 def _yes_no(value) -> str:
