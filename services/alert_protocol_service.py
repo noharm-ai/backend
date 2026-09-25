@@ -132,7 +132,9 @@ def counts_to_summary(config: dict, drugs: list, prescription: Prescription) -> 
     # it was assigned in memory, which may be a plain date
     prescription_date = _as_date(prescription.date)
 
-    return any(d[13] is not None and _as_date(d[13]) == prescription_date for d in drugs)
+    return any(
+        d[13] is not None and _as_date(d[13]) == prescription_date for d in drugs
+    )
 
 
 def _as_date(value) -> date:

@@ -278,9 +278,7 @@ def _build_name_lookup(drug_list, configs: list[dict]) -> dict:
                 substance_ids.update(str(v) for v in variable.get("substance") or [])
                 drug_ids.update(str(v) for v in variable.get("drug") or [])
 
-    substance_ids = {
-        i for i in substance_ids if i not in substance_map and i.isdigit()
-    }
+    substance_ids = {i for i in substance_ids if i not in substance_map and i.isdigit()}
     drug_ids = {i for i in drug_ids if i not in drug_map and i.isdigit()}
 
     if substance_ids:
@@ -294,9 +292,7 @@ def _build_name_lookup(drug_list, configs: list[dict]) -> dict:
 
     if drug_ids:
         drugs = (
-            db.session.query(Drug)
-            .filter(Drug.id.in_([int(i) for i in drug_ids]))
-            .all()
+            db.session.query(Drug).filter(Drug.id.in_([int(i) for i in drug_ids])).all()
         )
         for drug in drugs:
             drug_map[str(drug.id)] = drug.name

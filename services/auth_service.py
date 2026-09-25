@@ -121,9 +121,7 @@ def _has_force_schema_permission(user: User, force_schema: str = None):
 def _schema_exists(schema: str) -> bool:
     """Check whether the given schema is configured."""
     return (
-        db.session.query(SchemaConfig)
-        .filter(SchemaConfig.schemaName == schema)
-        .first()
+        db.session.query(SchemaConfig).filter(SchemaConfig.schemaName == schema).first()
         is not None
     )
 

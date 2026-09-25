@@ -201,7 +201,7 @@ AGENT_SYSTEM_PROMPT = (
     'with trigger "{{sem_creatinina}}".\n'
     "Name the variable after what it detects when TRUE (tem_..., possui_...), "
     "because the trigger is what inverts it. Combine it freely with other "
-    "variables, e.g. \"{{idoso}} and not {{tem_creatinina}}\".\n"
+    'variables, e.g. "{{idoso}} and not {{tem_creatinina}}".\n'
     "This trick is ONLY for the numeric fields (exam, exam_ref, cn_stats, "
     "cultureReleaseTime), which "
     "have no negative operator. For list fields (substance, class, idDrug, "
@@ -639,8 +639,7 @@ def _combination_criteria_errors(variables: list) -> list[str]:
 
         if not has_criteria:
             errors.append(
-                f"Variável {variable.get('name')}: COMBO sem nenhum critério "
-                "preenchido"
+                f"Variável {variable.get('name')}: COMBO sem nenhum critério preenchido"
             )
 
     return errors

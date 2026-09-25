@@ -151,7 +151,9 @@ def test_create_user_trims_email(client, user_manager_headers):
 
     session_commit()
 
-    user = session.query(User).filter(User.id == response.get_json()["data"]["id"]).first()
+    user = (
+        session.query(User).filter(User.id == response.get_json()["data"]["id"]).first()
+    )
     assert user.email == email
 
 
@@ -394,3 +396,115 @@ def test_update_user_authorization(client, user_manager_headers):
     data["segments"] = [1]
     response = client.post("/editUser", json=data, headers=user_manager_headers)
     assert response.status_code == 200
+
+
+_EXTRA_EMAIL_PREFIX = "zztest_usrextra_"
+
+
+@pytest.fixture
+def extra_schema_users():
+    """Users from other schemas granted access through UserExtra: one to the
+    demo schema and one to a schema whose name only starts with demo"""
+
+    def _delete():
+        session.execute(
+            text(
+                "DELETE FROM public.usuario_extra WHERE idusuario IN "
+                "(SELECT idusuario FROM public.usuario WHERE email LIKE :prefix)"
+            ),
+            {"prefix": f"{_EXTRA_EMAIL_PREFIX}%"},
+        )
+        session.execute(
+            text("DELETE FROM public.usuario WHERE email LIKE :prefix"),
+            {"prefix": f"{_EXTRA_EMAIL_PREFIX}%"},
+        )
+        session_commit()
+
+    def _add(suffix, extra_schema):
+        email = f"{_EXTRA_EMAIL_PREFIX}{suffix}@example.com"
+        user_id = session.execute(
+            text(
+                "INSERT INTO public.usuario (nome, email, senha, schema, config, ativo) "
+                "VALUES (:name, :email, 'x', 'hsc_test', CAST(:config AS json), true) "
+                "RETURNING idusuario"
+            ),
+            {
+                "name": f"Fulano Beltrano {suffix}",
+                "email": email,
+                "config": json.dumps({"roles": [Role.VIEWER.value]}),
+            },
+        ).scalar()
+        session.execute(
+            text(
+                "INSERT INTO public.usuario_extra (idusuario, config, created_at, created_by) "
+                "VALUES (:id, CAST(:config AS json), now(), :id)"
+            ),
+            {
+                "id": user_id,
+                "config": json.dumps({"schemas": [{"name": extra_schema}]}),
+            },
+        )
+        session_commit()
+
+        return user_id
+
+    _delete()
+
+    try:
+        yield {"granted": _add("granted", "demo"), "similar": _add("similar", "demo2")}
+    finally:
+        _delete()
+
+
+def test_get_users_maintainer_lists_extra_schema_users(
+    client, admin_headers, extra_schema_users
+):
+    """Teste get /users/ - Mantenedor deve ver, somente leitura, usuários de outros schemas com acesso ao schema atual"""
+    response = client.get("/users", headers=admin_headers)
+
+    assert response.status_code == 200
+
+    users = {u["id"]: u for u in response.get_json()["data"]}
+
+    granted = users[extra_schema_users["granted"]]
+    assert granted["readOnly"] is True
+    assert granted["schema"] == "hsc_test"
+    assert granted["segments"] == []
+
+    assert extra_schema_users["similar"] not in users
+    assert all(not u["readOnly"] for u in users.values() if "schema" not in u)
+
+
+def test_get_users_ignores_extra_schema_users_without_maintainer(
+    client, user_manager_headers, extra_schema_users
+):
+    """Teste get /users/ - Sem MAINTAINER não deve listar usuários de outros schemas"""
+    response = client.get("/users", headers=user_manager_headers)
+
+    assert response.status_code == 200
+
+    ids = [u["id"] for u in response.get_json()["data"]]
+    assert extra_schema_users["granted"] not in ids
+    assert all(not u["readOnly"] for u in response.get_json()["data"])
+
+
+def test_send_reset_email_other_schema_user(client, admin_headers, extra_schema_users):
+    """Teste post /user-admin/send-reset-email - Não deve permitir usuário de outro schema"""
+    response = client.post(
+        "/user-admin/send-reset-email",
+        json={"idUser": extra_schema_users["granted"]},
+        headers=admin_headers,
+    )
+
+    assert response.status_code == 400
+
+
+def test_reset_token_other_schema_user(client, admin_headers, extra_schema_users):
+    """Teste post /user-admin/reset-token - Não deve permitir usuário de outro schema"""
+    response = client.post(
+        "/user-admin/reset-token",
+        json={"idUser": extra_schema_users["granted"]},
+        headers=admin_headers,
+    )
+
+    assert response.status_code == 400

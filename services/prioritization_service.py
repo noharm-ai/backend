@@ -120,7 +120,9 @@ def get_prioritization_list(request: PrioritizationRequest):
         observation = None
         if p.observation:
             observation = (
-                p.observation[:300] + "..." if len(p.observation) > 300 else p.observation
+                p.observation[:300] + "..."
+                if len(p.observation) > 300
+                else p.observation
             )
 
         results.append(

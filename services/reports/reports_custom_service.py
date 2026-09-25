@@ -238,9 +238,7 @@ def suggest_graphs(request_data: SuggestGraphsRequest) -> list[dict]:
         ],
         ensure_ascii=False,
     )
-    rows_json = json.dumps(
-        _truncate_rows(request_data.sampleRows), ensure_ascii=False
-    )
+    rows_json = json.dumps(_truncate_rows(request_data.sampleRows), ensure_ascii=False)
     existing_titles_json = json.dumps(request_data.existingTitles, ensure_ascii=False)
 
     user_message = (
@@ -369,9 +367,7 @@ def _sanitize_series(raw) -> list[dict]:
     return clean
 
 
-def _sanitize_suggestions(
-    parsed, request_data: SuggestGraphsRequest
-) -> list[dict]:
+def _sanitize_suggestions(parsed, request_data: SuggestGraphsRequest) -> list[dict]:
     """Validate and clean LLM-suggested chart configs, dropping anything invalid."""
     if isinstance(parsed, dict):
         parsed = parsed.get("charts", [])
