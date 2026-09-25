@@ -416,6 +416,10 @@ class KnowledgeBase(db.Model):
     title = db.Column("titulo", db.String, nullable=False)
     description = db.Column("resumo", db.String, nullable=True)
     content = db.Column("conteudo", db.Text, nullable=True)
+    # training lessons (TrainingItem ids) that complement the article
+    training_items = db.Column(
+        "treinamento_item", postgresql.ARRAY(db.Integer), nullable=True
+    )
     active = db.Column("ativo", db.Boolean, nullable=False)
     updated_at = db.Column("updated_at", db.DateTime, nullable=True)
     updated_by = db.Column("updated_by", db.BigInteger, nullable=True)

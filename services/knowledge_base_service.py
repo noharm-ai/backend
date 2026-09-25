@@ -10,11 +10,36 @@ from models.requests.knowledge_base_request import (
     KnowledgeBaseManageListRequest,
     KnowledgeBaseUpsertRequest,
 )
-from repository import knowledge_base_repository
+from repository import knowledge_base_repository, training_repository
+from services import knowledge_base_vector_service
+from services.knowledge_base_vector_service import ArticleDocument
 from utils import dateutils, status
 
 
-def _to_dict(kb: KnowledgeBase, with_content: bool) -> dict:
+def _lesson_dict(lesson, training) -> dict:
+    """A training lesson as the article references it"""
+    return {
+        "id": lesson.id,
+        "title": lesson.title,
+        "trainingId": training.id,
+        "trainingTitle": training.title,
+    }
+
+
+def _lessons(kb: KnowledgeBase, schema: str | None) -> list[dict]:
+    """The article lessons that still exist and are active; only those of the
+    modules ``schema`` sees, unless schema is None (maintainers)"""
+    return [
+        _lesson_dict(lesson, training)
+        for lesson, training in training_repository.list_lessons(
+            ids=kb.training_items or [], schema=schema
+        )
+    ]
+
+
+def _to_dict(
+    kb: KnowledgeBase, with_content: bool, lessons: list[dict] | None = None
+) -> dict:
     """Serialize an article; the body only goes out when asked for"""
     article = {
         "id": kb.id,
@@ -22,6 +47,7 @@ def _to_dict(kb: KnowledgeBase, with_content: bool) -> dict:
         "description": kb.description,
         "path": kb.path or [],
         "section": kb.section or [],
+        "trainingItems": kb.training_items or [],
         "link": kb.link,
         "active": kb.active,
         "hasContent": bool(kb.content),
@@ -31,8 +57,21 @@ def _to_dict(kb: KnowledgeBase, with_content: bool) -> dict:
 
     if with_content:
         article["content"] = kb.content
+        article["trainingLessons"] = lessons or []
 
     return article
+
+
+def _document(kb: KnowledgeBase, lessons: list[dict]) -> ArticleDocument:
+    """What the vector index gets from the article"""
+    return ArticleDocument(
+        id=kb.id,
+        title=kb.title,
+        active=kb.active,
+        description=kb.description,
+        content=kb.content,
+        lessons=[f"{item['trainingTitle']} › {item['title']}" for item in lessons],
+    )
 
 
 def _is_http_url(link: str) -> bool:
@@ -60,7 +99,9 @@ def list_articles(request_data: KnowledgeBaseManageListRequest):
 
 
 @has_permission(Permission.READ_BASIC_FEATURES, Permission.WRITE_KNOWLEDGE_BASE)
-def get_article(id_article: int, user_permissions: list[Permission]):
+def get_article(
+    id_article: int, user_context: User, user_permissions: list[Permission]
+):
     """Get an article with its content.
 
     Readers only see active articles; maintainers also see the inactive ones,
@@ -71,10 +112,15 @@ def get_article(id_article: int, user_permissions: list[Permission]):
     if kb is None:
         raise _not_found()
 
-    if not kb.active and Permission.WRITE_KNOWLEDGE_BASE not in user_permissions:
+    is_maintainer = Permission.WRITE_KNOWLEDGE_BASE in user_permissions
+
+    if not kb.active and not is_maintainer:
         raise _not_found()
 
-    return _to_dict(kb, with_content=True)
+    # readers only get the lessons their schema has access to
+    lessons = _lessons(kb, schema=None if is_maintainer else user_context.schema)
+
+    return _to_dict(kb, with_content=True, lessons=lessons)
 
 
 @has_permission(Permission.WRITE_KNOWLEDGE_BASE)
@@ -102,6 +148,15 @@ def upsert_article(request_data: KnowledgeBaseUpsertRequest, user_context: User)
             status.HTTP_400_BAD_REQUEST,
         )
 
+    if request_data.training_items:
+        found = training_repository.list_lessons(ids=request_data.training_items)
+        if len(found) != len(request_data.training_items):
+            raise ValidationError(
+                "Aula de treinamento inexistente ou inativa",
+                "errors.invalidParams",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
     record = None
     if request_data.id is not None:
         record = knowledge_base_repository.get_by_id(id_article=request_data.id)
@@ -112,4 +167,35 @@ def upsert_article(request_data: KnowledgeBaseUpsertRequest, user_context: User)
         request_data=request_data, record=record, user_id=user_context.id
     )
 
-    return _to_dict(kb, with_content=True)
+    lessons = _lessons(kb, schema=None)
+    article = _to_dict(kb, with_content=True, lessons=lessons)
+    # the article is saved even when the index is out of reach: the status
+    # tells the maintainer to reindex it later
+    article["vectorIndex"] = knowledge_base_vector_service.index_article(
+        _document(kb, lessons)
+    )
+
+    return article
+
+
+@has_permission(Permission.WRITE_KNOWLEDGE_BASE)
+def reindex_article(id_article: int):
+    """Write the article to the vector index again (or remove it, if inactive)"""
+    kb = knowledge_base_repository.get_by_id(id_article=id_article)
+    if kb is None:
+        raise _not_found()
+
+    status_index = knowledge_base_vector_service.index_article(
+        _document(kb, _lessons(kb, schema=None))
+    )
+
+    return {"id": kb.id, "vectorIndex": status_index}
+
+
+@has_permission(Permission.WRITE_KNOWLEDGE_BASE)
+def list_training_lessons():
+    """Every active lesson of the active training modules, for the article form"""
+    return [
+        _lesson_dict(lesson, training)
+        for lesson, training in training_repository.list_lessons()
+    ]

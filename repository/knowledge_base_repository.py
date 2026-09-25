@@ -142,6 +142,7 @@ def upsert(
     record.description = request_data.description
     record.path = request_data.path
     record.section = request_data.section
+    record.training_items = request_data.training_items
     record.link = request_data.link
     record.content = request_data.content
     record.active = request_data.active
@@ -150,6 +151,18 @@ def upsert(
     db.session.flush()
 
     return record
+
+
+def get_active_by_ids(ids: list[int]) -> list[KnowledgeBase]:
+    """The active articles among the given ids"""
+    if not ids:
+        return []
+
+    return (
+        db.session.query(KnowledgeBase)
+        .filter(KnowledgeBase.id.in_(ids), KnowledgeBase.active == True)
+        .all()
+    )
 
 
 def search(query: str, limit: int) -> list[KnowledgeBase]:

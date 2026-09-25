@@ -14,7 +14,8 @@ from models.appendix import GlobalMemory
 from models.enums import GlobalMemoryEnum
 from models.main import User, db
 from models.response.agents.n0_response import TicketForm
-from repository import knowledge_base_repository
+from repository import knowledge_base_repository, training_repository
+from services import knowledge_base_vector_service
 from utils import aws, htmlutils, status
 
 logging.basicConfig()
@@ -65,7 +66,7 @@ def run_n0(query: str, user: User) -> str:
         boto_client_config=_get_model_config(),
     )
 
-    get_kb = wrap_kb(config)
+    get_kb = wrap_kb(config, schema=user.schema)
 
     agent = Agent(
         tools=[get_kb],
@@ -115,8 +116,12 @@ def run_n0_form(query: str) -> str:
     ).model_dump()
 
 
-def wrap_kb(config: dict):
-    """Wrap the knowledge base tool for the agent with call limiting."""
+def wrap_kb(config: dict, schema: str = None):
+    """Wrap the knowledge base tool for the agent with call limiting.
+
+    ``schema`` is the user's: related training lessons are only mentioned when
+    that schema has access to their module.
+    """
 
     call_state = {"called": False, "result": None}
 
@@ -139,9 +144,9 @@ def wrap_kb(config: dict):
 
         if app is not None:
             with app.app_context():
-                result = _get_knowledge_base(query=query, config=config)
+                result = _get_knowledge_base(query=query, config=config, schema=schema)
         else:
-            result = _get_knowledge_base(query=query, config=config)
+            result = _get_knowledge_base(query=query, config=config, schema=schema)
 
         call_state["called"] = True
         call_state["result"] = result
@@ -151,15 +156,19 @@ def wrap_kb(config: dict):
     return get_kb
 
 
-def _get_knowledge_base(query: str, config: dict) -> dict:
+def _get_knowledge_base(query: str, config: dict, schema: str = None) -> dict:
     """Get the knowledge base for the agent, from the configured source."""
 
     source = config.get("knowledge_base", {}).get("source", KB_SOURCE_VECTOR_INDEX)
 
     if source == KB_SOURCE_DATABASE:
-        return _get_knowledge_base_from_database(query=query, config=config)
+        return _get_knowledge_base_from_database(
+            query=query, config=config, schema=schema
+        )
 
-    return _get_knowledge_base_from_vector_index(query=query, config=config)
+    return _get_knowledge_base_from_vector_index(
+        query=query, config=config, schema=schema
+    )
 
 
 def _kb_success(articles: list[dict]) -> dict:
@@ -189,8 +198,9 @@ def _kb_error() -> dict:
     }
 
 
-def _article_text(kb) -> str:
-    """The article as plain text for the agent: title, summary, body, link."""
+def _article_text(kb, lessons: list[str] = None) -> str:
+    """The article as plain text for the agent: title, summary, body, related
+    training lessons and link."""
     parts = [kb.title]
 
     if kb.description:
@@ -200,13 +210,39 @@ def _article_text(kb) -> str:
     if body:
         parts.append(body)
 
+    if lessons:
+        parts.append(
+            "Aulas de treinamento relacionadas (Central de Treinamento): "
+            + "; ".join(lessons)
+        )
+
     if kb.link:
         parts.append(f"Link do artigo: {kb.link}")
 
     return "\n\n".join(parts)
 
 
-def _get_knowledge_base_from_database(query: str, config: dict) -> dict:
+def _db_article(kb, schema: str = None) -> dict:
+    """A NoHarm article (public.base_conhecimento) as the agent receives it."""
+    lessons = [
+        f"{training.title} › {lesson.title}"
+        for lesson, training in training_repository.list_lessons(
+            ids=kb.training_items or [], schema=schema
+        )
+    ]
+
+    return {
+        "article_id": kb.id,
+        "title": kb.title,
+        "pages": kb.path or [],
+        "sections": kb.section or [],
+        "content": _article_text(kb, lessons),
+    }
+
+
+def _get_knowledge_base_from_database(
+    query: str, config: dict, schema: str = None
+) -> dict:
     """Search the articles registered in public.base_conhecimento."""
 
     try:
@@ -223,25 +259,17 @@ def _get_knowledge_base_from_database(query: str, config: dict) -> dict:
             len(results),
         )
 
-        return _kb_success(
-            [
-                {
-                    "article_id": kb.id,
-                    "title": kb.title,
-                    "pages": kb.path or [],
-                    "sections": kb.section or [],
-                    "content": _article_text(kb),
-                }
-                for kb in results
-            ]
-        )
+        return _kb_success([_db_article(kb, schema=schema) for kb in results])
     except Exception as e:
         logger.error("Error in _get_knowledge_base_from_database: %s", str(e))
         return _kb_error()
 
 
-def _get_knowledge_base_from_vector_index(query: str, config: dict) -> dict:
-    """Search the ODOO articles indexed on S3 vectors."""
+def _get_knowledge_base_from_vector_index(
+    query: str, config: dict, schema: str = None
+) -> dict:
+    """Search the S3 vector index: ODOO articles are read from the article
+    bucket, NoHarm ones (metadata.source) from public.base_conhecimento."""
 
     try:
         logger.info("Iniciando busca na base de conhecimento com a consulta: %s", query)
@@ -285,10 +313,27 @@ def _get_knowledge_base_from_vector_index(query: str, config: dict) -> dict:
 
         articles = []
         article_ids = set()
+        kb_ids = []
         for vector in vectors:
-            article_id = vector["metadata"].get("article_id", None)
+            metadata = vector.get("metadata", {})
+            if metadata.get("source") == knowledge_base_vector_service.VECTOR_SOURCE:
+                kb_id = metadata.get("kb_id", None)
+                if kb_id is not None and int(kb_id) not in kb_ids:
+                    kb_ids.append(int(kb_id))
+                continue
+
+            article_id = metadata.get("article_id", None)
             if article_id:
                 article_ids.add(article_id)
+
+        # best match first; an article unpublished since it was indexed is
+        # skipped (get_active_by_ids leaves it out)
+        records = {
+            kb.id: kb for kb in knowledge_base_repository.get_active_by_ids(kb_ids)
+        }
+        for kb_id in kb_ids:
+            if kb_id in records:
+                articles.append(_db_article(records[kb_id], schema=schema))
 
         for article_id in article_ids:
             filename = f"{config['knowledge_base']['path']}/article_{article_id}.txt"

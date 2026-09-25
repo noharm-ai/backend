@@ -525,7 +525,7 @@ DB_CONFIG = {
 }
 
 
-def _kb(id_article, content="<p>Clique em <b>Checar</b>.</p>", link=None):
+def _kb(id_article, content="<p>Clique em <b>Checar</b>.</p>", link=None, lessons=None):
     """A knowledge base row, as the repository search returns it."""
     return SimpleNamespace(
         id=id_article,
@@ -533,9 +533,19 @@ def _kb(id_article, content="<p>Clique em <b>Checar</b>.</p>", link=None):
         description="Resumo do artigo",
         path=["Prescrição"],
         section=["prescricao.exames"],
+        training_items=lessons or [],
         content=content,
         link=link,
     )
+
+
+@pytest.fixture(autouse=True)
+def no_lessons():
+    """Articles relate to no training lesson unless a test says otherwise."""
+    with patch.object(
+        n0_agent.training_repository, "list_lessons", return_value=[]
+    ) as list_lessons:
+        yield list_lessons
 
 
 def test_database_source_searches_the_registered_articles(aws_clients):
@@ -598,3 +608,85 @@ def test_database_source_failure_degrades_into_a_message(aws_clients):
 
     assert result["status"] == "error"
     assert "text" in result["content"][0]
+
+
+def _lesson(id_lesson, title, training_title):
+    """A (TrainingItem, Training) pair, as training_repository returns it."""
+    return (
+        SimpleNamespace(id=id_lesson, title=title),
+        SimpleNamespace(id=1, title=training_title),
+    )
+
+
+def test_database_source_mentions_the_lessons_the_schema_sees(no_lessons):
+    """Related lessons reach the agent, filtered by the user's schema"""
+    no_lessons.return_value = [_lesson(5, "Checagem", "Módulo Prescrição")]
+
+    with patch.object(
+        n0_agent.knowledge_base_repository, "search", return_value=[_kb(7, lessons=[5])]
+    ):
+        result = n0_agent._get_knowledge_base(
+            query="pergunta", config=DB_CONFIG, schema="hospital_teste"
+        )
+
+    no_lessons.assert_called_once_with(ids=[5], schema="hospital_teste")
+    content = result["content"][0]["json"]["articles"][0]["content"]
+    assert "Módulo Prescrição › Checagem" in content
+
+
+def test_wrap_kb_passes_the_schema_to_the_lookup():
+    """The tool built for a user searches with that user's schema"""
+    with patch.object(
+        n0_agent, "_get_knowledge_base", return_value={"status": "success"}
+    ) as lookup:
+        get_kb = n0_agent.wrap_kb(DB_CONFIG, schema="hospital_teste")
+        get_kb(query="pergunta")
+
+    lookup.assert_called_once_with(
+        query="pergunta", config=DB_CONFIG, schema="hospital_teste"
+    )
+
+
+def test_vector_index_reads_noharm_articles_from_the_database(aws_clients):
+    """NoHarm vectors (metadata.source) are read from the database, ODOO ones
+    from the article bucket, best match first and each article once"""
+    _, _, s3vectors, s3 = aws_clients
+    s3vectors.query_vectors.return_value = {
+        "vectors": [
+            {"key": "noharm-kb-9-0", "metadata": {"source": "noharm", "kb_id": 9}},
+            _vector("odoo-3"),
+            {"key": "noharm-kb-9-1", "metadata": {"source": "noharm", "kb_id": 9}},
+            {"key": "noharm-kb-4-0", "metadata": {"source": "noharm", "kb_id": 4}},
+        ]
+    }
+
+    with patch.object(
+        n0_agent.knowledge_base_repository,
+        "get_active_by_ids",
+        return_value=[_kb(4), _kb(9)],
+    ) as get_active:
+        result = n0_agent._get_knowledge_base(query="pergunta", config=N0_CONFIG)
+
+    get_active.assert_called_once_with([9, 4])
+    articles = result["content"][0]["json"]["articles"]
+    assert [a["article_id"] for a in articles] == [9, 4, "odoo-3"]
+    assert "Clique em Checar." in articles[0]["content"]
+    # only the ODOO article touches the bucket
+    s3.get_object.assert_called_once()
+
+
+def test_vector_index_skips_unpublished_noharm_articles(aws_clients):
+    """A NoHarm article unpublished after being indexed is not handed over"""
+    _, _, s3vectors, _ = aws_clients
+    s3vectors.query_vectors.return_value = {
+        "vectors": [
+            {"key": "noharm-kb-9-0", "metadata": {"source": "noharm", "kb_id": 9}}
+        ]
+    }
+
+    with patch.object(
+        n0_agent.knowledge_base_repository, "get_active_by_ids", return_value=[]
+    ):
+        result = n0_agent._get_knowledge_base(query="pergunta", config=N0_CONFIG)
+
+    assert result["content"][0]["json"]["total"] == 0

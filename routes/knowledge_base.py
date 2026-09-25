@@ -25,6 +25,13 @@ def list_articles():
     )
 
 
+@app_knowledge_base.route("/knowledge-base/training-lessons", methods=["GET"])
+@api_endpoint()
+def list_training_lessons():
+    """List the training lessons an article can be related to"""
+    return knowledge_base_service.list_training_lessons()
+
+
 @app_knowledge_base.route("/knowledge-base/<int:id_article>", methods=["GET"])
 @api_endpoint()
 def get_article(id_article: int):
@@ -39,3 +46,10 @@ def upsert_article():
     return knowledge_base_service.upsert_article(
         request_data=KnowledgeBaseUpsertRequest(**(request.get_json() or {}))
     )
+
+
+@app_knowledge_base.route("/knowledge-base/<int:id_article>/reindex", methods=["POST"])
+@api_endpoint()
+def reindex_article(id_article: int):
+    """Write an article to the n0 vector index again"""
+    return knowledge_base_service.reindex_article(id_article=id_article)

@@ -12,3 +12,6 @@
 ALTER TABLE public.base_conhecimento ALTER COLUMN link DROP NOT NULL;
 ALTER TABLE public.base_conhecimento ADD COLUMN IF NOT EXISTS secao varchar(255)[] NULL;
 ALTER TABLE public.base_conhecimento ADD COLUMN IF NOT EXISTS conteudo text NULL;
+
+-- Training lessons (treinamento_item) that complement the article
+ALTER TABLE public.base_conhecimento ADD COLUMN IF NOT EXISTS treinamento_item integer[] NULL;

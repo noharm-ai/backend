@@ -406,3 +406,29 @@ def finish_training(training_id: int, user_id: int) -> bool:
     db.session.add(record)
 
     return True
+
+
+def list_lessons(ids: list[int] = None, schema: str = None) -> list:
+    """Active lessons of active modules, as (TrainingItem, Training) pairs in
+    the order the training center shows them.
+
+    ``ids`` restricts to those lessons; ``schema`` to the modules that schema
+    sees (None: every module, for the maintainers linking lessons to articles)
+    """
+    query = (
+        db.session.query(TrainingItem, Training)
+        .join(Training, Training.id == TrainingItem.training_id)
+        .filter(TrainingItem.active == True, Training.active == True)
+    )
+
+    if ids is not None:
+        if not ids:
+            return []
+        query = query.filter(TrainingItem.id.in_(ids))
+
+    if schema is not None:
+        query = _visible_to_schema(query, schema)
+
+    return query.order_by(
+        Training.position, Training.id, TrainingItem.position, TrainingItem.id
+    ).all()

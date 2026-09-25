@@ -31,6 +31,7 @@ class KnowledgeBaseUpsertRequest(BaseModel):
     description: Optional[str] = None
     path: list[str] = []
     section: list[str] = []
+    training_items: list[int] = []
     link: Optional[str] = Field(default=None, max_length=255)
     content: Optional[str] = None
     active: bool = True
@@ -70,3 +71,9 @@ class KnowledgeBaseUpsertRequest(BaseModel):
                 cleaned.append(item)
 
         return cleaned
+
+    @field_validator("training_items")
+    @classmethod
+    def unique_training_items(cls, value: list[int]) -> list[int]:
+        """Drop duplicated lessons, keeping the given order"""
+        return list(dict.fromkeys(value))

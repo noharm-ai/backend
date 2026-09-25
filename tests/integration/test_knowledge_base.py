@@ -11,9 +11,18 @@ behaviour is pinned down here against the real full-text configuration: any
 word of the question counts, accents do not matter, the title weighs more than
 the body and inactive articles never come back.
 
+An article can also point to training lessons that complement it: readers only
+see the lessons of the modules their schema has access to (the training
+center's own visibility rule), maintainers see them all.
+
 ``public.base_conhecimento`` is global, shared by every client: every row these
 tests write has a title starting with ``ZZTest KB`` and is removed on the way in
-and on the way out.
+and on the way out. The training modules/lessons use ids 991000+ (the training
+tests use 990000+).
+
+The test database has no n0-agent configuration, so saving never reaches the
+vector index: the response reports it as disabled (the indexing itself is
+covered by tests/unit/test_knowledge_base_vector_service.py).
 """
 
 import pytest
@@ -45,6 +54,86 @@ def clean_articles():
     finally:
         session.rollback()
         _remove_test_articles()
+
+
+# training fixtures: a global module, a module of another schema and an
+# inactive lesson
+GLOBAL_TRAINING = 991001
+OTHER_SCHEMA_TRAINING = 991002
+LESSON_GLOBAL = 991001
+LESSON_OTHER_SCHEMA = 991002
+LESSON_INACTIVE = 991003
+_TRAINING_IDS = [GLOBAL_TRAINING, OTHER_SCHEMA_TRAINING]
+
+
+def _remove_training():
+    """Drop the seeded training modules and lessons."""
+    params = {"ids": _TRAINING_IDS}
+    for table in ("treinamento_item", "treinamento_esquema", "treinamento"):
+        session.execute(
+            text(f"DELETE FROM public.{table} WHERE idtreinamento = ANY(:ids)"), params
+        )
+    session_commit()
+
+
+@pytest.fixture
+def lessons():
+    """Seed the training modules/lessons the articles can point to."""
+    _remove_training()
+    try:
+        for id_training, position, scope in (
+            (GLOBAL_TRAINING, 1, "global"),
+            (OTHER_SCHEMA_TRAINING, 2, "schemas"),
+        ):
+            session.execute(
+                text(
+                    "INSERT INTO public.treinamento (idtreinamento, pagina, titulo, "
+                    "posicao, ativo, obrigatorio, escopo, audiencia, tempo_horas, "
+                    "created_at, created_by) VALUES (:id, :pagina, :titulo, :posicao, "
+                    "true, false, :escopo, 'all', 0, now(), 1)"
+                ),
+                {
+                    "id": id_training,
+                    "pagina": ["ZZTest"],
+                    "titulo": f"ZZTest Módulo {id_training}",
+                    "posicao": position,
+                    "escopo": scope,
+                },
+            )
+        session.execute(
+            text(
+                "INSERT INTO public.treinamento_esquema (idtreinamento, schema_name, "
+                "obrigatorio, created_at, created_by) "
+                "VALUES (:id, 'outro_hospital', false, now(), 1)"
+            ),
+            {"id": OTHER_SCHEMA_TRAINING},
+        )
+        for id_lesson, id_training, active in (
+            (LESSON_GLOBAL, GLOBAL_TRAINING, True),
+            (LESSON_OTHER_SCHEMA, OTHER_SCHEMA_TRAINING, True),
+            (LESSON_INACTIVE, GLOBAL_TRAINING, False),
+        ):
+            session.execute(
+                text(
+                    "INSERT INTO public.treinamento_item (idtreinamento_item, "
+                    "idtreinamento, titulo, posicao, ativo, created_at, created_by) "
+                    "VALUES (:id, :training, :titulo, 1, :ativo, now(), 1)"
+                ),
+                {
+                    "id": id_lesson,
+                    "training": id_training,
+                    "titulo": f"ZZTest Aula {id_lesson}",
+                    "ativo": active,
+                },
+            )
+        session_commit()
+
+        yield
+    finally:
+        session.rollback()
+        # articles first: nothing references the lessons, but keep it tidy
+        _remove_test_articles()
+        _remove_training()
 
 
 def _article(**overrides):
@@ -310,3 +399,131 @@ def test_search_skips_inactive_articles(client, curator_headers):
 def test_search_without_words(client):
     """search - a question with no searchable word returns nothing"""
     assert _search(client, "?! ...") == []
+
+
+# --- training lessons --------------------------------------------------------
+
+
+def test_training_lessons_for_the_form(client, curator_headers, lessons):
+    """GET /knowledge-base/training-lessons - active lessons of active modules"""
+    response = client.get("/knowledge-base/training-lessons", headers=curator_headers)
+
+    assert response.status_code == status.HTTP_200_OK
+    seeded = [
+        item
+        for item in response.get_json()["data"]
+        if item["trainingId"] in _TRAINING_IDS
+    ]
+    assert [item["id"] for item in seeded] == [LESSON_GLOBAL, LESSON_OTHER_SCHEMA]
+    assert seeded[0] == {
+        "id": LESSON_GLOBAL,
+        "title": f"ZZTest Aula {LESSON_GLOBAL}",
+        "trainingId": GLOBAL_TRAINING,
+        "trainingTitle": f"ZZTest Módulo {GLOBAL_TRAINING}",
+    }
+
+
+def test_training_lessons_require_write_knowledge_base(client, analyst_headers):
+    """GET /knowledge-base/training-lessons - readers are denied [401]"""
+    response = client.get("/knowledge-base/training-lessons", headers=analyst_headers)
+
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+def test_article_relates_lessons(client, curator_headers, lessons):
+    """POST /knowledge-base/upsert - lessons are stored and come back resolved"""
+    article = _create(
+        client, curator_headers, training_items=[LESSON_OTHER_SCHEMA, LESSON_GLOBAL]
+    )
+
+    assert article["trainingItems"] == [LESSON_OTHER_SCHEMA, LESSON_GLOBAL]
+    # in the training center order, whatever order they were picked in
+    assert [lesson["id"] for lesson in article["trainingLessons"]] == [
+        LESSON_GLOBAL,
+        LESSON_OTHER_SCHEMA,
+    ]
+
+
+@pytest.mark.parametrize("lesson", [LESSON_INACTIVE, 987654321])
+def test_article_rejects_unknown_or_inactive_lessons(
+    client, curator_headers, lessons, lesson
+):
+    """POST /knowledge-base/upsert - only existing, active lessons [400]"""
+    response = client.post(
+        "/knowledge-base/upsert",
+        json=_article(training_items=[LESSON_GLOBAL, lesson]),
+        headers=curator_headers,
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+def test_reader_sees_only_the_lessons_of_their_schema(
+    client, curator_headers, analyst_headers, lessons
+):
+    """GET /knowledge-base/<id> - a module of another schema is left out for
+    readers, while maintainers see every lesson"""
+    article = _create(
+        client, curator_headers, training_items=[LESSON_GLOBAL, LESSON_OTHER_SCHEMA]
+    )
+
+    reader = client.get(f"/knowledge-base/{article['id']}", headers=analyst_headers)
+    maintainer = client.get(f"/knowledge-base/{article['id']}", headers=curator_headers)
+
+    assert [x["id"] for x in reader.get_json()["data"]["trainingLessons"]] == [
+        LESSON_GLOBAL
+    ]
+    assert [x["id"] for x in maintainer.get_json()["data"]["trainingLessons"]] == [
+        LESSON_GLOBAL,
+        LESSON_OTHER_SCHEMA,
+    ]
+
+
+def test_lesson_deactivated_later_disappears(client, curator_headers, lessons):
+    """GET /knowledge-base/<id> - a lesson deactivated after being related is
+    no longer offered, though the relation is kept"""
+    article = _create(client, curator_headers, training_items=[LESSON_GLOBAL])
+    session.execute(
+        text(
+            "UPDATE public.treinamento_item SET ativo = false "
+            "WHERE idtreinamento_item = :id"
+        ),
+        {"id": LESSON_GLOBAL},
+    )
+    session_commit()
+
+    data = client.get(
+        f"/knowledge-base/{article['id']}", headers=curator_headers
+    ).get_json()["data"]
+
+    assert data["trainingLessons"] == []
+    assert data["trainingItems"] == [LESSON_GLOBAL]
+
+
+# --- vector index ------------------------------------------------------------
+
+
+def test_save_reports_the_vector_index_status(client, curator_headers):
+    """POST /knowledge-base/upsert - without an n0 index, indexing is disabled"""
+    article = _create(client, curator_headers)
+
+    assert article["vectorIndex"] == "disabled"
+
+
+def test_reindex_article(client, curator_headers, analyst_headers):
+    """POST /knowledge-base/<id>/reindex - maintainers only"""
+    article = _create(client, curator_headers)
+
+    denied = client.post(
+        f"/knowledge-base/{article['id']}/reindex", headers=analyst_headers
+    )
+    response = client.post(
+        f"/knowledge-base/{article['id']}/reindex", headers=curator_headers
+    )
+
+    assert denied.status_code == status.HTTP_401_UNAUTHORIZED
+    assert response.status_code == status.HTTP_200_OK
+    assert response.get_json()["data"] == {
+        "id": article["id"],
+        "vectorIndex": "disabled",
+    }
