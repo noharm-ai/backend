@@ -1,5 +1,7 @@
 from typing import List
 
+import pytest
+
 from services.alert_interaction_service import find_relations
 from tests.utils import utils_test_prescription
 
@@ -13,7 +15,7 @@ def _mock_get_allergies(data: List[dict]):
     return allergies
 
 
-def _mock_get_active_relations(kind: str):
+def _mock_get_active_relations(kind: str, level=1):
     def mock(*args, **kwargs):
         # Simulate the response from the database
         active_relations = {}
@@ -24,7 +26,7 @@ def _mock_get_active_relations(kind: str):
                 "sctidb": "111111",
                 "kind": kind,
                 "text": "Drug A interacts with Drug B",
-                "level": 1,
+                "level": level,
             },
         ]
 
@@ -468,3 +470,68 @@ def test_find_relations_drug_interaction_kind_dm_freq_now(monkeypatch):
     assert results["stats"]["iy"] == 0
     assert results["stats"]["sl"] == 0
     assert results["stats"]["rx"] == 0
+
+
+@pytest.mark.parametrize(
+    "configured_level,expected_level",
+    [
+        ("high", "medium"),
+        ("medium", "low"),
+        ("low", "low"),
+        (None, "low"),
+    ],
+)
+def test_find_relations_drug_interaction_kind_dm_freq_sn(
+    monkeypatch, configured_level, expected_level
+):
+    """Alertas interação: Testa redução de nível na interação tipo DM com frequencia SN"""
+
+    drug_list = [
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=1, dose=10, drug_name="Drug A", frequency=33
+        ),
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=2, dose=20, drug_name="Drug B"
+        ),
+    ]
+
+    monkeypatch.setattr(
+        "services.alert_interaction_service._get_allergies",
+        _mock_get_allergies(data=[]),
+    )
+    monkeypatch.setattr(
+        "services.alert_interaction_service._get_active_relations",
+        _mock_get_active_relations(kind="dm", level=configured_level),
+    )
+
+    results = find_relations(drug_list, id_patient=1, is_cpoe=False)
+
+    assert results["alerts"]["2"][0]["type"] == "dm"
+    assert results["alerts"]["2"][0]["level"] == expected_level
+    assert results["stats"]["dm"] == 1
+
+
+def test_find_relations_drug_interaction_kind_dt_freq_sn_keeps_level(monkeypatch):
+    """Alertas interação: Testa que frequencia SN não reduz nível fora do tipo DM"""
+
+    drug_list = [
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=1, dose=10, drug_name="Drug A", frequency=33
+        ),
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=2, dose=20, drug_name="Drug B"
+        ),
+    ]
+
+    monkeypatch.setattr(
+        "services.alert_interaction_service._get_allergies",
+        _mock_get_allergies(data=[]),
+    )
+    monkeypatch.setattr(
+        "services.alert_interaction_service._get_active_relations",
+        _mock_get_active_relations(kind="dt", level="high"),
+    )
+
+    results = find_relations(drug_list, id_patient=1, is_cpoe=False)
+
+    assert results["alerts"]["2"][0]["level"] == "high"

@@ -229,6 +229,13 @@ def find_relations(drug_list, id_patient: int, is_cpoe: bool):
                     else DrugAlertLevelEnum.LOW.value
                 )
 
+                # dm with frequency SN (33) has its level reduced
+                if kind == "dm" and (
+                    drug_from["frequency"] == FrequencyEnum.SN.value
+                    or drug_to["frequency"] == FrequencyEnum.SN.value
+                ):
+                    alert_level = _reduce_alert_level(alert_level)
+
                 alert_text = examutils.typeRelations[kind] + ": "
                 alert_text += stringutils.strNone(active_relations[key]["text"])
 
@@ -278,6 +285,14 @@ def find_relations(drug_list, id_patient: int, is_cpoe: bool):
                         alerts[id] = [alert_obj]
 
     return {"alerts": alerts, "stats": stats}
+
+
+def _reduce_alert_level(alert_level: str) -> str:
+    """reduce alert level by one step (high -> medium -> low)"""
+    if alert_level == DrugAlertLevelEnum.HIGH.value:
+        return DrugAlertLevelEnum.MEDIUM.value
+
+    return DrugAlertLevelEnum.LOW.value
 
 
 def _has_interval_intersection(interval1: str, interval2: str) -> bool:
