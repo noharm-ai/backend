@@ -251,7 +251,11 @@ def test_the_empty_kit_of_a_grouped_item_still_reports_a_string_price():
 
 
 def test_kit_sums_the_other_components_of_the_solution():
-    """Every other item of the group is listed, with its own price and cost unit."""
+    """Every other item of the group is listed, with its own price and cost unit.
+
+    The lookup has no ``ORDER BY``, so the components are compared by name
+    rather than in the order the database happened to return them.
+    """
     id_prescription = _create_prescription()
     id_item = _add_item(id_prescription, _DRUG_TARGET, 500, group=_GROUP)
     _add_item(id_prescription, _DRUG_PRICED, 501, group=_GROUP)
@@ -260,7 +264,7 @@ def test_kit_sums_the_other_components_of_the_solution():
     result = _price_kit(id_prescription, id_item)
 
     assert result["price"] == str(_PRICE + _PRICE_OTHER_UNIT)
-    assert result["list"] == [
+    assert sorted(result["list"], key=lambda component: component["name"]) == [
         {
             "name": f"ZZTEST KIT {_DRUG_PRICED}",
             "price": str(_PRICE),
