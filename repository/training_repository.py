@@ -3,6 +3,7 @@
 from datetime import datetime
 
 from sqlalchemy import and_, case, func, or_
+from sqlalchemy.dialects.postgresql import insert
 
 from models.main import User, db
 from models.enums import TrainingScopeEnum
@@ -231,22 +232,30 @@ def list_training_items(training_id: int, user_id: int) -> list:
 
 def finish_training_item(
     training_item_id: int, user_id: int, duration_seconds: int = None
-) -> TrainingItemUser:
-    """Create or update the record marking a training item as finished by a user"""
-    record = TrainingItemUser.query.get((training_item_id, user_id))
+):
+    """Create or update the record marking a training item as finished by a user.
 
-    if record is None:
-        record = TrainingItemUser()
-        record.training_item_id = training_item_id
-        record.user_id = user_id
-        record.created_at = datetime.today()
-        db.session.add(record)
-    else:
-        record.updated_at = datetime.today()
+    A single upsert rather than read-then-insert: two finish requests for the
+    same lesson (a double click, a client retry) would both miss the row on
+    read and the loser would fail on the primary key"""
+    now = datetime.today()
+    table = TrainingItemUser.__table__
 
-    record.duration_seconds = duration_seconds
+    stmt = insert(table).values(
+        idtreinamento_item=training_item_id,
+        idusuario=user_id,
+        duracao_segundos=duration_seconds,
+        created_at=now,
+    )
+    stmt = stmt.on_conflict_do_update(
+        index_elements=[table.c.idtreinamento_item, table.c.idusuario],
+        set_={
+            "duracao_segundos": stmt.excluded.duracao_segundos,
+            "updated_at": now,
+        },
+    )
 
-    return record
+    db.session.execute(stmt)
 
 
 def get_training_id_for_item(training_item_id: int) -> int:
@@ -390,19 +399,26 @@ def _generate_unique_validation_code() -> str:
 
 def finish_training(training_id: int, user_id: int) -> bool:
     """Create the record marking a training module as finished by a user, if
-    not already present. Returns True the first time it's created for this user"""
-    record = TrainingUser.query.get((training_id, user_id))
+    not already present. Returns True the first time it's created for this user.
 
-    if record is not None:
-        return False
+    Insert-or-ignore for the same reason as finish_training_item: concurrent
+    requests finishing the last lesson must not collide on the primary key"""
+    table = TrainingUser.__table__
 
-    record = TrainingUser()
-    record.training_id = training_id
-    record.user_id = user_id
-    # minted here rather than on first print: the column is NOT NULL, and the
-    # code belongs to the completion itself, not to the act of printing it
-    record.validation_code = _generate_unique_validation_code()
-    record.created_at = datetime.today()
-    db.session.add(record)
+    stmt = (
+        insert(table)
+        .values(
+            idtreinamento=training_id,
+            idusuario=user_id,
+            # minted here rather than on first print: the column is NOT NULL, and
+            # the code belongs to the completion itself, not to the act of printing it
+            codigo_validacao=_generate_unique_validation_code(),
+            created_at=datetime.today(),
+        )
+        .on_conflict_do_nothing(
+            index_elements=[table.c.idtreinamento, table.c.idusuario]
+        )
+        .returning(table.c.idtreinamento)
+    )
 
-    return True
+    return db.session.execute(stmt).first() is not None
