@@ -123,6 +123,13 @@ def _cleanup():
     # Admin global-memory test records (reserved kind prefix, includes _bkp rows)
     session.execute(text("DELETE FROM public.memoria WHERE tipo LIKE 'zztest-gm%'"))
 
+    # Login notifications and their dismissal records (ids >= 100000)
+    session.execute(text("DELETE FROM public.notifica WHERE idnotifica >= 100000"))
+    session.execute(
+        text("DELETE FROM public.memoria WHERE tipo LIKE 'info-alert-1000%'")
+    )
+    session.execute(text("DELETE FROM demo.memoria WHERE tipo LIKE 'info-alert-1000%'"))
+
     # Admin schema-memory test records (reserved kind prefix, includes _bkp rows)
     session.execute(text("DELETE FROM demo.memoria WHERE tipo LIKE 'zztest-am%'"))
 

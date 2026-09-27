@@ -173,7 +173,11 @@ def test_save_applies_the_conversions_to_every_segment(client, config_manager_he
     assert response.status_code == status.HTTP_200_OK
 
     segments = _segments()
-    assert response.get_json()["data"]["updated"] == [s.description for s in segments]
+    # the service reads the segments without an ORDER BY, so only the set of
+    # names it reports is part of the contract
+    assert sorted(response.get_json()["data"]["updated"]) == sorted(
+        s.description for s in segments
+    )
 
     saved = _conversions(_DRUG_SEGMENTS)
     assert set(saved) == {
