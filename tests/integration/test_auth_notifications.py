@@ -69,11 +69,15 @@ def _add_notification(
     session_commit()
 
 
-def _dismiss(id_notification: int, id_user=DEMO_USER_ID, schema="public"):
-    """Write the memory record that marks a notification as read."""
+def _dismiss(id_notification: int, id_user=DEMO_USER_ID):
+    """Write the memory record that marks a notification as read.
+
+    ``public`` is where the query looks for it — see the dismissal tests below
+    for the schema the app itself writes to.
+    """
     session.execute(
         text(
-            f"INSERT INTO {schema}.memoria (tipo, valor, update_at, update_by) "
+            "INSERT INTO public.memoria (tipo, valor, update_at, update_by) "
             "VALUES (:kind, CAST('true' AS json), now(), :user)"
         ),
         {"kind": f"info-alert-{id_notification}-{id_user}", "user": id_user},
@@ -85,10 +89,12 @@ def _cleanup():
     session.execute(
         text("DELETE FROM public.notifica WHERE idnotifica >= :base"), {"base": BASE_ID}
     )
-    for schema in ("public", "demo"):
-        session.execute(
-            text(f"DELETE FROM {schema}.memoria WHERE tipo LIKE 'info-alert-1000%'")
-        )
+    # both schemas: the query reads the dismissal from public, the app writes
+    # it to the tenant schema
+    session.execute(
+        text("DELETE FROM public.memoria WHERE tipo LIKE 'info-alert-1000%'")
+    )
+    session.execute(text("DELETE FROM demo.memoria WHERE tipo LIKE 'info-alert-1000%'"))
     session_commit()
 
 
