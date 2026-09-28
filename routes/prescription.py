@@ -6,8 +6,10 @@ from flask import Blueprint, request
 from markupsafe import escape as escape_html
 
 from decorators.api_endpoint_decorator import api_endpoint
+from models.requests.interaction_trace_request import InteractionTraceRequest
 from models.requests.prioritization_request import PrioritizationRequest
 from services import (
+    interaction_trace_service,
     prescription_check_service,
     prescription_drug_service,
     prescription_service,
@@ -121,6 +123,15 @@ def get_prescriptions():
     )
 
     return prioritization_service.get_prioritization_list(prioritization_request)
+
+
+@app_pres.route("/prescriptions/interaction-trace", methods=["GET"])
+@api_endpoint()
+def trace_interaction():
+    """Explain why an interaction alert was or was not raised between two items"""
+    return interaction_trace_service.trace_interaction(
+        request_data=InteractionTraceRequest(**request.args.to_dict(flat=True))
+    )
 
 
 @app_pres.route("/prescriptions/<int:idPrescription>", methods=["GET"])
