@@ -1,7 +1,9 @@
 """Repository: User related operations"""
 
 from typing import Union, List
-from sqlalchemy import func, or_, desc, asc
+from sqlalchemy import func, or_, desc, asc, cast
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import aliased
 
 from models.main import db, User, UserAuthorization, UserExtra
 from security.role import Role
@@ -80,6 +82,23 @@ def get_admin_users_list(schema: str):
 
     query = db.session.query(User, segments_query.scalar_subquery()).filter(
         User.schema == schema
+    )
+
+    return _remove_staff_users(query).order_by(desc(User.active), asc(User.name)).all()
+
+
+def get_extra_schema_users_list(schema: str):
+    """Get users from other schemas that were granted access to this schema
+    through UserExtra, removing staff users"""
+    # aliased so it does not correlate with the UserExtra in _remove_staff_users
+    grant = aliased(UserExtra)
+    query = (
+        db.session.query(User)
+        .join(grant, grant.idUser == User.id)
+        .filter(User.schema != schema)
+        # containment matches the exact schema name (a LIKE would let "demo"
+        # match "demo2")
+        .filter(cast(grant.config["schemas"], JSONB).contains([{"name": schema}]))
     )
 
     return _remove_staff_users(query).order_by(desc(User.active), asc(User.name)).all()

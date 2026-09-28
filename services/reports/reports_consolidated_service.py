@@ -63,7 +63,9 @@ def get_patient_day_report(request_data: PatientDayReportRequest, user_context: 
 
 
 @has_permission(Permission.READ_REPORTS)
-def get_prescription_report(request_data: PrescriptionReportRequest, user_context: User):
+def get_prescription_report(
+    request_data: PrescriptionReportRequest, user_context: User
+):
     if Config.ENV == NoHarmENV.TEST.value:
         return {}
 
@@ -71,7 +73,9 @@ def get_prescription_report(request_data: PrescriptionReportRequest, user_contex
         "command": "lambda_query_reports.get_prescription_report",
         "schema": user_context.schema,
         "year": request_data.year,
-        "id_department": request_data.id_department if request_data.id_department else None,
+        "id_department": request_data.id_department
+        if request_data.id_department
+        else None,
         "segment": request_data.segment if request_data.segment else None,
         "start_date": (
             request_data.start_date.isoformat() if request_data.start_date else None
@@ -106,7 +110,9 @@ def get_economy_report(request_data: EconomyReportRequest, user_context: User):
         "end_date": (
             request_data.end_date.isoformat() if request_data.end_date else None
         ),
-        "economy_type": request_data.economy_type if request_data.economy_type else None,
+        "economy_type": request_data.economy_type
+        if request_data.economy_type
+        else None,
         "status": request_data.status if request_data.status else None,
         "responsible": request_data.responsible if request_data.responsible else None,
         "economy_value_type": request_data.economy_value_type

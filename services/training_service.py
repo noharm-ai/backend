@@ -297,10 +297,6 @@ def finish_training_item(
             training_id=training_id, user_id=user_context.id
         )
 
-    # the writes above are only staged in the session, and the summary below
-    # counts finished lessons and modules
-    db.session.flush()
-
     return {
         "moduleFinished": module_finished,
         "training": get_mandatory_summary(

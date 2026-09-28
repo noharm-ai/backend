@@ -30,11 +30,17 @@ them. Measure units are keyed by text and fall outside that window, so this
 module deletes the ones it creates itself.
 """
 
+from datetime import datetime, timedelta
+
 import pytest
 from sqlalchemy import text
 
 from models.enums import DefaultMeasureUnitEnum
 from tests.conftest import session, session_commit
+from tests.utils.utils_test_prescription import (
+    create_prescription,
+    create_prescription_drug,
+)
 from tests.utils.utils_test_unit_conversion import (
     create_test_drug,
     create_test_substance,
@@ -64,7 +70,15 @@ _DRUG_TWO_UNITS = 90805  # two different units configured across segments
 _DRUG_NO_SUBSTANCE_UNIT = 90806  # substance names no default unit
 _DRUG_BLANK_UNITS = 90807  # only blank/NULL unit ids anywhere
 _DRUG_PERMISSIONS = 90808  # target of the permission checks
+_DRUG_PRESMED_ONLY = 90809  # no prescricaoagg, only presmed records
+_DRUG_AGG_AND_PRESMED = 90810  # prescricaoagg and presmed combined
 _UNKNOWN_DRUG = 90899
+
+# Prescriptions for the presmed fallback (>= 100000, removed by the global
+# cleanup together with their presmed rows).
+_PRESCRIPTION_RECENT_A = 108001
+_PRESCRIPTION_RECENT_B = 108002
+_PRESCRIPTION_OLD = 108003
 
 # Both segments in the demo schema; the per-segment fold is only visible
 # because the seed has more than one.
@@ -108,6 +122,8 @@ def setup_unit_conversion_read_data(clean_test_artifacts):  # noqa: ARG001
         _DRUG_TWO_UNITS,
         _DRUG_BLANK_UNITS,
         _DRUG_PERMISSIONS,
+        _DRUG_PRESMED_ONLY,
+        _DRUG_AGG_AND_PRESMED,
     ):
         create_test_drug(
             id_drug, f"ZZTest Medicamento UC {id_drug}", _SCTID_WITH_DEFAULT
@@ -120,6 +136,7 @@ def setup_unit_conversion_read_data(clean_test_artifacts):  # noqa: ARG001
     )
 
     _seed_conversion_sources()
+    _seed_presmed_sources()
 
     yield
 
@@ -217,6 +234,54 @@ def _seed_conversion_sources():
     _prescribed(_DRUG_PERMISSIONS, _UNIT_PRESCRIBED)
 
     session_commit()
+
+
+def _seed_presmed_sources():
+    """Prescribe the fallback drugs directly in presmed, recent and old."""
+    now = datetime.now()
+    create_prescription(
+        id=_PRESCRIPTION_RECENT_A,
+        admissionNumber=_PRESCRIPTION_RECENT_A,
+        idPatient=1,
+        idSegment=_SEGMENT_A,
+        date=now,
+    )
+    create_prescription(
+        id=_PRESCRIPTION_RECENT_B,
+        admissionNumber=_PRESCRIPTION_RECENT_B,
+        idPatient=1,
+        idSegment=_SEGMENT_B,
+        date=now - timedelta(days=5),
+    )
+    create_prescription(
+        id=_PRESCRIPTION_OLD,
+        admissionNumber=_PRESCRIPTION_OLD,
+        idPatient=1,
+        idSegment=_SEGMENT_A,
+        date=now - timedelta(days=90),
+        expire=now - timedelta(days=89),
+    )
+
+    def _presmed(seq, id_prescription, id_drug, unit, segment):
+        create_prescription_drug(
+            id=int(f"{id_prescription}{seq:03d}"),
+            idPrescription=id_prescription,
+            idDrug=id_drug,
+            idMeasureUnit=unit,
+            idSegment=segment,
+        )
+
+    # recent records in both segments are offered
+    _presmed(1, _PRESCRIPTION_RECENT_A, _DRUG_PRESMED_ONLY, _UNIT_PRESCRIBED, 1)
+    _presmed(1, _PRESCRIPTION_RECENT_B, _DRUG_PRESMED_ONLY, _UNIT_CONVERTED, 2)
+    # an old record and a blank unit are not
+    _presmed(1, _PRESCRIPTION_OLD, _DRUG_PRESMED_ONLY, _UNIT_PRICE, 1)
+    _presmed(2, _PRESCRIPTION_RECENT_A, _DRUG_PRESMED_ONLY, "", 1)
+
+    # presmed is queried even when prescricaoagg has rows
+    _prescribed(_DRUG_AGG_AND_PRESMED, _UNIT_PRESCRIBED)
+    session_commit()
+    _presmed(3, _PRESCRIPTION_RECENT_A, _DRUG_AGG_AND_PRESMED, _UNIT_CONVERTED, 1)
 
 
 def _read(client, headers, id_drug):
@@ -355,6 +420,37 @@ def test_substance_without_default_unit_falls_back_to_un(
     assert by_unit[fallback]["default"] is True
     assert by_unit[fallback]["factor"] == 1
     assert by_unit[_UNIT_PRESCRIBED]["factor"] is None
+
+
+def test_recent_presmed_units_are_offered_without_prescription_agg(
+    client, config_manager_headers
+):
+    """A drug missing from prescricaoagg still gets units from recent presmed [200]."""
+    response = _read(client, config_manager_headers, _DRUG_PRESMED_ONLY)
+
+    assert response.status_code == status.HTTP_200_OK
+    # recent units from both segments, plus the appended substance default;
+    # the 90-day-old unit and the blank one are left out
+    assert set(_by_unit(response)) == {
+        _UNIT_PRESCRIBED,
+        _UNIT_CONVERTED,
+        _UNIT_DEFAULT,
+    }
+
+
+def test_presmed_units_are_combined_with_prescription_agg(
+    client, config_manager_headers
+):
+    """Units from prescricaoagg and recent presmed are offered together [200]."""
+    response = _read(client, config_manager_headers, _DRUG_AGG_AND_PRESMED)
+
+    assert response.status_code == status.HTTP_200_OK
+    # prescricaoagg names one unit, presmed another
+    assert set(_by_unit(response)) == {
+        _UNIT_PRESCRIBED,
+        _UNIT_CONVERTED,
+        _UNIT_DEFAULT,
+    }
 
 
 def test_blank_measure_units_are_not_offered(client, config_manager_headers):

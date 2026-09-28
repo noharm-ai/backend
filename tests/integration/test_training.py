@@ -9,6 +9,7 @@ is the user behind the ``analyst_headers`` fixture; that user's schema is
 """
 
 import re
+import threading
 
 import pytest
 from sqlalchemy import text
@@ -16,9 +17,10 @@ from sqlalchemy import text
 from config import Config
 from exception.validation_error import ValidationError
 from mobile import app
+from models.main import db
 from repository import training_repository
 from security.role import Role
-from tests.conftest import get_access, make_headers, session, session_commit
+from tests.conftest import engine, get_access, make_headers, session, session_commit
 
 TRAINING_ID = 990001
 INACTIVE_TRAINING_ID = 990002
@@ -378,6 +380,90 @@ def test_finishing_completed_module_again_returns_false(client, analyst_headers)
 
     assert again.status_code == 200
     assert again.get_json()["data"]["moduleFinished"] is False
+
+
+def _commit_competing_insert(sql, params):
+    """Insert a row from a separate transaction and keep it uncommitted for a
+    moment: the caller's write then runs while the row exists but is not yet
+    visible to it, the window two concurrent finish requests race in. The
+    commit happens on a timer thread so the caller can block on the row lock."""
+    connection = engine.connect()
+    transaction = connection.begin()
+    connection.execute(text(sql), params)
+
+    def _commit():
+        transaction.commit()
+        connection.close()
+
+    timer = threading.Timer(0.5, _commit)
+    timer.start()
+    return timer
+
+
+def test_concurrent_finish_of_the_same_item_does_not_collide():
+    """A lesson finished by a concurrent request between our read and our write
+    is updated, not inserted a second time (UniqueViolation on the pkey)."""
+    timer = _commit_competing_insert(
+        "INSERT INTO public.treinamento_item_usuario "
+        "(idtreinamento_item, idusuario, duracao_segundos, created_at) "
+        "VALUES (:item, :uid, 10, now())",
+        {"item": ITEM_1_ID, "uid": DEMO_USER_ID},
+    )
+
+    try:
+        with app.app_context():
+            training_repository.finish_training_item(
+                training_item_id=ITEM_1_ID, user_id=DEMO_USER_ID, duration_seconds=621
+            )
+            db.session.commit()
+    finally:
+        timer.join()
+
+    rows = session.execute(
+        text(
+            "SELECT duracao_segundos, updated_at FROM public.treinamento_item_usuario "
+            "WHERE idtreinamento_item = :item AND idusuario = :uid"
+        ),
+        {"item": ITEM_1_ID, "uid": DEMO_USER_ID},
+    ).all()
+    session_commit()
+
+    assert len(rows) == 1
+    assert rows[0][0] == 621
+    assert rows[0][1] is not None
+
+
+def test_concurrent_finish_of_the_same_module_does_not_collide():
+    """A module completed by a concurrent request is left alone and reported as
+    not newly finished, instead of failing on the pkey."""
+    timer = _commit_competing_insert(
+        "INSERT INTO public.treinamento_usuario "
+        "(idtreinamento, idusuario, codigo_validacao, created_at) "
+        "VALUES (:id, :uid, 'TESTRACE0001', now())",
+        {"id": TRAINING_ID, "uid": DEMO_USER_ID},
+    )
+
+    try:
+        with app.app_context():
+            created = training_repository.finish_training(
+                training_id=TRAINING_ID, user_id=DEMO_USER_ID
+            )
+            db.session.commit()
+    finally:
+        timer.join()
+
+    code = session.execute(
+        text(
+            "SELECT codigo_validacao FROM public.treinamento_usuario "
+            "WHERE idtreinamento = :id AND idusuario = :uid"
+        ),
+        {"id": TRAINING_ID, "uid": DEMO_USER_ID},
+    ).scalar_one()
+    session_commit()
+
+    assert created is False
+    # the competing completion keeps the code it was minted with
+    assert code == "TESTRACE0001"
 
 
 def test_finish_item_requires_basic_features_permission(client):

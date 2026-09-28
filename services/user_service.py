@@ -172,7 +172,7 @@ def admin_get_reset_token(id_user: int, user_context: User):
         .filter(User.active == True)
         .first()
     )
-    if not reset_user:
+    if not reset_user or reset_user.schema != user_context.schema:
         raise ValidationError(
             "Usuário inexistente ou inativo.",
             "errors.businessRules",
@@ -199,7 +199,7 @@ def send_reset_password_email(id_user: int, user_context: User):
         .filter(User.active == True)
         .first()
     )
-    if not reset_user:
+    if not reset_user or reset_user.schema != user_context.schema:
         raise ValidationError(
             "Usuário inexistente ou inativo.",
             "errors.businessRules",

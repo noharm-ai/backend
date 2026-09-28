@@ -142,9 +142,7 @@ def get_drug_summary(
         "frequencies": frequencyResults,
         "routes": routeResults,
         "intervals": intervalResults,
-        "extraFields": (
-            transcription_fields.value if transcription_fields else None
-        )
+        "extraFields": (transcription_fields.value if transcription_fields else None)
         or [],
         "removeFields": (remove_fields.value if remove_fields else None) or [],
     }

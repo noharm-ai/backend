@@ -86,9 +86,7 @@ def get_patients(request_data: PatientListRequest):
         query = query.filter(Prescription.idSegment == request_data.idSegment)
 
     if request_data.idDepartment:
-        query = query.filter(
-            Prescription.idDepartment.in_(request_data.idDepartment)
-        )
+        query = query.filter(Prescription.idDepartment.in_(request_data.idDepartment))
 
     if request_data.nextAppointmentStartDate:
         query = query.filter(sq_appointment >= request_data.nextAppointmentStartDate)

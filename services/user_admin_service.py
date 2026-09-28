@@ -24,8 +24,9 @@ from utils import emailutils, status
 
 
 @has_permission(Permission.READ_USERS)
-def get_user_list(user_context: User):
-    """get users list, ignores staff users"""
+def get_user_list(user_context: User, user_permissions: list[Permission]):
+    """get users list, ignores staff users. Maintainers also get, as read only,
+    the users from other schemas that have access to this schema"""
     users = user_repository.get_admin_users_list(schema=user_context.schema)
 
     hide_names = feature_service.has_user_feature(FeatureEnum.HIDE_NAMES)
@@ -35,25 +36,41 @@ def get_user_list(user_context: User):
         u = user[0]
         segments = user[1] if user[1] else []
 
-        results.append(
-            {
-                "id": u.id,
-                "external": u.external,
-                "name": "***" if hide_names else u.name,
-                "email": "***" if hide_names else u.email,
-                "active": u.active,
-                "roles": u.config["roles"] if u.config and "roles" in u.config else [],
-                "features": (
-                    u.config["features"] if u.config and "features" in u.config else []
-                ),
-                "ignoreReports": (
-                    u.reports_config.get("ignore", []) if u.reports_config else []
-                ),
-                "segments": segments,
-            }
+        results.append(_get_user_list_item(u, segments, hide_names))
+
+    if Permission.MAINTAINER in user_permissions:
+        extra_users = user_repository.get_extra_schema_users_list(
+            schema=user_context.schema
         )
 
+        for u in extra_users:
+            # segment authorizations belong to the user's own schema
+            item = _get_user_list_item(u, [], hide_names)
+            item["readOnly"] = True
+            item["schema"] = u.schema
+
+            results.append(item)
+
     return results
+
+
+def _get_user_list_item(u: User, segments: list, hide_names: bool):
+    return {
+        "id": u.id,
+        "external": u.external,
+        "name": "***" if hide_names else u.name,
+        "email": "***" if hide_names else u.email,
+        "active": u.active,
+        "roles": u.config["roles"] if u.config and "roles" in u.config else [],
+        "features": (
+            u.config["features"] if u.config and "features" in u.config else []
+        ),
+        "ignoreReports": (
+            u.reports_config.get("ignore", []) if u.reports_config else []
+        ),
+        "segments": segments,
+        "readOnly": False,
+    }
 
 
 @has_permission(Permission.READ_BASIC_FEATURES, Permission.READ_USERS)

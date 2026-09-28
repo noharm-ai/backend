@@ -279,7 +279,12 @@ def _update_agg_status(prescription: Prescription, user: User, extra={}):
 
 @timed()
 def _check_agg_internal_prescriptions(
-    prescription, p_status, user, has_lock_feature=False, extra={}, presmed_mark_ids=None
+    prescription,
+    p_status,
+    user,
+    has_lock_feature=False,
+    extra={},
+    presmed_mark_ids=None,
 ):
     is_pmc = memory_service.has_feature_nouser(FeatureEnum.PRIMARY_CARE.value)
     is_cpoe = segment_service.is_cpoe(id_segment=prescription.idSegment)

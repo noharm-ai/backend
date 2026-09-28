@@ -842,6 +842,35 @@ def get_protocol_evaluation_context(id_prescription: int, user_context: User) ->
     }
 
 
+def get_interaction_evaluation_context(
+    id_prescription: int, user_context: User
+) -> dict:
+    """Builds the same inputs _get_alerts uses for the interaction analysis.
+    Reused by the interaction trace endpoint to replay the analysis."""
+
+    prescription, patient, _, _, _, _ = _get_prescription_data(
+        id_prescription=id_prescription
+    )
+
+    config_data = _get_configs(
+        prescription=prescription, patient=patient, is_complete=False
+    )
+
+    drug_list = _get_drug_list(
+        prescription=prescription,
+        patient=patient,
+        config_data=config_data,
+        user_context=user_context,
+    )
+
+    return {
+        "prescription": prescription,
+        "patient": patient,
+        "drug_list": drug_list,
+        "is_cpoe": config_data["is_cpoe"],
+    }
+
+
 @timed()
 def _get_drug_data(
     drugs,

@@ -127,7 +127,7 @@ def get_substances(
                     **{
                         "className": i[1].name if i[1] != None else None,
                         "responsible": i.User.name if i.User else None,
-                    }
+                    },
                 )
                 for i in results
             ],
@@ -200,7 +200,7 @@ def upsert_substance(request_data: AdminSubstanceRequest, user_context: User):
         **{
             "className": db_substance[1].name if db_substance[1] != None else None,
             "responsible": db_substance.User.name if db_substance.User else None,
-        }
+        },
     )
 
 
@@ -220,7 +220,7 @@ def get_substance(substance_id: int):
         **{
             "className": db_substance[1].name if db_substance[1] is not None else None,
             "responsible": db_substance.User.name if db_substance.User else None,
-        }
+        },
     )
 
 
