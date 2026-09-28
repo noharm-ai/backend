@@ -509,11 +509,6 @@ def _get_exams_current_results_hybrid(id_patient: int, schema: str):
     for e in results:
         prev_value = cache_exams.get(e.typeExam.lower())
 
-        if not prev_value:
-            logger.backend_logger.warning(
-                f"CACHE_MISS: {cache_key} - type: {e.typeExam.lower()}"
-            )
-
         exams[e.typeExam.lower()] = {
             "value": e.value,
             "unit": e.unit,
