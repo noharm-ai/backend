@@ -10,7 +10,8 @@ draft article out of the product, and ``path`` is an array *overlap* — an
 article pinned to several screens must show up on each of them, and a request
 naming several screens must get the union. Neither is obvious from the query,
 so both are pinned down here, together with the alphabetical ordering the panel
-relies on and the narrow payload (an article's internal id is never exposed).
+relies on and the narrow payload (the id is exposed so the panel can open the
+article in the knowledge base page; the content itself is not).
 
 Rows are seeded directly into the table: it is global (public schema), shared
 by every client, and has no write endpoint of its own.
@@ -211,13 +212,14 @@ def test_knowledge_base_combines_both_filters(client, analyst_headers):
 
 
 def test_knowledge_base_exposes_only_the_panel_fields(client, analyst_headers):
-    """POST /support/knowledge-base-articles - only link, title and description"""
+    """POST /support/knowledge-base-articles - only id, link, title and description"""
     response = client.post(
         URL, json={"path": ["/relatorios"], "active": True}, headers=analyst_headers
     )
 
     articles = {item["title"]: item for item in response.get_json()["data"]}
-    assert set(articles[_REPORTS[3]].keys()) == {"link", "title", "description"}
+    assert set(articles[_REPORTS[3]].keys()) == {"id", "link", "title", "description"}
+    assert articles[_REPORTS[3]]["id"] == _REPORTS[0]
     assert articles[_REPORTS[3]]["link"] == _REPORTS[2]
     assert articles[_REPORTS[3]]["description"] == _REPORTS[4]
 

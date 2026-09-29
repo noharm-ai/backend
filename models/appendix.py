@@ -411,9 +411,18 @@ class KnowledgeBase(db.Model):
 
     id = db.Column("idbase_conhecimento", db.Integer, primary_key=True)
     path = db.Column("pagina", postgresql.ARRAY(db.String), nullable=False)
-    link = db.Column("link", db.String, nullable=False)
+    # external copy of the article; optional now that the content lives here
+    link = db.Column("link", db.String, nullable=True)
     title = db.Column("titulo", db.String, nullable=False)
     description = db.Column("resumo", db.String, nullable=True)
+    # article body, as HTML
+    content = db.Column("conteudo", db.Text, nullable=True)
+    # ids of other base_conhecimento rows, in display order
+    related = db.Column("relacionados", postgresql.ARRAY(db.Integer), nullable=True)
+    # ids of treinamento_item rows (lessons), in display order
+    related_lessons = db.Column(
+        "aulas_relacionadas", postgresql.ARRAY(db.Integer), nullable=True
+    )
     active = db.Column("ativo", db.Boolean, nullable=False)
     updated_at = db.Column("updated_at", db.DateTime, nullable=True)
     updated_by = db.Column("updated_by", db.BigInteger, nullable=True)
