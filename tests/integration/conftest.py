@@ -41,6 +41,12 @@ def config_manager_headers(client):
 
 
 @pytest.fixture
+def regulator_headers(client):
+    """Headers with REGULATOR role"""
+    return make_headers(get_access(client, roles=[Role.REGULATOR.value]))
+
+
+@pytest.fixture
 def admin_headers(client):
     """Headers with ADMIN role"""
     return make_headers(

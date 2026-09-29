@@ -163,6 +163,25 @@ def _cleanup():
     session.execute(text("DELETE FROM demo.medicamento WHERE fkmedicamento >= 90000"))
     session.execute(text("DELETE FROM public.substancia WHERE sctid >= 90000"))
 
+    # Regulation test records (see tests/utils/utils_test_regulation.py)
+    session.execute(
+        text("DELETE FROM demo.reg_movimentacao WHERE fkreg_solicitacao >= 900000")
+    )
+    session.execute(
+        text(
+            "DELETE FROM demo.reg_solicitacao_atributo WHERE fkreg_solicitacao >= 900000"
+        )
+    )
+    session.execute(
+        text("DELETE FROM demo.reg_solicitacao WHERE fkreg_solicitacao >= 900000")
+    )
+    session.execute(
+        text(
+            "DELETE FROM demo.reg_tipo_solicitacao WHERE fkreg_tipo_solicitacao >= 900000"
+        )
+    )
+    session.execute(text("DELETE FROM public.tb_cid10 WHERE co_cid10 >= 900000"))
+
     session_commit()
     pass
 

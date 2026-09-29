@@ -15,13 +15,13 @@ Three services make up the feature:
 * ``reg_prioritization_service`` — the regulator work queue and the list of
   solicitation types.
 
-The regulation tables live in a separate DDL file that neither CI nor the local
-``make test-setup`` loads, so these are unit tests: ``db`` is replaced with a
-mock session and the repository calls are patched. Real SQLAlchemy model
-instances are still used as the rows, so column mapping and the services'
-attribute writes are exercised for real. The ``@has_permission`` gate is
-bypassed via ``__wrapped__`` except in the two tests that assert the gate
-itself.
+These are unit tests: ``db`` is replaced with a mock session and the repository
+calls are patched, so each service's branching is exercised in isolation. Real
+SQLAlchemy model instances are still used as the rows, so column mapping and the
+services' attribute writes are exercised for real. The ``@has_permission`` gate
+is bypassed via ``__wrapped__`` except in the two tests that assert the gate
+itself. ``tests/integration/test_regulation.py`` runs the same endpoints against
+the database, covering the repository queries these tests patch out.
 """
 
 from contextlib import contextmanager
