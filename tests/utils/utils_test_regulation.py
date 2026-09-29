@@ -31,7 +31,12 @@ ICD_ID_BASE = 900000
 
 def get_user_id(email: str = "demo") -> int:
     """Return the id of a seed user, used as the record's responsible."""
-    return session.query(User).filter(User.email == email).first().id
+    user = session.query(User).filter(User.email == email).first()
+
+    if user is None:
+        raise LookupError(f"seed user '{email}' not found in the test database")
+
+    return user.id
 
 
 def create_solicitation_type(id: int, name: str, tp_type: int = 1, status: int = 1):
