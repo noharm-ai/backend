@@ -51,6 +51,7 @@ jobs:
           psql -h localhost -U postgres -d noharm -a -f database/noharm-newuser.sql -v ON_ERROR_STOP=1
           psql -h localhost -U postgres -d noharm -a -f database/noharm-triggers.sql -v ON_ERROR_STOP=1
           psql -h localhost -U postgres -d noharm -a -f database/noharm-insert.sql -v ON_ERROR_STOP=1
+          psql -h localhost -U postgres -d noharm -a -f database/noharm-create-regulation.sql -v ON_ERROR_STOP=1
       - name: Setup Application
         run: |
           python mobile.py &
@@ -96,6 +97,7 @@ jobs:
           psql -h localhost -U postgres -d noharm -a -f database/noharm-newuser.sql -v ON_ERROR_STOP=1
           psql -h localhost -U postgres -d noharm -a -f database/noharm-triggers.sql -v ON_ERROR_STOP=1
           psql -h localhost -U postgres -d noharm -a -f database/noharm-insert.sql -v ON_ERROR_STOP=1
+          psql -h localhost -U postgres -d noharm -a -f database/noharm-create-regulation.sql -v ON_ERROR_STOP=1
       - name: Setup Application
         run: |
           python mobile.py &

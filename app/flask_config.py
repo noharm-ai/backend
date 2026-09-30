@@ -4,6 +4,8 @@ This module defines configuration classes for different environments
 (development, production, testing).
 """
 
+import os
+
 from config import Config
 from models.enums import NoHarmENV
 
@@ -61,8 +63,10 @@ class TestConfig(BaseConfig):
 
     TESTING = True
     DEBUG = True
-    SQLALCHEMY_DATABASE_URI = "postgresql://postgres@localhost/noharm"
-    SQLALCHEMY_BINDS = {"report": "postgresql://postgres@localhost/noharm"}
+    SQLALCHEMY_DATABASE_URI = os.getenv(
+        "TEST_DATABASE_URL", "postgresql://postgres@localhost/noharm"
+    )
+    SQLALCHEMY_BINDS = {"report": SQLALCHEMY_DATABASE_URI}
 
 
 def get_config(config_name=None):

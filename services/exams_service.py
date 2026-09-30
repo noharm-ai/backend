@@ -151,11 +151,13 @@ def create_exam(request_data: ExamCreateRequest, user_context: User):
 
 
 def _get_textual_exams(admission_number: int = None, id_patient: int = None):
+    """Get textual exams from the given admission and the patient's latest 5 admissions"""
     admission_number_array = []
 
     if admission_number != None:
         admission_number_array.append(admission_number)
-    else:
+
+    if id_patient != None:
         admissions = (
             db.session.query(Patient)
             .filter(Patient.idPatient == id_patient)
@@ -165,7 +167,8 @@ def _get_textual_exams(admission_number: int = None, id_patient: int = None):
         )
 
         for a in admissions:
-            admission_number_array.append(a.admissionNumber)
+            if a.admissionNumber not in admission_number_array:
+                admission_number_array.append(a.admissionNumber)
 
     if len(admission_number_array) == 0:
         return []
@@ -354,7 +357,9 @@ def get_exams_by_admission(admission_number: int, id_segment: int, user_context:
             del results["swrtz1"]
 
     # add textual exams
-    examsText = _get_textual_exams(id_patient=patient.idPatient)
+    examsText = _get_textual_exams(
+        admission_number=admission_number, id_patient=patient.idPatient
+    )
     resultsText = {}
     for e in examsText:
         slugExam = (

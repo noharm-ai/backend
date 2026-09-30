@@ -27,5 +27,6 @@ psql "$DB_URL" -f "$DATABASE_REPO/noharm-create.sql"   -v ON_ERROR_STOP=1
 psql "$DB_URL" -f "$DATABASE_REPO/noharm-newuser.sql"  -v ON_ERROR_STOP=1
 psql "$DB_URL" -f "$DATABASE_REPO/noharm-triggers.sql" -v ON_ERROR_STOP=1
 psql "$DB_URL" -f "$DATABASE_REPO/noharm-insert.sql"   -v ON_ERROR_STOP=1
+psql "$DB_URL" -f "$DATABASE_REPO/noharm-create-regulation.sql" -v ON_ERROR_STOP=1
 
 echo "Done. Run: make test"

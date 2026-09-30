@@ -142,6 +142,32 @@ def _clean_result(result):
     return result
 
 
+def _mic(item: dict, result):
+    """The MIC (minimum inhibitory concentration) of a released antibiogram.
+
+    Labs report it as text with a qualifier ("<=0.5", ">=32"), but DynamoDB can
+    hand a bare value over as a number: either way it goes out as text. A
+    pending collection has no antibiogram, so it has no MIC to state."""
+
+    if result is None:
+        return None
+
+    mic = item.get("qtdmicroorganismo")
+
+    if isinstance(mic, Decimal):
+        # normalize() drops the trailing zeros; format(..., "f") keeps it out of
+        # scientific notation
+        return format(mic.normalize(), "f")
+
+    if isinstance(mic, (int, float)):
+        return str(mic)
+
+    if isinstance(mic, str) and mic.strip() != "":
+        return mic.strip()
+
+    return None
+
+
 def _prediction(item: dict, result):
     """Predictions are only relevant while the lab result is still pending"""
 
@@ -207,6 +233,7 @@ def _group_by_drug(items: list):
                 # free text of "result"
                 "resultType": result_type.value if result is not None else None,
                 "resultDetail": result_detail(result, result_type),
+                "mic": _mic(item=item, result=result),
                 "prediction": prediction,
                 # predictions share the alphabet of resultType
                 "predictionType": (
