@@ -266,6 +266,44 @@ class TestGroupByDrug:
         assert item["prediction"] is None
         assert item["probability"] is None
 
+    def test_released_result_carries_the_mic(self):
+        """The MIC is reported as text, qualifier included."""
+        result = culture_service._group_by_drug(
+            [_item(resultado="Resistente", qtdmicroorganismo=" >=32 ")]
+        )
+
+        assert result[0]["items"][0]["mic"] == ">=32"
+
+    def test_decimal_mic_becomes_text(self):
+        """A bare MIC comes as a Decimal, which would break json serialization."""
+        result = culture_service._group_by_drug(
+            [_item(resultado="Resistente", qtdmicroorganismo=Decimal("0.50"))]
+        )
+
+        assert result[0]["items"][0]["mic"] == "0.5"
+
+    def test_decimal_integer_mic_is_not_scientific(self):
+        """normalize() alone would turn 100 into 1E+2."""
+        result = culture_service._group_by_drug(
+            [_item(resultado="Resistente", qtdmicroorganismo=Decimal("100"))]
+        )
+
+        assert result[0]["items"][0]["mic"] == "100"
+
+    def test_blank_mic_is_none(self):
+        """A lab that does not report the MIC leaves nothing to show."""
+        result = culture_service._group_by_drug(
+            [_item(resultado="Resistente", qtdmicroorganismo="  ")]
+        )
+
+        assert result[0]["items"][0]["mic"] is None
+
+    def test_pending_collection_has_no_mic(self):
+        """Without an antibiogram there is no MIC, whatever the row carries."""
+        result = culture_service._group_by_drug([_item(qtdmicroorganismo="<=0.5")])
+
+        assert result[0]["items"][0]["mic"] is None
+
     def test_blank_result_is_treated_as_pending(self):
         """An empty result string means the culture is still pending."""
         result = culture_service._group_by_drug([_item(resultado="   ")])
