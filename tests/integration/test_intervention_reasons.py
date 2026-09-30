@@ -32,11 +32,14 @@ from utils import status
 
 URL = "/intervention/reasons"
 
-# reserved id range for this module — seed reasons live below 100
+# reserved ids for this module — seed reasons live below 100, and
+# test_intervention_multiple.py owns 90001
 PARENT_ID = 900001
 CHILD_ID = 900002
 ROOT_ID = 900003
 INACTIVE_ID = 900004
+
+REASON_IDS = [PARENT_ID, CHILD_ID, ROOT_ID, INACTIVE_ID]
 
 # Names are letters and spaces only, so the ordering assertion holds under
 # both the C and the en_US collations. The child sorts *before* the parent by
@@ -88,9 +91,16 @@ def _insert_reason(
 
 
 def _cleanup():
-    """Remove every reason this module may have created."""
+    """Remove every reason this module may have created.
+
+    Scoped to the exact ids rather than to a range, so the module can never
+    reach a row another test owns however the ranges are reshuffled later.
+    """
     session.execute(
-        text("DELETE FROM demo.motivointervencao WHERE idmotivointervencao >= 900000")
+        text(
+            "DELETE FROM demo.motivointervencao WHERE idmotivointervencao = ANY(:ids)"
+        ),
+        {"ids": REASON_IDS},
     )
     session_commit()
 
