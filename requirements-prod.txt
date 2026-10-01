@@ -9,7 +9,7 @@ flask-cors==6.0.5
 psycopg2-binary==2.9.12
 flask-mail==0.10.0
 random-password-generator==2.2.0
-PyJWT==2.13.0
+PyJWT==2.15.0
 cryptography==49.0.0
 boto3==1.43.56
 redis==8.0.1
