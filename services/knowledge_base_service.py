@@ -1,11 +1,15 @@
 """Service: knowledge base (help center articles)"""
 
+from datetime import datetime
+
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
-from models.appendix import GlobalMemory, KnowledgeBase
+from models.appendix import GlobalMemory, KnowledgeBase, KnowledgeBaseElement
 from models.enums import GlobalMemoryEnum
 from models.main import User, db
 from models.requests.knowledge_base_request import (
+    KnowledgeBaseElementListRequest,
+    KnowledgeBaseElementSaveRequest,
     KnowledgeBaseListRequest,
     KnowledgeBaseSearchRequest,
 )
@@ -23,6 +27,8 @@ SEARCH_MAX_ARTICLES = 12
 # 0.88 on the real index, while genuine matches stay below 0.8
 SEARCH_MAX_DISTANCE = 0.8
 SNIPPET_MAX_LENGTH = 280
+# page of the elements shown on every screen (header, menu, drawers)
+GLOBAL_PAGE = "*"
 
 
 def _updated_at(kb: KnowledgeBase):
@@ -185,3 +191,122 @@ def search_articles(request_data: KnowledgeBaseSearchRequest):
         )
 
     return results[:SEARCH_MAX_ARTICLES]
+
+
+def _element_page(page: str) -> str:
+    page = page.strip()
+
+    if page != GLOBAL_PAGE and not page.startswith("/"):
+        raise ValidationError(
+            "Página inválida",
+            "errors.invalidParams",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    return page
+
+
+def _group_elements(
+    rows: list[tuple[KnowledgeBaseElement, KnowledgeBase]],
+) -> list[dict]:
+    """One entry per element, its articles in the order the rows come"""
+    elements = {}
+    for element, kb in rows:
+        key = (element.page, element.selector)
+
+        if key not in elements:
+            elements[key] = {
+                "page": element.page,
+                "selector": element.selector,
+                "label": element.label,
+                "articles": [],
+            }
+
+        # every row of an element carries the same label, but a missing one
+        # should not hide it
+        if not elements[key]["label"]:
+            elements[key]["label"] = element.label
+
+        elements[key]["articles"].append(
+            {"id": kb.id, "title": kb.title, "description": kb.description}
+        )
+
+    return list(elements.values())
+
+
+@has_permission(Permission.READ_BASIC_FEATURES)
+def list_elements(request_data: KnowledgeBaseElementListRequest):
+    """Elements of a screen (and of every screen) with published articles"""
+    page = _element_page(request_data.page)
+    pages = list(dict.fromkeys([page, GLOBAL_PAGE]))
+
+    return _group_elements(knowledge_base_repository.list_elements(pages=pages))
+
+
+@has_permission(Permission.WRITE_HELP_TEXT)
+def save_element(request_data: KnowledgeBaseElementSaveRequest, user_context: User):
+    """Set the published articles pinned to an element: none unpins it
+
+    Rows pointing at unpublished articles are kept: the curator cannot see
+    them, so leaving them out of the list is not a request to remove them.
+    """
+    page = _element_page(request_data.page)
+    selector = request_data.selector.strip()
+    label = (request_data.label or "").strip() or None
+    article_ids = list(dict.fromkeys(request_data.articleIds))
+
+    if not selector:
+        raise ValidationError(
+            "Elemento inválido",
+            "errors.invalidParams",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    articles = knowledge_base_repository.list_active_articles_by_id(ids=article_ids)
+    if len(articles) != len(article_ids):
+        raise ValidationError(
+            "Artigo não encontrado",
+            "errors.invalidRecord",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    rows = knowledge_base_repository.list_element_rows(page=page, selector=selector)
+    published_ids = {
+        kb.id
+        for kb in knowledge_base_repository.list_active_articles_by_id(
+            ids=[row.id_article for row in rows]
+        )
+    }
+
+    pinned_ids = set()
+    for row in rows:
+        if row.id_article in published_ids and row.id_article not in article_ids:
+            db.session.delete(row)
+            continue
+
+        row.label = label
+        pinned_ids.add(row.id_article)
+
+    now = datetime.today()
+    for id_article in article_ids:
+        if id_article in pinned_ids:
+            continue
+
+        db.session.add(
+            KnowledgeBaseElement(
+                id_article=id_article,
+                page=page,
+                selector=selector,
+                label=label,
+                created_at=now,
+                created_by=user_context.id,
+            )
+        )
+
+    db.session.flush()
+
+    elements = _group_elements(
+        knowledge_base_repository.list_elements(pages=[page], selector=selector)
+    )
+
+    return elements[0] if elements else None

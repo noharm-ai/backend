@@ -3,7 +3,11 @@
 from flask import Blueprint, request
 
 from decorators.api_endpoint_decorator import api_endpoint
-from models.requests.knowledge_base_request import KnowledgeBaseSearchRequest
+from models.requests.knowledge_base_request import (
+    KnowledgeBaseElementListRequest,
+    KnowledgeBaseElementSaveRequest,
+    KnowledgeBaseSearchRequest,
+)
 from services import knowledge_base_service
 
 app_knowledge_base = Blueprint("app_knowledge_base", __name__)
@@ -29,4 +33,22 @@ def search_articles():
     """Semantic search over the published articles"""
     return knowledge_base_service.search_articles(
         request_data=KnowledgeBaseSearchRequest(**(request.get_json() or {}))
+    )
+
+
+@app_knowledge_base.route("/knowledge-base/elements", methods=["GET"])
+@api_endpoint()
+def list_elements():
+    """Screen elements with pinned articles, for the help mode"""
+    return knowledge_base_service.list_elements(
+        request_data=KnowledgeBaseElementListRequest(page=request.args.get("page", ""))
+    )
+
+
+@app_knowledge_base.route("/knowledge-base/elements", methods=["PUT"])
+@api_endpoint()
+def save_element():
+    """Set the articles pinned to a screen element"""
+    return knowledge_base_service.save_element(
+        request_data=KnowledgeBaseElementSaveRequest(**(request.get_json() or {}))
     )

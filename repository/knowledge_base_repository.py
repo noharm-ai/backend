@@ -1,6 +1,6 @@
 """Repository: knowledge base related operations"""
 
-from models.appendix import KnowledgeBase
+from models.appendix import KnowledgeBase, KnowledgeBaseElement
 from models.main import db
 from models.requests.knowledge_base_request import KnowledgeBaseListRequest
 
@@ -37,5 +37,36 @@ def list_active_articles_by_id(ids: list[int]) -> list[KnowledgeBase]:
         db.session.query(KnowledgeBase)
         .filter(KnowledgeBase.id.in_(ids))
         .filter(KnowledgeBase.active == True)
+        .all()
+    )
+
+
+def list_elements(
+    pages: list[str], selector: str | None = None
+) -> list[tuple[KnowledgeBaseElement, KnowledgeBase]]:
+    """Elements pinned to the given pages, with their published articles"""
+    query = (
+        db.session.query(KnowledgeBaseElement, KnowledgeBase)
+        .join(KnowledgeBase, KnowledgeBase.id == KnowledgeBaseElement.id_article)
+        .filter(KnowledgeBaseElement.page.in_(pages))
+        .filter(KnowledgeBase.active == True)
+    )
+
+    if selector is not None:
+        query = query.filter(KnowledgeBaseElement.selector == selector)
+
+    return query.order_by(
+        KnowledgeBaseElement.page,
+        KnowledgeBaseElement.selector,
+        KnowledgeBase.title,
+    ).all()
+
+
+def list_element_rows(page: str, selector: str) -> list[KnowledgeBaseElement]:
+    """Every row of one element, whatever the state of its articles"""
+    return (
+        db.session.query(KnowledgeBaseElement)
+        .filter(KnowledgeBaseElement.page == page)
+        .filter(KnowledgeBaseElement.selector == selector)
         .all()
     )
