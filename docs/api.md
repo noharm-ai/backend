@@ -317,6 +317,17 @@ Schema-scoped key-value configuration records.
 
 ---
 
+## News
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/news` | List published news (active, dated today or earlier), most recent first, without content. |
+| `GET` | `/news/<id>` | Get a published news record with its HTML content. |
+
+The `/authenticate` response carries `recentNews`: the number of published news dated within the last 3 days (drives the menu badge).
+
+---
+
 ## Reports
 
 | Method | Path | Description |

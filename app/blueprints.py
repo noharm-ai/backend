@@ -21,6 +21,7 @@ from routes.exams import app_exams
 from routes.help_text import app_help_text
 from routes.intervention import app_itrv
 from routes.knowledge_base import app_knowledge_base
+from routes.news import app_news
 from routes.lists import app_lists
 from routes.memory import app_mem
 from routes.names import app_names
@@ -88,6 +89,7 @@ def register_blueprints(app):
     app.register_blueprint(app_protocol)
     app.register_blueprint(app_training)
     app.register_blueprint(app_knowledge_base)
+    app.register_blueprint(app_news)
     app.register_blueprint(app_exams)
     app.register_blueprint(app_lists)
     app.register_blueprint(app_queue)

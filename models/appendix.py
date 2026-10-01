@@ -449,3 +449,23 @@ class KnowledgeBaseElement(db.Model):
     label = db.Column("rotulo", db.String(255), nullable=True)
     created_at = db.Column("created_at", db.DateTime, nullable=False)
     created_by = db.Column("created_by", db.Integer, nullable=False)
+
+
+class News(db.Model):
+    """News (novidades) published to every schema"""
+
+    __tablename__ = "novidade"
+    __table_args__ = {"schema": "public"}
+
+    id = db.Column("idnovidade", db.Integer, primary_key=True)
+    # publication date: a future date keeps the news scheduled
+    date = db.Column("data", db.Date, nullable=False)
+    title = db.Column("titulo", db.String(255), nullable=False)
+    description = db.Column("resumo", db.String(500), nullable=True)
+    # news body, as HTML
+    content = db.Column("conteudo", db.Text, nullable=True)
+    active = db.Column("ativo", db.Boolean, nullable=False)
+    updated_at = db.Column("updated_at", db.DateTime, nullable=True)
+    updated_by = db.Column("updated_by", db.BigInteger, nullable=True)
+    created_at = db.Column("created_at", db.DateTime, nullable=False)
+    created_by = db.Column("created_by", db.BigInteger, nullable=False)
