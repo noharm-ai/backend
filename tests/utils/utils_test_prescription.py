@@ -70,6 +70,8 @@ def get_prescription_drug_mock_row(
     mav: bool = False,
     notdefault: bool = False,
     dialyzable: bool = False,
+    max_time: float = None,
+    period_cpoe: int = None,
 ):
     MockRow = namedtuple(
         "Mockrow",
@@ -105,6 +107,7 @@ def get_prescription_drug_mock_row(
     da.idDrug = id_prescription_drug
     da.idSegment = 1
     da.maxDose = max_dose
+    da.maxTime = max_time
     da.kidney = kidney
     da.liver = liver
     da.platelets = platelets
@@ -142,7 +145,7 @@ def get_prescription_drug_mock_row(
         None,
         expire_date or datetime.now() + timedelta(days=1),
         substance,
-        0,
+        period_cpoe if period_cpoe is not None else 0,
         datetime.now(),
         1,
         [],
