@@ -422,3 +422,25 @@ def finish_training(training_id: int, user_id: int) -> bool:
     )
 
     return db.session.execute(stmt).first() is not None
+
+
+def list_visible_lessons_by_id(training_item_ids: list, schema: str) -> list:
+    """(TrainingItem, Training) for the active lessons among the given ids whose
+    module the schema sees, in no given order.
+
+    Lets other features point at lessons (the knowledge base "related lessons")
+    without ever linking a user to a module they cannot open"""
+    if not training_item_ids:
+        return []
+
+    return (
+        _visible_to_schema(
+            db.session.query(TrainingItem, Training).join(
+                Training, Training.id == TrainingItem.training_id
+            ),
+            schema=schema,
+        )
+        .filter(TrainingItem.id.in_(training_item_ids))
+        .filter(TrainingItem.active == True)
+        .all()
+    )

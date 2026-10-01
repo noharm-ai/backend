@@ -644,6 +644,8 @@ def list_knowledge_base_articles(request_data: KnowledgeBaseListRequest):
 
     return [
         {
+            # the panel opens the article in the knowledge base page
+            "id": kb.id,
             "link": kb.link,
             "title": kb.title,
             "description": kb.description,

@@ -411,11 +411,41 @@ class KnowledgeBase(db.Model):
 
     id = db.Column("idbase_conhecimento", db.Integer, primary_key=True)
     path = db.Column("pagina", postgresql.ARRAY(db.String), nullable=False)
-    link = db.Column("link", db.String, nullable=False)
+    # external copy of the article; optional now that the content lives here
+    link = db.Column("link", db.String, nullable=True)
     title = db.Column("titulo", db.String, nullable=False)
     description = db.Column("resumo", db.String, nullable=True)
+    # article body, as HTML
+    content = db.Column("conteudo", db.Text, nullable=True)
+    # ids of other base_conhecimento rows, in display order
+    related = db.Column("relacionados", postgresql.ARRAY(db.Integer), nullable=True)
+    # ids of treinamento_item rows (lessons), in display order
+    related_lessons = db.Column(
+        "aulas_relacionadas", postgresql.ARRAY(db.Integer), nullable=True
+    )
     active = db.Column("ativo", db.Boolean, nullable=False)
     updated_at = db.Column("updated_at", db.DateTime, nullable=True)
     updated_by = db.Column("updated_by", db.BigInteger, nullable=True)
     created_at = db.Column("created_at", db.DateTime, nullable=False)
     created_by = db.Column("created_by", db.BigInteger, nullable=False)
+
+
+class KnowledgeBaseElement(db.Model):
+    """Knowledge base article pinned to an element of a screen (help mode)
+
+    One row per (page, selector, article): an element with several articles
+    has several rows, all carrying the same label.
+    """
+
+    __tablename__ = "base_conhecimento_elemento"
+    __table_args__ = {"schema": "public"}
+
+    id = db.Column("idbase_conhecimento_elemento", db.Integer, primary_key=True)
+    id_article = db.Column("idbase_conhecimento", db.Integer, nullable=False)
+    # route pattern of the screen (e.g. /prescricao/:slug), or * for every screen
+    page = db.Column("pagina", db.String(255), nullable=False)
+    # CSS selector of the element
+    selector = db.Column("seletor", db.Text, nullable=False)
+    label = db.Column("rotulo", db.String(255), nullable=True)
+    created_at = db.Column("created_at", db.DateTime, nullable=False)
+    created_by = db.Column("created_by", db.Integer, nullable=False)
