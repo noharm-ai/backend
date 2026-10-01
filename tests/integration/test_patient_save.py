@@ -32,15 +32,15 @@ from tests.conftest import session, session_commit
 from tests.utils.utils_test_prescription import create_prescription
 
 # outside the ranges used by the shared counters, inside the cleanup range
-ADMISSION = 991101
-PRESCRIPTION = 991110
+ADMISSION = 991501
+PRESCRIPTION = 991510
 
 # admission used by the tests that exercise the implicit patient creation
-ORPHAN_ADMISSION = 991102
-ORPHAN_PRESCRIPTION = 991120
+ORPHAN_ADMISSION = 991502
+ORPHAN_PRESCRIPTION = 991520
 
 # an admission with neither a patient nor a prescription
-UNKNOWN_ADMISSION = 991103
+UNKNOWN_ADMISSION = 991503
 
 
 def _delete_admission(admission):
