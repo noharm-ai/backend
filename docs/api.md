@@ -321,10 +321,10 @@ Schema-scoped key-value configuration records.
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/news` | List published news (active, dated today or earlier), most recent first, without content. |
+| `GET` | `/news` | List published news (active, dated today or earlier), most recent first, with their HTML content. Paginated with `?limit=` (default 5, max 20) and `?offset=`; returns `{news, hasMore}`. |
 | `GET` | `/news/<id>` | Get a published news record with its HTML content. |
 
-The `/authenticate` response carries `recentNews`: the number of published news dated within the last 3 days (drives the menu badge).
+The `/authenticate` response carries `recentNews`: the number of published news dated today (drives the menu badge).
 
 ---
 

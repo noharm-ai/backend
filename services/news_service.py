@@ -8,8 +8,9 @@ from models.appendix import News
 from repository import news_repository
 from utils import status
 
-# news dated within these last days light up the menu badge
-RECENT_DAYS = 3
+# news per page of the list
+PAGE_SIZE = 5
+MAX_PAGE_SIZE = 20
 
 
 def _summary(news: News) -> dict:
@@ -23,11 +24,25 @@ def _summary(news: News) -> dict:
 
 
 @has_permission(Permission.READ_BASIC_FEATURES)
-def list_news():
-    """Published news, most recent first, without content"""
-    return [
-        _summary(n) for n in news_repository.list_published(today=date.today())
-    ]
+def list_news(limit: int = PAGE_SIZE, offset: int = 0):
+    """A page of the published news, most recent first, with their content"""
+    if limit < 1 or offset < 0:
+        raise ValidationError(
+            "Paginação inválida",
+            "errors.invalidParams",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    limit = min(limit, MAX_PAGE_SIZE)
+    # one extra row tells whether there is a next page
+    news = news_repository.list_published(
+        today=date.today(), limit=limit + 1, offset=offset
+    )
+
+    return {
+        "news": [{**_summary(n), "content": n.content} for n in news[:limit]],
+        "hasMore": len(news) > limit,
+    }
 
 
 @has_permission(Permission.READ_BASIC_FEATURES)
@@ -46,5 +61,5 @@ def get_news(id_news: int):
 
 
 def count_recent_news() -> int:
-    """Published news from the last RECENT_DAYS days (sent at login)"""
-    return news_repository.count_recent(today=date.today(), days=RECENT_DAYS)
+    """Published news dated today (sent at login, lights up the menu badge)"""
+    return news_repository.count_published_on(day=date.today())
