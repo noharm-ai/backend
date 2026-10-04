@@ -2,7 +2,7 @@
 
 from datetime import datetime, timedelta
 
-from sqlalchemy import and_, case, desc, func, or_
+from sqlalchemy import and_, case, cast, desc, func, or_
 from sqlalchemy.dialects import postgresql
 
 from decorators.has_permission_decorator import Permission, has_permission
@@ -190,9 +190,11 @@ def get_interventions(
 
     if len(id_intervention_reason_list) > 0:
         interventions = interventions.filter(
-            postgresql.array(id_intervention_reason_list).overlap(
-                Intervention.idInterventionReason
-            )
+            # the column is smallint[]; without the cast postgres finds no
+            # overlap operator for the integer[] the list would render as
+            cast(
+                id_intervention_reason_list, postgresql.ARRAY(db.SmallInteger)
+            ).overlap(Intervention.idInterventionReason)
         )
 
     if has_economy != None and has_economy != "":
