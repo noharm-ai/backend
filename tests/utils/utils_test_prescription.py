@@ -72,6 +72,7 @@ def get_prescription_drug_mock_row(
     dialyzable: bool = False,
     max_time: float = None,
     period_cpoe: int = None,
+    prescribed_dose: float = None,
 ):
     MockRow = namedtuple(
         "Mockrow",
@@ -92,6 +93,8 @@ def get_prescription_drug_mock_row(
     pd.idDrug = 1
     pd.frequency = frequency
     pd.doseconv = dose
+    # the raw prescribed dose; the dose/kg alerts only run when it is filled
+    pd.dose = prescribed_dose
     pd.tube = tube
     pd.allergy = allergy
     pd.interval = interval
