@@ -14,6 +14,7 @@ from routes.admin.admin_protocol import app_admin_protocol
 from routes.admin.admin_report import app_admin_report
 from routes.admin.admin_substance import app_admin_subs
 from routes.admin.admin_tag import app_admin_tag
+from routes.antimicrobial import app_antimicrobial
 from routes.authentication import app_auth
 from routes.conciliation import app_conciliation
 from routes.drugs import app_drugs
@@ -98,6 +99,7 @@ def register_blueprints(app):
     app.register_blueprint(app_pres_crud)
     app.register_blueprint(app_pres_clinical_note)
     app.register_blueprint(app_help_text)
+    app.register_blueprint(app_antimicrobial)
 
     # Admin blueprints
     app.register_blueprint(app_admin_memory)
