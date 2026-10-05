@@ -5,7 +5,11 @@ target-version = "py312"
 extend-exclude = ["env", "database"]
 
 [lint]
-# Uses ruff's default rule set (pyflakes "F" + pycodestyle errors "E4/E7/E9")
+# Pin the historical rule set explicitly: pyflakes ("F") + pycodestyle errors
+# ("E4/E7/E9"). This matches what ruff applied by default up to 0.15.x; ruff
+# 0.16 widened its default selection, so selecting these rules explicitly keeps
+# CI linting scope stable across ruff upgrades.
+select = ["E4", "E7", "E9", "F"]
 ignore = [
     # Comparisons to None/True/False are intentional SQLAlchemy filter syntax
     # (e.g. `Model.field == None` compiles to "IS NULL"). Rewriting them to
