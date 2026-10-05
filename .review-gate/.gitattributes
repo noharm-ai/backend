@@ -1,0 +1,6 @@
+# Instalado em .review-gate/.gitattributes pelo install.sh do review-gate (não edite;
+# vale só para esta subárvore). LF em tudo: hooks bash e review.conf não sobrevivem
+# ao checkout CRLF do core.autocrlf=true (padrão do Git for Windows). O .cmd é do
+# cmd.exe e fica em CRLF.
+* text eol=lf
+*.cmd text eol=crlf
