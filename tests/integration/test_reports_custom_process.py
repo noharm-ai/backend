@@ -11,7 +11,7 @@ happens at all:
   download endpoint uses: inactive reports stay closed without
   READ_CUSTOM_REPORTS, and a user who ignores CUSTOM reports is refused);
 - a report already PROCESSING is never queued twice;
-- a report processed less than an hour ago is throttled, unless the caller holds
+- a report processed less than 30 minutes ago is throttled, unless the caller holds
   READ_CUSTOM_REPORTS (ADMIN and CURATOR), who may reprocess at will.
 
 Custom reports live in the schema-local demo.relatorio table. Every row created
@@ -176,10 +176,10 @@ def test_process_refuses_a_report_already_processing(
 def test_process_throttles_a_recently_processed_report(
     client, analyst_headers, lambda_client
 ):
-    """A regular reader waits an hour between runs of the same report [400 BAD REQUEST]."""
+    """A regular reader waits 30 minutes between runs of the same report [400 BAD REQUEST]."""
     id_report = _insert_report(
         name=f"{_PREFIX} throttled",
-        processed_at=datetime.now() - timedelta(minutes=30),
+        processed_at=datetime.now() - timedelta(minutes=20),
     )
 
     response = _process(client, analyst_headers, id_report)
@@ -192,10 +192,10 @@ def test_process_throttles_a_recently_processed_report(
 def test_process_is_allowed_once_the_throttle_window_is_over(
     client, analyst_headers, lambda_client
 ):
-    """Past the one hour window a regular reader may reprocess [200 OK]."""
+    """Past the 30 minute window a regular reader may reprocess [200 OK]."""
     id_report = _insert_report(
         name=f"{_PREFIX} throttle expired",
-        processed_at=datetime.now() - timedelta(hours=2),
+        processed_at=datetime.now() - timedelta(minutes=40),
     )
 
     response = _process(client, analyst_headers, id_report)
