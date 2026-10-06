@@ -61,6 +61,10 @@ class TimelineItem:
     frequency: str | None
     route: str | None
     period_total: int | None
+    # dose in the drug's default unit and doses per day, to tell a posology
+    # change apart from a different way of writing the same one
+    doseconv: float | None = None
+    daily_frequency: float | None = None
 
 
 @dataclass
@@ -115,6 +119,8 @@ def build_item(row, now: datetime) -> TimelineItem:
         frequency=row.frequency,
         route=row.route,
         period_total=row.period_total,
+        doseconv=row.doseconv,
+        daily_frequency=row.daily_frequency,
     )
 
 

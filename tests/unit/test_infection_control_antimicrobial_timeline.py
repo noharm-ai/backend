@@ -47,6 +47,7 @@ def _row(
         expire=expire,
         suspended_date=suspended_date,
         dose=dose,
+        doseconv=dose,
         measure_unit="g",
         frequency=frequency,
         daily_frequency=3,

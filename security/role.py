@@ -256,6 +256,18 @@ class Role(Enum):
         ],
     )
 
+    INFECTION_CONTROLLER = (
+        "INFECTION_CONTROLLER",
+        [
+            Permission.READ_PRESCRIPTION,
+            Permission.WRITE_INFECTION_CONTROL,
+            Permission.READ_REPORTS,
+            Permission.READ_BASIC_FEATURES,
+            Permission.WRITE_BASIC_FEATURES,
+            Permission.READ_SUPPORT,
+        ],
+    )
+
     SUPPORT_REQUESTER = (
         "SUPPORT_REQUESTER",
         [

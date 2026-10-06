@@ -29,6 +29,7 @@ def get_admission_antimicrobials(admission_number: int):
             PrescriptionDrug.id.label("id_prescription_drug"),
             PrescriptionDrug.idDrug.label("id_drug"),
             PrescriptionDrug.dose,
+            PrescriptionDrug.doseconv,
             PrescriptionDrug.frequency.label("daily_frequency"),
             PrescriptionDrug.route,
             PrescriptionDrug.suspendedDate.label("suspended_date"),

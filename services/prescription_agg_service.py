@@ -30,6 +30,7 @@ from services import (
     prescription_view_service,
     segment_service,
 )
+from services.infection_control import infection_control_status_service
 from utils import logger, prescriptionutils, status
 
 
@@ -265,6 +266,14 @@ def create_agg_prescription_by_prescription(
                     },
                 )
 
+    infection_control_status_service.sync_from_prescalc(
+        schema=schema,
+        admission_number=p.admissionNumber,
+        features=features,
+        user_id=user_context.id,
+        id_prescription=p.id,
+    )
+
     _log_processed_date(id_prescription_array=[id_prescription], schema=schema)
 
 
@@ -396,6 +405,12 @@ def create_agg_prescription_by_date(
     _automatic_check(prescription=agg_p, features=features, user_context=user_context)
     _update_patient_conciliation_status(
         admission_number=agg_p.admissionNumber, is_concilia=False
+    )
+    infection_control_status_service.sync_from_prescalc(
+        schema=schema,
+        admission_number=agg_p.admissionNumber,
+        features=features,
+        user_id=user_context.id,
     )
 
 
