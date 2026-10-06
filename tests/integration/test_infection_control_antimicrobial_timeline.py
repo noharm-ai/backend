@@ -1,7 +1,7 @@
-"""Tests: GET /antimicrobial/timeline/<admission_number>
+"""Tests: GET /infection-control/antimicrobial-timeline/<admission_number>
 
 The endpoint returns the patient header and the antimicrobial courses of one
-admission. The grouping rules are covered by tests/unit/test_antimicrobial_timeline.py;
+admission. The grouping rules are covered by tests/unit/test_infection_control_antimicrobial_timeline.py;
 here we pin down what reaches the grouping:
 
 * only drugs flagged ``antimicro`` on the item's segment are listed;
@@ -38,7 +38,7 @@ PATIENT_ID = 100701
 
 def _url(admission_number):
     """Endpoint URL for an admission"""
-    return f"/antimicrobial/timeline/{admission_number}"
+    return f"/infection-control/antimicrobial-timeline/{admission_number}"
 
 
 def _next_prescription_id():

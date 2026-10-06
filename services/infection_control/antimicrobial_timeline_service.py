@@ -23,7 +23,7 @@ from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
 from models.main import db
 from models.prescription import Patient
-from repository import antimicrobial_repository
+from repository.infection_control import antimicrobial_repository
 from services import patient_service
 from utils import dateutils, status
 

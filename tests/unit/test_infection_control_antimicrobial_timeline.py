@@ -1,4 +1,4 @@
-"""Unit tests for the antimicrobial timeline courses (services.antimicrobial_timeline_service).
+"""Unit tests for the antimicrobial timeline courses (services.infection_control.antimicrobial_timeline_service).
 
 The service turns prescribed antimicrobial items into treatment courses. The
 two prescribing styles must end up the same:
@@ -16,7 +16,7 @@ from the first day of the course.
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 
-from services import antimicrobial_timeline_service as svc
+from services.infection_control import antimicrobial_timeline_service as svc
 
 DAY = timedelta(days=1)
 T0 = datetime(2026, 3, 1, 8, 0)

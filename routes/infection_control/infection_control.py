@@ -1,15 +1,15 @@
-"""Route: antimicrobial timeline"""
+"""Route: infection control"""
 
 from flask import Blueprint
 
 from decorators.api_endpoint_decorator import api_endpoint
-from services import antimicrobial_timeline_service
+from services.infection_control import antimicrobial_timeline_service
 
-app_antimicrobial = Blueprint("app_antimicrobial", __name__)
+app_infection_control = Blueprint("app_infection_control", __name__)
 
 
-@app_antimicrobial.route(
-    "/antimicrobial/timeline/<int:admission_number>", methods=["GET"]
+@app_infection_control.route(
+    "/infection-control/antimicrobial-timeline/<int:admission_number>", methods=["GET"]
 )
 @api_endpoint()
 def get_timeline(admission_number: int):
