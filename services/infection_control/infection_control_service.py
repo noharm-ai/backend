@@ -1,10 +1,11 @@
 """Service: infection control follow-up
 
 The infectologist reviews the patients on antimicrobials: each running drug is
-judged conforming or not (valid until a date) and a next review date can be
-scheduled. The admission status and its pending reasons are kept by the rule
-in infection_control_status_service; this service records the reviews and
-serves the follow-up data.
+judged conforming or not (valid until a date), optionally watching for its
+expiry or a posology change, and a next review date can be scheduled. The admission
+status and its pending reasons are kept by the rule in
+infection_control_status_service; this service records the reviews and serves
+the follow-up data.
 """
 
 from datetime import datetime
@@ -46,7 +47,13 @@ REVIEW_RESOLVED_TYPES = [
 EVALUATION_RESOLVED_TYPES = [
     InfectionControlPendingTypeEnum.NO_EVALUATION.value,
     InfectionControlPendingTypeEnum.EXPIRED.value,
+    InfectionControlPendingTypeEnum.POSOLOGY_CHANGED.value,
 ]
+# reasons an evaluation may opt into (the others always apply)
+OPTIONAL_TRIGGERS = {
+    InfectionControlPendingTypeEnum.EXPIRED.value,
+    InfectionControlPendingTypeEnum.POSOLOGY_CHANGED.value,
+}
 
 
 def _check_feature():
@@ -94,6 +101,7 @@ def _serialize_evaluation(evaluation: AntimicrobialEvaluation, names: dict) -> d
         "notes": evaluation.notes,
         "posology": evaluation.posology,
         "validUntil": dateutils.to_iso(evaluation.valid_until),
+        "triggers": evaluation.triggers or [],
         "status": evaluation.status,
         "closedAt": dateutils.to_iso(evaluation.closed_at),
         "closingType": evaluation.closing_type,
@@ -222,6 +230,13 @@ def _validate_review(
                 status.HTTP_400_BAD_REQUEST,
             )
 
+        if not set(evaluation.triggers) <= OPTIONAL_TRIGGERS:
+            raise ValidationError(
+                "Gatilho de pendência inválido",
+                "errors.invalidParams",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
 
 @has_permission(Permission.WRITE_INFECTION_CONTROL)
 def save_review(request_data: InfectionControlReviewRequest, user_context: User):
@@ -293,6 +308,7 @@ def save_review(request_data: InfectionControlReviewRequest, user_context: User)
         evaluation.notes = evaluation_data.notes
         evaluation.posology = rule.posology_snapshot(course)
         evaluation.valid_until = evaluation_data.validUntil
+        evaluation.triggers = sorted(set(evaluation_data.triggers))
         evaluation.status = AntimicrobialEvaluationStatusEnum.ACTIVE.value
         evaluation.created_at = now
         evaluation.created_by = user_context.id

@@ -25,6 +25,8 @@ class AntimicrobialEvaluationRequest(BaseModel):
     notes: str | None = None
     # the evaluation holds until this date
     validUntil: LocalDatetime
+    # optional reasons that send the patient back to pending (pending types)
+    triggers: list[int] = []
 
 
 class InfectionControlReviewRequest(BaseModel):

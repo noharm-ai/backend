@@ -449,6 +449,17 @@ The rule holds even when the real value would be convenient or is already visibl
 - Medication reconciliation between different prescriptions
 - Configurable algorithm (FUZZY by default)
 
+### Infection Control Rule (duplicated in backend-private)
+- Services: `services/infection_control/infection_control_status_service.py` (the rule) and `services/infection_control/antimicrobial_timeline_service.py` (how prescriptions are grouped into courses)
+- Decides when an admission is followed, which pending reasons open or resolve, when evaluations close, and the PENDING / REVISED / CLOSED status
+- **The same rule also lives in the `backend-private` repository** (`services/infection_control_service.py`, run by `lambda_infection_control.py`). That scheduled job applies the rule to every followed admission, and it can't import code from this repository.
+- **Every change to this rule must also be made in `backend-private`, in the same piece of work.** If only one copy changes, the job undoes the backend's result on its next run. Mirror in both repositories:
+  - course grouping and `GAP_TOLERANCE`, what counts as an ongoing course, how an evaluation is matched to its course
+  - the reasons a course gives (`course_reasons`), including the optional triggers stored in `gatilhos`, and posology comparison
+  - when reasons resolve, when evaluations close, and how the status is chosen
+  - the enum values (`InfectionControlPendingTypeEnum`, status, resolution, closing types) and any new `ci_*` column the rule reads
+- Update the tests in both repositories: `tests/integration/test_infection_control_follow_up.py` here, and `tests/test_infection_control_service.py` and `tests/test_infection_control_db.py` in `backend-private`
+
 ## Development Workflow
 
 ### Local Setup

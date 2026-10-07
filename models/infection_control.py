@@ -54,6 +54,8 @@ class AntimicrobialEvaluation(db.Model):
     notes = db.Column("observacao", db.String, nullable=True)
     posology = db.Column("posologia", postgresql.JSONB, nullable=False)
     valid_until = db.Column("dt_validade", db.DateTime, nullable=False)
+    # optional reasons this evaluation watches for (tp_pendencia values)
+    triggers = db.Column("gatilhos", postgresql.JSONB, nullable=False)
     status = db.Column("tp_status", db.Integer, nullable=False)
     closed_at = db.Column("dt_encerramento", db.DateTime, nullable=True)
     closing_type = db.Column("tp_encerramento", db.Integer, nullable=True)

@@ -4,7 +4,8 @@ An admission with a running antimicrobial is followed: prescalc creates its
 record as pending and never reviewed (or reopens a closed one); the rule
 (applied by the scheduled job in backend-private, the review save and the
 backfill) opens one reason per drug without an evaluation and follows stops,
-new drugs and discharge; the infectologist's
+new drugs and discharge, expired evaluations, posology changes (when the
+evaluation watches for them) and scheduled review dates; the infectologist's
 review evaluates drugs, settles reasons and sets the status (pending while a
 reason is open, revised when none is left, closed when no antimicrobial is
 running anymore).
@@ -56,6 +57,9 @@ REVISED = InfectionControlStatusEnum.REVISED.value
 CLOSED = InfectionControlStatusEnum.CLOSED.value
 NEVER_REVIEWED = InfectionControlPendingTypeEnum.NEVER_REVIEWED.value
 NO_EVALUATION = InfectionControlPendingTypeEnum.NO_EVALUATION.value
+EXPIRED = InfectionControlPendingTypeEnum.EXPIRED.value
+SCHEDULED_DATE = InfectionControlPendingTypeEnum.SCHEDULED_DATE.value
+POSOLOGY_CHANGED = InfectionControlPendingTypeEnum.POSOLOGY_CHANGED.value
 
 
 # ─── fixtures ─────────────────────────────────────────────────────────────────
@@ -190,6 +194,7 @@ def _prescribe(
     expire,
     drugs=(ANTIMICROBIAL_DRUG,),
     id_segment=ADULT_SEGMENT,
+    dose=2.0,
 ):
     """One prescription holding the given drugs"""
     id_prescription = test_counters["id_prescription"]
@@ -212,7 +217,7 @@ def _prescribe(
             idSegment=id_segment,
             idMeasureUnit="1",
             idFrequency="3",
-            dose=2.0,
+            dose=dose,
         )
     return id_prescription
 
@@ -332,6 +337,16 @@ def _evaluations(admission_number):
     )
 
 
+def _set(table, admission_number, **values):
+    """Move dates of a follow-up row, to reach what only time would"""
+    assignments = ", ".join(f"{column} = :{column}" for column in values)
+    session.execute(
+        text(f"UPDATE demo.{table} SET {assignments} WHERE nratendimento = :admission"),
+        {**values, "admission": admission_number},
+    )
+    session_commit()
+
+
 def _review(client, headers, admission_number, evaluations=(), **kwargs):
     payload = {
         "admissionNumber": admission_number,
@@ -345,6 +360,7 @@ def _review(client, headers, admission_number, evaluations=(), **kwargs):
                 "validUntil": kwargs.get(
                     "valid_until", (datetime.now() + timedelta(days=7)).isoformat()
                 ),
+                "triggers": kwargs.get("triggers", []),
             }
             for id_drug in evaluations
         ],
@@ -850,6 +866,212 @@ def test_backfill_follows_open_ended_cpoe_order(
     record = _record(admission)
     assert record is not None
     assert record["tp_origem"] == InfectionControlOriginEnum.BACKFILL.value
+
+
+# ─── triggers ─────────────────────────────────────────────────────────────────
+
+
+def _reviewed(client, headers, admission_number, **kwargs):
+    """An admission on an antimicrobial, evaluated and revised"""
+    _prescribe_today(admission_number)
+    response = _review(
+        client, headers, admission_number, evaluations=[ANTIMICROBIAL_DRUG], **kwargs
+    )
+    assert response.status_code == status.HTTP_200_OK, response.get_json()
+    assert _record(admission_number)["tp_status"] == REVISED
+
+
+def test_expired_evaluation_sends_admission_back_to_pending(
+    client, infection_controller_headers, infection_control, admission
+):
+    """A running drug whose evaluation watches its expiry and is past its
+    validity is pending again, until it is evaluated again"""
+    _reviewed(client, infection_controller_headers, admission, triggers=[EXPIRED])
+    (evaluation,) = _evaluations(admission)
+    _set("ci_avaliacao_atm", admission, dt_validade=datetime.now() - timedelta(hours=1))
+
+    _run_job(admission)
+
+    assert _record(admission)["tp_status"] == PENDING
+    (pending,) = _open_pendings(admission)
+    assert pending["tp_pendencia"] == EXPIRED
+    assert pending["fkmedicamento"] == ANTIMICROBIAL_DRUG
+    assert pending["fkci_avaliacao_atm"] == evaluation["idci_avaliacao_atm"]
+
+    # a review that doesn't evaluate the drug again leaves it pending
+    _review(client, infection_controller_headers, admission)
+    assert _record(admission)["tp_status"] == PENDING
+
+    _review(
+        client,
+        infection_controller_headers,
+        admission,
+        evaluations=[ANTIMICROBIAL_DRUG],
+        triggers=[EXPIRED],
+    )
+    assert _record(admission)["tp_status"] == REVISED
+    expired = next(p for p in _pendings(admission) if p["tp_pendencia"] == EXPIRED)
+    assert expired["tp_resolucao"] == InfectionControlResolutionEnum.EVALUATED.value
+
+
+def test_expiry_is_ignored_without_the_trigger(
+    client, infection_controller_headers, infection_control, admission
+):
+    """An evaluation that doesn't watch its expiry stays in force past it"""
+    _reviewed(client, infection_controller_headers, admission)
+    _set("ci_avaliacao_atm", admission, dt_validade=datetime.now() - timedelta(hours=1))
+
+    _run_job(admission)
+
+    assert _record(admission)["tp_status"] == REVISED
+    assert _open_pendings(admission) == []
+
+
+def test_posology_change_sends_watching_evaluation_back_to_pending(
+    client, infection_controller_headers, infection_control, admission
+):
+    """A new dose of a drug evaluated with the posology trigger is pending again"""
+    _reviewed(
+        client,
+        infection_controller_headers,
+        admission,
+        triggers=[POSOLOGY_CHANGED],
+    )
+    assert _evaluations(admission)[0]["gatilhos"] == [POSOLOGY_CHANGED]
+
+    _prescalc(_prescribe(admission, _day(0), _day(2), dose=4.0))
+    _run_job(admission)
+
+    assert _record(admission)["tp_status"] == PENDING
+    (pending,) = _open_pendings(admission)
+    assert pending["tp_pendencia"] == POSOLOGY_CHANGED
+    assert pending["detalhes"]["evaluated"]["dose"] == 2.0
+    assert pending["detalhes"]["current"]["dose"] == 4.0
+
+    response = _review(
+        client,
+        infection_controller_headers,
+        admission,
+        evaluations=[ANTIMICROBIAL_DRUG],
+        triggers=[POSOLOGY_CHANGED],
+    )
+    data = response.get_json()["data"]
+    assert data["status"] == REVISED
+    assert data["courses"][0]["evaluation"]["triggers"] == [POSOLOGY_CHANGED]
+    assert data["courses"][0]["evaluation"]["posology"]["dose"] == 4.0
+
+
+def test_posology_change_is_ignored_without_the_trigger(
+    client, infection_controller_headers, infection_control, admission
+):
+    """An evaluation that doesn't watch the posology stays in force"""
+    _reviewed(client, infection_controller_headers, admission)
+
+    _prescalc(_prescribe(admission, _day(0), _day(2), dose=4.0))
+    _run_job(admission)
+
+    assert _record(admission)["tp_status"] == REVISED
+    assert _open_pendings(admission) == []
+
+
+def test_daily_prescription_with_same_posology_is_not_a_change(
+    client, infection_controller_headers, infection_control, admission
+):
+    """The next day's prescription repeating the posology changes nothing"""
+    _reviewed(
+        client,
+        infection_controller_headers,
+        admission,
+        triggers=[POSOLOGY_CHANGED],
+    )
+
+    _prescalc(_prescribe(admission, _day(0), _day(2)))
+    _run_job(admission)
+
+    assert _record(admission)["tp_status"] == REVISED
+    assert _open_pendings(admission) == []
+
+
+def test_scheduled_review_date_sends_admission_back_to_pending(
+    client, infection_controller_headers, infection_control, admission
+):
+    """The scheduled review date arriving makes the patient pending until a
+    review is saved"""
+    _reviewed(
+        client,
+        infection_controller_headers,
+        admission,
+        next_review_date=(datetime.now() + timedelta(days=3)).isoformat(),
+    )
+    _set(
+        "ci_atendimento",
+        admission,
+        dt_proxima_revisao=datetime.now() - timedelta(hours=1),
+    )
+
+    _run_job(admission)
+
+    assert _record(admission)["tp_status"] == PENDING
+    assert [p["tp_pendencia"] for p in _open_pendings(admission)] == [SCHEDULED_DATE]
+
+    _review(client, infection_controller_headers, admission)
+
+    assert _record(admission)["tp_status"] == REVISED
+    assert _record(admission)["dt_proxima_revisao"] is None
+    scheduled = next(
+        p for p in _pendings(admission) if p["tp_pendencia"] == SCHEDULED_DATE
+    )
+    assert (
+        scheduled["tp_resolucao"] == InfectionControlResolutionEnum.REVIEW_SAVED.value
+    )
+
+
+def test_restarted_course_drops_reasons_of_the_old_evaluation(
+    client, infection_controller_headers, infection_control, admission
+):
+    """When the drug runs in a new course, the old course's evaluation closes
+    with its reasons and the new course needs an evaluation"""
+    _reviewed(client, infection_controller_headers, admission, triggers=[EXPIRED])
+    _set("ci_avaliacao_atm", admission, dt_validade=datetime.now() - timedelta(hours=1))
+    _run_job(admission)
+    (expired,) = _open_pendings(admission)
+
+    # the evaluation now belongs to a course that is over
+    _set("ci_avaliacao_atm", admission, dt_inicio_curso=_day(-9))
+    _run_job(admission)
+
+    assert _evaluations(admission)[0]["tp_status"] == (
+        AntimicrobialEvaluationStatusEnum.CLOSED.value
+    )
+    resolved = next(
+        p
+        for p in _pendings(admission)
+        if p["idci_pendencia"] == expired["idci_pendencia"]
+    )
+    assert (
+        resolved["tp_resolucao"]
+        == InfectionControlResolutionEnum.DRUG_NO_LONGER_ACTIVE.value
+    )
+    assert [p["tp_pendencia"] for p in _open_pendings(admission)] == [NO_EVALUATION]
+    assert _record(admission)["tp_status"] == PENDING
+
+
+def test_review_rejects_unknown_trigger(
+    client, infection_controller_headers, infection_control, admission
+):
+    """Only the optional reasons can be chosen as triggers"""
+    _prescribe_today(admission)
+
+    response = _review(
+        client,
+        infection_controller_headers,
+        admission,
+        evaluations=[ANTIMICROBIAL_DRUG],
+        triggers=[NEVER_REVIEWED],
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.get_json()["code"] == "errors.invalidParams"
 
 
 # ─── prescalc must not break ──────────────────────────────────────────────────

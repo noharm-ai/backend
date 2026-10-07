@@ -81,8 +81,7 @@ class FeatureEnum(Enum):
     # the culture card and the culture alerts; depends on the antibiogram
     # integration, so it is enabled per schema
     CULTURE = "CULTURE"
-    # infection control follow-up pages and reviews (ci_* tables); prescalc
-    # keeps the follow-up up to date in every schema regardless
+    # infection control follow-up pages and reviews (ci_* tables);
     INFECTION_CONTROL = "INFECTION_CONTROL"
 
 
@@ -463,11 +462,15 @@ class InfectionControlPendingTypeEnum(Enum):
     NEVER_REVIEWED = 1
     # an antimicrobial course without an active evaluation
     NO_EVALUATION = 2
-    # the evaluation of a course reached its valid-until date
+    # the evaluation of a course reached its valid-until date (a trigger the
+    # evaluation opts into)
     EXPIRED = 3
     # the infectologist's scheduled review date arrived
     SCHEDULED_DATE = 4
     ALERT_FIRED = 5
+    # the posology of a course changed from the one its evaluation judged (a
+    # trigger the evaluation opts into)
+    POSOLOGY_CHANGED = 6
 
 
 class InfectionControlResolutionEnum(Enum):

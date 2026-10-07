@@ -9,7 +9,11 @@ same rule):
 * an admission with a running antimicrobial course is followed; it is pending
   while it has an open reason and revised when none is left;
 * a running course without an active evaluation opens a reason for its drug;
-* an admission never reviewed opens a reason of its own;
+* a running course whose evaluation expired, or whose posology changed from
+  the evaluated one, opens a reason when its evaluation opted into that
+  trigger;
+* an admission never reviewed opens a reason of its own, and so does one
+  whose scheduled review date arrived;
 * when a drug stops, its reasons are resolved and its evaluation is closed;
 * with nothing running (or after discharge) the record is closed.
 
@@ -49,6 +53,7 @@ from services import feature_service
 from services.infection_control.antimicrobial_timeline_service import (
     GAP_TOLERANCE,
     Course,
+    TimelineItem,
     build_item,
     group_courses,
 )
@@ -102,9 +107,8 @@ def evaluation_matches_course(
     )
 
 
-def posology_snapshot(course: Course) -> dict:
-    """The posology of the latest item of a course, kept on its evaluation"""
-    item = course.items[-1]
+def item_posology(item: TimelineItem) -> dict:
+    """The posology of a prescribed item"""
     return {
         "idPrescriptionDrug": str(item.id_prescription_drug),
         "dose": item.dose,
@@ -114,6 +118,69 @@ def posology_snapshot(course: Course) -> dict:
         "dailyFrequency": item.daily_frequency,
         "route": item.route,
     }
+
+
+def posology_snapshot(course: Course) -> dict:
+    """The posology of the latest item of a course, kept on its evaluation"""
+    return item_posology(course.items[-1])
+
+
+def _same_number(a, b) -> bool:
+    return round(float(a), 4) == round(float(b), 4)
+
+
+def _same_text(a, b) -> bool:
+    return (a or "").strip().upper() == (b or "").strip().upper()
+
+
+def same_posology(evaluated: dict, current: dict) -> bool:
+    """Whether two posologies are the same treatment.
+
+    Dose and frequency are compared converted (default unit, doses per day)
+    when both sides have it, so writing the same posology another way is not
+    a change; otherwise as written.
+    """
+    if evaluated.get("doseconv") is not None and current.get("doseconv") is not None:
+        same_dose = _same_number(evaluated["doseconv"], current["doseconv"])
+    elif evaluated.get("dose") is not None and current.get("dose") is not None:
+        same_dose = _same_number(evaluated["dose"], current["dose"]) and _same_text(
+            evaluated.get("measureUnit"), current.get("measureUnit")
+        )
+    else:
+        same_dose = evaluated.get("dose") is None and current.get("dose") is None
+
+    if (
+        evaluated.get("dailyFrequency") is not None
+        and current.get("dailyFrequency") is not None
+    ):
+        same_frequency = _same_number(
+            evaluated["dailyFrequency"], current["dailyFrequency"]
+        )
+    else:
+        same_frequency = _same_text(
+            evaluated.get("frequency"), current.get("frequency")
+        )
+
+    return (
+        same_dose
+        and same_frequency
+        and _same_text(evaluated.get("route"), current.get("route"))
+    )
+
+
+def posology_changed(evaluation: AntimicrobialEvaluation, course: Course) -> bool:
+    """Whether the course is no longer prescribed as its evaluation judged it.
+
+    Only the latest prescription counts, and any of its items of the drug
+    matching is enough: a drug written in two lines (e.g. a loading dose)
+    must not flip between changed and unchanged.
+    """
+    latest = course.items[-1].id_prescription
+    return not any(
+        same_posology(evaluation.posology, item_posology(item))
+        for item in course.items
+        if item.id_prescription == latest
+    )
 
 
 def load_courses(admission_number: int, now: datetime) -> AdmissionCourses:
@@ -200,6 +267,49 @@ def sync_admission(
     return admission
 
 
+def course_reasons(
+    course: Course, evaluation: AntimicrobialEvaluation | None, now: datetime
+) -> list[tuple[InfectionControlPendingTypeEnum, dict]]:
+    """The reasons a running course gives, with their details, judged by its
+    active evaluation"""
+    if evaluation is None:
+        return [
+            (
+                InfectionControlPendingTypeEnum.NO_EVALUATION,
+                {"courseStart": dateutils.to_iso(course.start)},
+            )
+        ]
+
+    triggers = evaluation.triggers or []
+    reasons = []
+    if (
+        InfectionControlPendingTypeEnum.EXPIRED.value in triggers
+        and evaluation.valid_until <= now
+    ):
+        reasons.append(
+            (
+                InfectionControlPendingTypeEnum.EXPIRED,
+                {"validUntil": dateutils.to_iso(evaluation.valid_until)},
+            )
+        )
+
+    if (
+        InfectionControlPendingTypeEnum.POSOLOGY_CHANGED.value in triggers
+        and posology_changed(evaluation, course)
+    ):
+        reasons.append(
+            (
+                InfectionControlPendingTypeEnum.POSOLOGY_CHANGED,
+                {
+                    "evaluated": evaluation.posology,
+                    "current": posology_snapshot(course),
+                },
+            )
+        )
+
+    return reasons
+
+
 def apply_rule(
     admission: InfectionControlAdmission,
     admission_courses: AdmissionCourses,
@@ -215,6 +325,7 @@ def apply_rule(
 
     # evaluations of courses that are over are no longer in force
     active_evaluations = []
+    closed_evaluations = set()
     for evaluation in infection_control_repository.get_active_evaluations(
         admission_number=admission_number
     ):
@@ -222,6 +333,7 @@ def apply_rule(
             active_evaluations.append(evaluation)
             continue
 
+        closed_evaluations.add(evaluation.id)
         evaluation.status = AntimicrobialEvaluationStatusEnum.CLOSED.value
         evaluation.closed_at = now
         evaluation.closing_type = (
@@ -243,24 +355,36 @@ def apply_rule(
                 id_prescription=id_prescription,
             )
 
-        for course in ongoing:
-            if any(evaluation_matches_course(e, course) for e in active_evaluations):
-                continue
-
-            latest = course.items[-1]
+        if admission.next_review_date is not None and admission.next_review_date <= now:
             infection_control_repository.open_pending(
                 admission_number=admission_number,
-                pending_type=InfectionControlPendingTypeEnum.NO_EVALUATION.value,
+                pending_type=InfectionControlPendingTypeEnum.SCHEDULED_DATE.value,
                 origin=origin.value,
                 user_id=user_id,
                 now=now,
-                id_drug=course_drug(course),
-                id_prescription=id_prescription or latest.id_prescription,
                 details={
-                    "drug": latest.drug,
-                    "courseStart": dateutils.to_iso(course.start),
+                    "nextReviewDate": dateutils.to_iso(admission.next_review_date)
                 },
             )
+
+        for course in ongoing:
+            latest = course.items[-1]
+            evaluation = next(
+                (e for e in active_evaluations if evaluation_matches_course(e, course)),
+                None,
+            )
+            for pending_type, details in course_reasons(course, evaluation, now):
+                infection_control_repository.open_pending(
+                    admission_number=admission_number,
+                    pending_type=pending_type.value,
+                    origin=origin.value,
+                    user_id=user_id,
+                    now=now,
+                    id_drug=course_drug(course),
+                    id_prescription=id_prescription or latest.id_prescription,
+                    id_evaluation=evaluation.id if evaluation else None,
+                    details={"drug": latest.drug, **details},
+                )
 
     # reasons of drugs that stopped running are resolved
     ongoing_drugs = {course_drug(c) for c in ongoing}
@@ -279,7 +403,10 @@ def apply_rule(
                 user_id=user_id,
                 now=now,
             )
-        elif pending.id_drug is not None and pending.id_drug not in ongoing_drugs:
+        elif (
+            pending.id_drug is not None and pending.id_drug not in ongoing_drugs
+        ) or pending.id_evaluation in closed_evaluations:
+            # a drug restarted in a new course: the old evaluation's reasons go
             resolve_pending(
                 pending,
                 resolution=InfectionControlResolutionEnum.DRUG_NO_LONGER_ACTIVE,
