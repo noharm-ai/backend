@@ -266,7 +266,7 @@ def create_agg_prescription_by_prescription(
                     },
                 )
 
-    infection_control_status_service.sync_from_prescalc(
+    infection_control_status_service.follow_from_prescalc(
         schema=schema,
         admission_number=p.admissionNumber,
         features=features,
@@ -406,7 +406,7 @@ def create_agg_prescription_by_date(
     _update_patient_conciliation_status(
         admission_number=agg_p.admissionNumber, is_concilia=False
     )
-    infection_control_status_service.sync_from_prescalc(
+    infection_control_status_service.follow_from_prescalc(
         schema=schema,
         admission_number=agg_p.admissionNumber,
         features=features,

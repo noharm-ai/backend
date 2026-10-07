@@ -1,10 +1,13 @@
 """Tests: infection control follow-up (ci_* tables)
 
 An admission with a running antimicrobial is followed: prescalc creates its
-record as pending and opens one reason per drug without an evaluation; the
-infectologist's review evaluates drugs, settles reasons and sets the status
-(pending while a reason is open, revised when none is left, closed when no
-antimicrobial is running anymore).
+record as pending and never reviewed (or reopens a closed one); the rule
+(applied by the scheduled job in backend-private, the review save and the
+backfill) opens one reason per drug without an evaluation and follows stops,
+new drugs and discharge; the infectologist's
+review evaluates drugs, settles reasons and sets the status (pending while a
+reason is open, revised when none is left, closed when no antimicrobial is
+running anymore).
 
 Seed data used (demo schema): drug 1 (AMPICILINA + SULBACTAM) is antimicrobial
 on segment 1, drug 4 (BISACODIL) is not; the ``second_antimicrobial`` fixture
@@ -27,7 +30,9 @@ from models.enums import (
     InfectionControlResolutionEnum,
     InfectionControlStatusEnum,
 )
+from models.main import db, dbSession
 from security.role import Role
+from services.infection_control import infection_control_status_service
 from static import atendcalc, prescalc
 from tests.conftest import get_access, make_headers, session, session_commit
 from tests.utils.utils_test_prescription import (
@@ -36,6 +41,7 @@ from tests.utils.utils_test_prescription import (
     test_counters,
 )
 from utils import status
+from utils.static_context import static_user_context
 
 ADULT_SEGMENT = 1
 CPOE_SEGMENT = 2
@@ -211,10 +217,13 @@ def _prescribe(
     return id_prescription
 
 
-def _prescribe_today(admission_number, drugs=(ANTIMICROBIAL_DRUG,)):
-    """A daily prescription valid from yesterday until tomorrow, run through prescalc"""
+def _prescribe_today(admission_number, drugs=(ANTIMICROBIAL_DRUG,), job=True):
+    """A daily prescription valid from yesterday until tomorrow, run through
+    prescalc and then (unless job=False) the job"""
     id_prescription = _prescribe(admission_number, _day(-1), _day(1), drugs=drugs)
     _prescalc(id_prescription)
+    if job:
+        _run_job(admission_number)
     return id_prescription
 
 
@@ -226,6 +235,47 @@ def _prescalc(id_prescription):
     )
     assert response["status"] == "success", response
     session_commit()
+
+
+def _run_job(admission_number):
+    """Apply the rule to the admission, as the scheduled job does"""
+    with static_user_context("demo"):
+        dbSession.setSchema("demo")
+        infection_control_status_service.sync_admission(
+            admission_number=admission_number,
+            origin=InfectionControlOriginEnum.JOB,
+            user_id=0,
+        )
+        db.session.commit()
+        db.session.remove()
+    session_commit()
+
+
+def _suspend(id_prescription):
+    session.execute(
+        text("UPDATE demo.presmed SET dtsuspensao = :date WHERE fkprescricao = :id"),
+        {"date": datetime.now() - timedelta(hours=1), "id": id_prescription},
+    )
+    session_commit()
+
+
+def _discharge(admission_number):
+    session.execute(
+        text("UPDATE demo.pessoa SET dtalta = :date WHERE nratendimento = :admission"),
+        {"date": datetime.now() - timedelta(hours=1), "admission": admission_number},
+    )
+    session_commit()
+
+
+def _hold_record(admission_number):
+    """Lock the admission record in the test session, as a review save would"""
+    session.execute(
+        text(
+            "SELECT * FROM demo.ci_atendimento "
+            "WHERE nratendimento = :admission FOR UPDATE"
+        ),
+        {"admission": admission_number},
+    )
 
 
 def _record(admission_number):
@@ -307,27 +357,24 @@ def _review(client, headers, admission_number, evaluations=(), **kwargs):
 # ─── prescalc ─────────────────────────────────────────────────────────────────
 
 
-def test_prescalc_follows_admission_without_feature(admission):
-    """Prescalc keeps the follow-up even when the schema has not turned the
-    feature on, so it is up to date once it does"""
-    _prescribe_today(admission)
+def test_prescalc_without_feature_follows_nothing(admission):
+    """A schema without the INFECTION_CONTROL feature is not followed"""
+    _prescribe_today(admission, job=False)
 
-    record = _record(admission)
-    assert record is not None
-    assert record["tp_status"] == PENDING
+    assert _record(admission) is None
 
 
 def test_prescalc_without_antimicrobial_follows_nothing(infection_control, admission):
     """A prescription-day without antimicrobials does not follow the admission"""
-    _prescribe_today(admission, drugs=(OTHER_DRUG,))
+    _prescribe_today(admission, drugs=(OTHER_DRUG,), job=False)
 
     assert _record(admission) is None
 
 
 def test_prescalc_follows_admission(infection_control, admission):
-    """An antimicrobial makes the admission pending: never reviewed and the
-    drug without an evaluation"""
-    id_prescription = _prescribe_today(admission)
+    """An antimicrobial makes the admission pending and never reviewed; the
+    reasons of its drugs are left to the job"""
+    id_prescription = _prescribe_today(admission, job=False)
 
     record = _record(admission)
     assert record["tp_status"] == PENDING
@@ -336,19 +383,37 @@ def test_prescalc_follows_admission(infection_control, admission):
     assert record["created_by"] == 0
 
     pendings = _open_pendings(admission)
-    assert [p["tp_pendencia"] for p in pendings] == [NEVER_REVIEWED, NO_EVALUATION]
-    assert pendings[1]["fkmedicamento"] == ANTIMICROBIAL_DRUG
-    assert pendings[1]["fkprescricao"] == id_prescription
-    assert pendings[1]["tp_origem"] == InfectionControlOriginEnum.PRESCALC.value
+    assert [p["tp_pendencia"] for p in pendings] == [NEVER_REVIEWED]
+    assert pendings[0]["fkprescricao"] == id_prescription
+    assert pendings[0]["tp_origem"] == InfectionControlOriginEnum.PRESCALC.value
 
 
 def test_daily_prescriptions_keep_a_single_reason(infection_control, admission):
-    """The same drug on consecutive daily prescriptions stays one open reason"""
+    """Prescalc on consecutive daily prescriptions opens 'never reviewed' once"""
     _prescalc(_prescribe(admission, _day(-1), _day(0)))
     _prescalc(_prescribe(admission, _day(0), _day(1)))
 
     pendings = _open_pendings(admission)
-    assert [p["tp_pendencia"] for p in pendings] == [NEVER_REVIEWED, NO_EVALUATION]
+    assert [p["tp_pendencia"] for p in pendings] == [NEVER_REVIEWED]
+
+
+def test_prescalc_leaves_reviewed_admission_alone(
+    client, infection_controller_headers, infection_control, admission
+):
+    """A followed admission is the job's: prescalc doesn't reopen 'never
+    reviewed' after a review"""
+    _prescribe_today(admission)
+    _review(
+        client,
+        infection_controller_headers,
+        admission,
+        evaluations=[ANTIMICROBIAL_DRUG],
+    )
+
+    _prescribe_today(admission, job=False)
+
+    assert _record(admission)["tp_status"] == REVISED
+    assert _open_pendings(admission) == []
 
 
 def test_atendcalc_follows_cpoe_admission(
@@ -363,10 +428,91 @@ def test_atendcalc_follows_cpoe_admission(
     record = _record(admission)
     assert record is not None
     assert record["tp_status"] == PENDING
-    assert [p["tp_pendencia"] for p in _open_pendings(admission)] == [
-        NEVER_REVIEWED,
-        NO_EVALUATION,
-    ]
+    assert [p["tp_pendencia"] for p in _open_pendings(admission)] == [NEVER_REVIEWED]
+
+
+def test_prescalc_reopens_closed_admission(infection_control, admission):
+    """An antimicrobial restarted on a closed admission makes it pending again"""
+    _suspend(_prescribe_today(admission))
+    _run_job(admission)
+    assert _record(admission)["tp_status"] == CLOSED
+
+    _prescribe_today(admission, job=False)
+
+    record = _record(admission)
+    assert record["tp_status"] == PENDING
+    # never reviewed: the reason is open again
+    assert [p["tp_pendencia"] for p in _open_pendings(admission)] == [NEVER_REVIEWED]
+
+
+def test_prescalc_reopens_reviewed_admission_for_the_job(
+    client, infection_controller_headers, infection_control, admission
+):
+    """A reviewed admission reopened by prescalc waits for the job to open the
+    reasons of its drugs"""
+    id_prescription = _prescribe_today(admission)
+    _review(
+        client,
+        infection_controller_headers,
+        admission,
+        evaluations=[ANTIMICROBIAL_DRUG],
+    )
+    _suspend(id_prescription)
+    _run_job(admission)
+    assert _record(admission)["tp_status"] == CLOSED
+
+    _prescribe_today(admission, job=False)
+
+    assert _record(admission)["tp_status"] == PENDING
+    assert _open_pendings(admission) == []
+
+    _run_job(admission)
+
+    assert [
+        (p["tp_pendencia"], p["fkmedicamento"]) for p in _open_pendings(admission)
+    ] == [(NO_EVALUATION, ANTIMICROBIAL_DRUG)]
+
+
+def test_prescalc_does_not_reopen_discharged_admission(
+    client, infection_controller_headers, infection_control, admission
+):
+    """Recalculating a discharged patient's prescription keeps the record closed"""
+    id_prescription = _prescribe_today(admission)
+    _review(client, infection_controller_headers, admission)
+    _discharge(admission)
+    _run_job(admission)
+    assert _record(admission)["tp_status"] == CLOSED
+
+    _prescalc(id_prescription)
+
+    assert _record(admission)["tp_status"] == CLOSED
+    assert _open_pendings(admission) == []
+
+
+def test_prescalc_does_not_follow_discharged_admission(infection_control, admission):
+    """A discharged patient is not followed"""
+    _discharge(admission)
+
+    _prescribe_today(admission, job=False)
+
+    assert _record(admission) is None
+
+
+# ─── rule (applied by the scheduled job) ──────────────────────────────────────
+
+
+def test_rule_opens_reasons_of_each_drug(infection_control, admission):
+    """The rule opens a reason for each running drug without an evaluation"""
+    id_prescription = _prescribe_today(admission, job=False)
+
+    _run_job(admission)
+
+    pendings = _open_pendings(admission)
+    assert [p["tp_pendencia"] for p in pendings] == [NEVER_REVIEWED, NO_EVALUATION]
+    assert pendings[1]["fkmedicamento"] == ANTIMICROBIAL_DRUG
+    assert pendings[1]["fkprescricao"] == id_prescription
+    assert pendings[1]["tp_origem"] == InfectionControlOriginEnum.JOB.value
+    assert _record(admission)["tp_status"] == PENDING
 
 
 def test_new_antimicrobial_reopens_revised_admission(
@@ -376,7 +522,8 @@ def test_new_antimicrobial_reopens_revised_admission(
     admission,
     second_antimicrobial,
 ):
-    """A new antimicrobial on a revised patient makes it pending again"""
+    """A new antimicrobial on a revised patient makes it pending again once
+    the job runs"""
     _prescribe_today(admission)
     _review(
         client,
@@ -386,13 +533,48 @@ def test_new_antimicrobial_reopens_revised_admission(
     )
     assert _record(admission)["tp_status"] == REVISED
 
-    _prescribe_today(admission, drugs=(ANTIMICROBIAL_DRUG, second_antimicrobial))
+    _prescribe_today(
+        admission, drugs=(ANTIMICROBIAL_DRUG, second_antimicrobial), job=False
+    )
+    assert _record(admission)["tp_status"] == REVISED
+
+    _run_job(admission)
 
     assert _record(admission)["tp_status"] == PENDING
     pendings = _open_pendings(admission)
     assert [(p["tp_pendencia"], p["fkmedicamento"]) for p in pendings] == [
         (NO_EVALUATION, second_antimicrobial)
     ]
+
+
+def test_rule_closes_admission_when_drug_stops(infection_control, admission):
+    """A suspended drug resolves its reasons and closes the admission"""
+    _suspend(_prescribe_today(admission))
+
+    _run_job(admission)
+
+    assert _record(admission)["tp_status"] == CLOSED
+    assert _open_pendings(admission) == []
+    assert {p["tp_resolucao"] for p in _pendings(admission)} == {
+        InfectionControlResolutionEnum.DRUG_NO_LONGER_ACTIVE.value
+    }
+
+
+def test_rule_closes_admission_on_discharge(
+    client, infection_controller_headers, infection_control, admission
+):
+    """Discharge closes the admission, its evaluations and its reasons"""
+    _prescribe_today(admission)
+    _review(client, infection_controller_headers, admission)
+    _discharge(admission)
+
+    _run_job(admission)
+
+    assert _record(admission)["tp_status"] == CLOSED
+    assert {p["tp_resolucao"] for p in _pendings(admission) if p["tp_resolucao"]} >= {
+        InfectionControlResolutionEnum.DISCHARGE.value
+    }
+    assert _open_pendings(admission) == []
 
 
 # ─── review ───────────────────────────────────────────────────────────────────
@@ -513,12 +695,7 @@ def test_suspended_drug_is_settled_on_save(
     client, infection_controller_headers, infection_control, admission
 ):
     """A drug suspended before being evaluated stops keeping the patient pending"""
-    id_prescription = _prescribe_today(admission)
-    session.execute(
-        text("UPDATE demo.presmed SET dtsuspensao = :date WHERE fkprescricao = :id"),
-        {"date": datetime.now() - timedelta(hours=1), "id": id_prescription},
-    )
-    session_commit()
+    _suspend(_prescribe_today(admission))
 
     response = _review(client, infection_controller_headers, admission)
 
@@ -695,35 +872,30 @@ def test_prescalc_survives_hook_failure(infection_control, admission, monkeypatc
         raise RuntimeError("infection control failure")
 
     monkeypatch.setattr(
-        "services.infection_control.infection_control_status_service.load_courses",
+        "repository.infection_control.infection_control_repository.create_admission",
         fail,
     )
 
-    _prescribe_today(admission)
+    _prescribe_today(admission, job=False)
 
     assert _patient_day(admission) is not None
     assert _record(admission) is None
 
 
-def test_prescalc_survives_locked_record(
+def test_prescalc_does_not_wait_for_a_review(
     infection_control, admission, second_antimicrobial
 ):
-    """When a review holds the admission record, prescalc gives up the
-    infection control step after the lock timeout and still succeeds"""
+    """A review holding a followed record doesn't make prescalc wait: the
+    record is the job's"""
     _prescribe_today(admission)
 
     id_prescription = _prescribe(
         admission, _day(-1), _day(1), drugs=(ANTIMICROBIAL_DRUG, second_antimicrobial)
     )
 
-    # hold the record as a review save would (creating the prescription above
-    # commits the test session, so the lock is taken only now)
-    session.execute(
-        text(
-            "SELECT * FROM demo.ci_atendimento WHERE nratendimento = :admission FOR UPDATE"
-        ),
-        {"admission": admission},
-    )
+    # creating the prescription above commits the test session, so the lock is
+    # taken only now
+    _hold_record(admission)
     started = datetime.now()
     try:
         response = json.loads(
@@ -736,10 +908,5 @@ def test_prescalc_survives_locked_record(
         session_commit()
 
     assert response["status"] == "success", response
-    # prescalc waited for the lock timeout, then gave up the step
-    assert datetime.now() - started >= timedelta(seconds=4)
-    # the step was rolled back: the new drug did not open a reason
-    assert [p["fkmedicamento"] for p in _open_pendings(admission)] == [
-        None,
-        ANTIMICROBIAL_DRUG,
-    ]
+    assert datetime.now() - started < timedelta(seconds=2)
+    assert _record(admission)["tp_status"] == PENDING

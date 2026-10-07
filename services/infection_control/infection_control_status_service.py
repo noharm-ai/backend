@@ -2,8 +2,9 @@
 
 The single rule that keeps an admission's infection control record
 (ci_atendimento) and its pending reasons (ci_pendencia) in step with the
-antimicrobials prescribed. Prescalc, the review save, the backfill and the
-scheduled job all go through it, so it lives in one place:
+antimicrobials prescribed. The review save and the backfill go through it,
+so it lives in one place (the scheduled job in backend-private follows the
+same rule):
 
 * an admission with a running antimicrobial course is followed; it is pending
   while it has an open reason and revised when none is left;
@@ -12,8 +13,12 @@ scheduled job all go through it, so it lives in one place:
 * when a drug stops, its reasons are resolved and its evaluation is closed;
 * with nothing running (or after discharge) the record is closed.
 
+Prescalc runs many times a day, so it doesn't apply the rule: it only
+follows the admissions that start (or restart) an antimicrobial, and the
+scheduled job (backend-private) applies the rule to every followed admission.
+
 The functions here carry no permission check: they run inside callers that
-have one (the prescalc static context or a decorated endpoint).
+have one (the static context or a decorated endpoint).
 """
 
 import json
@@ -23,6 +28,7 @@ from datetime import datetime
 from models.enums import (
     AntimicrobialEvaluationClosingEnum,
     AntimicrobialEvaluationStatusEnum,
+    FeatureEnum,
     InfectionControlOriginEnum,
     InfectionControlPendingTypeEnum,
     InfectionControlResolutionEnum,
@@ -39,6 +45,7 @@ from repository.infection_control import (
     antimicrobial_repository,
     infection_control_repository,
 )
+from services import feature_service
 from services.infection_control.antimicrobial_timeline_service import (
     GAP_TOLERANCE,
     Course,
@@ -47,7 +54,7 @@ from services.infection_control.antimicrobial_timeline_service import (
 )
 from utils import dateutils, logger
 
-# prescalc must not wait long for a review save holding the admission record
+# prescalc must not wait long for a writer holding the admission record
 PRESCALC_LOCK_TIMEOUT_MS = 5000
 
 
@@ -299,7 +306,7 @@ def apply_rule(
     db.session.flush()
 
 
-def sync_from_prescalc(
+def follow_from_prescalc(
     schema: str,
     admission_number: int,
     features: dict,
@@ -307,10 +314,17 @@ def sync_from_prescalc(
     id_prescription: int | None = None,
 ):
     """Prescalc hook: follow an admission whose prescription-day has an
-    antimicrobial and open the reasons it brings.
+    antimicrobial.
 
-    Runs for every schema, with or without the INFECTION_CONTROL feature, so
-    the follow-up is already up to date when a schema turns it on.
+    Only what can't wait for the job, and cheap enough for prescalc (no
+    antimicrobial history, no wait for a record being reviewed):
+    * an admission not followed yet gets its record, pending and never reviewed;
+    * a closed record is reopened as pending (the antimicrobial restarted).
+
+    A discharged patient is left alone.
+
+    A followed record is left to the job, which also opens the reasons of each
+    drug. Only for schemas with the INFECTION_CONTROL feature.
 
     Runs in a savepoint and never raises: the prescription-day is the core
     product and must be saved even if this step fails.
@@ -323,24 +337,55 @@ def sync_from_prescalc(
     db.session.flush()
 
     try:
-        with db.session.begin_nested():
-            sync_admission(
+        with (
+            db.session.begin_nested(),
+            infection_control_repository.lock_timeout(PRESCALC_LOCK_TIMEOUT_MS),
+        ):
+            if not feature_service.has_feature(FeatureEnum.INFECTION_CONTROL):
+                return
+
+            now = datetime.now()
+            # a discharged patient's prescriptions are still recalculated
+            # (e.g. drugs suspended at discharge): they start nothing
+            if infection_control_repository.is_discharged(
+                admission_number=admission_number, now=now
+            ):
+                return
+
+            created = infection_control_repository.create_admission(
                 admission_number=admission_number,
-                origin=InfectionControlOriginEnum.PRESCALC,
+                origin=InfectionControlOriginEnum.PRESCALC.value,
                 user_id=user_id,
-                id_prescription=id_prescription,
-                lock_timeout_ms=PRESCALC_LOCK_TIMEOUT_MS,
+                now=now,
             )
+            reopened = (
+                None
+                if created
+                else infection_control_repository.reopen_admission(
+                    admission_number=admission_number, user_id=user_id, now=now
+                )
+            )
+
+            # reopened after a review: the job opens the reasons of its drugs
+            if created or (reopened and reopened.id_last_review is None):
+                infection_control_repository.open_pending(
+                    admission_number=admission_number,
+                    pending_type=InfectionControlPendingTypeEnum.NEVER_REVIEWED.value,
+                    origin=InfectionControlOriginEnum.PRESCALC.value,
+                    user_id=user_id,
+                    now=now,
+                    id_prescription=id_prescription,
+                )
     except Exception as e:  # noqa: BLE001 - must not break the prescription-day
-        logger.backend_logger.warning(
+        # same event as the static context's errors, which is the one monitored
+        logger.backend_logger.error(
             json.dumps(
                 {
-                    "event": "infection_control_prescalc_error",
-                    "path": "infection_control_status_service.sync_from_prescalc",
+                    "event": "backend_exception",
+                    "path": "infection_control_status_service.follow_from_prescalc",
                     "schema": schema,
-                    "message": "Falha ao atualizar o controle de infecção",
+                    "message": str(e),
                     "admission_number": admission_number,
-                    "error": str(e),
                 }
             )
         )

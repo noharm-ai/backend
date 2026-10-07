@@ -1,8 +1,9 @@
 """Repository: infection control follow-up (ci_* tables)"""
 
+from contextlib import contextmanager
 from datetime import datetime
 
-from sqlalchemy import and_, func, or_, text
+from sqlalchemy import and_, func, or_, text, update
 from sqlalchemy.dialects.postgresql import insert
 
 from models.appendix import Department
@@ -43,34 +44,78 @@ def create_admission(
     return db.session.execute(stmt).rowcount > 0
 
 
+@contextmanager
+def lock_timeout(lock_timeout_ms: int | None):
+    """Bound the lock waits inside the block: a timeout raises OperationalError.
+
+    Restored when the block succeeds, so it doesn't leak into later waits of the
+    transaction. When it fails the transaction (or the savepoint the block runs
+    in) is rolled back, and that undoes the setting too.
+    """
+    if lock_timeout_ms is None:
+        yield
+        return
+
+    # set_config(..., true) is SET LOCAL with a bind param
+    db.session.execute(
+        text("SELECT set_config('lock_timeout', :timeout, true)"),
+        {"timeout": f"{int(lock_timeout_ms)}ms"},
+    )
+    yield
+    db.session.execute(text("SET LOCAL lock_timeout = DEFAULT"))
+
+
 def lock_admission(
     admission_number: int, lock_timeout_ms: int | None = None
 ) -> InfectionControlAdmission | None:
     """The admission record, locked until the end of the transaction.
 
-    Every writer (prescalc, review save, the job) changes the pending reasons
-    and the status under this lock, so the two never disagree. With
-    lock_timeout_ms the wait is bounded: a timeout raises OperationalError.
+    Every writer (review save, the job) changes the pending reasons and the
+    status under this lock, so the two never disagree. With lock_timeout_ms
+    the wait is bounded: a timeout raises OperationalError.
     """
-    if lock_timeout_ms is not None:
-        # set_config(..., true) is SET LOCAL with a bind param
-        db.session.execute(
-            text("SELECT set_config('lock_timeout', :timeout, true)"),
-            {"timeout": f"{int(lock_timeout_ms)}ms"},
+    with lock_timeout(lock_timeout_ms):
+        return (
+            db.session.query(InfectionControlAdmission)
+            .filter(InfectionControlAdmission.admission_number == admission_number)
+            .with_for_update()
+            .first()
         )
 
-    admission = (
-        db.session.query(InfectionControlAdmission)
-        .filter(InfectionControlAdmission.admission_number == admission_number)
-        .with_for_update()
-        .first()
+
+def is_discharged(admission_number: int, now: datetime) -> bool:
+    """Whether the patient of an admission was discharged by `now`"""
+    discharge_date = (
+        db.session.query(Patient.dischargeDate)
+        .filter(Patient.admissionNumber == admission_number)
+        .scalar()
     )
+    return discharge_date is not None and discharge_date <= now
 
-    if lock_timeout_ms is not None:
-        # restore it so the timeout doesn't leak into later waits of the transaction
-        db.session.execute(text("SET LOCAL lock_timeout = DEFAULT"))
 
-    return admission
+def reopen_admission(admission_number: int, user_id: int, now: datetime):
+    """Make a closed admission record pending again.
+
+    Only a closed record is touched: a pending or revised one is left as is
+    without waiting for its lock. Returns the reopened row (with its last
+    review), or None when the record is not closed.
+    """
+    stmt = (
+        update(InfectionControlAdmission)
+        .where(InfectionControlAdmission.admission_number == admission_number)
+        .where(
+            InfectionControlAdmission.status == InfectionControlStatusEnum.CLOSED.value
+        )
+        .values(
+            status=InfectionControlStatusEnum.PENDING.value,
+            status_date=now,
+            updated_at=now,
+            updated_by=user_id,
+        )
+        .returning(InfectionControlAdmission.id_last_review)
+        .execution_options(synchronize_session=False)
+    )
+    return db.session.execute(stmt).first()
 
 
 def open_pending(
