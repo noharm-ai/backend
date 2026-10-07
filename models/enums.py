@@ -454,6 +454,8 @@ class InfectionControlOriginEnum(Enum):
     JOB = 2
     BACKFILL = 3
     REVIEW = 4
+    # started by hand from the infection control page
+    MANUAL = 5
 
 
 class InfectionControlPendingTypeEnum(Enum):

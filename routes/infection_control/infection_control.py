@@ -38,6 +38,15 @@ def get_admission_state(admission_number: int):
     )
 
 
+@app_infection_control.route(
+    "/infection-control/admission/<int:admission_number>/follow", methods=["POST"]
+)
+@api_endpoint()
+def follow_admission(admission_number: int):
+    """Start following an admission by hand"""
+    return infection_control_service.follow_admission(admission_number=admission_number)
+
+
 @app_infection_control.route("/infection-control/review", methods=["POST"])
 @api_endpoint()
 def save_review():

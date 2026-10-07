@@ -254,22 +254,13 @@ def save_review(request_data: InfectionControlReviewRequest, user_context: User)
     admission = infection_control_repository.lock_admission(
         admission_number=admission_number
     )
+    # an admission is reviewed only once followed (by prescalc, the backfill or
+    # started by hand)
     if admission is None:
-        if not admission_courses.ongoing:
-            raise ValidationError(
-                "Nenhum antimicrobiano em uso neste atendimento",
-                "errors.invalidRecord",
-                status.HTTP_400_BAD_REQUEST,
-            )
-
-        infection_control_repository.create_admission(
-            admission_number=admission_number,
-            origin=InfectionControlOriginEnum.REVIEW.value,
-            user_id=user_context.id,
-            now=now,
-        )
-        admission = infection_control_repository.lock_admission(
-            admission_number=admission_number
+        raise ValidationError(
+            "Atendimento não está no acompanhamento do controle de infecção",
+            "errors.invalidRecord",
+            status.HTTP_400_BAD_REQUEST,
         )
 
     review = InfectionControlReview()
@@ -358,6 +349,39 @@ def save_review(request_data: InfectionControlReviewRequest, user_context: User)
         origin=InfectionControlOriginEnum.REVIEW,
         user_id=user_context.id,
     )
+
+    return _get_state(admission_number=admission_number, now=now)
+
+
+@has_permission(Permission.WRITE_INFECTION_CONTROL)
+def follow_admission(admission_number: int, user_context: User):
+    """Start following an admission by hand, as prescalc does when it sees an
+    antimicrobial: the record is created pending, with the reasons of its
+    running drugs. An admission already followed just gets the rule applied."""
+    _check_feature()
+
+    now = datetime.now()
+    if infection_control_repository.is_discharged(
+        admission_number=admission_number, now=now
+    ):
+        raise ValidationError(
+            "Paciente com alta não entra no acompanhamento",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    admission = rule.sync_admission(
+        admission_number=admission_number,
+        origin=InfectionControlOriginEnum.MANUAL,
+        user_id=user_context.id,
+        now=now,
+    )
+    if admission is None:
+        raise ValidationError(
+            "Nenhum antimicrobiano em uso neste atendimento",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
 
     return _get_state(admission_number=admission_number, now=now)
 
