@@ -190,11 +190,15 @@ def get_interventions(
 
     if len(id_intervention_reason_list) > 0:
         interventions = interventions.filter(
-            # the column is smallint[]; without the cast postgres finds no
-            # overlap operator for the integer[] the list would render as
+            # the column is smallint[]: cast both sides to integer[] so the
+            # operator resolves with or without the intarray extension
+            # (smallint[] && smallint[] is ambiguous when intarray is installed,
+            # integer[] && smallint[] does not exist when it is not)
             cast(
-                id_intervention_reason_list, postgresql.ARRAY(db.SmallInteger)
-            ).overlap(Intervention.idInterventionReason)
+                Intervention.idInterventionReason, postgresql.ARRAY(db.Integer)
+            ).overlap(
+                cast(id_intervention_reason_list, postgresql.ARRAY(db.Integer))
+            )
         )
 
     if has_economy != None and has_economy != "":
