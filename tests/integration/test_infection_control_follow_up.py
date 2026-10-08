@@ -708,6 +708,79 @@ def test_reevaluation_supersedes_previous(
     assert _record(admission)["tp_status"] == REVISED
 
 
+def test_overlapping_backdated_evaluation_supersedes_previous(
+    client, infection_controller_headers, infection_control, admission
+):
+    """A backdated evaluation whose period reaches the one in force replaces
+    it"""
+    _prescribe_today(admission)
+    _review(client, infection_controller_headers, admission, [ANTIMICROBIAL_DRUG])
+    _review(
+        client,
+        infection_controller_headers,
+        admission,
+        evaluations=[ANTIMICROBIAL_DRUG],
+        valid_from=_day(-1).isoformat(),
+    )
+
+    first, second = _evaluations(admission)
+    assert first["tp_status"] == AntimicrobialEvaluationStatusEnum.SUPERSEDED.value
+    assert first["fkci_avaliacao_atm_substituta"] == second["idci_avaliacao_atm"]
+    assert second["tp_status"] == AntimicrobialEvaluationStatusEnum.ACTIVE.value
+
+
+def test_evaluation_over_before_the_one_in_force_goes_to_history(
+    client, infection_controller_headers, infection_control, admission
+):
+    """A period over before the evaluation in force starts is recorded as
+    history: the evaluation in force and its reasons stay as they are"""
+    _prescribe_today(admission)
+    _review(
+        client,
+        infection_controller_headers,
+        admission,
+        evaluations=[ANTIMICROBIAL_DRUG],
+        triggers=[EXPIRED],
+    )
+    # the evaluation in force expired: the admission is pending for it
+    _set(
+        "ci_avaliacao_atm", admission, dt_validade=datetime.now() - timedelta(minutes=1)
+    )
+    _run_job(admission)
+    assert _record(admission)["tp_status"] == PENDING
+
+    response = _review(
+        client,
+        infection_controller_headers,
+        admission,
+        evaluations=[ANTIMICROBIAL_DRUG],
+        valid_from=_day(-1).isoformat(),
+        valid_until=(_day(-1) + timedelta(hours=2)).isoformat(),
+        triggers=[EXPIRED],
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.get_json()
+    in_force, past = _evaluations(admission)
+    assert in_force["tp_status"] == AntimicrobialEvaluationStatusEnum.ACTIVE.value
+    assert in_force["fkci_avaliacao_atm_substituta"] is None
+    assert past["tp_status"] == AntimicrobialEvaluationStatusEnum.CLOSED.value
+    assert (
+        past["tp_encerramento"] == AntimicrobialEvaluationClosingEnum.RETROACTIVE.value
+    )
+    # the expired one in force still keeps the admission pending
+    assert _record(admission)["tp_status"] == PENDING
+    (pending,) = _open_pendings(admission)
+    assert pending["tp_pendencia"] == EXPIRED
+    assert pending["fkci_avaliacao_atm"] == in_force["idci_avaliacao_atm"]
+
+    course = response.get_json()["data"]["courses"][0]
+    assert course["evaluation"]["id"] == str(in_force["idci_avaliacao_atm"])
+    assert [e["id"] for e in course["history"]] == [
+        str(past["idci_avaliacao_atm"]),
+        str(in_force["idci_avaliacao_atm"]),
+    ]
+
+
 def test_suspended_drug_is_settled_on_save(
     client, infection_controller_headers, infection_control, admission
 ):

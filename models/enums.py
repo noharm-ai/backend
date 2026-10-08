@@ -499,3 +499,6 @@ class AntimicrobialEvaluationClosingEnum(Enum):
     SUPERSEDED = 1
     COURSE_ENDED = 2
     DISCHARGE = 3
+    # recorded for a period over before the evaluation in force started: it
+    # goes straight to the history and leaves that one in force
+    RETROACTIVE = 4

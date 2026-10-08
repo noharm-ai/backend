@@ -300,6 +300,16 @@ def save_review(request_data: InfectionControlReviewRequest, user_context: User)
     for evaluation_data in request_data.evaluations:
         course = admission_courses.ongoing_course(evaluation_data.idDrug)
         latest = course.items[-1]
+        in_force = [
+            previous
+            for previous in active_evaluations
+            if rule.evaluation_matches_course(previous, course)
+        ]
+        # a period over before the evaluation in force starts is a record of
+        # the past, not a replacement
+        retroactive = bool(in_force) and all(
+            evaluation_data.validUntil < previous.valid_from for previous in in_force
+        )
 
         evaluation = AntimicrobialEvaluation()
         evaluation.id_review = review.id
@@ -317,19 +327,26 @@ def save_review(request_data: InfectionControlReviewRequest, user_context: User)
         evaluation.status = AntimicrobialEvaluationStatusEnum.ACTIVE.value
         evaluation.created_at = now
         evaluation.created_by = user_context.id
+        if retroactive:
+            evaluation.status = AntimicrobialEvaluationStatusEnum.CLOSED.value
+            evaluation.closed_at = now
+            evaluation.closing_type = (
+                AntimicrobialEvaluationClosingEnum.RETROACTIVE.value
+            )
         db.session.add(evaluation)
         db.session.flush()
 
-        for previous in active_evaluations:
-            if rule.evaluation_matches_course(previous, course):
-                previous.status = AntimicrobialEvaluationStatusEnum.SUPERSEDED.value
-                previous.closed_at = now
-                previous.closing_type = (
-                    AntimicrobialEvaluationClosingEnum.SUPERSEDED.value
-                )
-                previous.id_superseded_by = evaluation.id
-                previous.updated_at = now
-                previous.updated_by = user_context.id
+        # the evaluation in force and its reasons stay as they are
+        if retroactive:
+            continue
+
+        for previous in in_force:
+            previous.status = AntimicrobialEvaluationStatusEnum.SUPERSEDED.value
+            previous.closed_at = now
+            previous.closing_type = AntimicrobialEvaluationClosingEnum.SUPERSEDED.value
+            previous.id_superseded_by = evaluation.id
+            previous.updated_at = now
+            previous.updated_by = user_context.id
 
         for pending in open_pendings:
             if (
