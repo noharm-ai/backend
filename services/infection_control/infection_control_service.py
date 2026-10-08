@@ -234,9 +234,11 @@ def _validate_review(
                 status.HTTP_400_BAD_REQUEST,
             )
 
-        if evaluation.validUntil <= now:
+        # the validity may already be over (a retroactive record), but not
+        # before the evaluation starts
+        if evaluation.validUntil < (evaluation.validFrom or now):
             raise ValidationError(
-                "A validade da avaliação deve ser futura",
+                "A validade da avaliação deve ser posterior ao seu início",
                 "errors.invalidParams",
                 status.HTTP_400_BAD_REQUEST,
             )

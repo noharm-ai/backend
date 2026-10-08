@@ -730,14 +730,19 @@ def test_suspended_drug_is_settled_on_save(
 @pytest.mark.parametrize(
     "kwargs",
     [
+        # validity over before the evaluation starts
         {"valid_until": (datetime.now() - timedelta(hours=1)).isoformat()},
+        {
+            "valid_from": _day(-1).isoformat(),
+            "valid_until": (_day(-1) - timedelta(hours=1)).isoformat(),
+        },
         {"next_review_date": (datetime.now() - timedelta(hours=1)).isoformat()},
     ],
 )
-def test_review_rejects_past_dates(
+def test_review_rejects_invalid_dates(
     client, infection_controller_headers, infection_control, admission, kwargs
 ):
-    """Validity and the next review date must be in the future"""
+    """Validity ends after the evaluation starts; the next review is ahead"""
     _prescribe_today(admission)
 
     response = _review(
@@ -750,6 +755,54 @@ def test_review_rejects_past_dates(
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.get_json()["code"] == "errors.invalidParams"
+    assert _evaluations(admission) == []
+
+
+def test_retroactive_evaluation_is_recorded_already_expired(
+    client, infection_controller_headers, infection_control, admission
+):
+    """A backdated evaluation may have its validity over already: watching its
+    expiry, it sends the admission straight back to pending"""
+    _prescribe_today(admission)
+    valid_until = datetime.now() - timedelta(hours=1)
+
+    response = _review(
+        client,
+        infection_controller_headers,
+        admission,
+        evaluations=[ANTIMICROBIAL_DRUG],
+        valid_from=_day(-1).isoformat(),
+        valid_until=valid_until.isoformat(),
+        triggers=[EXPIRED],
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.get_json()
+    (evaluation,) = _evaluations(admission)
+    assert evaluation["dt_validade"] == valid_until
+    assert _record(admission)["tp_status"] == PENDING
+    (pending,) = _open_pendings(admission)
+    assert pending["tp_pendencia"] == EXPIRED
+    assert pending["fkci_avaliacao_atm"] == evaluation["idci_avaliacao_atm"]
+
+
+def test_retroactive_evaluation_without_expiry_trigger_revises(
+    client, infection_controller_headers, infection_control, admission
+):
+    """Without watching its expiry, a retroactive evaluation settles the drug"""
+    _prescribe_today(admission)
+
+    response = _review(
+        client,
+        infection_controller_headers,
+        admission,
+        evaluations=[ANTIMICROBIAL_DRUG],
+        valid_from=_day(-1).isoformat(),
+        valid_until=(datetime.now() - timedelta(hours=1)).isoformat(),
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.get_json()
+    assert _record(admission)["tp_status"] == REVISED
+    assert _open_pendings(admission) == []
 
 
 def test_evaluation_applies_from_the_review_by_default(
