@@ -15,6 +15,7 @@ from datetime import date, timedelta
 import pytest
 from sqlalchemy import bindparam, text
 
+from services import news_service
 from services.news_service import PAGE_SIZE
 from tests.conftest import session, session_commit
 from utils import status
@@ -29,6 +30,17 @@ SCHEDULED_ID = 994105
 NO_CONTENT_ID = 994106
 
 _TODAY = date.today()
+
+
+class _FixedDate(date):
+    """date whose today() is _TODAY: the service and the seed must agree on
+    the day, and the process clock may switch from UTC to America/Sao_Paulo
+    mid-run (the dates differ every evening from 21:00 to midnight)"""
+
+    @classmethod
+    def today(cls):
+        return _TODAY
+
 
 # (id, date, title, description, content, active)
 _NEWS = (
@@ -81,8 +93,9 @@ def _cleanup():
 
 
 @pytest.fixture(autouse=True)
-def seed():
+def seed(monkeypatch):
     """News on both sides of every publication rule."""
+    monkeypatch.setattr(news_service, "date", _FixedDate)
     _cleanup()
 
     for id_news, news_date, title, description, content, active in _NEWS:

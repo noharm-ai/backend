@@ -21,12 +21,17 @@ than an empty list when nothing is left.
 """
 
 import json
+from datetime import date, timedelta
 
 import pytest
 from sqlalchemy import text
 
 from security.role import Role
 from tests.conftest import get_access, make_headers, session, session_commit
+
+# the app filters on its own date (America/Sao_Paulo), which is not the
+# database's current_date for a few hours every evening, so windows are
+# seeded from date.today()
 
 # test-generated notifications use ids >= 100000 (see conftest._cleanup)
 BASE_ID = 100000
@@ -36,7 +41,7 @@ _INSERT = text(
     "INSERT INTO public.notifica "
     "(idnotifica, titulo, tooltip, link, icon, classname, inicio, validade, schema, texto, grupo_alvo) "
     "VALUES (:id, :title, :tooltip, :link, :icon, :classname, "
-    "current_date + CAST(:starts_in AS interval), current_date + CAST(:ends_in AS interval), "
+    ":starts, :ends, "
     ":schema, :text, :target_group)"
 )
 
@@ -59,8 +64,8 @@ def _add_notification(
             "link": "https://example.com/aviso",
             "icon": "info",
             "classname": "info-alert",
-            "starts_in": f"{starts_in} days",
-            "ends_in": f"{ends_in} days",
+            "starts": date.today() + timedelta(days=starts_in),
+            "ends": date.today() + timedelta(days=ends_in),
             "schema": schema,
             "text": "corpo do aviso",
             "target_group": target_group,
@@ -201,7 +206,7 @@ def test_notification_payload_carries_every_field(client):
     _add_notification(BASE_ID + 11, starts_in=0, ends_in=3, title="Manutenção")
 
     notification = _login(client)["notifications"][0]
-    today = session.execute(text("SELECT current_date")).scalar()
+    today = date.today()
 
     assert notification == {
         "id": BASE_ID + 11,
