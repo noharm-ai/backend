@@ -5,7 +5,6 @@ and configures the Flask application instance.
 """
 
 import os
-import time
 
 from flask import Flask
 
@@ -15,9 +14,6 @@ from .flask_config import get_config
 
 # Set timezone
 os.environ["TZ"] = "America/Sao_Paulo"
-# without tzset the process keeps the zone it started with until something
-# else happens to reload it, so "today" could differ across the same request
-time.tzset()
 
 
 def create_app(config_name=None):
