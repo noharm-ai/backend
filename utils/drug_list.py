@@ -640,8 +640,9 @@ class DrugList:
 
                 pd_dose = self.get_solution_dose(pd)
 
-                if pd_dose == 0:
+                if not pd_dose:
                     # unable to calculate total volume due to dose unit conversion
+                    # (or missing dose/doseconv, in which case pd_dose is None)
                     result[key]["disableTotal"] = True
 
                 if not bool(pd[0].suspendedDate):
@@ -662,10 +663,18 @@ class DrugList:
                             and pd[2].id.lower() != "ml"
                             and pd[2].id.lower() == pd[6].amountUnit.lower()
                         ):
-                            recalc = round(pd[0].dose / pd[6].amount, 5)
-                            if should_update:
-                                result[key]["vol"] = recalc
-                            pd_dose = recalc  # always update for totalVol
+                            if pd[0].dose is None:
+                                # volume cannot be derived without a dose: leave it
+                                # unknown and flag the total instead of guessing
+                                result[key]["disableTotal"] = True
+                                if should_update:
+                                    result[key]["vol"] = 0
+                                pd_dose = 0
+                            else:
+                                recalc = round(pd[0].dose / pd[6].amount, 5)
+                                if should_update:
+                                    result[key]["vol"] = recalc
+                                pd_dose = recalc  # always update for totalVol
 
                     if pd[6] and pd[6].amount and pd[6].amountUnit is None:
                         if should_update:
