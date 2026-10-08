@@ -1,0 +1,112 @@
+#!/usr/bin/env bash
+# Portão de pre-push: nenhuma branch sai da máquina sem a revisão essencial.
+#
+# Ativação (uma vez por clone):
+#   git config core.hooksPath .review-gate/hooks
+# Automática: o install.sh faz no clone de quem instala; nos outros clones, o
+# SessionStart do Claude Code (.claude/settings.json → ensure-hookspath.sh) faz
+# na primeira sessão, e o review-local.sh também. Sem isso o arquivo é inerte —
+# é o caso de checkouts em servidor, onde ninguém abre o Claude Code.
+#
+# O que faz: para cada branch sendo empurrada, exige uma nota de revisão
+# (refs/notes/review) VÁLIDA para o conteúdo do head — lib.sh:review_note_valid.
+# Se não há nota mas existe uma com o mesmo patch-id noutro commit (amend de
+# mensagem, rebase que não tocou os hunks), copia. Se não há nada: BLOQUEIA e
+# diz como rodar a revisão. Nunca roda Claude aqui — decisão de desenho: a
+# revisão é do dev, no tempo dele; o hook só confere.
+#
+# Achado não bloqueia; só "não rodou" bloqueia. `git push --no-verify` pula o
+# hook e só ADIA: o check obrigatório (revisao-essencial) no CI exige a mesma
+# nota no head da PR.
+#
+# Depois de aprovar ao menos uma branch, empurra refs/notes/review para o
+# remoto (mesclando com o que outros devs empurraram — lib.sh:review_notes_sync),
+# ANTES da branch: assim o evento da PR já encontra a nota lá. Falha nessa
+# entrega NÃO bloqueia a branch: o contrato do portão é (a revisão rodou), e
+# ela rodou; a entrega da prova o CI cobra de qualquer jeito. Fica o aviso alto
+# com o erro real e o comando para empurrar as notas à mão. Remoto que recusa
+# refs/notes/* (o proxy das sessões remotas do Claude Code) recebe as notas
+# pelo espelho refs/heads/review-gate/notes, que o CI também lê.
+#
+# Protocolo do git: pre-push <remote> <url>, stdin = "<lref> <lsha> <rref> <rsha>".
+# Todo o stdin é lido ANTES de qualquer subprocesso — filho que herde fd0
+# comeria as linhas seguintes.
+set -uo pipefail
+
+HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib.sh
+source "${HOOK_DIR}/lib.sh"
+
+REMOTE="${1:-origin}"
+review_load_config "$REMOTE"
+HOOKS_REL="$(review_hooks_rel)"
+HOOKS_REL_WIN="$(review_hooks_rel_win)"
+lines=()
+while IFS= read -r l; do lines+=("$l"); done
+[ "${#lines[@]}" -gt 0 ] || exit 0
+
+rc=0
+passed=0
+for l in "${lines[@]}"; do
+    read -r lref lsha rref rsha <<<"$l"
+    [ -n "${rsha:-}" ] || continue
+    if [[ "$lsha" =~ ^0+$ ]]; then
+        _rv_say "pulado (delete): $rref"; continue
+    fi
+    case "$rref" in
+        "$NOTES_MIRROR_REF") continue ;;   # espelho das notas: histórico de notas, não código
+        refs/heads/*) ;;
+        *) continue ;;   # tags, notas, refs/for/… — não é branch, sem revisão
+    esac
+    branch="${rref#refs/heads/}"
+    if review_is_protected "$branch"; then
+        _rv_say "pulado (ref protegido, a revisão é da PR): ${branch}"; continue
+    fi
+    base="$(review_base_branch "$branch")"
+    base_ref="refs/remotes/${REMOTE}/${base}"
+
+    if ! review_fetch_base "$REMOTE" "$base"; then
+        _rv_say "${branch}: sem base para comparar; bloqueado"; rc=1; continue
+    fi
+    mb="$(git merge-base "$base_ref" "$lsha" 2>/dev/null)" || {
+        _rv_say "${branch}: merge-base com ${REMOTE}/${base} falhou (clone raso? git fetch --unshallow); bloqueado"
+        rc=1; continue
+    }
+    pid="$(review_patch_id "$mb" "$lsha")"
+    if [ -z "$pid" ]; then
+        _rv_say "${branch}: nada a revisar (conteúdo idêntico a ${REMOTE}/${base})"; passed=$((passed + 1)); continue
+    fi
+    if review_note_valid "$lsha" "$base_ref" 2>/dev/null; then
+        _rv_say "${branch}: revisão essencial OK (nota em ${lsha:0:12})"; passed=$((passed + 1)); continue
+    fi
+    # Mesmo conteúdo noutro commit (amend, rebase sem tocar nos hunks): regrava a
+    # prova no head atual com o merge-base de HOJE — o da nota antiga ficou para
+    # trás num rebase, e a validação recomputaria o patch-id contra ele.
+    if old="$(review_note_find_by_patch_id "$pid")"; then
+        body="$(mktemp)"
+        review_note_read "$old" | review_note_body > "$body"
+        if review_note_write "$lsha" "$pid" "$mb" "${REMOTE}/${base}" "copia:${old:0:12}" "$body" \
+           && review_note_valid "$lsha" "$base_ref" 2>/dev/null; then
+            rm -f "$body"
+            _rv_say "${branch}: revisão essencial OK (recibo copiado de ${old:0:12}, mesmo conteúdo)"
+            passed=$((passed + 1)); continue
+        fi
+        rm -f "$body"
+    fi
+    # Havia nota e ela não vale? O motivo (conteúdo mudou, base errada…) sai aqui.
+    if git notes --ref="$NOTES_REF" show "$lsha" >/dev/null 2>&1; then
+        review_note_valid "$lsha" "$base_ref" || true
+    fi
+    _rv_say "Revisão essencial NÃO rodou para o conteúdo de ${branch} (patch-id ${pid:0:12}). Push bloqueado."
+    _rv_say "  Rode:  bash ${HOOKS_REL}/review-local.sh   (usa o seu login do Claude Code, 1 a 3 min)"
+    _rv_say "  ou, numa sessão do Claude Code neste clone:  /pr-review-essentials modo local"
+    _rv_say "  no Windows, fora do Git Bash (PowerShell/cmd):  ${HOOKS_REL_WIN}\\review-local.cmd"
+    _rv_say "  Depois repita o push. Sem a revisão local: git push --no-verify — o check obrigatório"
+    _rv_say "  (revisao-essencial) no CI continua exigindo a nota no head da PR."
+    rc=1
+done
+
+if [ "$rc" -eq 0 ] && [ "$passed" -gt 0 ] && git rev-parse -q --verify "$NOTES_REF" >/dev/null 2>&1; then
+    review_notes_sync "$REMOTE" || true
+fi
+exit $rc

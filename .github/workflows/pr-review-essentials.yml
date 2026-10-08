@@ -1,0 +1,168 @@
+name: PR Review Essentials
+
+# Confere que a revisão essencial (skill pr-review-essentials) RODOU LOCALMENTE
+# para o conteúdo da PR e republica o resultado na PR. Não roda Claude aqui.
+#
+# Modelo (README do review-gate: https://github.com/noharm-ai/review-gate)
+# --------------------------------------------------------------------------
+# O dev roda a revisão na máquina dele, com o login do Claude Code dele
+# (.review-gate/hooks/review-local.sh ou a skill em modo local). A prova é uma nota de
+# git (refs/notes/review) no commit revisado: patch-id do diff + corpo da
+# review. O hook pre-push não deixa a branch sair sem a nota e empurra o ref
+# das notas junto (ou a branch-espelho review-gate/notes, quando o remoto recusa
+# refs/notes/* — caso do proxy das sessões do Claude Code na nuvem). Aqui, o CI:
+#   1. busca a nota do head da PR (nos dois refs, mesclados) e aplica a MESMA regra de validade do hook
+#      (.review-gate/hooks/lib.sh:review_note_valid, via review-verify.sh): merge-base
+#      gravado ancestral do head e da base, patch-id recomputado igual, corpo
+#      começando pelo cabeçalho da skill;
+#   2. republica o corpo como review COMMENT na PR (uma vez por head SHA),
+#      com o token do job — para o revisor humano ler no thread da PR;
+#   3. fica verde só se a review com o cabeçalho existe para este head.
+#
+# Por que no CI se o hook já bloqueia: hook é da máquina do dev — quem empurra
+# de outra máquina, pela UI, ou com --no-verify não passa por ele. O check
+# obrigatório no ruleset é o que torna isso regra e não pedido. Sem nenhum
+# secret além do GITHUB_TOKEN: nada de Claude, nada de chave de API no CI.
+#
+# Verde significa "a revisão rodou para exatamente este conteúdo e está na
+# PR" — não "nada encontrado". A skill nunca aprova nem bloqueia sozinha; o
+# veredito é humano.
+#
+# Pulados de propósito (job `skipped` satisfaz check obrigatório):
+#   - PR de bot (release-pr.yml, dependabot): não há dev nem revisão local.
+#   - PR de fork: a nota vive no fork e o job não tem como buscá-la.
+#   - Draft: revisa quando virar ready_for_review.
+#
+# Fora do portão (job verde sem conferir nada, passo "Escopo"): PR cuja base
+# não é a de feature/bugfix (REVIEW_BASE_BRANCH do .review-gate/review.conf,
+# a develop quando existe). PR develop → main/master é release: o que ela leva
+# já passou pelo portão ao entrar na develop. O workflow continua disparando
+# para main/master de propósito — check obrigatório de workflow que não roda
+# fica "Expected" para sempre e trava o merge. Repo só com main/master tem a
+# main como base, e ali o portão vale.
+#
+# Requisito fora deste arquivo (uma vez, pelo tech lead): ruleset das branches
+# base com Require status checks to pass → `revisao-essencial`. Sem isso o
+# workflow informa mas não impede.
+#
+# Instalado/atualizado pelo install.sh do review-gate — não edite à mão; mude no
+# review-gate e rode (install.sh update). Contrato: test/ do review-gate.
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, reopened]
+    branches:
+      - main
+      - master
+      - develop
+
+concurrency:
+  group: pr-review-essentials-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write   # postar a review (COMMENT) e ler as existentes
+
+env:
+  # Primeira linha do corpo da review no template da skill (fonte única em
+  # .review-gate/hooks/lib.sh:REVIEW_MARKER — o lint confere a igualdade).
+  REVIEW_MARKER: "## Revisão essencial"
+
+jobs:
+  revisao-essencial:
+    if: >-
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      !endsWith(github.actor, '[bot]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      # fetch-depth 0: o merge-base gravado na nota tem de existir aqui, e o
+      # review-verify.sh recomputa o patch-id a partir dele.
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      # Só PR para a base de feature/bugfix passa pelo portão (ver o topo).
+      - name: Escopo
+        id: escopo
+        env:
+          BASE: ${{ github.event.pull_request.base.ref }}
+        run: bash .review-gate/hooks/review-verify.sh --escopo "${BASE}" >> "$GITHUB_OUTPUT"
+
+      # Refspec explícito pela razão de sempre (CLAUDE.md > git 1.8): fetch de
+      # um branch só move refs/remotes/origin/<branch> com refspec.
+      - name: Conferir a nota da revisão local
+        if: steps.escopo.outputs.aplica == 'true'
+        env:
+          BASE: ${{ github.event.pull_request.base.ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git fetch --quiet --no-tags origin "+refs/heads/${BASE}:refs/remotes/origin/${BASE}"
+          bash .review-gate/hooks/review-verify.sh "origin/${BASE}" "${HEAD_SHA}" > "${RUNNER_TEMP}/review-body.md"
+          bash .review-gate/hooks/review-verify.sh "origin/${BASE}" "${HEAD_SHA}" --cabecalho > "${RUNNER_TEMP}/review-header.txt"
+
+      - name: Review deste head já existe na PR?
+        id: existente
+        if: steps.escopo.outputs.aplica == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          n="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR}/reviews" --paginate \
+                --jq '[.[] | select(.commit_id == env.HEAD_SHA and ((.body // "") | contains(env.REVIEW_MARKER)))] | length' \
+              | awk '{ s += $1 } END { print s + 0 }')"
+          echo "reviews com o cabeçalho da skill para ${HEAD_SHA}: ${n}"
+          if [ "$n" -gt 0 ]; then
+            echo "ja_revisada=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ja_revisada=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Republica o corpo da nota como review COMMENT, amarrada ao head SHA
+      # (commit_id) — é o que a checagem acima e a de baixo procuram. Rodapé de
+      # procedência + atribuição: a review foi escrita pelo Claude Code do dev.
+      - name: Publicar a review na PR
+        if: steps.escopo.outputs.aplica == 'true' && steps.existente.outputs.ja_revisada != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          pid="$(awk -F= '$1 == "patch_id" { print substr($2, 1, 12) }' "${RUNNER_TEMP}/review-header.txt")"
+          origem="$(awk -F= '$1 == "origem" { print $2 }' "${RUNNER_TEMP}/review-header.txt")"
+          {
+            cat "${RUNNER_TEMP}/review-body.md"
+            printf '\n---\n'
+            printf 'Revisão essencial rodada **localmente** pelo autor antes do push '
+            printf '(nota `refs/notes/review` no head `%s`, patch-id `%s`, origem `%s`), ' "${HEAD_SHA:0:12}" "${pid}" "${origem}"
+            printf 'conferida e republicada pelo CI sem rodar modelo aqui. O veredito continua humano.\n'
+            printf '\n---\n_Generated by [Claude Code](https://claude.ai/code)_\n'
+          } > "${RUNNER_TEMP}/review-post.md"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/pulls/${PR}/reviews" \
+            -f event=COMMENT -f commit_id="${HEAD_SHA}" -F body=@"${RUNNER_TEMP}/review-post.md" >/dev/null
+          echo "review publicada para ${HEAD_SHA}"
+
+      # Verde = review com o cabeçalho existe para ESTE head. Conferir depois
+      # de postar, e não confiar no rc do passo anterior, fecha o caso do skip
+      # acima com uma review que era de outro commit.
+      - name: Review postada para este head?
+        if: steps.escopo.outputs.aplica == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          n="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR}/reviews" --paginate \
+                --jq '[.[] | select(.commit_id == env.HEAD_SHA and ((.body // "") | contains(env.REVIEW_MARKER)))] | length' \
+              | awk '{ s += $1 } END { print s + 0 }')"
+          if [ "$n" -gt 0 ]; then
+            echo "OK: ${n} review(s) da revisão essencial para ${HEAD_SHA}."
+          else
+            echo "::error::Nenhuma review com o cabeçalho (${REVIEW_MARKER}) para o head ${HEAD_SHA}."
+            exit 1
+          fi

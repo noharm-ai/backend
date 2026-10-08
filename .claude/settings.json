@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"$(git rev-parse --show-toplevel 2>/dev/null)/.review-gate/hooks/ensure-hookspath.sh\"; [ ! -f \"$f\" ] || bash \"$f\""
+          }
+        ]
+      }
+    ]
+  }
+}

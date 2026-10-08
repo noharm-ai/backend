@@ -146,11 +146,11 @@ def process_report(
         report_data.processed_at is not None
         and Permission.READ_CUSTOM_REPORTS not in user_permissions
     ):
-        # Allow reprocessing only if processed_at is older than 1 hour
+        # Allow reprocessing only if processed_at is older than 30 minutes
         time_since_processed = datetime.now() - report_data.processed_at
-        if time_since_processed < timedelta(hours=1):
+        if time_since_processed < timedelta(minutes=30):
             raise ValidationError(
-                "Relatório já foi processado recentemente. Aguarde 1 hora para processar novamente.",
+                "Relatório já foi processado recentemente. Aguarde 30 minutos para processar novamente.",
                 "errors.invalidRecord",
                 status.HTTP_400_BAD_REQUEST,
             )

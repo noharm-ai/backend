@@ -37,7 +37,7 @@ from repository import (
     user_repository,
 )
 from security.role import Role
-from services import memory_service, training_service, user_service
+from services import memory_service, news_service, training_service, user_service
 from services.admin import admin_integration_status_service
 from utils import logger, status
 
@@ -346,6 +346,8 @@ def _auth_user(
         "training": training_service.get_mandatory_summary(
             user_id=user.id, schema=user_schema
         ),
+        # lights up the news menu badge; only queried here, at login
+        "recentNews": news_service.count_recent_news(),
     }
 
 
