@@ -53,6 +53,9 @@ class AntimicrobialEvaluation(db.Model):
     conforming = db.Column("conforme", db.Boolean, nullable=False)
     notes = db.Column("observacao", db.String, nullable=True)
     posology = db.Column("posologia", postgresql.JSONB, nullable=False)
+    # when the verdict starts to apply: the review, or earlier when the
+    # infectologist backdates it (up to the course start)
+    valid_from = db.Column("dt_inicio_validade", db.DateTime, nullable=False)
     valid_until = db.Column("dt_validade", db.DateTime, nullable=False)
     # optional reasons this evaluation watches for (tp_pendencia values)
     triggers = db.Column("gatilhos", postgresql.JSONB, nullable=False)

@@ -23,6 +23,9 @@ class AntimicrobialEvaluationRequest(BaseModel):
     idDrug: int
     conforming: bool
     notes: str | None = None
+    # the evaluation applies from this date, between the course start and now;
+    # empty means from the review
+    validFrom: LocalDatetime | None = None
     # the evaluation holds until this date
     validUntil: LocalDatetime
     # optional reasons that send the patient back to pending (pending types)

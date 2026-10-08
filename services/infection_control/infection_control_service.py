@@ -100,6 +100,7 @@ def _serialize_evaluation(evaluation: AntimicrobialEvaluation, names: dict) -> d
         "conforming": evaluation.conforming,
         "notes": evaluation.notes,
         "posology": evaluation.posology,
+        "validFrom": dateutils.to_iso(evaluation.valid_from),
         "validUntil": dateutils.to_iso(evaluation.valid_until),
         "triggers": evaluation.triggers or [],
         "status": evaluation.status,
@@ -216,9 +217,19 @@ def _validate_review(
         )
 
     for evaluation in request_data.evaluations:
-        if admission_courses.ongoing_course(evaluation.idDrug) is None:
+        course = admission_courses.ongoing_course(evaluation.idDrug)
+        if course is None:
             raise ValidationError(
                 "Antimicrobiano não está em uso neste atendimento",
+                "errors.invalidParams",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+        if evaluation.validFrom is not None and (
+            evaluation.validFrom > now or evaluation.validFrom < course.start
+        ):
+            raise ValidationError(
+                "O início da avaliação deve estar entre o início do tratamento e agora",
                 "errors.invalidParams",
                 status.HTTP_400_BAD_REQUEST,
             )
@@ -298,6 +309,7 @@ def save_review(request_data: InfectionControlReviewRequest, user_context: User)
         evaluation.conforming = evaluation_data.conforming
         evaluation.notes = evaluation_data.notes
         evaluation.posology = rule.posology_snapshot(course)
+        evaluation.valid_from = evaluation_data.validFrom or now
         evaluation.valid_until = evaluation_data.validUntil
         evaluation.triggers = sorted(set(evaluation_data.triggers))
         evaluation.status = AntimicrobialEvaluationStatusEnum.ACTIVE.value

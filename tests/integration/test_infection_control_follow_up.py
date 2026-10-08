@@ -357,6 +357,7 @@ def _review(client, headers, admission_number, evaluations=(), **kwargs):
                 "idDrug": id_drug,
                 "conforming": True,
                 "notes": "Indicação adequada",
+                "validFrom": kwargs.get("valid_from"),
                 "validUntil": kwargs.get(
                     "valid_until", (datetime.now() + timedelta(days=7)).isoformat()
                 ),
@@ -749,6 +750,75 @@ def test_review_rejects_past_dates(
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.get_json()["code"] == "errors.invalidParams"
+
+
+def test_evaluation_applies_from_the_review_by_default(
+    client, infection_controller_headers, infection_control, admission
+):
+    """Without a start, the evaluation applies from the moment it is saved"""
+    _prescribe_today(admission)
+
+    response = _review(
+        client,
+        infection_controller_headers,
+        admission,
+        evaluations=[ANTIMICROBIAL_DRUG],
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.get_json()
+    evaluation = response.get_json()["data"]["courses"][0]["evaluation"]
+    assert evaluation["validFrom"] == evaluation["createdAt"]
+    row = _evaluations(admission)[0]
+    assert row["dt_inicio_validade"] == row["created_at"]
+
+
+def test_evaluation_can_be_backdated_to_the_course_start(
+    client, infection_controller_headers, infection_control, admission
+):
+    """The infectologist may date the verdict back to the start of the course"""
+    _prescribe_today(admission)
+
+    response = _review(
+        client,
+        infection_controller_headers,
+        admission,
+        evaluations=[ANTIMICROBIAL_DRUG],
+        valid_from=_day(-1).isoformat(),
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.get_json()
+    course = response.get_json()["data"]["courses"][0]
+    assert course["evaluation"]["validFrom"] == course["start"]
+    assert course["evaluation"]["validFrom"] == _day(-1).isoformat()
+    assert _evaluations(admission)[0]["dt_inicio_validade"] == _day(-1)
+
+
+@pytest.mark.parametrize(
+    "valid_from",
+    [
+        # before the course
+        lambda: _day(-2),
+        # in the future
+        lambda: datetime.now() + timedelta(hours=1),
+    ],
+)
+def test_review_rejects_start_outside_the_course_until_now(
+    client, infection_controller_headers, infection_control, admission, valid_from
+):
+    """An evaluation starts between its course start and now"""
+    _prescribe_today(admission)
+
+    response = _review(
+        client,
+        infection_controller_headers,
+        admission,
+        evaluations=[ANTIMICROBIAL_DRUG],
+        valid_from=valid_from().isoformat(),
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.get_json()["code"] == "errors.invalidParams"
+    assert _evaluations(admission) == []
 
 
 def test_review_rejects_drug_not_running(
