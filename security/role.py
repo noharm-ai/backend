@@ -243,6 +243,7 @@ class Role(Enum):
             Permission.WRITE_CUSTOM_FORMS,
             Permission.WRITE_NAME,
             Permission.WRITE_PATIENT_TAGS,
+            Permission.WRITE_CUSTOM_REPORTS_GRAPHS,
         ],
     )
 
