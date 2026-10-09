@@ -29,6 +29,7 @@ from models.requests.infection_control_request import (
     InfectionControlListRequest,
     InfectionControlReviewRequest,
 )
+from repository import user_repository
 from repository.infection_control import infection_control_repository
 from services import feature_service
 from services.infection_control import infection_control_status_service as rule
@@ -43,17 +44,6 @@ def _check_feature():
             "errors.businessRules",
             status.HTTP_400_BAD_REQUEST,
         )
-
-
-def _user_names(user_ids: set) -> dict:
-    ids = [i for i in user_ids if i is not None]
-    if not ids:
-        return {}
-
-    return {
-        u.id: u.name
-        for u in db.session.query(User.id, User.name).filter(User.id.in_(ids)).all()
-    }
 
 
 def _serialize_pending(pending: InfectionControlPending) -> dict:
@@ -110,7 +100,7 @@ def _get_state(admission_number: int, now: datetime) -> dict:
     pendings = infection_control_repository.get_open_pendings(
         admission_number=admission_number
     )
-    names = _user_names(
+    names = user_repository.get_user_names(
         {r.created_by for r in reviews} | {e.created_by for e in evaluations}
     )
 

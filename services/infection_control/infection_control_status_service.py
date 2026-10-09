@@ -47,7 +47,6 @@ from models.infection_control import (
     InfectionControlReview,
 )
 from models.main import db
-from models.prescription import Patient
 from models.requests.infection_control_request import AntimicrobialEvaluationRequest
 from repository.infection_control import (
     antimicrobial_repository,
@@ -227,12 +226,9 @@ def load_courses(admission_number: int, now: datetime) -> AdmissionCourses:
     ]
     courses = group_courses(items)
 
-    discharge_date = (
-        db.session.query(Patient.dischargeDate)
-        .filter(Patient.admissionNumber == admission_number)
-        .scalar()
+    discharged = infection_control_repository.is_discharged(
+        admission_number=admission_number, now=now
     )
-    discharged = discharge_date is not None and discharge_date <= now
 
     return AdmissionCourses(
         now=now,
