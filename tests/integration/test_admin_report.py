@@ -12,10 +12,13 @@ isolates them.
 import json
 
 import pytest
+from flask_jwt_extended import create_access_token
 from sqlalchemy import text
 
+from mobile import app
 from models.enums import ReportStatusEnum, ReportTypeEnum
-from tests.conftest import session, session_commit
+from security.role import Role
+from tests.conftest import make_headers, session, session_commit
 from utils import status
 
 GRAPHS_URL = "/admin/report/{id_report}/graphs"
@@ -108,6 +111,26 @@ def stored_report():
     return id_report
 
 
+def _switched_navigator_headers(schema: str) -> dict:
+    """Headers of a NAVIGATOR whose session was switched into another schema.
+
+    Mirrors the claims auth_service._auth_user issues to a NAVIGATOR entering an
+    external schema: the active schema differs from the home one in usuario.
+    """
+    id_user = session.execute(
+        text("SELECT idusuario FROM public.usuario WHERE email = 'demo'")
+    ).scalar()
+    claims = {
+        "schema": schema,
+        "config": {"roles": [Role.NAVIGATOR.value, Role.VIEWER.value], "features": []},
+    }
+
+    with app.app_context():
+        token = create_access_token(identity=str(id_user), additional_claims=claims)
+
+    return make_headers(token)
+
+
 def _patch_graphs(client, headers, id_report, graphs):
     """Call the graphs-only patch endpoint."""
     return client.patch(
@@ -143,6 +166,29 @@ def test_graphs_is_allowed_for_admin(client, admin_headers, stored_report):
 
     session_commit()
     assert _row(stored_report)["graficos"] == graphs
+
+
+def test_graphs_is_allowed_for_navigator_in_home_schema(
+    client, navigator_headers, stored_report
+):
+    """NAVIGATOR may configure the graphs of a report in its own schema."""
+    graphs = [{"type": "pie"}]
+
+    response = _patch_graphs(client, navigator_headers, stored_report, graphs)
+
+    assert response.status_code == status.HTTP_200_OK
+
+    session_commit()
+    assert _row(stored_report)["graficos"] == graphs
+
+
+def test_graphs_is_refused_for_navigator_in_foreign_schema(client, stored_report):
+    """A non-maintainer switched into another schema may not edit graphs there [401]."""
+    headers = _switched_navigator_headers(schema="zztest_foreign")
+
+    response = _patch_graphs(client, headers, stored_report, [{"type": "bar"}])
+
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
 
 def test_graphs_is_allowed_for_curator(client, curator_headers, stored_report):

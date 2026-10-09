@@ -21,9 +21,16 @@ from utils import logger, status
 
 @has_permission(Permission.WRITE_CUSTOM_REPORTS_GRAPHS)
 def update_report_graphs(
-    id_report: int, request_data: UpdateReportGraphsRequest, user_context: User
+    id_report: int,
+    request_data: UpdateReportGraphsRequest,
+    user_context: User,
+    user_permissions: list[Permission],
 ):
     """Update only the graphs field of a report."""
+    _authorize_graph_editing_schema(
+        user_context=user_context, user_permissions=user_permissions
+    )
+
     report = reports_repository.get_report(id_report=id_report)
 
     if not report:
@@ -43,8 +50,16 @@ def update_report_graphs(
 
 
 @has_permission(Permission.WRITE_CUSTOM_REPORTS_GRAPHS)
-def get_copy_source_reports(request_data: CopySourceListRequest, user_context: User):
+def get_copy_source_reports(
+    request_data: CopySourceListRequest,
+    user_context: User,
+    user_permissions: list[Permission],
+):
     """List the custom reports whose charts may be copied into another report."""
+    _authorize_graph_editing_schema(
+        user_context=user_context, user_permissions=user_permissions
+    )
+
     source_schema = _authorize_source_schema(
         user_context=user_context, source_schema=request_data.sourceSchema
     )
@@ -73,8 +88,16 @@ def get_copy_source_reports(request_data: CopySourceListRequest, user_context: U
 
 
 @has_permission(Permission.WRITE_CUSTOM_REPORTS_GRAPHS)
-def get_copy_source_graphs(request_data: CopySourceGraphsRequest, user_context: User):
+def get_copy_source_graphs(
+    request_data: CopySourceGraphsRequest,
+    user_context: User,
+    user_permissions: list[Permission],
+):
     """Get the chart configurations of a copy-source report."""
+    _authorize_graph_editing_schema(
+        user_context=user_context, user_permissions=user_permissions
+    )
+
     source_schema = _authorize_source_schema(
         user_context=user_context, source_schema=request_data.sourceSchema
     )
@@ -100,6 +123,26 @@ def get_copy_source_graphs(request_data: CopySourceGraphsRequest, user_context: 
         }
     finally:
         db_session.close()
+
+
+def _authorize_graph_editing_schema(
+    user_context: User, user_permissions: list[Permission]
+):
+    """Restrict chart editing to the user's home schema unless they are a MAINTAINER.
+
+    user_context.schema is the active schema from the JWT, which a MULTI_SCHEMA
+    user (e.g. NAVIGATOR) may have switched to another client, so the home schema
+    is read from public.usuario.
+    """
+    if Permission.MAINTAINER in user_permissions:
+        return
+
+    home_schema = (
+        db.session.query(User.schema).filter(User.id == user_context.id).scalar()
+    )
+
+    if home_schema is None or home_schema != user_context.schema:
+        raise AuthorizationError()
 
 
 def _authorize_source_schema(user_context: User, source_schema: str) -> str:
