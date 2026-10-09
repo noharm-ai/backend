@@ -455,3 +455,109 @@ class TestGetInfusionList:
 
         assert result["101"]["speed"] == 42.5
         assert result["101"]["speedUnit"] == "ml/h"
+
+    def test_missing_dose_in_the_amount_unit_does_not_crash(self):
+        """A dose of None in the concentration unit leaves the volume unknown.
+
+        Regression: dividing a NULL dose by the amount raised TypeError and made
+        the whole prescription impossible to open.
+        """
+        drug_list = _make_drug_list_with(
+            [
+                _infusion_row(
+                    dose=None,
+                    doseconv=30,
+                    default_unit="ml",
+                    amount=4,
+                    amount_unit="mg",
+                    measure_unit_id="MG",
+                )
+            ]
+        )
+
+        result = drug_list.getInfusionList()
+
+        # the stale doseconv must not be used as the volume
+        assert result["101"]["vol"] == 0
+        assert result["101"]["totalVol"] == 0
+        assert result["101"]["disableTotal"] is True
+
+    def test_missing_dose_is_left_out_of_the_group_total(self):
+        """An item with no dose adds nothing to the total, which is flagged as unusable."""
+        drug_list = _make_drug_list_with(
+            [
+                _infusion_row(
+                    id=1001,
+                    dose=None,
+                    doseconv=None,
+                    default_unit="ml",
+                    amount=4,
+                    amount_unit="mg",
+                    measure_unit_id="MG",
+                ),
+                _infusion_row(id=1002, dose=90, prescribed_unit="ml"),
+            ]
+        )
+
+        result = drug_list.getInfusionList()
+
+        assert result["101"]["totalVol"] == 90
+        assert result["101"]["disableTotal"] is True
+
+    def test_missing_dose_prescribed_in_ml_disables_the_total(self):
+        """A None dose in ml cannot be summed, so the total is flagged instead of silently short."""
+        drug_list = _make_drug_list_with(
+            [
+                _infusion_row(id=1001, dose=None, prescribed_unit="ml"),
+                _infusion_row(id=1002, dose=90, prescribed_unit="ml"),
+            ]
+        )
+
+        result = drug_list.getInfusionList()
+
+        assert result["101"]["totalVol"] == 90
+        assert result["101"]["disableTotal"] is True
+
+    def test_missing_amount_skips_the_recalculation(self):
+        """Without an amount there is no concentration, so the converted dose is kept."""
+        drug_list = _make_drug_list_with(
+            [
+                _infusion_row(
+                    dose=30,
+                    doseconv=12,
+                    default_unit="ml",
+                    amount=None,
+                    amount_unit="mg",
+                    measure_unit_id="MG",
+                )
+            ]
+        )
+
+        result = drug_list.getInfusionList()
+
+        assert result["101"]["vol"] == 0
+        assert result["101"]["amount"] == 0
+        assert result["101"]["totalVol"] == 12
+        assert result["101"]["disableTotal"] is False
+
+    def test_zero_amount_skips_the_recalculation(self):
+        """A zero amount must not be used as a divisor; the converted dose is kept."""
+        drug_list = _make_drug_list_with(
+            [
+                _infusion_row(
+                    dose=30,
+                    doseconv=12,
+                    default_unit="ml",
+                    amount=0,
+                    amount_unit="mg",
+                    measure_unit_id="MG",
+                )
+            ]
+        )
+
+        result = drug_list.getInfusionList()
+
+        assert result["101"]["vol"] == 0
+        assert result["101"]["amount"] == 0
+        assert result["101"]["totalVol"] == 12
+        assert result["101"]["disableTotal"] is False
