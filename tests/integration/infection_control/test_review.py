@@ -237,16 +237,19 @@ def test_suspended_drug_is_settled_on_save(
     )
 
 
+# dates are built when the test runs, not at collection: the process clock can
+# switch from UTC to America/Sao_Paulo mid-run, and a past date taken before
+# the switch would be in the future for the endpoint
 @pytest.mark.parametrize(
     "kwargs",
     [
         # validity over before the evaluation starts
-        {"valid_until": (datetime.now() - timedelta(hours=1)).isoformat()},
-        {
+        lambda: {"valid_until": (datetime.now() - timedelta(hours=1)).isoformat()},
+        lambda: {
             "valid_from": _day(-1).isoformat(),
             "valid_until": (_day(-1) - timedelta(hours=1)).isoformat(),
         },
-        {"next_review_date": (datetime.now() - timedelta(hours=1)).isoformat()},
+        lambda: {"next_review_date": (datetime.now() - timedelta(hours=1)).isoformat()},
     ],
 )
 def test_review_rejects_invalid_dates(
@@ -260,7 +263,7 @@ def test_review_rejects_invalid_dates(
         infection_controller_headers,
         admission,
         evaluations=[ANTIMICROBIAL_DRUG],
-        **kwargs,
+        **kwargs(),
     )
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
