@@ -13,12 +13,9 @@ from datetime import datetime
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
 from models.enums import (
-    AntimicrobialEvaluationClosingEnum,
     AntimicrobialEvaluationStatusEnum,
     FeatureEnum,
     InfectionControlOriginEnum,
-    InfectionControlPendingTypeEnum,
-    InfectionControlResolutionEnum,
     InfectionControlStatusEnum,
 )
 from models.infection_control import (
@@ -37,23 +34,6 @@ from services import feature_service
 from services.infection_control import infection_control_status_service as rule
 from services.infection_control.antimicrobial_timeline_service import GAP_TOLERANCE
 from utils import dateutils, status
-
-# reasons a saved review settles by itself, whatever drugs it evaluates
-REVIEW_RESOLVED_TYPES = [
-    InfectionControlPendingTypeEnum.NEVER_REVIEWED.value,
-    InfectionControlPendingTypeEnum.SCHEDULED_DATE.value,
-]
-# reasons of one drug that its new evaluation settles
-EVALUATION_RESOLVED_TYPES = [
-    InfectionControlPendingTypeEnum.NO_EVALUATION.value,
-    InfectionControlPendingTypeEnum.EXPIRED.value,
-    InfectionControlPendingTypeEnum.POSOLOGY_CHANGED.value,
-]
-# reasons an evaluation may opt into (the others always apply)
-OPTIONAL_TRIGGERS = {
-    InfectionControlPendingTypeEnum.EXPIRED.value,
-    InfectionControlPendingTypeEnum.POSOLOGY_CHANGED.value,
-}
 
 
 def _check_feature():
@@ -243,7 +223,7 @@ def _validate_review(
                 status.HTTP_400_BAD_REQUEST,
             )
 
-        if not set(evaluation.triggers) <= OPTIONAL_TRIGGERS:
+        if not set(evaluation.triggers) <= rule.OPTIONAL_TRIGGERS:
             raise ValidationError(
                 "Gatilho de pendência inválido",
                 "errors.invalidParams",
@@ -298,81 +278,19 @@ def save_review(request_data: InfectionControlReviewRequest, user_context: User)
     )
 
     for evaluation_data in request_data.evaluations:
-        course = admission_courses.ongoing_course(evaluation_data.idDrug)
-        latest = course.items[-1]
-        in_force = [
-            previous
-            for previous in active_evaluations
-            if rule.evaluation_matches_course(previous, course)
-        ]
-        # a period over before the evaluation in force starts is a record of
-        # the past, not a replacement
-        retroactive = bool(in_force) and all(
-            evaluation_data.validUntil < previous.valid_from for previous in in_force
+        rule.record_evaluation(
+            review=review,
+            course=admission_courses.ongoing_course(evaluation_data.idDrug),
+            evaluation_data=evaluation_data,
+            active_evaluations=active_evaluations,
+            open_pendings=open_pendings,
+            user_id=user_context.id,
+            now=now,
         )
 
-        evaluation = AntimicrobialEvaluation()
-        evaluation.id_review = review.id
-        evaluation.admission_number = admission_number
-        evaluation.id_drug = evaluation_data.idDrug
-        evaluation.id_prescription = latest.id_prescription
-        evaluation.id_prescription_drug = latest.id_prescription_drug
-        evaluation.course_start = course.start
-        evaluation.conforming = evaluation_data.conforming
-        evaluation.notes = evaluation_data.notes
-        evaluation.posology = rule.posology_snapshot(course)
-        evaluation.valid_from = evaluation_data.validFrom or now
-        evaluation.valid_until = evaluation_data.validUntil
-        evaluation.triggers = sorted(set(evaluation_data.triggers))
-        evaluation.status = AntimicrobialEvaluationStatusEnum.ACTIVE.value
-        evaluation.created_at = now
-        evaluation.created_by = user_context.id
-        if retroactive:
-            evaluation.status = AntimicrobialEvaluationStatusEnum.CLOSED.value
-            evaluation.closed_at = now
-            evaluation.closing_type = (
-                AntimicrobialEvaluationClosingEnum.RETROACTIVE.value
-            )
-        db.session.add(evaluation)
-        db.session.flush()
-
-        # the evaluation in force and its reasons stay as they are
-        if retroactive:
-            continue
-
-        for previous in in_force:
-            previous.status = AntimicrobialEvaluationStatusEnum.SUPERSEDED.value
-            previous.closed_at = now
-            previous.closing_type = AntimicrobialEvaluationClosingEnum.SUPERSEDED.value
-            previous.id_superseded_by = evaluation.id
-            previous.updated_at = now
-            previous.updated_by = user_context.id
-
-        for pending in open_pendings:
-            if (
-                pending.id_drug == evaluation_data.idDrug
-                and pending.pending_type in EVALUATION_RESOLVED_TYPES
-            ):
-                rule.resolve_pending(
-                    pending,
-                    resolution=InfectionControlResolutionEnum.EVALUATED,
-                    user_id=user_context.id,
-                    now=now,
-                    id_review=review.id,
-                )
-
-    for pending in open_pendings:
-        if (
-            pending.resolved_at is None
-            and pending.pending_type in REVIEW_RESOLVED_TYPES
-        ):
-            rule.resolve_pending(
-                pending,
-                resolution=InfectionControlResolutionEnum.REVIEW_SAVED,
-                user_id=user_context.id,
-                now=now,
-                id_review=review.id,
-            )
+    rule.resolve_on_review(
+        review=review, open_pendings=open_pendings, user_id=user_context.id, now=now
+    )
 
     rule.apply_rule(
         admission=admission,
