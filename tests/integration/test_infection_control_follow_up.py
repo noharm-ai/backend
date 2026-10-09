@@ -1104,8 +1104,23 @@ def test_state_of_followed_admission(
     assert data["courses"][0]["evaluation"] is None
 
 
-def test_worklist_lists_pending_admission(
+def test_worklist_requires_permission(
     client, analyst_headers, infection_control, admission
+):
+    """401 without READ_INFECTION_CONTROL, even with READ_PRESCRIPTION"""
+    _prescribe_today(admission)
+
+    response = client.post(
+        "/infection-control/admissions",
+        json={"status": [PENDING], "limit": 500},
+        headers=analyst_headers,
+    )
+
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+def test_worklist_lists_pending_admission(
+    client, infection_controller_headers, infection_control, admission
 ):
     """The worklist brings the admission with its open reasons"""
     _prescribe_today(admission)
@@ -1113,7 +1128,7 @@ def test_worklist_lists_pending_admission(
     response = client.post(
         "/infection-control/admissions",
         json={"status": [PENDING], "limit": 500},
-        headers=analyst_headers,
+        headers=infection_controller_headers,
     )
 
     assert response.status_code == status.HTTP_200_OK

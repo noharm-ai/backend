@@ -59,6 +59,7 @@ class Role(Enum):
             Permission.MAINTAINER,
             Permission.READ_DISPENSATION,
             Permission.READ_REGULATION,
+            Permission.READ_INFECTION_CONTROL,
             Permission.READ_TAGS,
             Permission.WRITE_TAGS,
             Permission.READ_PROTOCOLS,
@@ -109,6 +110,7 @@ class Role(Enum):
             Permission.READ_TAGS,
             Permission.WRITE_TAGS,
             Permission.READ_REGULATION,
+            Permission.READ_INFECTION_CONTROL,
             Permission.UPDATE_USER_SG,
             Permission.READ_NAV,
             Permission.READ_PROTOCOLS,
@@ -260,6 +262,7 @@ class Role(Enum):
         "INFECTION_CONTROLLER",
         [
             Permission.READ_PRESCRIPTION,
+            Permission.READ_INFECTION_CONTROL,
             Permission.WRITE_INFECTION_CONTROL,
             Permission.READ_REPORTS,
             Permission.READ_BASIC_FEATURES,

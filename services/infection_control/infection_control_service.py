@@ -417,7 +417,7 @@ def follow_admission(admission_number: int, user_context: User):
     return _get_state(admission_number=admission_number, now=now)
 
 
-@has_permission(Permission.READ_PRESCRIPTION)
+@has_permission(Permission.READ_INFECTION_CONTROL)
 def list_admissions(request_data: InfectionControlListRequest):
     """Followed admissions for the worklist, longest in their status first"""
     _check_feature()
