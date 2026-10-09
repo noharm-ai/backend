@@ -75,7 +75,9 @@ def _bedrock_client(text: str):
     client = MagicMock()
     client.invoke_model.return_value = {
         "body": MagicMock(
-            read=MagicMock(return_value=json.dumps({"content": [{"text": text}]}))
+            read=MagicMock(
+                return_value=json.dumps({"content": [{"type": "text", "text": text}]})
+            )
         )
     }
     return client
@@ -542,6 +544,25 @@ def test_prompt_sonnet_returns_the_parsed_model_answer(monkeypatch):
     assert result == [{"type": "bar"}]
 
 
+def test_prompt_sonnet_skips_leading_thinking_blocks(monkeypatch):
+    """Sonnet 5.5 may open the response with a thinking block before the text"""
+    client = MagicMock()
+    content = [
+        {"type": "thinking", "thinking": "", "signature": "x"},
+        {"type": "text", "text": '[{"type": "bar"}]'},
+    ]
+    client.invoke_model.return_value = {
+        "body": MagicMock(read=MagicMock(return_value=json.dumps({"content": content})))
+    }
+    monkeypatch.setattr(
+        reports_custom_service.aws, "get_client", lambda *a, **k: client
+    )
+
+    result = reports_custom_service._prompt_sonnet(messages=[], system="s")
+
+    assert result == [{"type": "bar"}]
+
+
 def test_prompt_sonnet_sends_the_configured_model_and_token_budget(monkeypatch):
     """The request carries the pinned model id and the Bedrock envelope"""
     client = _bedrock_client("[]")
@@ -559,6 +580,7 @@ def test_prompt_sonnet_sends_the_configured_model_and_token_budget(monkeypatch):
     assert kwargs["modelId"] == reports_custom_service.CHART_SUGGESTION_MODEL_ID
     assert body["max_tokens"] == reports_custom_service.CHART_SUGGESTION_MAX_TOKENS
     assert body["anthropic_version"] == "bedrock-2023-05-31"
+    assert body["output_config"] == {"effort": "low"}
     assert body["system"] == "sistema"
     assert body["messages"] == [{"role": "user", "content": "oi"}]
 

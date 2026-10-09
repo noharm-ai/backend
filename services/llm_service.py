@@ -70,13 +70,14 @@ def _prompt_claude(messages):
 
     body = json.dumps(
         {
-            "max_tokens": 1024,
+            "max_tokens": 4096,
             "messages": messages,
             "anthropic_version": "bedrock-2023-05-31",
+            "output_config": {"effort": "low"},
         }
     )
 
-    modelId = "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
+    modelId = "us.anthropic.claude-sonnet-5-5"
     accept = "application/json"
     contentType = "application/json"
 
@@ -86,7 +87,14 @@ def _prompt_claude(messages):
 
     response_body = json.loads(response.get("body").read())
 
-    return {"answer": response_body["content"][0]["text"]}
+    return {"answer": _get_text_block(response_body)}
+
+
+def _get_text_block(response_body: dict) -> str:
+    """Return the first text block of a Claude response (it may start with thinking blocks)."""
+    return next(
+        (b["text"] for b in response_body["content"] if b.get("type") == "text"), ""
+    )
 
 
 def _prompt_gpt_oss(messages):
