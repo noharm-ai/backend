@@ -458,7 +458,7 @@ The rule holds even when the real value would be convenient or is already visibl
   - the reasons a course gives (`course_reasons`), including the optional triggers stored in `gatilhos`, and posology comparison
   - when reasons resolve, when evaluations close, and how the status is chosen
   - the enum values (`InfectionControlPendingTypeEnum`, status, resolution, closing types) and any new `ci_*` column the rule reads
-- Update the tests in both repositories: `tests/integration/test_infection_control_follow_up.py` here, and `tests/test_infection_control_service.py` and `tests/test_infection_control_db.py` in `backend-private`
+- Update the tests in both repositories: `tests/unit/test_infection_control_status_rule.py` (its `plan_rule` cases mirror backend-private's, same names) and `tests/integration/infection_control/` here, and `tests/test_infection_control_service.py` and `tests/test_infection_control_db.py` in `backend-private`
 
 ## Development Workflow
 
