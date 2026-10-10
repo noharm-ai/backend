@@ -89,6 +89,9 @@ class _Odoo:
             return self.saved
 
         if model == "ir.attachment" and action == "create":
+            assert self._attachments, (
+                "more uploads than the stub has ids for: add to _ATTACHMENT_IDS"
+            )
             return self._attachments.pop(0)
 
         if model == "helpdesk.ticket" and action == "search_read":
@@ -102,7 +105,9 @@ class _Odoo:
 
     def payload_of(self, model, action):
         """The payload of the first call to ``model``/``action``, as sent."""
-        return self.find(model, action)[0]["payload"]
+        calls = self.find(model, action)
+        assert calls, f"{model}.{action} was never called"
+        return calls[0]["payload"]
 
     def ticket_sent(self):
         """The ticket dict given to ``helpdesk.ticket.web_save``."""
