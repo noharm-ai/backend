@@ -294,7 +294,7 @@ def _ticket_form():
 def test_run_n0_form_uses_the_form_prompt(config_memory, agent_mock):
     """The form agent runs with the n0form system prompt"""
     agent_class, _, agent = agent_mock
-    agent.structured_output.return_value = _ticket_form()
+    agent.return_value.structured_output = _ticket_form()
 
     n0_agent.run_n0_form(query="o relatório não abre")
 
@@ -304,7 +304,7 @@ def test_run_n0_form_uses_the_form_prompt(config_memory, agent_mock):
 def test_run_n0_form_does_not_expose_the_knowledge_base(config_memory, agent_mock):
     """The form agent has no tools: it only reshapes the question"""
     agent_class, _, agent = agent_mock
-    agent.structured_output.return_value = _ticket_form()
+    agent.return_value.structured_output = _ticket_form()
 
     n0_agent.run_n0_form(query="o relatório não abre")
 
@@ -314,7 +314,7 @@ def test_run_n0_form_does_not_expose_the_knowledge_base(config_memory, agent_moc
 def test_run_n0_form_model_has_no_guardrail(config_memory, agent_mock):
     """The form model is built without the guardrail used for free answers"""
     _, model_class, agent = agent_mock
-    agent.structured_output.return_value = _ticket_form()
+    agent.return_value.structured_output = _ticket_form()
 
     n0_agent.run_n0_form(query="o relatório não abre")
 
@@ -327,7 +327,7 @@ def test_run_n0_form_model_has_no_guardrail(config_memory, agent_mock):
 def test_run_n0_form_returns_the_ticket_as_a_dict(config_memory, agent_mock):
     """The structured ticket comes back serialized for the HTTP response"""
     _, _, agent = agent_mock
-    agent.structured_output.return_value = _ticket_form()
+    agent.return_value.structured_output = _ticket_form()
 
     response = n0_agent.run_n0_form(query="o relatório não abre")
 
@@ -342,13 +342,23 @@ def test_run_n0_form_returns_the_ticket_as_a_dict(config_memory, agent_mock):
 def test_run_n0_form_asks_for_the_ticket_schema(config_memory, agent_mock):
     """The question is sent tagged, with TicketForm as the expected output"""
     _, _, agent = agent_mock
-    agent.structured_output.return_value = _ticket_form()
+    agent.return_value.structured_output = _ticket_form()
 
     n0_agent.run_n0_form(query="o relatório não abre")
 
-    model, prompt = agent.structured_output.call_args.args
-    assert model is TicketForm
+    (prompt,) = agent.call_args.args
+    assert agent.call_args.kwargs["structured_output_model"] is TicketForm
     assert prompt == "<pergunta_usuario>o relatório não abre</pergunta_usuario>"
+
+
+def test_run_n0_form_does_not_force_tool_choice(config_memory, agent_mock):
+    """agent.structured_output() forces tool_choice, which Sonnet 5.5 rejects"""
+    _, _, agent = agent_mock
+    agent.return_value.structured_output = _ticket_form()
+
+    n0_agent.run_n0_form(query="o relatório não abre")
+
+    agent.structured_output.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

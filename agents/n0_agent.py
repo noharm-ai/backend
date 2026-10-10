@@ -102,9 +102,14 @@ def run_n0_form(query: str) -> str:
         callback_handler=None,
     )
 
-    return agent.structured_output(
-        TicketForm, f"<pergunta_usuario>{query}</pergunta_usuario>"
-    ).model_dump()
+    # structured_output_model lets the model call the output tool on its own;
+    # agent.structured_output() forces tool_choice, which Sonnet 5.5 rejects
+    result = agent(
+        f"<pergunta_usuario>{query}</pergunta_usuario>",
+        structured_output_model=TicketForm,
+    )
+
+    return result.structured_output.model_dump()
 
 
 def wrap_kb(config: dict):

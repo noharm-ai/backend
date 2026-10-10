@@ -71,7 +71,7 @@ class Config:
     BACKEND_FUNCTION_NAME = getenv("BACKEND_FUNCTION_NAME", "")
 
     PROTOCOL_AGENT_MODEL_ID = getenv(
-        "PROTOCOL_AGENT_MODEL_ID", "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
+        "PROTOCOL_AGENT_MODEL_ID", "us.anthropic.claude-sonnet-5-5"
     )
     PROTOCOL_AGENT_REGION = getenv("PROTOCOL_AGENT_REGION", "us-east-1")
     PROTOCOL_AGENT_MAX_TURNS = int(getenv("PROTOCOL_AGENT_MAX_TURNS", "8"))
