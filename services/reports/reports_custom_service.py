@@ -15,8 +15,8 @@ from repository.reports import reports_repository
 from services.reports import reports_cache_service
 from utils import aws, dateutils, logger, status, stringutils
 
-CHART_SUGGESTION_MODEL_ID = "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
-CHART_SUGGESTION_MAX_TOKENS = 1024
+CHART_SUGGESTION_MODEL_ID = "us.anthropic.claude-sonnet-5-5"
+CHART_SUGGESTION_MAX_TOKENS = 4096
 MAX_SUGGESTIONS = 1
 
 CHART_SUGGESTION_EXAMPLES = (
@@ -489,6 +489,7 @@ def _prompt_sonnet(messages: list, system: str) -> list:
             "system": system,
             "messages": messages,
             "anthropic_version": "bedrock-2023-05-31",
+            "output_config": {"effort": "low"},
         }
     )
 
@@ -508,7 +509,10 @@ def _prompt_sonnet(messages: list, system: str) -> list:
         )
 
     response_body = json.loads(response.get("body").read())
-    return _parse_llm_json(response_body["content"][0]["text"])
+    text = next(
+        (b["text"] for b in response_body["content"] if b.get("type") == "text"), ""
+    )
+    return _parse_llm_json(text)
 
 
 def _get_resource_path(id_report: int, schema: str, filename: str):
