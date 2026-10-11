@@ -22,6 +22,7 @@ import pytest
 from sqlalchemy import text
 
 from tests.conftest import session, session_commit
+from tests.utils.utils_test_prescription import test_counters
 from utils import status
 
 URL = "/reports/drug-attributes/history"
@@ -34,11 +35,6 @@ PATIENT_ID = 5
 # seed presmed ids reachable from ADMISSION
 ANTIMICRO_DRUGS = {"10", "30"}  # ENALAPRIL, on prescriptions 8 and 20
 CONTROLLED_DRUG = "42"  # BISACODIL, on prescription 20
-
-# a later admission for the same patient, created by one test to exercise the
-# previous-admission lookup. Ids >= 100000 are wiped by the session-scoped
-# clean_test_artifacts fixture in tests/conftest.py.
-LATER_ADMISSION = 100005
 
 
 def _get(client, headers, admission_number=ADMISSION, attribute=None, url=URL):
@@ -59,25 +55,33 @@ def _drug_ids(response):
 
 @pytest.fixture
 def later_admission():
-    """Register a second, more recent admission for the seed patient."""
+    """Register a second, more recent admission for the seed patient.
+
+    The number comes from test_counters, like every test admission, so it never
+    collides with one another test created (ids >= 100000 are wiped by the
+    session-scoped clean_test_artifacts fixture in tests/conftest.py).
+    """
+    admission_number = test_counters["admission_number"]
+    test_counters["admission_number"] += 1
+
     session.execute(
         text(
             "INSERT INTO demo.pessoa (fkpessoa, nratendimento, dtinternacao) "
             "VALUES (:patient, :admission, '2024-01-05 00:00:00')"
         ),
-        {"patient": PATIENT_ID, "admission": LATER_ADMISSION},
+        {"patient": PATIENT_ID, "admission": admission_number},
     )
     session_commit()
 
-    yield LATER_ADMISSION
+    yield admission_number
 
     session.execute(
         text("DELETE FROM demo.pessoa WHERE nratendimento = :admission"),
-        {"admission": LATER_ADMISSION},
+        {"admission": admission_number},
     )
     session.execute(
         text("DELETE FROM demo.pessoa_audit WHERE nratendimento = :admission"),
-        {"admission": LATER_ADMISSION},
+        {"admission": admission_number},
     )
     session_commit()
 

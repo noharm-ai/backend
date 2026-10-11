@@ -11,6 +11,12 @@ def analyst_headers(client):
 
 
 @pytest.fixture
+def infection_controller_headers(client):
+    """Headers with INFECTION_CONTROLLER role"""
+    return make_headers(get_access(client, roles=[Role.INFECTION_CONTROLLER.value]))
+
+
+@pytest.fixture
 def viewer_headers(client):
     """Headers with VIEWER role — used to assert 401 responses"""
     return make_headers(get_access(client, roles=[Role.VIEWER.value]))

@@ -11,10 +11,13 @@ exercised against a real second schema instead of a stub.
 import json
 
 import pytest
+from flask_jwt_extended import create_access_token
 from sqlalchemy import text
 
+from mobile import app
 from models.enums import ReportStatusEnum, ReportTypeEnum
-from tests.conftest import session, session_commit
+from security.role import Role
+from tests.conftest import make_headers, session, session_commit
 from utils import status
 
 LIST_URL = "/admin/report/copy-source/list"
@@ -148,6 +151,24 @@ def _graphs(client, headers, id_report, source_schema=None):
     return client.get(url, headers=headers)
 
 
+def _switched_headers(email: str, roles: list[str], schema: str) -> dict:
+    """Headers of a user whose session was switched into `schema`.
+
+    Mints the claims auth_service._auth_user issues on a schema switch, so the
+    active schema differs from the user's home schema in usuario.
+    """
+    id_user = session.execute(
+        text("SELECT idusuario FROM public.usuario WHERE email = :email"),
+        {"email": email},
+    ).scalar()
+    claims = {"schema": schema, "config": {"roles": roles, "features": []}}
+
+    with app.app_context():
+        token = create_access_token(identity=str(id_user), additional_claims=claims)
+
+    return make_headers(token)
+
+
 def _find(rows, id_report):
     """Return the listed row of a report, or None when it was not offered."""
     return next((row for row in rows if row["id"] == id_report), None)
@@ -169,6 +190,63 @@ def test_list_offers_the_reports_of_the_current_schema(client, admin_headers):
     row = _find(response.get_json()["data"], id_report)
     assert row["name"] == f"{_PREFIX} own"
     assert row["graphCount"] == 2
+
+
+def test_list_is_allowed_for_navigator_in_home_schema(client, navigator_headers):
+    """NAVIGATOR may list the copy sources of its own schema."""
+    id_report = _insert_report(name=f"{_PREFIX} navigator", graphs=[_A_CHART])
+    session_commit()
+
+    response = _list(client, navigator_headers)
+
+    assert response.status_code == status.HTTP_200_OK
+    assert _find(response.get_json()["data"], id_report) is not None
+
+
+def test_list_is_refused_for_navigator_in_foreign_schema(client):
+    """A non-maintainer switched into another schema may not list its copy sources [401]."""
+    headers = _switched_headers(
+        email="demo",
+        roles=[Role.NAVIGATOR.value, Role.VIEWER.value],
+        schema=_FOREIGN_SCHEMA,
+    )
+
+    response = _list(client, headers)
+
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+def test_graphs_is_refused_for_navigator_in_foreign_schema(client):
+    """A non-maintainer switched into another schema may not read its charts [401]."""
+    id_report = _insert_report(
+        name=f"{_PREFIX} foreign", graphs=[_A_CHART], schema=_FOREIGN_SCHEMA
+    )
+    session_commit()
+    headers = _switched_headers(
+        email="demo",
+        roles=[Role.NAVIGATOR.value, Role.VIEWER.value],
+        schema=_FOREIGN_SCHEMA,
+    )
+
+    response = _graphs(client, headers, id_report)
+
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+def test_list_is_allowed_for_maintainer_in_foreign_schema(client):
+    """A maintainer switched into another schema may still list its copy sources."""
+    id_report = _insert_report(
+        name=f"{_PREFIX} foreign", graphs=[_A_CHART], schema=_FOREIGN_SCHEMA
+    )
+    session_commit()
+    headers = _switched_headers(
+        email="user@curator.com", roles=[Role.CURATOR.value], schema=_FOREIGN_SCHEMA
+    )
+
+    response = _list(client, headers)
+
+    assert response.status_code == status.HTTP_200_OK
+    assert _find(response.get_json()["data"], id_report) is not None
 
 
 def test_list_requires_the_graphs_permission(client, analyst_headers):

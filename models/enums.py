@@ -81,6 +81,8 @@ class FeatureEnum(Enum):
     # the culture card and the culture alerts; depends on the antibiogram
     # integration, so it is enabled per schema
     CULTURE = "CULTURE"
+    # infection control follow-up pages and reviews (ci_* tables);
+    INFECTION_CONTROL = "INFECTION_CONTROL"
 
 
 class PrescriptionAuditTypeEnum(Enum):
@@ -431,3 +433,72 @@ class PrescriptionClinicalNoteStatusEnum(Enum):
     PENDING = 0
     SENT = 1
     ERROR = 2
+
+
+class InfectionControlStatusEnum(Enum):
+    """Enum: infection control status of an admission (ci_atendimento.tp_status)
+
+    Pending while it has at least one open reason (ci_pendencia), revised when
+    none is left, closed when no antimicrobial is running anymore.
+    """
+
+    PENDING = 1
+    REVISED = 2
+    CLOSED = 3
+
+
+class InfectionControlOriginEnum(Enum):
+    """Enum: what created an infection control record (tp_origem)"""
+
+    PRESCALC = 1
+    JOB = 2
+    BACKFILL = 3
+    REVIEW = 4
+    # started by hand from the infection control page
+    MANUAL = 5
+
+
+class InfectionControlPendingTypeEnum(Enum):
+    """Enum: why an admission is pending (ci_pendencia.tp_pendencia)"""
+
+    NEVER_REVIEWED = 1
+    # an antimicrobial course without an active evaluation
+    NO_EVALUATION = 2
+    # the evaluation of a course reached its valid-until date (a trigger the
+    # evaluation opts into)
+    EXPIRED = 3
+    # the infectologist's scheduled review date arrived
+    SCHEDULED_DATE = 4
+    ALERT_FIRED = 5
+    # the posology of a course changed from the one its evaluation judged (a
+    # trigger the evaluation opts into)
+    POSOLOGY_CHANGED = 6
+
+
+class InfectionControlResolutionEnum(Enum):
+    """Enum: how a pending reason was resolved (ci_pendencia.tp_resolucao)"""
+
+    EVALUATED = 1
+    REVIEW_SAVED = 2
+    DISMISSED = 3
+    DRUG_NO_LONGER_ACTIVE = 4
+    DISCHARGE = 5
+
+
+class AntimicrobialEvaluationStatusEnum(Enum):
+    """Enum: status of an antimicrobial evaluation (ci_avaliacao_atm.tp_status)"""
+
+    ACTIVE = 1
+    SUPERSEDED = 2
+    CLOSED = 3
+
+
+class AntimicrobialEvaluationClosingEnum(Enum):
+    """Enum: why an antimicrobial evaluation stopped being active (ci_avaliacao_atm.tp_encerramento)"""
+
+    SUPERSEDED = 1
+    COURSE_ENDED = 2
+    DISCHARGE = 3
+    # recorded for a period over before the evaluation in force started: it
+    # goes straight to the history and leaves that one in force
+    RETROACTIVE = 4

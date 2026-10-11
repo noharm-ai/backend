@@ -151,6 +151,7 @@ def _resolve_prompt_variant(
         "max_tokens": variant.get("max_tokens")
         or config.get("max_tokens")
         or SOAP_DEFAULT_MAX_TOKENS,
+        "effort": variant.get("effort") or config.get("effort"),
     }
 
     return resolved, key, options
@@ -220,18 +221,20 @@ def _prompt_soap(messages: list, system: str, config: dict) -> str:
 
     client = aws.get_client("bedrock-runtime", region_name="us-east-1")
 
-    body = json.dumps(
-        {
-            "max_tokens": config.get("max_tokens", SOAP_DEFAULT_MAX_TOKENS),
-            "system": system,
-            "messages": messages,
-            "anthropic_version": "bedrock-2023-05-31",
-        }
-    )
+    body = {
+        "max_tokens": config.get("max_tokens", SOAP_DEFAULT_MAX_TOKENS),
+        "system": system,
+        "messages": messages,
+        "anthropic_version": "bedrock-2023-05-31",
+    }
+
+    # effort is optional: Sonnet 4.5 rejects it, Sonnet 4.6+ accepts it
+    if config.get("effort"):
+        body["output_config"] = {"effort": config.get("effort")}
 
     try:
         response = client.invoke_model(
-            body=body,
+            body=json.dumps(body),
             modelId=config.get("model_id"),
             accept="application/json",
             contentType="application/json",
@@ -246,7 +249,11 @@ def _prompt_soap(messages: list, system: str, config: dict) -> str:
 
     response_body = json.loads(response.get("body").read())
 
-    return _strip_code_fences(response_body["content"][0]["text"])
+    text = next(
+        (b["text"] for b in response_body["content"] if b.get("type") == "text"), ""
+    )
+
+    return _strip_code_fences(text)
 
 
 def _strip_code_fences(text: str) -> str:

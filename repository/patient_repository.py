@@ -7,6 +7,15 @@ from models.main import User, db
 from models.prescription import Patient, PatientAudit
 
 
+def get_patient_by_admission(admission_number: int) -> Patient | None:
+    """The patient record of an admission, or None when it has none"""
+    return (
+        db.session.query(Patient)
+        .filter(Patient.admissionNumber == admission_number)
+        .first()
+    )
+
+
 def get_latest_admissions_by_id_patient(id_patient: int, limit: int = 2):
     """
     Search for latest admission number by id_patient

@@ -1,6 +1,6 @@
 """Repository: User related operations"""
 
-from typing import Union, List
+from typing import Iterable, Union, List
 from sqlalchemy import func, or_, desc, asc, cast
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import aliased
@@ -25,6 +25,18 @@ def get_user_by_email(email: str) -> User:
     return (
         db.session.query(User).filter(func.lower(User.email) == email.lower()).first()
     )
+
+
+def get_user_names(user_ids: Iterable[int | None]) -> dict[int, str]:
+    """Names of the given users by id (None ids are ignored)"""
+    ids = [i for i in user_ids if i is not None]
+    if not ids:
+        return {}
+
+    return {
+        u.id: u.name
+        for u in db.session.query(User.id, User.name).filter(User.id.in_(ids)).all()
+    }
 
 
 def get_users_by_role(schema: str, role: Union[Role, List[Role]]):

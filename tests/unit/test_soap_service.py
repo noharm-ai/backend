@@ -6,6 +6,7 @@ the database or the Bedrock client, so they run as fast unit tests.
 """
 
 import json
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -286,3 +287,76 @@ class TestGetNoteContent:
         result = soap_service._get_note_content(note)
         assert "## Formulário da consulta (perguntas e respostas)" not in result
         assert "## Texto da evolução" not in result
+
+
+class TestPromptSoap:
+    """Tests for soap_service._prompt_soap (Bedrock request/response handling)."""
+
+    def _client(self, content):
+        """A stand-in Bedrock client whose model answers with the given blocks."""
+        client = MagicMock()
+        client.invoke_model.return_value = {
+            "body": MagicMock(
+                read=MagicMock(return_value=json.dumps({"content": content}))
+            )
+        }
+        return client
+
+    def _call(self, monkeypatch, config, content=None):
+        """Run _prompt_soap against a mocked client; return (result, sent body)."""
+        client = self._client(content or [{"type": "text", "text": "SOAP"}])
+        monkeypatch.setattr(soap_service.aws, "get_client", lambda *a, **k: client)
+        result = soap_service._prompt_soap(messages=[], system="s", config=config)
+        return result, json.loads(client.invoke_model.call_args.kwargs["body"])
+
+    def test_effort_omitted_when_not_configured(self, monkeypatch):
+        """Without effort in the config no output_config is sent (Sonnet 4.5 rejects it)."""
+        _, body = self._call(monkeypatch, {"model_id": "m", "max_tokens": 10})
+        assert "output_config" not in body
+
+    def test_effort_sent_when_configured(self, monkeypatch):
+        """A configured effort is forwarded as output_config.effort."""
+        _, body = self._call(
+            monkeypatch, {"model_id": "m", "max_tokens": 10, "effort": "low"}
+        )
+        assert body["output_config"] == {"effort": "low"}
+
+    def test_skips_leading_thinking_blocks(self, monkeypatch):
+        """Sonnet 5.5 may open the response with a thinking block before the text."""
+        result, _ = self._call(
+            monkeypatch,
+            {"model_id": "m"},
+            content=[
+                {"type": "thinking", "thinking": "", "signature": "x"},
+                {"type": "text", "text": "SOAP"},
+            ],
+        )
+        assert result == "SOAP"
+
+
+class TestResolvePromptVariantEffort:
+    """Tests for the optional effort setting in the multi-prompt config."""
+
+    def _config(self):
+        """Build a minimal valid multi-prompt config dict."""
+        return {
+            "model_id": "top-model",
+            "prompts": [{"key": "guide", "label": "Novo", "prompt": "p"}],
+        }
+
+    def test_effort_defaults_to_none(self):
+        """Without effort anywhere the resolved effort is None."""
+        resolved, _, _ = soap_service._resolve_prompt_variant(
+            config=self._config(), prompt_key=None
+        )
+        assert resolved["effort"] is None
+
+    def test_variant_effort_overrides_top_level(self):
+        """A variant-level effort wins over the top-level one."""
+        config = self._config()
+        config["effort"] = "medium"
+        config["prompts"][0]["effort"] = "low"
+        resolved, _, _ = soap_service._resolve_prompt_variant(
+            config=config, prompt_key=None
+        )
+        assert resolved["effort"] == "low"

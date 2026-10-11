@@ -108,6 +108,10 @@ class Permission(Enum):
 
     UPDATE_USER_SG = "UPDATE_USER_SG"  # permission to update user's security group
 
+    # permission to view the infection control worklist
+    READ_INFECTION_CONTROL = "READ_INFECTION_CONTROL"
+    WRITE_INFECTION_CONTROL = "WRITE_INFECTION_CONTROL"  # permission to review patients and evaluate antimicrobials
+
     READ_NAV = "READ_NAV"  # permission to navigation data
     NAV_COPY_PATIENT = "NAV_COPY_PATIENT"  # permission to copy patient data
 

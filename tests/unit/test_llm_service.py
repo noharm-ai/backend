@@ -153,7 +153,30 @@ class TestClaudeProvider:
             acting_as([Role.NAVIGATOR.value]),
             summary_config({"provider": "claude"}),
             bedrock_answering(
-                {"content": [{"text": "Paciente estável"}, {"text": "ignorado"}]}
+                {
+                    "content": [
+                        {"type": "text", "text": "Paciente estável"},
+                        {"type": "text", "text": "ignorado"},
+                    ]
+                }
+            ),
+        ):
+            result = llm_service.prompt(MESSAGES)
+
+        assert result == {"answer": "Paciente estável"}
+
+    def test_skips_leading_thinking_blocks(self):
+        """Sonnet 5.5 may open the response with a thinking block before the text"""
+        with (
+            acting_as([Role.NAVIGATOR.value]),
+            summary_config({"provider": "claude"}),
+            bedrock_answering(
+                {
+                    "content": [
+                        {"type": "thinking", "thinking": "", "signature": "x"},
+                        {"type": "text", "text": "Paciente estável"},
+                    ]
+                }
             ),
         ):
             result = llm_service.prompt(MESSAGES)
@@ -165,13 +188,21 @@ class TestClaudeProvider:
         with (
             acting_as([Role.NAVIGATOR.value]),
             summary_config({"provider": "claude"}),
-            bedrock_answering({"content": [{"text": "ok"}]}) as (mock_aws, client),
+            bedrock_answering({"content": [{"type": "text", "text": "ok"}]}) as (
+                mock_aws,
+                client,
+            ),
         ):
             llm_service.prompt(MESSAGES)
 
         body = _sent_body(client)
         assert body["messages"] == MESSAGES
-        assert body["max_tokens"] == 1024
+        assert body["max_tokens"] == 4096
+        assert body["output_config"] == {"effort": "low"}
+        assert (
+            client.invoke_model.call_args.kwargs["modelId"]
+            == "us.anthropic.claude-sonnet-5-5"
+        )
         assert body["anthropic_version"] == "bedrock-2023-05-31"
         assert client.invoke_model.call_args.kwargs["contentType"] == "application/json"
         mock_aws.get_client.assert_called_once_with(
