@@ -334,8 +334,9 @@ def list_admissions(request_data: InfectionControlListRequest):
         InfectionControlStatusEnum.PENDING.value,
         InfectionControlStatusEnum.REVISED.value,
     ]
+    now = datetime.now()
     rows = infection_control_repository.list_admissions(
-        statuses=statuses, limit=request_data.limit, offset=request_data.offset
+        statuses=statuses, filters=request_data, now=now
     )
     admission_numbers = [row.InfectionControlAdmission.admission_number for row in rows]
 
@@ -380,7 +381,11 @@ def list_admissions(request_data: InfectionControlListRequest):
         )
 
     return {
-        "count": infection_control_repository.count_admissions(statuses=statuses),
+        # all the matching admissions: more than listed when the limit cut
+        # the list
+        "count": infection_control_repository.count_admissions(
+            statuses=statuses, filters=request_data, now=now
+        ),
         "admissions": admissions,
     }
 

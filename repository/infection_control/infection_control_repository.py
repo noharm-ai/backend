@@ -19,6 +19,7 @@ from models.infection_control import (
 )
 from models.main import DrugAttributes, db
 from models.prescription import Patient, Prescription, PrescriptionDrug
+from models.requests.infection_control_request import InfectionControlListRequest
 
 
 def create_admission(
@@ -257,32 +258,93 @@ def get_backfill_candidates(since: datetime, after: int, limit: int) -> list[int
     return [row.admissionNumber for row in query.all()]
 
 
-def list_admissions(statuses: list[int], limit: int, offset: int):
-    """Followed admissions with the given statuses, longest in that status first"""
-    return (
-        db.session.query(InfectionControlAdmission, Patient)
-        .outerjoin(
-            Patient,
-            Patient.admissionNumber == InfectionControlAdmission.admission_number,
+def _filter_admissions(query, filters: InfectionControlListRequest, now: datetime):
+    """Apply the worklist filters (all but the status) to a query on the
+    followed admissions"""
+    if filters.idDepartment:
+        # the department of the latest real prescription, as the department
+        # shown in the worklist (get_last_prescriptions)
+        last_prescription = (
+            db.session.query(
+                Prescription.admissionNumber.label("admission_number"),
+                Prescription.idDepartment.label("id_department"),
+            )
+            .join(
+                InfectionControlAdmission,
+                InfectionControlAdmission.admission_number
+                == Prescription.admissionNumber,
+            )
+            .filter(or_(Prescription.agg == None, Prescription.agg == False))
+            .filter(Prescription.concilia == None)
+            .distinct(Prescription.admissionNumber)
+            .order_by(Prescription.admissionNumber, Prescription.date.desc())
+            .subquery()
         )
-        .filter(InfectionControlAdmission.status.in_(statuses))
+        query = query.join(
+            last_prescription,
+            last_prescription.c.admission_number
+            == InfectionControlAdmission.admission_number,
+        ).filter(last_prescription.c.id_department.in_(filters.idDepartment))
+
+    if filters.admissionNumbers:
+        query = query.filter(
+            InfectionControlAdmission.admission_number.in_(filters.admissionNumbers)
+        )
+
+    if filters.pendingTypes:
+        query = query.filter(
+            db.session.query(InfectionControlPending.id)
+            .filter(
+                InfectionControlPending.admission_number
+                == InfectionControlAdmission.admission_number
+            )
+            .filter(InfectionControlPending.resolved_at == None)
+            .filter(InfectionControlPending.pending_type.in_(filters.pendingTypes))
+            .exists()
+        )
+
+    if filters.overdueReview:
+        query = query.filter(InfectionControlAdmission.next_review_date != None).filter(
+            InfectionControlAdmission.next_review_date < now
+        )
+
+    return query
+
+
+def list_admissions(
+    statuses: list[int],
+    filters: InfectionControlListRequest,
+    now: datetime,
+):
+    """Followed admissions with the given statuses matching the worklist
+    filters, longest in that status first"""
+    query = db.session.query(InfectionControlAdmission, Patient).outerjoin(
+        Patient,
+        Patient.admissionNumber == InfectionControlAdmission.admission_number,
+    )
+    query = _filter_admissions(query=query, filters=filters, now=now)
+
+    return (
+        query.filter(InfectionControlAdmission.status.in_(statuses))
         .order_by(
             InfectionControlAdmission.status_date,
             InfectionControlAdmission.admission_number,
         )
-        .limit(limit)
-        .offset(offset)
+        .limit(filters.limit)
+        .offset(filters.offset)
         .all()
     )
 
 
-def count_admissions(statuses: list[int]) -> int:
-    """How many followed admissions have the given statuses"""
-    return (
-        db.session.query(func.count(InfectionControlAdmission.admission_number))
-        .filter(InfectionControlAdmission.status.in_(statuses))
-        .scalar()
-    )
+def count_admissions(
+    statuses: list[int], filters: InfectionControlListRequest, now: datetime
+) -> int:
+    """How many followed admissions with the given statuses match the worklist
+    filters"""
+    query = db.session.query(func.count(InfectionControlAdmission.admission_number))
+    query = _filter_admissions(query=query, filters=filters, now=now)
+
+    return query.filter(InfectionControlAdmission.status.in_(statuses)).scalar()
 
 
 def get_open_pendings_by_admission(
