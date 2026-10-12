@@ -42,9 +42,17 @@ class InfectionControlReviewRequest(BaseModel):
 
 
 class InfectionControlListRequest(BaseModel):
-    """Followed admissions, filtered by status"""
+    """Followed admissions, filtered by status and by the worklist filters"""
 
     status: list[int] = []
+    # segment and department of the latest prescription of the admission
+    idSegment: list[int] = []
+    idDepartment: list[int] = []
+    # admissions with an open pending reason of any of these types
+    pendingTypes: list[int] = []
+    admissionNumbers: list[int] = []
+    # admissions whose scheduled review date has passed
+    overdueReview: bool = False
     limit: int = Field(default=100, ge=1, le=500)
     offset: int = Field(default=0, ge=0)
 

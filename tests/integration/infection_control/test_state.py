@@ -1,10 +1,21 @@
 """Tests: infection control follow-up, the admission state and the worklist"""
 
+from datetime import datetime, timedelta
+
+from sqlalchemy import text
+
+from tests.conftest import session, session_commit
 from tests.integration.infection_control.helpers import (
+    ADULT_SEGMENT,
+    CLOSED,
+    CPOE_SEGMENT,
+    DEPARTMENT_BY_SEGMENT,
     NEVER_REVIEWED,
     NO_EVALUATION,
     PATIENT_ID,
     PENDING,
+    REVISED,
+    SCHEDULED_DATE,
     _prescribe_today,
 )
 from utils import status
@@ -73,3 +84,95 @@ def test_worklist_lists_pending_admission(
     assert len(rows) == 1
     assert rows[0]["idPatient"] == str(PATIENT_ID)
     assert [p["type"] for p in rows[0]["pendings"]] == [NEVER_REVIEWED, NO_EVALUATION]
+
+
+def _worklist(client, headers, admission, **filters):
+    """The worklist narrowed to one admission, plus the given filters"""
+    response = client.post(
+        "/infection-control/admissions",
+        json={"status": [PENDING], "admissionNumbers": [admission], **filters},
+        headers=headers,
+    )
+    assert response.status_code == status.HTTP_200_OK
+    return response.get_json()["data"]
+
+
+def test_worklist_filters_by_segment_and_department(
+    client, infection_controller_headers, infection_control, admission
+):
+    """Segment and department of the latest prescription narrow the worklist"""
+    _prescribe_today(admission)
+    adult_department = DEPARTMENT_BY_SEGMENT[ADULT_SEGMENT]
+    cpoe_department = DEPARTMENT_BY_SEGMENT[CPOE_SEGMENT]
+
+    def listed(**filters):
+        data = _worklist(client, infection_controller_headers, admission, **filters)
+        return [a["admissionNumber"] for a in data["admissions"]]
+
+    assert listed(idDepartment=[adult_department]) == [admission]
+    assert listed(idDepartment=[cpoe_department]) == []
+    assert listed(idSegment=[ADULT_SEGMENT]) == [admission]
+    assert listed(idSegment=[CPOE_SEGMENT]) == []
+    assert listed(idSegment=[ADULT_SEGMENT], idDepartment=[cpoe_department]) == []
+
+
+def test_worklist_filters_by_pending_type(
+    client, infection_controller_headers, infection_control, admission
+):
+    """Only admissions with an open reason of the chosen types"""
+    _prescribe_today(admission)
+
+    def listed(**filters):
+        data = _worklist(client, infection_controller_headers, admission, **filters)
+        return [a["admissionNumber"] for a in data["admissions"]]
+
+    assert listed(pendingTypes=[NO_EVALUATION]) == [admission]
+    assert listed(pendingTypes=[SCHEDULED_DATE, NO_EVALUATION]) == [admission]
+    assert listed(pendingTypes=[SCHEDULED_DATE]) == []
+
+
+def test_worklist_counts_by_status(
+    client, infection_controller_headers, infection_control, admission
+):
+    """Every status is counted under the filters, whatever status is listed"""
+    _prescribe_today(admission)
+
+    data = _worklist(client, infection_controller_headers, admission)
+    assert data["count"] == 1
+    assert data["countByStatus"] == {str(PENDING): 1, str(REVISED): 0, str(CLOSED): 0}
+
+    revised = client.post(
+        "/infection-control/admissions",
+        json={"status": [REVISED], "admissionNumbers": [admission]},
+        headers=infection_controller_headers,
+    ).get_json()["data"]
+    assert revised["count"] == 0
+    assert revised["admissions"] == []
+    assert revised["countByStatus"][str(PENDING)] == 1
+
+
+def test_worklist_filters_overdue_review(
+    client, infection_controller_headers, infection_control, admission
+):
+    """Only admissions whose scheduled review date has passed"""
+    _prescribe_today(admission)
+
+    def listed():
+        data = _worklist(
+            client, infection_controller_headers, admission, overdueReview=True
+        )
+        return [a["admissionNumber"] for a in data["admissions"]]
+
+    # no review scheduled
+    assert listed() == []
+
+    for offset, expected in ((1, []), (-1, [admission])):
+        session.execute(
+            text(
+                "UPDATE demo.ci_atendimento SET dt_proxima_revisao = :date "
+                "WHERE nratendimento = :admission"
+            ),
+            {"date": datetime.now() + timedelta(days=offset), "admission": admission},
+        )
+        session_commit()
+        assert listed() == expected

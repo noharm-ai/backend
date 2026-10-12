@@ -334,8 +334,9 @@ def list_admissions(request_data: InfectionControlListRequest):
         InfectionControlStatusEnum.PENDING.value,
         InfectionControlStatusEnum.REVISED.value,
     ]
+    now = datetime.now()
     rows = infection_control_repository.list_admissions(
-        statuses=statuses, limit=request_data.limit, offset=request_data.offset
+        statuses=statuses, filters=request_data, now=now
     )
     admission_numbers = [row.InfectionControlAdmission.admission_number for row in rows]
 
@@ -379,8 +380,17 @@ def list_admissions(request_data: InfectionControlListRequest):
             }
         )
 
+    count_by_status = infection_control_repository.count_admissions_by_status(
+        filters=request_data, now=now
+    )
+
     return {
-        "count": infection_control_repository.count_admissions(statuses=statuses),
+        "count": sum(count_by_status.get(value, 0) for value in statuses),
+        # every status, so the worklist shows how many each one holds
+        "countByStatus": {
+            item.value: count_by_status.get(item.value, 0)
+            for item in InfectionControlStatusEnum
+        },
         "admissions": admissions,
     }
 
