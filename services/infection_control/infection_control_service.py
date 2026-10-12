@@ -380,17 +380,12 @@ def list_admissions(request_data: InfectionControlListRequest):
             }
         )
 
-    count_by_status = infection_control_repository.count_admissions_by_status(
-        filters=request_data, now=now
-    )
-
     return {
-        "count": sum(count_by_status.get(value, 0) for value in statuses),
-        # every status, so the worklist shows how many each one holds
-        "countByStatus": {
-            item.value: count_by_status.get(item.value, 0)
-            for item in InfectionControlStatusEnum
-        },
+        # all the matching admissions: more than listed when the limit cut
+        # the list
+        "count": infection_control_repository.count_admissions(
+            statuses=statuses, filters=request_data, now=now
+        ),
         "admissions": admissions,
     }
 

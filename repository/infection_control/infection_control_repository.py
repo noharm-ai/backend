@@ -261,13 +261,12 @@ def get_backfill_candidates(since: datetime, after: int, limit: int) -> list[int
 def _filter_admissions(query, filters: InfectionControlListRequest, now: datetime):
     """Apply the worklist filters (all but the status) to a query on the
     followed admissions"""
-    if filters.idSegment or filters.idDepartment:
-        # segment and department come from the latest real prescription, as
-        # the department shown in the worklist (get_last_prescriptions)
+    if filters.idDepartment:
+        # the department of the latest real prescription, as the department
+        # shown in the worklist (get_last_prescriptions)
         last_prescription = (
             db.session.query(
                 Prescription.admissionNumber.label("admission_number"),
-                Prescription.idSegment.label("id_segment"),
                 Prescription.idDepartment.label("id_department"),
             )
             .join(
@@ -285,13 +284,7 @@ def _filter_admissions(query, filters: InfectionControlListRequest, now: datetim
             last_prescription,
             last_prescription.c.admission_number
             == InfectionControlAdmission.admission_number,
-        )
-        if filters.idSegment:
-            query = query.filter(last_prescription.c.id_segment.in_(filters.idSegment))
-        if filters.idDepartment:
-            query = query.filter(
-                last_prescription.c.id_department.in_(filters.idDepartment)
-            )
+        ).filter(last_prescription.c.id_department.in_(filters.idDepartment))
 
     if filters.admissionNumbers:
         query = query.filter(
@@ -343,18 +336,15 @@ def list_admissions(
     )
 
 
-def count_admissions_by_status(
-    filters: InfectionControlListRequest, now: datetime
-) -> dict[int, int]:
-    """How many followed admissions match the worklist filters, by status"""
-    query = db.session.query(
-        InfectionControlAdmission.status,
-        func.count(InfectionControlAdmission.admission_number),
-    )
+def count_admissions(
+    statuses: list[int], filters: InfectionControlListRequest, now: datetime
+) -> int:
+    """How many followed admissions with the given statuses match the worklist
+    filters"""
+    query = db.session.query(func.count(InfectionControlAdmission.admission_number))
     query = _filter_admissions(query=query, filters=filters, now=now)
 
-    rows = query.group_by(InfectionControlAdmission.status).all()
-    return {admission_status: count for admission_status, count in rows}
+    return query.filter(InfectionControlAdmission.status.in_(statuses)).scalar()
 
 
 def get_open_pendings_by_admission(

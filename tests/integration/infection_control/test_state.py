@@ -97,23 +97,18 @@ def _worklist(client, headers, admission, **filters):
     return response.get_json()["data"]
 
 
-def test_worklist_filters_by_segment_and_department(
+def test_worklist_filters_by_department(
     client, infection_controller_headers, infection_control, admission
 ):
-    """Segment and department of the latest prescription narrow the worklist"""
+    """The department of the latest prescription narrows the worklist"""
     _prescribe_today(admission)
-    adult_department = DEPARTMENT_BY_SEGMENT[ADULT_SEGMENT]
-    cpoe_department = DEPARTMENT_BY_SEGMENT[CPOE_SEGMENT]
 
     def listed(**filters):
         data = _worklist(client, infection_controller_headers, admission, **filters)
         return [a["admissionNumber"] for a in data["admissions"]]
 
-    assert listed(idDepartment=[adult_department]) == [admission]
-    assert listed(idDepartment=[cpoe_department]) == []
-    assert listed(idSegment=[ADULT_SEGMENT]) == [admission]
-    assert listed(idSegment=[CPOE_SEGMENT]) == []
-    assert listed(idSegment=[ADULT_SEGMENT], idDepartment=[cpoe_department]) == []
+    assert listed(idDepartment=[DEPARTMENT_BY_SEGMENT[ADULT_SEGMENT]]) == [admission]
+    assert listed(idDepartment=[DEPARTMENT_BY_SEGMENT[CPOE_SEGMENT]]) == []
 
 
 def test_worklist_filters_by_pending_type(
@@ -131,24 +126,36 @@ def test_worklist_filters_by_pending_type(
     assert listed(pendingTypes=[SCHEDULED_DATE]) == []
 
 
-def test_worklist_counts_by_status(
+def test_worklist_counts_the_matching_admissions(
     client, infection_controller_headers, infection_control, admission
 ):
-    """Every status is counted under the filters, whatever status is listed"""
+    """count is every admission matching the filters and statuses, beyond
+    the limit"""
     _prescribe_today(admission)
 
-    data = _worklist(client, infection_controller_headers, admission)
-    assert data["count"] == 1
-    assert data["countByStatus"] == {str(PENDING): 1, str(REVISED): 0, str(CLOSED): 0}
+    def worklist(statuses, limit=500):
+        return client.post(
+            "/infection-control/admissions",
+            json={
+                "status": statuses,
+                "admissionNumbers": [admission],
+                "limit": limit,
+            },
+            headers=infection_controller_headers,
+        ).get_json()["data"]
 
-    revised = client.post(
+    assert worklist([PENDING])["count"] == 1
+    assert worklist([REVISED, CLOSED])["count"] == 0
+    assert worklist([PENDING, REVISED])["count"] == 1
+
+    # a page past the admissions still counts them all
+    past = client.post(
         "/infection-control/admissions",
-        json={"status": [REVISED], "admissionNumbers": [admission]},
+        json={"status": [PENDING], "admissionNumbers": [admission], "offset": 1},
         headers=infection_controller_headers,
     ).get_json()["data"]
-    assert revised["count"] == 0
-    assert revised["admissions"] == []
-    assert revised["countByStatus"][str(PENDING)] == 1
+    assert past["admissions"] == []
+    assert past["count"] == 1
 
 
 def test_worklist_filters_overdue_review(
