@@ -2,7 +2,7 @@
 
 A user who still owes mandatory training cannot open a support ticket; holders of
 ADMIN_SUPPORT may override it for an urgent ticket, and the override is recorded
-in the ticket body.
+in the ticket body. The gate only applies once the schema is in production.
 
 ``create_ticket`` talks to Odoo over XML-RPC, so tests that need to get *past*
 the gate stub ``support_service._get_client`` and inspect what the ticket payload
@@ -14,6 +14,7 @@ import pytest
 from sqlalchemy import text
 
 from config import Config
+from models.enums import IntegrationStatusEnum
 from security.permission import Permission
 from security.role import Role
 from services import support_service
@@ -79,14 +80,34 @@ def _cleanup():
     session_commit()
 
 
+def _get_demo_status():
+    return session.execute(
+        text("SELECT status FROM public.schema_config WHERE schema_name = 'demo'")
+    ).scalar()
+
+
+def _set_demo_status(value):
+    session.execute(
+        text(
+            "UPDATE public.schema_config SET status = :status WHERE schema_name = 'demo'"
+        ),
+        {"status": value},
+    )
+    session_commit()
+
+
 @pytest.fixture(autouse=True)
 def mandatory_training(monkeypatch):
-    """A pending mandatory module, with obligations enabled."""
+    """A pending mandatory module, with obligations enabled, on a schema in
+    production (the only status the gate applies to)."""
     monkeypatch.setattr(Config, "FEATURE_USER_ONBOARDING", True)
+    original_status = _get_demo_status()
+    _set_demo_status(IntegrationStatusEnum.PRODUCTION.value)
     _cleanup()
     _add_mandatory_training()
     yield
     _cleanup()
+    _set_demo_status(original_status)
 
 
 @pytest.fixture
@@ -205,6 +226,18 @@ def test_finished_training_creates_a_normal_ticket(client, odoo_stub):
 def test_feature_flag_off_disables_the_gate(client, monkeypatch, odoo_stub):
     """The env flag gates obligations, so with it off nobody is blocked."""
     monkeypatch.setattr(Config, "FEATURE_USER_ONBOARDING", False)
+    headers = _headers(client, GATED_ROLES)
+
+    response = _post_ticket(client, headers)
+
+    assert response.status_code == 200
+    assert "Chamado urgente" not in odoo_stub["ticket"]["description"]
+
+
+def test_schema_in_integration_disables_the_gate(client, odoo_stub):
+    """During integration support is how the client gets set up, so pending
+    training does not block tickets."""
+    _set_demo_status(IntegrationStatusEnum.INTEGRATION.value)
     headers = _headers(client, GATED_ROLES)
 
     response = _post_ticket(client, headers)
