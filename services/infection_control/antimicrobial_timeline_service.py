@@ -276,6 +276,7 @@ def _get_patient_data(patient: Patient | None, last_prescription) -> dict:
         "record": prescription.record if prescription else None,
         "department": last_prescription.department if last_prescription else None,
         "segment": last_prescription.segment if last_prescription else None,
+        "idSegment": prescription.idSegment if prescription else None,
     }
 
 

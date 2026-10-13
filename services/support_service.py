@@ -6,7 +6,7 @@ from agents import n0_agent
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
 from models.appendix import GlobalMemory
-from models.enums import GlobalMemoryEnum
+from models.enums import GlobalMemoryEnum, IntegrationStatusEnum
 from models.main import User, UserExtra, db
 from models.requests.knowledge_base_request import (
     KnowledgeBaseListRequest,
@@ -14,6 +14,7 @@ from models.requests.knowledge_base_request import (
 from repository import knowledge_base_repository, user_repository
 from security.role import Role
 from services import odoo_client, training_service, vector_search_service
+from services.admin import admin_integration_status_service
 from utils import status
 
 
@@ -131,6 +132,15 @@ def _check_mandatory_training(
     # hold, so gating them would be a permanent lockout with no way out. If those
     # roles ever gain the permission, the gate starts applying on its own.
     if Permission.READ_BASIC_FEATURES not in user_permissions:
+        return False
+
+    # The gate only applies once the schema is in production: during integration
+    # the team is still setting the client up and support is how they do it.
+    # Mirrors useTicketCreationBlock in the frontend.
+    if (
+        admin_integration_status_service.get_integration_status(user_context.schema)
+        != IntegrationStatusEnum.PRODUCTION.value
+    ):
         return False
 
     if not training_service.has_pending_mandatory_training(
