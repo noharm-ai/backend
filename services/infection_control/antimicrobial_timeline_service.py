@@ -26,7 +26,7 @@ from models.prescription import Patient
 from repository import patient_repository
 from repository.infection_control import antimicrobial_repository
 from services import patient_service, prescription_view_service
-from utils import dateutils, status
+from utils import dateutils, prescriptionutils, status
 
 ONE_DAY = timedelta(days=1)
 # breaks shorter than this are just prescription timing, not a gap in the treatment
@@ -66,6 +66,10 @@ class TimelineItem:
     # change apart from a different way of writing the same one
     doseconv: float | None = None
     daily_frequency: float | None = None
+    # prescribed and default measure unit ids, for the dose per weight
+    id_measure_unit: str | None = None
+    default_measure_unit: str | None = None
+    use_weight: bool = False
 
 
 @dataclass
@@ -122,6 +126,9 @@ def build_item(row, now: datetime) -> TimelineItem:
         period_total=row.period_total,
         doseconv=row.doseconv,
         daily_frequency=row.daily_frequency,
+        id_measure_unit=row.id_measure_unit,
+        default_measure_unit=row.default_measure_unit,
+        use_weight=bool(row.use_weight),
     )
 
 
@@ -178,16 +185,19 @@ def _planned_end(course: Course) -> datetime | None:
     return None
 
 
-def _regimens(course: Course) -> list[dict]:
+def _regimens(course: Course, weight: float | None = None) -> list[dict]:
     """Consecutive items with the same dose, frequency and route, merged"""
     regimens = []
     for item in course.items:
         key = (item.dose, item.measure_unit, item.frequency, item.route)
         if regimens and regimens[-1]["key"] == key:
             regimens[-1]["end"] = max(regimens[-1]["end"], item.end)
+            regimens[-1]["latest"] = item
             continue
 
-        regimens.append({"key": key, "start": item.start, "end": item.end})
+        regimens.append(
+            {"key": key, "start": item.start, "end": item.end, "latest": item}
+        )
 
     return [
         {
@@ -197,15 +207,39 @@ def _regimens(course: Course) -> list[dict]:
             "measureUnit": r["key"][1],
             "frequency": r["key"][2],
             "route": r["key"][3],
+            **_dose_per_weight(r["latest"], weight),
         }
         for r in regimens
     ]
 
 
+def _dose_per_weight(item: TimelineItem, weight: float | None) -> dict:
+    """The dose per Kg and per Kg a day of an item, as the screening shows them"""
+    dose_weight = prescriptionutils.get_dose_per_weight(
+        dose=item.dose,
+        weight=weight,
+        frequency=item.daily_frequency,
+        unit=item.id_measure_unit,
+        default_unit=item.default_measure_unit,
+        doseconv=item.doseconv,
+        use_weight=item.use_weight,
+        unit_label=item.measure_unit or item.id_measure_unit,
+    )
+
+    return {
+        "doseWeight": dose_weight["doseWeight"],
+        "doseWeightDay": dose_weight["doseWeightDay"],
+    }
+
+
 def serialize_course(
-    course: Course, now: datetime, discharge_date: datetime | None = None
+    course: Course,
+    now: datetime,
+    discharge_date: datetime | None = None,
+    weight: float | None = None,
 ) -> dict:
-    """The course as the timeline shows it, judged at `now`"""
+    """The course as the timeline shows it, judged at `now`; the patient
+    weight gives the dose per Kg of its regimens"""
     end = course.end
     if discharge_date is not None and end > discharge_date:
         end = max(discharge_date, course.start)
@@ -237,7 +271,7 @@ def serialize_course(
         "days": _days(course.start, min(now, end)),
         "lastIdPrescription": str(latest.id_prescription),
         "prescriptionCount": len({i.id_prescription for i in course.items}),
-        "regimens": _regimens(course),
+        "regimens": _regimens(course, weight=weight),
         "gaps": [
             {"start": dateutils.to_iso(g["start"]), "end": dateutils.to_iso(g["end"])}
             for g in course.gaps
@@ -328,11 +362,18 @@ def get_timeline(admission_number: int, user_context: User = None):
     discharge_date = patient.dischargeDate if patient else None
     exam_data = _get_exams(patient, last_prescription, user_context=user_context)
 
+    patient_data = _get_patient_data(patient, last_prescription)
+
     return {
         "now": dateutils.to_iso(now),
-        "patient": _get_patient_data(patient, last_prescription),
+        "patient": patient_data,
         "courses": [
-            serialize_course(course, now=now, discharge_date=discharge_date)
+            serialize_course(
+                course,
+                now=now,
+                discharge_date=discharge_date,
+                weight=patient_data["weight"],
+            )
             for course in group_courses(items)
         ],
         # the exam card of the screening

@@ -44,6 +44,10 @@ def get_admission_antimicrobials(admission_number: int):
             Substance.atb_level,
             MeasureUnit.description.label("measure_unit"),
             Frequency.description.label("frequency"),
+            # to tell the dose per weight in the drug's default unit
+            PrescriptionDrug.idMeasureUnit.label("id_measure_unit"),
+            DrugAttributes.idMeasureUnit.label("default_measure_unit"),
+            DrugAttributes.useWeight.label("use_weight"),
         )
         .join(Prescription, Prescription.id == PrescriptionDrug.idPrescription)
         .join(
