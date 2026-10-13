@@ -11,9 +11,9 @@ the plan; a saved review also records its evaluations here
 * an admission with a running antimicrobial course is followed; it is pending
   while it has an open reason and revised when none is left;
 * a running course without an active evaluation opens a reason for its drug;
-* a running course whose evaluation expired, or whose posology changed from
-  the evaluated one, opens a reason when its evaluation opted into that
-  trigger;
+* a running course whose evaluation expired (the drug runs past its
+  validity), or whose posology changed from the evaluated one, opens a reason
+  when its evaluation opted into that trigger;
 * an admission never reviewed opens a reason of its own, and so does one
   whose scheduled review date arrived;
 * when a drug stops, its reasons are resolved and its evaluation is closed;
@@ -408,9 +408,12 @@ def course_reasons(
 
     triggers = evaluation.triggers or []
     reasons = []
+    # expired only while the drug runs past the validity: a course kept in
+    # the gap tolerance after its last order ended is not running past it
     if (
         InfectionControlPendingTypeEnum.EXPIRED.value in triggers
         and evaluation.valid_until <= now
+        and evaluation.valid_until < course.end
     ):
         reasons.append(
             (

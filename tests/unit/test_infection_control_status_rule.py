@@ -365,6 +365,45 @@ class TestTriggers:
         assert unwatched.open_pendings == []
         assert unwatched.status == Status.REVISED
 
+    def test_rule_expired_evaluation_covering_the_ended_course_is_not_pending(self):
+        """A course whose last order ended is kept in the gap tolerance: an
+        evaluation valid past the order's end has not expired for it"""
+        (course,) = _courses(
+            _row(
+                date=NOW - timedelta(days=10),
+                expire=NOW - timedelta(hours=12),
+                cpoe=True,
+            )
+        )
+        valid_until = NOW - timedelta(hours=1)
+
+        plan = _plan(
+            course,
+            _evaluation(
+                50, 1, course.start, valid_until=valid_until, triggers=EXPIRED_TRIGGER
+            ),
+        )
+
+        assert rule.is_ongoing(course, NOW)
+        assert plan.open_pendings == []
+        assert plan.close_evaluations == []
+        assert plan.status == Status.REVISED
+
+    def test_rule_expired_evaluation_is_pending_when_the_course_runs_past_it(self):
+        """A new order continuing the course past the validity expires it"""
+        course = _prescribed(_yesterday(), _today())
+        valid_until = NOW - timedelta(hours=8)
+
+        plan = _plan(
+            course,
+            _evaluation(
+                50, 1, course.start, valid_until=valid_until, triggers=EXPIRED_TRIGGER
+            ),
+        )
+
+        assert _reasons(plan) == [PendingType.EXPIRED]
+        assert plan.status == Status.PENDING
+
     def test_rule_posology_change_is_pending_when_watched(self):
         """A new dose opens a reason only for an evaluation that watches the posology"""
         course = _prescribed(_yesterday(), _today(dose=4.0))
