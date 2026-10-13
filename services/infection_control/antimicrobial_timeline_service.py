@@ -19,7 +19,6 @@ import math
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
-from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
 from models.main import User
 from models.prescription import Patient
@@ -335,9 +334,18 @@ def _get_exams(patient: Patient | None, last_prescription, user_context: User) -
     )
 
 
-@has_permission(Permission.READ_PRESCRIPTION)
-def get_timeline(admission_number: int, user_context: User = None):
-    """Patient data, antimicrobial courses and latest exams of an admission"""
+def get_timeline(
+    admission_number: int,
+    courses: list[Course],
+    now: datetime,
+    user_context: User,
+) -> dict:
+    """Patient data, antimicrobial courses and latest exams of an admission.
+
+    The courses come grouped by the caller, which judges them at `now` (the
+    follow-up is built from the same ones). Carries no permission check: the
+    caller has one.
+    """
     patient = patient_repository.get_patient_by_admission(
         admission_number=admission_number
     )
@@ -352,13 +360,6 @@ def get_timeline(admission_number: int, user_context: User = None):
             status.HTTP_400_BAD_REQUEST,
         )
 
-    now = datetime.now()
-    items = [
-        build_item(row, now=now)
-        for row in antimicrobial_repository.get_admission_antimicrobials(
-            admission_number=admission_number
-        )
-    ]
     discharge_date = patient.dischargeDate if patient else None
     exam_data = _get_exams(patient, last_prescription, user_context=user_context)
 
@@ -374,7 +375,7 @@ def get_timeline(admission_number: int, user_context: User = None):
                 discharge_date=discharge_date,
                 weight=patient_data["weight"],
             )
-            for course in group_courses(items)
+            for course in courses
         ],
         # the exam card of the screening
         "exams": exam_data["exams_card"],

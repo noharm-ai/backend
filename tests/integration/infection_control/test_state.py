@@ -4,6 +4,8 @@ from datetime import datetime, timedelta
 
 from sqlalchemy import text
 
+from models.main import db
+from services.infection_control import infection_control_service
 from tests.conftest import session, session_commit
 from tests.integration.infection_control.helpers import (
     ADULT_SEGMENT,
@@ -46,6 +48,58 @@ def test_state_of_followed_admission(
     assert data["status"] == PENDING
     assert [p["type"] for p in data["pendings"]] == [NEVER_REVIEWED, NO_EVALUATION]
     assert data["courses"][0]["evaluation"] is None
+
+
+def _view(client, headers, admission):
+    """The infection control page of an admission: timeline and follow-up"""
+    response = client.get(
+        f"/infection-control/antimicrobial-timeline/{admission}", headers=headers
+    )
+    assert response.status_code == status.HTTP_200_OK
+    return response.get_json()["data"]
+
+
+def test_view_without_feature(client, analyst_headers, admission):
+    """The page loads its timeline and learns the feature is off"""
+    _prescribe_today(admission, job=False)
+
+    data = _view(client, analyst_headers, admission)
+
+    assert len(data["courses"]) == 1
+    assert data["followUp"] == {"enabled": False, "admissionNumber": admission}
+
+
+def test_view_brings_follow_up(client, analyst_headers, infection_control, admission):
+    """The timeline comes with the follow-up, both from the same courses"""
+    _prescribe_today(admission)
+
+    data = _view(client, analyst_headers, admission)
+
+    follow_up = data["followUp"]
+    assert follow_up["followed"] is True
+    assert follow_up["status"] == PENDING
+    # the page places each evaluation on the course with the same drug and start
+    assert [(c["idDrug"], c["start"]) for c in follow_up["courses"]] == [
+        (c["idDrug"], c["start"]) for c in data["courses"]
+    ]
+
+
+def test_view_survives_follow_up_failure(
+    client, analyst_headers, infection_control, admission, monkeypatch
+):
+    """A failing follow-up (here a query error) still lets the timeline
+    through, without the follow-up"""
+    _prescribe_today(admission)
+
+    def failing_state(**kwargs):
+        db.session.execute(text("SELECT 1 / 0"))
+
+    monkeypatch.setattr(infection_control_service, "_get_state", failing_state)
+
+    data = _view(client, analyst_headers, admission)
+
+    assert len(data["courses"]) == 1
+    assert data["followUp"] is None
 
 
 def test_worklist_requires_permission(
