@@ -32,6 +32,9 @@ def _row(
     frequency="8/8h",
     period_total=None,
     id_prescription=None,
+    doseconv=None,
+    default_measure_unit=None,
+    use_weight=None,
 ):
     """A repository row of one prescribed antimicrobial item"""
     id_prescription = id_prescription or int(start.timestamp())
@@ -47,12 +50,15 @@ def _row(
         expire=expire,
         suspended_date=suspended_date,
         dose=dose,
-        doseconv=dose,
+        doseconv=doseconv if doseconv is not None else dose,
         measure_unit="g",
         frequency=frequency,
         daily_frequency=3,
         route="IV",
         period_total=period_total,
+        id_measure_unit="g",
+        default_measure_unit=default_measure_unit,
+        use_weight=use_weight,
     )
 
 
@@ -232,3 +238,44 @@ class TestDischarge:
         assert result["status"] == svc.STATUS_FINISHED
         assert result["end"] == (T0 + timedelta(hours=12)).isoformat()
         assert result["days"] == 1
+
+
+class TestDosePerWeight:
+    """Regimens carry the dose per Kg the screening shows, from the patient weight"""
+
+    def _regimen(self, rows, weight):
+        items = [svc.build_item(r, now=T0 + DAY) for r in rows]
+        course = svc.group_courses(items)[0]
+        return svc.serialize_course(course, now=T0 + DAY, weight=weight)["regimens"]
+
+    def test_dose_per_kg_and_per_day(self):
+        """1 g 8/8h for a 50 Kg patient: 0,02 g/Kg and 0,06 g/Kg/Dia"""
+        regimen = self._regimen([_row(T0, expire=T0 + DAY)], weight=50)[0]
+
+        assert regimen["doseWeight"] == "0,02 g/Kg"
+        assert regimen["doseWeightDay"] == "0,06 g/Kg/Dia"
+
+    def test_no_weight_has_no_dose_per_kg(self):
+        regimen = self._regimen([_row(T0, expire=T0 + DAY)], weight=None)[0]
+
+        assert regimen["doseWeight"] is None
+        assert regimen["doseWeightDay"] is None
+
+    def test_dose_in_the_default_unit(self):
+        """Prescribed in another unit, the converted dose follows"""
+        row = _row(
+            T0, expire=T0 + DAY, dose=2, doseconv=1000, default_measure_unit="mg"
+        )
+        regimen = self._regimen([row], weight=50)[0]
+
+        assert regimen["doseWeight"] == "0,04 g/Kg ou 20,00 mg/Kg"
+        assert regimen["doseWeightDay"] == "0,12 g/Kg/Dia ou 60,00 mg/Kg/Dia"
+
+    def test_each_regimen_has_its_own_dose(self):
+        rows = [
+            _row(T0, expire=T0 + DAY, dose=1.0),
+            _row(T0 + DAY, expire=T0 + 2 * DAY, dose=2.0),
+        ]
+        regimens = self._regimen(rows, weight=50)
+
+        assert [r["doseWeight"] for r in regimens] == ["0,02 g/Kg", "0,04 g/Kg"]

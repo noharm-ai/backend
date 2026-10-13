@@ -218,67 +218,19 @@ class DrugList:
                         body_surface = math.sqrt((bs_weight * bs_height) / 3600)
                         doseBodySurfaceStr = f"""{stringutils.strFormatBR(round(pd[0].dose / body_surface, 2))} {pdUnit}/m²"""
 
-                if pd[0].dose:
-                    weight = numberutils.none2zero(self.exams["weight"])
-
-                    if weight > 0:
-                        weight = weight if weight > 0 else 1
-
-                        dose_per_kg = pd[0].dose / float(weight)
-                        frequency = numberutils.none2zero(pd[0].frequency)
-
-                        has_conv = (
-                            pd[6].idMeasureUnit is not None
-                            and pd[6].idMeasureUnit != pdUnit
-                            and pd[0].doseconv is not None
-                        )
-                        conv_per_kg = None
-                        if has_conv:
-                            conv_per_kg = (
-                                pd[0].doseconv
-                                if pd[6].useWeight
-                                else round(pd[0].doseconv / float(weight), 2)
-                            )
-
-                        for multiplier, suffix in [
-                            (1, "/Kg"),
-                            (frequency, "/Kg/Dia"),
-                        ]:
-                            if multiplier <= 0:
-                                continue
-
-                            if multiplier in [33, 44, 55, 66, 99]:
-                                continue
-
-                            value = stringutils.strFormatBR(
-                                round(dose_per_kg * multiplier, 2)
-                            )
-                            result = f"{value} {pdUnit}{suffix}"
-
-                            if suffix == "/Kg":
-                                doseWeightValue = value
-                            else:
-                                doseWeightDayValue = value
-
-                            if has_conv:
-                                conv_value = stringutils.strFormatBR(
-                                    round(conv_per_kg * multiplier, 2)
-                                    if not pd[6].useWeight
-                                    else conv_per_kg * multiplier
-                                )
-                                conv_suffix = (
-                                    " (faixa arredondada)" if pd[6].useWeight else ""
-                                )
-                                result += (
-                                    f" ou {conv_value} "
-                                    f"{pd[6].idMeasureUnit}{suffix}"
-                                    f"{conv_suffix}"
-                                )
-
-                            if suffix == "/Kg":
-                                doseWeightStr = result
-                            else:
-                                doseWeightDayStr = result
+                dose_weight = prescriptionutils.get_dose_per_weight(
+                    dose=pd[0].dose,
+                    weight=self.exams.get("weight"),
+                    frequency=pd[0].frequency,
+                    unit=pdUnit,
+                    default_unit=pd[6].idMeasureUnit,
+                    doseconv=pd[0].doseconv,
+                    use_weight=pd[6].useWeight,
+                )
+                doseWeightStr = dose_weight["doseWeight"]
+                doseWeightValue = dose_weight["doseWeightValue"]
+                doseWeightDayStr = dose_weight["doseWeightDay"]
+                doseWeightDayValue = dose_weight["doseWeightDayValue"]
 
                 if (
                     not bool(pd[0].suspendedDate)
