@@ -21,10 +21,11 @@ from datetime import datetime, timedelta
 
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
+from models.main import User
 from models.prescription import Patient
 from repository import patient_repository
 from repository.infection_control import antimicrobial_repository
-from services import patient_service
+from services import patient_service, prescription_view_service
 from utils import dateutils, status
 
 ONE_DAY = timedelta(days=1)
@@ -280,9 +281,29 @@ def _get_patient_data(patient: Patient | None, last_prescription) -> dict:
     }
 
 
+def _get_exams(patient: Patient | None, last_prescription, user_context: User) -> dict:
+    """The latest exams of the patient, read as the prescription view reads
+    them for the admission's latest prescription (the references come from its
+    segment)"""
+    prescription = last_prescription[0] if last_prescription else None
+
+    if prescription is None:
+        return {"exams": {}, "exams_card": [], "alerts": 0}
+
+    if patient is None:
+        # the view does the same for an admission with no patient record
+        patient = Patient()
+        patient.idPatient = prescription.idPatient
+        patient.admissionNumber = prescription.admissionNumber
+
+    return prescription_view_service.get_exams(
+        prescription=prescription, patient=patient, user_context=user_context
+    )
+
+
 @has_permission(Permission.READ_PRESCRIPTION)
-def get_timeline(admission_number: int):
-    """Patient data and antimicrobial courses of an admission"""
+def get_timeline(admission_number: int, user_context: User = None):
+    """Patient data, antimicrobial courses and latest exams of an admission"""
     patient = patient_repository.get_patient_by_admission(
         admission_number=admission_number
     )
@@ -305,6 +326,7 @@ def get_timeline(admission_number: int):
         )
     ]
     discharge_date = patient.dischargeDate if patient else None
+    exam_data = _get_exams(patient, last_prescription, user_context=user_context)
 
     return {
         "now": dateutils.to_iso(now),
@@ -313,4 +335,7 @@ def get_timeline(admission_number: int):
             serialize_course(course, now=now, discharge_date=discharge_date)
             for course in group_courses(items)
         ],
+        # the exam card of the screening
+        "exams": exam_data["exams_card"],
+        "alertExams": exam_data["alerts"],
     }

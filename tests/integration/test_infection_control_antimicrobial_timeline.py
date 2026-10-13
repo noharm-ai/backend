@@ -177,6 +177,32 @@ def test_admission_without_antimicrobials(client, analyst_headers, admission):
     assert data["patient"]["segment"] == "Segmento Adulto"
 
 
+def test_exams_of_the_latest_prescription(client, analyst_headers, admission):
+    """The exam card is the one the prescription view carries for the latest
+    prescription of the admission"""
+    _prescribe(admission, _day(-2), _day(-1))
+    last = _prescribe(admission, _day(-1), _day(0), id_drug=OTHER_DRUG)
+
+    data = client.get(_url(admission), headers=analyst_headers).get_json()["data"]
+    view = client.get(f"/prescriptions/{last}", headers=analyst_headers).get_json()[
+        "data"
+    ]
+
+    assert data["patient"]["idPrescription"] == str(last)
+    assert data["exams"] == view["exams"]
+    assert data["alertExams"] == view["alertExams"]
+
+
+def test_exams_without_prescription(client, analyst_headers, admission):
+    """With no prescription there is no segment to read the exam references
+    from: the card is empty"""
+    data = client.get(_url(admission), headers=analyst_headers).get_json()["data"]
+
+    assert data["patient"]["idPrescription"] is None
+    assert data["exams"] == []
+    assert data["alertExams"] == 0
+
+
 def test_daily_prescriptions_become_one_course(client, analyst_headers, admission):
     """Three daily prescriptions up to today make one active course on D3"""
     for offset in (-2, -1, 0):
