@@ -8,10 +8,7 @@ from models.requests.infection_control_request import (
     InfectionControlListRequest,
     InfectionControlReviewRequest,
 )
-from services.infection_control import (
-    antimicrobial_timeline_service,
-    infection_control_service,
-)
+from services.infection_control import infection_control_service
 
 app_infection_control = Blueprint("app_infection_control", __name__)
 
@@ -21,8 +18,8 @@ app_infection_control = Blueprint("app_infection_control", __name__)
 )
 @api_endpoint()
 def get_timeline(admission_number: int):
-    """Patient data and antimicrobial courses of an admission"""
-    return antimicrobial_timeline_service.get_timeline(
+    """Patient data, antimicrobial courses and follow-up of an admission"""
+    return infection_control_service.get_admission_view(
         admission_number=admission_number
     )
 

@@ -35,6 +35,7 @@ def _row(
     doseconv=None,
     default_measure_unit=None,
     use_weight=None,
+    notes=None,
 ):
     """A repository row of one prescribed antimicrobial item"""
     id_prescription = id_prescription or int(start.timestamp())
@@ -59,6 +60,7 @@ def _row(
         id_measure_unit="g",
         default_measure_unit=default_measure_unit,
         use_weight=use_weight,
+        notes=notes,
     )
 
 
@@ -159,6 +161,12 @@ class TestDailyPrescriber:
             (1.0, T0.isoformat(), (T0 + 2 * DAY).isoformat()),
             (2.0, (T0 + 2 * DAY).isoformat(), (T0 + 4 * DAY).isoformat()),
         ]
+
+    def test_regimen_shows_the_notes_of_its_latest_item(self):
+        rows = _daily(range(1), notes="D1 de 7") + _daily(range(1, 3), notes="D3 de 7")
+        courses = _courses(rows, now=T0 + 10 * DAY)
+
+        assert [r["notes"] for r in courses[0]["regimens"]] == ["D3 de 7"]
 
     def test_each_drug_has_its_own_course(self):
         rows = _daily(range(3), id_drug=1) + _daily(range(1, 2), id_drug=2)
