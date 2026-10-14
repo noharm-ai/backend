@@ -287,3 +287,96 @@ class TestDosePerWeight:
         regimens = self._regimen(rows, weight=50)
 
         assert [r["doseWeight"] for r in regimens] == ["0,02 g/Kg", "0,04 g/Kg"]
+
+
+def _alert(id_prescription_drug, alert_type, level, text):
+    """One screening alert, as prescription_view_service.get_drug_alerts lists it"""
+    return {
+        "idPrescriptionDrug": str(id_prescription_drug),
+        "key": "",
+        "type": alert_type,
+        "level": level,
+        "text": text,
+    }
+
+
+class TestCourseAlerts:
+    """The screening alerts reach a course through its items in the screening
+    prescription"""
+
+    def _course(self, rows, now):
+        """The only course the rows make"""
+        items = [svc.build_item(r, now=now) for r in rows]
+        (course,) = svc.group_courses(items)
+        return course
+
+    def test_alerts_of_the_course_items(self):
+        now = T0 + 2 * DAY
+        rows = _daily([0, 1])
+        course = self._course(rows, now=now)
+        today = rows[-1].id_prescription_drug
+        other_drug = 999
+
+        drug_alerts = {
+            str(today): {
+                "idDrug": 1,
+                "idSubstance": "372687004",
+                "alerts": [_alert(today, "kidney", "medium", "Renal")],
+            },
+            str(other_drug): {
+                "idDrug": 2,
+                "idSubstance": None,
+                "alerts": [_alert(other_drug, "maxDose", "high", "Other drug")],
+            },
+        }
+
+        result = svc.course_alerts(course, drug_alerts=drug_alerts)
+
+        assert result["idSubstance"] == "372687004"
+        assert [a["text"] for a in result["alerts"]] == ["Renal"]
+
+    def test_repeated_alert_listed_once_most_severe_first(self):
+        now = T0 + DAY
+        # two prescriptions of the same day: both items reach the screening
+        rows = [
+            _row(T0, expire=T0 + DAY, id_prescription=1),
+            _row(T0 + timedelta(hours=6), expire=T0 + DAY, id_prescription=2),
+        ]
+        course = self._course(rows, now=now)
+        first, second = (r.id_prescription_drug for r in rows)
+
+        drug_alerts = {
+            str(first): {
+                "idDrug": 1,
+                "idSubstance": None,
+                "alerts": [
+                    _alert(first, "liver", "low", "Hepatic"),
+                    _alert(first, "maxDose", "high", "Max dose"),
+                ],
+            },
+            str(second): {
+                "idDrug": 1,
+                "idSubstance": None,
+                "alerts": [
+                    _alert(second, "maxDose", "high", "Max dose"),
+                    _alert(second, "it", "medium", "Interaction"),
+                ],
+            },
+        }
+
+        result = svc.course_alerts(course, drug_alerts=drug_alerts)
+
+        assert [(a["type"], a["level"]) for a in result["alerts"]] == [
+            ("maxDose", "high"),
+            ("it", "medium"),
+            ("liver", "low"),
+        ]
+
+    def test_course_not_in_the_screening_prescription(self):
+        now = T0 + 10 * DAY
+        course = self._course(_daily([0, 1]), now=now)
+
+        assert svc.course_alerts(course, drug_alerts={}) == {
+            "idSubstance": None,
+            "alerts": [],
+        }

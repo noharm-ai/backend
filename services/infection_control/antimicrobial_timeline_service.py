@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
 from exception.validation_error import ValidationError
+from models.enums import DrugAlertLevelEnum
 from models.main import User
 from models.prescription import Patient
 from repository import patient_repository
@@ -36,6 +37,13 @@ GAP_TOLERANCE = timedelta(hours=36)
 STATUS_ACTIVE = "active"
 STATUS_SUSPENDED = "suspended"
 STATUS_FINISHED = "finished"
+
+# the screening alerts of a course are listed most severe first
+ALERT_LEVEL_ORDER = {
+    DrugAlertLevelEnum.HIGH.value: 0,
+    DrugAlertLevelEnum.MEDIUM.value: 1,
+    DrugAlertLevelEnum.LOW.value: 2,
+}
 
 
 @dataclass
@@ -322,24 +330,84 @@ def _get_patient_data(patient: Patient | None, last_prescription) -> dict:
     }
 
 
-def _get_exams(patient: Patient | None, last_prescription, user_context: User) -> dict:
-    """The latest exams of the patient, read as the prescription view reads
-    them for the admission's latest prescription (the references come from its
-    segment)"""
-    prescription = last_prescription[0] if last_prescription else None
+def _get_screening_prescription(admission_number: int, last_prescription):
+    """The prescription the exams and the alerts are read from: the one the
+    screening shows for the patient now.
 
+    That is the latest prescription-day (aggregated prescription), which holds
+    every drug of the day, so an antimicrobial and a drug it interacts with
+    meet even when they were prescribed apart. Without an aggregated
+    prescription as recent as the latest real one (schemas that do not
+    aggregate), the latest real prescription.
+    """
+    prescription = last_prescription[0] if last_prescription else None
+    agg_prescription = antimicrobial_repository.get_last_agg_prescription(
+        admission_number=admission_number
+    )
+
+    if agg_prescription is not None and (
+        prescription is None or agg_prescription.date.date() >= prescription.date.date()
+    ):
+        return agg_prescription
+
+    return prescription
+
+
+def _get_exams(patient: Patient, prescription, user_context: User) -> dict:
+    """The latest exams of the patient, read as the prescription view reads
+    them for the screening prescription (the references come from its
+    segment)"""
     if prescription is None:
         return {"exams": {}, "exams_card": [], "alerts": 0}
-
-    if patient is None:
-        # the view does the same for an admission with no patient record
-        patient = Patient()
-        patient.idPatient = prescription.idPatient
-        patient.admissionNumber = prescription.admissionNumber
 
     return prescription_view_service.get_exams(
         prescription=prescription, patient=patient, user_context=user_context
     )
+
+
+def _get_drug_alerts(
+    patient: Patient, prescription, exam_data: dict, user_context: User
+) -> dict:
+    """The screening alerts of every drug of the screening prescription, keyed
+    by idPrescriptionDrug (prescription_view_service.get_drug_alerts)"""
+    if prescription is None:
+        return {}
+
+    return prescription_view_service.get_drug_alerts(
+        prescription=prescription,
+        patient=patient,
+        segment=antimicrobial_repository.get_segment(id_segment=prescription.idSegment),
+        exam_data=exam_data,
+        user_context=user_context,
+    )
+
+
+def course_alerts(course: Course, drug_alerts: dict) -> dict:
+    """The screening alerts of a course: those of its items in the screening
+    prescription, so only a course prescribed there has any. An alert repeated
+    by two items of the course (two prescriptions of the same day) is listed
+    once. Most severe first."""
+    alerts = []
+    seen = set()
+    id_substance = None
+
+    for item in course.items:
+        drug_alert = drug_alerts.get(str(item.id_prescription_drug))
+        if drug_alert is None:
+            continue
+
+        id_substance = id_substance or drug_alert["idSubstance"]
+        for alert in drug_alert["alerts"]:
+            key = (alert["type"], alert["text"])
+            if key in seen:
+                continue
+
+            seen.add(key)
+            alerts.append(alert)
+
+    alerts.sort(key=lambda a: ALERT_LEVEL_ORDER.get(a["level"], len(ALERT_LEVEL_ORDER)))
+
+    return {"idSubstance": id_substance, "alerts": alerts}
 
 
 def get_timeline(
@@ -348,7 +416,8 @@ def get_timeline(
     now: datetime,
     user_context: User,
 ) -> dict:
-    """Patient data, antimicrobial courses and latest exams of an admission.
+    """Patient data, antimicrobial courses and latest exams of an admission,
+    each current course with the alerts the screening raises for it.
 
     The courses come grouped by the caller, which judges them at `now` (the
     follow-up is built from the same ones). Carries no permission check: the
@@ -369,22 +438,54 @@ def get_timeline(
         )
 
     discharge_date = patient.dischargeDate if patient else None
-    exam_data = _get_exams(patient, last_prescription, user_context=user_context)
-
     patient_data = _get_patient_data(patient, last_prescription)
+
+    screening_prescription = _get_screening_prescription(
+        admission_number=admission_number, last_prescription=last_prescription
+    )
+    screening_patient = patient
+    if screening_patient is None and screening_prescription is not None:
+        # the view does the same for an admission with no patient record
+        screening_patient = Patient()
+        screening_patient.idPatient = screening_prescription.idPatient
+        screening_patient.admissionNumber = screening_prescription.admissionNumber
+
+    exam_data = _get_exams(
+        screening_patient, screening_prescription, user_context=user_context
+    )
+    drug_alerts = _get_drug_alerts(
+        screening_patient,
+        screening_prescription,
+        exam_data=exam_data,
+        user_context=user_context,
+    )
 
     return {
         "now": dateutils.to_iso(now),
         "patient": patient_data,
         "courses": [
-            serialize_course(
-                course,
-                now=now,
-                discharge_date=discharge_date,
-                weight=patient_data["weight"],
-            )
+            {
+                **serialize_course(
+                    course,
+                    now=now,
+                    discharge_date=discharge_date,
+                    weight=patient_data["weight"],
+                ),
+                **course_alerts(course, drug_alerts=drug_alerts),
+            }
             for course in courses
         ],
+        # the prescription the screening shows for the patient now, which the
+        # exams and the alerts are read from
+        "screeningPrescription": (
+            {
+                "idPrescription": str(screening_prescription.id),
+                "date": dateutils.to_iso(screening_prescription.date),
+                "agg": bool(screening_prescription.agg),
+            }
+            if screening_prescription is not None
+            else None
+        ),
         # the exam card of the screening
         "exams": exam_data["exams_card"],
         "alertExams": exam_data["alerts"],

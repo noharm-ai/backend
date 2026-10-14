@@ -129,6 +129,83 @@ def get_exams(prescription: Prescription, patient: Patient, user_context: User):
     )
 
 
+def get_drug_alerts(
+    prescription: Prescription,
+    patient: Patient,
+    segment: Segment | None,
+    exam_data: dict,
+    user_context: User,
+) -> dict:
+    """The alerts the screening raises for each drug of a prescription, for
+    the screens that need them without loading the whole prescription
+    (infection control).
+
+    They come from the same pipeline the prescription view runs (_get_alerts),
+    over the same drug list, so both screens raise the same alerts. exam_data
+    is what get_exams returned for this prescription.
+
+    Keyed by idPrescriptionDrug: the drug, its substance and its alerts, the
+    interactions first and then the drug alerts (the order the screening
+    lists them in, utils/drug_list.py).
+    """
+
+    config_data = _get_configs(
+        prescription=prescription, patient=patient, is_complete=False
+    )
+
+    # the alerts only read the clinical notes counters (cn_stats)
+    cn_data = _get_clinical_notes_stats(
+        prescription=prescription,
+        patient=patient,
+        config_data=config_data,
+        is_complete=False,
+        user_context=user_context,
+    )
+
+    drug_list = _get_drug_list(
+        prescription=prescription,
+        patient=patient,
+        config_data=config_data,
+        user_context=user_context,
+    )
+
+    culture_data = alert_service.flag_prescribed_cultures(
+        cultures=_get_cultures(patient=patient, user_context=user_context),
+        drug_list=drug_list,
+    )
+
+    alerts_data = _get_alerts(
+        prescription=prescription,
+        drug_list=drug_list,
+        patient=patient,
+        config_data=config_data,
+        exam_data=exam_data,
+        cn_data=cn_data,
+        user_context=user_context,
+        segment=segment,
+        culture_data=culture_data,
+    )
+
+    relations = alerts_data["relations"]["alerts"] or {}
+    alerts = alerts_data["alerts"]["alerts"] or {}
+
+    drug_alerts = {}
+    for item in drug_list:
+        prescription_drug = item[0]
+        drug = item[1]
+        key = str(prescription_drug.id)
+
+        drug_alerts[key] = {
+            "idDrug": prescription_drug.idDrug,
+            "idSubstance": (
+                str(drug.sctid) if drug is not None and drug.sctid else None
+            ),
+            "alerts": relations.get(key, []) + alerts.get(key, []),
+        }
+
+    return drug_alerts
+
+
 def _internal_get_prescription(
     id_prescription: int,
     user_context: User,

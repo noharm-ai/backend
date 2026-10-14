@@ -108,3 +108,25 @@ def get_last_prescription(admission_number: int):
         .order_by(Prescription.date.desc())
         .first()
     )
+
+
+def get_last_agg_prescription(admission_number: int):
+    """The latest aggregated prescription (prescription-day) of an admission,
+    or None when the admission has none"""
+    return (
+        db.session.query(Prescription)
+        .filter(Prescription.admissionNumber == admission_number)
+        .filter(Prescription.agg == True)
+        .filter(Prescription.concilia == None)
+        .filter(Prescription.idSegment != None)
+        .order_by(Prescription.date.desc())
+        .first()
+    )
+
+
+def get_segment(id_segment: int | None) -> Segment | None:
+    """A segment by id, or None"""
+    if id_segment is None:
+        return None
+
+    return db.session.query(Segment).filter(Segment.id == id_segment).first()
