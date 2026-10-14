@@ -69,6 +69,8 @@ class TimelineItem:
     id_measure_unit: str | None = None
     default_measure_unit: str | None = None
     use_weight: bool = False
+    # the observation written on the prescribed item (complemento)
+    notes: str | None = None
 
 
 @dataclass
@@ -128,6 +130,7 @@ def build_item(row, now: datetime) -> TimelineItem:
         id_measure_unit=row.id_measure_unit,
         default_measure_unit=row.default_measure_unit,
         use_weight=bool(row.use_weight),
+        notes=row.notes,
     )
 
 
@@ -185,7 +188,11 @@ def _planned_end(course: Course) -> datetime | None:
 
 
 def _regimens(course: Course, weight: float | None = None) -> list[dict]:
-    """Consecutive items with the same dose, frequency and route, merged"""
+    """Consecutive items with the same dose, frequency and route, merged.
+
+    The notes are not part of the posology: daily prescribers rewrite them
+    every day ("D3 de 7"), so a regimen shows the notes of its latest item.
+    """
     regimens = []
     for item in course.items:
         key = (item.dose, item.measure_unit, item.frequency, item.route)
@@ -206,6 +213,7 @@ def _regimens(course: Course, weight: float | None = None) -> list[dict]:
             "measureUnit": r["key"][1],
             "frequency": r["key"][2],
             "route": r["key"][3],
+            "notes": r["latest"].notes,
             **_dose_per_weight(r["latest"], weight),
         }
         for r in regimens

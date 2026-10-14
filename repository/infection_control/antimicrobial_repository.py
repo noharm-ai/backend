@@ -34,6 +34,7 @@ def get_admission_antimicrobials(admission_number: int):
             PrescriptionDrug.route,
             PrescriptionDrug.suspendedDate.label("suspended_date"),
             PrescriptionDrug.period_total,
+            PrescriptionDrug.notes,
             Prescription.id.label("id_prescription"),
             Prescription.date,
             Prescription.expire,
