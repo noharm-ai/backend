@@ -181,7 +181,7 @@ def prescalc_env(
         p = stack.enter_context
 
         p(patch.object(module, "db", fake_db))
-        p(patch.object(module, "_set_schema"))
+        p(patch.object(module.db_utils, "set_schema"))
         mocks.logger = p(patch.object(module.logger, "backend_logger"))
 
         mocks.acquire_lock = p(
@@ -234,9 +234,7 @@ def prescalc_env(
             )
         )
         mocks.get_features = p(
-            patch.object(
-                module.prescriptionutils, "getFeatures", return_value=features
-            )
+            patch.object(module.prescriptionutils, "getFeatures", return_value=features)
         )
         mocks.get_internal_prescription_ids = p(
             patch.object(
@@ -393,9 +391,7 @@ def test_by_prescription_skips_an_already_processed_prescription():
     """Idempotency: processed items with computed features are not redone."""
     prescription = _prescription(features=_features())
 
-    with prescalc_env(
-        rows=[prescription], processed_status="PROCESSED"
-    ) as mocks:
+    with prescalc_env(rows=[prescription], processed_status="PROCESSED") as mocks:
         result = _create_by_prescription(
             schema=SCHEMA, id_prescription=prescription.id, user_context=_user()
         )
@@ -411,9 +407,7 @@ def test_by_prescription_force_reprocesses_an_already_processed_prescription():
     """``force`` is the support escape hatch for a bad earlier calculation."""
     prescription = _prescription(features=_features())
 
-    with prescalc_env(
-        rows=[prescription, None], processed_status="PROCESSED"
-    ) as mocks:
+    with prescalc_env(rows=[prescription, None], processed_status="PROCESSED") as mocks:
         _create_by_prescription(
             schema=SCHEMA,
             id_prescription=prescription.id,
@@ -429,9 +423,7 @@ def test_by_prescription_reprocesses_when_features_were_never_computed():
     """A PROCESSED row with no features is a failed run, so it is redone."""
     prescription = _prescription(features=None)
 
-    with prescalc_env(
-        rows=[prescription, None], processed_status="PROCESSED"
-    ) as mocks:
+    with prescalc_env(rows=[prescription, None], processed_status="PROCESSED") as mocks:
         _create_by_prescription(
             schema=SCHEMA, id_prescription=prescription.id, user_context=_user()
         )
@@ -724,9 +716,7 @@ def test_no_check_is_touched_when_the_prescription_has_no_validated_items():
     prescription = _prescription(status="s")
     existing_agg = _prescription(id=999, status="s")
 
-    with prescalc_env(
-        rows=[prescription, existing_agg], drug_count=0
-    ) as mocks:
+    with prescalc_env(rows=[prescription, existing_agg], drug_count=0) as mocks:
         _create_by_prescription(
             schema=SCHEMA, id_prescription=prescription.id, user_context=_user()
         )
@@ -931,9 +921,7 @@ def test_by_date_creates_the_agg_prescription_with_the_derived_id():
     assert agg.prescriber == "Prescrição Agregada"
 
     audits = _added(mocks, PrescriptionAudit)
-    assert [a.auditType for a in audits] == [
-        PrescriptionAuditTypeEnum.CREATE_AGG.value
-    ]
+    assert [a.auditType for a in audits] == [PrescriptionAuditTypeEnum.CREATE_AGG.value]
 
 
 def test_by_date_reuses_an_existing_agg_prescription():
@@ -1040,11 +1028,14 @@ def test_by_date_runs_the_automatic_check_and_conciliation_update():
     reloaded = _prescription(id=999)
 
     with prescalc_env(rows=_by_date_rows(reloaded=reloaded)) as mocks:
-        with patch.object(
-            prescription_agg_service.prescription_repository,
-            "get_last_prescription",
-            return_value=_prescription(id=888),
-        ), patch.object(prescription_agg_service, "_automatic_check") as auto_check:
+        with (
+            patch.object(
+                prescription_agg_service.prescription_repository,
+                "get_last_prescription",
+                return_value=_prescription(id=888),
+            ),
+            patch.object(prescription_agg_service, "_automatic_check") as auto_check,
+        ):
             _create_by_date(
                 schema=SCHEMA,
                 admission_number=ADMISSION,
@@ -1142,9 +1133,12 @@ def test_score_variation_compares_against_the_previous_calendar_day():
     prescription = _prescription(id=999, p_date=datetime(2026, 3, 10, 0, 0))
     fake_db = _fake_db([None])
 
-    with patch.object(prescription_agg_service, "db", fake_db), patch.object(
-        prescription_agg_service.prescriptionutils, "gen_agg_id"
-    ) as gen_agg_id:
+    with (
+        patch.object(prescription_agg_service, "db", fake_db),
+        patch.object(
+            prescription_agg_service.prescriptionutils, "gen_agg_id"
+        ) as gen_agg_id,
+    ):
         prescription_agg_service._get_score_variation(
             prescription=prescription, features=_features()
         )
@@ -1269,11 +1263,12 @@ def _run_automatic_check(features, *, status, has_feature):
     prescription = _prescription(id=999, status=status)
     module = prescription_agg_service
 
-    with patch.object(
-        module.feature_service, "has_feature", return_value=has_feature
-    ), patch.object(
-        module.prescription_check_service, "check_prescription"
-    ) as check_prescription:
+    with (
+        patch.object(module.feature_service, "has_feature", return_value=has_feature),
+        patch.object(
+            module.prescription_check_service, "check_prescription"
+        ) as check_prescription,
+    ):
         module._automatic_check(
             prescription=prescription, features=features, user_context=_user()
         )
@@ -1324,7 +1319,7 @@ def test_the_automatic_check_is_behind_a_feature_flag():
 
 
 # --------------------------------------------------------------------------
-# _log_processed_date and _set_schema
+# _log_processed_date
 # --------------------------------------------------------------------------
 
 
@@ -1341,36 +1336,3 @@ def test_log_processed_date_stamps_the_items_of_every_prescription():
     assert f"insert into {SCHEMA}.presmed_audit" in str(query)
     assert params["auditType"] == PrescriptionDrugAuditTypeEnum.PROCESSED.value
     assert params["prescriptionArray"] == [100100, 100200]
-
-
-def test_set_schema_rejects_an_unknown_schema():
-    """A bad schema name must fail loudly instead of querying the wrong tenant."""
-    module = prescription_agg_service
-    session = MagicMock()
-    session.execute.return_value = [("public",), ("demo",)]
-
-    with patch.object(module, "db"), patch.object(
-        module, "Session", return_value=session
-    ), patch.object(module, "dbSession") as db_session:
-        with pytest.raises(ValidationError) as exc:
-            module._set_schema("does_not_exist")
-
-    assert exc.value.code == "errors.invalidSchema"
-    assert exc.value.httpStatus == 400
-    db_session.setSchema.assert_not_called()
-
-
-def test_set_schema_switches_to_a_known_schema():
-    """A valid schema is handed to the session's tenant switch."""
-    module = prescription_agg_service
-    session = MagicMock()
-    session.execute.return_value = [("public",), ("demo",)]
-
-    with patch.object(module, "db"), patch.object(
-        module, "Session", return_value=session
-    ), patch.object(module, "dbSession") as db_session:
-        module._set_schema("demo")
-
-    db_session.setSchema.assert_called_once_with("demo")
-    # the probe session is not left open
-    session.close.assert_called_once()

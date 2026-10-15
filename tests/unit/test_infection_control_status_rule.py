@@ -1,10 +1,8 @@
 """Unit tests for the infection control rule (services.infection_control.infection_control_status_service).
 
 plan_rule decides, without the database, which evaluations close, which
-pending reasons open or resolve and the admission status. The same rule runs
-in the scheduled job of backend-private: the plan_rule cases here mirror the
-rule and trigger tests of its tests/test_infection_control_service.py (same
-names), so a change to the rule must keep both suites in step.
+pending reasons open or resolve and the admission status. The review save,
+the backfill and the scheduled job all apply this one copy of the rule.
 """
 
 from datetime import datetime, timedelta
@@ -186,7 +184,7 @@ class TestIsOngoing:
 
 
 class TestRule:
-    """Reasons, evaluations closed and the status (mirrors backend-private)"""
+    """Reasons, evaluations closed and the status"""
 
     def test_rule_opens_never_reviewed_and_one_reason_per_drug(self):
         """A never reviewed admission gets its own reason plus one per running drug"""
@@ -342,7 +340,7 @@ class TestRule:
 
 
 class TestTriggers:
-    """Optional reasons an evaluation opts into (mirrors backend-private)"""
+    """Optional reasons an evaluation opts into"""
 
     def test_rule_expired_evaluation_is_pending_when_watched(self):
         """A running course whose evaluation watches its expiry and is past its

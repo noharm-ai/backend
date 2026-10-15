@@ -3,7 +3,6 @@
 import json
 from datetime import date, datetime, timedelta
 
-from flask_sqlalchemy.session import Session
 from sqlalchemy import desc, text
 
 from decorators.has_permission_decorator import Permission, has_permission
@@ -15,7 +14,7 @@ from models.enums import (
     PrescriptionAuditTypeEnum,
     PrescriptionDrugAuditTypeEnum,
 )
-from models.main import User, db, dbSession
+from models.main import User, db
 from models.prescription import (
     Patient,
     Prescription,
@@ -31,7 +30,7 @@ from services import (
     segment_service,
 )
 from services.infection_control import infection_control_status_service
-from utils import logger, prescriptionutils, status
+from utils import db_utils, logger, prescriptionutils, status
 
 
 @has_permission(Permission.READ_STATIC)
@@ -40,7 +39,7 @@ def create_agg_prescription_by_prescription(
 ):
     """Creates a new prescription-day based on an individual prescription"""
 
-    _set_schema(schema)
+    db_utils.set_schema(schema)
 
     p = (
         db.session.query(Prescription)
@@ -282,7 +281,7 @@ def create_agg_prescription_by_date(
     schema, admission_number, p_date, user_context: User
 ):
     """Creates a new prescription-day based on admission number and date (most used for CPOE)"""
-    _set_schema(schema)
+    db_utils.set_schema(schema)
 
     # first look for an agg prescription
     last_prescription = prescription_repository.get_last_prescription(
@@ -440,27 +439,6 @@ def _log_processed_date(id_prescription_array, schema):
             "createdAt": datetime.today(),
         },
     )
-
-
-def _set_schema(schema):
-    db_session = Session(db)
-    result = db_session.execute(
-        text("SELECT schema_name FROM information_schema.schemata")
-    )
-
-    schemaExists = False
-    for r in result:
-        if r[0] == schema:
-            schemaExists = True
-
-    if not schemaExists:
-        raise ValidationError(
-            "Schema Inexistente", "errors.invalidSchema", status.HTTP_400_BAD_REQUEST
-        )
-
-    db_session.close()
-
-    dbSession.setSchema(schema)
 
 
 def get_last_agg_prescription(admission_number) -> Prescription:

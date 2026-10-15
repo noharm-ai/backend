@@ -5,6 +5,7 @@ from datetime import datetime
 from services import (
     prescription_agg_service,
 )
+from services.infection_control import infection_control_job_service
 from utils import logger
 from utils.static_context import execute_with_static_context
 
@@ -80,6 +81,30 @@ def atendcalc(event: dict, context: any):
 
     return execute_with_static_context(
         schema=schema, operation_func=_atendcalc_operation, params=params
+    )
+
+
+def infection_control_sync(event: dict, context: any):
+    """
+    Infection control job: apply the rule to one followed admission. Called
+    by the scheduled job in backend-private, one admission at a time
+    """
+
+    schema: str = event.get("schema", None)
+    admission_number: int = event.get("admission_number", None)
+
+    def _infection_control_sync_operation(user_context, schema, admission_number):
+        """Internal operation function for the infection control job."""
+        return infection_control_job_service.sync_followed_admission(
+            schema=schema,
+            admission_number=admission_number,
+            user_context=user_context,
+        )
+
+    params = {"schema": schema, "admission_number": admission_number}
+
+    return execute_with_static_context(
+        schema=schema, operation_func=_infection_control_sync_operation, params=params
     )
 
 
