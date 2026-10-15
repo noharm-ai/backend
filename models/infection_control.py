@@ -51,6 +51,10 @@ class AntimicrobialEvaluation(db.Model):
     id_prescription_drug = db.Column("fkpresmed", db.BigInteger, nullable=False)
     course_start = db.Column("dt_inicio_curso", db.DateTime, nullable=False)
     conforming = db.Column("conforme", db.Boolean, nullable=False)
+    # why it is not conforming (ci_motivo_nao_conformidade), None when it is
+    id_non_conformity_reason = db.Column(
+        "fkci_motivo_nao_conformidade", db.Integer, nullable=True
+    )
     notes = db.Column("observacao", db.String, nullable=True)
     posology = db.Column("posologia", postgresql.JSONB, nullable=False)
     # when the verdict starts to apply: the review, or earlier when the
@@ -65,6 +69,26 @@ class AntimicrobialEvaluation(db.Model):
     id_superseded_by = db.Column(
         "fkci_avaliacao_atm_substituta", db.BigInteger, nullable=True
     )
+
+    updated_at = db.Column("updated_at", db.DateTime, nullable=True)
+    updated_by = db.Column("updated_by", db.Integer, nullable=True)
+    created_at = db.Column("created_at", db.DateTime, nullable=False)
+    created_by = db.Column("created_by", db.Integer, nullable=False)
+
+
+class NonConformityReason(db.Model):
+    """A reason an antimicrobial can be judged not conforming in a review"""
+
+    __tablename__ = "ci_motivo_nao_conformidade"
+
+    id = db.Column(
+        "idci_motivo_nao_conformidade",
+        db.Integer,
+        primary_key=True,
+        autoincrement=True,
+    )
+    name = db.Column("nome", db.String(250), nullable=False)
+    active = db.Column("ativo", db.Boolean, nullable=False)
 
     updated_at = db.Column("updated_at", db.DateTime, nullable=True)
     updated_by = db.Column("updated_by", db.Integer, nullable=True)

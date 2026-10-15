@@ -79,6 +79,15 @@ def save_review():
     )
 
 
+@app_infection_control.route(
+    "/infection-control/non-conformity-reasons", methods=["GET"]
+)
+@api_endpoint()
+def list_non_conformity_reasons():
+    """Active reasons of non conformity, to pick from in a review"""
+    return infection_control_service.list_non_conformity_reasons()
+
+
 @app_infection_control.route("/infection-control/admissions", methods=["POST"])
 @api_endpoint()
 def list_admissions():

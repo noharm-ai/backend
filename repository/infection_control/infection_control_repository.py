@@ -16,6 +16,7 @@ from models.infection_control import (
     InfectionControlAdmission,
     InfectionControlPending,
     InfectionControlReview,
+    NonConformityReason,
 )
 from models.main import DrugAttributes, db
 from models.prescription import Patient, Prescription, PrescriptionDrug
@@ -206,6 +207,17 @@ def get_reviews(admission_number: int) -> list[InfectionControlReview]:
         .order_by(InfectionControlReview.created_at.desc())
         .all()
     )
+
+
+def get_non_conformity_reasons(
+    active_only: bool = False,
+) -> list[NonConformityReason]:
+    """The reasons of non conformity, by name"""
+    query = db.session.query(NonConformityReason)
+    if active_only:
+        query = query.filter(NonConformityReason.active == True)  # noqa: E712
+
+    return query.order_by(NonConformityReason.name).all()
 
 
 def get_backfill_candidates(since: datetime, after: int, limit: int) -> list[int]:

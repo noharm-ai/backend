@@ -206,7 +206,19 @@ def _set(table, admission_number, **values):
     session_commit()
 
 
+def _non_conformity_reason_id(name):
+    """Id of a seeded reason of non conformity"""
+    return session.execute(
+        text(
+            "SELECT idci_motivo_nao_conformidade "
+            "FROM demo.ci_motivo_nao_conformidade WHERE nome = :name"
+        ),
+        {"name": name},
+    ).scalar_one()
+
+
 def _review(client, headers, admission_number, evaluations=(), **kwargs):
+    """Save a review evaluating the given drugs, all with the same verdict"""
     payload = {
         "admissionNumber": admission_number,
         "notes": kwargs.get("notes"),
@@ -214,7 +226,8 @@ def _review(client, headers, admission_number, evaluations=(), **kwargs):
         "evaluations": [
             {
                 "idDrug": id_drug,
-                "conforming": True,
+                "conforming": kwargs.get("conforming", True),
+                "idNonConformityReason": kwargs.get("id_non_conformity_reason"),
                 "notes": "Indicação adequada",
                 "validFrom": kwargs.get("valid_from"),
                 "validUntil": kwargs.get(

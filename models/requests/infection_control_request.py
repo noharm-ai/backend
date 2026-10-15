@@ -22,6 +22,8 @@ class AntimicrobialEvaluationRequest(BaseModel):
 
     idDrug: int
     conforming: bool
+    # why it is not conforming (required then, ignored when conforming)
+    idNonConformityReason: int | None = None
     notes: str | None = None
     # the evaluation applies from this date, between the course start and now;
     # empty means from the review

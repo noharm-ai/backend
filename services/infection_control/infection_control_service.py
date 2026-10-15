@@ -64,7 +64,9 @@ def _serialize_pending(pending: InfectionControlPending) -> dict:
     }
 
 
-def _serialize_evaluation(evaluation: AntimicrobialEvaluation, names: dict) -> dict:
+def _serialize_evaluation(
+    evaluation: AntimicrobialEvaluation, names: dict, reasons: dict
+) -> dict:
     return {
         "id": str(evaluation.id),
         "idReview": str(evaluation.id_review),
@@ -72,6 +74,8 @@ def _serialize_evaluation(evaluation: AntimicrobialEvaluation, names: dict) -> d
         "idPrescription": str(evaluation.id_prescription),
         "courseStart": dateutils.to_iso(evaluation.course_start),
         "conforming": evaluation.conforming,
+        "idNonConformityReason": evaluation.id_non_conformity_reason,
+        "nonConformityReason": reasons.get(evaluation.id_non_conformity_reason),
         "notes": evaluation.notes,
         "posology": evaluation.posology,
         "validFrom": dateutils.to_iso(evaluation.valid_from),
@@ -112,6 +116,15 @@ def _get_state(
     names = user_repository.get_user_names(
         {r.created_by for r in reviews} | {e.created_by for e in evaluations}
     )
+    # inactive reasons still name the evaluations recorded with them
+    reasons = (
+        {
+            reason.id: reason.name
+            for reason in infection_control_repository.get_non_conformity_reasons()
+        }
+        if any(e.id_non_conformity_reason for e in evaluations)
+        else {}
+    )
 
     if admission_courses is None:
         admission_courses = rule.load_courses(
@@ -120,7 +133,7 @@ def _get_state(
     courses = []
     for course in admission_courses.courses:
         history = [
-            _serialize_evaluation(e, names)
+            _serialize_evaluation(e, names, reasons)
             for e in reversed(evaluations)
             if rule.evaluation_matches_course(e, course)
         ]
@@ -246,6 +259,30 @@ def _validate_review(
             status.HTTP_400_BAD_REQUEST,
         )
 
+    active_reasons = None
+    for evaluation in request_data.evaluations:
+        if evaluation.conforming:
+            continue
+        if evaluation.idNonConformityReason is None:
+            raise ValidationError(
+                "Informe o motivo da não conformidade",
+                "errors.invalidParams",
+                status.HTTP_400_BAD_REQUEST,
+            )
+        if active_reasons is None:
+            active_reasons = {
+                reason.id
+                for reason in infection_control_repository.get_non_conformity_reasons(
+                    active_only=True
+                )
+            }
+        if evaluation.idNonConformityReason not in active_reasons:
+            raise ValidationError(
+                "Motivo de não conformidade inválido",
+                "errors.invalidParams",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
     drugs = [e.idDrug for e in request_data.evaluations]
     if len(drugs) != len(set(drugs)):
         raise ValidationError(
@@ -358,6 +395,19 @@ def save_review(request_data: InfectionControlReviewRequest, user_context: User)
     )
 
     return _get_state(admission_number=admission_number, now=now)
+
+
+@has_permission(Permission.READ_INFECTION_CONTROL)
+def list_non_conformity_reasons():
+    """The active reasons a drug can be judged not conforming for in a review"""
+    _check_feature()
+
+    return [
+        {"id": reason.id, "name": reason.name}
+        for reason in infection_control_repository.get_non_conformity_reasons(
+            active_only=True
+        )
+    ]
 
 
 @has_permission(Permission.WRITE_INFECTION_CONTROL)

@@ -286,6 +286,9 @@ def record_evaluation(
     evaluation.id_prescription_drug = latest.id_prescription_drug
     evaluation.course_start = course.start
     evaluation.conforming = evaluation_data.conforming
+    evaluation.id_non_conformity_reason = (
+        None if evaluation_data.conforming else evaluation_data.idNonConformityReason
+    )
     evaluation.notes = evaluation_data.notes
     evaluation.posology = posology_snapshot(course)
     evaluation.valid_from = evaluation_data.validFrom or now

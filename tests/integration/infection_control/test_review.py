@@ -4,6 +4,7 @@ superseding, backdating and validation"""
 from datetime import datetime, timedelta
 
 import pytest
+from sqlalchemy import text
 
 from models.enums import (
     AntimicrobialEvaluationClosingEnum,
@@ -21,6 +22,7 @@ from tests.integration.infection_control.helpers import (
     REVISED,
     _day,
     _evaluations,
+    _non_conformity_reason_id,
     _open_pendings,
     _pendings,
     _prescribe,
@@ -31,6 +33,7 @@ from tests.integration.infection_control.helpers import (
     _set,
     _suspend,
 )
+from tests.conftest import session, session_commit
 from utils import status
 
 
@@ -417,3 +420,131 @@ def test_review_rejects_admission_not_followed(
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.get_json()["code"] == "errors.invalidRecord"
     assert _record(admission) is None
+
+
+@pytest.fixture
+def inactive_reason():
+    """A reason of non conformity no longer offered"""
+    id_reason = session.execute(
+        text(
+            "INSERT INTO demo.ci_motivo_nao_conformidade "
+            "(nome, ativo, created_at, created_by) "
+            "VALUES ('Motivo desativado', false, now(), 1) "
+            "RETURNING idci_motivo_nao_conformidade"
+        )
+    ).scalar_one()
+    session_commit()
+
+    yield id_reason
+
+    session.execute(
+        text(
+            "DELETE FROM demo.ci_motivo_nao_conformidade "
+            "WHERE idci_motivo_nao_conformidade = :id"
+        ),
+        {"id": id_reason},
+    )
+    session_commit()
+
+
+def test_non_conformity_reasons_lists_active_ones(
+    client, infection_controller_headers, infection_control, inactive_reason
+):
+    """The reasons offered in a review: the active ones, by name"""
+    response = client.get(
+        "/infection-control/non-conformity-reasons",
+        headers=infection_controller_headers,
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.get_json()
+    reasons = response.get_json()["data"]
+    names = [reason["name"] for reason in reasons]
+    assert "Dose inadequada" in names
+    assert "Motivo desativado" not in names
+    assert names == sorted(names)
+    assert inactive_reason not in [reason["id"] for reason in reasons]
+
+
+def test_non_conformity_reasons_requires_feature(client, infection_controller_headers):
+    """400 when the schema does not have the feature"""
+    response = client.get(
+        "/infection-control/non-conformity-reasons",
+        headers=infection_controller_headers,
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.get_json()["code"] == "errors.businessRules"
+
+
+def test_non_conforming_evaluation_records_its_reason(
+    client, infection_controller_headers, infection_control, admission
+):
+    """A drug judged not conforming keeps the reason chosen"""
+    _prescribe_today(admission)
+    id_reason = _non_conformity_reason_id("Dose inadequada")
+
+    response = _review(
+        client,
+        infection_controller_headers,
+        admission,
+        evaluations=[ANTIMICROBIAL_DRUG],
+        conforming=False,
+        id_non_conformity_reason=id_reason,
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.get_json()
+    evaluation = response.get_json()["data"]["courses"][0]["evaluation"]
+    assert evaluation["conforming"] is False
+    assert evaluation["idNonConformityReason"] == id_reason
+    assert evaluation["nonConformityReason"] == "Dose inadequada"
+    assert _evaluations(admission)[0]["fkci_motivo_nao_conformidade"] == id_reason
+
+
+def test_conforming_evaluation_has_no_reason(
+    client, infection_controller_headers, infection_control, admission
+):
+    """A reason sent with a conforming verdict is not recorded"""
+    _prescribe_today(admission)
+
+    response = _review(
+        client,
+        infection_controller_headers,
+        admission,
+        evaluations=[ANTIMICROBIAL_DRUG],
+        id_non_conformity_reason=_non_conformity_reason_id("Dose inadequada"),
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.get_json()
+    evaluation = response.get_json()["data"]["courses"][0]["evaluation"]
+    assert evaluation["idNonConformityReason"] is None
+    assert evaluation["nonConformityReason"] is None
+    assert _evaluations(admission)[0]["fkci_motivo_nao_conformidade"] is None
+
+
+@pytest.mark.parametrize("reason", ["missing", "inactive", "unknown"])
+def test_review_rejects_non_conformity_without_valid_reason(
+    client,
+    infection_controller_headers,
+    infection_control,
+    admission,
+    inactive_reason,
+    reason,
+):
+    """A non conformity needs an active reason"""
+    _prescribe_today(admission)
+    id_reason = {"missing": None, "inactive": inactive_reason, "unknown": 999999}[
+        reason
+    ]
+
+    response = _review(
+        client,
+        infection_controller_headers,
+        admission,
+        evaluations=[ANTIMICROBIAL_DRUG],
+        conforming=False,
+        id_non_conformity_reason=id_reason,
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.get_json()["code"] == "errors.invalidParams"
+    assert _evaluations(admission) == []
