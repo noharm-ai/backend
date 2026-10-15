@@ -17,7 +17,7 @@ from models.requests.protocol_request import (
     ProtocolUpsertRequest,
 )
 from repository import protocol_repository
-from utils import dateutils, status
+from utils import contains_expression, dateutils, status
 from utils.alert_protocol import AlertProtocol
 
 
@@ -237,6 +237,8 @@ def _validate_variables(variables: list[dict], protocol_type: int):
                         status.HTTP_400_BAD_REQUEST,
                     )
 
+            _validate_contains_expression(name=name, value=var.get("observation"))
+
         else:
             # 0 is a legitimate threshold, not an empty field: comparing an exam
             # to "> 0" is how the absence of a result is expressed (the trigger
@@ -269,6 +271,22 @@ def _validate_variables(variables: list[dict], protocol_type: int):
                     "errors.businessRules",
                     status.HTTP_400_BAD_REQUEST,
                 )
+
+            if operator == "CONTAINS":
+                _validate_contains_expression(name=name, value=value)
+
+
+def _validate_contains_expression(name: str, value):
+    """Rejects CONTAINS expressions with a blank term (ex.: 'ml/min & ')"""
+
+    if contains_expression.has_empty_term(value):
+        raise ValidationError(
+            f"Variável {name}: Texto inválido. Use & para exigir todos os textos "
+            "e | para qualquer um deles, sem deixar termos vazios "
+            "(ex.: ml/min & gotejo)",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
 
 
 def _test_protocol(protocol: dict):

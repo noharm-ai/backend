@@ -10,7 +10,7 @@ from models.enums import DrugTypeEnum
 from models.main import DrugAttributes, Substance
 from models.prescription import Patient, Prescription, PrescriptionDrug
 from services import culture_service
-from utils import prescriptionutils
+from utils import contains_expression, prescriptionutils
 from utils.alert_protocol_trace import (
     CombinationCriterionTrace,
     CombinationDrugTrace,
@@ -204,6 +204,11 @@ class AlertProtocol:
             self._current_trace.reason = TraceReasonEnum.COMPARED.value
             self._current_trace.actual_value = value1
             self._current_trace.details.update(details)
+
+            if op == "CONTAINS" and value2 is not None:
+                self._current_trace.details["missing"] = (
+                    contains_expression.missing_terms(text=value1, value=value2)
+                )
 
             if op in ("IN", "NOTIN", "NOT IN"):
                 try:
@@ -895,10 +900,7 @@ class AlertProtocol:
         if op == "NOTIN":
             return len(set.intersection(set(value1), set(value2))) == 0
         if op == "CONTAINS":
-            if value1 is None or value2 is None:
-                return False
-
-            return str(value2).lower() in str(value1).lower()
+            return contains_expression.matches(text=value1, value=value2)
 
         raise NotImplementedError(f"operator not supported: {op}")
 
