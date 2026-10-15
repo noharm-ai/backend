@@ -3,9 +3,38 @@
 import logging
 import time
 
+from flask_sqlalchemy.session import Session
+from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 
+from exception.validation_error import ValidationError
+from models.main import db, dbSession
+from utils import status
+
 logger = logging.getLogger("noharm.backend")
+
+
+def set_schema(schema: str):
+    """
+    Point the session at a tenant schema, after checking that it exists.
+
+    Static entries take the schema from the event, so an unknown one must fail
+    instead of querying the wrong tenant. The check runs in its own session and
+    leaves the session's connection to the schema_translate_map.
+    """
+    probe_session = Session(db)
+    result = probe_session.execute(
+        text("SELECT schema_name FROM information_schema.schemata")
+    )
+    schema_exists = any(r[0] == schema for r in result)
+    probe_session.close()
+
+    if not schema_exists:
+        raise ValidationError(
+            "Schema Inexistente", "errors.invalidSchema", status.HTTP_400_BAD_REQUEST
+        )
+
+    dbSession.setSchema(schema)
 
 
 def run_with_deadlock_retry(fn, max_retries=3, base_delay=0.1, on_retry=None):

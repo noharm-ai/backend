@@ -1,10 +1,8 @@
 """Unit tests for the infection control rule (services.infection_control.infection_control_status_service).
 
 plan_rule decides, without the database, which evaluations close, which
-pending reasons open or resolve and the admission status. The same rule runs
-in the scheduled job of backend-private: the plan_rule cases here mirror the
-rule and trigger tests of its tests/test_infection_control_service.py (same
-names), so a change to the rule must keep both suites in step.
+pending reasons open or resolve and the admission status. The review save,
+the backfill and the scheduled job all apply this one copy of the rule.
 """
 
 from datetime import datetime, timedelta
@@ -60,6 +58,10 @@ def _row(id_drug=1, date=None, expire=None, suspended_date=None, cpoe=False, **k
         daily_frequency=kwargs.get("daily_frequency", 3.0),
         route=kwargs.get("route", "EV"),
         period_total=None,
+        id_measure_unit=kwargs.get("measure_unit", "g"),
+        default_measure_unit=None,
+        use_weight=None,
+        notes=None,
     )
 
 
@@ -182,7 +184,7 @@ class TestIsOngoing:
 
 
 class TestRule:
-    """Reasons, evaluations closed and the status (mirrors backend-private)"""
+    """Reasons, evaluations closed and the status"""
 
     def test_rule_opens_never_reviewed_and_one_reason_per_drug(self):
         """A never reviewed admission gets its own reason plus one per running drug"""
@@ -338,7 +340,7 @@ class TestRule:
 
 
 class TestTriggers:
-    """Optional reasons an evaluation opts into (mirrors backend-private)"""
+    """Optional reasons an evaluation opts into"""
 
     def test_rule_expired_evaluation_is_pending_when_watched(self):
         """A running course whose evaluation watches its expiry and is past its
@@ -361,6 +363,45 @@ class TestTriggers:
         assert watched.status == Status.PENDING
         assert unwatched.open_pendings == []
         assert unwatched.status == Status.REVISED
+
+    def test_rule_expired_evaluation_covering_the_ended_course_is_not_pending(self):
+        """A course whose last order ended is kept in the gap tolerance: an
+        evaluation valid past the order's end has not expired for it"""
+        (course,) = _courses(
+            _row(
+                date=NOW - timedelta(days=10),
+                expire=NOW - timedelta(hours=12),
+                cpoe=True,
+            )
+        )
+        valid_until = NOW - timedelta(hours=1)
+
+        plan = _plan(
+            course,
+            _evaluation(
+                50, 1, course.start, valid_until=valid_until, triggers=EXPIRED_TRIGGER
+            ),
+        )
+
+        assert rule.is_ongoing(course, NOW)
+        assert plan.open_pendings == []
+        assert plan.close_evaluations == []
+        assert plan.status == Status.REVISED
+
+    def test_rule_expired_evaluation_is_pending_when_the_course_runs_past_it(self):
+        """A new order continuing the course past the validity expires it"""
+        course = _prescribed(_yesterday(), _today())
+        valid_until = NOW - timedelta(hours=8)
+
+        plan = _plan(
+            course,
+            _evaluation(
+                50, 1, course.start, valid_until=valid_until, triggers=EXPIRED_TRIGGER
+            ),
+        )
+
+        assert _reasons(plan) == [PendingType.EXPIRED]
+        assert plan.status == Status.PENDING
 
     def test_rule_posology_change_is_pending_when_watched(self):
         """A new dose opens a reason only for an evaluation that watches the posology"""

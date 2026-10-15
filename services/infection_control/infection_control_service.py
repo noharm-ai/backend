@@ -8,6 +8,7 @@ infection_control_status_service; this service records the reviews and serves
 the follow-up data.
 """
 
+import json
 from datetime import datetime
 
 from decorators.has_permission_decorator import Permission, has_permission
@@ -32,9 +33,12 @@ from models.requests.infection_control_request import (
 from repository import user_repository
 from repository.infection_control import infection_control_repository
 from services import feature_service
-from services.infection_control import infection_control_status_service as rule
+from services.infection_control import (
+    antimicrobial_timeline_service,
+    infection_control_status_service as rule,
+)
 from services.infection_control.antimicrobial_timeline_service import GAP_TOLERANCE
-from utils import dateutils, status
+from utils import dateutils, logger, status
 
 
 def _check_feature():
@@ -81,12 +85,17 @@ def _serialize_evaluation(evaluation: AntimicrobialEvaluation, names: dict) -> d
     }
 
 
-def _get_state(admission_number: int, now: datetime) -> dict:
+def _get_state(
+    admission_number: int,
+    now: datetime,
+    admission_courses: rule.AdmissionCourses | None = None,
+) -> dict:
     """The follow-up of an admission: status, open reasons, reviews and the
     evaluations of each antimicrobial course.
 
     Courses are listed by drug and start, the same key the antimicrobial
-    timeline uses, so the page can place each evaluation on its course.
+    timeline uses, so the page can place each evaluation on its course. The
+    page passes the courses it already loaded for the timeline.
     """
     admission = infection_control_repository.get_admission(
         admission_number=admission_number
@@ -104,7 +113,10 @@ def _get_state(admission_number: int, now: datetime) -> dict:
         {r.created_by for r in reviews} | {e.created_by for e in evaluations}
     )
 
-    admission_courses = rule.load_courses(admission_number=admission_number, now=now)
+    if admission_courses is None:
+        admission_courses = rule.load_courses(
+            admission_number=admission_number, now=now
+        )
     courses = []
     for course in admission_courses.courses:
         history = [
@@ -157,13 +169,69 @@ def _get_state(admission_number: int, now: datetime) -> dict:
     }
 
 
-@has_permission(Permission.READ_PRESCRIPTION)
-def get_admission_state(admission_number: int):
-    """Infection control follow-up of an admission"""
+def _get_follow_up(
+    admission_number: int,
+    now: datetime,
+    admission_courses: rule.AdmissionCourses | None = None,
+) -> dict:
     if not feature_service.has_feature(FeatureEnum.INFECTION_CONTROL):
         return {"enabled": False, "admissionNumber": admission_number}
 
-    return _get_state(admission_number=admission_number, now=datetime.now())
+    return _get_state(
+        admission_number=admission_number,
+        now=now,
+        admission_courses=admission_courses,
+    )
+
+
+@has_permission(Permission.READ_PRESCRIPTION)
+def get_admission_state(admission_number: int):
+    """Infection control follow-up of an admission"""
+    return _get_follow_up(admission_number=admission_number, now=datetime.now())
+
+
+@has_permission(Permission.READ_PRESCRIPTION)
+def get_admission_view(admission_number: int, user_context: User):
+    """The infection control page of an admission: the antimicrobial timeline
+    and its follow-up, built from the same courses judged at the same time.
+
+    The follow-up runs last, in a savepoint, and never raises: the timeline is
+    shown without it (followUp None) and the page offers to load it again.
+    """
+    now = datetime.now()
+    admission_courses = rule.load_courses(admission_number=admission_number, now=now)
+    timeline = antimicrobial_timeline_service.get_timeline(
+        admission_number=admission_number,
+        courses=admission_courses.courses,
+        now=now,
+        user_context=user_context,
+    )
+
+    try:
+        with db.session.begin_nested():
+            follow_up = _get_follow_up(
+                admission_number=admission_number,
+                now=now,
+                admission_courses=admission_courses,
+            )
+    except Exception as e:  # noqa: BLE001 - the timeline is shown without it
+        logger.backend_logger.exception(str(e))
+        # the event the endpoint errors log, which is the one monitored
+        logger.backend_logger.warning(
+            json.dumps(
+                {
+                    "event": "backend_exception",
+                    "path": "infection_control_service.get_admission_view",
+                    "schema": user_context.schema,
+                    "user": user_context.id,
+                    "message": str(e),
+                    "admission_number": admission_number,
+                }
+            )
+        )
+        follow_up = None
+
+    return {**timeline, "followUp": follow_up}
 
 
 def _validate_review(

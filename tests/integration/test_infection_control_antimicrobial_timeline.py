@@ -1,13 +1,16 @@
 """Tests: GET /infection-control/antimicrobial-timeline/<admission_number>
 
 The endpoint returns the patient header and the antimicrobial courses of one
-admission. The grouping rules are covered by tests/unit/test_infection_control_antimicrobial_timeline.py;
+admission (and its follow-up, covered by tests/integration/infection_control). The grouping rules are covered by tests/unit/test_infection_control_antimicrobial_timeline.py;
 here we pin down what reaches the grouping:
 
 * only drugs flagged ``antimicro`` on the item's segment are listed;
 * aggregated and conciliation prescriptions are ignored (they repeat the real
   prescriptions or are not a treatment at all);
-* daily prescriptions (segment 1) and CPOE orders (segment 2) both become courses.
+* daily prescriptions (segment 1) and CPOE orders (segment 2) both become courses;
+* each course carries the alerts the screening raises for it, read from the
+  prescription the screening shows now (the latest prescription-day, or the
+  latest prescription without one).
 
 Seed data used (demo schema): drug 1 (AMPICILINA + SULBACTAM) is antimicrobial
 on segment 1, drug 4 (BISACODIL) is not. Segment 2 is the CPOE segment; the
@@ -103,6 +106,57 @@ def cpoe_antimicrobial():
     session_commit()
 
 
+@pytest.fixture
+def max_dose():
+    """An alert dose for the antimicrobial drug below the dose the tests
+    prescribe (2), so the screening raises a max dose alert for it"""
+    session.execute(
+        text(
+            "UPDATE demo.medatributos SET dosemaxima = 1 "
+            "WHERE fkmedicamento = :id_drug AND idsegmento = :id_segment"
+        ),
+        {"id_drug": ANTIMICROBIAL_DRUG, "id_segment": ADULT_SEGMENT},
+    )
+    session_commit()
+
+    yield
+
+    session.execute(
+        text(
+            "UPDATE demo.medatributos SET dosemaxima = NULL "
+            "WHERE fkmedicamento = :id_drug AND idsegmento = :id_segment"
+        ),
+        {"id_drug": ANTIMICROBIAL_DRUG, "id_segment": ADULT_SEGMENT},
+    )
+    session_commit()
+
+
+def _aggregate(admission_number, day):
+    """The prescription-day of an admission (aggregated prescription), which
+    holds no item of its own"""
+    id_prescription = _next_prescription_id()
+    create_prescription(
+        id=id_prescription,
+        admissionNumber=admission_number,
+        idPatient=PATIENT_ID,
+        idSegment=ADULT_SEGMENT,
+        idDepartment=DEPARTMENT_BY_SEGMENT[ADULT_SEGMENT],
+        date=day.replace(hour=0),
+        expire=day.replace(hour=23, minute=59),
+        agg=True,
+    )
+    return id_prescription
+
+
+def _drug_alerts(view, id_prescription_drug):
+    """The alerts the prescription view lists for one prescribed item"""
+    for item in view["prescription"] + view["solution"] + view["procedures"]:
+        if item["idPrescriptionDrug"] == str(id_prescription_drug):
+            return item["alertsComplete"]
+
+    raise AssertionError(f"item {id_prescription_drug} is not in the prescription")
+
+
 def _prescribe(
     admission_number,
     date,
@@ -177,6 +231,32 @@ def test_admission_without_antimicrobials(client, analyst_headers, admission):
     assert data["patient"]["segment"] == "Segmento Adulto"
 
 
+def test_exams_of_the_latest_prescription(client, analyst_headers, admission):
+    """The exam card is the one the prescription view carries for the latest
+    prescription of the admission"""
+    _prescribe(admission, _day(-2), _day(-1))
+    last = _prescribe(admission, _day(-1), _day(0), id_drug=OTHER_DRUG)
+
+    data = client.get(_url(admission), headers=analyst_headers).get_json()["data"]
+    view = client.get(f"/prescriptions/{last}", headers=analyst_headers).get_json()[
+        "data"
+    ]
+
+    assert data["patient"]["idPrescription"] == str(last)
+    assert data["exams"] == view["exams"]
+    assert data["alertExams"] == view["alertExams"]
+
+
+def test_exams_without_prescription(client, analyst_headers, admission):
+    """With no prescription there is no segment to read the exam references
+    from: the card is empty"""
+    data = client.get(_url(admission), headers=analyst_headers).get_json()["data"]
+
+    assert data["patient"]["idPrescription"] is None
+    assert data["exams"] == []
+    assert data["alertExams"] == 0
+
+
 def test_daily_prescriptions_become_one_course(client, analyst_headers, admission):
     """Three daily prescriptions up to today make one active course on D3"""
     for offset in (-2, -1, 0):
@@ -233,3 +313,64 @@ def test_cpoe_order(client, analyst_headers, admission, cpoe_antimicrobial):
     assert course["plannedEnd"] == _day(4).isoformat()
     assert course["plannedDays"] == 7
     assert course["days"] == 2
+
+
+def test_course_alerts_are_the_screening_alerts(
+    client, analyst_headers, admission, max_dose
+):
+    """The current course lists the alerts the screening raises for its item"""
+    last = _prescribe(admission, _day(0), _day(1))
+
+    data = client.get(_url(admission), headers=analyst_headers).get_json()["data"]
+    view = client.get(f"/prescriptions/{last}", headers=analyst_headers).get_json()[
+        "data"
+    ]
+
+    assert data["screeningPrescription"]["idPrescription"] == str(last)
+    assert data["screeningPrescription"]["agg"] is False
+
+    course = data["courses"][0]
+    screening_alerts = _drug_alerts(view, f"{last}001")
+    assert [a["type"] for a in course["alerts"]] == ["maxDose"]
+    assert course["alerts"] == screening_alerts
+    assert course["alerts"][0]["level"] == "high"
+
+
+def test_past_course_has_no_alerts(client, analyst_headers, admission, max_dose):
+    """A course that is not in the screening prescription has no alert: the
+    alerts are about what is prescribed now"""
+    _prescribe(admission, _day(-6), _day(-5))
+    _prescribe(admission, _day(0), _day(1), id_drug=OTHER_DRUG)
+
+    data = client.get(_url(admission), headers=analyst_headers).get_json()["data"]
+
+    assert len(data["courses"]) == 1
+    assert data["courses"][0]["alerts"] == []
+    assert data["courses"][0]["idSubstance"] is None
+
+
+def test_alerts_of_the_prescription_day(client, analyst_headers, admission, max_dose):
+    """With a prescription-day as recent as the latest prescription, the
+    alerts (and the exams) are read from it, as the screening shows it"""
+    _prescribe(admission, _day(0), _day(1))
+    agg = _aggregate(admission, _day(0))
+
+    data = client.get(_url(admission), headers=analyst_headers).get_json()["data"]
+
+    assert data["screeningPrescription"]["idPrescription"] == str(agg)
+    assert data["screeningPrescription"]["agg"] is True
+    assert [a["type"] for a in data["courses"][0]["alerts"]] == ["maxDose"]
+
+
+def test_stale_prescription_day_is_ignored(
+    client, analyst_headers, admission, max_dose
+):
+    """A prescription-day older than the latest prescription is not what the
+    screening shows now: the latest prescription is read instead"""
+    _aggregate(admission, _day(-4))
+    last = _prescribe(admission, _day(0), _day(1))
+
+    data = client.get(_url(admission), headers=analyst_headers).get_json()["data"]
+
+    assert data["screeningPrescription"]["idPrescription"] == str(last)
+    assert [a["type"] for a in data["courses"][0]["alerts"]] == ["maxDose"]

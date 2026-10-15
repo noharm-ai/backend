@@ -349,3 +349,74 @@ def get_prescription_item_period(
         total_period = numberutils.none2zero(item_period)
 
     return period, total_period
+
+
+# frequency codes that are not a number of doses a day (SN, ACM, ...)
+_NON_DAILY_FREQUENCIES = [33, 44, 55, 66, 99]
+
+
+def get_dose_per_weight(
+    dose,
+    weight,
+    frequency,
+    unit: str | None,
+    default_unit: str | None = None,
+    doseconv=None,
+    use_weight: bool = False,
+    unit_label: str | None = None,
+) -> dict:
+    """The dose per Kg and per Kg a day, as the screening shows them
+    ("2,00 mg/Kg"), followed by the dose in the drug's default unit when it
+    is prescribed in another one ("ou 2,00 mg/Kg").
+
+    `unit` is the prescribed measure unit id, `unit_label` how to show it
+    (the id when not given). Every value is None without a dose or a weight.
+    """
+    result = {
+        "doseWeight": None,
+        "doseWeightValue": None,
+        "doseWeightDay": None,
+        "doseWeightDayValue": None,
+    }
+
+    weight = numberutils.none2zero(weight)
+    if not dose or weight <= 0:
+        return result
+
+    unit_label = unit_label if unit_label is not None else unit
+    dose_per_kg = dose / float(weight)
+    frequency = numberutils.none2zero(frequency)
+
+    has_conv = (
+        default_unit is not None and default_unit != unit and doseconv is not None
+    )
+    conv_per_kg = None
+    if has_conv:
+        conv_per_kg = doseconv if use_weight else round(doseconv / float(weight), 2)
+
+    for multiplier, suffix, key in [
+        (1, "/Kg", "doseWeight"),
+        (frequency, "/Kg/Dia", "doseWeightDay"),
+    ]:
+        if multiplier <= 0:
+            continue
+
+        if multiplier in _NON_DAILY_FREQUENCIES:
+            continue
+
+        value = stringutils.strFormatBR(round(dose_per_kg * multiplier, 2))
+        text = f"{value} {unit_label}{suffix}"
+
+        if has_conv:
+            conv_value = stringutils.strFormatBR(
+                round(conv_per_kg * multiplier, 2)
+                if not use_weight
+                else conv_per_kg * multiplier
+            )
+            conv_suffix = " (faixa arredondada)" if use_weight else ""
+            text += f" ou {conv_value} {default_unit}{suffix}{conv_suffix}"
+
+        result[f"{key}Value"] = value
+        result[key] = text
+
+    return result

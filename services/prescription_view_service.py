@@ -113,6 +113,99 @@ def route_get_prescription_cultures(id_prescription: int, user_context: User = N
     return culture_service.to_card(cultures)
 
 
+def get_exams(prescription: Prescription, patient: Patient, user_context: User):
+    """The exams the prescription view reads, for the screens that need them
+    without loading the whole prescription (infection control): every latest
+    exam keyed by type (exams), the card (exams_card) and how many of the
+    card are out of range (alerts)
+    """
+
+    return _get_exams(
+        patient=patient,
+        prescription=prescription,
+        config_data=_get_patient_configs(patient=patient),
+        is_complete=True,
+        user_context=user_context,
+    )
+
+
+def get_drug_alerts(
+    prescription: Prescription,
+    patient: Patient,
+    segment: Segment | None,
+    exam_data: dict,
+    user_context: User,
+) -> dict:
+    """The alerts the screening raises for each drug of a prescription, for
+    the screens that need them without loading the whole prescription
+    (infection control).
+
+    They come from the same pipeline the prescription view runs (_get_alerts),
+    over the same drug list, so both screens raise the same alerts. exam_data
+    is what get_exams returned for this prescription.
+
+    Keyed by idPrescriptionDrug: the drug, its substance and its alerts, the
+    interactions first and then the drug alerts (the order the screening
+    lists them in, utils/drug_list.py).
+    """
+
+    config_data = _get_configs(
+        prescription=prescription, patient=patient, is_complete=False
+    )
+
+    # the alerts only read the clinical notes counters (cn_stats)
+    cn_data = _get_clinical_notes_stats(
+        prescription=prescription,
+        patient=patient,
+        config_data=config_data,
+        is_complete=False,
+        user_context=user_context,
+    )
+
+    drug_list = _get_drug_list(
+        prescription=prescription,
+        patient=patient,
+        config_data=config_data,
+        user_context=user_context,
+    )
+
+    culture_data = alert_service.flag_prescribed_cultures(
+        cultures=_get_cultures(patient=patient, user_context=user_context),
+        drug_list=drug_list,
+    )
+
+    alerts_data = _get_alerts(
+        prescription=prescription,
+        drug_list=drug_list,
+        patient=patient,
+        config_data=config_data,
+        exam_data=exam_data,
+        cn_data=cn_data,
+        user_context=user_context,
+        segment=segment,
+        culture_data=culture_data,
+    )
+
+    relations = alerts_data["relations"]["alerts"] or {}
+    alerts = alerts_data["alerts"]["alerts"] or {}
+
+    drug_alerts = {}
+    for item in drug_list:
+        prescription_drug = item[0]
+        drug = item[1]
+        key = str(prescription_drug.id)
+
+        drug_alerts[key] = {
+            "idDrug": prescription_drug.idDrug,
+            "idSubstance": (
+                str(drug.sctid) if drug is not None and drug.sctid else None
+            ),
+            "alerts": relations.get(key, []) + alerts.get(key, []),
+        }
+
+    return drug_alerts
+
+
 def _internal_get_prescription(
     id_prescription: int,
     user_context: User,
@@ -404,6 +497,36 @@ def _get_prescription_data(
     return prescription, patient, department, segment, prescription_user, icd
 
 
+def _get_patient_configs(patient: Patient) -> dict:
+    """Weight, height and age of the patient, the weight falling back to an
+    earlier admission when this one has none"""
+    data = {}
+    data["weight"] = patient.weight if patient.weight else None
+    data["weight_date"] = patient.weightDate if patient.weightDate else None
+    data["height"] = patient.height if patient.height else None
+    data["age"] = dateutils.data2age(
+        patient.birthdate.isoformat() if patient.birthdate else date.today().isoformat()
+    )
+
+    if data["weight"] == None:
+        patient_previous_data = patient_service.get_patient_weight(patient.idPatient)
+
+        if patient_previous_data != None:
+            data["weight"] = (
+                patient_previous_data.weight if patient_previous_data.weight else None
+            )
+            data["weight_date"] = (
+                patient_previous_data.weightDate
+                if patient_previous_data.weightDate
+                else None
+            )
+            data["height"] = (
+                patient_previous_data.height if patient_previous_data.height else None
+            )
+
+    return data
+
+
 def _get_segment_configs(prescription: Prescription) -> dict:
     is_cpoe = segment_service.is_cpoe(id_segment=prescription.idSegment)
 
@@ -463,29 +586,7 @@ def _get_configs(prescription: Prescription, patient: Patient, is_complete: bool
         _get_segment_configs(prescription=prescription),
     )
 
-    # patient data
-    data["weight"] = patient.weight if patient.weight else None
-    data["weight_date"] = patient.weightDate if patient.weightDate else None
-    data["height"] = patient.height if patient.height else None
-    data["age"] = dateutils.data2age(
-        patient.birthdate.isoformat() if patient.birthdate else date.today().isoformat()
-    )
-
-    if data["weight"] == None:
-        patient_previous_data = patient_service.get_patient_weight(patient.idPatient)
-
-        if patient_previous_data != None:
-            data["weight"] = (
-                patient_previous_data.weight if patient_previous_data.weight else None
-            )
-            data["weight_date"] = (
-                patient_previous_data.weightDate
-                if patient_previous_data.weightDate
-                else None
-            )
-            data["height"] = (
-                patient_previous_data.height if patient_previous_data.height else None
-            )
+    data.update(_get_patient_configs(patient=patient))
 
     # previous admissions
     data["previous_admissions"] = patient_repository.get_previous_admissions(

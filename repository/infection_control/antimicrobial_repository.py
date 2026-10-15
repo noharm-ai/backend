@@ -34,6 +34,7 @@ def get_admission_antimicrobials(admission_number: int):
             PrescriptionDrug.route,
             PrescriptionDrug.suspendedDate.label("suspended_date"),
             PrescriptionDrug.period_total,
+            PrescriptionDrug.notes,
             Prescription.id.label("id_prescription"),
             Prescription.date,
             Prescription.expire,
@@ -44,6 +45,10 @@ def get_admission_antimicrobials(admission_number: int):
             Substance.atb_level,
             MeasureUnit.description.label("measure_unit"),
             Frequency.description.label("frequency"),
+            # to tell the dose per weight in the drug's default unit
+            PrescriptionDrug.idMeasureUnit.label("id_measure_unit"),
+            DrugAttributes.idMeasureUnit.label("default_measure_unit"),
+            DrugAttributes.useWeight.label("use_weight"),
         )
         .join(Prescription, Prescription.id == PrescriptionDrug.idPrescription)
         .join(
@@ -103,3 +108,25 @@ def get_last_prescription(admission_number: int):
         .order_by(Prescription.date.desc())
         .first()
     )
+
+
+def get_last_agg_prescription(admission_number: int):
+    """The latest aggregated prescription (prescription-day) of an admission,
+    or None when the admission has none"""
+    return (
+        db.session.query(Prescription)
+        .filter(Prescription.admissionNumber == admission_number)
+        .filter(Prescription.agg == True)
+        .filter(Prescription.concilia == None)
+        .filter(Prescription.idSegment != None)
+        .order_by(Prescription.date.desc())
+        .first()
+    )
+
+
+def get_segment(id_segment: int | None) -> Segment | None:
+    """A segment by id, or None"""
+    if id_segment is None:
+        return None
+
+    return db.session.query(Segment).filter(Segment.id == id_segment).first()

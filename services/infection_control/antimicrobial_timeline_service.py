@@ -19,13 +19,14 @@ import math
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
-from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
+from models.enums import DrugAlertLevelEnum
+from models.main import User
 from models.prescription import Patient
 from repository import patient_repository
 from repository.infection_control import antimicrobial_repository
-from services import patient_service
-from utils import dateutils, status
+from services import patient_service, prescription_view_service
+from utils import dateutils, prescriptionutils, status
 
 ONE_DAY = timedelta(days=1)
 # breaks shorter than this are just prescription timing, not a gap in the treatment
@@ -36,6 +37,13 @@ GAP_TOLERANCE = timedelta(hours=36)
 STATUS_ACTIVE = "active"
 STATUS_SUSPENDED = "suspended"
 STATUS_FINISHED = "finished"
+
+# the screening alerts of a course are listed most severe first
+ALERT_LEVEL_ORDER = {
+    DrugAlertLevelEnum.HIGH.value: 0,
+    DrugAlertLevelEnum.MEDIUM.value: 1,
+    DrugAlertLevelEnum.LOW.value: 2,
+}
 
 
 @dataclass
@@ -65,6 +73,12 @@ class TimelineItem:
     # change apart from a different way of writing the same one
     doseconv: float | None = None
     daily_frequency: float | None = None
+    # prescribed and default measure unit ids, for the dose per weight
+    id_measure_unit: str | None = None
+    default_measure_unit: str | None = None
+    use_weight: bool = False
+    # the observation written on the prescribed item (complemento)
+    notes: str | None = None
 
 
 @dataclass
@@ -121,6 +135,10 @@ def build_item(row, now: datetime) -> TimelineItem:
         period_total=row.period_total,
         doseconv=row.doseconv,
         daily_frequency=row.daily_frequency,
+        id_measure_unit=row.id_measure_unit,
+        default_measure_unit=row.default_measure_unit,
+        use_weight=bool(row.use_weight),
+        notes=row.notes,
     )
 
 
@@ -177,16 +195,23 @@ def _planned_end(course: Course) -> datetime | None:
     return None
 
 
-def _regimens(course: Course) -> list[dict]:
-    """Consecutive items with the same dose, frequency and route, merged"""
+def _regimens(course: Course, weight: float | None = None) -> list[dict]:
+    """Consecutive items with the same dose, frequency and route, merged.
+
+    The notes are not part of the posology: daily prescribers rewrite them
+    every day ("D3 de 7"), so a regimen shows the notes of its latest item.
+    """
     regimens = []
     for item in course.items:
         key = (item.dose, item.measure_unit, item.frequency, item.route)
         if regimens and regimens[-1]["key"] == key:
             regimens[-1]["end"] = max(regimens[-1]["end"], item.end)
+            regimens[-1]["latest"] = item
             continue
 
-        regimens.append({"key": key, "start": item.start, "end": item.end})
+        regimens.append(
+            {"key": key, "start": item.start, "end": item.end, "latest": item}
+        )
 
     return [
         {
@@ -196,15 +221,40 @@ def _regimens(course: Course) -> list[dict]:
             "measureUnit": r["key"][1],
             "frequency": r["key"][2],
             "route": r["key"][3],
+            "notes": r["latest"].notes,
+            **_dose_per_weight(r["latest"], weight),
         }
         for r in regimens
     ]
 
 
+def _dose_per_weight(item: TimelineItem, weight: float | None) -> dict:
+    """The dose per Kg and per Kg a day of an item, as the screening shows them"""
+    dose_weight = prescriptionutils.get_dose_per_weight(
+        dose=item.dose,
+        weight=weight,
+        frequency=item.daily_frequency,
+        unit=item.id_measure_unit,
+        default_unit=item.default_measure_unit,
+        doseconv=item.doseconv,
+        use_weight=item.use_weight,
+        unit_label=item.measure_unit or item.id_measure_unit,
+    )
+
+    return {
+        "doseWeight": dose_weight["doseWeight"],
+        "doseWeightDay": dose_weight["doseWeightDay"],
+    }
+
+
 def serialize_course(
-    course: Course, now: datetime, discharge_date: datetime | None = None
+    course: Course,
+    now: datetime,
+    discharge_date: datetime | None = None,
+    weight: float | None = None,
 ) -> dict:
-    """The course as the timeline shows it, judged at `now`"""
+    """The course as the timeline shows it, judged at `now`; the patient
+    weight gives the dose per Kg of its regimens"""
     end = course.end
     if discharge_date is not None and end > discharge_date:
         end = max(discharge_date, course.start)
@@ -236,7 +286,7 @@ def serialize_course(
         "days": _days(course.start, min(now, end)),
         "lastIdPrescription": str(latest.id_prescription),
         "prescriptionCount": len({i.id_prescription for i in course.items}),
-        "regimens": _regimens(course),
+        "regimens": _regimens(course, weight=weight),
         "gaps": [
             {"start": dateutils.to_iso(g["start"]), "end": dateutils.to_iso(g["end"])}
             for g in course.gaps
@@ -280,9 +330,99 @@ def _get_patient_data(patient: Patient | None, last_prescription) -> dict:
     }
 
 
-@has_permission(Permission.READ_PRESCRIPTION)
-def get_timeline(admission_number: int):
-    """Patient data and antimicrobial courses of an admission"""
+def _get_screening_prescription(admission_number: int, last_prescription):
+    """The prescription the exams and the alerts are read from: the one the
+    screening shows for the patient now.
+
+    That is the latest prescription-day (aggregated prescription), which holds
+    every drug of the day, so an antimicrobial and a drug it interacts with
+    meet even when they were prescribed apart. Without an aggregated
+    prescription as recent as the latest real one (schemas that do not
+    aggregate), the latest real prescription.
+    """
+    prescription = last_prescription[0] if last_prescription else None
+    agg_prescription = antimicrobial_repository.get_last_agg_prescription(
+        admission_number=admission_number
+    )
+
+    if agg_prescription is not None and (
+        prescription is None or agg_prescription.date.date() >= prescription.date.date()
+    ):
+        return agg_prescription
+
+    return prescription
+
+
+def _get_exams(patient: Patient, prescription, user_context: User) -> dict:
+    """The latest exams of the patient, read as the prescription view reads
+    them for the screening prescription (the references come from its
+    segment)"""
+    if prescription is None:
+        return {"exams": {}, "exams_card": [], "alerts": 0}
+
+    return prescription_view_service.get_exams(
+        prescription=prescription, patient=patient, user_context=user_context
+    )
+
+
+def _get_drug_alerts(
+    patient: Patient, prescription, exam_data: dict, user_context: User
+) -> dict:
+    """The screening alerts of every drug of the screening prescription, keyed
+    by idPrescriptionDrug (prescription_view_service.get_drug_alerts)"""
+    if prescription is None:
+        return {}
+
+    return prescription_view_service.get_drug_alerts(
+        prescription=prescription,
+        patient=patient,
+        segment=antimicrobial_repository.get_segment(id_segment=prescription.idSegment),
+        exam_data=exam_data,
+        user_context=user_context,
+    )
+
+
+def course_alerts(course: Course, drug_alerts: dict) -> dict:
+    """The screening alerts of a course: those of its items in the screening
+    prescription, so only a course prescribed there has any. An alert repeated
+    by two items of the course (two prescriptions of the same day) is listed
+    once. Most severe first."""
+    alerts = []
+    seen = set()
+    id_substance = None
+
+    for item in course.items:
+        drug_alert = drug_alerts.get(str(item.id_prescription_drug))
+        if drug_alert is None:
+            continue
+
+        id_substance = id_substance or drug_alert["idSubstance"]
+        for alert in drug_alert["alerts"]:
+            key = (alert["type"], alert["text"])
+            if key in seen:
+                continue
+
+            seen.add(key)
+            alerts.append(alert)
+
+    alerts.sort(key=lambda a: ALERT_LEVEL_ORDER.get(a["level"], len(ALERT_LEVEL_ORDER)))
+
+    return {"idSubstance": id_substance, "alerts": alerts}
+
+
+def get_timeline(
+    admission_number: int,
+    courses: list[Course],
+    now: datetime,
+    user_context: User,
+) -> dict:
+    """Patient data, antimicrobial courses and latest exams of an admission,
+    each current course with the alerts the screening raises for it.
+
+    The courses come grouped by the caller, which judges them at `now` (the
+    follow-up is built from the same ones). Carries no permission check: the
+    caller has one.
+    """
     patient = patient_repository.get_patient_by_admission(
         admission_number=admission_number
     )
@@ -297,20 +437,56 @@ def get_timeline(admission_number: int):
             status.HTTP_400_BAD_REQUEST,
         )
 
-    now = datetime.now()
-    items = [
-        build_item(row, now=now)
-        for row in antimicrobial_repository.get_admission_antimicrobials(
-            admission_number=admission_number
-        )
-    ]
     discharge_date = patient.dischargeDate if patient else None
+    patient_data = _get_patient_data(patient, last_prescription)
+
+    screening_prescription = _get_screening_prescription(
+        admission_number=admission_number, last_prescription=last_prescription
+    )
+    screening_patient = patient
+    if screening_patient is None and screening_prescription is not None:
+        # the view does the same for an admission with no patient record
+        screening_patient = Patient()
+        screening_patient.idPatient = screening_prescription.idPatient
+        screening_patient.admissionNumber = screening_prescription.admissionNumber
+
+    exam_data = _get_exams(
+        screening_patient, screening_prescription, user_context=user_context
+    )
+    drug_alerts = _get_drug_alerts(
+        screening_patient,
+        screening_prescription,
+        exam_data=exam_data,
+        user_context=user_context,
+    )
 
     return {
         "now": dateutils.to_iso(now),
-        "patient": _get_patient_data(patient, last_prescription),
+        "patient": patient_data,
         "courses": [
-            serialize_course(course, now=now, discharge_date=discharge_date)
-            for course in group_courses(items)
+            {
+                **serialize_course(
+                    course,
+                    now=now,
+                    discharge_date=discharge_date,
+                    weight=patient_data["weight"],
+                ),
+                **course_alerts(course, drug_alerts=drug_alerts),
+            }
+            for course in courses
         ],
+        # the prescription the screening shows for the patient now, which the
+        # exams and the alerts are read from
+        "screeningPrescription": (
+            {
+                "idPrescription": str(screening_prescription.id),
+                "date": dateutils.to_iso(screening_prescription.date),
+                "agg": bool(screening_prescription.agg),
+            }
+            if screening_prescription is not None
+            else None
+        ),
+        # the exam card of the screening
+        "exams": exam_data["exams_card"],
+        "alertExams": exam_data["alerts"],
     }

@@ -2,18 +2,18 @@
 
 The single rule that keeps an admission's infection control record
 (ci_atendimento) and its pending reasons (ci_pendencia) in step with the
-antimicrobials prescribed. The review save, the manual follow and the
-backfill go through it, so it lives in one place (the scheduled job in
-backend-private follows the same rule). plan_rule decides, apply_rule writes
-the plan; a saved review also records its evaluations here
+antimicrobials prescribed. The review save, the manual follow, the backfill
+and the scheduled job (infection_control_job_service, driven by
+backend-private) go through it, so it lives in one place. plan_rule decides,
+apply_rule writes the plan; a saved review also records its evaluations here
 (record_evaluation, resolve_on_review):
 
 * an admission with a running antimicrobial course is followed; it is pending
   while it has an open reason and revised when none is left;
 * a running course without an active evaluation opens a reason for its drug;
-* a running course whose evaluation expired, or whose posology changed from
-  the evaluated one, opens a reason when its evaluation opted into that
-  trigger;
+* a running course whose evaluation expired (the drug runs past its
+  validity), or whose posology changed from the evaluated one, opens a reason
+  when its evaluation opted into that trigger;
 * an admission never reviewed opens a reason of its own, and so does one
   whose scheduled review date arrived;
 * when a drug stops, its reasons are resolved and its evaluation is closed;
@@ -21,7 +21,7 @@ the plan; a saved review also records its evaluations here
 
 Prescalc runs many times a day, so it doesn't apply the rule: it only
 follows the admissions that start (or restart) an antimicrobial, and the
-scheduled job (backend-private) applies the rule to every followed admission.
+scheduled job applies the rule to every followed admission.
 
 The functions here carry no permission check: they run inside callers that
 have one (the static context or a decorated endpoint).
@@ -408,9 +408,12 @@ def course_reasons(
 
     triggers = evaluation.triggers or []
     reasons = []
+    # expired only while the drug runs past the validity: a course kept in
+    # the gap tolerance after its last order ended is not running past it
     if (
         InfectionControlPendingTypeEnum.EXPIRED.value in triggers
         and evaluation.valid_until <= now
+        and evaluation.valid_until < course.end
     ):
         reasons.append(
             (

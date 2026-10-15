@@ -2,8 +2,7 @@
 
 An admission with a running antimicrobial is followed: prescalc creates its
 record as pending and never reviewed (or reopens a closed one); the rule
-(applied by the scheduled job in backend-private, the review save and the
-backfill) opens one reason per drug without an evaluation and follows stops,
+(applied by the scheduled job, the review save and the backfill) opens one reason per drug without an evaluation and follows stops,
 new drugs and discharge, expired evaluations, posology changes (when the
 evaluation watches for them) and scheduled review dates; the infectologist's
 review evaluates drugs, settles reasons and sets the status (pending while a

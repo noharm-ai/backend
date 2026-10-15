@@ -9,8 +9,8 @@ from models.requests.infection_control_request import (
     InfectionControlReviewRequest,
 )
 from services.infection_control import (
-    antimicrobial_timeline_service,
     infection_control_service,
+    recent_cultures_service,
 )
 
 app_infection_control = Blueprint("app_infection_control", __name__)
@@ -21,8 +21,8 @@ app_infection_control = Blueprint("app_infection_control", __name__)
 )
 @api_endpoint()
 def get_timeline(admission_number: int):
-    """Patient data and antimicrobial courses of an admission"""
-    return antimicrobial_timeline_service.get_timeline(
+    """Patient data, antimicrobial courses and follow-up of an admission"""
+    return infection_control_service.get_admission_view(
         admission_number=admission_number
     )
 
@@ -35,6 +35,29 @@ def get_admission_state(admission_number: int):
     """Infection control follow-up of an admission"""
     return infection_control_service.get_admission_state(
         admission_number=admission_number
+    )
+
+
+@app_infection_control.route(
+    "/infection-control/admission/<int:admission_number>/cultures", methods=["GET"]
+)
+@api_endpoint()
+def get_recent_cultures(admission_number: int):
+    """Latest culture of each exam and material of the admission's patient"""
+    return recent_cultures_service.get_recent_cultures(
+        admission_number=admission_number
+    )
+
+
+@app_infection_control.route(
+    "/infection-control/admission/<int:admission_number>/cultures/<int:id_culture>",
+    methods=["GET"],
+)
+@api_endpoint()
+def get_culture_history(admission_number: int, id_culture: int):
+    """Every culture of the patient with the exam and material of one culture"""
+    return recent_cultures_service.get_culture_history(
+        admission_number=admission_number, id_culture=id_culture
     )
 
 

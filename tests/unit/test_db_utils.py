@@ -1,4 +1,4 @@
-"""Unit tests for utils.db_utils.run_with_deadlock_retry"""
+"""Unit tests for utils.db_utils (run_with_deadlock_retry and set_schema)"""
 
 import sys
 import types
@@ -7,6 +7,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from sqlalchemy.exc import OperationalError
 
+from exception.validation_error import ValidationError
+from utils import db_utils
 from utils.db_utils import run_with_deadlock_retry
 
 
@@ -111,3 +113,40 @@ class TestRunWithDeadlockRetry:
         assert result == "ok"
         assert fn.call_count == 2
         fake_db.session.rollback.assert_called_once()
+
+
+class TestSetSchema:
+    """Teste db_utils - set_schema"""
+
+    def test_rejects_an_unknown_schema(self):
+        """A bad schema name must fail loudly instead of querying the wrong tenant."""
+        session = MagicMock()
+        session.execute.return_value = [("public",), ("demo",)]
+
+        with (
+            patch.object(db_utils, "db"),
+            patch.object(db_utils, "Session", return_value=session),
+            patch.object(db_utils, "dbSession") as db_session,
+        ):
+            with pytest.raises(ValidationError) as exc:
+                db_utils.set_schema("does_not_exist")
+
+        assert exc.value.code == "errors.invalidSchema"
+        assert exc.value.httpStatus == 400
+        db_session.setSchema.assert_not_called()
+
+    def test_switches_to_a_known_schema(self):
+        """A valid schema is handed to the session's tenant switch."""
+        session = MagicMock()
+        session.execute.return_value = [("public",), ("demo",)]
+
+        with (
+            patch.object(db_utils, "db"),
+            patch.object(db_utils, "Session", return_value=session),
+            patch.object(db_utils, "dbSession") as db_session,
+        ):
+            db_utils.set_schema("demo")
+
+        db_session.setSchema.assert_called_once_with("demo")
+        # the probe session is not left open
+        session.close.assert_called_once()
