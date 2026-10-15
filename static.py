@@ -93,6 +93,10 @@ def infection_control_sync(event: dict, context: any):
     schema: str = event.get("schema", None)
     admission_number: int = event.get("admission_number", None)
 
+    logger.backend_logger.warning(
+        "infection control: schema: %s | admission_number: %s", schema, admission_number
+    )
+
     def _infection_control_sync_operation(user_context, schema, admission_number):
         """Internal operation function for the infection control job."""
         return infection_control_job_service.sync_followed_admission(
