@@ -2,10 +2,10 @@
 
 The single rule that keeps an admission's infection control record
 (ci_atendimento) and its pending reasons (ci_pendencia) in step with the
-antimicrobials prescribed. The review save, the manual follow and the
-backfill go through it, so it lives in one place (the scheduled job in
-backend-private follows the same rule). plan_rule decides, apply_rule writes
-the plan; a saved review also records its evaluations here
+antimicrobials prescribed. The review save, the manual follow, the backfill
+and the scheduled job (infection_control_job_service, driven by
+backend-private) go through it, so it lives in one place. plan_rule decides,
+apply_rule writes the plan; a saved review also records its evaluations here
 (record_evaluation, resolve_on_review):
 
 * an admission with a running antimicrobial course is followed; it is pending
@@ -21,7 +21,7 @@ the plan; a saved review also records its evaluations here
 
 Prescalc runs many times a day, so it doesn't apply the rule: it only
 follows the admissions that start (or restart) an antimicrobial, and the
-scheduled job (backend-private) applies the rule to every followed admission.
+scheduled job applies the rule to every followed admission.
 
 The functions here carry no permission check: they run inside callers that
 have one (the static context or a decorated endpoint).
