@@ -24,6 +24,8 @@ endpoint. This module covers the variable rules:
   explicitly a value and ``IN``/``NOTIN`` the only operators taking a list;
 * a ``combination`` is validated by its own rules — its empty keys are dropped
   rather than rejected, and only its ``*Operator`` keys are operator-checked;
+* a CONTAINS value (and a combination ``observation``) may join texts with
+  ``&`` and ``|``, but never leave a blank term around them;
 * an empty ``examPeriod`` is dropped from the stored config.
 """
 
@@ -506,6 +508,61 @@ def test_a_combination_keeps_its_valid_inner_operators(client, admin_headers):
     stored = _stored_variables()[0]
     assert stored["doseOperator"] == ">="
     assert stored["periodOperator"] == "<="
+
+
+# --- CONTAINS expressions -------------------------------------------------------
+
+_INSURANCE_VARIABLE = {"name": "v1", "field": "insurance", "operator": "CONTAINS"}
+
+
+@pytest.mark.parametrize(
+    "value", ["ficticio", "ficticio & especial", "sus | ficticio", "a & b | c"]
+)
+def test_a_contains_expression_is_accepted(client, admin_headers, value):
+    """A CONTAINS value may join texts with ``&`` (all) and ``|`` (any)."""
+    response = _upsert(
+        client, admin_headers, [{**_INSURANCE_VARIABLE, "value": value}]
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert _stored_variables()[0]["value"] == value
+
+
+@pytest.mark.parametrize(
+    "value", ["ficticio & ", "& especial", "sus || ficticio", "|"]
+)
+def test_a_contains_expression_with_a_blank_term_is_rejected(
+    client, admin_headers, value
+):
+    """A blank text around ``&``/``|`` is a typo, not a criterion [400]."""
+    _assert_rejected(
+        _upsert(client, admin_headers, [{**_INSURANCE_VARIABLE, "value": value}])
+    )
+
+
+def test_a_combination_observation_expression_is_accepted(client, admin_headers):
+    """The combination observation takes the same expression syntax."""
+    response = _upsert(
+        client,
+        admin_headers,
+        [{**_COMBINATION_VARIABLE, "observation": "ml/min & gotejo"}],
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert _stored_variables()[0]["observation"] == "ml/min & gotejo"
+
+
+def test_a_combination_observation_with_a_blank_term_is_rejected(
+    client, admin_headers
+):
+    """A blank text in the observation expression is rejected too [400]."""
+    _assert_rejected(
+        _upsert(
+            client,
+            admin_headers,
+            [{**_COMBINATION_VARIABLE, "observation": "ml/min & "}],
+        )
+    )
 
 
 # --- the rules apply to every variable, not just the first ---------------------

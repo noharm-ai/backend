@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 
+from utils import contains_expression
+
 
 class TraceReasonEnum(Enum):
     """Enum: why a protocol variable evaluated to its result"""
@@ -255,10 +257,21 @@ def _build_compared_body(trace: VariableTrace, name_lookup: dict) -> str:
 
     if op == "CONTAINS" or trace.operator is None:
         actual = trace.actual_value if trace.actual_value is not None else "(vazio)"
-        return (
-            f"o valor encontrado foi '{actual}'; "
-            f"esperado conter o texto '{_fmt_value(trace.expected_value)}'"
+
+        if not contains_expression.is_expression(trace.expected_value):
+            return (
+                f"o valor encontrado foi '{actual}'; "
+                f"esperado conter o texto '{_fmt_value(trace.expected_value)}'"
+            )
+
+        body = (
+            f"o valor encontrado foi '{actual}'; esperado conter "
+            f"{contains_expression.describe(trace.expected_value)}"
         )
+        missing = trace.details.get("missing")
+        if not trace.result and missing:
+            body += "; não encontrado: " + ", ".join(f"'{m}'" for m in missing)
+        return body
 
     op_label = OPERATOR_LABELS.get(op, op)
     actual = (
@@ -309,7 +322,12 @@ def _build_combination_body(trace: VariableTrace, name_lookup: dict) -> str:
             )
             op_label = OPERATOR_LABELS.get(failed.operator, failed.operator)
             mapping = _lookup_for_field(failed.criterion, name_lookup)
-            expected = ", ".join(_translate_values(failed.expected, mapping))
+            if failed.operator == "CONTAINS" and contains_expression.is_expression(
+                failed.expected
+            ):
+                expected = contains_expression.describe(failed.expected)
+            else:
+                expected = ", ".join(_translate_values(failed.expected, mapping))
             actual = ", ".join(_translate_values(failed.actual, mapping)) or "(vazio)"
             body += (
                 f"; ex.: '{name}' falhou no critério {criterion_label} "
