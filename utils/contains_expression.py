@@ -9,20 +9,17 @@ A CONTAINS value is a plain string that may combine several texts:
 
 ``&`` binds tighter than ``|`` and there are no parentheses, so an expression is
 always "any of the groups, where every text of a group must be present".
-Matching ignores case and accents.
+Matching ignores case only: accents must match exactly.
 """
-
-import unicodedata
 
 AND_SEPARATOR = "&"
 OR_SEPARATOR = "|"
 
 
 def normalize_text(text) -> str:
-    """Lowercases a text and strips its accents so comparisons ignore both"""
+    """Lowercases a text so comparisons ignore case (accents are kept)"""
 
-    decomposed = unicodedata.normalize("NFKD", str(text))
-    return "".join(c for c in decomposed if not unicodedata.combining(c)).lower()
+    return str(text).lower()
 
 
 def is_expression(value) -> bool:

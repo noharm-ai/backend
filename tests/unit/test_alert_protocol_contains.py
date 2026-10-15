@@ -3,8 +3,8 @@
 A CONTAINS value stays a plain string, but it may join several texts: ``&``
 requires all of them and ``|`` accepts any of them (``&`` binds tighter). A value
 without separators keeps matching as a plain substring. Matching ignores case
-and accents. The same rule backs ``insurance``, ``dischargeReason`` and the
-``observation`` criterion of a combination.
+only: accents must match exactly. The same rule backs ``insurance``,
+``dischargeReason`` and the ``observation`` criterion of a combination.
 """
 
 import pytest
@@ -39,15 +39,16 @@ NOTES = "Infundir em BIC a 20 ml/min; ajustar gotejo conforme sedação"
         ("bolus | ataque", False),
         ("bolus & ataque | ml/min & gotejo", True),
         ("bolus & gotejo | ataque", False),
-        ("sedacao", True),  # accents are ignored on the text side
+        ("SEDAÇÃO", True),
         ("sedação & gotejo", True),
-        ("gotéjo", True),  # and on the value side
+        ("sedacao", False),  # accents are not ignored on the text side
+        ("gotéjo", False),  # nor on the value side
         ("20 ml", True),  # a plain value is matched untrimmed, as before
         ("mg/kg", False),
     ],
 )
 def test_matches(value, expected):
-    """contains_expression.matches: AND/OR groups, case and accent insensitive"""
+    """contains_expression.matches: AND/OR groups, case insensitive, accents exact"""
 
     assert contains_expression.matches(text=NOTES, value=value) is expected
 
@@ -212,7 +213,12 @@ def test_insurance(value, has_result):
 
 @pytest.mark.parametrize(
     "value,has_result",
-    [("obito | óbito", True), ("alta & melhorada", False)],
+    [
+        ("óbito", True),
+        ("obito", False),
+        ("obito | óbito", True),
+        ("alta & melhorada", False),
+    ],
 )
 def test_discharge_reason(value, has_result):
     """dischargeReason: CONTAINS accepts the expression syntax"""
