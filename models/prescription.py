@@ -232,6 +232,11 @@ class Intervention(db.Model):
     ram = db.Column("ram", postgresql.JSONB, nullable=True)
     # count of days using the selected drug
     period = db.Column("periodo_uso", db.Integer, nullable=True)
+    # the antimicrobial evaluation of an infection control review that
+    # recorded it: kept by infection control
+    id_infection_control_evaluation = db.Column(
+        "fkci_avaliacao_atm", db.BigInteger, nullable=True
+    )
 
 
 class InterventionAudit(db.Model):

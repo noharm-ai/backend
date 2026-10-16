@@ -210,6 +210,7 @@ class DrugAttributesAuditTypeEnum(Enum):
     INSERT_FROM_REFERENCE = 4
     COPY_FROM_REFERENCE = 5
     SET_DIVISION_RANGE = 6
+    DOSE_MAX_UPDATE = 7
 
 
 class PatientAuditTypeEnum(Enum):

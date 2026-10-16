@@ -51,6 +51,8 @@ class InterventionReason(db.Model):
     blocking = db.Column("bloqueante", db.Boolean, nullable=False)
     ram = db.Column("ram", db.Boolean, nullable=False)
     relation_type = db.Column("tp_relacao", db.BigInteger, nullable=False)
+    # can justify a non-conformity in the infection control review
+    infection_control = db.Column("controle_infeccao", db.Boolean, nullable=False)
 
 
 class Frequency(db.Model):

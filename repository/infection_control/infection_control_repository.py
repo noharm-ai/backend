@@ -6,7 +6,7 @@ from datetime import datetime
 from sqlalchemy import and_, func, or_, text, update
 from sqlalchemy.dialects.postgresql import insert
 
-from models.appendix import Department
+from models.appendix import Department, InterventionReason
 from models.enums import (
     AntimicrobialEvaluationStatusEnum,
     InfectionControlStatusEnum,
@@ -18,7 +18,7 @@ from models.infection_control import (
     InfectionControlReview,
 )
 from models.main import DrugAttributes, db
-from models.prescription import Patient, Prescription, PrescriptionDrug
+from models.prescription import Intervention, Patient, Prescription, PrescriptionDrug
 from models.requests.infection_control_request import InfectionControlListRequest
 
 
@@ -185,6 +185,35 @@ def get_evaluations(admission_number: int) -> list[AntimicrobialEvaluation]:
         db.session.query(AntimicrobialEvaluation)
         .filter(AntimicrobialEvaluation.admission_number == admission_number)
         .order_by(AntimicrobialEvaluation.created_at, AntimicrobialEvaluation.id)
+        .all()
+    )
+
+
+def get_intervention_reasons(
+    id_reasons: set[int],
+) -> list[tuple[InterventionReason, str | None]]:
+    """Intervention reasons, each with the name of its parent reason"""
+    if not id_reasons:
+        return []
+
+    parent = db.aliased(InterventionReason)
+    return (
+        db.session.query(InterventionReason, parent.description)
+        .outerjoin(parent, InterventionReason.mamy == parent.id)
+        .filter(InterventionReason.id.in_(id_reasons))
+        .all()
+    )
+
+
+def get_evaluation_interventions(admission_number: int) -> list[Intervention]:
+    """Interventions recorded by the reviews of an admission, oldest first;
+    the ones undone (status 0) are gone, as in the screening"""
+    return (
+        db.session.query(Intervention)
+        .filter(Intervention.admissionNumber == admission_number)
+        .filter(Intervention.id_infection_control_evaluation != None)
+        .filter(Intervention.status != "0")
+        .order_by(Intervention.idIntervention)
         .all()
     )
 

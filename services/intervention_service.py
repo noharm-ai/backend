@@ -6,6 +6,7 @@ from sqlalchemy import and_, case, cast, desc, func, or_
 from sqlalchemy.dialects import postgresql
 
 from decorators.has_permission_decorator import Permission, has_permission
+from exception.authorization_error import AuthorizationError
 from exception.validation_error import ValidationError
 from models.appendix import Department, Frequency, InterventionReason, MeasureUnit
 from models.enums import FeatureEnum, InterventionAuditEnum, InterventionEconomyTypeEnum
@@ -17,6 +18,7 @@ from models.prescription import (
     PrescriptionDrug,
 )
 from repository import user_activity_repository
+from security.role import Role
 from services import (
     data_authorization_service,
     feature_service,
@@ -246,6 +248,11 @@ def get_interventions(
             {
                 "id": str(i[0].id),
                 "idIntervention": str(i[0].idIntervention),
+                "idInfectionControlEvaluation": (
+                    str(i[0].id_infection_control_evaluation)
+                    if i[0].id_infection_control_evaluation
+                    else None
+                ),
                 "idSegment": (
                     i[1].idSegment if i[1] else i[7].idSegment if i[7] else None
                 ),
@@ -303,6 +310,124 @@ def get_interventions(
     return result
 
 
+def get_economy_type(
+    reasons: list[InterventionReason], prescription_level: bool = False
+) -> tuple[int | None, bool]:
+    """The economy type the reasons give an intervention, and whether one of
+    them records an adverse reaction (ram). A prescription intervention only
+    has custom economy."""
+    economy_type = None
+    has_ram = False
+    for r in reasons:
+        if r.suspension:
+            economy_type = InterventionEconomyTypeEnum.SUSPENSION.value
+        elif r.substitution:
+            economy_type = InterventionEconomyTypeEnum.SUBSTITUTION.value
+        elif r.customEconomy:
+            economy_type = InterventionEconomyTypeEnum.CUSTOM.value
+
+        if r.ram:
+            has_ram = True
+
+    if prescription_level and economy_type != InterventionEconomyTypeEnum.CUSTOM.value:
+        economy_type = None
+
+    return economy_type, has_ram
+
+
+def get_current_department(admission_number) -> int | None:
+    """The department of the latest prescription of the admission"""
+    current_department = (
+        db.session.query(Prescription.idDepartment)
+        .filter(Prescription.admissionNumber == admission_number)
+        .order_by(desc(Prescription.date))
+        .first()
+    )
+
+    return current_department[0] if current_department != None else None
+
+
+def create_drug_intervention(
+    user_context: User,
+    id_prescription_drug,
+    admission_number,
+    id_intervention_reason: list[int],
+    reasons: list[InterventionReason],
+    id_department: int | None,
+    error=None,
+    cost=None,
+    observation=None,
+    agg_id_prescription=None,
+    ram=None,
+    id_infection_control_evaluation: int | None = None,
+) -> Intervention:
+    """Create a pending intervention on a prescribed drug, with the economy
+    its reasons give it, and audit it. The caller checks the permissions."""
+    economy_type, has_ram = get_economy_type(reasons)
+
+    i = Intervention()
+    i.id = id_prescription_drug
+    i.idPrescription = 0
+    i.date = datetime.today()
+    i.update = datetime.today()
+    i.user = user_context.id
+    i.interactions = None
+    i.transcription = None
+    i.economy_days = None
+    i.expended_dose = None
+    i.economy_type = economy_type
+    i.status = "s"
+    i.economy_day_value_manual = False
+    i.id_infection_control_evaluation = id_infection_control_evaluation
+
+    if admission_number:
+        i.admissionNumber = admission_number
+    if id_intervention_reason:
+        i.idInterventionReason = id_intervention_reason
+    if error is not None:
+        i.error = error
+    if cost is not None:
+        i.cost = cost
+    if observation:
+        i.notes = observation
+    if has_ram:
+        i.ram = ram
+
+    # date base economy
+    i.date_base_economy = _get_date_base_economy(
+        economy_type=economy_type,
+        i=i,
+        id_prescription=0,
+        id_prescription_drug=id_prescription_drug,
+        agg_id_prescription=agg_id_prescription,
+        user=user_context,
+    )
+
+    # current department
+    if id_department != None:
+        i.idDepartment = id_department
+
+    db.session.add(i)
+    db.session.flush()
+
+    user_activity_repository.increment_interventions(user_context.id)
+
+    audit = InterventionAudit()
+    audit.auditType = InterventionAuditEnum.CREATE.value
+    audit.idIntervention = i.idIntervention
+    audit.extra = {
+        "status": i.status,
+        "update_responsible": False,
+        "economy_type": economy_type,
+    }
+    audit.createdBy = user_context.id
+    audit.createdAt = datetime.now()
+    db.session.add(audit)
+    db.session.flush()
+
+    return i
+
+
 @has_permission(Permission.WRITE_PRESCRIPTION)
 def add_multiple_interventions(
     id_prescription_drug_list,
@@ -318,99 +443,34 @@ def add_multiple_interventions(
     """Create multiple interventions in one request"""
     id_intervention_list = []
 
-    # define economy
-    economy_type = None
     reasons = (
         db.session.query(InterventionReason)
         .filter(InterventionReason.id.in_(id_intervention_reason))
         .all()
     )
-    has_ram = False
-    for r in reasons:
-        if r.suspension:
-            economy_type = InterventionEconomyTypeEnum.SUSPENSION.value
-        elif r.substitution:
-            economy_type = InterventionEconomyTypeEnum.SUBSTITUTION.value
-        elif r.customEconomy:
-            economy_type = InterventionEconomyTypeEnum.CUSTOM.value
-
-        if r.ram:
-            has_ram = True
-
-    currentDepartment = (
-        db.session.query(Prescription.idDepartment)
-        .filter(Prescription.admissionNumber == admission_number)
-        .order_by(desc(Prescription.date))
-        .first()
-    )
+    id_department = get_current_department(admission_number)
 
     # insert
     for id_prescription_drug in id_prescription_drug_list:
-        i = Intervention()
-        i.id = id_prescription_drug
-        i.idPrescription = 0
-        i.date = datetime.today()
-        i.update = datetime.today()
-        i.user = user_context.id
-        i.interactions = None
-        i.transcription = None
-        i.economy_days = None
-        i.expended_dose = None
-        i.economy_type = economy_type
-        i.date = datetime.today()
-        i.status = "s"
-        i.economy_day_value_manual = False
-
         _validate_authorization(
-            id_prescription=i.idPrescription,
-            id_prescription_drug=i.id,
-            user=user_context,
-        )
-
-        if admission_number:
-            i.admissionNumber = admission_number
-        if id_intervention_reason:
-            i.idInterventionReason = id_intervention_reason
-        if error is not None:
-            i.error = error
-        if cost is not None:
-            i.cost = cost
-        if observation:
-            i.notes = observation
-        if has_ram:
-            i.ram = ram
-
-        # date base economy
-        i.date_base_economy = _get_date_base_economy(
-            economy_type=economy_type,
-            i=i,
             id_prescription=0,
             id_prescription_drug=id_prescription_drug,
-            agg_id_prescription=agg_id_prescription,
             user=user_context,
         )
 
-        # current department
-        if currentDepartment != None:
-            i.idDepartment = currentDepartment[0]
-
-        db.session.add(i)
-        db.session.flush()
-
-        user_activity_repository.increment_interventions(user_context.id)
-
-        audit = InterventionAudit()
-        audit.auditType = InterventionAuditEnum.CREATE.value
-        audit.idIntervention = i.idIntervention
-        audit.extra = {
-            "status": i.status,
-            "update_responsible": False,
-            "economy_type": economy_type,
-        }
-        audit.createdBy = user_context.id
-        audit.createdAt = datetime.now()
-        db.session.add(audit)
-        db.session.flush()
+        i = create_drug_intervention(
+            user_context=user_context,
+            id_prescription_drug=id_prescription_drug,
+            admission_number=admission_number,
+            id_intervention_reason=id_intervention_reason,
+            reasons=reasons,
+            id_department=id_department,
+            error=error,
+            cost=cost,
+            observation=observation,
+            agg_id_prescription=agg_id_prescription,
+            ram=ram,
+        )
 
         id_intervention_list.append(i.idIntervention)
 
@@ -422,7 +482,24 @@ def add_multiple_interventions(
     return []
 
 
-@has_permission(Permission.WRITE_PRESCRIPTION)
+def can_change_intervention(intervention: Intervention, user: User) -> bool:
+    """Interventions recorded by an infection control review are changed only
+    by infection control, the others by the prescription screening"""
+    permission = (
+        Permission.WRITE_INFECTION_CONTROL
+        if intervention.id_infection_control_evaluation
+        else Permission.WRITE_PRESCRIPTION
+    )
+
+    return permission in Role.get_permissions_from_user(user=user)
+
+
+def validate_origin_permission(intervention: Intervention, user: User):
+    if not can_change_intervention(intervention=intervention, user=user):
+        raise AuthorizationError()
+
+
+@has_permission(Permission.WRITE_PRESCRIPTION, Permission.WRITE_INFECTION_CONTROL)
 def save_intervention(
     id_intervention=None,
     id_prescription=0,
@@ -478,6 +555,8 @@ def save_intervention(
                 status.HTTP_400_BAD_REQUEST,
             )
 
+        validate_origin_permission(intervention=i, user=user_context)
+
         if i.status in ["a", "n", "x", "j"] and new_status != "s":
             raise ValidationError(
                 "Intervenção com desfecho não pode ser alterada",
@@ -523,9 +602,16 @@ def save_intervention(
         i.update = datetime.today()
         i.user = user_context.id
 
-    _validate_authorization(
-        id_prescription=i.idPrescription, id_prescription_drug=i.id, user=user_context
-    )
+        # only the infection control review creates its interventions
+        validate_origin_permission(intervention=i, user=user_context)
+
+    # infection control interventions follow the admission, not the segment
+    if not i.id_infection_control_evaluation:
+        _validate_authorization(
+            id_prescription=i.idPrescription,
+            id_prescription_drug=i.id,
+            user=user_context,
+        )
 
     if admission_number:
         i.admissionNumber = admission_number
@@ -549,30 +635,15 @@ def save_intervention(
         i.period = period
 
     # get economy type and ram
-    economy_type = None
-    has_ram = False
     reasons = (
         db.session.query(InterventionReason)
         .filter(InterventionReason.id.in_(i.idInterventionReason))
         .all()
     )
-    for r in reasons:
-        if r.suspension:
-            economy_type = InterventionEconomyTypeEnum.SUSPENSION.value
-        elif r.substitution:
-            economy_type = InterventionEconomyTypeEnum.SUBSTITUTION.value
-        elif r.customEconomy:
-            economy_type = InterventionEconomyTypeEnum.CUSTOM.value
-
-        if r.ram:
-            has_ram = True
-
-    if (
-        id_prescription != 0
-        and economy_type != InterventionEconomyTypeEnum.CUSTOM.value
-    ):
-        # prescription intv can only have custom economy
-        economy_type = None
+    # prescription intv can only have custom economy
+    economy_type, has_ram = get_economy_type(
+        reasons, prescription_level=id_prescription != 0
+    )
 
     i.economy_type = economy_type
     i.ram = ram if ram and has_ram else None
