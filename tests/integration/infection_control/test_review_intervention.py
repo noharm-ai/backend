@@ -17,6 +17,7 @@ from tests.integration.infection_control.helpers import (
     ANTIMICROBIAL_DRUG,
     DEPARTMENT_BY_SEGMENT,
     ADULT_SEGMENT,
+    OTHER_DRUG,
     _day,
     _evaluations,
     _prescribe_today,
@@ -30,25 +31,49 @@ REASON_IC_SUSPENSION = 30101
 REASON_NOT_IC = 30102
 REASON_IC_INACTIVE = 30103
 REASON_PARENT = 30104
+# relates the drug to another: the substitute is required / optional
+REASON_IC_SUBSTITUTION = 30105
+REASON_IC_ALTERNATIVE = 30106
+# a substitution without a relation type, as the seed's "Substituição"
+REASON_IC_SUBSTITUTION_FLAG = 30107
+
+# drugs of the seed data: one flagged antimicrobial, recommended instead of
+# the one evaluated, and one that is not
+SUBSTITUTE_DRUG = 2
+NOT_ANTIMICROBIAL_DRUG = OTHER_DRUG
 
 
 @pytest.fixture
 def reasons():
     """Intervention reasons for the review, one of them under a parent"""
     rows = [
-        (REASON_PARENT, "ZZTEST Antimicrobiano", 0, True, False, True),
-        (REASON_IC, "ZZTEST Espectro", REASON_PARENT, True, False, True),
-        (REASON_IC_SUSPENSION, "ZZTEST Suspender", 0, True, True, True),
-        (REASON_NOT_IC, "ZZTEST Diluição", 0, True, False, False),
-        (REASON_IC_INACTIVE, "ZZTEST Inativo", 0, False, False, True),
+        # id, name, parent, active, suspension, substitution, relation, ic
+        (REASON_PARENT, "ZZTEST Antimicrobiano", 0, True, False, False, 0, True),
+        (REASON_IC, "ZZTEST Espectro", REASON_PARENT, True, False, False, 0, True),
+        (REASON_IC_SUSPENSION, "ZZTEST Suspender", 0, True, True, False, 0, True),
+        (REASON_NOT_IC, "ZZTEST Diluição", 0, True, False, False, 0, False),
+        (REASON_IC_INACTIVE, "ZZTEST Inativo", 0, False, False, False, 0, True),
+        (REASON_IC_SUBSTITUTION, "ZZTEST Substituir", 0, True, False, True, 2, True),
+        (REASON_IC_ALTERNATIVE, "ZZTEST Alternativa", 0, True, False, False, 1, True),
+        (REASON_IC_SUBSTITUTION_FLAG, "ZZTEST Trocar", 0, True, False, True, 0, True),
     ]
-    for id_reason, name, parent, active, suspension, infection_control in rows:
+    for (
+        id_reason,
+        name,
+        parent,
+        active,
+        suspension,
+        substitution,
+        relation_type,
+        infection_control,
+    ) in rows:
         session.execute(
             text(
                 "INSERT INTO demo.motivointervencao "
                 "(idmotivointervencao, nome, idmotivomae, ativo, suspensao, "
-                "controle_infeccao) "
-                "VALUES (:id, :name, :parent, :active, :suspension, :ic)"
+                "substituicao, tp_relacao, controle_infeccao) "
+                "VALUES (:id, :name, :parent, :active, :suspension, "
+                ":substitution, :relation_type, :ic)"
             ),
             {
                 "id": id_reason,
@@ -56,6 +81,8 @@ def reasons():
                 "parent": parent,
                 "active": active,
                 "suspension": suspension,
+                "substitution": substitution,
+                "relation_type": relation_type,
                 "ic": infection_control,
             },
         )
@@ -493,3 +520,166 @@ def test_undone_intervention_leaves_the_evaluation(
     evaluation = response.get_json()["data"]["courses"][0]["evaluation"]
     assert evaluation["interventions"] == []
     assert [r["id"] for r in evaluation["interventionReasons"]] == [REASON_IC]
+
+
+@pytest.mark.parametrize(
+    "reason", [REASON_IC_SUBSTITUTION, REASON_IC_SUBSTITUTION_FLAG]
+)
+def test_substitution_requires_substitute(
+    client, infection_control, admission, reasons, interventions, reason
+):
+    """400 without a substitute for a reason whose relation requires it, or
+    a substitution"""
+    _prescribe_today(admission)
+
+    response = _non_conformity(client, admission, intervention_reasons=[reason])
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.get_json()["code"] == "errors.invalidParams"
+    assert _evaluations(admission) == []
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        # no reason relates the drug to another
+        {"conforming": True},
+        {"conforming": False, "intervention_reasons": [REASON_IC]},
+        # not a drug
+        {
+            "conforming": False,
+            "intervention_reasons": [REASON_IC_SUBSTITUTION],
+            "substitute": 999999999,
+        },
+        # not an antimicrobial
+        {
+            "conforming": False,
+            "intervention_reasons": [REASON_IC_SUBSTITUTION],
+            "substitute": NOT_ANTIMICROBIAL_DRUG,
+        },
+    ],
+)
+def test_substitute_rejected(
+    client, infection_control, admission, reasons, interventions, extra
+):
+    """400 for a substitute the reasons don't ask for, or not an antimicrobial"""
+    _prescribe_today(admission)
+    extra = dict(extra)
+
+    response = _review(
+        client,
+        _as(client, Role.INFECTION_CONTROLLER),
+        admission,
+        evaluations=[ANTIMICROBIAL_DRUG],
+        evaluation_notes="Espectro amplo",
+        substitute_drug=extra.pop("substitute", SUBSTITUTE_DRUG),
+        **extra,
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.get_json()["code"] == "errors.invalidParams"
+    assert _evaluations(admission) == []
+
+
+def test_optional_relation_keeps_without_substitute(
+    client, infection_control, admission, reasons, interventions
+):
+    """A reason with an optional relation takes the non-conformity without a
+    substitute"""
+    _prescribe_today(admission)
+
+    response = _non_conformity(
+        client, admission, intervention_reasons=[REASON_IC_ALTERNATIVE]
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.get_json()
+    (evaluation,) = _evaluations(admission)
+    assert evaluation["fkmedicamento_substituto"] is None
+    served = response.get_json()["data"]["courses"][0]["evaluation"]
+    assert served["substituteDrug"] is None
+
+
+def test_substitute_kept_without_intervention(
+    client, infection_control, admission, reasons, interventions
+):
+    """The substitute is recorded on the evaluation, named for the page"""
+    _prescribe_today(admission)
+
+    response = _non_conformity(
+        client,
+        admission,
+        intervention_reasons=[REASON_IC_SUBSTITUTION],
+        substitute_drug=SUBSTITUTE_DRUG,
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.get_json()
+    (evaluation,) = _evaluations(admission)
+    assert evaluation["fkmedicamento_substituto"] == SUBSTITUTE_DRUG
+    assert _interventions(admission) == []
+
+    name = session.execute(
+        text("SELECT nome FROM demo.medicamento WHERE fkmedicamento = :id"),
+        {"id": SUBSTITUTE_DRUG},
+    ).scalar()
+    served = response.get_json()["data"]["courses"][0]["evaluation"]
+    assert served["substituteDrug"] == {"id": SUBSTITUTE_DRUG, "name": name}
+
+
+def test_substitute_goes_to_the_intervention(
+    client, infection_control, admission, reasons, interventions
+):
+    """The intervention gets the substitute as the screening's form gives it
+    (interacoes), the destination of its substitution economy"""
+    _prescribe_today(admission)
+
+    response = _non_conformity(
+        client,
+        admission,
+        intervention_reasons=[REASON_IC_SUBSTITUTION],
+        substitute_drug=SUBSTITUTE_DRUG,
+        create_intervention=True,
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.get_json()
+    (intervention,) = _interventions(admission)
+    assert intervention["interacoes"] == [SUBSTITUTE_DRUG]
+    assert intervention["tp_economia"] == InterventionEconomyTypeEnum.SUBSTITUTION.value
+
+
+def _search(client, term):
+    return client.get(
+        "/infection-control/antimicrobials",
+        query_string={"q": term},
+        headers=_as(client, Role.INFECTION_CONTROLLER),
+    )
+
+
+def test_search_lists_only_antimicrobials(client, infection_control):
+    """The substitute is searched among the antimicrobials, by name"""
+    response = _search(client, "ampicilina")
+
+    assert response.status_code == status.HTTP_200_OK, response.get_json()
+    found = response.get_json()["data"]
+    assert {
+        "id": ANTIMICROBIAL_DRUG,
+        "name": "AMPICILINA + SULBACTAM 2 g + 1 g SOL INJ",
+    } in found
+
+    # a drug not flagged antimicrobial is left out
+    response = _search(client, "bisacodil")
+    assert response.get_json()["data"] == []
+
+
+def test_search_waits_for_three_letters(client, infection_control):
+    """Fewer than three letters search nothing"""
+    response = _search(client, "am")
+
+    assert response.status_code == status.HTTP_200_OK, response.get_json()
+    assert response.get_json()["data"] == []
+
+
+def test_search_requires_the_feature(client):
+    """400 for a schema without infection control"""
+    response = _search(client, "ampicilina")
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST

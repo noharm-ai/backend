@@ -136,6 +136,14 @@ class InterventionEconomyTypeEnum(Enum):
     CUSTOM = 3
 
 
+class InterventionReasonRelationTypeEnum(Enum):
+    """Whether an intervention reason relates the drug to others (motivointervencao.tp_relacao)"""
+
+    DO_NOT_APPLY = 0
+    OPTIONAL = 1
+    REQUIRED = 2
+
+
 class InterventionStatusEnum(Enum):
     PENDING = "s"
     REMOVED = "0"

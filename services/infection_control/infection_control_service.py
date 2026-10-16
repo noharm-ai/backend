@@ -19,6 +19,7 @@ from models.enums import (
     FeatureEnum,
     InfectionControlOriginEnum,
     InfectionControlStatusEnum,
+    InterventionReasonRelationTypeEnum,
 )
 from models.infection_control import (
     AntimicrobialEvaluation,
@@ -40,6 +41,10 @@ from services.infection_control import (
 )
 from services.infection_control.antimicrobial_timeline_service import GAP_TOLERANCE
 from utils import dateutils, logger, status
+
+
+# letters typed before the drugs are searched
+MIN_DRUG_SEARCH = 3
 
 
 def _check_feature():
@@ -76,9 +81,11 @@ def _serialize_evaluation(
     names: dict,
     reason_names: dict | None = None,
     interventions: dict | None = None,
+    drug_names: dict | None = None,
 ) -> dict:
     reason_names = reason_names or {}
     interventions = interventions or {}
+    drug_names = drug_names or {}
     return {
         "id": str(evaluation.id),
         "idReview": str(evaluation.id_review),
@@ -90,6 +97,14 @@ def _serialize_evaluation(
             {"id": id_reason, "name": reason_names.get(id_reason)}
             for id_reason in evaluation.id_intervention_reasons or []
         ],
+        "substituteDrug": (
+            {
+                "id": evaluation.id_substitute_drug,
+                "name": drug_names.get(evaluation.id_substitute_drug),
+            }
+            if evaluation.id_substitute_drug
+            else None
+        ),
         "interventions": [
             {"id": str(i.idIntervention), "status": i.status}
             for i in interventions.get(evaluation.id, [])
@@ -140,6 +155,9 @@ def _get_state(
             {r for e in evaluations for r in e.id_intervention_reasons or []}
         )
     }
+    drug_names = infection_control_repository.get_drug_names(
+        {e.id_substitute_drug for e in evaluations if e.id_substitute_drug}
+    )
     interventions: dict[int, list] = {}
     for intervention in infection_control_repository.get_evaluation_interventions(
         admission_number=admission_number
@@ -155,7 +173,7 @@ def _get_state(
     courses = []
     for course in admission_courses.courses:
         history = [
-            _serialize_evaluation(e, names, reason_names, interventions)
+            _serialize_evaluation(e, names, reason_names, interventions, drug_names)
             for e in reversed(evaluations)
             if rule.evaluation_matches_course(e, course)
         ]
@@ -360,6 +378,49 @@ def _validate_review(
             status.HTTP_400_BAD_REQUEST,
         )
 
+    # a reason related to another drug takes a substitute; a substitution, or
+    # one whose relation is required, must have it
+    for evaluation in request_data.evaluations:
+        chosen = [reasons[id_reason] for id_reason in evaluation.interventionReasons]
+        relation_types = {reason.relation_type for reason in chosen}
+        if any(reason.substitution for reason in chosen):
+            relation_types.add(InterventionReasonRelationTypeEnum.REQUIRED.value)
+        if evaluation.substituteDrug is None:
+            if InterventionReasonRelationTypeEnum.REQUIRED.value in relation_types:
+                raise ValidationError(
+                    "Informe o medicamento substituto",
+                    "errors.invalidParams",
+                    status.HTTP_400_BAD_REQUEST,
+                )
+        elif not relation_types & {
+            InterventionReasonRelationTypeEnum.OPTIONAL.value,
+            InterventionReasonRelationTypeEnum.REQUIRED.value,
+        }:
+            raise ValidationError(
+                "Os motivos não indicam medicamento substituto",
+                "errors.invalidParams",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+    # the substitute is another antimicrobial
+    id_substitutes = {
+        evaluation.substituteDrug
+        for evaluation in request_data.evaluations
+        if evaluation.substituteDrug is not None
+    }
+    antimicrobials = {
+        id_drug
+        for id_drug, _ in infection_control_repository.search_antimicrobials(
+            id_drugs=id_substitutes, limit=len(id_substitutes)
+        )
+    }
+    if id_substitutes - antimicrobials:
+        raise ValidationError(
+            "O medicamento substituto deve ser um antimicrobiano",
+            "errors.invalidParams",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
     return reasons
 
 
@@ -388,6 +449,9 @@ def _record_intervention(
         id_department=id_department,
         observation=evaluation.notes,
         id_infection_control_evaluation=evaluation.id,
+        interactions=(
+            [evaluation.id_substitute_drug] if evaluation.id_substitute_drug else None
+        ),
     )
 
 
@@ -473,6 +537,23 @@ def save_review(request_data: InfectionControlReviewRequest, user_context: User)
     )
 
     return _get_state(admission_number=admission_number, now=now)
+
+
+@has_permission(Permission.READ_PRESCRIPTION)
+def search_antimicrobials(term: str | None):
+    """Antimicrobials by name, to recommend one instead of another"""
+    _check_feature()
+
+    term = (term or "").strip()
+    if len(term) < MIN_DRUG_SEARCH:
+        return []
+
+    return [
+        {"id": id_drug, "name": name}
+        for id_drug, name in infection_control_repository.search_antimicrobials(
+            term=term
+        )
+    ]
 
 
 @has_permission(Permission.WRITE_INFECTION_CONTROL)

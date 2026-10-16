@@ -17,7 +17,7 @@ from models.infection_control import (
     InfectionControlPending,
     InfectionControlReview,
 )
-from models.main import DrugAttributes, db
+from models.main import Drug, DrugAttributes, db
 from models.prescription import Intervention, Patient, Prescription, PrescriptionDrug
 from models.requests.infection_control_request import InfectionControlListRequest
 
@@ -203,6 +203,35 @@ def get_intervention_reasons(
         .filter(InterventionReason.id.in_(id_reasons))
         .all()
     )
+
+
+def get_drug_names(id_drugs: set[int]) -> dict[int, str]:
+    """Names of drugs, by id"""
+    if not id_drugs:
+        return {}
+
+    return dict(
+        db.session.query(Drug.id, Drug.name).filter(Drug.id.in_(id_drugs)).all()
+    )
+
+
+def search_antimicrobials(
+    term: str | None = None, id_drugs: set[int] | None = None, limit: int = 50
+) -> list[tuple[int, str]]:
+    """Drugs flagged antimicrobial (antimicro) in some segment, by name"""
+    is_antimicrobial = (
+        db.session.query(DrugAttributes.idDrug)
+        .filter(DrugAttributes.idDrug == Drug.id)
+        .filter(DrugAttributes.antimicro == True)
+        .exists()
+    )
+    query = db.session.query(Drug.id, Drug.name).filter(is_antimicrobial)
+    if term:
+        query = query.filter(Drug.name.ilike(f"%{term}%"))
+    if id_drugs is not None:
+        query = query.filter(Drug.id.in_(id_drugs))
+
+    return query.order_by(Drug.name, Drug.id).limit(limit).all()
 
 
 def get_evaluation_interventions(admission_number: int) -> list[Intervention]:

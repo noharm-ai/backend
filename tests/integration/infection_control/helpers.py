@@ -218,6 +218,7 @@ def _review(client, headers, admission_number, evaluations=(), **kwargs):
                 "notes": kwargs.get("evaluation_notes", "Indicação adequada"),
                 "interventionReasons": kwargs.get("intervention_reasons", []),
                 "createIntervention": kwargs.get("create_intervention", False),
+                "substituteDrug": kwargs.get("substitute_drug"),
                 "validFrom": kwargs.get("valid_from"),
                 "validUntil": kwargs.get(
                     "valid_until", (datetime.now() + timedelta(days=7)).isoformat()

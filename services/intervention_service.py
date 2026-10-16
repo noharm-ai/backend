@@ -360,6 +360,7 @@ def create_drug_intervention(
     agg_id_prescription=None,
     ram=None,
     id_infection_control_evaluation: int | None = None,
+    interactions: list[int] | None = None,
 ) -> Intervention:
     """Create a pending intervention on a prescribed drug, with the economy
     its reasons give it, and audit it. The caller checks the permissions."""
@@ -371,7 +372,7 @@ def create_drug_intervention(
     i.date = datetime.today()
     i.update = datetime.today()
     i.user = user_context.id
-    i.interactions = None
+    i.interactions = interactions or None
     i.transcription = None
     i.economy_days = None
     i.expended_dose = None
