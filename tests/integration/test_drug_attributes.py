@@ -1,21 +1,26 @@
 """Integration tests for drug attributes management (``/drugs/attributes`` and
 ``/drugs/substance``).
 
-Exercises ``drug_service.get_attributes``, ``drug_service.save_attributes``,
-``drug_service.update_substance`` and, indirectly,
-``drug_service.copy_substance_default_attributes`` — the flow a curator uses to
-bind a drug to a substance and let the substance's curated defaults propagate to
-every segment. None of these endpoints had prior coverage.
+Exercises ``drug_service.get_attributes``, ``drug_service.save_attributes`` and
+``drug_service.update_substance`` — the flow a curator uses to bind a drug to a
+substance. Copying the substance's curated defaults to every segment happens in
+backend-private (``lambda_substances.update_substance``, tested there), so here
+the Lambda is stubbed and the tests assert the payload the backend sends and how
+it handles the answer.
 
 Fixtures use the reserved ``>= 90000`` id range so the session-scoped
 ``clean_test_artifacts`` fixture removes them afterwards.
 """
 
+import io
+import json
+from unittest.mock import MagicMock, patch
+
 import pytest
 from sqlalchemy import text
 
 from models.enums import DrugAttributesAuditTypeEnum, SubstanceTagEnum
-from models.main import Drug, DrugAttributes, DrugAttributesAudit, Substance
+from models.main import Drug, DrugAttributes, DrugAttributesAudit
 from tests.conftest import session, session_commit
 from tests.utils.utils_test_unit_conversion import (
     create_test_drug,
@@ -37,6 +42,10 @@ _OUTLIER_SUBSTANCE = 90103  # makes _DRUG_SUBSTANCE visible to the admin drug li
 _UNKNOWN_DRUG = 90199
 _UNKNOWN_SCTID = 90199
 _UNAUTHORIZED_SEGMENT = 3  # the demo user is only authorized on segments 1 and 2
+
+# the demo user behind the config_manager_headers fixture
+CALLER_ID = 1
+CALLER_SCHEMA = "demo"
 
 # Curated values carried by _SCTID_TAGGED, mirrored into every segment on update.
 _REFERENCE_TAGS = [
@@ -307,135 +316,146 @@ def test_save_attributes_requires_write_permission(client, analyst_headers):
     assert response.status_code == 401
 
 
-def test_update_substance_copies_reference_to_every_segment(
+def _backend_private(response, apply_sctid=None, function_error=False):
+    """Lambda client double for backend-private's update_substance command.
+
+    With ``apply_sctid`` it commits the substance change (and a ``medatributos``
+    row, which the admin drug list needs) from another session before
+    answering, as the real command does, so the test sees whether the endpoint
+    reads the drug back after the call.
+    """
+
+    def invoke(**kwargs):
+        if apply_sctid:
+            session.execute(
+                text(
+                    "UPDATE demo.medicamento SET sctid = :sctid WHERE fkmedicamento = :id"
+                ),
+                {"sctid": apply_sctid, "id": _DRUG_SUBSTANCE},
+            )
+            session.execute(
+                text(
+                    "INSERT INTO demo.medatributos (fkmedicamento, idsegmento)"
+                    " VALUES (:id, 1) ON CONFLICT DO NOTHING"
+                ),
+                {"id": _DRUG_SUBSTANCE},
+            )
+            session_commit()
+
+        result = {"Payload": io.BytesIO(json.dumps(response).encode("utf-8"))}
+        if function_error:
+            result["FunctionError"] = "Unhandled"
+        return result
+
+    lambda_client = MagicMock()
+    lambda_client.invoke.side_effect = invoke
+    return lambda_client
+
+
+def _post_substance(client, headers, payload, lambda_client=None):
+    """POST /drugs/substance with the backend-private client stubbed."""
+    lambda_client = lambda_client or _backend_private({"updated": True})
+
+    with patch(
+        "utils.lambdautils.aws.get_client", return_value=lambda_client
+    ) as get_client:
+        response = client.post("/drugs/substance", headers=headers, json=payload)
+
+    return response, get_client
+
+
+def _drug_sctid(id_drug: int):
+    """Return the committed sctid of a drug."""
+    session_commit()
+    return session.query(Drug.sctid).filter(Drug.id == id_drug).scalar()
+
+
+def test_update_substance_hands_the_drug_to_backend_private(
     client, config_manager_headers
 ):
-    """POST /drugs/substance - binds the substance and mirrors its defaults per segment"""
-    response = client.post(
-        "/drugs/substance",
-        headers=config_manager_headers,
-        json={"idDrug": _DRUG_SUBSTANCE, "sctid": _SCTID_TAGGED},
+    """POST /drugs/substance - backend-private applies the substance; the endpoint answers the refreshed drug"""
+    lambda_client = _backend_private({"updated": True}, apply_sctid=_SCTID_TAGGED)
+
+    response, _ = _post_substance(
+        client,
+        config_manager_headers,
+        {"idDrug": _DRUG_SUBSTANCE, "sctid": _SCTID_TAGGED},
+        lambda_client,
     )
 
     assert response.status_code == 200
 
-    # the endpoint answers with the refreshed admin drug list for that drug
+    kwargs = lambda_client.invoke.call_args.kwargs
+    # synchronous: the answer below must already carry the new substance
+    assert kwargs["InvocationType"] == "RequestResponse"
+    assert json.loads(kwargs["Payload"]) == {
+        "command": "lambda_substances.update_substance",
+        "schema": CALLER_SCHEMA,
+        "id_user": CALLER_ID,
+        "id_drug": _DRUG_SUBSTANCE,
+        "sctid": _SCTID_TAGGED,
+    }
+
+    # the endpoint answers with the admin drug list for that drug, read after the call
     drug_list = response.get_json()["data"]["list"]
     assert [d["idDrug"] for d in drug_list] == [str(_DRUG_SUBSTANCE)]
     assert drug_list[0]["sctid"] == str(_SCTID_TAGGED)
 
-    session_commit()
-    drug = session.query(Drug).filter(Drug.id == _DRUG_SUBSTANCE).first()
-    assert drug.sctid == _SCTID_TAGGED
-    # the manual binding invalidates any AI-suggested match
-    assert drug.ai_accuracy is None
-    assert drug.updated_by is not None
 
-    segment_ids = [1, 2]
-    for id_segment in segment_ids:
-        attributes = _read_attributes(_DRUG_SUBSTANCE, id_segment)
-        assert attributes is not None, f"no attributes created for segment {id_segment}"
-        # tags present on the substance become boolean flags
-        assert attributes.antimicro is True
-        assert attributes.controlled is True
-        assert attributes.dialyzable is True
-        # tags absent from the substance are cleared
-        assert attributes.mav is False
-        assert attributes.chemo is False
-        assert attributes.tube is False
-        # both seed segments are adult, so the adult reference values are used
-        assert attributes.kidney == _REFERENCE_KIDNEY_ADULT
-        assert attributes.liver == _REFERENCE_LIVER_ADULT
-        assert attributes.platelets == _REFERENCE_PLATELETS
-        assert attributes.fallRisk == _REFERENCE_FALL_RISK
-
-    assert DrugAttributesAuditTypeEnum.UPSERT_UPDATE_SUBSTANCE.value in _audit_types(
-        _DRUG_SUBSTANCE
+@pytest.mark.parametrize(
+    "lambda_response, function_error",
+    [
+        # the command raised: backend-private answers a JSON-encoded error string
+        (json.dumps({"error": True, "message": "Invalid substance"}), False),
+        # the lambda itself crashed or timed out
+        ({"errorMessage": "Task timed out"}, True),
+    ],
+    ids=["command error", "function error"],
+)
+def test_update_substance_reports_a_backend_private_failure(
+    client, config_manager_headers, lambda_response, function_error
+):
+    """POST /drugs/substance - a failed backend-private call is not a success [500]"""
+    response, _ = _post_substance(
+        client,
+        config_manager_headers,
+        {"idDrug": _DRUG_SUBSTANCE, "sctid": _SCTID_PLAIN},
+        _backend_private(lambda_response, function_error=function_error),
     )
 
-
-def test_update_substance_overwrites_previous_binding(client, config_manager_headers):
-    """POST /drugs/substance - rebinding to another substance clears the copied flags"""
-    response = client.post(
-        "/drugs/substance",
-        headers=config_manager_headers,
-        json={"idDrug": _DRUG_SUBSTANCE, "sctid": _SCTID_PLAIN},
-    )
-
-    assert response.status_code == 200
-
-    session_commit()
-    drug = session.query(Drug).filter(Drug.id == _DRUG_SUBSTANCE).first()
-    assert drug.sctid == _SCTID_PLAIN
-
-    attributes = _read_attributes(_DRUG_SUBSTANCE, 1)
-    # the new substance carries no tags nor clinical references
-    assert attributes.antimicro is False
-    assert attributes.controlled is False
-    assert attributes.dialyzable is False
-    assert attributes.kidney is None
-    assert attributes.liver is None
-
-
-def test_update_substance_rejects_missing_sctid(client, config_manager_headers):
-    """POST /drugs/substance - a null substance is rejected [400 BAD REQUEST]"""
-    response = client.post(
-        "/drugs/substance",
-        headers=config_manager_headers,
-        json={"idDrug": _DRUG_SUBSTANCE, "sctid": None},
-    )
-
-    assert response.status_code == 400
+    assert response.status_code == 500
     assert response.get_json()["code"] == "errors.businessRules"
 
 
-def test_update_substance_rejects_inactive_substance(client, config_manager_headers):
-    """POST /drugs/substance - an inactive substance is rejected [400 BAD REQUEST]"""
-    response = client.post(
-        "/drugs/substance",
-        headers=config_manager_headers,
-        json={"idDrug": _DRUG_SUBSTANCE, "sctid": _SCTID_INACTIVE},
-    )
+@pytest.mark.parametrize(
+    "payload, code",
+    [
+        ({"idDrug": _DRUG_SUBSTANCE, "sctid": None}, "errors.businessRules"),
+        ({"idDrug": _DRUG_SUBSTANCE, "sctid": _SCTID_INACTIVE}, "errors.businessRules"),
+        ({"idDrug": _DRUG_SUBSTANCE, "sctid": _UNKNOWN_SCTID}, "errors.businessRules"),
+        ({"idDrug": _UNKNOWN_DRUG, "sctid": _SCTID_PLAIN}, "errors.invalidRecord"),
+    ],
+    ids=["missing sctid", "inactive substance", "unknown substance", "unknown drug"],
+)
+def test_update_substance_rejects_invalid_params(
+    client, config_manager_headers, payload, code
+):
+    """POST /drugs/substance - invalid params never reach backend-private [400 BAD REQUEST]"""
+    sctid_before = _drug_sctid(_DRUG_SUBSTANCE)
+
+    response, get_client = _post_substance(client, config_manager_headers, payload)
 
     assert response.status_code == 400
-
-    session_commit()
-    drug = session.query(Drug).filter(Drug.id == _DRUG_SUBSTANCE).first()
-    assert drug.sctid == _SCTID_PLAIN
-
-
-def test_update_substance_rejects_unknown_substance(client, config_manager_headers):
-    """POST /drugs/substance - a substance that does not exist [400 BAD REQUEST]"""
-    response = client.post(
-        "/drugs/substance",
-        headers=config_manager_headers,
-        json={"idDrug": _DRUG_SUBSTANCE, "sctid": _UNKNOWN_SCTID},
-    )
-
-    assert response.status_code == 400
-    assert (
-        session.query(Substance).filter(Substance.id == _UNKNOWN_SCTID).first() is None
-    )
-
-
-def test_update_substance_rejects_unknown_drug(client, config_manager_headers):
-    """POST /drugs/substance - a drug that does not exist [400 BAD REQUEST]"""
-    response = client.post(
-        "/drugs/substance",
-        headers=config_manager_headers,
-        json={"idDrug": _UNKNOWN_DRUG, "sctid": _SCTID_PLAIN},
-    )
-
-    assert response.status_code == 400
-    assert response.get_json()["code"] == "errors.invalidRecord"
+    assert response.get_json()["code"] == code
+    get_client.assert_not_called()
+    assert _drug_sctid(_DRUG_SUBSTANCE) == sctid_before
 
 
 def test_update_substance_requires_write_permission(client, analyst_headers):
     """POST /drugs/substance - user without WRITE_DRUG_ATTRIBUTES [401 UNAUTHORIZED]"""
-    response = client.post(
-        "/drugs/substance",
-        headers=analyst_headers,
-        json={"idDrug": _DRUG_SUBSTANCE, "sctid": _SCTID_TAGGED},
+    response, get_client = _post_substance(
+        client, analyst_headers, {"idDrug": _DRUG_SUBSTANCE, "sctid": _SCTID_TAGGED}
     )
 
     assert response.status_code == 401
+    get_client.assert_not_called()

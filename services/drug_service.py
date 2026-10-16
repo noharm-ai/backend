@@ -29,7 +29,7 @@ from models.segment import Segment
 from repository import drugs_repository, outlier_repository
 from services import data_authorization_service, memory_service
 from services.admin import admin_drug_service
-from utils import numberutils, prescriptionutils, status
+from utils import lambdautils, numberutils, prescriptionutils, status
 
 
 @has_permission(Permission.READ_PRESCRIPTION)
@@ -438,9 +438,11 @@ def save_attributes(id_segment, id_drug, data, user_context: User):
 
 @has_permission(Permission.WRITE_DRUG_ATTRIBUTES)
 def update_substance(id_drug, sctid, user_context: User):
-    drug = db.session.query(Drug).filter(Drug.id == id_drug).first()
+    """Set a drug's substance (backend-private copies its attributes and recalculates the max dose)"""
+    # column queries: an ORM Drug in the identity map would hide the lambda's update
+    drug_exists = db.session.query(Drug.id).filter(Drug.id == id_drug).first()
 
-    if drug is None:
+    if drug_exists is None:
         raise ValidationError(
             "Registro inexistente", "errors.invalidRecord", status.HTTP_400_BAD_REQUEST
         )
@@ -450,21 +452,23 @@ def update_substance(id_drug, sctid, user_context: User):
             "Substância inválida", "errors.businessRules", status.HTTP_400_BAD_REQUEST
         )
 
-    substance = db.session.query(Substance).filter(Substance.id == sctid).first()
-    if not substance or not substance.active:
+    substance_active = (
+        db.session.query(Substance.active).filter(Substance.id == sctid).scalar()
+    )
+    if not substance_active:
         raise ValidationError(
             "Substância inválida", "errors.businessRules", status.HTTP_400_BAD_REQUEST
         )
 
-    drug.sctid = sctid
-    drug.ai_accuracy = None
-    drug.updated_at = datetime.today()
-    drug.updated_by = user_context.id
-
-    db.session.flush()
-
-    copy_substance_default_attributes(
-        drug.id, drug.sctid, user=user_context, calc_dose_max=True
+    lambdautils.invoke_backend_function(
+        payload={
+            "command": "lambda_substances.update_substance",
+            "schema": user_context.schema,
+            "id_user": user_context.id,
+            "id_drug": id_drug,
+            "sctid": sctid,
+        },
+        error_message="Ocorreu um erro ao atualizar a substância. Consulte o administrador do sistema.",
     )
 
     return admin_drug_service.get_drug_list(
@@ -472,9 +476,7 @@ def update_substance(id_drug, sctid, user_context: User):
     )
 
 
-def copy_substance_default_attributes(
-    id_drug, sctid, user: User, overwrite=True, calc_dose_max=False
-):
+def copy_substance_default_attributes(id_drug, sctid, user: User, overwrite=True):
     reference = db.session.query(Substance).filter(Substance.id == sctid).first()
 
     if reference != None:
@@ -511,11 +513,6 @@ def copy_substance_default_attributes(
                 db.session.add(da)
             else:
                 db.session.flush()
-
-            if calc_dose_max:
-                admin_drug_service.calculate_dosemax_uniq(
-                    id_drug=id_drug, id_segment=da.idSegment
-                )
 
             _audit(
                 drug_attributes=da,

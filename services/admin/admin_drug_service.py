@@ -134,7 +134,6 @@ def fix_inconsistency(user_context: User):
             sctid=d[1],
             user=user_context,
             overwrite=False,
-            calc_dose_max=False,
         )
 
     return len(inconsistent_drugs)
