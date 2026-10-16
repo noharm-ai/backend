@@ -136,6 +136,14 @@ class InterventionEconomyTypeEnum(Enum):
     CUSTOM = 3
 
 
+class InterventionReasonRelationTypeEnum(Enum):
+    """Whether an intervention reason relates the drug to others (motivointervencao.tp_relacao)"""
+
+    DO_NOT_APPLY = 0
+    OPTIONAL = 1
+    REQUIRED = 2
+
+
 class InterventionStatusEnum(Enum):
     PENDING = "s"
     REMOVED = "0"
@@ -210,6 +218,7 @@ class DrugAttributesAuditTypeEnum(Enum):
     INSERT_FROM_REFERENCE = 4
     COPY_FROM_REFERENCE = 5
     SET_DIVISION_RANGE = 6
+    DOSE_MAX_UPDATE = 7
 
 
 class PatientAuditTypeEnum(Enum):

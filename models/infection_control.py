@@ -51,6 +51,14 @@ class AntimicrobialEvaluation(db.Model):
     id_prescription_drug = db.Column("fkpresmed", db.BigInteger, nullable=False)
     course_start = db.Column("dt_inicio_curso", db.DateTime, nullable=False)
     conforming = db.Column("conforme", db.Boolean, nullable=False)
+    # the intervention reasons of a non-conformity
+    id_intervention_reasons = db.Column(
+        "idmotivointervencao", postgresql.ARRAY(db.BigInteger), nullable=True
+    )
+    # the drug a substitution reason recommends instead
+    id_substitute_drug = db.Column(
+        "fkmedicamento_substituto", db.BigInteger, nullable=True
+    )
     notes = db.Column("observacao", db.String, nullable=True)
     posology = db.Column("posologia", postgresql.JSONB, nullable=False)
     # when the verdict starts to apply: the review, or earlier when the

@@ -14,10 +14,12 @@ from datetime import datetime
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
 from models.enums import (
+    AntimicrobialEvaluationClosingEnum,
     AntimicrobialEvaluationStatusEnum,
     FeatureEnum,
     InfectionControlOriginEnum,
     InfectionControlStatusEnum,
+    InterventionReasonRelationTypeEnum,
 )
 from models.infection_control import (
     AntimicrobialEvaluation,
@@ -32,13 +34,17 @@ from models.requests.infection_control_request import (
 )
 from repository import user_repository
 from repository.infection_control import infection_control_repository
-from services import feature_service
+from services import feature_service, intervention_service
 from services.infection_control import (
     antimicrobial_timeline_service,
     infection_control_status_service as rule,
 )
 from services.infection_control.antimicrobial_timeline_service import GAP_TOLERANCE
 from utils import dateutils, logger, status
+
+
+# letters typed before the drugs are searched
+MIN_DRUG_SEARCH = 3
 
 
 def _check_feature():
@@ -64,7 +70,22 @@ def _serialize_pending(pending: InfectionControlPending) -> dict:
     }
 
 
-def _serialize_evaluation(evaluation: AntimicrobialEvaluation, names: dict) -> dict:
+def _reason_name(reason, parent_name: str | None) -> str:
+    return (
+        f"{parent_name} - {reason.description}" if parent_name else reason.description
+    )
+
+
+def _serialize_evaluation(
+    evaluation: AntimicrobialEvaluation,
+    names: dict,
+    reason_names: dict | None = None,
+    interventions: dict | None = None,
+    drug_names: dict | None = None,
+) -> dict:
+    reason_names = reason_names or {}
+    interventions = interventions or {}
+    drug_names = drug_names or {}
     return {
         "id": str(evaluation.id),
         "idReview": str(evaluation.id_review),
@@ -72,6 +93,22 @@ def _serialize_evaluation(evaluation: AntimicrobialEvaluation, names: dict) -> d
         "idPrescription": str(evaluation.id_prescription),
         "courseStart": dateutils.to_iso(evaluation.course_start),
         "conforming": evaluation.conforming,
+        "interventionReasons": [
+            {"id": id_reason, "name": reason_names.get(id_reason)}
+            for id_reason in evaluation.id_intervention_reasons or []
+        ],
+        "substituteDrug": (
+            {
+                "id": evaluation.id_substitute_drug,
+                "name": drug_names.get(evaluation.id_substitute_drug),
+            }
+            if evaluation.id_substitute_drug
+            else None
+        ),
+        "interventions": [
+            {"id": str(i.idIntervention), "status": i.status}
+            for i in interventions.get(evaluation.id, [])
+        ],
         "notes": evaluation.notes,
         "posology": evaluation.posology,
         "validFrom": dateutils.to_iso(evaluation.valid_from),
@@ -112,6 +149,22 @@ def _get_state(
     names = user_repository.get_user_names(
         {r.created_by for r in reviews} | {e.created_by for e in evaluations}
     )
+    reason_names = {
+        reason.id: _reason_name(reason, parent_name)
+        for reason, parent_name in infection_control_repository.get_intervention_reasons(
+            {r for e in evaluations for r in e.id_intervention_reasons or []}
+        )
+    }
+    drug_names = infection_control_repository.get_drug_names(
+        {e.id_substitute_drug for e in evaluations if e.id_substitute_drug}
+    )
+    interventions: dict[int, list] = {}
+    for intervention in infection_control_repository.get_evaluation_interventions(
+        admission_number=admission_number
+    ):
+        interventions.setdefault(
+            intervention.id_infection_control_evaluation, []
+        ).append(intervention)
 
     if admission_courses is None:
         admission_courses = rule.load_courses(
@@ -120,7 +173,7 @@ def _get_state(
     courses = []
     for course in admission_courses.courses:
         history = [
-            _serialize_evaluation(e, names)
+            _serialize_evaluation(e, names, reason_names, interventions, drug_names)
             for e in reversed(evaluations)
             if rule.evaluation_matches_course(e, course)
         ]
@@ -238,7 +291,8 @@ def _validate_review(
     request_data: InfectionControlReviewRequest,
     admission_courses: rule.AdmissionCourses,
     now: datetime,
-):
+) -> dict:
+    """Check the review; returns the intervention reasons it uses, by id"""
     if request_data.nextReviewDate is not None and request_data.nextReviewDate <= now:
         raise ValidationError(
             "A data da próxima revisão deve ser futura",
@@ -288,6 +342,118 @@ def _validate_review(
                 status.HTTP_400_BAD_REQUEST,
             )
 
+        # a non-conformity is given its reasons, and may record an intervention
+        if evaluation.conforming and (
+            evaluation.interventionReasons or evaluation.createIntervention
+        ):
+            raise ValidationError(
+                "Avaliação conforme não tem motivo de não conformidade",
+                "errors.invalidParams",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not evaluation.conforming and not evaluation.interventionReasons:
+            raise ValidationError(
+                "Informe o motivo da não conformidade",
+                "errors.invalidParams",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+    id_reasons = {
+        id_reason
+        for evaluation in request_data.evaluations
+        for id_reason in evaluation.interventionReasons
+    }
+    reasons = {
+        reason.id: reason
+        for reason, _ in infection_control_repository.get_intervention_reasons(
+            id_reasons
+        )
+        if reason.active and reason.infection_control
+    }
+    if id_reasons - reasons.keys():
+        raise ValidationError(
+            "Motivo de não conformidade inválido",
+            "errors.invalidParams",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    # a reason related to another drug takes a substitute; a substitution, or
+    # one whose relation is required, must have it
+    for evaluation in request_data.evaluations:
+        chosen = [reasons[id_reason] for id_reason in evaluation.interventionReasons]
+        relation_types = {reason.relation_type for reason in chosen}
+        if any(reason.substitution for reason in chosen):
+            relation_types.add(InterventionReasonRelationTypeEnum.REQUIRED.value)
+        if evaluation.substituteDrug is None:
+            if InterventionReasonRelationTypeEnum.REQUIRED.value in relation_types:
+                raise ValidationError(
+                    "Informe o medicamento substituto",
+                    "errors.invalidParams",
+                    status.HTTP_400_BAD_REQUEST,
+                )
+        elif not relation_types & {
+            InterventionReasonRelationTypeEnum.OPTIONAL.value,
+            InterventionReasonRelationTypeEnum.REQUIRED.value,
+        }:
+            raise ValidationError(
+                "Os motivos não indicam medicamento substituto",
+                "errors.invalidParams",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+    # the substitute is another antimicrobial
+    id_substitutes = {
+        evaluation.substituteDrug
+        for evaluation in request_data.evaluations
+        if evaluation.substituteDrug is not None
+    }
+    antimicrobials = {
+        id_drug
+        for id_drug, _ in infection_control_repository.search_antimicrobials(
+            id_drugs=id_substitutes, limit=len(id_substitutes)
+        )
+    }
+    if id_substitutes - antimicrobials:
+        raise ValidationError(
+            "O medicamento substituto deve ser um antimicrobiano",
+            "errors.invalidParams",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    return reasons
+
+
+def _record_intervention(
+    evaluation: AntimicrobialEvaluation,
+    reasons: list,
+    id_department: int | None,
+    user_context: User,
+):
+    """Record the non-conformity as an intervention on the drug, as the
+    prescription screening would, kept by infection control"""
+    # a record of the past would land on the drug prescribed now
+    if evaluation.closing_type == AntimicrobialEvaluationClosingEnum.RETROACTIVE.value:
+        raise ValidationError(
+            "Avaliação retroativa não registra intervenção",
+            "errors.invalidParams",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    intervention_service.create_drug_intervention(
+        user_context=user_context,
+        id_prescription_drug=evaluation.id_prescription_drug,
+        admission_number=evaluation.admission_number,
+        id_intervention_reason=evaluation.id_intervention_reasons,
+        reasons=reasons,
+        id_department=id_department,
+        observation=evaluation.notes,
+        id_infection_control_evaluation=evaluation.id,
+        interactions=(
+            [evaluation.id_substitute_drug] if evaluation.id_substitute_drug else None
+        ),
+    )
+
 
 @has_permission(Permission.WRITE_INFECTION_CONTROL)
 def save_review(request_data: InfectionControlReviewRequest, user_context: User):
@@ -298,7 +464,7 @@ def save_review(request_data: InfectionControlReviewRequest, user_context: User)
     now = datetime.now()
     admission_number = request_data.admissionNumber
     admission_courses = rule.load_courses(admission_number=admission_number, now=now)
-    _validate_review(
+    reasons = _validate_review(
         request_data=request_data, admission_courses=admission_courses, now=now
     )
 
@@ -335,8 +501,9 @@ def save_review(request_data: InfectionControlReviewRequest, user_context: User)
         admission_number=admission_number
     )
 
+    id_department = None
     for evaluation_data in request_data.evaluations:
-        rule.record_evaluation(
+        evaluation = rule.record_evaluation(
             review=review,
             course=admission_courses.ongoing_course(evaluation_data.idDrug),
             evaluation_data=evaluation_data,
@@ -345,6 +512,18 @@ def save_review(request_data: InfectionControlReviewRequest, user_context: User)
             user_id=user_context.id,
             now=now,
         )
+
+        if evaluation_data.createIntervention:
+            if id_department is None:
+                id_department = intervention_service.get_current_department(
+                    admission_number
+                )
+            _record_intervention(
+                evaluation=evaluation,
+                reasons=[reasons[r] for r in evaluation.id_intervention_reasons],
+                id_department=id_department,
+                user_context=user_context,
+            )
 
     rule.resolve_on_review(
         review=review, open_pendings=open_pendings, user_id=user_context.id, now=now
@@ -358,6 +537,23 @@ def save_review(request_data: InfectionControlReviewRequest, user_context: User)
     )
 
     return _get_state(admission_number=admission_number, now=now)
+
+
+@has_permission(Permission.READ_PRESCRIPTION)
+def search_antimicrobials(term: str | None):
+    """Antimicrobials by name, to recommend one instead of another"""
+    _check_feature()
+
+    term = (term or "").strip()
+    if len(term) < MIN_DRUG_SEARCH:
+        return []
+
+    return [
+        {"id": id_drug, "name": name}
+        for id_drug, name in infection_control_repository.search_antimicrobials(
+            term=term
+        )
+    ]
 
 
 @has_permission(Permission.WRITE_INFECTION_CONTROL)

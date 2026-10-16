@@ -18,13 +18,13 @@ from models.prescription import (
     PrescriptionDrug,
 )
 from repository import intervention_outcome_repository, patient_repository
-from services import data_authorization_service, segment_service
+from services import data_authorization_service, intervention_service, segment_service
 from utils import numberutils, prescriptionutils, status
 
 DEFAULT_SEGMENT = 1
 
 
-@has_permission(Permission.WRITE_PRESCRIPTION)
+@has_permission(Permission.WRITE_PRESCRIPTION, Permission.WRITE_INFECTION_CONTROL)
 def set_intervention_outcome(
     user_context: User,
     id_intervention,
@@ -50,6 +50,10 @@ def set_intervention_outcome(
             "errors.invalidRecord",
             status.HTTP_400_BAD_REQUEST,
         )
+
+    intervention_service.validate_origin_permission(
+        intervention=intervention, user=user_context
+    )
 
     # check if intervention fkpresmed is archived
     if intervention.id != 0:
@@ -81,11 +85,13 @@ def set_intervention_outcome(
                 status.HTTP_400_BAD_REQUEST,
             )
 
-    _validate_authorization(
-        id_prescription=intervention.idPrescription,
-        id_prescription_drug=intervention.id,
-        user=user_context,
-    )
+    # infection control interventions follow the admission, not the segment
+    if not intervention.id_infection_control_evaluation:
+        _validate_authorization(
+            id_prescription=intervention.idPrescription,
+            id_prescription_drug=intervention.id,
+            user=user_context,
+        )
 
     if outcome not in ["a", "n", "x", "j", "s"]:
         raise ValidationError(
@@ -255,6 +261,21 @@ def get_outcome_data(id_intervention, user_context: User, edit=False):
             status.HTTP_400_BAD_REQUEST,
         )
 
+    data = _get_outcome_data(record=record, user_context=user_context, edit=edit)
+
+    # who may change it: infection control keeps the ones its reviews recorded
+    intervention: Intervention = record[0]
+    data["header"]["infectionControl"] = bool(
+        intervention.id_infection_control_evaluation
+    )
+    data["header"]["locked"] = not intervention_service.can_change_intervention(
+        intervention=intervention, user=user_context
+    )
+
+    return data
+
+
+def _get_outcome_data(record, user_context: User, edit: bool):
     intervention: Intervention = record[0]
     prescription_drug: PrescriptionDrug = record[1]
     readonly = intervention.status != InterventionStatusEnum.PENDING.value and not edit

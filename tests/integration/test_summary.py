@@ -23,11 +23,12 @@ from sqlalchemy import text
 
 from tests.conftest import session, session_commit
 
-# test-generated ids use the reserved ranges cleaned by tests/conftest.py
-ADMISSION = 100501
-ID_PATIENT = 100501
-ADMISSION_NO_NOTES = 100502
-ID_PATIENT_NO_NOTES = 100502
+# test-generated ids use the reserved ranges cleaned by tests/conftest.py, the
+# admissions above the ones handed out by test_counters
+ADMISSION = 900501
+ID_PATIENT = 900501
+ADMISSION_NO_NOTES = 900502
+ID_PATIENT_NO_NOTES = 900502
 
 NOTE_FIRST = 100801
 NOTE_SECOND_DAY_TWO = 100802

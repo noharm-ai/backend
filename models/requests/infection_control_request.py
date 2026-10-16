@@ -23,6 +23,12 @@ class AntimicrobialEvaluationRequest(BaseModel):
     idDrug: int
     conforming: bool
     notes: str | None = None
+    # intervention reasons of a non-conformity (flagged for infection control)
+    interventionReasons: list[int] = []
+    # the drug recommended instead, for reasons related to another drug
+    substituteDrug: int | None = None
+    # record an intervention on the drug with the non-conformity reasons
+    createIntervention: bool = False
     # the evaluation applies from this date, between the course start and now;
     # empty means from the review
     validFrom: LocalDatetime | None = None

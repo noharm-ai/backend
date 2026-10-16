@@ -286,6 +286,10 @@ def record_evaluation(
     evaluation.id_prescription_drug = latest.id_prescription_drug
     evaluation.course_start = course.start
     evaluation.conforming = evaluation_data.conforming
+    evaluation.id_intervention_reasons = (
+        sorted(set(evaluation_data.interventionReasons)) or None
+    )
+    evaluation.id_substitute_drug = evaluation_data.substituteDrug
     evaluation.notes = evaluation_data.notes
     evaluation.posology = posology_snapshot(course)
     evaluation.valid_from = evaluation_data.validFrom or now

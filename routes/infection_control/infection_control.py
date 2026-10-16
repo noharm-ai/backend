@@ -70,6 +70,15 @@ def follow_admission(admission_number: int):
     return infection_control_service.follow_admission(admission_number=admission_number)
 
 
+@app_infection_control.route("/infection-control/antimicrobials", methods=["GET"])
+@api_endpoint()
+def search_antimicrobials():
+    """Antimicrobials by name, for the substitute of a non-conformity"""
+    return infection_control_service.search_antimicrobials(
+        term=request.args.get("q", None)
+    )
+
+
 @app_infection_control.route("/infection-control/review", methods=["POST"])
 @api_endpoint()
 def save_review():
