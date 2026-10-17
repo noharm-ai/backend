@@ -457,12 +457,13 @@ The rule holds even when the real value would be convenient or is already visibl
 - Keep the contract (`schema`/`admission_number` in; `processed`/`changed`/`skipped` out) in step with `services/infection_control_service.py` in `backend-private`
 - Tests: `tests/unit/test_infection_control_status_rule.py` and `tests/integration/infection_control/` (the job entry in `test_job.py`)
 
-### Drug Substance and Unit Conversion (persisted by backend-private)
-- Setting a drug's substance (`POST /drugs/substance`, `drug_service.update_substance`) and saving its unit conversions (`POST /drugs/unit-conversion/<id>`, `unit_conversion_service.save_unit_conversion_for_drug`) only validate the request here and then call `backend-private` synchronously through `lambdautils.invoke_backend_function`: `lambda_substances.update_substance` and `lambda_unit_conversion.save_drug_conversions`. The admin project calls the same commands.
-- **Don't re-implement the writes here** (copying substance attributes to every segment, `unidadeconverte` upserts, default measure unit, max dose recalculation): change them in `backend-private`, so backend and admin stay in step.
+### Drug Substance, Unit Conversion and Score Config (persisted by backend-private)
+- Setting a drug's substance (`POST /drugs/substance`, `drug_service.update_substance`), saving its unit conversions (`POST /drugs/unit-conversion/<id>`, `unit_conversion_service.save_unit_conversion_for_drug`) and setting its division range before generating scores (`POST /outliers/generate/config/<segment>/<drug>/v2`, `drug_service.drug_config_to_generate_score`) only validate the request here and then call `backend-private` synchronously through `lambdautils.invoke_backend_function`: `lambda_substances.update_substance`, `lambda_unit_conversion.save_drug_conversions` and `lambda_scores.set_division_range`. The admin project calls the same commands.
+- **Max dose is never calculated here.** `backend-private` recalculates it (and decides when a curator's value is kept) as part of those commands.
+- **Don't re-implement the writes here** (copying substance attributes to every segment, `unidadeconverte` upserts, default measure unit, creating `medatributos` from the substance, divisor/weight, max dose recalculation): change them in `backend-private`, so backend and admin stay in step.
 - Don't write in the request session before the call: backend-private commits in its own session, so a pending write here can block it. Read the result back with column queries (an ORM object already in the identity map keeps its old values).
-- The save sends `process_scores: false`: the client generates the scores with `POST /drugs/process-scores/<id>`.
-- Tests: `tests/integration/test_drug_attributes.py` and `tests/integration/test_unit_conversion_save.py` stub the Lambda and assert the payload; the writes are tested in `backend-private`.
+- The unit conversion save and the score config send `process_scores: false`: the client generates the scores afterwards (`POST /drugs/process-scores/<id>`, or `prepare` + `single` in the generate-score drawer).
+- Tests: `tests/integration/test_drug_attributes.py`, `tests/integration/test_unit_conversion_save.py` and `tests/integration/test_drug_score_config.py` stub the Lambda and assert the payload; the writes are tested in `backend-private`.
 
 ## Development Workflow
 
