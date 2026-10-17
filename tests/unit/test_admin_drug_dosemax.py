@@ -8,15 +8,14 @@ record is reported as ``not_converted``. Which reference is read (adult or
 pediatric) depends on the segment type.
 
 ``calculate_dosemax_uniq`` applies that result to a single ``medatributos``
-record and ``calculate_dosemax_bulk`` does it for the whole table, so both are
-covered here through their repository boundaries.
+record, covered here through its repository boundary.
 
 The functions are reached through ``__wrapped__`` to bypass the
 ``@has_permission`` gate — no request context or database is involved.
 """
 
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -29,7 +28,6 @@ from services.admin import admin_drug_service
 # The undecorated business logic (skips the permission gate).
 _max_dose_ref = admin_drug_service.get_max_dose_ref.__wrapped__
 _dosemax_uniq = admin_drug_service.calculate_dosemax_uniq.__wrapped__
-_dosemax_bulk = admin_drug_service.calculate_dosemax_bulk.__wrapped__
 
 
 def _segment(id=1, type=SegmentTypeEnum.ADULT.value):
@@ -327,87 +325,3 @@ def test_dosemax_uniq_clears_the_max_dose_when_the_reference_cannot_be_converted
     assert attributes.maxDose is None
     assert attributes.ref_maxdose is None
     assert attributes.ref_maxdose_weight is None
-
-
-# ---------------------------------------------------------------------------
-# calculate_dosemax_bulk
-# ---------------------------------------------------------------------------
-
-
-def _run_dosemax_bulk(refs):
-    """Run the bulk calculation over one row per entry of ``refs``."""
-    rows = [_attributes_row(_attributes(), _segment()) for _ in refs]
-    user_context = SimpleNamespace(id=1, schema="demo")
-
-    with (
-        patch.object(
-            admin_drug_service.drugs_repository,
-            "get_drug_attributes",
-            return_value=rows,
-        ),
-        patch.object(
-            admin_drug_service.drugs_repository, "get_conversions", return_value=[]
-        ),
-        patch.object(admin_drug_service, "get_max_dose_ref", side_effect=list(refs)),
-        patch.object(
-            admin_drug_service, "drug_attributes_repository"
-        ) as attributes_repository,
-    ):
-        attributes_repository.copy_dose_max_from_ref.return_value = MagicMock(
-            rowcount=len([r for r in refs if r["type"] == "converted"])
-        )
-        result = _dosemax_bulk(user_context=user_context)
-
-    return result, attributes_repository
-
-
-def test_dosemax_bulk_counts_every_outcome():
-    """Each record is tallied under the outcome its reference produced."""
-    result, _ = _run_dosemax_bulk(
-        [
-            {"type": "converted", "idDrug": 1, "idSegment": 1, "dosemax": 10},
-            {"type": "converted", "idDrug": 2, "idSegment": 1, "dosemax": 20},
-            {"type": "not_converted", "idDrug": 3, "idSegment": 1},
-            {"type": "no_reference", "idDrug": 4, "idSegment": 1},
-        ]
-    )
-
-    assert result["converted"] == 2
-    assert result["notConverted"] == 1
-    assert result["noReference"] == 1
-    assert result["updated"] == 2
-
-
-def test_dosemax_bulk_only_persists_converted_records():
-    """Records without a usable reference are not sent to the update statement."""
-    converted = {"type": "converted", "idDrug": 1, "idSegment": 1, "dosemax": 10}
-
-    _, attributes_repository = _run_dosemax_bulk(
-        [converted, {"type": "not_converted", "idDrug": 2, "idSegment": 1}]
-    )
-
-    attributes_repository.update_dose_max.assert_called_once_with(
-        update_list=[converted], schema="demo"
-    )
-    attributes_repository.copy_dose_max_from_ref.assert_called_once_with(
-        schema="demo", update_by=1
-    )
-
-
-def test_dosemax_bulk_skips_the_update_when_nothing_converted():
-    """No conversion means no write and nothing reported as updated."""
-    result, attributes_repository = _run_dosemax_bulk(
-        [
-            {"type": "not_converted", "idDrug": 1, "idSegment": 1},
-            {"type": "no_reference", "idDrug": 2, "idSegment": 1},
-        ]
-    )
-
-    assert result == {
-        "converted": 0,
-        "notConverted": 1,
-        "noReference": 1,
-        "updated": 0,
-    }
-    attributes_repository.update_dose_max.assert_not_called()
-    attributes_repository.copy_dose_max_from_ref.assert_not_called()

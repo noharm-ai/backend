@@ -356,7 +356,6 @@ All endpoints in this section require administrator-level authorization.
 | `POST` | `/admin/drug/predict-substance` | AI-predict substance for unmapped drugs. |
 | `GET` | `/admin/drug/get-missing-substance` | List drugs with no substance mapping. |
 | `POST` | `/admin/drug/add-new-outlier` | Manually add an outlier entry. |
-| `POST` | `/admin/drug/calculate-dosemax` | Bulk-calculate max dose for drugs. |
 
 ### Substance Management
 
