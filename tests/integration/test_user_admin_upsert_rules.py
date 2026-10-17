@@ -15,6 +15,8 @@ Users created here use the ``test%@example.com`` pattern removed by
 ``_cleanup`` in ``tests/conftest.py``; each test also removes its own rows.
 """
 
+import json
+
 import pytest
 from sqlalchemy import text
 
@@ -121,7 +123,7 @@ def other_schema_user():
         ),
         {
             "email": OTHER_SCHEMA_EMAIL,
-            "config": '{"roles": ["%s"]}' % Role.VIEWER.value,
+            "config": json.dumps({"roles": [Role.VIEWER.value]}),
         },
     ).scalar()
     session_commit()
