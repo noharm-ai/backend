@@ -1,9 +1,9 @@
 """Repository: infection control follow-up (ci_* tables)"""
 
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timedelta
 
-from sqlalchemy import and_, func, or_, text, update
+from sqlalchemy import DateTime, and_, func, or_, text, update
 from sqlalchemy.dialects.postgresql import insert
 
 from models.appendix import Department, InterventionReason
@@ -365,6 +365,40 @@ def _filter_admissions(query, filters: InfectionControlListRequest, now: datetim
         query = query.filter(InfectionControlAdmission.next_review_date != None).filter(
             InfectionControlAdmission.next_review_date < now
         )
+
+    return _filter_features(query=query, filters=filters, now=now)
+
+
+def _contains_any(key: str, values: list[int]):
+    """Whether the list `key` of the record's features holds any of `values`"""
+    return or_(
+        *[InfectionControlAdmission.features[key].contains([value]) for value in values]
+    )
+
+
+def _filter_features(query, filters: InfectionControlListRequest, now: datetime):
+    """Apply the worklist filters kept on the record by the rule (indicadores),
+    so the worklist doesn't join the prescriptions of every admission"""
+    features = InfectionControlAdmission.features
+
+    if filters.idDrug:
+        query = query.filter(_contains_any("drugIDs", filters.idDrug))
+
+    if filters.idSubstance:
+        query = query.filter(_contains_any("substanceIDs", filters.idSubstance))
+
+    if filters.awareLevels:
+        query = query.filter(_contains_any("awareLevels", filters.awareLevels))
+
+    if filters.minTreatmentDays:
+        # day N starts (N - 1) days after the course start
+        query = query.filter(
+            features["firstCourseStart"].astext.cast(DateTime)
+            < now - timedelta(days=filters.minTreatmentDays - 1)
+        )
+
+    if filters.nonConforming:
+        query = query.filter(features["nonConforming"].as_boolean() == True)
 
     return query
 

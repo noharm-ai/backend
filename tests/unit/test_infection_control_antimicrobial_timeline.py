@@ -44,6 +44,7 @@ def _row(
         id_prescription_drug=int(f"{id_prescription}{id_drug}"),
         id_drug=id_drug,
         drug=f"Drug {id_drug}",
+        id_substance=None,
         substance=None,
         atb_level=None,
         cpoe=cpoe,

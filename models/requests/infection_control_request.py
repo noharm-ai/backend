@@ -58,6 +58,18 @@ class InfectionControlListRequest(BaseModel):
     admissionNumbers: list[int] = []
     # admissions whose scheduled review date has passed
     overdueReview: bool = False
+    # the filters below read what the rule last saw running (indicadores)
+    # admissions running any of these antimicrobials
+    idDrug: list[int] = []
+    # admissions running an antimicrobial of any of these substances
+    idSubstance: list[int] = []
+    # admissions running an antimicrobial of any of these AWaRe levels
+    awareLevels: list[int] = []
+    # admissions with an antimicrobial running for at least this many days (D1
+    # is the first 24 hours, as in the timeline)
+    minTreatmentDays: int | None = Field(default=None, ge=1)
+    # admissions with an evaluation in force judged non conforming
+    nonConforming: bool = False
     limit: int = Field(default=100, ge=1, le=500)
     offset: int = Field(default=0, ge=0)
 
