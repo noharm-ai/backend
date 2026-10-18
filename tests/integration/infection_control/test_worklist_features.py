@@ -132,6 +132,11 @@ def test_rule_keeps_running_antimicrobials(
     assert _drugs(_record(admission)["indicadores"]) == [ANTIMICROBIAL_DRUG]
 
 
+def _criteria(*criteria):
+    """The antimicrobials filter: every criterion met by a course of its own"""
+    return {"antimicrobials": list(criteria)}
+
+
 def test_worklist_filters_by_antimicrobial(
     client, infection_controller_headers, infection_control, admission
 ):
@@ -139,16 +144,20 @@ def test_worklist_filters_by_antimicrobial(
     follows an admission without them, the job fills them in"""
     _prescribe_today(admission, job=False)
 
-    def listed(**filters):
-        return _listed(client, infection_controller_headers, admission, **filters)
+    def listed(*criteria):
+        return _listed(
+            client, infection_controller_headers, admission, **_criteria(*criteria)
+        )
 
-    assert listed(idDrug=[ANTIMICROBIAL_DRUG]) == []
+    assert listed({"idDrug": [ANTIMICROBIAL_DRUG]}) == []
 
     _run_job(admission)
 
-    assert listed(idDrug=[ANTIMICROBIAL_DRUG]) == [admission]
-    assert listed(idDrug=[OTHER_DRUG, ANTIMICROBIAL_DRUG]) == [admission]
-    assert listed(idDrug=[OTHER_DRUG]) == []
+    assert listed({"idDrug": [ANTIMICROBIAL_DRUG]}) == [admission]
+    assert listed({"idDrug": [OTHER_DRUG, ANTIMICROBIAL_DRUG]}) == [admission]
+    assert listed({"idDrug": [OTHER_DRUG]}) == []
+    # an empty criterion asks for nothing
+    assert listed({}) == [admission]
 
 
 def test_worklist_filters_by_substance_and_aware_level(
@@ -158,14 +167,25 @@ def test_worklist_filters_by_substance_and_aware_level(
     admission,
     antimicrobial_substance,
 ):
-    """The substance and the AWaRe group of the running antimicrobials"""
+    """The substance of a criterion, either it or its drugs; the AWaRe group
+    of any running antimicrobial"""
     _prescribe_today(admission)
 
-    def listed(**filters):
-        return _listed(client, infection_controller_headers, admission, **filters)
+    def listed(*criteria, **filters):
+        return _listed(
+            client,
+            infection_controller_headers,
+            admission,
+            **_criteria(*criteria),
+            **filters,
+        )
 
-    assert listed(idSubstance=[antimicrobial_substance]) == [admission]
-    assert listed(idSubstance=[antimicrobial_substance + 1]) == []
+    assert listed({"idSubstance": [antimicrobial_substance]}) == [admission]
+    assert listed({"idSubstance": [antimicrobial_substance + 1]}) == []
+    # the drug is not running, its substance is
+    assert listed(
+        {"idDrug": [OTHER_DRUG], "idSubstance": [antimicrobial_substance]}
+    ) == [admission]
     assert listed(awareLevels=[AWARE_RESERVE]) == [admission]
     assert listed(awareLevels=[1, 2]) == []
 
@@ -179,8 +199,10 @@ def test_worklist_filters_by_treatment_day(
     _prescribe(admission, datetime.now() - timedelta(days=4, hours=1), _day(1))
     _run_job(admission)
 
-    def listed(**filters):
-        return _listed(client, infection_controller_headers, admission, **filters)
+    def listed(**days):
+        return _listed(
+            client, infection_controller_headers, admission, **_criteria(days)
+        )
 
     assert listed(treatmentDayFrom=5, treatmentDayTo=5) == [admission]
     assert listed(treatmentDayFrom=1) == [admission]
@@ -191,15 +213,20 @@ def test_worklist_filters_by_treatment_day(
     assert listed(treatmentDayFrom=1, treatmentDayTo=1) == []
 
 
-def test_worklist_filters_by_antimicrobial_on_a_treatment_day(
+def _d(day):
+    """A treatment day range of a single day"""
+    return {"treatmentDayFrom": day, "treatmentDayTo": day}
+
+
+def test_worklist_filters_by_antimicrobials_on_their_treatment_days(
     client,
     infection_controller_headers,
     infection_control,
     admission,
     second_antimicrobial,
 ):
-    """The antimicrobial and the treatment day are met by the same course:
-    one started today is on D1, the other one is not"""
+    """Each criterion is met by a course of its own: the drug and the day of a
+    criterion go together, and every criterion must be met"""
     # on D5
     _prescribe(admission, datetime.now() - timedelta(days=4, hours=1), _day(1))
     # started an hour ago: on D1
@@ -208,27 +235,39 @@ def test_worklist_filters_by_antimicrobial_on_a_treatment_day(
     )
     _run_job(admission)
 
-    def on_d1(**filters):
+    def listed(*criteria):
         return _listed(
-            client,
-            infection_controller_headers,
-            admission,
-            treatmentDayFrom=1,
-            treatmentDayTo=1,
-            **filters,
+            client, infection_controller_headers, admission, **_criteria(*criteria)
         )
 
-    assert on_d1() == [admission]
-    assert on_d1(idDrug=[OTHER_DRUG]) == [admission]
-    assert on_d1(idDrug=[ANTIMICROBIAL_DRUG]) == []
-    assert _listed(
-        client,
-        infection_controller_headers,
-        admission,
-        idDrug=[ANTIMICROBIAL_DRUG],
-        treatmentDayFrom=5,
-        treatmentDayTo=5,
+    assert listed(_d(1)) == [admission]
+    assert listed({"idDrug": [OTHER_DRUG], **_d(1)}) == [admission]
+    assert listed({"idDrug": [ANTIMICROBIAL_DRUG], **_d(1)}) == []
+    assert listed({"idDrug": [ANTIMICROBIAL_DRUG], **_d(5)}) == [admission]
+
+    # both at once: one on D5 and the other on D1
+    assert listed(
+        {"idDrug": [ANTIMICROBIAL_DRUG], **_d(5)}, {"idDrug": [OTHER_DRUG], **_d(1)}
     ) == [admission]
+    assert (
+        listed(
+            {"idDrug": [ANTIMICROBIAL_DRUG], **_d(1)}, {"idDrug": [OTHER_DRUG], **_d(1)}
+        )
+        == []
+    )
+
+
+def test_worklist_limits_the_antimicrobial_criteria(
+    client, infection_controller_headers, infection_control
+):
+    """At most 10 criteria"""
+    response = client.post(
+        "/infection-control/admissions",
+        json={"status": [PENDING], "antimicrobials": [{}] * 11},
+        headers=infection_controller_headers,
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
 
 
 def test_worklist_filters_by_non_conformity(

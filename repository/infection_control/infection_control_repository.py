@@ -29,7 +29,10 @@ from models.infection_control import (
 )
 from models.main import Drug, DrugAttributes, db
 from models.prescription import Intervention, Patient, Prescription, PrescriptionDrug
-from models.requests.infection_control_request import InfectionControlListRequest
+from models.requests.infection_control_request import (
+    AntimicrobialCriterionRequest,
+    InfectionControlListRequest,
+)
 
 
 def create_admission(
@@ -379,48 +382,79 @@ def _filter_admissions(query, filters: InfectionControlListRequest, now: datetim
     return _filter_features(query=query, filters=filters, now=now)
 
 
-def _filter_features(query, filters: InfectionControlListRequest, now: datetime):
-    """Apply the worklist filters kept on the record by the rule (indicadores),
-    so the worklist doesn't join the prescriptions of every admission.
-
-    The antimicrobial filters (drug, substance, AWaRe level, treatment day) are
-    met by one running course: amoxicillin on D1 is the amoxicillin course on
-    its first day, not amoxicillin and some other antimicrobial on D1.
-    """
+def _running_course(conditions: list):
+    """Whether a running course kept on the record (indicadores) meets all the
+    conditions, given on its value by the caller"""
     course = (
         func.jsonb_array_elements(InfectionControlAdmission.features["courses"])
         .table_valued(column("value", JSONB))
         .alias("course")
     )
-    value = course.c.value
+    return (
+        db.session.query(course)
+        .filter(and_(*[condition(course.c.value) for condition in conditions]))
+        .exists()
+    )
+
+
+def _criterion_conditions(criterion: AntimicrobialCriterionRequest, now: datetime):
+    """The conditions a course meets for one antimicrobial criterion: any of
+    its drugs or substances, on a treatment day of its range"""
     conditions = []
 
-    if filters.idDrug:
-        conditions.append(value["idDrug"].astext.cast(BigInteger).in_(filters.idDrug))
-
-    if filters.idSubstance:
+    drugs = criterion.idDrug
+    substances = criterion.idSubstance
+    if drugs or substances:
         conditions.append(
-            value["idSubstance"].astext.cast(BigInteger).in_(filters.idSubstance)
-        )
-
-    if filters.awareLevels:
-        conditions.append(
-            value["awareLevel"].astext.cast(Integer).in_(filters.awareLevels)
+            lambda value: or_(
+                value["idDrug"].astext.cast(BigInteger).in_(drugs),
+                value["idSubstance"].astext.cast(BigInteger).in_(substances),
+            )
         )
 
     # the course is on day N, counted as in the timeline (D1 is the first 24
     # hours), once more than N - 1 days passed since its start and until N days
     # passed
-    start = value["start"].astext.cast(DateTime)
-    if filters.treatmentDayFrom and filters.treatmentDayFrom > 1:
-        conditions.append(start < now - timedelta(days=filters.treatmentDayFrom - 1))
+    day_from = criterion.treatmentDayFrom
+    if day_from and day_from > 1:
+        conditions.append(
+            lambda value: (
+                value["start"].astext.cast(DateTime)
+                < now - timedelta(days=day_from - 1)
+            )
+        )
 
-    if filters.treatmentDayTo:
-        conditions.append(start >= now - timedelta(days=filters.treatmentDayTo))
+    day_to = criterion.treatmentDayTo
+    if day_to:
+        conditions.append(
+            lambda value: (
+                value["start"].astext.cast(DateTime) >= now - timedelta(days=day_to)
+            )
+        )
 
-    if conditions:
+    return conditions
+
+
+def _filter_features(query, filters: InfectionControlListRequest, now: datetime):
+    """Apply the worklist filters kept on the record by the rule (indicadores),
+    so the worklist doesn't join the prescriptions of every admission.
+
+    Each antimicrobial criterion is met by a running course of its own: the
+    drug and the treatment day of a criterion go together (amoxicillin on D1 is
+    the amoxicillin course on its first day), and amoxicillin on D1 with
+    vancomycin on D2 asks for both courses.
+    """
+    for criterion in filters.antimicrobials:
+        conditions = _criterion_conditions(criterion=criterion, now=now)
+        if conditions:
+            query = query.filter(_running_course(conditions))
+
+    if filters.awareLevels:
+        levels = filters.awareLevels
         query = query.filter(
-            db.session.query(course).filter(and_(*conditions)).exists()
+            _running_course(
+                [lambda value: value["awareLevel"].astext.cast(Integer).in_(levels)]
+            )
         )
 
     if filters.nonConforming:
