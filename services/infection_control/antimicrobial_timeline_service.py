@@ -79,6 +79,7 @@ class TimelineItem:
     use_weight: bool = False
     # the observation written on the prescribed item (complemento)
     notes: str | None = None
+    id_substance: int | None = None
 
 
 @dataclass
@@ -139,6 +140,7 @@ def build_item(row, now: datetime) -> TimelineItem:
         default_measure_unit=row.default_measure_unit,
         use_weight=bool(row.use_weight),
         notes=row.notes,
+        id_substance=row.id_substance,
     )
 
 

@@ -15,6 +15,9 @@ class InfectionControlAdmission(db.Model):
     id_last_review = db.Column("fkci_revisao_ultima", db.BigInteger, nullable=True)
     origin = db.Column("tp_origem", db.Integer, nullable=False)
     recalculated_at = db.Column("dt_recalculo", db.DateTime, nullable=False)
+    # what the rule last saw running, for the worklist filters (see
+    # infection_control_status_service.admission_features)
+    features = db.Column("indicadores", postgresql.JSONB, nullable=True)
 
     updated_at = db.Column("updated_at", db.DateTime, nullable=True)
     updated_by = db.Column("updated_by", db.Integer, nullable=True)

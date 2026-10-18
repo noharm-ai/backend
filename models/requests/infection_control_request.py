@@ -47,6 +47,17 @@ class InfectionControlReviewRequest(BaseModel):
     evaluations: list[AntimicrobialEvaluationRequest] = []
 
 
+class AntimicrobialCriterionRequest(BaseModel):
+    """One running antimicrobial the worklist asks for: any of these drugs or
+    substances, on a treatment day between these (D1 is the first 24 hours, as
+    in the timeline). Every part is optional; an empty one asks for nothing"""
+
+    idDrug: list[int] = []
+    idSubstance: list[int] = []
+    treatmentDayFrom: int | None = Field(default=None, ge=1)
+    treatmentDayTo: int | None = Field(default=None, ge=1)
+
+
 class InfectionControlListRequest(BaseModel):
     """Followed admissions, filtered by status and by the worklist filters"""
 
@@ -58,6 +69,18 @@ class InfectionControlListRequest(BaseModel):
     admissionNumbers: list[int] = []
     # admissions whose scheduled review date has passed
     overdueReview: bool = False
+    # the filters below read what the rule last saw running (indicadores)
+    # admissions meeting any criterion, or every one with
+    # antimicrobialsMatchAll, each by a running course of its own (e.g.
+    # amoxicillin on D1 and vancomycin on D2)
+    antimicrobials: list[AntimicrobialCriterionRequest] = Field(
+        default=[], max_length=10
+    )
+    antimicrobialsMatchAll: bool = False
+    # admissions running an antimicrobial of any of these AWaRe levels
+    awareLevels: list[int] = []
+    # admissions with an evaluation in force judged non conforming
+    nonConforming: bool = False
     limit: int = Field(default=100, ge=1, le=500)
     offset: int = Field(default=0, ge=0)
 
