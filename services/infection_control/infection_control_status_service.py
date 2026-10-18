@@ -19,6 +19,9 @@ apply_rule writes the plan; a saved review also records its evaluations here
 * when a drug stops, its reasons are resolved and its evaluation is closed;
 * with nothing running (or after discharge) the record is closed.
 
+Each time it also keeps on the record what it saw (admission_features): the
+worklist filters by it without going through the prescriptions.
+
 Prescalc runs many times a day, so it doesn't apply the rule: it only
 follows the admissions that start (or restart) an antimicrobial, and the
 scheduled job applies the rule to every followed admission.
@@ -286,6 +289,10 @@ def record_evaluation(
     evaluation.id_prescription_drug = latest.id_prescription_drug
     evaluation.course_start = course.start
     evaluation.conforming = evaluation_data.conforming
+    evaluation.id_intervention_reasons = (
+        sorted(set(evaluation_data.interventionReasons)) or None
+    )
+    evaluation.id_substitute_drug = evaluation_data.substituteDrug
     evaluation.notes = evaluation_data.notes
     evaluation.posology = posology_snapshot(course)
     evaluation.valid_from = evaluation_data.validFrom or now
@@ -530,6 +537,32 @@ def plan_rule(
     return plan
 
 
+def admission_features(
+    ongoing: list[Course], evaluations: list[AntimicrobialEvaluation]
+) -> dict:
+    """What the worklist filters by, kept on the admission record (indicadores)
+    as prescalc keeps the drugs of a prescription: joining the prescriptions of
+    every followed admission on each search would cost too much.
+
+    Each running course (drug, substance, AWaRe level and start, so a drug can
+    be searched on a treatment day) and whether an evaluation in force judged
+    one non conforming. Nothing runs on a closed record. It holds as of the
+    last time the rule ran.
+    """
+    return {
+        "courses": [
+            {
+                "idDrug": course_drug(course),
+                "idSubstance": course.items[-1].id_substance,
+                "awareLevel": course.items[-1].atb_level,
+                "start": dateutils.to_iso(course.start),
+            }
+            for course in ongoing
+        ],
+        "nonConforming": any(not e.conforming for e in evaluations),
+    }
+
+
 def apply_rule(
     admission: InfectionControlAdmission,
     admission_courses: AdmissionCourses,
@@ -537,7 +570,8 @@ def apply_rule(
     user_id: int,
 ):
     """Plan the rule for a locked admission record and write the plan: close
-    evaluations, open and resolve pending reasons and set the status"""
+    evaluations, open and resolve pending reasons, set the status and keep
+    what the worklist filters by"""
     now = admission_courses.now
     admission_number = admission.admission_number
     active_evaluations = infection_control_repository.get_active_evaluations(
@@ -595,6 +629,12 @@ def apply_rule(
         admission.updated_at = now
         admission.updated_by = user_id
 
+    admission.features = admission_features(
+        ongoing=admission_courses.ongoing,
+        evaluations=[
+            e for e in active_evaluations if e.id not in plan.close_evaluations
+        ],
+    )
     admission.recalculated_at = now
     db.session.flush()
 

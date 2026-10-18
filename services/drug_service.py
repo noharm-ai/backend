@@ -6,7 +6,7 @@ from sqlalchemy.orm import undefer
 
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
-from models.appendix import Frequency, MeasureUnit, MeasureUnitConvert
+from models.appendix import Frequency, MeasureUnit
 from models.enums import (
     DrugAttributesAuditTypeEnum,
     MemoryEnum,
@@ -29,7 +29,7 @@ from models.segment import Segment
 from repository import drugs_repository, outlier_repository
 from services import data_authorization_service, memory_service
 from services.admin import admin_drug_service
-from utils import numberutils, prescriptionutils, status
+from utils import lambdautils, numberutils, prescriptionutils, status
 
 
 @has_permission(Permission.READ_PRESCRIPTION)
@@ -220,26 +220,36 @@ def get_all_frequencies():
 
 @has_permission(Permission.WRITE_DRUG_ATTRIBUTES)
 def drug_config_to_generate_score(
-    id_drug,
-    id_segment,
-    id_measure_unit,
-    division,
-    use_weight,
-    measure_unit_list,
+    id_drug: int,
+    id_segment: int,
+    division: float | str | None,
+    use_weight: bool | None,
     user_context: User,
-    skip_measure_unit=False,
 ):
-    if not skip_measure_unit:
-        if id_measure_unit == None or id_measure_unit == "":
-            raise ValidationError(
-                "Unidade de medida inválida",
-                "errors.invalidParams",
-                status.HTTP_400_BAD_REQUEST,
-            )
+    """Set a drug's division range and weight usage before generating its scores (persisted by backend-private)"""
 
-    if division != None and division == 1:
+    # the screen sends the division as a string, and 0 (or nothing) for "no ranges"
+    try:
+        division = float(division) if division not in (None, "") else None
+    except (TypeError, ValueError):
         raise ValidationError(
-            "Divisor de faixas deve ser diferente de 1",
+            "Divisor de faixas inválido",
+            "errors.invalidParams",
+            status.HTTP_400_BAD_REQUEST,
+        )
+    division = division if division else None
+    use_weight = bool(use_weight)
+
+    if division is not None and (division <= 0 or division == 1):
+        raise ValidationError(
+            "Divisor de faixas deve ser maior que zero e diferente de 1",
+            "errors.invalidParams",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    if use_weight and division is None:
+        raise ValidationError(
+            "Divisor de faixas deve ser informado quando o peso é utilizado",
             "errors.invalidParams",
             status.HTTP_400_BAD_REQUEST,
         )
@@ -253,49 +263,26 @@ def drug_config_to_generate_score(
             status.HTTP_401_UNAUTHORIZED,
         )
 
-    if not skip_measure_unit:
-        if measure_unit_list:
-            for m in measure_unit_list:
-                _setDrugUnit(id_drug, m["idMeasureUnit"], id_segment, m["fator"])
-
-    drugAttr = DrugAttributes.query.get((id_drug, id_segment))
-
-    if drugAttr is None:
-        drugAttr = create_attributes_from_reference(
-            id_drug=id_drug, id_segment=id_segment, user=user_context
+    if db.session.query(Drug.id).filter(Drug.id == id_drug).first() is None:
+        raise ValidationError(
+            "Registro inexistente", "errors.invalidRecord", status.HTTP_400_BAD_REQUEST
         )
 
-    drugAttr.division = division if division != 0 else None
-    drugAttr.useWeight = use_weight
-    drugAttr.update = datetime.today()
-    drugAttr.user = user_context.id
-
-    _audit(
-        drug_attributes=drugAttr,
-        audit_type=DrugAttributesAuditTypeEnum.UPSERT_BEFORE_GEN_SCORE,
-        user=user_context,
+    # backend-private creates the medatributos row when missing and recalculates the max dose
+    lambdautils.invoke_backend_function(
+        payload={
+            "command": "lambda_scores.set_division_range",
+            "schema": user_context.schema,
+            "id_drug": id_drug,
+            "id_segment": id_segment,
+            "id_user": user_context.id,
+            "division_range": division,
+            "use_weight": use_weight,
+            # the client generates the scores afterwards (prepare + single)
+            "process_scores": False,
+        },
+        error_message="Ocorreu um erro ao salvar a configuração do medicamento. Consulte o administrador do sistema.",
     )
-
-    db.session.flush()
-
-    admin_drug_service.calculate_dosemax_uniq(id_drug=id_drug, id_segment=id_segment)
-
-
-def _setDrugUnit(idDrug, idMeasureUnit, idSegment, factor):
-    u = MeasureUnitConvert.query.get((idMeasureUnit, idDrug, idSegment))
-    new = False
-
-    if u is None:
-        new = True
-        u = MeasureUnitConvert()
-        u.idMeasureUnit = idMeasureUnit
-        u.idDrug = idDrug
-        u.idSegment = idSegment
-
-    u.factor = factor
-
-    if new:
-        db.session.add(u)
 
 
 @has_permission(Permission.READ_PRESCRIPTION)
@@ -438,9 +425,11 @@ def save_attributes(id_segment, id_drug, data, user_context: User):
 
 @has_permission(Permission.WRITE_DRUG_ATTRIBUTES)
 def update_substance(id_drug, sctid, user_context: User):
-    drug = db.session.query(Drug).filter(Drug.id == id_drug).first()
+    """Set a drug's substance (backend-private copies its attributes and recalculates the max dose)"""
+    # column queries: an ORM Drug in the identity map would hide the lambda's update
+    drug_exists = db.session.query(Drug.id).filter(Drug.id == id_drug).first()
 
-    if drug is None:
+    if drug_exists is None:
         raise ValidationError(
             "Registro inexistente", "errors.invalidRecord", status.HTTP_400_BAD_REQUEST
         )
@@ -450,21 +439,23 @@ def update_substance(id_drug, sctid, user_context: User):
             "Substância inválida", "errors.businessRules", status.HTTP_400_BAD_REQUEST
         )
 
-    substance = db.session.query(Substance).filter(Substance.id == sctid).first()
-    if not substance or not substance.active:
+    substance_active = (
+        db.session.query(Substance.active).filter(Substance.id == sctid).scalar()
+    )
+    if not substance_active:
         raise ValidationError(
             "Substância inválida", "errors.businessRules", status.HTTP_400_BAD_REQUEST
         )
 
-    drug.sctid = sctid
-    drug.ai_accuracy = None
-    drug.updated_at = datetime.today()
-    drug.updated_by = user_context.id
-
-    db.session.flush()
-
-    copy_substance_default_attributes(
-        drug.id, drug.sctid, user=user_context, calc_dose_max=True
+    lambdautils.invoke_backend_function(
+        payload={
+            "command": "lambda_substances.update_substance",
+            "schema": user_context.schema,
+            "id_user": user_context.id,
+            "id_drug": id_drug,
+            "sctid": sctid,
+        },
+        error_message="Ocorreu um erro ao atualizar a substância. Consulte o administrador do sistema.",
     )
 
     return admin_drug_service.get_drug_list(
@@ -472,9 +463,7 @@ def update_substance(id_drug, sctid, user_context: User):
     )
 
 
-def copy_substance_default_attributes(
-    id_drug, sctid, user: User, overwrite=True, calc_dose_max=False
-):
+def copy_substance_default_attributes(id_drug, sctid, user: User, overwrite=True):
     reference = db.session.query(Substance).filter(Substance.id == sctid).first()
 
     if reference != None:
@@ -511,11 +500,6 @@ def copy_substance_default_attributes(
                 db.session.add(da)
             else:
                 db.session.flush()
-
-            if calc_dose_max:
-                admin_drug_service.calculate_dosemax_uniq(
-                    id_drug=id_drug, id_segment=da.idSegment
-                )
 
             _audit(
                 drug_attributes=da,

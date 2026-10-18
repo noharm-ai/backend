@@ -45,8 +45,9 @@ def _row(id_drug=1, date=None, expire=None, suspended_date=None, cpoe=False, **k
         id_prescription_drug=kwargs.get("id_prescription_drug", 100),
         id_drug=id_drug,
         drug=kwargs.get("drug", f"DRUG {id_drug}"),
+        id_substance=kwargs.get("id_substance"),
         substance=None,
-        atb_level=None,
+        atb_level=kwargs.get("atb_level"),
         date=date,
         expire=expire,
         suspended_date=suspended_date,
@@ -497,3 +498,69 @@ class TestSamePosology:
         current = {**evaluated, "frequency": current_frequency}
 
         assert rule.same_posology(evaluated, current) is same
+
+
+class TestAdmissionFeatures:
+    """What the rule keeps on the record for the worklist filters"""
+
+    def test_running_antimicrobials(self):
+        """Drug, substance, AWaRe level and start of each running course"""
+        first = _courses(
+            _row(
+                id_drug=1,
+                id_substance=500,
+                atb_level=2,
+                date=NOW - timedelta(days=3),
+                expire=NOW + timedelta(hours=18),
+            )
+        )
+        second = _courses(
+            _row(id_drug=4, id_substance=None, atb_level=None, **_today_dates())
+        )
+
+        features = rule.admission_features(ongoing=first + second, evaluations=[])
+
+        assert features == {
+            "courses": [
+                {
+                    "idDrug": 1,
+                    "idSubstance": 500,
+                    "awareLevel": 2,
+                    "start": (NOW - timedelta(days=3)).isoformat(),
+                },
+                {
+                    "idDrug": 4,
+                    "idSubstance": None,
+                    "awareLevel": None,
+                    "start": (NOW - timedelta(hours=6)).isoformat(),
+                },
+            ],
+            "nonConforming": False,
+        }
+
+    def test_nothing_running(self):
+        """A closed record runs nothing"""
+        features = rule.admission_features(ongoing=[], evaluations=[])
+
+        assert features == {"courses": [], "nonConforming": False}
+
+    @pytest.mark.parametrize(
+        "verdicts, expected", [([True], False), ([True, False], True)]
+    )
+    def test_non_conforming(self, verdicts, expected):
+        """Any evaluation in force judged non conforming marks the record"""
+        evaluations = [
+            SimpleNamespace(id=index, conforming=conforming)
+            for index, conforming in enumerate(verdicts)
+        ]
+
+        features = rule.admission_features(
+            ongoing=[_running()], evaluations=evaluations
+        )
+
+        assert features["nonConforming"] is expected
+
+
+def _today_dates():
+    """The dates of a row of today's prescription, running"""
+    return {"date": NOW - timedelta(hours=6), "expire": NOW + timedelta(hours=18)}

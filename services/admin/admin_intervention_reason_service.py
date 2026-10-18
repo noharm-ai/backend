@@ -59,6 +59,7 @@ def list_to_dto(reasons):
                 "blocking": r[0].blocking,
                 "protected": r[3],
                 "ram": r[0].ram,
+                "infectionControl": r[0].infection_control,
             }
         )
 

@@ -41,6 +41,7 @@ def get_admission_antimicrobials(admission_number: int):
             Prescription.idSegment.label("id_segment"),
             Segment.cpoe,
             Drug.name.label("drug"),
+            Drug.sctid.label("id_substance"),
             Substance.name.label("substance"),
             Substance.atb_level,
             MeasureUnit.description.label("measure_unit"),

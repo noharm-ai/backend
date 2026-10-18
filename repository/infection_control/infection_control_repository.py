@@ -1,12 +1,22 @@
 """Repository: infection control follow-up (ci_* tables)"""
 
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timedelta
 
-from sqlalchemy import and_, func, or_, text, update
-from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy import (
+    BigInteger,
+    DateTime,
+    Integer,
+    and_,
+    column,
+    func,
+    or_,
+    text,
+    update,
+)
+from sqlalchemy.dialects.postgresql import JSONB, insert
 
-from models.appendix import Department
+from models.appendix import Department, InterventionReason
 from models.enums import (
     AntimicrobialEvaluationStatusEnum,
     InfectionControlStatusEnum,
@@ -17,9 +27,12 @@ from models.infection_control import (
     InfectionControlPending,
     InfectionControlReview,
 )
-from models.main import DrugAttributes, db
-from models.prescription import Patient, Prescription, PrescriptionDrug
-from models.requests.infection_control_request import InfectionControlListRequest
+from models.main import Drug, DrugAttributes, db
+from models.prescription import Intervention, Patient, Prescription, PrescriptionDrug
+from models.requests.infection_control_request import (
+    AntimicrobialCriterionRequest,
+    InfectionControlListRequest,
+)
 
 
 def create_admission(
@@ -189,6 +202,64 @@ def get_evaluations(admission_number: int) -> list[AntimicrobialEvaluation]:
     )
 
 
+def get_intervention_reasons(
+    id_reasons: set[int],
+) -> list[tuple[InterventionReason, str | None]]:
+    """Intervention reasons, each with the name of its parent reason"""
+    if not id_reasons:
+        return []
+
+    parent = db.aliased(InterventionReason)
+    return (
+        db.session.query(InterventionReason, parent.description)
+        .outerjoin(parent, InterventionReason.mamy == parent.id)
+        .filter(InterventionReason.id.in_(id_reasons))
+        .all()
+    )
+
+
+def get_drug_names(id_drugs: set[int]) -> dict[int, str]:
+    """Names of drugs, by id"""
+    if not id_drugs:
+        return {}
+
+    return dict(
+        db.session.query(Drug.id, Drug.name).filter(Drug.id.in_(id_drugs)).all()
+    )
+
+
+def search_antimicrobials(
+    term: str | None = None, id_drugs: set[int] | None = None, limit: int = 50
+) -> list[tuple[int, str]]:
+    """Drugs flagged antimicrobial (antimicro) in some segment, by name"""
+    is_antimicrobial = (
+        db.session.query(DrugAttributes.idDrug)
+        .filter(DrugAttributes.idDrug == Drug.id)
+        .filter(DrugAttributes.antimicro == True)
+        .exists()
+    )
+    query = db.session.query(Drug.id, Drug.name).filter(is_antimicrobial)
+    if term:
+        query = query.filter(Drug.name.ilike(f"%{term}%"))
+    if id_drugs is not None:
+        query = query.filter(Drug.id.in_(id_drugs))
+
+    return query.order_by(Drug.name, Drug.id).limit(limit).all()
+
+
+def get_evaluation_interventions(admission_number: int) -> list[Intervention]:
+    """Interventions recorded by the reviews of an admission, oldest first;
+    the ones undone (status 0) are gone, as in the screening"""
+    return (
+        db.session.query(Intervention)
+        .filter(Intervention.admissionNumber == admission_number)
+        .filter(Intervention.id_infection_control_evaluation != None)
+        .filter(Intervention.status != "0")
+        .order_by(Intervention.idIntervention)
+        .all()
+    )
+
+
 def get_admission(admission_number: int) -> InfectionControlAdmission | None:
     """The admission record, without locking it"""
     return (
@@ -306,6 +377,97 @@ def _filter_admissions(query, filters: InfectionControlListRequest, now: datetim
     if filters.overdueReview:
         query = query.filter(InfectionControlAdmission.next_review_date != None).filter(
             InfectionControlAdmission.next_review_date < now
+        )
+
+    return _filter_features(query=query, filters=filters, now=now)
+
+
+def _running_course(conditions: list):
+    """Whether a running course kept on the record (indicadores) meets all the
+    conditions, given on its value by the caller"""
+    course = (
+        func.jsonb_array_elements(InfectionControlAdmission.features["courses"])
+        .table_valued(column("value", JSONB))
+        .alias("course")
+    )
+    return (
+        db.session.query(course)
+        .filter(and_(*[condition(course.c.value) for condition in conditions]))
+        .exists()
+    )
+
+
+def _criterion_conditions(criterion: AntimicrobialCriterionRequest, now: datetime):
+    """The conditions a course meets for one antimicrobial criterion: any of
+    its drugs or substances, on a treatment day of its range"""
+    conditions = []
+
+    drugs = criterion.idDrug
+    substances = criterion.idSubstance
+    if drugs or substances:
+        conditions.append(
+            lambda value: or_(
+                value["idDrug"].astext.cast(BigInteger).in_(drugs),
+                value["idSubstance"].astext.cast(BigInteger).in_(substances),
+            )
+        )
+
+    # the course is on day N, counted as in the timeline (D1 is the first 24
+    # hours), once more than N - 1 days passed since its start and until N days
+    # passed
+    day_from = criterion.treatmentDayFrom
+    if day_from and day_from > 1:
+        conditions.append(
+            lambda value: (
+                value["start"].astext.cast(DateTime)
+                < now - timedelta(days=day_from - 1)
+            )
+        )
+
+    day_to = criterion.treatmentDayTo
+    if day_to:
+        conditions.append(
+            lambda value: (
+                value["start"].astext.cast(DateTime) >= now - timedelta(days=day_to)
+            )
+        )
+
+    return conditions
+
+
+def _filter_features(query, filters: InfectionControlListRequest, now: datetime):
+    """Apply the worklist filters kept on the record by the rule (indicadores),
+    so the worklist doesn't join the prescriptions of every admission.
+
+    Each antimicrobial criterion is met by a running course of its own: the
+    drug and the treatment day of a criterion go together (amoxicillin on D1 is
+    the amoxicillin course on its first day). Amoxicillin on D1 with vancomycin
+    on D2 asks for either course, or for both with antimicrobialsMatchAll.
+    """
+    courses = [
+        _running_course(conditions)
+        for conditions in (
+            _criterion_conditions(criterion=criterion, now=now)
+            for criterion in filters.antimicrobials
+        )
+        if conditions
+    ]
+    if courses:
+        query = query.filter(
+            and_(*courses) if filters.antimicrobialsMatchAll else or_(*courses)
+        )
+
+    if filters.awareLevels:
+        levels = filters.awareLevels
+        query = query.filter(
+            _running_course(
+                [lambda value: value["awareLevel"].astext.cast(Integer).in_(levels)]
+            )
+        )
+
+    if filters.nonConforming:
+        query = query.filter(
+            InfectionControlAdmission.features["nonConforming"].as_boolean() == True
         )
 
     return query

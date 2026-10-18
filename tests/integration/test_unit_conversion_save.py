@@ -1,38 +1,31 @@
 """Integration tests for the write half of the drug unit-conversion feature.
 
 ``GET /drugs/unit-conversion/<drug>`` is covered by
-``tests/unit/test_unit_conversion_service.py``, but the two endpoints that
-actually change data had no coverage at all:
+``tests/unit/test_unit_conversion_service.py``; this module covers the two
+endpoints that change data:
 
 * ``POST /drugs/unit-conversion/<drug>`` — the curator screen that fixes a
-  drug's conversion factors. It is deceptively wide: the payload names no
-  segment, yet the save is applied to *every* segment, creating the
-  ``medatributos`` row from the substance reference where one is missing,
-  pinning each row's default measure unit and upserting one
-  ``unidadeconverte`` row per segment/unit pair. The default unit comes from
-  the substance and falls back to ``un``; when that unit has no
-  ``unidademedida`` row yet, the save creates it.
+  drug's conversion factors. The backend validates the payload and hands it to
+  backend-private (``lambda_unit_conversion.save_drug_conversions``), which
+  applies it to *every* segment: it upserts the ``unidadeconverte`` rows, pins
+  the substance's default unit (``un`` as fallback) on each ``medatributos``
+  row, creating rows and the ``unidademedida`` entry where missing, and
+  recalculates the max dose. Those effects are tested in backend-private; here
+  the Lambda is stubbed and the tests assert the payload and how the answer is
+  handled.
 * ``POST /drugs/process-scores/<drug>`` — hands the drug to the score Lambda.
 
-Both AWS calls are stubbed: the save path must *not* reach Lambda (it passes
-``skip_lambda``), and the score path is asserted on the payload it sends,
-which is the part the backend decides.
-
-Each test saves against its own drug, so the module has no internal ordering.
 Fixtures use the reserved ``>= 90000`` id range (90400 block) so the
-session-scoped ``clean_test_artifacts`` fixture removes them. Measure units
-are not in that range, so this module removes the ones it created itself.
+session-scoped ``clean_test_artifacts`` fixture removes them.
 """
 
+import io
 import json
 from unittest.mock import MagicMock, patch
 
 import pytest
-from sqlalchemy import text
 
-from models.appendix import MeasureUnit, MeasureUnitConvert
-from models.enums import DefaultMeasureUnitEnum
-from models.main import DrugAttributes
+from models.appendix import MeasureUnitConvert
 from models.segment import Segment
 from tests.conftest import session, session_commit
 from tests.utils.utils_test_unit_conversion import (
@@ -45,21 +38,12 @@ SAVE_URL = "/drugs/unit-conversion"
 SCORES_URL = "/drugs/process-scores"
 
 # Ids reserved for this module (90400 block, distinct from other modules').
-_SCTID_WITH_DEFAULT = 90401
-_SCTID_WITHOUT_DEFAULT = 90402
+_SCTID = 90401
 
-_DRUG_SEGMENTS = 90401  # asserts the conversions reach every segment
-_DRUG_ATTRIBUTES = 90402  # asserts medatributos is created on the fly
-_DRUG_MEASURE_UNIT = 90403  # asserts the default unit row is created
-_DRUG_RESAVED = 90404  # saved twice, asserts the upsert
-_DRUG_WITHOUT_DEFAULT = 90405  # substance names no unit, so ``un`` is used
-_DRUG_NO_LAMBDA = 90406  # asserts the save stays local
+_DRUG_SAVED = 90401  # handed to backend-private
 _DRUG_SCORES = 90407  # target of the score endpoint
 _DRUG_REJECTED = 90408  # receives the payloads that must be refused
 _UNKNOWN_DRUG = 90499
-
-# A default measure unit absent from the seed, so the save has to create it.
-_TEST_MEASURE_UNIT = "ZZTESTUN"
 
 # an existing seed unit, used as the converted-from unit
 _SEED_MEASURE_UNIT = "1"
@@ -68,65 +52,41 @@ _SEED_MEASURE_UNIT = "1"
 CALLER_ID = 1
 CALLER_SCHEMA = "demo"
 
-_DRUGS_WITH_DEFAULT = [
-    (_DRUG_SEGMENTS, "ZZTest Medicamento Segmentos"),
-    (_DRUG_ATTRIBUTES, "ZZTest Medicamento Atributos UC"),
-    (_DRUG_MEASURE_UNIT, "ZZTest Medicamento Unidade"),
-    (_DRUG_RESAVED, "ZZTest Medicamento Refeito"),
-    (_DRUG_NO_LAMBDA, "ZZTest Medicamento Sem Lambda"),
-    (_DRUG_SCORES, "ZZTest Medicamento Escores"),
-    (_DRUG_REJECTED, "ZZTest Medicamento Recusado"),
-]
-
 
 @pytest.fixture(scope="module", autouse=True)
 def setup_unit_conversion_data(clean_test_artifacts):  # noqa: ARG001
-    """Create the substances and drugs for this module, after the global cleanup.
+    """Create the substance and drugs for this module, after the global cleanup."""
+    create_test_substance(_SCTID, "ZZTest Substância Unidade", "mg")
 
-    ``unidademedida`` rows fall outside the ``>= 90000`` window the shared
-    cleanup wipes, so whatever the save creates is removed here on teardown —
-    identified by diffing against the units present before the tests ran.
-    """
-    create_test_substance(
-        _SCTID_WITH_DEFAULT, "ZZTest Substância Unidade", _TEST_MEASURE_UNIT
-    )
-    create_test_substance(_SCTID_WITHOUT_DEFAULT, "ZZTest Substância Sem Unidade", None)
-
-    for id_drug, name in _DRUGS_WITH_DEFAULT:
-        create_test_drug(id_drug, name, _SCTID_WITH_DEFAULT)
-
-    create_test_drug(
-        _DRUG_WITHOUT_DEFAULT, "ZZTest Medicamento Sem Unidade", _SCTID_WITHOUT_DEFAULT
-    )
-
-    preexisting_units = _measure_unit_ids()
-
-    yield
-
-    created_units = _measure_unit_ids() - preexisting_units
-    if created_units:
-        session.execute(
-            text("DELETE FROM demo.unidademedida WHERE fkunidademedida = ANY(:ids)"),
-            {"ids": list(created_units)},
-        )
-        session_commit()
+    for id_drug, name in [
+        (_DRUG_SAVED, "ZZTest Medicamento Conversao"),
+        (_DRUG_SCORES, "ZZTest Medicamento Escores"),
+        (_DRUG_REJECTED, "ZZTest Medicamento Recusado"),
+    ]:
+        create_test_drug(id_drug, name, _SCTID)
 
 
-def _measure_unit_ids() -> set:
-    """Every measure unit id currently configured in the demo schema."""
-    session_commit()
+def _backend_private(response, function_error=False):
+    """Lambda client double answering ``response`` as backend-private would."""
+    lambda_client = MagicMock()
 
-    return {row.id for row in session.query(MeasureUnit).all()}
+    def invoke(**kwargs):
+        result = {"Payload": io.BytesIO(json.dumps(response).encode("utf-8"))}
+        if function_error:
+            result["FunctionError"] = "Unhandled"
+        return result
+
+    lambda_client.invoke.side_effect = invoke
+    return lambda_client
 
 
-def _segments() -> list:
-    """All segments the save is expected to touch."""
-    return session.query(Segment).order_by(Segment.id).all()
+def _save(client, headers, id_drug, conversion_list, lambda_client=None):
+    """POST a conversion list, with backend-private stubbed so nothing leaves the process."""
+    lambda_client = lambda_client or _backend_private({"success": True})
 
-
-def _save(client, headers, id_drug, conversion_list):
-    """POST a conversion list, with Lambda stubbed so nothing leaves the process."""
-    with patch("services.unit_conversion_service.aws.get_client") as get_client:
+    with patch(
+        "utils.lambdautils.aws.get_client", return_value=lambda_client
+    ) as get_client:
         response = client.post(
             f"{SAVE_URL}/{id_drug}",
             data=json.dumps({"conversion_list": conversion_list}),
@@ -149,173 +109,100 @@ def _conversions(id_drug: int) -> dict:
     return {(r.idSegment, r.idMeasureUnit): r.factor for r in rows}
 
 
-def _attributes(id_drug: int) -> dict:
-    """Saved medatributos rows for a drug, keyed by segment."""
-    session_commit()
+def test_save_hands_the_conversions_to_backend_private(
+    client, config_manager_headers
+):
+    """One payload, no segment in it; backend-private applies it to every segment [200]."""
+    lambda_client = _backend_private({"success": True})
 
-    rows = session.query(DrugAttributes).filter(DrugAttributes.idDrug == id_drug).all()
-
-    return {r.idSegment: r for r in rows}
-
-
-def test_save_applies_the_conversions_to_every_segment(client, config_manager_headers):
-    """One payload, no segment in it, and every segment ends up converted [200]."""
     response, _ = _save(
         client,
         config_manager_headers,
-        _DRUG_SEGMENTS,
+        _DRUG_SAVED,
         [
-            {"id_measure_unit": _TEST_MEASURE_UNIT, "factor": 1},
+            {"id_measure_unit": "mg", "factor": 1},
             {"id_measure_unit": _SEED_MEASURE_UNIT, "factor": 0.5},
         ],
+        lambda_client,
     )
 
     assert response.status_code == status.HTTP_200_OK
 
-    segments = _segments()
+    kwargs = lambda_client.invoke.call_args.kwargs
+    # synchronous, so a failed save is reported to the curator
+    assert kwargs["InvocationType"] == "RequestResponse"
+    assert json.loads(kwargs["Payload"]) == {
+        "command": "lambda_unit_conversion.save_drug_conversions",
+        "schema": CALLER_SCHEMA,
+        "id_drug": _DRUG_SAVED,
+        "id_user": CALLER_ID,
+        "units": [
+            {"id_measure_unit": "mg", "factor": 1},
+            {"id_measure_unit": _SEED_MEASURE_UNIT, "factor": 0.5},
+        ],
+        # the client asks for the scores in a separate request
+        "process_scores": False,
+    }
+
     # the service reads the segments without an ORDER BY, so only the set of
     # names it reports is part of the contract
     assert sorted(response.get_json()["data"]["updated"]) == sorted(
-        s.description for s in segments
+        s.description for s in session.query(Segment).all()
     )
 
-    saved = _conversions(_DRUG_SEGMENTS)
-    assert set(saved) == {
-        (segment.id, unit)
-        for segment in segments
-        for unit in (_TEST_MEASURE_UNIT, _SEED_MEASURE_UNIT)
-    }
-    for segment in segments:
-        assert saved[(segment.id, _TEST_MEASURE_UNIT)] == 1
-        assert saved[(segment.id, _SEED_MEASURE_UNIT)] == 0.5
 
-
-def test_save_creates_the_drug_attributes_it_needs(client, config_manager_headers):
-    """The drug has no medatributos row anywhere; the save creates one per segment [200]."""
-    assert _attributes(_DRUG_ATTRIBUTES) == {}
-
-    _save(
-        client,
-        config_manager_headers,
-        _DRUG_ATTRIBUTES,
-        [{"id_measure_unit": _SEED_MEASURE_UNIT, "factor": 1}],
-    )
-
-    attributes = _attributes(_DRUG_ATTRIBUTES)
-
-    assert set(attributes) == {s.id for s in _segments()}
-    for record in attributes.values():
-        # the substance's unit becomes the segment's default measure unit
-        assert record.idMeasureUnit == _TEST_MEASURE_UNIT
-        assert record.user == CALLER_ID
-
-
-def test_save_creates_the_missing_default_measure_unit(client, config_manager_headers):
-    """A substance may name a unit the schema does not configure yet [200]."""
-    session.execute(
-        text("DELETE FROM demo.unidademedida WHERE fkunidademedida = :id"),
-        {"id": _TEST_MEASURE_UNIT},
-    )
-    session_commit()
-
-    _save(
-        client,
-        config_manager_headers,
-        _DRUG_MEASURE_UNIT,
-        [{"id_measure_unit": _SEED_MEASURE_UNIT, "factor": 1}],
-    )
-    session_commit()
-
-    unit = (
-        session.query(MeasureUnit).filter(MeasureUnit.id == _TEST_MEASURE_UNIT).first()
-    )
-
-    assert unit is not None
-    assert unit.description == _TEST_MEASURE_UNIT
-    assert unit.measureunit_nh == _TEST_MEASURE_UNIT
-
-
-def test_resaving_updates_the_factor_instead_of_duplicating(
-    client, config_manager_headers
+@pytest.mark.parametrize(
+    "lambda_response, function_error",
+    [
+        # the command raised: backend-private answers a JSON-encoded error string
+        (json.dumps({"error": True, "message": "drug not found"}), False),
+        # the lambda itself crashed or timed out
+        ({"errorMessage": "Task timed out"}, True),
+    ],
+    ids=["command error", "function error"],
+)
+def test_save_reports_a_backend_private_failure(
+    client, config_manager_headers, lambda_response, function_error
 ):
-    """The upsert is keyed by segment/drug/unit, so a second save overwrites [200]."""
-    _save(
-        client,
-        config_manager_headers,
-        _DRUG_RESAVED,
-        [{"id_measure_unit": _SEED_MEASURE_UNIT, "factor": 2}],
-    )
-
-    first = _conversions(_DRUG_RESAVED)
-    assert set(first.values()) == {2}
-
+    """A failed backend-private call is not reported as saved [500]."""
     response, _ = _save(
         client,
         config_manager_headers,
-        _DRUG_RESAVED,
-        [{"id_measure_unit": _SEED_MEASURE_UNIT, "factor": 7.5}],
-    )
-    assert response.status_code == status.HTTP_200_OK
-
-    second = _conversions(_DRUG_RESAVED)
-    assert set(second) == set(first)
-    assert set(second.values()) == {7.5}
-
-
-def test_substance_without_default_unit_falls_back_to_un(
-    client, config_manager_headers
-):
-    """No curated unit on the substance means the generic ``un`` is used [200]."""
-    response, _ = _save(
-        client,
-        config_manager_headers,
-        _DRUG_WITHOUT_DEFAULT,
-        [{"id_measure_unit": _SEED_MEASURE_UNIT, "factor": 3}],
+        _DRUG_SAVED,
+        [{"id_measure_unit": _SEED_MEASURE_UNIT, "factor": 1}],
+        _backend_private(lambda_response, function_error=function_error),
     )
 
-    assert response.status_code == status.HTTP_200_OK
-
-    fallback = DefaultMeasureUnitEnum.UN.value
-    attributes = _attributes(_DRUG_WITHOUT_DEFAULT)
-    assert attributes
-    for record in attributes.values():
-        assert record.idMeasureUnit == fallback
-
-    assert session.query(MeasureUnit).filter(MeasureUnit.id == fallback).first()
-
-
-def test_save_does_not_invoke_the_score_lambda(client, config_manager_headers):
-    """Scores are generated by a separate call, so the save must stay local [200]."""
-    response, get_client = _save(
-        client,
-        config_manager_headers,
-        _DRUG_NO_LAMBDA,
-        [{"id_measure_unit": _SEED_MEASURE_UNIT, "factor": 4}],
-    )
-
-    assert response.status_code == status.HTTP_200_OK
-    get_client.assert_not_called()
+    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+    assert response.get_json()["code"] == "errors.businessRules"
 
 
 @pytest.mark.parametrize(
     "conversion_list",
-    [[], [{"id_measure_unit": _SEED_MEASURE_UNIT, "factor": 0}]],
-    ids=["empty list", "zero factor"],
+    [
+        [],
+        [{"id_measure_unit": _SEED_MEASURE_UNIT, "factor": 0}],
+        [{"id_measure_unit": _SEED_MEASURE_UNIT, "factor": -2}],
+    ],
+    ids=["empty list", "zero factor", "negative factor"],
 )
 def test_save_rejects_a_conversion_list_it_cannot_apply(
     client, config_manager_headers, conversion_list
 ):
-    """A missing list or a zero factor would silently break dose conversion [400]."""
-    response, _ = _save(client, config_manager_headers, _DRUG_REJECTED, conversion_list)
+    """A missing list or a non-positive factor would silently break dose conversion [400]."""
+    response, get_client = _save(
+        client, config_manager_headers, _DRUG_REJECTED, conversion_list
+    )
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.get_json()["code"] == "errors.invalidParams"
+    get_client.assert_not_called()
     assert _conversions(_DRUG_REJECTED) == {}
 
 
 def test_save_rejects_a_non_numeric_factor(client, config_manager_headers):
     """The factor is typed, so a text value never reaches the service [400]."""
-    response, _ = _save(
+    response, get_client = _save(
         client,
         config_manager_headers,
         _DRUG_REJECTED,
@@ -324,12 +211,12 @@ def test_save_rejects_a_non_numeric_factor(client, config_manager_headers):
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.get_json()["validations"]
-    assert _conversions(_DRUG_REJECTED) == {}
+    get_client.assert_not_called()
 
 
 def test_save_rejects_an_unknown_drug(client, config_manager_headers):
-    """There is no drug to build the attributes from, so nothing is written [400]."""
-    response, _ = _save(
+    """There is no drug to convert, so backend-private is not called [400]."""
+    response, get_client = _save(
         client,
         config_manager_headers,
         _UNKNOWN_DRUG,
@@ -338,13 +225,12 @@ def test_save_rejects_an_unknown_drug(client, config_manager_headers):
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.get_json()["code"] == "errors.invalidRecord"
-    assert _conversions(_UNKNOWN_DRUG) == {}
-    assert _attributes(_UNKNOWN_DRUG) == {}
+    get_client.assert_not_called()
 
 
 def test_role_without_write_drug_attributes_cannot_save(client, analyst_headers):
     """PRESCRIPTION_ANALYST may read conversions but never write them [401]."""
-    response, _ = _save(
+    response, get_client = _save(
         client,
         analyst_headers,
         _DRUG_REJECTED,
@@ -352,7 +238,7 @@ def test_role_without_write_drug_attributes_cannot_save(client, analyst_headers)
     )
 
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
-    assert _conversions(_DRUG_REJECTED) == {}
+    get_client.assert_not_called()
 
 
 def test_process_scores_hands_the_drug_to_the_lambda(client, config_manager_headers):

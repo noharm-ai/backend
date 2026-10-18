@@ -15,6 +15,9 @@ class InfectionControlAdmission(db.Model):
     id_last_review = db.Column("fkci_revisao_ultima", db.BigInteger, nullable=True)
     origin = db.Column("tp_origem", db.Integer, nullable=False)
     recalculated_at = db.Column("dt_recalculo", db.DateTime, nullable=False)
+    # what the rule last saw running, for the worklist filters (see
+    # infection_control_status_service.admission_features)
+    features = db.Column("indicadores", postgresql.JSONB, nullable=True)
 
     updated_at = db.Column("updated_at", db.DateTime, nullable=True)
     updated_by = db.Column("updated_by", db.Integer, nullable=True)
@@ -51,6 +54,14 @@ class AntimicrobialEvaluation(db.Model):
     id_prescription_drug = db.Column("fkpresmed", db.BigInteger, nullable=False)
     course_start = db.Column("dt_inicio_curso", db.DateTime, nullable=False)
     conforming = db.Column("conforme", db.Boolean, nullable=False)
+    # the intervention reasons of a non-conformity
+    id_intervention_reasons = db.Column(
+        "idmotivointervencao", postgresql.ARRAY(db.BigInteger), nullable=True
+    )
+    # the drug a substitution reason recommends instead
+    id_substitute_drug = db.Column(
+        "fkmedicamento_substituto", db.BigInteger, nullable=True
+    )
     notes = db.Column("observacao", db.String, nullable=True)
     posology = db.Column("posologia", postgresql.JSONB, nullable=False)
     # when the verdict starts to apply: the review, or earlier when the

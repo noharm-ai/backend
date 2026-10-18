@@ -37,25 +37,6 @@ def add_history(id_segment, id_drug):
 
 
 @app_gen.route(
-    "/outliers/generate/config/<int:id_segment>/<int:id_drug>", methods=["POST"]
-)
-@api_endpoint()
-def config(id_segment, id_drug):
-    data = request.get_json()
-
-    drug_service.drug_config_to_generate_score(
-        id_drug=id_drug,
-        id_segment=id_segment,
-        id_measure_unit=data.get("idMeasureUnit", None),
-        division=data.get("division", None),
-        use_weight=data.get("useWeight", False),
-        measure_unit_list=data.get("measureUnitList"),
-    )
-
-    return True
-
-
-@app_gen.route(
     "/outliers/generate/config/<int:id_segment>/<int:id_drug>/v2", methods=["POST"]
 )
 @api_endpoint()
@@ -65,11 +46,8 @@ def config_v2(id_segment, id_drug):
     drug_service.drug_config_to_generate_score(
         id_drug=id_drug,
         id_segment=id_segment,
-        id_measure_unit=data.get("idMeasureUnit", None),
         division=data.get("division", None),
         use_weight=data.get("useWeight", False),
-        measure_unit_list=data.get("measureUnitList"),
-        skip_measure_unit=True,
     )
 
     return True

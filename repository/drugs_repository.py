@@ -339,27 +339,6 @@ def get_admin_drug_list(request_data: AdminDrugListRequest):
     )
 
 
-def get_drug_attributes(id_drug: int = None, id_segment: int = None):
-    """
-    Returns a list of drugs (with substances) from medatributos table
-    """
-
-    query = (
-        db.session.query(DrugAttributes, Drug, Substance, Segment)
-        .join(Drug, Drug.id == DrugAttributes.idDrug)
-        .join(Substance, Drug.sctid == Substance.id)
-        .join(Segment, Segment.id == DrugAttributes.idSegment)
-    )
-
-    if id_drug:
-        query = query.filter(DrugAttributes.idDrug == id_drug)
-
-    if id_segment:
-        query = query.filter(DrugAttributes.idSegment == id_segment)
-
-    return query.all()
-
-
 def get_single_drug(
     id_drug: int = None, id_segment: int = None
 ) -> (Drug, DrugAttributes, Substance):

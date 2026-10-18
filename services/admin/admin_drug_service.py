@@ -10,12 +10,10 @@ from sqlalchemy.orm import undefer
 from config import Config
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
-from models.appendix import MeasureUnit, MeasureUnitConvert
 from models.enums import SegmentTypeEnum
 from models.main import Drug, DrugAttributes, Outlier, Substance, User, db
 from models.requests.admin.admin_drug_request import AdminDrugListRequest
-from models.segment import Segment
-from repository import drug_attributes_repository, drugs_repository
+from repository import drugs_repository
 from repository.admin import admin_drug_repository
 from services import drug_service as main_drug_service
 from utils import aws, dateutils, status
@@ -134,7 +132,6 @@ def fix_inconsistency(user_context: User):
             sctid=d[1],
             user=user_context,
             overwrite=False,
-            calc_dose_max=False,
         )
 
     return len(inconsistent_drugs)
@@ -262,177 +259,3 @@ def get_drugs_missing_substance():
         id_drugs.append(d[0])
 
     return id_drugs
-
-
-@has_permission(Permission.ADMIN_DRUGS, Permission.WRITE_DRUG_ATTRIBUTES)
-def calculate_dosemax_uniq(id_drug: int, id_segment: int):
-    """
-    Calculates dosemax based on substance reference for one medatributos record
-    """
-
-    drug_attributes = drugs_repository.get_drug_attributes(
-        id_drug=id_drug, id_segment=id_segment
-    )
-    conversions = drugs_repository.get_conversions(id_drug=id_drug)
-
-    if not drug_attributes:
-        return None
-
-    attributes: DrugAttributes = drug_attributes[0].DrugAttributes
-    segment: Segment = drug_attributes[0].Segment
-
-    maxdose_ref = get_max_dose_ref(
-        attributes=drug_attributes[0].DrugAttributes,
-        drug=drug_attributes[0].Drug,
-        substance=drug_attributes[0].Substance,
-        segment=segment,
-        conversions=conversions,
-    )
-
-    attributes.ref_maxdose = maxdose_ref.get("dosemax", None)
-    attributes.ref_maxdose_weight = maxdose_ref.get("dosemaxWeight", None)
-
-    if maxdose_ref["type"] == "converted":
-        attributes.maxDose = (
-            attributes.ref_maxdose_weight
-            if attributes.useWeight
-            else attributes.ref_maxdose
-        )
-    else:
-        attributes.maxDose = None
-
-    db.session.flush()
-
-    return attributes
-
-
-@has_permission(Permission.ADMIN_DRUGS)
-def calculate_dosemax_bulk(user_context: User):
-    """
-    Calculates dosemax based on substance reference from all records in medatributos table.
-    Updates dosemax attribute if its empty or updated by internal staff
-    """
-
-    current_drugs = drugs_repository.get_drug_attributes()
-    conversions = drugs_repository.get_conversions()
-    update_list = []
-
-    converted = 0
-    not_converted = 0
-    no_reference = 0
-    updated = 0
-
-    for item in current_drugs:
-        attributes: DrugAttributes = item.DrugAttributes
-        drug: Drug = item.Drug
-        substance: Substance = item.Substance
-        segment: Segment = item.Segment
-
-        max_dose_ref = get_max_dose_ref(
-            attributes=attributes,
-            drug=drug,
-            substance=substance,
-            segment=segment,
-            conversions=conversions,
-        )
-
-        if max_dose_ref["type"] == "converted":
-            converted += 1
-            update_list.append(max_dose_ref)
-
-        not_converted += 1 if max_dose_ref["type"] == "not_converted" else 0
-        no_reference += 1 if max_dose_ref["type"] == "no_reference" else 0
-
-    if update_list:
-        drug_attributes_repository.update_dose_max(
-            update_list=update_list, schema=user_context.schema
-        )
-
-        copy_result = drug_attributes_repository.copy_dose_max_from_ref(
-            schema=user_context.schema, update_by=user_context.id
-        )
-        updated = copy_result.rowcount
-
-    return {
-        "converted": converted,
-        "notConverted": not_converted,
-        "noReference": no_reference,
-        "updated": updated,
-    }
-
-
-@has_permission(Permission.ADMIN_DRUGS, Permission.WRITE_DRUG_ATTRIBUTES)
-def get_max_dose_ref(
-    attributes: DrugAttributes,
-    drug: Drug,
-    segment: Segment,
-    substance: Substance,
-    conversions: list[(MeasureUnitConvert, MeasureUnit)],
-):
-    """
-    Calculates dosemax based on substance reference.
-    """
-
-    ref_dose = None
-    ref_dose_weight = None
-    max_decimals = 3
-
-    def get_conversion(id_drug: int, id_segment: int, measureunit_nh: str):
-        c_list = filter(
-            lambda item: (
-                item.MeasureUnitConvert.idDrug == id_drug
-                and item.MeasureUnitConvert.idSegment == id_segment
-                and item.MeasureUnit.measureunit_nh == measureunit_nh
-            ),
-            conversions,
-        )
-
-        result = next(c_list, None)
-
-        if result:
-            return result.MeasureUnitConvert.factor
-
-        return None
-
-    if not segment.type:
-        raise ValidationError(
-            "Tipo de segmento não está configurado",
-            "errors.businessRules",
-            status.HTTP_400_BAD_REQUEST,
-        )
-
-    if segment.type == SegmentTypeEnum.ADULT.value:
-        ref_dose = substance.maxdose_adult
-        ref_dose_weight = substance.maxdose_adult_weight
-    if segment.type == SegmentTypeEnum.PEDIATRIC.value:
-        ref_dose = substance.maxdose_pediatric
-        ref_dose_weight = substance.maxdose_pediatric_weight
-
-    result = {
-        "idDrug": drug.id,
-        "idSegment": attributes.idSegment,
-    }
-
-    if ref_dose or ref_dose_weight:
-        conversion = get_conversion(
-            id_drug=drug.id,
-            id_segment=attributes.idSegment,
-            measureunit_nh=substance.default_measureunit,
-        )
-
-        if conversion:
-            result["type"] = "converted"
-
-            if ref_dose:
-                result["dosemax"] = round(ref_dose * conversion, max_decimals)
-
-            if ref_dose_weight:
-                result["dosemaxWeight"] = round(
-                    ref_dose_weight * conversion, max_decimals
-                )
-        else:
-            result["type"] = "not_converted"
-    else:
-        result["type"] = "no_reference"
-
-    return result
