@@ -350,12 +350,7 @@ All endpoints in this section require administrator-level authorization.
 
 | Method | Path | Description |
 |---|---|---|
-| `POST` | `/admin/drug/attributes-list` | List all drug attributes across the schema. |
 | `GET` | `/admin/drug/ref` | Get reference drug data by SNOMED CT (`?sctid=`). |
-| `POST` | `/admin/drug/copy-attributes` | Copy drug attributes from reference. |
-| `POST` | `/admin/drug/predict-substance` | AI-predict substance for unmapped drugs. |
-| `GET` | `/admin/drug/get-missing-substance` | List drugs with no substance mapping. |
-| `POST` | `/admin/drug/add-new-outlier` | Manually add an outlier entry. |
 
 ### Substance Management
 

@@ -1,22 +1,16 @@
 """Service: admin drug related operations"""
 
-import json
-from datetime import datetime
-from typing import List
-
-from sqlalchemy import and_, distinct, func, text
+from sqlalchemy import and_, distinct, text
 from sqlalchemy.orm import undefer
 
-from config import Config
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
 from models.enums import SegmentTypeEnum
 from models.main import Drug, DrugAttributes, Outlier, Substance, User, db
 from models.requests.admin.admin_drug_request import AdminDrugListRequest
 from repository import drugs_repository
-from repository.admin import admin_drug_repository
 from services import drug_service as main_drug_service
-from utils import aws, dateutils, status
+from utils import dateutils, status
 
 
 @has_permission(Permission.ADMIN_DRUGS)
@@ -135,127 +129,3 @@ def fix_inconsistency(user_context: User):
         )
 
     return len(inconsistent_drugs)
-
-
-@has_permission(Permission.ADMIN_DRUGS)
-def copy_drug_attributes(
-    id_segment_origin,
-    id_segment_destiny,
-    user_context: User,
-    user_permissions: List[Permission],
-    attributes,
-    from_admin_schema=True,
-    overwrite_all=False,
-):
-    if not from_admin_schema and id_segment_origin == id_segment_destiny:
-        raise ValidationError(
-            "Segmento origem igual ao segmento destino",
-            "errors.invalidParams",
-            status.HTTP_400_BAD_REQUEST,
-        )
-
-    if (
-        overwrite_all
-        and Permission.ADMIN_DRUGS__OVERWRITE_ATTRIBUTES not in user_permissions
-    ):
-        raise ValidationError(
-            "Usuário não autorizado",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
-
-    if not from_admin_schema and not id_segment_origin:
-        raise ValidationError(
-            "Segmento origem inválido",
-            "errors.businessRules",
-            status.HTTP_400_BAD_REQUEST,
-        )
-
-    if not id_segment_destiny:
-        raise ValidationError(
-            "Segmento destino inválido",
-            "errors.businessRules",
-            status.HTTP_400_BAD_REQUEST,
-        )
-
-    return admin_drug_repository.copy_attributes(
-        from_admin_schema=from_admin_schema,
-        id_segment_origin=id_segment_origin,
-        id_segment_destiny=id_segment_destiny,
-        attributes=attributes,
-        user_context=user_context,
-        overwrite_all=overwrite_all,
-    )
-
-
-@has_permission(Permission.ADMIN_DRUGS)
-def predict_substance(user_context: User):
-    lambda_client = aws.get_client("lambda", region_name="sa-east-1")
-
-    response = lambda_client.invoke(
-        FunctionName=Config.BACKEND_FUNCTION_NAME,
-        InvocationType="Event",
-        Payload=json.dumps(
-            {
-                "command": "lambda_substances.infer_schema_substances",
-                "schema": user_context.schema,
-            }
-        ),
-    )
-
-    return {
-        "request_id": response.get("ResponseMetadata", {}).get("RequestId"),
-        "status_code": response.get("StatusCode"),
-    }
-
-
-@has_permission(Permission.ADMIN_DRUGS)
-def add_new_drugs_to_outlier(user_context: User):
-    query = text(
-        f"""
-            insert into {user_context.schema}.outlier
-                (fkmedicamento, idsegmento, contagem, doseconv, frequenciadia, escore, update_at, update_by)
-            select
-                pm.fkmedicamento, p.idsegmento, 0, 0, 0, 4, :updateAt, :updateBy
-            from
-	            {user_context.schema}.presmed pm
-	            inner join {user_context.schema}.prescricao p on (pm.fkprescricao = p.fkprescricao)
-            where
-                p.update_at > now() - interval '5 days'
-                and pm.idoutlier is null
-                and p.idsegmento is not null
-                and not exists (
-                    select 1
-                    from {user_context.schema}.outlier o
-                    where o.fkmedicamento = pm.fkmedicamento and o.idsegmento = p.idsegmento
-                )
-            group by
-	            pm.fkmedicamento, p.idsegmento
-        """
-    )
-
-    return db.session.execute(
-        query,
-        {
-            "updateAt": datetime.today(),
-            "updateBy": user_context.id,
-        },
-    )
-
-
-@has_permission(Permission.ADMIN_DRUGS)
-def get_drugs_missing_substance():
-    drugs = (
-        db.session.query(func.distinct(Drug.id))
-        .select_from(Outlier)
-        .join(Drug, Drug.id == Outlier.idDrug)
-        .filter(Drug.sctid == None)
-        .order_by(Drug.id)
-        .all()
-    )
-
-    id_drugs = []
-    for d in drugs:
-        id_drugs.append(d[0])
-
-    return id_drugs
