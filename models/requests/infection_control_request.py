@@ -65,9 +65,11 @@ class InfectionControlListRequest(BaseModel):
     idSubstance: list[int] = []
     # admissions running an antimicrobial of any of these AWaRe levels
     awareLevels: list[int] = []
-    # admissions with an antimicrobial running for at least this many days (D1
-    # is the first 24 hours, as in the timeline)
-    minTreatmentDays: int | None = Field(default=None, ge=1)
+    # admissions with an antimicrobial on a treatment day between these (D1 is
+    # the first 24 hours, as in the timeline); with the filters above, the
+    # same antimicrobial must match them all (e.g. amoxicillin on D1)
+    treatmentDayFrom: int | None = Field(default=None, ge=1)
+    treatmentDayTo: int | None = Field(default=None, ge=1)
     # admissions with an evaluation in force judged non conforming
     nonConforming: bool = False
     limit: int = Field(default=100, ge=1, le=500)

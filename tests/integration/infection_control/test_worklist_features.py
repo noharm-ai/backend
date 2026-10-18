@@ -98,6 +98,11 @@ def _listed(client, headers, admission, statuses=(PENDING,), **filters):
     return [a["admissionNumber"] for a in response.get_json()["data"]["admissions"]]
 
 
+def _drugs(features):
+    """The drugs of the running courses kept on the record"""
+    return sorted(course["idDrug"] for course in features["courses"])
+
+
 def test_rule_keeps_running_antimicrobials(
     infection_control, admission, second_antimicrobial
 ):
@@ -107,7 +112,7 @@ def test_rule_keeps_running_antimicrobials(
     )
 
     features = _record(admission)["indicadores"]
-    assert features["drugIDs"] == [ANTIMICROBIAL_DRUG, OTHER_DRUG]
+    assert _drugs(features) == [ANTIMICROBIAL_DRUG, OTHER_DRUG]
     assert features["nonConforming"] is False
 
     session.execute(
@@ -124,7 +129,7 @@ def test_rule_keeps_running_antimicrobials(
     session_commit()
     _run_job(admission)
 
-    assert _record(admission)["indicadores"]["drugIDs"] == [ANTIMICROBIAL_DRUG]
+    assert _drugs(_record(admission)["indicadores"]) == [ANTIMICROBIAL_DRUG]
 
 
 def test_worklist_filters_by_antimicrobial(
@@ -165,10 +170,10 @@ def test_worklist_filters_by_substance_and_aware_level(
     assert listed(awareLevels=[1, 2]) == []
 
 
-def test_worklist_filters_by_treatment_days(
+def test_worklist_filters_by_treatment_day(
     client, infection_controller_headers, infection_control, admission
 ):
-    """Admissions with an antimicrobial running for at least that many days,
+    """Admissions with an antimicrobial on a treatment day of the range,
     counted as the timeline counts them (D1 is the first 24 hours)"""
     # started 4 days and 1 hour ago: on D5
     _prescribe(admission, datetime.now() - timedelta(days=4, hours=1), _day(1))
@@ -177,9 +182,53 @@ def test_worklist_filters_by_treatment_days(
     def listed(**filters):
         return _listed(client, infection_controller_headers, admission, **filters)
 
-    assert listed(minTreatmentDays=1) == [admission]
-    assert listed(minTreatmentDays=5) == [admission]
-    assert listed(minTreatmentDays=6) == []
+    assert listed(treatmentDayFrom=5, treatmentDayTo=5) == [admission]
+    assert listed(treatmentDayFrom=1) == [admission]
+    assert listed(treatmentDayFrom=5) == [admission]
+    assert listed(treatmentDayFrom=6) == []
+    assert listed(treatmentDayTo=5) == [admission]
+    assert listed(treatmentDayTo=4) == []
+    assert listed(treatmentDayFrom=1, treatmentDayTo=1) == []
+
+
+def test_worklist_filters_by_antimicrobial_on_a_treatment_day(
+    client,
+    infection_controller_headers,
+    infection_control,
+    admission,
+    second_antimicrobial,
+):
+    """The antimicrobial and the treatment day are met by the same course:
+    one started today is on D1, the other one is not"""
+    # on D5
+    _prescribe(admission, datetime.now() - timedelta(days=4, hours=1), _day(1))
+    # started an hour ago: on D1
+    _prescribe(
+        admission, datetime.now() - timedelta(hours=1), _day(1), drugs=(OTHER_DRUG,)
+    )
+    _run_job(admission)
+
+    def on_d1(**filters):
+        return _listed(
+            client,
+            infection_controller_headers,
+            admission,
+            treatmentDayFrom=1,
+            treatmentDayTo=1,
+            **filters,
+        )
+
+    assert on_d1() == [admission]
+    assert on_d1(idDrug=[OTHER_DRUG]) == [admission]
+    assert on_d1(idDrug=[ANTIMICROBIAL_DRUG]) == []
+    assert _listed(
+        client,
+        infection_controller_headers,
+        admission,
+        idDrug=[ANTIMICROBIAL_DRUG],
+        treatmentDayFrom=5,
+        treatmentDayTo=5,
+    ) == [admission]
 
 
 def test_worklist_filters_by_non_conformity(

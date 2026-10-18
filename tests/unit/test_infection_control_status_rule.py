@@ -504,8 +504,7 @@ class TestAdmissionFeatures:
     """What the rule keeps on the record for the worklist filters"""
 
     def test_running_antimicrobials(self):
-        """Drugs, substances and AWaRe levels of the running courses, and when
-        the oldest of them started"""
+        """Drug, substance, AWaRe level and start of each running course"""
         first = _courses(
             _row(
                 id_drug=1,
@@ -522,10 +521,20 @@ class TestAdmissionFeatures:
         features = rule.admission_features(ongoing=first + second, evaluations=[])
 
         assert features == {
-            "drugIDs": [1, 4],
-            "substanceIDs": [500],
-            "awareLevels": [2],
-            "firstCourseStart": (NOW - timedelta(days=3)).isoformat(),
+            "courses": [
+                {
+                    "idDrug": 1,
+                    "idSubstance": 500,
+                    "awareLevel": 2,
+                    "start": (NOW - timedelta(days=3)).isoformat(),
+                },
+                {
+                    "idDrug": 4,
+                    "idSubstance": None,
+                    "awareLevel": None,
+                    "start": (NOW - timedelta(hours=6)).isoformat(),
+                },
+            ],
             "nonConforming": False,
         }
 
@@ -533,8 +542,7 @@ class TestAdmissionFeatures:
         """A closed record runs nothing"""
         features = rule.admission_features(ongoing=[], evaluations=[])
 
-        assert features["drugIDs"] == []
-        assert features["firstCourseStart"] is None
+        assert features == {"courses": [], "nonConforming": False}
 
     @pytest.mark.parametrize(
         "verdicts, expected", [([True], False), ([True, False], True)]

@@ -3,8 +3,18 @@
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 
-from sqlalchemy import DateTime, and_, func, or_, text, update
-from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy import (
+    BigInteger,
+    DateTime,
+    Integer,
+    and_,
+    column,
+    func,
+    or_,
+    text,
+    update,
+)
+from sqlalchemy.dialects.postgresql import JSONB, insert
 
 from models.appendix import Department, InterventionReason
 from models.enums import (
@@ -369,36 +379,54 @@ def _filter_admissions(query, filters: InfectionControlListRequest, now: datetim
     return _filter_features(query=query, filters=filters, now=now)
 
 
-def _contains_any(key: str, values: list[int]):
-    """Whether the list `key` of the record's features holds any of `values`"""
-    return or_(
-        *[InfectionControlAdmission.features[key].contains([value]) for value in values]
-    )
-
-
 def _filter_features(query, filters: InfectionControlListRequest, now: datetime):
     """Apply the worklist filters kept on the record by the rule (indicadores),
-    so the worklist doesn't join the prescriptions of every admission"""
-    features = InfectionControlAdmission.features
+    so the worklist doesn't join the prescriptions of every admission.
+
+    The antimicrobial filters (drug, substance, AWaRe level, treatment day) are
+    met by one running course: amoxicillin on D1 is the amoxicillin course on
+    its first day, not amoxicillin and some other antimicrobial on D1.
+    """
+    course = (
+        func.jsonb_array_elements(InfectionControlAdmission.features["courses"])
+        .table_valued(column("value", JSONB))
+        .alias("course")
+    )
+    value = course.c.value
+    conditions = []
 
     if filters.idDrug:
-        query = query.filter(_contains_any("drugIDs", filters.idDrug))
+        conditions.append(value["idDrug"].astext.cast(BigInteger).in_(filters.idDrug))
 
     if filters.idSubstance:
-        query = query.filter(_contains_any("substanceIDs", filters.idSubstance))
+        conditions.append(
+            value["idSubstance"].astext.cast(BigInteger).in_(filters.idSubstance)
+        )
 
     if filters.awareLevels:
-        query = query.filter(_contains_any("awareLevels", filters.awareLevels))
+        conditions.append(
+            value["awareLevel"].astext.cast(Integer).in_(filters.awareLevels)
+        )
 
-    if filters.minTreatmentDays:
-        # day N starts (N - 1) days after the course start
+    # the course is on day N, counted as in the timeline (D1 is the first 24
+    # hours), once more than N - 1 days passed since its start and until N days
+    # passed
+    start = value["start"].astext.cast(DateTime)
+    if filters.treatmentDayFrom and filters.treatmentDayFrom > 1:
+        conditions.append(start < now - timedelta(days=filters.treatmentDayFrom - 1))
+
+    if filters.treatmentDayTo:
+        conditions.append(start >= now - timedelta(days=filters.treatmentDayTo))
+
+    if conditions:
         query = query.filter(
-            features["firstCourseStart"].astext.cast(DateTime)
-            < now - timedelta(days=filters.minTreatmentDays - 1)
+            db.session.query(course).filter(and_(*conditions)).exists()
         )
 
     if filters.nonConforming:
-        query = query.filter(features["nonConforming"].as_boolean() == True)
+        query = query.filter(
+            InfectionControlAdmission.features["nonConforming"].as_boolean() == True
+        )
 
     return query
 

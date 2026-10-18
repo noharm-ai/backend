@@ -544,25 +544,21 @@ def admission_features(
     as prescalc keeps the drugs of a prescription: joining the prescriptions of
     every followed admission on each search would cost too much.
 
-    The running antimicrobials (drug, substance, AWaRe level), when the oldest
-    of them started and whether an evaluation in force judged one non
-    conforming. Nothing runs on a closed record. It holds as of the last time
-    the rule ran.
+    Each running course (drug, substance, AWaRe level and start, so a drug can
+    be searched on a treatment day) and whether an evaluation in force judged
+    one non conforming. Nothing runs on a closed record. It holds as of the
+    last time the rule ran.
     """
-    latest_items = [course.items[-1] for course in ongoing]
     return {
-        "drugIDs": sorted({item.id_drug for item in latest_items}),
-        "substanceIDs": sorted(
-            {item.id_substance for item in latest_items if item.id_substance}
-        ),
-        "awareLevels": sorted(
-            {item.atb_level for item in latest_items if item.atb_level}
-        ),
-        "firstCourseStart": (
-            dateutils.to_iso(min(course.start for course in ongoing))
-            if ongoing
-            else None
-        ),
+        "courses": [
+            {
+                "idDrug": course_drug(course),
+                "idSubstance": course.items[-1].id_substance,
+                "awareLevel": course.items[-1].atb_level,
+                "start": dateutils.to_iso(course.start),
+            }
+            for course in ongoing
+        ],
         "nonConforming": any(not e.conforming for e in evaluations),
     }
 
