@@ -441,13 +441,21 @@ def _filter_features(query, filters: InfectionControlListRequest, now: datetime)
 
     Each antimicrobial criterion is met by a running course of its own: the
     drug and the treatment day of a criterion go together (amoxicillin on D1 is
-    the amoxicillin course on its first day), and amoxicillin on D1 with
-    vancomycin on D2 asks for both courses.
+    the amoxicillin course on its first day). Amoxicillin on D1 with vancomycin
+    on D2 asks for either course, or for both with antimicrobialsMatchAll.
     """
-    for criterion in filters.antimicrobials:
-        conditions = _criterion_conditions(criterion=criterion, now=now)
-        if conditions:
-            query = query.filter(_running_course(conditions))
+    courses = [
+        _running_course(conditions)
+        for conditions in (
+            _criterion_conditions(criterion=criterion, now=now)
+            for criterion in filters.antimicrobials
+        )
+        if conditions
+    ]
+    if courses:
+        query = query.filter(
+            and_(*courses) if filters.antimicrobialsMatchAll else or_(*courses)
+        )
 
     if filters.awareLevels:
         levels = filters.awareLevels

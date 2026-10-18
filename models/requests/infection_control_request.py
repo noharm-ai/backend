@@ -70,11 +70,13 @@ class InfectionControlListRequest(BaseModel):
     # admissions whose scheduled review date has passed
     overdueReview: bool = False
     # the filters below read what the rule last saw running (indicadores)
-    # admissions meeting every criterion, each by a running course of its own
-    # (e.g. amoxicillin on D1 and vancomycin on D2)
+    # admissions meeting any criterion, or every one with
+    # antimicrobialsMatchAll, each by a running course of its own (e.g.
+    # amoxicillin on D1 and vancomycin on D2)
     antimicrobials: list[AntimicrobialCriterionRequest] = Field(
         default=[], max_length=10
     )
+    antimicrobialsMatchAll: bool = False
     # admissions running an antimicrobial of any of these AWaRe levels
     awareLevels: list[int] = []
     # admissions with an evaluation in force judged non conforming

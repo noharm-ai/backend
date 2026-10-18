@@ -132,9 +132,10 @@ def test_rule_keeps_running_antimicrobials(
     assert _drugs(_record(admission)["indicadores"]) == [ANTIMICROBIAL_DRUG]
 
 
-def _criteria(*criteria):
-    """The antimicrobials filter: every criterion met by a course of its own"""
-    return {"antimicrobials": list(criteria)}
+def _criteria(*criteria, match_all=False):
+    """The antimicrobials filter: any criterion, or every one with match_all,
+    met by a course of its own"""
+    return {"antimicrobials": list(criteria), "antimicrobialsMatchAll": match_all}
 
 
 def test_worklist_filters_by_antimicrobial(
@@ -226,7 +227,8 @@ def test_worklist_filters_by_antimicrobials_on_their_treatment_days(
     second_antimicrobial,
 ):
     """Each criterion is met by a course of its own: the drug and the day of a
-    criterion go together, and every criterion must be met"""
+    criterion go together. Any criterion will do, or every one with
+    antimicrobialsMatchAll"""
     # on D5
     _prescribe(admission, datetime.now() - timedelta(days=4, hours=1), _day(1))
     # started an hour ago: on D1
@@ -235,9 +237,12 @@ def test_worklist_filters_by_antimicrobials_on_their_treatment_days(
     )
     _run_job(admission)
 
-    def listed(*criteria):
+    def listed(*criteria, match_all=False):
         return _listed(
-            client, infection_controller_headers, admission, **_criteria(*criteria)
+            client,
+            infection_controller_headers,
+            admission,
+            **_criteria(*criteria, match_all=match_all),
         )
 
     assert listed(_d(1)) == [admission]
@@ -245,16 +250,21 @@ def test_worklist_filters_by_antimicrobials_on_their_treatment_days(
     assert listed({"idDrug": [ANTIMICROBIAL_DRUG], **_d(1)}) == []
     assert listed({"idDrug": [ANTIMICROBIAL_DRUG], **_d(5)}) == [admission]
 
-    # both at once: one on D5 and the other on D1
-    assert listed(
-        {"idDrug": [ANTIMICROBIAL_DRUG], **_d(5)}, {"idDrug": [OTHER_DRUG], **_d(1)}
-    ) == [admission]
-    assert (
-        listed(
-            {"idDrug": [ANTIMICROBIAL_DRUG], **_d(1)}, {"idDrug": [OTHER_DRUG], **_d(1)}
-        )
-        == []
-    )
+    on_d5 = {"idDrug": [ANTIMICROBIAL_DRUG], **_d(5)}
+    on_d1 = {"idDrug": [OTHER_DRUG], **_d(1)}
+    not_on_d1 = {"idDrug": [ANTIMICROBIAL_DRUG], **_d(1)}
+    not_on_d5 = {"idDrug": [OTHER_DRUG], **_d(5)}
+
+    # any of them: one is enough
+    assert listed(not_on_d1, on_d1) == [admission]
+    assert listed(on_d5, not_on_d5) == [admission]
+    assert listed(not_on_d1, not_on_d5) == []
+    # an empty criterion does not make every admission match
+    assert listed(not_on_d1, {}) == []
+
+    # all of them: one on D5 and the other on D1
+    assert listed(on_d5, on_d1, match_all=True) == [admission]
+    assert listed(not_on_d1, on_d1, match_all=True) == []
 
 
 def test_worklist_limits_the_antimicrobial_criteria(
