@@ -237,13 +237,13 @@ def _get_follow_up(
     )
 
 
-@has_permission(Permission.READ_PRESCRIPTION)
+@has_permission(Permission.READ_INFECTION_CONTROL)
 def get_admission_state(admission_number: int):
     """Infection control follow-up of an admission"""
     return _get_follow_up(admission_number=admission_number, now=datetime.now())
 
 
-@has_permission(Permission.READ_PRESCRIPTION)
+@has_permission(Permission.READ_INFECTION_CONTROL)
 def get_admission_view(admission_number: int, user_context: User):
     """The infection control page of an admission: the antimicrobial timeline
     and its follow-up, built from the same courses judged at the same time.

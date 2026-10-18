@@ -23,10 +23,20 @@ from tests.integration.infection_control.helpers import (
 from utils import status
 
 
-def test_state_without_feature(client, analyst_headers, admission):
-    """The page learns the feature is off"""
+def test_state_requires_permission(client, analyst_headers, admission):
+    """401 without READ_INFECTION_CONTROL, even with READ_PRESCRIPTION"""
     response = client.get(
         f"/infection-control/admission/{admission}", headers=analyst_headers
+    )
+
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+def test_state_without_feature(client, infection_controller_headers, admission):
+    """The page learns the feature is off"""
+    response = client.get(
+        f"/infection-control/admission/{admission}",
+        headers=infection_controller_headers,
     )
 
     assert response.status_code == status.HTTP_200_OK
@@ -34,13 +44,14 @@ def test_state_without_feature(client, analyst_headers, admission):
 
 
 def test_state_of_followed_admission(
-    client, analyst_headers, infection_control, admission
+    client, infection_controller_headers, infection_control, admission
 ):
     """Status, open reasons and the courses of a followed admission"""
     _prescribe_today(admission)
 
     response = client.get(
-        f"/infection-control/admission/{admission}", headers=analyst_headers
+        f"/infection-control/admission/{admission}",
+        headers=infection_controller_headers,
     )
 
     data = response.get_json()["data"]
@@ -59,21 +70,23 @@ def _view(client, headers, admission):
     return response.get_json()["data"]
 
 
-def test_view_without_feature(client, analyst_headers, admission):
+def test_view_without_feature(client, infection_controller_headers, admission):
     """The page loads its timeline and learns the feature is off"""
     _prescribe_today(admission, job=False)
 
-    data = _view(client, analyst_headers, admission)
+    data = _view(client, infection_controller_headers, admission)
 
     assert len(data["courses"]) == 1
     assert data["followUp"] == {"enabled": False, "admissionNumber": admission}
 
 
-def test_view_brings_follow_up(client, analyst_headers, infection_control, admission):
+def test_view_brings_follow_up(
+    client, infection_controller_headers, infection_control, admission
+):
     """The timeline comes with the follow-up, both from the same courses"""
     _prescribe_today(admission)
 
-    data = _view(client, analyst_headers, admission)
+    data = _view(client, infection_controller_headers, admission)
 
     follow_up = data["followUp"]
     assert follow_up["followed"] is True
@@ -85,7 +98,7 @@ def test_view_brings_follow_up(client, analyst_headers, infection_control, admis
 
 
 def test_view_survives_follow_up_failure(
-    client, analyst_headers, infection_control, admission, monkeypatch
+    client, infection_controller_headers, infection_control, admission, monkeypatch
 ):
     """A failing follow-up (here a query error) still lets the timeline
     through, without the follow-up"""
@@ -96,7 +109,7 @@ def test_view_survives_follow_up_failure(
 
     monkeypatch.setattr(infection_control_service, "_get_state", failing_state)
 
-    data = _view(client, analyst_headers, admission)
+    data = _view(client, infection_controller_headers, admission)
 
     assert len(data["courses"]) == 1
     assert data["followUp"] is None
