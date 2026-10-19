@@ -24,11 +24,9 @@ from models.main import (
     db,
 )
 from models.prescription import Prescription, PrescriptionDrug
-from models.requests.admin.admin_drug_request import AdminDrugListRequest
 from models.segment import Segment
 from repository import drugs_repository, outlier_repository
 from services import data_authorization_service, memory_service
-from services.admin import admin_drug_service
 from utils import lambdautils, numberutils, prescriptionutils, status
 
 
@@ -458,9 +456,12 @@ def update_substance(id_drug, sctid, user_context: User):
         error_message="Ocorreu um erro ao atualizar a substância. Consulte o administrador do sistema.",
     )
 
-    return admin_drug_service.get_drug_list(
-        request_data=AdminDrugListRequest(idDrugList=[id_drug], limit=20, offset=0)
-    )
+    updated_sctid = db.session.query(Drug.sctid).filter(Drug.id == id_drug).scalar()
+
+    return {
+        "idDrug": str(id_drug),
+        "sctid": str(updated_sctid) if updated_sctid else None,
+    }
 
 
 def copy_substance_default_attributes(id_drug, sctid, user: User, overwrite=True):
