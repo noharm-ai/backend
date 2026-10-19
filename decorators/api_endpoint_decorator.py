@@ -31,6 +31,21 @@ def api_endpoint(download_headers=None, is_admin=False):
                 verify_jwt_in_request()
 
                 user_context = User.find(get_jwt_identity())
+
+                # logged before any work so a request that times out (and never
+                # reaches request_complete) can still be traced by @requestId
+                logger.backend_logger.warning(
+                    json.dumps(
+                        {
+                            "event": "request_start",
+                            "path": request.path,
+                            "method": request.method,
+                            "schema": user_context.schema,
+                            "user": user_context.id,
+                        }
+                    )
+                )
+
                 if "user_context" in inspect.signature(f).parameters:
                     kwargs["user_context"] = user_context
 
