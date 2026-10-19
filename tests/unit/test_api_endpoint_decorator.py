@@ -491,6 +491,59 @@ def test_every_request_logs_a_completion_event():
     assert complete[0]["duration_ms"] >= 0
 
 
+def test_an_authenticated_request_logs_a_start_event_before_the_handler_runs():
+    """``request_start`` identifies requests that time out before completing."""
+
+    logged_before_handler = []
+
+    @api_endpoint()
+    def handler():
+        # a Lambda timeout kills the request here: the start event must exist
+        warning = api_endpoint_decorator.logger.backend_logger.warning
+        logged_before_handler.extend(
+            json.loads(call.args[0])["event"] for call in warning.call_args_list
+        )
+
+    _, mocks = _run(handler, path="/some/endpoint", method="POST")
+
+    assert logged_before_handler == ["request_start"]
+
+    events = [json.loads(call.args[0]) for call in mocks.logger.warning.call_args_list]
+    start = [e for e in events if e.get("event") == "request_start"]
+
+    assert start == [
+        {
+            "event": "request_start",
+            "path": "/some/endpoint",
+            "method": "POST",
+            "schema": "demo",
+            "user": 42,
+        }
+    ]
+
+
+def test_a_request_that_failed_authentication_logs_no_start_event():
+    """No user means nothing useful to report up front."""
+
+    @api_endpoint()
+    def handler():
+        return None
+
+    with app.test_request_context(path="/some/endpoint"):
+        with patch.object(api_endpoint_decorator, "db"), patch.object(
+            api_endpoint_decorator, "dbSession"
+        ), patch.object(
+            api_endpoint_decorator,
+            "verify_jwt_in_request",
+            side_effect=NoAuthorizationError("missing token"),
+        ), patch.object(api_endpoint_decorator.logger, "backend_logger") as mock_logger:
+            handler()
+
+    events = [json.loads(call.args[0]) for call in mock_logger.warning.call_args_list]
+
+    assert "request_start" not in [e.get("event") for e in events]
+
+
 def test_a_request_that_failed_before_authentication_logs_an_undefined_user():
     """With no resolved user the log must not blow up on the missing context."""
 

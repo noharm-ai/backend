@@ -140,6 +140,18 @@ def execute_with_static_context(schema: str, operation_func, params: dict):
         start_time = time.time()
         params["user_context"] = user_context
 
+        logger.backend_logger.warning(
+            json.dumps(
+                {
+                    "event": "request_start",
+                    "path": operation_func.__name__,
+                    "method": "event",
+                    "schema": user_context.schema,
+                    "user": user_context.id,
+                }
+            )
+        )
+
         try:
             result = operation_func(**params)
 
