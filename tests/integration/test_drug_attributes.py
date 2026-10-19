@@ -373,7 +373,7 @@ def _drug_sctid(id_drug: int):
 def test_update_substance_hands_the_drug_to_backend_private(
     client, config_manager_headers
 ):
-    """POST /drugs/substance - backend-private applies the substance; the endpoint answers the refreshed drug"""
+    """POST /drugs/substance - backend-private applies the substance; the endpoint answers the new sctid"""
     lambda_client = _backend_private({"updated": True}, apply_sctid=_SCTID_TAGGED)
 
     response, _ = _post_substance(
@@ -396,10 +396,11 @@ def test_update_substance_hands_the_drug_to_backend_private(
         "sctid": _SCTID_TAGGED,
     }
 
-    # the endpoint answers with the admin drug list for that drug, read after the call
-    drug_list = response.get_json()["data"]["list"]
-    assert [d["idDrug"] for d in drug_list] == [str(_DRUG_SUBSTANCE)]
-    assert drug_list[0]["sctid"] == str(_SCTID_TAGGED)
+    # the endpoint answers with the drug's substance, read after the call
+    assert response.get_json()["data"] == {
+        "idDrug": str(_DRUG_SUBSTANCE),
+        "sctid": str(_SCTID_TAGGED),
+    }
 
 
 @pytest.mark.parametrize(
