@@ -10,7 +10,9 @@
     "cors": true,
     "memory_size": 1024,
     "num_retained_versions": 5,
-    "api_key_required": true
+    "api_key_required": true,
+    "log_level": "INFO",
+    "debug": false
   },
   "test": {
     "app_function": "mobile.app",
@@ -23,7 +25,9 @@
     "cors": true,
     "memory_size": 1024,
     "num_retained_versions": 5,
-    "api_key_required": true
+    "api_key_required": true,
+    "log_level": "INFO",
+    "debug": false
   },
   "homolog": {
     "app_function": "mobile.app",
@@ -36,6 +40,8 @@
     "cors": true,
     "memory_size": 1024,
     "num_retained_versions": 5,
-    "api_key_required": true
+    "api_key_required": true,
+    "log_level": "INFO",
+    "debug": false
   }
 }
