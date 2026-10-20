@@ -126,3 +126,32 @@ def get_microorganisms(id_exam_items: list[int]) -> dict[int, list[str]]:
         id_exam_item: sorted(set(names))
         for id_exam_item, names in microorganisms.items()
     }
+
+
+def get_antibiograms(id_exam_items: list[int]) -> dict[int, list]:
+    """The released antibiogram rows (cultura) of each exam item. A row with
+    no result is a prediction or a pending one, and is left out: a prediction
+    must never be read as the lab's result."""
+
+    if not id_exam_items:
+        return {}
+
+    query = (
+        select(
+            Culture.idExamItem,
+            Culture.microorganism,
+            Culture.drug,
+            Culture.result,
+            Culture.microorganismAmount,
+        )
+        .where(Culture.idExamItem.in_(id_exam_items))
+        .where(func.trim(Culture.result) != "")
+        .where(func.trim(Culture.drug) != "")
+        .order_by(Culture.microorganism, Culture.drug, Culture.id)
+    )
+
+    antibiograms = {}
+    for row in db.session.execute(query).all():
+        antibiograms.setdefault(row.idExamItem, []).append(row)
+
+    return antibiograms

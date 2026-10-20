@@ -152,7 +152,12 @@ def _mic(item: dict, result):
     if result is None:
         return None
 
-    mic = item.get("qtdmicroorganismo")
+    return format_mic(item.get("qtdmicroorganismo"))
+
+
+def format_mic(mic):
+    """The MIC as text, whether it comes as text with its qualifier or as a
+    bare number; blank says nothing"""
 
     if isinstance(mic, Decimal):
         # normalize() drops the trailing zeros; format(..., "f") keeps it out of
