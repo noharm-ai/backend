@@ -256,7 +256,9 @@ def lambda_client():
     different one.
     """
     client = MagicMock()
-    client.invoke.return_value = _lambda_response({"status": "success"})
+    client.invoke.return_value = _lambda_response(
+        {"success": True, "data": {"to_admission_number": 4242}}
+    )
 
     with patch("services.navigation_service.aws.get_client", return_value=client):
         yield client
@@ -331,18 +333,14 @@ def test_copy_returns_the_lambda_response(
     client, navigator_headers, cohort, fernet, lambda_client
 ):
     """The Lambda payload is returned to the caller untouched."""
-    lambda_client.invoke.return_value = _lambda_response(
-        {"status": "success", "admission_number": 4242}
-    )
-
     response = client.post(
         URL, json=_body(ADMISSION_STANDARD), headers=navigator_headers
     )
 
     assert response.status_code == 200
     assert response.get_json()["data"] == {
-        "status": "success",
-        "admission_number": 4242,
+        "success": True,
+        "data": {"to_admission_number": 4242},
     }
 
 
@@ -492,3 +490,47 @@ def test_copy_reports_a_lambda_error_as_a_server_error(
 
     assert response.status_code == 500
     assert "Ocorreu um erro ao copiar" in response.get_json()["message"]
+
+
+def test_copy_reports_an_unsuccessful_response_as_a_server_error(
+    client, navigator_headers, cohort, fernet, lambda_client
+):
+    """A response without success, and no "error" key, is not a copy [500]."""
+    lambda_client.invoke.return_value = _lambda_response(
+        {"success": False, "message": "zztest lambda failure"}
+    )
+
+    response = client.post(
+        URL, json=_body(ADMISSION_STANDARD), headers=navigator_headers
+    )
+
+    assert response.status_code == 500
+    assert "Ocorreu um erro ao copiar" in response.get_json()["message"]
+
+
+def test_copy_rejects_a_patient_already_in_navigation(
+    client, navigator_headers, cohort, fernet, lambda_client
+):
+    """PATIENT_ALREADY_IN_NAVIGATION: the origin patient was copied before [400].
+
+    It comes back as a *successful* invocation carrying ``success: false``, so
+    it has to be recognised by its error code rather than by an "error" key.
+    """
+    lambda_client.invoke.return_value = _lambda_response(
+        {
+            "success": False,
+            "error_code": "PATIENT_ALREADY_IN_NAVIGATION",
+            "message": "patient already in navigation: 1991001",
+            "data": {"nav_admission_number": 1991001},
+        }
+    )
+
+    response = client.post(
+        URL, json=_body(ADMISSION_STANDARD), headers=navigator_headers
+    )
+
+    assert response.status_code == 400
+    assert (
+        response.get_json()["message"]
+        == "Este paciente já foi copiado para a navegação."
+    )
