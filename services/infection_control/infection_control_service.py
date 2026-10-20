@@ -11,6 +11,8 @@ the follow-up data.
 import json
 from datetime import datetime
 
+from sqlalchemy.exc import OperationalError
+
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
 from models.enums import (
@@ -45,6 +47,13 @@ from utils import dateutils, logger, status
 
 # letters typed before the drugs are searched
 MIN_DRUG_SEARCH = 3
+# the worklist counts its matches up to this: the closed admissions grow
+# without end, and counting them all could outlast the request
+COUNT_LIMIT = 5000
+# each worklist query stops after this: the request has 30s in all
+WORKLIST_STATEMENT_TIMEOUT_MS = 10000
+# postgres query_canceled, raised when statement_timeout runs out
+QUERY_CANCELED = "57014"
 
 
 def _check_feature():
@@ -482,6 +491,8 @@ def save_review(request_data: InfectionControlReviewRequest, user_context: User)
 
     review = InfectionControlReview()
     review.admission_number = admission_number
+    # the prescription-day the record points at, as the worklist shows it
+    review.id_prescription = admission.id_last_prescription
     review.notes = request_data.notes
     review.next_review_date = request_data.nextReviewDate
     review.created_at = now
@@ -589,9 +600,45 @@ def follow_admission(admission_number: int, user_context: User):
     return _get_state(admission_number=admission_number, now=now)
 
 
+def _search_admissions(
+    statuses: list[int], request_data: InfectionControlListRequest, now: datetime
+) -> tuple[list, int]:
+    """The worklist rows and how many match, each query bounded by
+    WORKLIST_STATEMENT_TIMEOUT_MS: a search that slow asks for more filters"""
+    try:
+        with infection_control_repository.statement_timeout(
+            WORKLIST_STATEMENT_TIMEOUT_MS
+        ):
+            rows = infection_control_repository.list_admissions(
+                statuses=statuses, filters=request_data, now=now
+            )
+
+            # the list holds every match from the offset unless the limit cut
+            # it (an empty page past the offset says nothing)
+            if len(rows) < request_data.limit and (rows or request_data.offset == 0):
+                return rows, request_data.offset + len(rows)
+
+            return rows, infection_control_repository.count_admissions(
+                statuses=statuses,
+                filters=request_data,
+                now=now,
+                limit=COUNT_LIMIT + 1,
+            )
+    except OperationalError as e:
+        if getattr(e.orig, "pgcode", None) != QUERY_CANCELED:
+            raise
+
+        raise ValidationError(
+            "A busca demorou demais. Utilize mais filtros",
+            "errors.queryTimeout",
+            status.HTTP_400_BAD_REQUEST,
+        ) from e
+
+
 @has_permission(Permission.READ_INFECTION_CONTROL)
 def list_admissions(request_data: InfectionControlListRequest):
-    """Followed admissions for the worklist, longest in their status first"""
+    """Followed admissions for the worklist: the open ones longest in their
+    status first, then the closed ones latest closed first"""
     _check_feature()
 
     statuses = request_data.status or [
@@ -599,8 +646,8 @@ def list_admissions(request_data: InfectionControlListRequest):
         InfectionControlStatusEnum.REVISED.value,
     ]
     now = datetime.now()
-    rows = infection_control_repository.list_admissions(
-        statuses=statuses, filters=request_data, now=now
+    rows, count = _search_admissions(
+        statuses=statuses, request_data=request_data, now=now
     )
     admission_numbers = [row.InfectionControlAdmission.admission_number for row in rows]
 
@@ -614,15 +661,11 @@ def list_admissions(request_data: InfectionControlListRequest):
     validity = infection_control_repository.get_earliest_validity_by_admission(
         admission_numbers=admission_numbers
     )
-    last_prescriptions = infection_control_repository.get_last_prescriptions(
-        admission_numbers=admission_numbers
-    )
 
     admissions = []
     for row in rows:
         admission = row.InfectionControlAdmission
         patient = row.Patient
-        last = last_prescriptions.get(admission.admission_number)
         admissions.append(
             {
                 "admissionNumber": admission.admission_number,
@@ -632,8 +675,8 @@ def list_admissions(request_data: InfectionControlListRequest):
                 "admissionDate": (
                     dateutils.to_iso(patient.admissionDate) if patient else None
                 ),
-                "bed": last.Prescription.bed if last else None,
-                "department": last.department if last else None,
+                "bed": row.bed,
+                "department": row.department,
                 "status": admission.status,
                 "statusDate": dateutils.to_iso(admission.status_date),
                 "nextReviewDate": dateutils.to_iso(admission.next_review_date),
@@ -645,11 +688,11 @@ def list_admissions(request_data: InfectionControlListRequest):
         )
 
     return {
-        # all the matching admissions: more than listed when the limit cut
-        # the list
-        "count": infection_control_repository.count_admissions(
-            statuses=statuses, filters=request_data, now=now
-        ),
+        # all the matching admissions, up to COUNT_LIMIT: more than listed when
+        # the limit cut the list
+        "count": min(count, COUNT_LIMIT),
+        # more than COUNT_LIMIT match
+        "countLimited": count > COUNT_LIMIT,
         "admissions": admissions,
     }
 

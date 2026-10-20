@@ -18,6 +18,11 @@ class InfectionControlAdmission(db.Model):
     # what the rule last saw running, for the worklist filters (see
     # infection_control_status_service.admission_features)
     features = db.Column("indicadores", postgresql.JSONB, nullable=True)
+    # the latest prescription-day of the admission: the worklist filters by
+    # and shows its department and bed, which change during the admission
+    id_last_prescription = db.Column(
+        "fkprescricao_ultima", db.BigInteger, nullable=True
+    )
 
     updated_at = db.Column("updated_at", db.DateTime, nullable=True)
     updated_by = db.Column("updated_by", db.Integer, nullable=True)
@@ -32,6 +37,8 @@ class InfectionControlReview(db.Model):
 
     id = db.Column("idci_revisao", db.BigInteger, primary_key=True, autoincrement=True)
     admission_number = db.Column("nratendimento", db.BigInteger, nullable=False)
+    # the prescription-day the review was made on: where the patient was
+    id_prescription = db.Column("fkprescricao", db.BigInteger, nullable=True)
     notes = db.Column("observacao", db.String, nullable=True)
     next_review_date = db.Column("dt_proxima_revisao", db.DateTime, nullable=True)
 

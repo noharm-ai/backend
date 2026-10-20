@@ -81,6 +81,9 @@ class InfectionControlListRequest(BaseModel):
     awareLevels: list[int] = []
     # admissions with an evaluation in force judged non conforming
     nonConforming: bool = False
+    # closed admissions are listed only within this many days of closing,
+    # unless asked by admission number: they grow without end
+    closedDays: int = Field(default=30, ge=1, le=365)
     limit: int = Field(default=100, ge=1, le=500)
     offset: int = Field(default=0, ge=0)
 
