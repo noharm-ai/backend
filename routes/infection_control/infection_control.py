@@ -55,7 +55,8 @@ def get_recent_cultures(admission_number: int):
 )
 @api_endpoint()
 def get_culture_history(admission_number: int, id_culture: int):
-    """Every culture of the patient with the exam and material of one culture"""
+    """Every culture of the patient with the exam and material of one culture,
+    each with its antibiogram"""
     return recent_cultures_service.get_culture_history(
         admission_number=admission_number, id_culture=id_culture
     )

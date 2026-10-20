@@ -117,15 +117,32 @@ def _add_header(
     return id_header
 
 
-def _add_antibiogram(id_header: int, microorganism: str | None, drug: str):
+def _add_antibiogram(
+    id_header: int,
+    microorganism: str | None,
+    drug: str,
+    result: str | None = "S",
+    mic: str | None = None,
+    prediction: str | None = None,
+):
     """Insert an antibiogram row (demo.cultura) of a header"""
     session.execute(
         text(
             "INSERT INTO demo.cultura "
-            "(fkexame, fkitemexame, nomemedicamento, nomemicroorganismo, resultado) "
-            "VALUES (:id, :id, :drug, :microorganism, 'S')"
+            "(fkexame, fkitemexame, nomemedicamento, nomemicroorganismo, resultado, "
+            " qtmicroorganismo, predict, predict_proba) "
+            "VALUES (:id, :id, :drug, :microorganism, :result, :mic, :prediction, "
+            " :probability)"
         ),
-        {"id": id_header, "drug": drug, "microorganism": microorganism},
+        {
+            "id": id_header,
+            "drug": drug,
+            "microorganism": microorganism,
+            "result": result,
+            "mic": mic,
+            "prediction": prediction,
+            "probability": 0.9 if prediction else None,
+        },
     )
     session_commit()
 
@@ -327,3 +344,86 @@ def test_history_of_another_patient(client, analyst_headers, admission):
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.get_json()["code"] == "errors.invalidRecord"
+
+
+def test_recent_cultures_without_antibiogram(client, analyst_headers, admission):
+    """The card only names the microorganisms: the drugs stay in the history"""
+    id_header = _add_header(_day(-3), _day(-1), result="Positivo")
+    _add_antibiogram(id_header, "Microrganismo teste", "DROGA A")
+
+    data = _get(client, analyst_headers, admission)
+
+    assert "antibiogram" not in data["cultures"][0]
+
+
+def test_history_with_the_antibiogram(client, analyst_headers, admission):
+    """Each culture of the history carries its released antibiogram, read as
+    the culture card reads it, sorted by microorganism and drug"""
+    old = _add_header(_day(-20), _day(-18), result="Positivo")
+    _add_antibiogram(old, "Microrganismo teste", "DROGA A", result="R")
+    latest = _add_header(_day(-3), _day(-1), result="Positivo")
+    _add_antibiogram(
+        latest, "Microrganismo B teste", "DROGA B", result="Resistente", mic=">=32"
+    )
+    _add_antibiogram(
+        latest,
+        "Microrganismo B teste",
+        "DROGA A",
+        result="Sensível Dose-Dependente",
+        mic=" <=0.5 ",
+    )
+    _add_antibiogram(latest, "Microrganismo A teste", "DROGA C", result="Sensível")
+    _add_antibiogram(latest, "Microrganismo A teste", "DROGA D", result="Indeterminado")
+
+    response = client.get(_history_url(admission, latest), headers=analyst_headers)
+
+    data = response.get_json()["data"]
+    assert [c["id"] for c in data["cultures"]] == [str(latest), str(old)]
+    assert data["cultures"][0]["antibiogram"] == [
+        {
+            "microorganism": "Microrganismo A teste",
+            "drug": "DROGA C",
+            "result": "Sensível",
+            "resultType": "S",
+            "resultDetail": None,
+            "mic": None,
+        },
+        {
+            "microorganism": "Microrganismo A teste",
+            "drug": "DROGA D",
+            "result": "Indeterminado",
+            "resultType": "U",
+            "resultDetail": "Indeterminado",
+            "mic": None,
+        },
+        {
+            "microorganism": "Microrganismo B teste",
+            "drug": "DROGA A",
+            "result": "Sensível Dose-Dependente",
+            "resultType": "S",
+            "resultDetail": "Sensível Dose-Dependente",
+            "mic": "<=0.5",
+        },
+        {
+            "microorganism": "Microrganismo B teste",
+            "drug": "DROGA B",
+            "result": "Resistente",
+            "resultType": "R",
+            "resultDetail": None,
+            "mic": ">=32",
+        },
+    ]
+    assert [row["drug"] for row in data["cultures"][1]["antibiogram"]] == ["DROGA A"]
+    assert data["cultures"][1]["antibiogram"][0]["resultType"] == "R"
+
+
+def test_history_antibiogram_leaves_predictions_out(client, analyst_headers, admission):
+    """A pending culture has no antibiogram yet: its predictions and blank
+    results are never served as the lab's result"""
+    pending = _add_header(_day(-1), _day(-1))
+    _add_antibiogram(pending, None, "DROGA A", result=None, prediction="R")
+    _add_antibiogram(pending, "Microrganismo teste", "DROGA B", result=" ")
+
+    response = client.get(_history_url(admission, pending), headers=analyst_headers)
+
+    assert response.get_json()["data"]["cultures"][0]["antibiogram"] == []
