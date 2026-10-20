@@ -485,6 +485,8 @@ def save_review(request_data: InfectionControlReviewRequest, user_context: User)
 
     review = InfectionControlReview()
     review.admission_number = admission_number
+    # the prescription-day the record points at, as the worklist shows it
+    review.id_prescription = admission.id_last_prescription
     review.notes = request_data.notes
     review.next_review_date = request_data.nextReviewDate
     review.created_at = now

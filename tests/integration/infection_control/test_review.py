@@ -4,12 +4,14 @@ superseding, backdating and validation"""
 from datetime import datetime, timedelta
 
 import pytest
+from sqlalchemy import text
 
 from models.enums import (
     AntimicrobialEvaluationClosingEnum,
     AntimicrobialEvaluationStatusEnum,
     InfectionControlResolutionEnum,
 )
+from tests.conftest import session
 from tests.integration.infection_control.helpers import (
     ANTIMICROBIAL_DRUG,
     CLOSED,
@@ -21,8 +23,10 @@ from tests.integration.infection_control.helpers import (
     REVISED,
     _day,
     _evaluations,
+    _last_prescription_day,
     _open_pendings,
     _pendings,
+    _prescalc,
     _prescribe,
     _prescribe_today,
     _record,
@@ -64,6 +68,31 @@ def test_review_requires_feature(client, infection_controller_headers, admission
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.get_json()["code"] == "errors.businessRules"
+
+
+def test_review_records_its_prescription_day(
+    client, infection_controller_headers, infection_control, admission
+):
+    """The review keeps the prescription-day the record points at (where the
+    worklist shows the patient), not a later one the job hasn't reached"""
+    _prescribe_today(admission)
+    review_day = _last_prescription_day(admission)
+    _prescalc(_prescribe(admission, _day(1), _day(2)))
+    assert _last_prescription_day(admission) != review_day
+
+    response = _review(
+        client,
+        infection_controller_headers,
+        admission,
+        evaluations=[ANTIMICROBIAL_DRUG],
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    reviews = session.execute(
+        text("SELECT fkprescricao FROM demo.ci_revisao WHERE nratendimento = :a"),
+        {"a": admission},
+    ).all()
+    assert [r.fkprescricao for r in reviews] == [review_day]
 
 
 def test_full_review_revises_admission(

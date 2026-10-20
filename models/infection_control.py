@@ -37,6 +37,8 @@ class InfectionControlReview(db.Model):
 
     id = db.Column("idci_revisao", db.BigInteger, primary_key=True, autoincrement=True)
     admission_number = db.Column("nratendimento", db.BigInteger, nullable=False)
+    # the prescription-day the review was made on: where the patient was
+    id_prescription = db.Column("fkprescricao", db.BigInteger, nullable=True)
     notes = db.Column("observacao", db.String, nullable=True)
     next_review_date = db.Column("dt_proxima_revisao", db.DateTime, nullable=True)
 
