@@ -38,13 +38,23 @@ class AntimicrobialEvaluationRequest(BaseModel):
     triggers: list[int] = []
 
 
+class InfectionControlClinicalNoteRequest(BaseModel):
+    """The clinical note a review writes in the patient's record"""
+
+    # an active clinical note type (tipoevolucao)
+    idClinicalNoteType: str
+    text: str
+
+
 class InfectionControlReviewRequest(BaseModel):
-    """A review of the patient: drugs evaluated and the next review date"""
+    """A review of the patient: drugs evaluated, the next review date and,
+    optionally, a clinical note"""
 
     admissionNumber: int
     notes: str | None = None
     nextReviewDate: LocalDatetime | None = None
     evaluations: list[AntimicrobialEvaluationRequest] = []
+    clinicalNote: InfectionControlClinicalNoteRequest | None = None
 
 
 class AntimicrobialCriterionRequest(BaseModel):
