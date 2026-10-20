@@ -17,6 +17,7 @@ from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
 from repository import culture_repository, patient_repository
 from repository.infection_control import antimicrobial_repository
+from services import culture_service
 from utils import dateutils, status
 
 # a culture released before this is old news for the treatment now
@@ -56,14 +57,44 @@ def _text(value):
     return f"{value}".strip()
 
 
-def _serialize(headers: list) -> list[dict]:
-    """The cultures with the microorganisms their antibiograms name"""
-    microorganisms = culture_repository.get_microorganisms(
-        id_exam_items=[h.idExamItem for h in headers if h.idExamItem is not None]
+def _serialize_antibiogram(rows: list) -> list[dict]:
+    """The released results of a culture, read as the culture card reads them
+    (culture_service): resistant, susceptible or a wording it could not
+    classify, which is never shown as either"""
+    antibiogram = []
+
+    for row in rows:
+        result = row.result.strip()
+        result_type = culture_service.classify_result(result)
+
+        antibiogram.append(
+            {
+                "microorganism": _text(row.microorganism),
+                "drug": row.drug.strip(),
+                "result": result,
+                "resultType": result_type.value,
+                "resultDetail": culture_service.result_detail(result, result_type),
+                "mic": culture_service.format_mic(row.microorganismAmount),
+            }
+        )
+
+    return antibiogram
+
+
+def _serialize(headers: list, with_antibiogram: bool = False) -> list[dict]:
+    """The cultures with the microorganisms their antibiograms name, and with
+    the antibiogram itself when asked (the history, opened on one culture)"""
+    id_exam_items = [h.idExamItem for h in headers if h.idExamItem is not None]
+    microorganisms = culture_repository.get_microorganisms(id_exam_items=id_exam_items)
+    antibiograms = (
+        culture_repository.get_antibiograms(id_exam_items=id_exam_items)
+        if with_antibiogram
+        else {}
     )
 
-    return [
-        {
+    cultures = []
+    for header in headers:
+        culture = {
             "id": str(header.id),
             "examName": _text(header.examName),
             "material": _text(header.examMaterialName),
@@ -73,8 +104,15 @@ def _serialize(headers: list) -> list[dict]:
             "previousResult": _text(header.previousResult),
             "microorganisms": microorganisms.get(header.idExamItem, []),
         }
-        for header in headers
-    ]
+
+        if with_antibiogram:
+            culture["antibiogram"] = _serialize_antibiogram(
+                antibiograms.get(header.idExamItem, [])
+            )
+
+        cultures.append(culture)
+
+    return cultures
 
 
 def _sort_key(culture: dict):
@@ -109,8 +147,10 @@ def get_recent_cultures(admission_number: int):
 @has_permission(Permission.READ_PRESCRIPTION)
 def get_culture_history(admission_number: int, id_culture: int):
     """Every culture of the patient with the exam and material of the given
-    one, newest collection first, released at any time: the history behind a
-    row of the recent cultures.
+    one, newest collection first, released at any time, each with its
+    antibiogram: what a row of the recent cultures opens. The antibiogram of
+    the clicked culture comes first on the screen, and its previous
+    collections are one click away, without another request.
 
     The culture must be the patient's, so that the admission on screen never
     opens another patient's history.
@@ -138,5 +178,5 @@ def get_culture_history(admission_number: int, id_culture: int):
         "admissionNumber": admission_number,
         "examName": _text(culture.examName),
         "material": _text(culture.examMaterialName),
-        "cultures": _serialize(headers),
+        "cultures": _serialize(headers, with_antibiogram=True),
     }
