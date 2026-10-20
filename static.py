@@ -20,10 +20,6 @@ def prescalc(event: dict, context: any):
     id_prescription: int = event.get("id_prescription", None)
     force: bool = event.get("force", False)
 
-    logger.backend_logger.warning(
-        "schema: %s | id_prescription: %s", schema, id_prescription
-    )
-
     def _prescalc_operation(user_context, schema, id_prescription, force):
         """Internal operation function for prescalc with automatic exception handling."""
         prescription_agg_service.create_agg_prescription_by_prescription(
@@ -56,10 +52,6 @@ def atendcalc(event: dict, context: any):
 
     schema: str = event.get("schema", None)
     admission_number: int = event.get("admission_number", None)
-
-    logger.backend_logger.warning(
-        "schema: %s | admission_number: %s", schema, admission_number
-    )
 
     def _atendcalc_operation(user_context, schema, admission_number, str_date):
         p_date = (
