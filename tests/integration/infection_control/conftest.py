@@ -60,9 +60,9 @@ def infection_control():
     _write_features(original)
 
 
-@pytest.fixture
-def admission():
-    """A synthetic patient admitted ten days ago"""
+def _admit():
+    """Admit a synthetic patient ten days ago, removing it (and its follow-up)
+    afterwards"""
     admission_number = test_counters["admission_number"]
     test_counters["admission_number"] += 1
 
@@ -95,6 +95,18 @@ def admission():
             {"admission": admission_number},
         )
     session_commit()
+
+
+@pytest.fixture
+def admission():
+    """A synthetic patient admitted ten days ago"""
+    yield from _admit()
+
+
+@pytest.fixture
+def second_admission():
+    """Another synthetic patient admitted ten days ago"""
+    yield from _admit()
 
 
 def _flag_antimicrobial(id_drug, id_segment, value):

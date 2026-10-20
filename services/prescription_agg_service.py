@@ -270,6 +270,7 @@ def create_agg_prescription_by_prescription(
         admission_number=p.admissionNumber,
         features=features,
         user_id=user_context.id,
+        id_prescription_day=pAgg.id,
         id_prescription=p.id,
     )
 
@@ -410,6 +411,7 @@ def create_agg_prescription_by_date(
         admission_number=agg_p.admissionNumber,
         features=features,
         user_id=user_context.id,
+        id_prescription_day=agg_p.id,
     )
 
 

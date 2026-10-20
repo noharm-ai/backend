@@ -14,11 +14,18 @@ from tests.integration.infection_control.helpers import (
     DEPARTMENT_BY_SEGMENT,
     NEVER_REVIEWED,
     NO_EVALUATION,
+    OTHER_ADULT_DEPARTMENT,
+    OTHER_DRUG,
     PATIENT_ID,
     PENDING,
     REVISED,
     SCHEDULED_DATE,
+    _day,
+    _prescalc,
+    _prescribe,
     _prescribe_today,
+    _run_job,
+    _set,
 )
 from utils import status
 
@@ -178,6 +185,59 @@ def test_worklist_filters_by_department(
     assert listed(idDepartment=[DEPARTMENT_BY_SEGMENT[CPOE_SEGMENT]]) == []
 
 
+def test_worklist_follows_patient_to_another_department(
+    client, infection_controller_headers, infection_control, admission
+):
+    """The department filtered by and the bed and department shown are those
+    of the latest prescription-day, as the patient moves"""
+    _prescribe_today(admission)
+    _prescalc(
+        _prescribe(
+            admission,
+            _day(0),
+            _day(1),
+            drugs=(OTHER_DRUG,),
+            id_department=OTHER_ADULT_DEPARTMENT,
+            bed="202",
+        )
+    )
+    # the move is a new prescription-day: the job points the record at it
+    _run_job(admission)
+
+    def listed(**filters):
+        data = _worklist(client, infection_controller_headers, admission, **filters)
+        return [a["admissionNumber"] for a in data["admissions"]]
+
+    assert listed(idDepartment=[OTHER_ADULT_DEPARTMENT]) == [admission]
+    assert listed(idDepartment=[DEPARTMENT_BY_SEGMENT[ADULT_SEGMENT]]) == []
+
+    [row] = _worklist(client, infection_controller_headers, admission)["admissions"]
+    assert row["bed"] == "202"
+    assert row["department"] == "Setor Adulto 2"
+
+
+def test_worklist_lists_record_not_pointed_yet(
+    client, infection_controller_headers, infection_control, admission
+):
+    """A record not pointed at a prescription yet is listed, without bed and
+    department, and left out by the department filter"""
+    _prescribe_today(admission)
+    _set("ci_atendimento", admission, fkprescricao_ultima=None)
+
+    [row] = _worklist(client, infection_controller_headers, admission)["admissions"]
+    assert row["admissionNumber"] == admission
+    assert row["bed"] is None
+    assert row["department"] is None
+
+    data = _worklist(
+        client,
+        infection_controller_headers,
+        admission,
+        idDepartment=[DEPARTMENT_BY_SEGMENT[ADULT_SEGMENT]],
+    )
+    assert data["admissions"] == []
+
+
 def test_worklist_filters_by_pending_type(
     client, infection_controller_headers, infection_control, admission
 ):
@@ -223,6 +283,55 @@ def test_worklist_counts_the_matching_admissions(
     ).get_json()["data"]
     assert past["admissions"] == []
     assert past["count"] == 1
+
+
+def test_worklist_counts_up_to_the_count_limit(
+    client,
+    infection_controller_headers,
+    infection_control,
+    admission,
+    second_admission,
+    monkeypatch,
+):
+    """Only a list cut by the limit counts its matches, up to COUNT_LIMIT, and
+    says when more match"""
+    _prescribe_today(admission)
+    _prescribe_today(second_admission)
+
+    def worklist(limit):
+        return client.post(
+            "/infection-control/admissions",
+            json={
+                "status": [PENDING],
+                "admissionNumbers": [admission, second_admission],
+                "limit": limit,
+            },
+            headers=infection_controller_headers,
+        ).get_json()["data"]
+
+    def fail(*args, **kwargs):
+        raise RuntimeError("counted a list holding every match")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(
+            "repository.infection_control.infection_control_repository"
+            ".count_admissions",
+            fail,
+        )
+        data = worklist(limit=500)
+    assert len(data["admissions"]) == 2
+    assert data["count"] == 2
+    assert data["countLimited"] is False
+
+    data = worklist(limit=1)
+    assert len(data["admissions"]) == 1
+    assert data["count"] == 2
+    assert data["countLimited"] is False
+
+    monkeypatch.setattr(infection_control_service, "COUNT_LIMIT", 1)
+    data = worklist(limit=1)
+    assert data["count"] == 1
+    assert data["countLimited"] is True
 
 
 def test_worklist_filters_overdue_review(

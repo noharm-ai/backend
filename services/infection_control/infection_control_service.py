@@ -45,6 +45,9 @@ from utils import dateutils, logger, status
 
 # letters typed before the drugs are searched
 MIN_DRUG_SEARCH = 3
+# the worklist counts its matches up to this: the closed admissions grow
+# without end, and counting them all could outlast the request
+COUNT_LIMIT = 5000
 
 
 def _check_feature():
@@ -614,15 +617,11 @@ def list_admissions(request_data: InfectionControlListRequest):
     validity = infection_control_repository.get_earliest_validity_by_admission(
         admission_numbers=admission_numbers
     )
-    last_prescriptions = infection_control_repository.get_last_prescriptions(
-        admission_numbers=admission_numbers
-    )
 
     admissions = []
     for row in rows:
         admission = row.InfectionControlAdmission
         patient = row.Patient
-        last = last_prescriptions.get(admission.admission_number)
         admissions.append(
             {
                 "admissionNumber": admission.admission_number,
@@ -632,8 +631,8 @@ def list_admissions(request_data: InfectionControlListRequest):
                 "admissionDate": (
                     dateutils.to_iso(patient.admissionDate) if patient else None
                 ),
-                "bed": last.Prescription.bed if last else None,
-                "department": last.department if last else None,
+                "bed": row.bed,
+                "department": row.department,
                 "status": admission.status,
                 "statusDate": dateutils.to_iso(admission.status_date),
                 "nextReviewDate": dateutils.to_iso(admission.next_review_date),
@@ -644,12 +643,24 @@ def list_admissions(request_data: InfectionControlListRequest):
             }
         )
 
+    # the list holds every match from the offset unless the limit cut it (an
+    # empty page past the offset says nothing)
+    if len(rows) < request_data.limit and (rows or request_data.offset == 0):
+        count = request_data.offset + len(rows)
+    else:
+        count = infection_control_repository.count_admissions(
+            statuses=statuses,
+            filters=request_data,
+            now=now,
+            limit=COUNT_LIMIT + 1,
+        )
+
     return {
-        # all the matching admissions: more than listed when the limit cut
-        # the list
-        "count": infection_control_repository.count_admissions(
-            statuses=statuses, filters=request_data, now=now
-        ),
+        # all the matching admissions, up to COUNT_LIMIT: more than listed when
+        # the limit cut the list
+        "count": min(count, COUNT_LIMIT),
+        # more than COUNT_LIMIT match
+        "countLimited": count > COUNT_LIMIT,
         "admissions": admissions,
     }
 
