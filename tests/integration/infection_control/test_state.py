@@ -9,6 +9,7 @@ from services.infection_control import infection_control_service
 from tests.conftest import session, session_commit
 from tests.integration.infection_control.helpers import (
     ADULT_SEGMENT,
+    ANTIMICROBIAL_DRUG,
     CLOSED,
     CPOE_SEGMENT,
     DEPARTMENT_BY_SEGMENT,
@@ -359,3 +360,139 @@ def test_worklist_filters_overdue_review(
         )
         session_commit()
         assert listed() == expected
+
+
+def _close(admission_number, days_ago):
+    """Close the admission record as of some days ago"""
+    _set(
+        "ci_atendimento",
+        admission_number,
+        tp_status=CLOSED,
+        dt_status=datetime.now() - timedelta(days=days_ago),
+    )
+
+
+def test_worklist_lists_closed_within_closed_days(
+    client, infection_controller_headers, infection_control, admission
+):
+    """Closed admissions are listed only within closedDays of closing (30 by
+    default), unless asked by admission number"""
+    _prescribe_today(admission)
+    _close(admission, days_ago=40)
+
+    def listed(**filters):
+        response = client.post(
+            "/infection-control/admissions",
+            json={"status": [CLOSED], "limit": 500, **filters},
+            headers=infection_controller_headers,
+        )
+        assert response.status_code == status.HTTP_200_OK
+        return [
+            a["admissionNumber"]
+            for a in response.get_json()["data"]["admissions"]
+            if a["admissionNumber"] == admission
+        ]
+
+    assert listed() == []
+    assert listed(closedDays=60) == [admission]
+    assert listed(admissionNumbers=[admission]) == [admission]
+
+
+def test_worklist_leaves_closed_out_of_open_only_filters(
+    client,
+    infection_controller_headers,
+    infection_control,
+    admission,
+    second_admission,
+):
+    """A closed record has nothing running, no open reason and no evaluation
+    in force: the filters asking for them leave the closed ones out without
+    looking at them, even when the record still keeps what it last saw"""
+    _prescribe_today(admission)
+    _prescribe_today(second_admission)
+    # closed by hand, so its indicadores still have the running course
+    _close(admission, days_ago=1)
+
+    def listed(statuses, **filters):
+        response = client.post(
+            "/infection-control/admissions",
+            json={
+                "status": statuses,
+                "admissionNumbers": [admission, second_admission],
+                **filters,
+            },
+            headers=infection_controller_headers,
+        )
+        assert response.status_code == status.HTTP_200_OK
+        return [a["admissionNumber"] for a in response.get_json()["data"]["admissions"]]
+
+    assert listed([CLOSED]) == [admission]
+    assert listed([CLOSED], antimicrobials=[{"idDrug": [ANTIMICROBIAL_DRUG]}]) == []
+    assert listed([CLOSED], awareLevels=[1, 2, 3]) == []
+    assert listed([CLOSED], pendingTypes=[NO_EVALUATION]) == []
+    assert listed([CLOSED], nonConforming=True) == []
+    # a criterion asking for nothing asks for nothing of the closed ones either
+    assert listed([CLOSED], antimicrobials=[{"treatmentDayFrom": 1}]) == [admission]
+    assert listed([PENDING, CLOSED], pendingTypes=[NO_EVALUATION]) == [second_admission]
+
+
+def test_worklist_lists_open_first_and_latest_closed_first(
+    client,
+    infection_controller_headers,
+    infection_control,
+    admission,
+    second_admission,
+    third_admission,
+):
+    """The open admissions come first, longest in their status first, then the
+    closed ones, latest closed first"""
+    for admission_number in (admission, second_admission, third_admission):
+        _prescribe_today(admission_number)
+    _close(second_admission, days_ago=5)
+    _close(third_admission, days_ago=1)
+
+    response = client.post(
+        "/infection-control/admissions",
+        json={
+            "status": [PENDING, REVISED, CLOSED],
+            "admissionNumbers": [admission, second_admission, third_admission],
+        },
+        headers=infection_controller_headers,
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert [
+        a["admissionNumber"] for a in response.get_json()["data"]["admissions"]
+    ] == [
+        admission,
+        third_admission,
+        second_admission,
+    ]
+
+
+def test_worklist_asks_for_more_filters_when_too_slow(
+    client, infection_controller_headers, infection_control, admission, monkeypatch
+):
+    """A worklist query that outlasts its timeout is stopped, and the user is
+    asked for more filters instead of waiting for the request to time out"""
+    _prescribe_today(admission)
+
+    def slow(*args, **kwargs):
+        db.session.execute(text("SELECT pg_sleep(1)"))
+
+    monkeypatch.setattr(infection_control_service, "WORKLIST_STATEMENT_TIMEOUT_MS", 100)
+    monkeypatch.setattr(
+        "repository.infection_control.infection_control_repository.list_admissions",
+        slow,
+    )
+
+    started = datetime.now()
+    response = client.post(
+        "/infection-control/admissions",
+        json={"status": [PENDING], "admissionNumbers": [admission]},
+        headers=infection_controller_headers,
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.get_json()["code"] == "errors.queryTimeout"
+    assert datetime.now() - started < timedelta(seconds=1)

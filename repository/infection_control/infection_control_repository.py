@@ -8,7 +8,9 @@ from sqlalchemy import (
     DateTime,
     Integer,
     and_,
+    case,
     column,
+    false,
     func,
     or_,
     text,
@@ -64,24 +66,35 @@ def create_admission(
 
 
 @contextmanager
-def lock_timeout(lock_timeout_ms: int | None):
-    """Bound the lock waits inside the block: a timeout raises OperationalError.
+def _local_timeout(setting: str, timeout_ms: int | None):
+    """Set a timeout (lock_timeout, statement_timeout) inside the block: running
+    out raises OperationalError.
 
-    Restored when the block succeeds, so it doesn't leak into later waits of the
+    Restored when the block succeeds, so it doesn't leak into the rest of the
     transaction. When it fails the transaction (or the savepoint the block runs
     in) is rolled back, and that undoes the setting too.
     """
-    if lock_timeout_ms is None:
+    if timeout_ms is None:
         yield
         return
 
     # set_config(..., true) is SET LOCAL with a bind param
     db.session.execute(
-        text("SELECT set_config('lock_timeout', :timeout, true)"),
-        {"timeout": f"{int(lock_timeout_ms)}ms"},
+        text("SELECT set_config(:setting, :timeout, true)"),
+        {"setting": setting, "timeout": f"{int(timeout_ms)}ms"},
     )
     yield
-    db.session.execute(text("SET LOCAL lock_timeout = DEFAULT"))
+    db.session.execute(text(f"SET LOCAL {setting} = DEFAULT"))
+
+
+def lock_timeout(lock_timeout_ms: int | None):
+    """Bound the lock waits inside the block (see _local_timeout)"""
+    return _local_timeout("lock_timeout", lock_timeout_ms)
+
+
+def statement_timeout(statement_timeout_ms: int | None):
+    """Bound each query inside the block (see _local_timeout)"""
+    return _local_timeout("statement_timeout", statement_timeout_ms)
 
 
 def lock_admission(
@@ -471,6 +484,47 @@ def _filter_features(query, filters: InfectionControlListRequest, now: datetime)
     return query
 
 
+def _asks_open_only(filters: InfectionControlListRequest, now: datetime) -> bool:
+    """Whether the filters ask for what only an open record has: a running
+    antimicrobial, an open reason or an evaluation in force. A record is
+    closed when nothing runs, so it has none of them"""
+    return bool(
+        filters.pendingTypes
+        or filters.awareLevels
+        or filters.nonConforming
+        or any(
+            _criterion_conditions(criterion=criterion, now=now)
+            for criterion in filters.antimicrobials
+        )
+    )
+
+
+def _status_condition(
+    statuses: list[int], filters: InfectionControlListRequest, now: datetime
+):
+    """The followed admissions of the given statuses. The closed ones only
+    within filters.closedDays of closing (unless asked by admission number),
+    and none when the filters ask for what only an open record has"""
+    closed = InfectionControlStatusEnum.CLOSED.value
+    conditions = []
+
+    open_statuses = [s for s in statuses if s != closed]
+    if open_statuses:
+        conditions.append(InfectionControlAdmission.status.in_(open_statuses))
+
+    if closed in statuses and not _asks_open_only(filters=filters, now=now):
+        closed_condition = InfectionControlAdmission.status == closed
+        if not filters.admissionNumbers:
+            closed_condition = and_(
+                closed_condition,
+                InfectionControlAdmission.status_date
+                >= now - timedelta(days=filters.closedDays),
+            )
+        conditions.append(closed_condition)
+
+    return or_(*conditions) if conditions else false()
+
+
 def _worklist_query(
     entities: list,
     statuses: list[int],
@@ -487,7 +541,7 @@ def _worklist_query(
             Prescription,
             Prescription.id == InfectionControlAdmission.id_last_prescription,
         )
-        .filter(InfectionControlAdmission.status.in_(statuses))
+        .filter(_status_condition(statuses=statuses, filters=filters, now=now))
     )
     return _filter_admissions(query=query, filters=filters, now=now)
 
@@ -498,8 +552,9 @@ def list_admissions(
     now: datetime,
 ):
     """Followed admissions with the given statuses matching the worklist
-    filters, longest in that status first, with the bed and department of
-    their latest prescription-day"""
+    filters, with the bed and department of their latest prescription-day.
+    The open ones first, longest in their status first, then the closed ones,
+    latest closed first"""
     query = (
         _worklist_query(
             entities=[
@@ -525,9 +580,14 @@ def list_admissions(
         )
     )
 
+    is_closed = (
+        InfectionControlAdmission.status == InfectionControlStatusEnum.CLOSED.value
+    )
     return (
         query.order_by(
-            InfectionControlAdmission.status_date,
+            is_closed,
+            case((is_closed, None), else_=InfectionControlAdmission.status_date),
+            InfectionControlAdmission.status_date.desc(),
             InfectionControlAdmission.admission_number,
         )
         .limit(filters.limit)

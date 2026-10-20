@@ -11,6 +11,8 @@ the follow-up data.
 import json
 from datetime import datetime
 
+from sqlalchemy.exc import OperationalError
+
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
 from models.enums import (
@@ -48,6 +50,10 @@ MIN_DRUG_SEARCH = 3
 # the worklist counts its matches up to this: the closed admissions grow
 # without end, and counting them all could outlast the request
 COUNT_LIMIT = 5000
+# each worklist query stops after this: the request has 30s in all
+WORKLIST_STATEMENT_TIMEOUT_MS = 10000
+# postgres query_canceled, raised when statement_timeout runs out
+QUERY_CANCELED = "57014"
 
 
 def _check_feature():
@@ -594,9 +600,45 @@ def follow_admission(admission_number: int, user_context: User):
     return _get_state(admission_number=admission_number, now=now)
 
 
+def _search_admissions(
+    statuses: list[int], request_data: InfectionControlListRequest, now: datetime
+) -> tuple[list, int]:
+    """The worklist rows and how many match, each query bounded by
+    WORKLIST_STATEMENT_TIMEOUT_MS: a search that slow asks for more filters"""
+    try:
+        with infection_control_repository.statement_timeout(
+            WORKLIST_STATEMENT_TIMEOUT_MS
+        ):
+            rows = infection_control_repository.list_admissions(
+                statuses=statuses, filters=request_data, now=now
+            )
+
+            # the list holds every match from the offset unless the limit cut
+            # it (an empty page past the offset says nothing)
+            if len(rows) < request_data.limit and (rows or request_data.offset == 0):
+                return rows, request_data.offset + len(rows)
+
+            return rows, infection_control_repository.count_admissions(
+                statuses=statuses,
+                filters=request_data,
+                now=now,
+                limit=COUNT_LIMIT + 1,
+            )
+    except OperationalError as e:
+        if getattr(e.orig, "pgcode", None) != QUERY_CANCELED:
+            raise
+
+        raise ValidationError(
+            "A busca demorou demais. Utilize mais filtros",
+            "errors.queryTimeout",
+            status.HTTP_400_BAD_REQUEST,
+        ) from e
+
+
 @has_permission(Permission.READ_INFECTION_CONTROL)
 def list_admissions(request_data: InfectionControlListRequest):
-    """Followed admissions for the worklist, longest in their status first"""
+    """Followed admissions for the worklist: the open ones longest in their
+    status first, then the closed ones latest closed first"""
     _check_feature()
 
     statuses = request_data.status or [
@@ -604,8 +646,8 @@ def list_admissions(request_data: InfectionControlListRequest):
         InfectionControlStatusEnum.REVISED.value,
     ]
     now = datetime.now()
-    rows = infection_control_repository.list_admissions(
-        statuses=statuses, filters=request_data, now=now
+    rows, count = _search_admissions(
+        statuses=statuses, request_data=request_data, now=now
     )
     admission_numbers = [row.InfectionControlAdmission.admission_number for row in rows]
 
@@ -643,18 +685,6 @@ def list_admissions(request_data: InfectionControlListRequest):
                 ),
                 "pendings": pendings_by_admission.get(admission.admission_number, []),
             }
-        )
-
-    # the list holds every match from the offset unless the limit cut it (an
-    # empty page past the offset says nothing)
-    if len(rows) < request_data.limit and (rows or request_data.offset == 0):
-        count = request_data.offset + len(rows)
-    else:
-        count = infection_control_repository.count_admissions(
-            statuses=statuses,
-            filters=request_data,
-            now=now,
-            limit=COUNT_LIMIT + 1,
         )
 
     return {

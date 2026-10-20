@@ -109,6 +109,12 @@ def second_admission():
     yield from _admit()
 
 
+@pytest.fixture
+def third_admission():
+    """A third synthetic patient admitted ten days ago"""
+    yield from _admit()
+
+
 def _flag_antimicrobial(id_drug, id_segment, value):
     session.execute(
         text(
