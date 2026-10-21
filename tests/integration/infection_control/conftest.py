@@ -19,7 +19,7 @@ import json
 from datetime import datetime, timedelta
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 
 from models.enums import FeatureEnum
 from security.role import Role
@@ -83,6 +83,7 @@ def _admit():
     yield admission_number
 
     for table in (
+        "prescricao_evolucao",
         "ci_pendencia",
         "ci_avaliacao_atm",
         "ci_revisao",
@@ -163,3 +164,44 @@ def cpoe_antimicrobial():
 def admin_utils_headers(client):
     """Headers with the ADMIN role (INTEGRATION_UTILS)"""
     return make_headers(get_access(client, roles=[Role.ADMIN.value]))
+
+
+def _write_clinical_note_type(id_type, name, active):
+    session.execute(
+        text(
+            "INSERT INTO demo.tipoevolucao "
+            "(idtipoevolucao, nome, ativo, created_at, created_by) "
+            "VALUES (:id, :name, :active, now(), 0)"
+        ),
+        {"id": id_type, "name": name, "active": active},
+    )
+    session_commit()
+
+
+@pytest.fixture
+def clinical_note_types():
+    """An active clinical note type and an inactive one; returns their ids"""
+    types = {"active": "CI-TESTE", "inactive": "CI-INATIVO"}
+    _write_clinical_note_type(types["active"], "Controle de infecção", True)
+    _write_clinical_note_type(types["inactive"], "Tipo inativo", False)
+
+    yield types
+
+    session.execute(
+        text("DELETE FROM demo.tipoevolucao WHERE idtipoevolucao IN :ids").bindparams(
+            bindparam("ids", expanding=True)
+        ),
+        {"ids": list(types.values())},
+    )
+    session_commit()
+
+
+@pytest.fixture
+def without_multi_clinical_notes(infection_control):
+    """INFECTION_CONTROL on and MULTI_CLINICAL_NOTES off"""
+    original = _read_features()
+    _write_features(
+        [f for f in original if f != FeatureEnum.MULTI_CLINICAL_NOTES.value]
+    )
+    yield
+    _write_features(original)

@@ -244,6 +244,7 @@ def _review(client, headers, admission_number, evaluations=(), **kwargs):
             }
             for id_drug in evaluations
         ],
+        "clinicalNote": kwargs.get("clinical_note"),
     }
     response = client.post("/infection-control/review", json=payload, headers=headers)
     session_commit()

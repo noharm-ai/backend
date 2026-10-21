@@ -22,21 +22,32 @@ from models.enums import (
     InfectionControlOriginEnum,
     InfectionControlStatusEnum,
     InterventionReasonRelationTypeEnum,
+    PrescriptionClinicalNoteStatusEnum,
 )
 from models.infection_control import (
     AntimicrobialEvaluation,
+    InfectionControlAdmission,
     InfectionControlPending,
     InfectionControlReview,
 )
 from models.main import User, db
+from models.prescription import Prescription, PrescriptionClinicalNote
 from models.requests.infection_control_request import (
     InfectionControlBackfillRequest,
     InfectionControlListRequest,
     InfectionControlReviewRequest,
 )
-from repository import user_repository
+from repository import (
+    clinical_notes_type_repository,
+    user_activity_repository,
+    user_repository,
+)
 from repository.infection_control import infection_control_repository
-from services import feature_service, intervention_service
+from services import (
+    data_authorization_service,
+    feature_service,
+    intervention_service,
+)
 from services.infection_control import (
     antimicrobial_timeline_service,
     infection_control_status_service as rule,
@@ -215,6 +226,13 @@ def _get_state(
         ),
         "recalculatedAt": (
             dateutils.to_iso(admission.recalculated_at) if admission else None
+        ),
+        # the prescription-day the record points at, where a review and its
+        # clinical note are written
+        "idPrescription": (
+            str(admission.id_last_prescription)
+            if admission and admission.id_last_prescription
+            else None
         ),
         "pendings": [_serialize_pending(p) for p in pendings],
         "reviews": [
@@ -433,6 +451,88 @@ def _validate_review(
     return reasons
 
 
+def _validate_clinical_note(
+    request_data: InfectionControlReviewRequest,
+    admission: InfectionControlAdmission,
+    user_context: User,
+):
+    """Check the clinical note of a review; returns the prescription it is
+    written on: the prescription-day the record points at, as the review"""
+    clinical_note = request_data.clinicalNote
+
+    if not clinical_note.text.strip():
+        raise ValidationError(
+            "Informe o texto da evolução",
+            "errors.invalidParams",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    note_types = {
+        note_type.id
+        for note_type in clinical_notes_type_repository.list_clinical_notes_types(
+            active=True
+        )
+    }
+    if clinical_note.idClinicalNoteType not in note_types:
+        raise ValidationError(
+            "Tipo de evolução inválido",
+            "errors.invalidParams",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    prescription = (
+        db.session.get(Prescription, admission.id_last_prescription)
+        if admission.id_last_prescription is not None
+        else None
+    )
+    if prescription is None:
+        raise ValidationError(
+            "Atendimento sem prescrição para registrar a evolução",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    # as a clinical note written on the prescription screen
+    if not data_authorization_service.has_segment_authorization(
+        id_segment=prescription.idSegment, user=user_context
+    ):
+        raise ValidationError(
+            "Usuário não autorizado neste segmento",
+            "errors.invalidRegister",
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
+    return prescription
+
+
+def _record_clinical_note(
+    request_data: InfectionControlReviewRequest,
+    review: InfectionControlReview,
+    prescription,
+    user_context: User,
+    now: datetime,
+):
+    """Write the clinical note of a review, pending its integration. It is
+    always a prescription clinical note (prescricao_evolucao), as with
+    MULTI_CLINICAL_NOTES, whether or not the schema has the feature, and
+    points at the review"""
+    record = PrescriptionClinicalNote()
+    record.idPrescription = prescription.id
+    record.idInfectionControlReview = review.id
+    record.admission_number = prescription.admissionNumber
+    record.idClinicalNoteType = request_data.clinicalNote.idClinicalNoteType
+    record.tpStatus = PrescriptionClinicalNoteStatusEnum.PENDING.value
+    record.text = request_data.clinicalNote.text
+    record.createdAt = now
+    record.createdBy = user_context.id
+    record.updatedAt = now
+    record.updatedBy = user_context.id
+    db.session.add(record)
+    db.session.flush()
+
+    user_activity_repository.increment_evolutions(user_context.id)
+
+
 def _record_intervention(
     evaluation: AntimicrobialEvaluation,
     reasons: list,
@@ -488,6 +588,13 @@ def save_review(request_data: InfectionControlReviewRequest, user_context: User)
             "errors.invalidRecord",
             status.HTTP_400_BAD_REQUEST,
         )
+    note_prescription = (
+        _validate_clinical_note(
+            request_data=request_data, admission=admission, user_context=user_context
+        )
+        if request_data.clinicalNote is not None
+        else None
+    )
 
     review = InfectionControlReview()
     review.admission_number = admission_number
@@ -536,6 +643,15 @@ def save_review(request_data: InfectionControlReviewRequest, user_context: User)
                 user_context=user_context,
             )
 
+    if note_prescription is not None:
+        _record_clinical_note(
+            request_data=request_data,
+            review=review,
+            prescription=note_prescription,
+            user_context=user_context,
+            now=now,
+        )
+
     rule.resolve_on_review(
         review=review, open_pendings=open_pendings, user_id=user_context.id, now=now
     )
@@ -548,6 +664,19 @@ def save_review(request_data: InfectionControlReviewRequest, user_context: User)
     )
 
     return _get_state(admission_number=admission_number, now=now)
+
+
+@has_permission(Permission.READ_INFECTION_CONTROL)
+def list_clinical_note_types():
+    """The active clinical note types, one of which a review's note is given"""
+    _check_feature()
+
+    return [
+        {"id": note_type.id, "name": note_type.name}
+        for note_type in clinical_notes_type_repository.list_clinical_notes_types(
+            active=True
+        )
+    ]
 
 
 @has_permission(Permission.READ_PRESCRIPTION)
