@@ -11,6 +11,8 @@ the follow-up data.
 import json
 from datetime import datetime
 
+from sqlalchemy.exc import OperationalError
+
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
 from models.enums import (
@@ -20,21 +22,32 @@ from models.enums import (
     InfectionControlOriginEnum,
     InfectionControlStatusEnum,
     InterventionReasonRelationTypeEnum,
+    PrescriptionClinicalNoteStatusEnum,
 )
 from models.infection_control import (
     AntimicrobialEvaluation,
+    InfectionControlAdmission,
     InfectionControlPending,
     InfectionControlReview,
 )
 from models.main import User, db
+from models.prescription import Prescription, PrescriptionClinicalNote
 from models.requests.infection_control_request import (
     InfectionControlBackfillRequest,
     InfectionControlListRequest,
     InfectionControlReviewRequest,
 )
-from repository import user_repository
+from repository import (
+    clinical_notes_type_repository,
+    user_activity_repository,
+    user_repository,
+)
 from repository.infection_control import infection_control_repository
-from services import feature_service, intervention_service
+from services import (
+    data_authorization_service,
+    feature_service,
+    intervention_service,
+)
 from services.infection_control import (
     antimicrobial_timeline_service,
     infection_control_status_service as rule,
@@ -45,6 +58,13 @@ from utils import dateutils, logger, status
 
 # letters typed before the drugs are searched
 MIN_DRUG_SEARCH = 3
+# the worklist counts its matches up to this: the closed admissions grow
+# without end, and counting them all could outlast the request
+COUNT_LIMIT = 5000
+# each worklist query stops after this: the request has 30s in all
+WORKLIST_STATEMENT_TIMEOUT_MS = 10000
+# postgres query_canceled, raised when statement_timeout runs out
+QUERY_CANCELED = "57014"
 
 
 def _check_feature():
@@ -206,6 +226,13 @@ def _get_state(
         ),
         "recalculatedAt": (
             dateutils.to_iso(admission.recalculated_at) if admission else None
+        ),
+        # the prescription-day the record points at, where a review and its
+        # clinical note are written
+        "idPrescription": (
+            str(admission.id_last_prescription)
+            if admission and admission.id_last_prescription
+            else None
         ),
         "pendings": [_serialize_pending(p) for p in pendings],
         "reviews": [
@@ -424,6 +451,88 @@ def _validate_review(
     return reasons
 
 
+def _validate_clinical_note(
+    request_data: InfectionControlReviewRequest,
+    admission: InfectionControlAdmission,
+    user_context: User,
+):
+    """Check the clinical note of a review; returns the prescription it is
+    written on: the prescription-day the record points at, as the review"""
+    clinical_note = request_data.clinicalNote
+
+    if not clinical_note.text.strip():
+        raise ValidationError(
+            "Informe o texto da evolução",
+            "errors.invalidParams",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    note_types = {
+        note_type.id
+        for note_type in clinical_notes_type_repository.list_clinical_notes_types(
+            active=True
+        )
+    }
+    if clinical_note.idClinicalNoteType not in note_types:
+        raise ValidationError(
+            "Tipo de evolução inválido",
+            "errors.invalidParams",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    prescription = (
+        db.session.get(Prescription, admission.id_last_prescription)
+        if admission.id_last_prescription is not None
+        else None
+    )
+    if prescription is None:
+        raise ValidationError(
+            "Atendimento sem prescrição para registrar a evolução",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    # as a clinical note written on the prescription screen
+    if not data_authorization_service.has_segment_authorization(
+        id_segment=prescription.idSegment, user=user_context
+    ):
+        raise ValidationError(
+            "Usuário não autorizado neste segmento",
+            "errors.invalidRegister",
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
+    return prescription
+
+
+def _record_clinical_note(
+    request_data: InfectionControlReviewRequest,
+    review: InfectionControlReview,
+    prescription,
+    user_context: User,
+    now: datetime,
+):
+    """Write the clinical note of a review, pending its integration. It is
+    always a prescription clinical note (prescricao_evolucao), as with
+    MULTI_CLINICAL_NOTES, whether or not the schema has the feature, and
+    points at the review"""
+    record = PrescriptionClinicalNote()
+    record.idPrescription = prescription.id
+    record.idInfectionControlReview = review.id
+    record.admission_number = prescription.admissionNumber
+    record.idClinicalNoteType = request_data.clinicalNote.idClinicalNoteType
+    record.tpStatus = PrescriptionClinicalNoteStatusEnum.PENDING.value
+    record.text = request_data.clinicalNote.text
+    record.createdAt = now
+    record.createdBy = user_context.id
+    record.updatedAt = now
+    record.updatedBy = user_context.id
+    db.session.add(record)
+    db.session.flush()
+
+    user_activity_repository.increment_evolutions(user_context.id)
+
+
 def _record_intervention(
     evaluation: AntimicrobialEvaluation,
     reasons: list,
@@ -479,9 +588,18 @@ def save_review(request_data: InfectionControlReviewRequest, user_context: User)
             "errors.invalidRecord",
             status.HTTP_400_BAD_REQUEST,
         )
+    note_prescription = (
+        _validate_clinical_note(
+            request_data=request_data, admission=admission, user_context=user_context
+        )
+        if request_data.clinicalNote is not None
+        else None
+    )
 
     review = InfectionControlReview()
     review.admission_number = admission_number
+    # the prescription-day the record points at, as the worklist shows it
+    review.id_prescription = admission.id_last_prescription
     review.notes = request_data.notes
     review.next_review_date = request_data.nextReviewDate
     review.created_at = now
@@ -525,6 +643,15 @@ def save_review(request_data: InfectionControlReviewRequest, user_context: User)
                 user_context=user_context,
             )
 
+    if note_prescription is not None:
+        _record_clinical_note(
+            request_data=request_data,
+            review=review,
+            prescription=note_prescription,
+            user_context=user_context,
+            now=now,
+        )
+
     rule.resolve_on_review(
         review=review, open_pendings=open_pendings, user_id=user_context.id, now=now
     )
@@ -537,6 +664,19 @@ def save_review(request_data: InfectionControlReviewRequest, user_context: User)
     )
 
     return _get_state(admission_number=admission_number, now=now)
+
+
+@has_permission(Permission.READ_INFECTION_CONTROL)
+def list_clinical_note_types():
+    """The active clinical note types, one of which a review's note is given"""
+    _check_feature()
+
+    return [
+        {"id": note_type.id, "name": note_type.name}
+        for note_type in clinical_notes_type_repository.list_clinical_notes_types(
+            active=True
+        )
+    ]
 
 
 @has_permission(Permission.READ_PRESCRIPTION)
@@ -589,9 +729,45 @@ def follow_admission(admission_number: int, user_context: User):
     return _get_state(admission_number=admission_number, now=now)
 
 
+def _search_admissions(
+    statuses: list[int], request_data: InfectionControlListRequest, now: datetime
+) -> tuple[list, int]:
+    """The worklist rows and how many match, each query bounded by
+    WORKLIST_STATEMENT_TIMEOUT_MS: a search that slow asks for more filters"""
+    try:
+        with infection_control_repository.statement_timeout(
+            WORKLIST_STATEMENT_TIMEOUT_MS
+        ):
+            rows = infection_control_repository.list_admissions(
+                statuses=statuses, filters=request_data, now=now
+            )
+
+            # the list holds every match from the offset unless the limit cut
+            # it (an empty page past the offset says nothing)
+            if len(rows) < request_data.limit and (rows or request_data.offset == 0):
+                return rows, request_data.offset + len(rows)
+
+            return rows, infection_control_repository.count_admissions(
+                statuses=statuses,
+                filters=request_data,
+                now=now,
+                limit=COUNT_LIMIT + 1,
+            )
+    except OperationalError as e:
+        if getattr(e.orig, "pgcode", None) != QUERY_CANCELED:
+            raise
+
+        raise ValidationError(
+            "A busca demorou demais. Utilize mais filtros",
+            "errors.queryTimeout",
+            status.HTTP_400_BAD_REQUEST,
+        ) from e
+
+
 @has_permission(Permission.READ_INFECTION_CONTROL)
 def list_admissions(request_data: InfectionControlListRequest):
-    """Followed admissions for the worklist, longest in their status first"""
+    """Followed admissions for the worklist: the open ones longest in their
+    status first, then the closed ones latest closed first"""
     _check_feature()
 
     statuses = request_data.status or [
@@ -599,8 +775,8 @@ def list_admissions(request_data: InfectionControlListRequest):
         InfectionControlStatusEnum.REVISED.value,
     ]
     now = datetime.now()
-    rows = infection_control_repository.list_admissions(
-        statuses=statuses, filters=request_data, now=now
+    rows, count = _search_admissions(
+        statuses=statuses, request_data=request_data, now=now
     )
     admission_numbers = [row.InfectionControlAdmission.admission_number for row in rows]
 
@@ -614,15 +790,11 @@ def list_admissions(request_data: InfectionControlListRequest):
     validity = infection_control_repository.get_earliest_validity_by_admission(
         admission_numbers=admission_numbers
     )
-    last_prescriptions = infection_control_repository.get_last_prescriptions(
-        admission_numbers=admission_numbers
-    )
 
     admissions = []
     for row in rows:
         admission = row.InfectionControlAdmission
         patient = row.Patient
-        last = last_prescriptions.get(admission.admission_number)
         admissions.append(
             {
                 "admissionNumber": admission.admission_number,
@@ -632,8 +804,8 @@ def list_admissions(request_data: InfectionControlListRequest):
                 "admissionDate": (
                     dateutils.to_iso(patient.admissionDate) if patient else None
                 ),
-                "bed": last.Prescription.bed if last else None,
-                "department": last.department if last else None,
+                "bed": row.bed,
+                "department": row.department,
                 "status": admission.status,
                 "statusDate": dateutils.to_iso(admission.status_date),
                 "nextReviewDate": dateutils.to_iso(admission.next_review_date),
@@ -645,11 +817,11 @@ def list_admissions(request_data: InfectionControlListRequest):
         )
 
     return {
-        # all the matching admissions: more than listed when the limit cut
-        # the list
-        "count": infection_control_repository.count_admissions(
-            statuses=statuses, filters=request_data, now=now
-        ),
+        # all the matching admissions, up to COUNT_LIMIT: more than listed when
+        # the limit cut the list
+        "count": min(count, COUNT_LIMIT),
+        # more than COUNT_LIMIT match
+        "countLimited": count > COUNT_LIMIT,
         "admissions": admissions,
     }
 

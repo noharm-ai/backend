@@ -112,9 +112,21 @@ def copy_patient(request_data: NavCopyPatientRequest, user_context: User):
 
     response_json = lambdautils.response_to_json(response)
 
-    if "error" in response_json:
+    # the origin patient was already copied to the navigation schema
+    if response_json.get("error_code") == "PATIENT_ALREADY_IN_NAVIGATION":
+        logger.backend_logger.warning(
+            "Navigation copy patient: %s", response_json.get("message")
+        )
+
+        raise ValidationError(
+            "Este paciente já foi copiado para a navegação.",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    if "error" in response_json or not response_json.get("success"):
         logger.backend_logger.error(
-            "Error copying patient prescription: %s", response_json["message"]
+            "Error copying patient prescription: %s", response_json.get("message")
         )
 
         raise ValidationError(

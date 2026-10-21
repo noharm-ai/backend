@@ -15,12 +15,14 @@ from tests.integration.infection_control.helpers import (
     CPOE_SEGMENT,
     NEVER_REVIEWED,
     NO_EVALUATION,
+    OTHER_ADULT_DEPARTMENT,
     OTHER_DRUG,
     PENDING,
     REVISED,
     _day,
     _discharge,
     _hold_record,
+    _last_prescription_day,
     _open_pendings,
     _prescalc,
     _prescribe,
@@ -94,7 +96,8 @@ def test_prescalc_leaves_reviewed_admission_alone(
 def test_atendcalc_follows_cpoe_admission(
     infection_control, cpoe_antimicrobial, admission
 ):
-    """The CPOE path (atendcalc) follows the admission too"""
+    """The CPOE path (atendcalc) follows the admission too, and points the
+    record at its prescription-day"""
     _prescribe(admission, _day(-1), _day(2), id_segment=CPOE_SEGMENT)
 
     atendcalc({"schema": "demo", "admission_number": admission}, None)
@@ -103,6 +106,7 @@ def test_atendcalc_follows_cpoe_admission(
     record = _record(admission)
     assert record is not None
     assert record["tp_status"] == PENDING
+    assert record["fkprescricao_ultima"] == _last_prescription_day(admission)
     assert [p["tp_pendencia"] for p in _open_pendings(admission)] == [NEVER_REVIEWED]
 
 
@@ -228,3 +232,39 @@ def test_prescalc_does_not_wait_for_a_review(
     assert response["status"] == "success", response
     assert datetime.now() - started < timedelta(seconds=2)
     assert _record(admission)["tp_status"] == PENDING
+
+
+def test_prescalc_points_new_record_at_its_prescription_day(
+    infection_control, admission
+):
+    """A new record points at the prescription-day prescalc follows it from"""
+    _prescribe_today(admission, job=False)
+
+    assert _record(admission)["fkprescricao_ultima"] == _last_prescription_day(
+        admission
+    )
+
+
+def test_job_points_record_at_latest_prescription_day(infection_control, admission):
+    """A later prescription-day, with an antimicrobial or not, leaves the
+    record to the job, which points it at the latest one: the patient changes
+    department and bed during the admission"""
+    _prescalc(_prescribe(admission, _day(-3), _day(1)))
+    first_day = _record(admission)["fkprescricao_ultima"]
+    assert first_day == _last_prescription_day(admission)
+
+    _prescalc(
+        _prescribe(
+            admission,
+            _day(0),
+            _day(1),
+            drugs=(OTHER_DRUG,),
+            id_department=OTHER_ADULT_DEPARTMENT,
+        )
+    )
+    latest_day = _last_prescription_day(admission)
+    assert latest_day != first_day
+    assert _record(admission)["fkprescricao_ultima"] == first_day
+
+    _run_job(admission)
+    assert _record(admission)["fkprescricao_ultima"] == latest_day

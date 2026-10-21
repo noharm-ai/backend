@@ -80,6 +80,13 @@ def search_antimicrobials():
     )
 
 
+@app_infection_control.route("/infection-control/clinical-note-types", methods=["GET"])
+@api_endpoint()
+def list_clinical_note_types():
+    """The clinical note types a review's note can be given"""
+    return infection_control_service.list_clinical_note_types()
+
+
 @app_infection_control.route("/infection-control/review", methods=["POST"])
 @api_endpoint()
 def save_review():

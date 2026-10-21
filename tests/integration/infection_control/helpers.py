@@ -26,6 +26,8 @@ ADULT_SEGMENT = 1
 CPOE_SEGMENT = 2
 # a trigger sets the prescription segment from its department (segmentosetor)
 DEPARTMENT_BY_SEGMENT = {ADULT_SEGMENT: 1, CPOE_SEGMENT: 3}
+# another department of the adult segment
+OTHER_ADULT_DEPARTMENT = 2
 ANTIMICROBIAL_DRUG = 1
 OTHER_DRUG = 4
 PATIENT_ID = 100702
@@ -54,8 +56,11 @@ def _prescribe(
     drugs=(ANTIMICROBIAL_DRUG,),
     id_segment=ADULT_SEGMENT,
     dose=2.0,
+    id_department=None,
+    bed="101",
 ):
-    """One prescription holding the given drugs"""
+    """One prescription holding the given drugs, in the department of its
+    segment unless given one"""
     id_prescription = test_counters["id_prescription"]
     test_counters["id_prescription"] += 1
 
@@ -64,9 +69,10 @@ def _prescribe(
         admissionNumber=admission_number,
         idPatient=PATIENT_ID,
         idSegment=id_segment,
-        idDepartment=DEPARTMENT_BY_SEGMENT[id_segment],
+        idDepartment=id_department or DEPARTMENT_BY_SEGMENT[id_segment],
         date=date,
         expire=expire,
+        bed=bed,
     )
     for index, id_drug in enumerate(drugs, start=1):
         create_prescription_drug(
@@ -153,6 +159,17 @@ def _record(admission_number):
     )
 
 
+def _last_prescription_day(admission_number):
+    return session.execute(
+        text(
+            "SELECT fkprescricao FROM demo.prescricao "
+            "WHERE nratendimento = :admission AND agregada = true "
+            "ORDER BY dtprescricao DESC, fkprescricao DESC LIMIT 1"
+        ),
+        {"admission": admission_number},
+    ).scalar()
+
+
 def _open_pendings(admission_number):
     return (
         session.execute(
@@ -227,6 +244,7 @@ def _review(client, headers, admission_number, evaluations=(), **kwargs):
             }
             for id_drug in evaluations
         ],
+        "clinicalNote": kwargs.get("clinical_note"),
     }
     response = client.post("/infection-control/review", json=payload, headers=headers)
     session_commit()

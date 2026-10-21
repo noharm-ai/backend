@@ -84,6 +84,8 @@ class PrescriptionClinicalNote(db.Model):
     updatedAt = db.Column("updated_at", db.DateTime, nullable=True)
     updatedBy = db.Column("updated_by", db.Integer, nullable=True)
     sentAt = db.Column("sent_at", db.DateTime, nullable=True)
+    # the infection control review that wrote the note (ci_revisao)
+    idInfectionControlReview = db.Column("fkci_revisao", db.BigInteger, nullable=True)
 
 
 class Patient(db.Model):

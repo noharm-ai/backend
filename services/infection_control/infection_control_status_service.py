@@ -635,6 +635,13 @@ def apply_rule(
             e for e in active_evaluations if e.id not in plan.close_evaluations
         ],
     )
+    # prescalc points a new record at its prescription-day; the patient
+    # changes department and bed after that
+    admission.id_last_prescription = (
+        infection_control_repository.get_last_prescription_day_id(
+            admission_number=admission_number
+        )
+    )
     admission.recalculated_at = now
     db.session.flush()
 
@@ -644,6 +651,7 @@ def follow_from_prescalc(
     admission_number: int,
     features: dict,
     user_id: int,
+    id_prescription_day: int,
     id_prescription: int | None = None,
 ):
     """Prescalc hook: follow an admission whose prescription-day has an
@@ -651,7 +659,9 @@ def follow_from_prescalc(
 
     Only what can't wait for the job, and cheap enough for prescalc (no
     antimicrobial history, no wait for a record being reviewed):
-    * an admission not followed yet gets its record, pending and never reviewed;
+    * an admission not followed yet gets its record, pending and never
+      reviewed, pointed at this prescription-day (the job keeps it on the
+      latest one);
     * a closed record is reopened as pending (the antimicrobial restarted).
 
     A discharged patient is left alone.
@@ -690,6 +700,7 @@ def follow_from_prescalc(
                 origin=InfectionControlOriginEnum.PRESCALC.value,
                 user_id=user_id,
                 now=now,
+                id_last_prescription=id_prescription_day,
             )
             reopened = (
                 None
