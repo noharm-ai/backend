@@ -38,7 +38,8 @@
 
 ## How to exercise it
 - The image has PostgreSQL with the `noharm` database already loaded from `noharm-ai/database`
-  (schema plus synthetic seed data; tenant schema `demo`, login `demo` / `demo`). Start it with
+  (schema plus synthetic seed data; tenant schema `demo`, login `demo` / `demo`). The image's entrypoint
+  starts it when the container starts; if the entrypoint was bypassed, start it with
   `.oss-scanner/start-db.sh` before running the app or the integration tests.
 - Tests: `python -m pytest tests/unit` (no database) and `python -m pytest tests/integration`
   (needs the database). `ENV=test` is already set in the image. `tests/conftest.py` shows how to log in

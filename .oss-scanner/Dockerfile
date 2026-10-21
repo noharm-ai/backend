@@ -49,3 +49,8 @@ RUN ruff check . || echo "WARNING: ruff reported problems"
 RUN /src/.oss-scanner/start-db.sh \
     && (python -m pytest -q -p no:cacheprovider || echo "WARNING: pytest reported failures") \
     && /src/.oss-scanner/start-db.sh stop
+
+# PostgreSQL does not survive past the RUN that started it; start it in every container, before the command.
+RUN chmod +x /src/.oss-scanner/entrypoint.sh
+ENTRYPOINT ["/src/.oss-scanner/entrypoint.sh"]
+CMD ["sleep", "infinity"]
