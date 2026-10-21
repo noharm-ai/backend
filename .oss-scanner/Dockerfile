@@ -50,7 +50,11 @@ RUN /src/.oss-scanner/start-db.sh \
     && (python -m pytest -q -p no:cacheprovider || echo "WARNING: pytest reported failures") \
     && /src/.oss-scanner/start-db.sh stop
 
-# PostgreSQL does not survive past the RUN that started it; start it in every container, before the command.
-RUN chmod +x /src/.oss-scanner/entrypoint.sh
+# PostgreSQL does not survive past the RUN that started it. The scanner builds its own image on top of this one
+# and resets ENTRYPOINT/CMD (keeping ENV), so pytest starts the database itself through a plugin enabled by
+# PYTEST_PLUGINS. The entrypoint covers a plain `docker run` of this image (e.g. to run the app).
+RUN cp /src/.oss-scanner/oss_scanner_db.py "$(python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')/" \
+    && chmod +x /src/.oss-scanner/entrypoint.sh
+ENV PYTEST_PLUGINS=oss_scanner_db
 ENTRYPOINT ["/src/.oss-scanner/entrypoint.sh"]
 CMD ["sleep", "infinity"]
