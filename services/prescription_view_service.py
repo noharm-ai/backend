@@ -26,6 +26,7 @@ from models.prescription import (
 )
 from models.segment import Segment
 from repository import (
+    allergy_repository,
     clinical_notes_repository,
     clinical_notes_type_repository,
     patient_repository,
@@ -851,6 +852,9 @@ def _get_alerts(
         id_patient=patient.idPatient,
     )
 
+    # confirm the allergy flag of the items (alert_service.is_allergic)
+    allergies = allergy_repository.get_allergy_records(id_patient=patient.idPatient)
+
     protocol_extra_info = ProtocolExtraInfo()
     protocol_extra_info.is_cpoe = config_data["is_cpoe"]
     if segment:
@@ -878,9 +882,15 @@ def _get_alerts(
         protocols=protocols.get("items", None) if protocols else None,
         is_cpoe=config_data["is_cpoe"],
         cultures=culture_data,
+        allergies=allergies,
     )
 
-    return {"relations": relations, "alerts": alerts, "protocols": protocols}
+    return {
+        "relations": relations,
+        "alerts": alerts,
+        "protocols": protocols,
+        "allergies": allergies,
+    }
 
 
 def get_protocol_evaluation_context(id_prescription: int, user_context: User) -> dict:
@@ -994,6 +1004,7 @@ def _get_drug_data(
         alerts=alerts_data["alerts"],
         is_cpoe=config_data["is_cpoe"],
         admission_number=prescription.admissionNumber,
+        allergies=alerts_data["allergies"],
     )
 
     if config_data["disable_solution_tab"]:

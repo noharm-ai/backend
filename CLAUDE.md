@@ -434,6 +434,12 @@ The rule holds even when the real value would be convenient or is already visibl
 - Checks drug-drug interactions
 - Multiple severity levels
 
+### Allergy Alert
+- Rule: `alert_service.is_allergic`, used by the allergy alert and by the item's `allergy` flag in the drug list (`utils/drug_list.py`)
+- The flag on `presmed.alergia` is set when the item arrives; the prescription view confirms it with the patient's `alergia` records (`repository/allergy_repository.py`): an active record of the item raises the alert, only inactive ones drop it, and with no record of the item the flag stands (some clients have no `alergia` records)
+- A record is of the item by `alergia.sctid` when present (filled by a separate job and trusted, since `fkmedicamento` does not always reference a `medicamento` record); otherwise by `fkmedicamento` (same drug or same substance). The cross reactivity check (`alert_interaction_service._get_allergies`) resolves the substance the same way
+- Tests: `tests/unit/test_alerts_allergy.py` and `tests/integration/test_prescription_allergy.py`
+
 ### Outlier Detection
 - Service: `services/outlier_service.py`
 - Statistical analysis of dose/frequency

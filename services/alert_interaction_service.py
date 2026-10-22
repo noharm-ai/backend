@@ -3,7 +3,7 @@
 from datetime import datetime, timedelta
 from typing import List
 
-from sqlalchemy import text
+from sqlalchemy import func, text
 
 from models.enums import DrugAlertLevelEnum, DrugTypeEnum, FrequencyEnum
 from models.main import Allergy, Drug, DrugAttributes, Substance, db
@@ -467,11 +467,13 @@ def _get_solution_group_key(pd: PrescriptionDrug, is_cpoe: bool):
 
 
 def _get_allergies(id_patient: int):
+    """Active allergies of the patient by substance: the record's sctid when it
+    has one (trusted), otherwise the substance of its fkmedicamento"""
     allergies = (
         db.session.query(Substance.id, Substance.name)
         .select_from(Allergy)
-        .join(Drug, Allergy.idDrug == Drug.id)
-        .join(Substance, Substance.id == Drug.sctid)
+        .outerjoin(Drug, Allergy.idDrug == Drug.id)
+        .join(Substance, Substance.id == func.coalesce(Allergy.sctid, Drug.sctid))
         .filter(Allergy.idPatient == id_patient)
         .filter(Allergy.active == True)
         .group_by(Substance.id, Substance.name)
