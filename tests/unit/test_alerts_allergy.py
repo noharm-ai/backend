@@ -6,8 +6,9 @@ confirm it: an active record of the item raises the alert even without the
 flag, a record of the item that was inactivated drops it, and with no record of
 the item the flag stands (some clients have no allergy records at all).
 
-A record is of the item by its sctid when it has one; otherwise by its
-fkmedicamento: the same drug or a drug of the same substance.
+A record is of the item by its fkmedicamento when it is the same drug, or by
+its substance: its sctid when it has one, otherwise the substance of its
+fkmedicamento.
 """
 
 from collections import namedtuple
@@ -121,9 +122,23 @@ def test_records_of_other_items_keep_the_flag():
     assert _is_allergic(None, allergies) is False
 
 
-def test_the_record_sctid_is_trusted_over_its_fkmedicamento():
-    """fkmedicamento does not always reference a medicamento record: when the
-    record has a sctid, a coincident fkmedicamento does not make it the item's"""
+def test_the_record_sctid_is_trusted_over_the_substance_of_its_fkmedicamento():
+    """When the record has a sctid, the substance of another drug in its
+    fkmedicamento does not make it the item's"""
+    inactive = AllergyRecord(
+        idDrug=99001, sctid=_OTHER_SCTID, drugSctid=_SCTID, active=False
+    )
+    active = AllergyRecord(
+        idDrug=99001, sctid=_OTHER_SCTID, drugSctid=_SCTID, active=True
+    )
+
+    assert _is_allergic("S", [inactive]) is True
+    assert _is_allergic(None, [active]) is False
+
+
+def test_the_same_drug_matches_even_with_a_stale_sctid():
+    """The job copies the drug's sctid only into recent records: a record of
+    the same drug whose substance changed afterwards is still the item's"""
     inactive = AllergyRecord(
         idDrug=_ID_DRUG, sctid=_OTHER_SCTID, drugSctid=_SCTID, active=False
     )
@@ -131,8 +146,8 @@ def test_the_record_sctid_is_trusted_over_its_fkmedicamento():
         idDrug=_ID_DRUG, sctid=_OTHER_SCTID, drugSctid=_SCTID, active=True
     )
 
-    assert _is_allergic("S", [inactive]) is True
-    assert _is_allergic(None, [active]) is False
+    assert _is_allergic("S", [inactive]) is False
+    assert _is_allergic(None, [active]) is True
 
 
 def test_a_record_without_status_neither_confirms_nor_drops():

@@ -615,9 +615,10 @@ def is_allergic(
     - only inactive records of the item: the allergy was inactivated
     - no record of the item: the flag stands (some clients have no records)
 
-    A record is of the item by its sctid when it has one (trusted: resolved by
-    a separate job, since fkmedicamento does not always reference a medicamento
-    record); otherwise by fkmedicamento, the same drug or its substance.
+    A record is of the item when its fkmedicamento is the same drug, or when
+    its substance is the item's: the record's sctid when it has one (trusted:
+    resolved by a separate job, since fkmedicamento does not always reference a
+    medicamento record), otherwise the substance of its fkmedicamento.
     allergies is None when the records were not fetched: the flag stands"""
 
     status = get_allergy_record_status(
@@ -647,14 +648,15 @@ def get_allergy_record_status(
 
     item_records = []
     for record in allergies:
-        if record.sctid is not None:
-            same_item = sctid is not None and _sctid(record.sctid) == sctid
-        else:
-            same_item = record.idDrug == prescription_drug.idDrug or (
-                sctid is not None
-                and record.drugSctid is not None
-                and _sctid(record.drugSctid) == sctid
-            )
+        # the record's substance: its own sctid when it has one (trusted),
+        # otherwise the substance of its fkmedicamento
+        record_sctid = record.sctid if record.sctid is not None else record.drugSctid
+        # the same drug is always the item's, even if the record's sctid is stale
+        same_item = record.idDrug == prescription_drug.idDrug or (
+            sctid is not None
+            and record_sctid is not None
+            and _sctid(record_sctid) == sctid
+        )
 
         # a record without a status neither confirms nor inactivates the flag
         if same_item and record.active is not None:
