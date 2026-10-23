@@ -6,6 +6,7 @@ from typing import List, Union
 
 from models.appendix import Frequency
 from models.enums import (
+    AllergyRecordStatusEnum,
     CultureResultTypeEnum,
     DrugAlertLevelEnum,
     DrugAlertTypeEnum,
@@ -619,10 +620,28 @@ def is_allergic(
     record); otherwise by fkmedicamento, the same drug or its substance.
     allergies is None when the records were not fetched: the flag stands"""
 
-    flag = prescription_drug.allergy == "S"
+    status = get_allergy_record_status(
+        prescription_drug=prescription_drug, drug=drug, allergies=allergies
+    )
+
+    if status is None:
+        return prescription_drug.allergy == "S"
+
+    return status == AllergyRecordStatusEnum.ACTIVE
+
+
+def get_allergy_record_status(
+    prescription_drug: PrescriptionDrug,
+    drug: Union[Drug, None],
+    allergies: Union[list, None],
+) -> Union[AllergyRecordStatusEnum, None]:
+    """What the allergy records of the patient say of the prescribed item
+    (is_allergic): active when one of its records is active, inactive when they
+    were all inactivated, None when there is no record of the item (or the
+    records were not fetched) and the flag stands"""
 
     if not allergies:
-        return flag
+        return None
 
     sctid = _sctid(drug.sctid) if drug is not None else None
 
@@ -642,9 +661,12 @@ def is_allergic(
             item_records.append(record)
 
     if not item_records:
-        return flag
+        return None
 
-    return any(record.active for record in item_records)
+    if any(record.active for record in item_records):
+        return AllergyRecordStatusEnum.ACTIVE
+
+    return AllergyRecordStatusEnum.INACTIVE
 
 
 def _alert_allergy(

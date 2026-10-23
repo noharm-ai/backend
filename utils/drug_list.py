@@ -268,6 +268,10 @@ class DrugList:
             allergy = alert_service.is_allergic(
                 prescription_drug=pd[0], drug=pd[1], allergies=self.allergies
             )
+            # why: the maintainers read the flag next to what the records said
+            allergy_record = alert_service.get_allergy_record_status(
+                prescription_drug=pd[0], drug=pd[1], allergies=self.allergies
+            )
 
             self.drug_results.append(
                 {
@@ -289,6 +293,11 @@ class DrugList:
                     "dialyzable": dialyzable,
                     "alergy": allergy,
                     "allergy": allergy,
+                    # presmed.alergia as it arrived ("S", "N" or None)
+                    "allergyFlag": pd[0].allergy,
+                    "allergyRecord": (
+                        allergy_record.value if allergy_record is not None else None
+                    ),
                     "whiteList": pdWhiteList,
                     "doseWeight": doseWeightStr,
                     "doseWeightDay": doseWeightDayStr,

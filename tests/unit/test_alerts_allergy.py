@@ -14,7 +14,7 @@ from collections import namedtuple
 
 import pytest
 
-from models.enums import DrugAlertTypeEnum
+from models.enums import AllergyRecordStatusEnum, DrugAlertTypeEnum
 from services import alert_service
 from tests.utils import utils_test_prescription
 
@@ -160,6 +160,29 @@ def test_an_item_without_drug_only_matches_by_fkmedicamento():
         )
         is True
     )
+
+
+def _record_status(allergy: str | None, allergies: list | None):
+    row = _row(allergy=allergy)
+    return alert_service.get_allergy_record_status(
+        prescription_drug=row[0], drug=row[1], allergies=allergies
+    )
+
+
+@pytest.mark.parametrize("flag", ["S", "N", None])
+def test_the_record_status_says_why_the_flag_was_kept_or_overridden(flag):
+    """The maintainers read it next to the flag: the records decide only when
+    there is a record of the item, whatever the flag says"""
+    active = AllergyRecord(idDrug=_ID_DRUG, sctid=None, drugSctid=None, active=True)
+    inactive = AllergyRecord(idDrug=99001, sctid=_SCTID, drugSctid=None, active=False)
+    other = AllergyRecord(idDrug=99002, sctid=_OTHER_SCTID, drugSctid=None, active=True)
+
+    assert _record_status(flag, [active]) is AllergyRecordStatusEnum.ACTIVE
+    assert _record_status(flag, [inactive, active]) is AllergyRecordStatusEnum.ACTIVE
+    assert _record_status(flag, [inactive]) is AllergyRecordStatusEnum.INACTIVE
+    assert _record_status(flag, [other]) is None
+    assert _record_status(flag, []) is None
+    assert _record_status(flag, None) is None
 
 
 def test_find_alerts_raises_the_allergy_alert_from_the_records():

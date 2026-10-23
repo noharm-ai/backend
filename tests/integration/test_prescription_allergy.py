@@ -98,6 +98,13 @@ def _item(payload: dict, id_prescription_drug: int) -> dict:
     raise AssertionError(f"prescribed drug {id_prescription_drug} is not listed")
 
 
+def _why(payload: dict, id_prescription_drug: int) -> tuple:
+    """Why the item was flagged or not, as the maintainers read it: the flag as
+    it arrived and what the allergy records said of the item"""
+    item = _item(payload, id_prescription_drug)
+    return item["allergyFlag"], item["allergyRecord"]
+
+
 def _has_allergy_alert(payload: dict, id_prescription_drug: int) -> bool:
     """Whether the item carries the alert and the payload flags it the same way"""
     alerted = any(
@@ -116,6 +123,7 @@ def test_the_flag_stands_without_allergy_records(client, analyst_headers):
 
     assert _has_allergy_alert(payload, id_a) is True
     assert payload["alertStats"]["allergy"] == 1
+    assert _why(payload, id_a) == ("S", None)
 
 
 def test_an_inactivated_allergy_drops_the_flag(client, analyst_headers):
@@ -128,6 +136,7 @@ def test_an_inactivated_allergy_drops_the_flag(client, analyst_headers):
     assert _flag(id_a) == "S"
     assert _has_allergy_alert(payload, id_a) is False
     assert payload["alertStats"].get("allergy", 0) == 0
+    assert _why(payload, id_a) == ("S", "inactive")
 
 
 def test_an_allergy_recorded_after_arrival_raises_the_alert(client, analyst_headers):
@@ -143,6 +152,8 @@ def test_an_allergy_recorded_after_arrival_raises_the_alert(client, analyst_head
     assert _has_allergy_alert(payload, id_a) is True
     assert _has_allergy_alert(payload, id_b) is False
     assert payload["alertStats"]["allergy"] == 1
+    assert _why(payload, id_a) == ("N", "active")
+    assert _why(payload, id_b) == ("N", None)
 
 
 def test_an_allergy_resolved_by_substance_raises_the_alert(client, analyst_headers):
@@ -157,6 +168,7 @@ def test_an_allergy_resolved_by_substance_raises_the_alert(client, analyst_heade
     assert _flag(id_a) == "N"
     assert _has_allergy_alert(payload, id_a) is True
     assert _has_allergy_alert(payload, id_b) is False
+    assert _why(payload, id_a) == ("N", "active")
 
 
 def test_an_allergy_inactivated_by_substance_drops_the_flag(client, analyst_headers):
