@@ -186,16 +186,22 @@ def check_prescription(
     # dispatched only after the transaction commits, so presmed is never
     # marked for a check that ends up rolled back
     if presmed_mark_ids:
+        # read now: the callback runs after the session is closed, when a user
+        # loaded from the database (static_check) is expired and detached
+        schema = user_context.schema
+        id_user = user_context.id
         post_commit.on_commit(
             lambda: _dispatch_presmed_checked(
-                user_context=user_context, id_prescription_list=presmed_mark_ids
+                schema=schema,
+                id_user=id_user,
+                id_prescription_list=presmed_mark_ids,
             )
         )
 
     return results
 
 
-def _dispatch_presmed_checked(user_context: User, id_prescription_list: list):
+def _dispatch_presmed_checked(schema: str, id_user: int, id_prescription_list: list):
     """
     Fire-and-forget async event to mark presmed rows as checked
     (checado = true). Runs outside the check transaction because presmed is
@@ -223,8 +229,8 @@ def _dispatch_presmed_checked(user_context: User, id_prescription_list: list):
             Payload=json.dumps(
                 {
                     "command": "lambda_check.mark_presmed_checked",
-                    "schema": user_context.schema,
-                    "id_user": user_context.id,
+                    "schema": schema,
+                    "id_user": id_user,
                     "id_prescription_list": [str(i) for i in id_prescription_list],
                 }
             ),
@@ -232,7 +238,7 @@ def _dispatch_presmed_checked(user_context: User, id_prescription_list: list):
     except Exception:
         logger.backend_logger.exception(
             "failed to dispatch presmed checado event | schema: %s | prescriptions: %s",
-            user_context.schema,
+            schema,
             id_prescription_list,
         )
 
