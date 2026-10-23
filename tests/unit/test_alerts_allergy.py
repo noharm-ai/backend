@@ -11,11 +11,12 @@ fkmedicamento: the same drug or a drug of the same substance.
 """
 
 from collections import namedtuple
+from datetime import datetime
 
 import pytest
 
 from models.enums import AllergyRecordStatusEnum, DrugAlertTypeEnum
-from services import alert_service
+from services import alert_service, prescription_view_service
 from tests.utils import utils_test_prescription
 
 AllergyRecord = namedtuple("AllergyRecord", "idDrug sctid drugSctid active")
@@ -213,3 +214,40 @@ def test_find_alerts_without_records_keeps_the_flag():
     rows = [_row(allergy="S", id_prescription_drug=83)]
 
     assert len(_allergy_alerts(rows, None).get("83", [])) == 1
+
+
+ListedRecord = namedtuple("ListedRecord", "name active createdAt")
+
+
+def test_the_listed_records_are_one_per_name_dated_by_the_latest():
+    """Only information on the screen: active, named, alphabetical, the latest
+    date of each name"""
+    listed = prescription_view_service._list_allergy_records(
+        allergies=[
+            ListedRecord("Sulfa", True, datetime(2026, 1, 1)),
+            ListedRecord("Dipirona", True, datetime(2026, 2, 1)),
+            ListedRecord("Sulfa", True, datetime(2026, 3, 1)),
+            ListedRecord("Sulfa", True, None),
+            ListedRecord("Penicilina", False, datetime(2026, 3, 1)),
+            ListedRecord("Ativo nulo", None, datetime(2026, 3, 1)),
+            ListedRecord("  ", True, datetime(2026, 3, 1)),
+            ListedRecord(None, True, datetime(2026, 3, 1)),
+        ]
+    )
+
+    assert listed == [
+        {"date": "2026-02-01T00:00:00", "text": "Dipirona", "source": "pep"},
+        {"date": "2026-03-01T00:00:00", "text": "Sulfa", "source": "pep"},
+    ]
+
+
+def test_the_listed_records_are_cut_at_the_limit():
+    """The alert reads every record; the list on the screen is truncated"""
+    allergies = [
+        ListedRecord(f"Alergia {i:03d}", True, datetime(2026, 1, 1)) for i in range(150)
+    ]
+
+    listed = prescription_view_service._list_allergy_records(allergies=allergies)
+
+    assert len(listed) == prescription_view_service._ALLERGY_RECORDS_LIMIT
+    assert listed[0]["text"] == "Alergia 000"

@@ -438,6 +438,7 @@ The rule holds even when the real value would be convenient or is already visibl
 - Rule: `alert_service.is_allergic`, used by the allergy alert and by the item's `allergy` flag in the drug list (`utils/drug_list.py`)
 - The flag on `presmed.alergia` is set when the item arrives; the prescription view confirms it with the patient's `alergia` records (`repository/allergy_repository.py`): an active record of the item raises the alert, only inactive ones drop it, and with no record of the item the flag stands (some clients have no `alergia` records)
 - A record is of the item by `alergia.sctid` when present (filled by a separate job and trusted, since `fkmedicamento` does not always reference a `medicamento` record); otherwise by `fkmedicamento` (same drug or same substance). The cross reactivity check (`alert_interaction_service._get_allergies`) resolves the substance the same way
+- The prescription view reads the records once (`_internal_get_prescription`) and passes them to the alerts and to the clinical notes, which list the active ones (source `pep`, one per name, cut at `_ALLERGY_RECORDS_LIMIT`: only information)
 - Each drug list item carries why, for the maintainers (drug popover in the frontend): `allergyFlag` (`presmed.alergia` as it arrived) and `allergyRecord` (`active`/`inactive` from `alert_service.get_allergy_record_status`, `None` when no record of the item decided and the flag stood)
 - Tests: `tests/unit/test_alerts_allergy.py` and `tests/integration/test_prescription_allergy.py`
 

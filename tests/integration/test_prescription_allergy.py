@@ -204,3 +204,49 @@ def test_an_allergy_resolved_by_substance_is_cross_checked(client, analyst_heade
 
     assert _count(payload, "rx") == 1
     assert _SUBSTANCE_ALLERGEN[1] in _alerts_of(payload, id_b)[0]["text"]
+
+
+def _register_allergy_by_name(id_patient: int, code: int, name: str) -> None:
+    """An allergy recorded by name only: no drug, no substance"""
+    session.execute(
+        text(
+            "INSERT INTO demo.alergia "
+            "(fkpessoa, fkmedicamento, nome_medicamento, ativo, created_at, created_by) "
+            "VALUES (:id_patient, :code, :name, true, now(), 1)"
+        ),
+        {"id_patient": id_patient, "code": code, "name": name},
+    )
+    session_commit()
+
+
+def _listed_allergy_records(payload: dict) -> list[str]:
+    """The allergy records the screen lists with the notes (source pep), of
+    this module's fixtures only"""
+    return [
+        a["text"]
+        for a in payload["notesAllergies"]
+        if a["source"] == "pep" and a["text"].startswith("ZZTest")
+    ]
+
+
+def test_the_screen_lists_the_active_allergy_records(client, analyst_headers):
+    """The records that confirm the alert are listed with the notes: active
+    ones only, once per name, by substance (the record's sctid first) or by the
+    name recorded"""
+    _register_allergy(_SEED_PATIENT, _DRUG_A[0])
+    # the same substance recorded again, by sctid
+    _register_allergy_by_substance(_SEED_PATIENT, _UNMAPPED_CODE, _SUBSTANCE_A[0])
+    _register_allergy_by_substance(
+        _SEED_PATIENT, _OTHER_UNMAPPED_CODE, _SUBSTANCE_ALLERGEN[0]
+    )
+    _register_allergy(_SEED_PATIENT, _DRUG_B[0], active=False)
+    _register_allergy_by_name(_SEED_PATIENT, 99103, "ZZTest Alergia Sem Cadastro")
+    id_prescription, _ = _create([{"idDrug": _DRUG_A[0]}])
+
+    payload = _view(client, analyst_headers, id_prescription)
+
+    assert _listed_allergy_records(payload) == [
+        "ZZTest Alergia Sem Cadastro",
+        _SUBSTANCE_A[1],
+        _SUBSTANCE_ALLERGEN[1],
+    ]

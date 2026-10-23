@@ -52,6 +52,9 @@ from utils.alert_protocol import ProtocolExtraInfo
 from utils.drug_list import DrugList
 from utils.tagutils import filter_nav_tags
 
+# the patient's allergy records listed with the clinical notes (only information)
+_ALLERGY_RECORDS_LIMIT = 100
+
 
 @has_permission(Permission.READ_PRESCRIPTION)
 def route_get_prescription(id_prescription: int, user_context: User = None):
@@ -154,6 +157,8 @@ def get_drug_alerts(
         prescription=prescription, patient=patient, is_complete=False
     )
 
+    allergies = allergy_repository.get_allergy_records(id_patient=patient.idPatient)
+
     # the alerts only read the clinical notes counters (cn_stats)
     cn_data = _get_clinical_notes_stats(
         prescription=prescription,
@@ -185,6 +190,7 @@ def get_drug_alerts(
         user_context=user_context,
         segment=segment,
         culture_data=culture_data,
+        allergies=allergies,
     )
 
     relations = alerts_data["relations"]["alerts"] or {}
@@ -226,12 +232,16 @@ def _internal_get_prescription(
         concilia=prescription.concilia,
     )
 
+    # read once: they confirm the allergy alert and are listed with the notes
+    allergies = allergy_repository.get_allergy_records(id_patient=patient.idPatient)
+
     cn_data = _get_clinical_notes_stats(
         prescription=prescription,
         patient=patient,
         config_data=config_data,
         user_context=user_context,
         is_complete=is_complete,
+        allergies=allergies,
     )
 
     exam_data = _get_exams(
@@ -269,6 +279,7 @@ def _internal_get_prescription(
         user_context=user_context,
         segment=segment,
         culture_data=culture_data,
+        allergies=allergies,
     )
 
     drug_data = _get_drug_data(
@@ -631,7 +642,11 @@ def _get_clinical_notes_stats(
     config_data: dict,
     is_complete: bool,
     user_context: User,
+    allergies: list | None = None,
 ):
+    """allergies: the patient's allergy records
+    (allergy_repository.get_allergy_records), listed with the allergies of the
+    notes when is_complete"""
     is_cache_active = feature_service.has_feature_flag(
         flag=AppFeatureFlagEnum.REDIS_CACHE
     )
@@ -671,21 +686,14 @@ def _get_clinical_notes_stats(
             cache=is_cache_active,
         )
 
-        allergies = clinical_notes_repository.get_allergies(
+        allergies_data += clinical_notes_repository.get_allergies(
             admission_number=prescription.admissionNumber,
             admission_date=patient.admissionDate,
             user_context=user_context,
             cache=is_cache_active,
         )
-        db_allergies = patient_service.get_patient_allergies(patient.idPatient)
 
-        allergies_data += allergies
-
-        for a in db_allergies:
-            if a[1] and a[1].strip():
-                allergies_data.append(
-                    {"date": dateutils.to_iso(a[0]), "text": a[1], "source": "pep"}
-                )
+        allergies_data += _list_allergy_records(allergies=allergies or [])
 
         dialysis_data = clinical_notes_repository.get_dialysis(
             admission_number=prescription.admissionNumber,
@@ -703,6 +711,33 @@ def _get_clinical_notes_stats(
             "dialysis": dialysis_data,
         },
     }
+
+
+def _list_allergy_records(allergies: list) -> list:
+    """The active allergy records of the patient as the screen lists them: one
+    per name, alphabetical, dated by its latest record. Only information (the
+    alert reads every record), so the list is cut at _ALLERGY_RECORDS_LIMIT"""
+    latest = {}
+    for record in allergies:
+        name = record.name.strip() if record.name else ""
+        if not record.active or not name:
+            continue
+
+        current = latest.get(name)
+        if current is None or (
+            record.createdAt is not None
+            and (current.createdAt is None or record.createdAt > current.createdAt)
+        ):
+            latest[name] = record
+
+    return [
+        {
+            "date": dateutils.to_iso(latest[name].createdAt),
+            "text": name,
+            "source": "pep",
+        }
+        for name in sorted(latest)[:_ALLERGY_RECORDS_LIMIT]
+    ]
 
 
 def _build_exams_card(exams_json: list) -> list:
@@ -845,15 +880,16 @@ def _get_alerts(
     user_context: User,
     segment: Segment,
     culture_data: list,
+    allergies: list,
 ):
+    """allergies: the patient's allergy records
+    (allergy_repository.get_allergy_records), which confirm the allergy flag of
+    the items (alert_service.is_allergic)"""
     relations = alert_interaction_service.find_relations(
         drug_list=drug_list,
         is_cpoe=config_data["is_cpoe"],
         id_patient=patient.idPatient,
     )
-
-    # confirm the allergy flag of the items (alert_service.is_allergic)
-    allergies = allergy_repository.get_allergy_records(id_patient=patient.idPatient)
 
     protocol_extra_info = ProtocolExtraInfo()
     protocol_extra_info.is_cpoe = config_data["is_cpoe"]
