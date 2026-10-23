@@ -130,6 +130,7 @@ def _get_allergies_without_substance(id_patient: int) -> list[str]:
         .outerjoin(Drug, Allergy.idDrug == Drug.id)
         .filter(Allergy.idPatient == id_patient)
         .filter(Allergy.active == True)
+        .filter(Allergy.sctid == None)
         .filter(Drug.sctid == None)
         .all()
     )

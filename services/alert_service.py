@@ -6,6 +6,7 @@ from typing import List, Union
 
 from models.appendix import Frequency
 from models.enums import (
+    AllergyRecordStatusEnum,
     CultureResultTypeEnum,
     DrugAlertLevelEnum,
     DrugAlertTypeEnum,
@@ -27,12 +28,16 @@ def find_alerts(
     protocols: Union[List[dict], None],
     is_cpoe: bool,
     cultures: Union[List[dict], None] = None,
+    allergies: Union[list, None] = None,
 ):
     """
     Find alerts for a list of drugs
     :param drug_list: list of drugs
     :param cultures: culture summary of the patient, grouped by drug
-        (services/culture_service.get_culture_summary)"""
+        (services/culture_service.get_culture_summary)
+    :param allergies: allergy records of the patient, active and inactive
+        (repository/allergy_repository.get_allergy_records). They confirm the
+        allergy flag of each item (is_allergic); None keeps the flag as is"""
     filtered_list = _filter_drug_list(drug_list=drug_list)
     resistant_cultures = _index_resistant_cultures(cultures=cultures)
     dose_total = _get_dose_total(drug_list=filtered_list, exams=exams)
@@ -126,7 +131,9 @@ def find_alerts(
 
         # allergy
         add_alert(
-            _alert_allergy(prescription_drug=prescription_drug),
+            _alert_allergy(
+                prescription_drug=prescription_drug, drug=drug, allergies=allergies
+            ),
             handling_types=handling_types,
         )
 
@@ -594,7 +601,81 @@ def _alert_lactating(
     return None
 
 
-def _alert_allergy(prescription_drug: PrescriptionDrug):
+def is_allergic(
+    prescription_drug: PrescriptionDrug,
+    drug: Union[Drug, None],
+    allergies: Union[list, None],
+) -> bool:
+    """Whether the patient is allergic to the prescribed item.
+
+    The flag (presmed.alergia) is set by the integration when the item arrives,
+    so it misses an allergy recorded afterwards and keeps one that was
+    inactivated. The allergy records of the patient (alergia) confirm it:
+    - an active record of the item: allergic, whatever the flag says
+    - only inactive records of the item: the allergy was inactivated
+    - no record of the item: the flag stands (some clients have no records)
+
+    A record is of the item when its fkmedicamento is the same drug, or when
+    its substance is the item's: the record's sctid when it has one (trusted:
+    resolved by a separate job, since fkmedicamento does not always reference a
+    medicamento record), otherwise the substance of its fkmedicamento.
+    allergies is None when the records were not fetched: the flag stands"""
+
+    status = get_allergy_record_status(
+        prescription_drug=prescription_drug, drug=drug, allergies=allergies
+    )
+
+    if status is None:
+        return prescription_drug.allergy == "S"
+
+    return status == AllergyRecordStatusEnum.ACTIVE
+
+
+def get_allergy_record_status(
+    prescription_drug: PrescriptionDrug,
+    drug: Union[Drug, None],
+    allergies: Union[list, None],
+) -> Union[AllergyRecordStatusEnum, None]:
+    """What the allergy records of the patient say of the prescribed item
+    (is_allergic): active when one of its records is active, inactive when they
+    were all inactivated, None when there is no record of the item (or the
+    records were not fetched) and the flag stands"""
+
+    if not allergies:
+        return None
+
+    sctid = _sctid(drug.sctid) if drug is not None else None
+
+    item_records = []
+    for record in allergies:
+        # the record's substance: its own sctid when it has one (trusted),
+        # otherwise the substance of its fkmedicamento
+        record_sctid = record.sctid if record.sctid is not None else record.drugSctid
+        # the same drug is always the item's, even if the record's sctid is stale
+        same_item = record.idDrug == prescription_drug.idDrug or (
+            sctid is not None
+            and record_sctid is not None
+            and _sctid(record_sctid) == sctid
+        )
+
+        # a record without a status neither confirms nor inactivates the flag
+        if same_item and record.active is not None:
+            item_records.append(record)
+
+    if not item_records:
+        return None
+
+    if any(record.active for record in item_records):
+        return AllergyRecordStatusEnum.ACTIVE
+
+    return AllergyRecordStatusEnum.INACTIVE
+
+
+def _alert_allergy(
+    prescription_drug: PrescriptionDrug,
+    drug: Union[Drug, None] = None,
+    allergies: Union[list, None] = None,
+):
     alert = _create_alert(
         id_prescription_drug=str(prescription_drug.id),
         key="",
@@ -603,7 +684,7 @@ def _alert_allergy(prescription_drug: PrescriptionDrug):
         text="",
     )
 
-    if prescription_drug.allergy == "S":
+    if is_allergic(prescription_drug=prescription_drug, drug=drug, allergies=allergies):
         alert["text"] = "Paciente alérgico a este medicamento."
 
         return alert

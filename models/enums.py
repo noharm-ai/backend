@@ -438,6 +438,19 @@ class AntimicrobialLevelEnum(Enum):
     NOT_RECOMMENDED = 4
 
 
+class AllergyRecordStatusEnum(Enum):
+    """Enum: what the patient's allergy records (alergia) say of a prescribed
+    item (alert_service.get_allergy_record_status)
+
+    Active when an active record of the item exists, inactive when its records
+    were all inactivated. No record of the item has no status: the item's flag
+    (presmed.alergia) stands.
+    """
+
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+
+
 class PrescriptionClinicalNoteStatusEnum(Enum):
     PENDING = 0
     SENT = 1

@@ -8,7 +8,7 @@ from models.appendix import MeasureUnit
 from models.enums import DefaultMeasureUnitEnum, DrugTypeEnum, FeatureEnum
 from models.main import Drug, DrugAttributes
 from models.prescription import PrescriptionDrug
-from services import drug_service, feature_service
+from services import alert_service, drug_service, feature_service
 from services.admin import admin_ai_service
 from utils import dateutils, numberutils, prescriptionutils, stringutils
 
@@ -40,6 +40,7 @@ class DrugList:
         alerts,
         admission_number,
         is_cpoe=False,
+        allergies=None,
     ):
         self.drugList = drugList
         self.interventions = interventions
@@ -50,6 +51,7 @@ class DrugList:
         self.dialysis = dialysis
         self.is_cpoe = is_cpoe
         self.admission_number = admission_number
+        self.allergies = allergies
         self.maxDoseAgg = {}
         self.alertStats = {
             "dup": 0,
@@ -262,6 +264,15 @@ class DrugList:
 
             auc_value = self.get_auc_value(pd)
 
+            # the same allergy the alert reports (flag confirmed by alergia)
+            allergy = alert_service.is_allergic(
+                prescription_drug=pd[0], drug=pd[1], allergies=self.allergies
+            )
+            # why: the maintainers read the flag next to what the records said
+            allergy_record = alert_service.get_allergy_record_status(
+                prescription_drug=pd[0], drug=pd[1], allergies=self.allergies
+            )
+
             self.drug_results.append(
                 {
                     "idPrescription": str(pd[0].idPrescription),
@@ -280,8 +291,13 @@ class DrugList:
                     "c": pd[6].controlled if pd[6] is not None else False,
                     "q": pd[6].chemo if pd[6] is not None else False,
                     "dialyzable": dialyzable,
-                    "alergy": bool(pd[0].allergy == "S"),
-                    "allergy": bool(pd[0].allergy == "S"),
+                    "alergy": allergy,
+                    "allergy": allergy,
+                    # presmed.alergia as it arrived ("S", "N" or None)
+                    "allergyFlag": pd[0].allergy,
+                    "allergyRecord": (
+                        allergy_record.value if allergy_record is not None else None
+                    ),
                     "whiteList": pdWhiteList,
                     "doseWeight": doseWeightStr,
                     "doseWeightDay": doseWeightDayStr,
