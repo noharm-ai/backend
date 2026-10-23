@@ -6,11 +6,14 @@ identifies the real author by their external id; the check is then recorded as
 if that user had performed it.
 """
 
+import json
 from datetime import datetime
+from unittest.mock import MagicMock, patch
 
 import pytest
 from sqlalchemy import func
 
+from config import Config
 from models.enums import PrescriptionAuditTypeEnum
 from models.main import User, UserAuthorization
 from models.prescription import Prescription, PrescriptionAudit
@@ -198,6 +201,35 @@ def test_static_check_audits_the_check_as_a_service_user(
     assert audit is not None
     assert audit.createdBy == origin_users["analyst"]
     assert audit.extra["serviceUser"] is True
+
+
+def test_static_check_dispatches_the_presmed_event_for_the_origin_user(
+    client, integrator_headers, origin_users
+):
+    """POST /static/prescriptions/status - marca a presmed como checada em nome do usuário de origem
+
+    The origin user is loaded from the database, so it is already expired and
+    detached when the dispatch runs after the commit: the dispatch must not
+    read it then"""
+    id_prescription = create_basic_prescription().id
+    lambda_client = MagicMock()
+
+    with patch.object(Config, "BACKEND_FUNCTION_NAME", "test-backend-function"), patch(
+        "services.prescription_check_service.aws.get_client",
+        return_value=lambda_client,
+    ):
+        response = client.post(
+            STATIC_CHECK_URL, json=_payload(id_prescription), headers=integrator_headers
+        )
+
+    assert response.status_code == 200
+    assert lambda_client.invoke.call_count == 1
+
+    payload = json.loads(lambda_client.invoke.call_args.kwargs["Payload"])
+    assert payload["command"] == "lambda_check.mark_presmed_checked"
+    assert payload["schema"] == "demo"
+    assert payload["id_user"] == origin_users["analyst"]
+    assert payload["id_prescription_list"] == [str(id_prescription)]
 
 
 def test_static_check_undoes_a_previous_check(client, integrator_headers):
