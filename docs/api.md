@@ -356,9 +356,7 @@ All endpoints in this section require administrator-level authorization.
 
 | Method | Path | Description |
 |---|---|---|
-| `POST` | `/admin/substance/list` | List substances with filters. |
 | `GET` | `/admin/substance/<id>` | Get substance detail. |
-| `POST` | `/admin/substance` | Create or update a substance. |
 
 ### Exam Management
 
