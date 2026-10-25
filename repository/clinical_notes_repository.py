@@ -3,6 +3,7 @@
 from datetime import datetime, timedelta
 
 from sqlalchemy import Integer, desc, func
+from sqlalchemy.dialects.postgresql import distinct_on
 
 from decorators.timed_decorator import timed
 from models.main import User, db
@@ -245,7 +246,7 @@ def get_dialysis(admission_number: int, user_context: User, cache=True):
                 order_by=desc(ClinicalNotes.date),
             ),
         )
-        .distinct(func.date(ClinicalNotes.date))
+        .ext(distinct_on(func.date(ClinicalNotes.date)))
         .filter(ClinicalNotes.admissionNumber == admission_number)
         .filter(ClinicalNotes.dialysisText != "")
         .filter(ClinicalNotes.dialysisText != None)

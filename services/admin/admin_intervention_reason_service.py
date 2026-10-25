@@ -1,6 +1,6 @@
 """Service: admin intervention reason operations"""
 
-from sqlalchemy import asc, func, literal_column
+from sqlalchemy import any_, asc, func, literal_column
 
 from decorators.has_permission_decorator import Permission, has_permission
 from models.appendix import InterventionReason
@@ -14,7 +14,7 @@ def get_reasons(id=None, active_only=False):
     query_editable = (
         db.session.query(func.count(Intervention.id))
         .select_from(Intervention)
-        .filter(Intervention.idInterventionReason.any(InterventionReason.id))
+        .filter(InterventionReason.id == any_(Intervention.idInterventionReason))
     )
 
     q = (
