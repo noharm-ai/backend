@@ -1,6 +1,6 @@
 """Service: admin drug related operations"""
 
-from sqlalchemy import and_, distinct, text
+from sqlalchemy import and_, text
 from sqlalchemy.orm import undefer
 
 from decorators.has_permission_decorator import Permission, has_permission
@@ -48,8 +48,9 @@ def fix_inconsistency(user_context: User):
     db.session.execute(query_normalize)
 
     inconsistent_drugs = (
-        db.session.query(distinct(Outlier.idDrug), Drug.sctid)
+        db.session.query(Outlier.idDrug, Drug.sctid)
         .select_from(Outlier)
+        .distinct()
         .join(Drug, Drug.id == Outlier.idDrug)
         .outerjoin(
             DrugAttributes,

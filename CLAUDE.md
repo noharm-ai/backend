@@ -4,7 +4,7 @@
 
 NoHarm is a healthcare/pharmacy clinical decision support system that helps prevent adverse drug events. This Flask-based backend provides APIs for prescription management, drug interaction checking, clinical interventions, patient monitoring, and regulatory compliance.
 
-**Tech Stack:** Flask 3.0.3, SQLAlchemy 2.0.29, PostgreSQL, Redis, AWS (S3, SQS, Lambda)
+**Tech Stack:** Flask 3.1.3, SQLAlchemy 2.1.6, PostgreSQL, Redis, AWS (S3, SQS, Lambda)
 
 ## Architecture
 
@@ -128,7 +128,8 @@ Permissions are defined in `decorators/has_permission_decorator.py`
 ### Primary Database
 - **Type:** PostgreSQL
 - **Connection:** `Config.POTGRESQL_CONNECTION_STRING`
-- **ORM:** SQLAlchemy 2.0.29
+- **ORM:** SQLAlchemy 2.1.6
+- **Driver:** psycopg2. SQLAlchemy 2.1 maps a bare `postgresql://` URL to psycopg (version 3), so `app/flask_config.py` (`with_psycopg2`) pins the driver on every connection string. The connection strings in the environments need no driver. Don't switch to psycopg 3 without fixing what it rejects: model types that differ from the column (e.g. `presmed.slagrupamento` is `bigint`, declared `String(1)`), ids arriving as strings compared with `bigint` columns, and `IN :tuple` binds
 - **Migrations:** Not currently using Alembic (manual schema management)
 
 ### Report Database

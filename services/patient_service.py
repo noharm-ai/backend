@@ -76,7 +76,8 @@ def get_patients(request_data: PatientListRequest):
             .filter(Pmax.idPatient == Patient.idPatient)
             .filter(Pmax.admissionNumber == Patient.admissionNumber)
             .filter(Pmax.idHospital == Patient.idHospital)
-            .filter(Pmax.agg == True),
+            .filter(Pmax.agg == True)
+            .scalar_subquery(),
         )
         .order_by(desc("appointment"))
         .options(undefer(Patient.observation))

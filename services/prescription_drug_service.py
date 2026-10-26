@@ -373,7 +373,7 @@ def _getDrugFuture(
                 .filter(pd1.suspendedDate == None)
                 .filter(pr1.concilia == None)
                 .order_by(asc(pr1.date))
-                .as_scalar()
+                .scalar_subquery()
             )
 
             return func.array(query)
@@ -406,7 +406,7 @@ def _getDrugFuture(
     if prescription.concilia is None:
         query = query.filter(pr1.id > idPrescription)
 
-    return func.array(query.order_by(asc(pr1.date)).as_scalar())
+    return func.array(query.order_by(asc(pr1.date)).scalar_subquery())
 
 
 def _format_dose(dose_column):

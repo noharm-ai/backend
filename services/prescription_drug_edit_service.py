@@ -1,4 +1,5 @@
-from sqlalchemy import distinct, text
+from sqlalchemy import text
+from sqlalchemy.dialects.postgresql import distinct_on
 from datetime import datetime
 
 from models.main import db, User, Substance, Drug
@@ -234,7 +235,7 @@ def copy_missing_drugs(idPrescription, user_context: User, idDrugs):
 
     drugs = (
         db.session.query(PrescriptionDrug)
-        .distinct(PrescriptionDrug.idDrug)
+        .ext(distinct_on(PrescriptionDrug.idDrug))
         .join(Prescription, Prescription.id == PrescriptionDrug.idPrescription)
         .filter(Prescription.admissionNumber == prescription.admissionNumber)
         .filter(PrescriptionDrug.idDrug.in_(idDrugs))
@@ -286,7 +287,8 @@ def get_missing_drugs(idPrescription):
     )
 
     return (
-        db.session.query(distinct(PrescriptionDrug.idDrug), Drug.name)
+        db.session.query(PrescriptionDrug.idDrug, Drug.name)
+        .distinct()
         .join(Prescription, Prescription.id == PrescriptionDrug.idPrescription)
         .join(Drug, Drug.id == PrescriptionDrug.idDrug)
         .filter(Prescription.admissionNumber == prescription.admissionNumber)
