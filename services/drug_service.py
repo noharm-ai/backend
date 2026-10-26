@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List
 
-from sqlalchemy import and_, asc, distinct, func
+from sqlalchemy import and_, asc, func
 from sqlalchemy.orm import undefer
 
 from decorators.has_permission_decorator import Permission, has_permission
@@ -209,8 +209,9 @@ def getFrequencies():
 @has_permission(Permission.READ_PRESCRIPTION)
 def get_all_frequencies():
     return (
-        db.session.query(distinct(Frequency.id), Frequency.description)
+        db.session.query(Frequency.id, Frequency.description)
         .select_from(Frequency)
+        .distinct()
         .order_by(asc(Frequency.description))
         .all()
     )

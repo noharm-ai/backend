@@ -275,6 +275,9 @@ class Allergy(db.Model):
     idDrug = db.Column("fkmedicamento", db.BigInteger, primary_key=True)
     idPatient = db.Column("fkpessoa", db.BigInteger, primary_key=True)
     drugName = db.Column("nome_medicamento", db.String, nullable=True)
+    # substance resolved by a separate job (fkmedicamento does not always
+    # reference a medicamento record): when present it is the trusted one
+    sctid = db.Column("sctid", db.BigInteger, nullable=True)
     active = db.Column("ativo", db.Boolean, nullable=False)
     createdAt = db.Column("created_at", db.DateTime, nullable=True)
 

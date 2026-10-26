@@ -10,7 +10,7 @@ from flask import Flask
 
 # Import only extensions and config at module level to avoid circular imports
 from .extensions import cors, db, jwt, mail
-from .flask_config import get_config
+from .flask_config import database_config, get_config
 
 # Set timezone
 os.environ["TZ"] = "America/Sao_Paulo"
@@ -39,6 +39,7 @@ def create_app(config_name=None):
     # Load configuration
     config_class = get_config(config_name)
     app.config.from_object(config_class)
+    app.config.update(database_config(config_class))
 
     # Initialize extensions
     db.init_app(app)

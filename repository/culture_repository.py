@@ -4,6 +4,7 @@ from datetime import datetime
 
 from boto3.dynamodb.conditions import Key
 from sqlalchemy import desc, func, select
+from sqlalchemy.dialects.postgresql import distinct_on
 
 from config import Config
 from models.appendix import Culture, CultureHeader
@@ -56,7 +57,7 @@ def get_latest_culture_headers(id_patient: int, released_since: datetime) -> lis
         select(*_HEADER_COLUMNS)
         .where(CultureHeader.idPatient == id_patient)
         .where(CultureHeader.releaseDate >= released_since)
-        .distinct(CultureHeader.examName, CultureHeader.examMaterialName)
+        .ext(distinct_on(CultureHeader.examName, CultureHeader.examMaterialName))
         .order_by(
             CultureHeader.examName,
             CultureHeader.examMaterialName,

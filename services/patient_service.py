@@ -11,7 +11,7 @@ from exception.authorization_error import AuthorizationError
 from exception.validation_error import ValidationError
 from models.appendix import Tag
 from models.enums import FeatureEnum, PatientAuditTypeEnum, TagTypeEnum
-from models.main import Allergy, Drug, Substance, User, db
+from models.main import User, db
 from models.notes import ClinicalNotes
 from models.prescription import (
     Patient,
@@ -76,7 +76,8 @@ def get_patients(request_data: PatientListRequest):
             .filter(Pmax.idPatient == Patient.idPatient)
             .filter(Pmax.admissionNumber == Patient.admissionNumber)
             .filter(Pmax.idHospital == Patient.idHospital)
-            .filter(Pmax.agg == True),
+            .filter(Pmax.agg == True)
+            .scalar_subquery(),
         )
         .order_by(desc("appointment"))
         .options(undefer(Patient.observation))
@@ -134,22 +135,6 @@ def get_patients(request_data: PatientListRequest):
         )
 
     return _format_patients(query.limit(1500).all())
-
-
-def get_patient_allergies(id_patient):
-    return (
-        db.session.query(
-            Allergy.createdAt, func.coalesce(Substance.name, Allergy.drugName)
-        )
-        .distinct(func.coalesce(Substance.name, Allergy.drugName))
-        .outerjoin(Drug, Allergy.idDrug == Drug.id)
-        .outerjoin(Substance, Drug.sctid == Substance.id)
-        .filter(Allergy.idPatient == id_patient)
-        .filter(Allergy.active == True)
-        .order_by(func.coalesce(Substance.name, Allergy.drugName))
-        .limit(100)
-        .all()
-    )
 
 
 def get_patient_weight(id_patient):

@@ -67,23 +67,3 @@ def create_test_substance(
     )
     session_commit()
 
-
-def set_substance_handling(id: int, handling: str) -> None:
-    """Set the ``manejo`` jsonb column of a substance (raw json string)."""
-    session.execute(
-        text("UPDATE public.substancia SET manejo = CAST(:handling AS jsonb) WHERE sctid = :id"),
-        {"id": id, "handling": handling},
-    )
-    session_commit()
-
-
-def get_substance_row(id: int):
-    """Read a substance straight from the DB, bypassing the service layer."""
-    return session.execute(
-        text(
-            "SELECT sctid, nome, idclasse, ativo, unidadepadrao, dosemax_adulto, "
-            "       manejo, curadoria, tags, update_by, divisor_faixa "
-            "FROM public.substancia WHERE sctid = :id"
-        ),
-        {"id": id},
-    ).first()

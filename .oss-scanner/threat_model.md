@@ -38,8 +38,8 @@
 
 ## How to exercise it
 - The image has PostgreSQL with the `noharm` database already loaded from `noharm-ai/database`
-  (schema plus synthetic seed data; tenant schema `demo`, login `demo` / `demo`). Start it with
-  `.oss-scanner/start-db.sh` before running the app or the integration tests.
+  (schema plus synthetic seed data; tenant schema `demo`, login `demo` / `demo`). pytest starts it on its
+  own (plugin `.oss-scanner/oss_scanner_db.py`); to run the app, start it first with `.oss-scanner/start-db.sh`.
 - Tests: `python -m pytest tests/unit` (no database) and `python -m pytest tests/integration`
   (needs the database). `ENV=test` is already set in the image. `tests/conftest.py` shows how to log in
   and get a JWT (`get_access`) and how roles are assigned for a test user.

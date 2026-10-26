@@ -5,6 +5,7 @@ from datetime import date, datetime, timedelta
 
 from dateutil import parser
 from sqlalchemy import and_, desc
+from sqlalchemy.dialects.postgresql import distinct_on
 
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
@@ -466,7 +467,7 @@ def _get_exams_previous_results(id_patient: int):
     examLatest = (
         db.session.query(Exams.typeExam.label("typeExam"), Exams.date.label("date"))
         .select_from(Exams)
-        .distinct(Exams.typeExam)
+        .ext(distinct_on(Exams.typeExam))
         .filter(Exams.idPatient == id_patient)
         .filter(Exams.date >= (date.today() - timedelta(days=90)))
         .order_by(Exams.typeExam, Exams.date.desc())
@@ -476,7 +477,7 @@ def _get_exams_previous_results(id_patient: int):
     el = db.aliased(examLatest)
 
     resultsPrev = (
-        Exams.query.distinct(Exams.typeExam)
+        Exams.query.ext(distinct_on(Exams.typeExam))
         .join(el, and_(Exams.typeExam == el.c.typeExam, Exams.date < el.c.date))
         .filter(Exams.idPatient == id_patient)
         .filter(Exams.date >= (date.today() - timedelta(days=90)))
@@ -495,7 +496,7 @@ def _get_exams_current_results_hybrid(id_patient: int, schema: str):
     MIN_DATE = date.today() - timedelta(days=5)
 
     results = (
-        Exams.query.distinct(Exams.typeExam)
+        Exams.query.ext(distinct_on(Exams.typeExam))
         .filter(Exams.idPatient == id_patient)
         .filter(Exams.date >= MIN_DATE)
         .order_by(Exams.typeExam, Exams.date.desc())
@@ -545,7 +546,7 @@ def _get_exams_current_results(
         previous_exams = _get_exams_previous_results(id_patient=id_patient)
 
     results = (
-        Exams.query.distinct(Exams.typeExam)
+        Exams.query.ext(distinct_on(Exams.typeExam))
         .filter(Exams.idPatient == id_patient)
         .filter(Exams.date >= MIN_DATE)
         .order_by(Exams.typeExam, Exams.date.desc())
