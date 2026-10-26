@@ -18,13 +18,19 @@ class Config:
     SELF_API_URL = getenv("SELF_API_URL") or ""
     APP_URL = getenv("APP_URL")
     APP_DOMAIN = getenv("APP_DOMAIN") or "localhost"
-    POTGRESQL_CONNECTION_STRING = (
-        getenv("POTGRESQL_CONNECTION_STRING")
-        or "postgresql://postgres@localhost/noharm"
-    )
+    # connection strings: a development opt-out of the secrets below, ignored elsewhere
+    POTGRESQL_CONNECTION_STRING = getenv("POTGRESQL_CONNECTION_STRING") or None
     REPORT_CONNECTION_STRING = (
-        getenv("REPORT_CONNECTION_STRING") or "postgresql://postgres@localhost/noharm"
+        getenv("REPORT_CONNECTION_STRING") or POTGRESQL_CONNECTION_STRING
     )
+    # database credentials in AWS Secrets Manager (username, password, host, port)
+    DB_SECRET_REGION = getenv("DB_SECRET_REGION") or "sa-east-1"
+    DB_SECRET_ID = getenv("SECRET_ID_DB_API_USER") or "prod/homolog/api_user"
+    DB_NAME = getenv("DB_NAME") or "postgres"
+    REPORT_DB_SECRET_ID = (
+        getenv("SECRET_ID_DB_REPORT") or "prod/replica/postgres-readonly"
+    )
+    REPORT_DB_NAME = getenv("REPORT_DB_NAME") or DB_NAME
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(
         minutes=int(getenv("JWT_ACCESS_TOKEN_EXPIRES", "20"))
     )
