@@ -4,12 +4,73 @@ This module defines configuration classes for different environments
 (development, production, testing).
 """
 
+import json
 import os
 
-from sqlalchemy.engine import make_url
+from sqlalchemy.engine import URL, make_url
 
 from config import Config
 from models.enums import NoHarmENV
+from utils import aws
+
+# Amazon RDS root CAs; the server certificate must chain to one of them
+DB_SSL_ROOT_CERT = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config", "certs.pem"
+)
+
+
+def url_from_secret(secret_id: str, database: str) -> str:
+    """Build a psycopg2 connection URL from a database secret in AWS Secrets Manager.
+
+    The secret holds username, password, host and port; the database name is
+    not in it and comes from the environment. The connection requires SSL and
+    verifies the server certificate against DB_SSL_ROOT_CERT (verify-ca).
+    """
+    client = aws.get_client("secretsmanager", Config.DB_SECRET_REGION)
+    secret = json.loads(client.get_secret_value(SecretId=secret_id)["SecretString"])
+
+    return URL.create(
+        "postgresql+psycopg2",
+        username=secret["username"],
+        password=secret["password"],
+        host=secret["host"],
+        port=int(secret.get("port") or 5432),
+        database=database,
+        query={"sslmode": "verify-ca", "sslrootcert": DB_SSL_ROOT_CERT},
+    ).render_as_string(hide_password=False)
+
+
+def database_config_from_secrets() -> dict:
+    """Database settings for an environment that reads its credentials from secrets."""
+    return {
+        "SQLALCHEMY_DATABASE_URI": url_from_secret(Config.DB_SECRET_ID, Config.DB_NAME),
+        "SQLALCHEMY_BINDS": {
+            "report": url_from_secret(Config.REPORT_DB_SECRET_ID, Config.REPORT_DB_NAME)
+        },
+    }
+
+
+def database_config(config_class) -> dict:
+    """Database settings resolved when the app is created.
+
+    A config with its own URIs (test) keeps them. Where the connection string
+    is allowed (development only), setting POTGRESQL_CONNECTION_STRING opts out
+    of the secrets. Everything else reads the secrets.
+    """
+    if not config_class.DATABASE_FROM_SECRETS:
+        return {}
+
+    if config_class.ALLOW_CONNECTION_STRING and Config.POTGRESQL_CONNECTION_STRING:
+        return {
+            "SQLALCHEMY_DATABASE_URI": with_psycopg2(
+                Config.POTGRESQL_CONNECTION_STRING
+            ),
+            "SQLALCHEMY_BINDS": {
+                "report": with_psycopg2(Config.REPORT_CONNECTION_STRING)
+            },
+        }
+
+    return database_config_from_secrets()
 
 
 def with_psycopg2(url: str) -> str:
@@ -29,8 +90,9 @@ class BaseConfig:
     """Base configuration with settings common to all environments."""
 
     # SQLAlchemy
-    SQLALCHEMY_DATABASE_URI = with_psycopg2(Config.POTGRESQL_CONNECTION_STRING)
-    SQLALCHEMY_BINDS = {"report": with_psycopg2(Config.REPORT_CONNECTION_STRING)}
+    # the database URIs are set by create_app (see database_config)
+    DATABASE_FROM_SECRETS = True
+    ALLOW_CONNECTION_STRING = False
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {
         "pool_recycle": 250,
@@ -65,10 +127,11 @@ class DevelopmentConfig(BaseConfig):
     """Development environment configuration."""
 
     DEBUG = True
+    ALLOW_CONNECTION_STRING = True
 
 
 class ProductionConfig(BaseConfig):
-    """Production environment configuration."""
+    """Production (and staging) environment configuration."""
 
     DEBUG = False
 
@@ -78,6 +141,7 @@ class TestConfig(BaseConfig):
 
     TESTING = True
     DEBUG = True
+    DATABASE_FROM_SECRETS = False
     SQLALCHEMY_DATABASE_URI = with_psycopg2(
         os.getenv("TEST_DATABASE_URL", "postgresql://postgres@localhost/noharm")
     )

@@ -127,14 +127,15 @@ Permissions are defined in `decorators/has_permission_decorator.py`
 
 ### Primary Database
 - **Type:** PostgreSQL
-- **Connection:** `Config.POTGRESQL_CONNECTION_STRING`
+- **Connection:** every environment but test reads the credentials (`username`, `password`, `host`, `port`) from AWS Secrets Manager when the app is created (`create_app` → `database_config` in `app/flask_config.py`): secret `SECRET_ID_DB_API_USER` (default `prod/homolog/api_user`), database `DB_NAME` (default `postgres`). Development only (`ALLOW_CONNECTION_STRING`) may opt out by setting `POTGRESQL_CONNECTION_STRING`; production and staging ignore it. Tests use `TestConfig` and never call AWS. Don't read a secret in a config class body: it runs on import, tests included
+- **SSL:** connections built from the secrets use `sslmode=verify-ca` with `sslrootcert` pointing to `config/certs.pem` (Amazon RDS root CAs, path resolved absolute as `DB_SSL_ROOT_CERT`). If the database moves to a CA not in the bundle, update the bundle first or every connection fails
 - **ORM:** SQLAlchemy 2.1.6
 - **Driver:** psycopg2. SQLAlchemy 2.1 maps a bare `postgresql://` URL to psycopg (version 3), so `app/flask_config.py` (`with_psycopg2`) pins the driver on every connection string. The connection strings in the environments need no driver. Don't switch to psycopg 3 without fixing what it rejects: model types that differ from the column (e.g. `presmed.slagrupamento` is `bigint`, declared `String(1)`), ids arriving as strings compared with `bigint` columns, and `IN :tuple` binds
 - **Migrations:** Not currently using Alembic (manual schema management)
 
 ### Report Database
 - **Bind Name:** `report`
-- **Connection:** `Config.REPORT_CONNECTION_STRING`
+- **Connection:** secret `SECRET_ID_DB_REPORT` (default `prod/replica/postgres-readonly`), database `REPORT_DB_NAME` (default `DB_NAME`); with the development opt-out, `REPORT_CONNECTION_STRING` (defaults to `POTGRESQL_CONNECTION_STRING`)
 - **Purpose:** Separate database for reporting/analytics queries
 
 ### Redis
@@ -325,7 +326,7 @@ Key configuration via environment variables (see `config.py`):
 **Required:**
 - `ENV`: development/production/test
 - `SECRET_KEY`: JWT signing key
-- `POTGRESQL_CONNECTION_STRING`: Main database URL
+- `SECRET_ID_DB_API_USER` + `DB_NAME`: Main database credentials secret and name (`POTGRESQL_CONNECTION_STRING` replaces them in development only)
 - `REDIS_HOST`, `REDIS_PORT`: Redis connection
 
 **Optional but Important:**
