@@ -112,3 +112,13 @@ def backfill():
     return infection_control_service.backfill(
         request_data=InfectionControlBackfillRequest(**request.get_json())
     )
+
+
+@app_infection_control.route("/infection-control/backfill-summary", methods=["POST"])
+@api_endpoint()
+def backfill_summary():
+    """Fill the report summary of the followed admissions without one (one
+    batch per call)"""
+    return infection_control_service.backfill_summary(
+        request_data=InfectionControlBackfillRequest(**request.get_json())
+    )

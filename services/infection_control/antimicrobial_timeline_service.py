@@ -171,12 +171,12 @@ def group_courses(items: list[TimelineItem]) -> list[Course]:
     return sorted(courses, key=lambda c: (c.start, c.items[0].drug or ""))
 
 
-def _days(start: datetime, end: datetime) -> int:
+def started_days(start: datetime, end: datetime) -> int:
     """Started days between two dates (D1 is the first 24 hours)"""
     return max(1, math.ceil((end - start) / ONE_DAY))
 
 
-def _planned_end(course: Course) -> datetime | None:
+def planned_end_of(course: Course) -> datetime | None:
     """When the course is meant to end.
 
     CPOE orders carry it in the expire date of the latest order. Daily
@@ -197,7 +197,7 @@ def _planned_end(course: Course) -> datetime | None:
     return None
 
 
-def _regimens(course: Course, weight: float | None = None) -> list[dict]:
+def course_regimens(course: Course, weight: float | None = None) -> list[dict]:
     """Consecutive items with the same dose, frequency and route, merged.
 
     The notes are not part of the posology: daily prescribers rewrite them
@@ -268,7 +268,7 @@ def serialize_course(
     else:
         course_status = STATUS_FINISHED
 
-    planned_end = _planned_end(course)
+    planned_end = planned_end_of(course)
     latest = course.items[-1]
 
     return {
@@ -282,13 +282,13 @@ def serialize_course(
         "end": dateutils.to_iso(end),
         "plannedEnd": dateutils.to_iso(planned_end),
         "plannedDays": (
-            _days(course.start, planned_end) if planned_end is not None else None
+            started_days(course.start, planned_end) if planned_end is not None else None
         ),
         # started days of treatment up to now (or up to the end, when it is over)
-        "days": _days(course.start, min(now, end)),
+        "days": started_days(course.start, min(now, end)),
         "lastIdPrescription": str(latest.id_prescription),
         "prescriptionCount": len({i.id_prescription for i in course.items}),
-        "regimens": _regimens(course, weight=weight),
+        "regimens": course_regimens(course, weight=weight),
         "gaps": [
             {"start": dateutils.to_iso(g["start"]), "end": dateutils.to_iso(g["end"])}
             for g in course.gaps

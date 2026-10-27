@@ -50,6 +50,9 @@ from services import (
 )
 from services.infection_control import (
     antimicrobial_timeline_service,
+    infection_control_summary_service,
+)
+from services.infection_control import (
     infection_control_status_service as rule,
 )
 from services.infection_control.antimicrobial_timeline_service import GAP_TOLERANCE
@@ -855,5 +858,45 @@ def backfill(request_data: InfectionControlBackfillRequest, user_context: User):
     return {
         "processed": len(candidates),
         "created": created,
+        "next": (candidates[-1] if len(candidates) == request_data.limit else None),
+    }
+
+
+@has_permission(Permission.INTEGRATION_UTILS)
+def backfill_summary(request_data: InfectionControlBackfillRequest, user_context: User):
+    """Fill the summary of the followed admissions that have none yet (the
+    closed ones, which the job no longer runs), from their courses and
+    cultures.
+
+    Runs one batch per call; call again with `after` = the returned `next`
+    until it is None. The courses only see the prescriptions not archived yet,
+    so run it before more of them are.
+    """
+    _check_feature()
+
+    now = datetime.now()
+    candidates = infection_control_repository.get_summary_backfill_candidates(
+        after=request_data.after, limit=request_data.limit
+    )
+
+    filled = 0
+    for admission_number in candidates:
+        admission = rule.sync_admission(
+            admission_number=admission_number,
+            origin=InfectionControlOriginEnum.BACKFILL,
+            user_id=user_context.id,
+            now=now,
+        )
+        if admission is None or admission.summary is None:
+            continue
+
+        infection_control_summary_service.refresh_cultures(
+            admission=admission, schema=user_context.schema, now=now
+        )
+        filled += 1
+
+    return {
+        "processed": len(candidates),
+        "filled": filled,
         "next": (candidates[-1] if len(candidates) == request_data.limit else None),
     }
