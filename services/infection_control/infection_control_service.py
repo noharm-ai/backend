@@ -405,13 +405,13 @@ def _validate_review(
             status.HTTP_400_BAD_REQUEST,
         )
 
-    # a reason related to another drug takes a substitute; a substitution, or
-    # one whose relation is required, must have it
+    # a reason related to another drug takes a substitute; one whose relation
+    # is required must have it
     for evaluation in request_data.evaluations:
-        chosen = [reasons[id_reason] for id_reason in evaluation.interventionReasons]
-        relation_types = {reason.relation_type for reason in chosen}
-        if any(reason.substitution for reason in chosen):
-            relation_types.add(InterventionReasonRelationTypeEnum.REQUIRED.value)
+        relation_types = {
+            reasons[id_reason].relation_type
+            for id_reason in evaluation.interventionReasons
+        }
         if evaluation.substituteDrug is None:
             if InterventionReasonRelationTypeEnum.REQUIRED.value in relation_types:
                 raise ValidationError(

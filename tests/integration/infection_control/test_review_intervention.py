@@ -34,7 +34,8 @@ REASON_PARENT = 30104
 # relates the drug to another: the substitute is required / optional
 REASON_IC_SUBSTITUTION = 30105
 REASON_IC_ALTERNATIVE = 30106
-# a substitution without a relation type, as the seed's "Substituição"
+# a substitution without a relation type, as the seed's "Substituição": the
+# relation type alone asks for a substitute
 REASON_IC_SUBSTITUTION_FLAG = 30107
 
 # drugs of the seed data: one flagged antimicrobial, recommended instead of
@@ -522,17 +523,15 @@ def test_undone_intervention_leaves_the_evaluation(
     assert [r["id"] for r in evaluation["interventionReasons"]] == [REASON_IC]
 
 
-@pytest.mark.parametrize(
-    "reason", [REASON_IC_SUBSTITUTION, REASON_IC_SUBSTITUTION_FLAG]
-)
 def test_substitution_requires_substitute(
-    client, infection_control, admission, reasons, interventions, reason
+    client, infection_control, admission, reasons, interventions
 ):
-    """400 without a substitute for a reason whose relation requires it, or
-    a substitution"""
+    """400 without a substitute for a reason whose relation requires it"""
     _prescribe_today(admission)
 
-    response = _non_conformity(client, admission, intervention_reasons=[reason])
+    response = _non_conformity(
+        client, admission, intervention_reasons=[REASON_IC_SUBSTITUTION]
+    )
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.get_json()["code"] == "errors.invalidParams"
@@ -545,6 +544,11 @@ def test_substitution_requires_substitute(
         # no reason relates the drug to another
         {"conforming": True},
         {"conforming": False, "intervention_reasons": [REASON_IC]},
+        # a substitution without a relation type
+        {
+            "conforming": False,
+            "intervention_reasons": [REASON_IC_SUBSTITUTION_FLAG],
+        },
         # not a drug
         {
             "conforming": False,
@@ -581,16 +585,15 @@ def test_substitute_rejected(
     assert _evaluations(admission) == []
 
 
-def test_optional_relation_keeps_without_substitute(
-    client, infection_control, admission, reasons, interventions
+@pytest.mark.parametrize("reason", [REASON_IC_ALTERNATIVE, REASON_IC_SUBSTITUTION_FLAG])
+def test_takes_non_conformity_without_substitute(
+    client, infection_control, admission, reasons, interventions, reason
 ):
-    """A reason with an optional relation takes the non-conformity without a
-    substitute"""
+    """A reason with an optional relation, or a substitution without one,
+    takes the non-conformity without a substitute"""
     _prescribe_today(admission)
 
-    response = _non_conformity(
-        client, admission, intervention_reasons=[REASON_IC_ALTERNATIVE]
-    )
+    response = _non_conformity(client, admission, intervention_reasons=[reason])
 
     assert response.status_code == status.HTTP_200_OK, response.get_json()
     (evaluation,) = _evaluations(admission)
