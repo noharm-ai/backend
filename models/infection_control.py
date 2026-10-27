@@ -1,4 +1,5 @@
 from sqlalchemy.dialects import postgresql
+from sqlalchemy.orm import deferred
 
 from .main import db
 
@@ -22,6 +23,12 @@ class InfectionControlAdmission(db.Model):
     # and shows its department and bed, which change during the admission
     id_last_prescription = db.Column(
         "fkprescricao_ultima", db.BigInteger, nullable=True
+    )
+    # what the infection control report reads of the admission (courses,
+    # department of each day, culture facts), kept by the rule on every run
+    # (infection_control_summary_service). Deferred: the worklist never needs it
+    summary = deferred(
+        db.Column("resumo_acompanhamento", postgresql.JSONB, nullable=True)
     )
 
     updated_at = db.Column("updated_at", db.DateTime, nullable=True)

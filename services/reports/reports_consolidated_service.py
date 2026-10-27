@@ -2,15 +2,18 @@ import json
 
 from config import Config
 from decorators.has_permission_decorator import Permission, has_permission
-from models.enums import NoHarmENV
+from exception.validation_error import ValidationError
+from models.enums import FeatureEnum, NoHarmENV
 from models.main import User
 from models.requests.reports_consolidated_request import (
     EconomyReportRequest,
+    InfectionControlReportRequest,
     InterventionReportRequest,
     PatientDayReportRequest,
     PrescriptionReportRequest,
 )
-from utils import aws
+from services import feature_service
+from utils import aws, status
 
 
 def _invoke_report_lambda(payload: dict, report_name: str) -> dict:
@@ -150,3 +153,40 @@ def get_intervention_report(
     }
 
     return _invoke_report_lambda(payload=payload, report_name="intervention")
+
+
+@has_permission(Permission.READ_INFECTION_CONTROL)
+def get_infection_control_report(
+    request_data: InfectionControlReportRequest, user_context: User
+):
+    """The infection control report (indicators of a period, or the view of a
+    day), read by the private backend from the files long-running-tasks builds"""
+    if not feature_service.has_feature(FeatureEnum.INFECTION_CONTROL):
+        raise ValidationError(
+            "Controle de infecção não habilitado",
+            "errors.invalidParams",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    if Config.ENV == NoHarmENV.TEST.value:
+        return {}
+
+    payload = {
+        "command": "lambda_query_reports.get_infection_control_report",
+        "schema": user_context.schema,
+        "year": request_data.year,
+        "start_date": (
+            request_data.start_date.isoformat() if request_data.start_date else None
+        ),
+        "end_date": (
+            request_data.end_date.isoformat() if request_data.end_date else None
+        ),
+        "id_department": request_data.id_department or None,
+        "segment": request_data.segment or None,
+        "substance": request_data.substance or None,
+        "aware_level": request_data.aware_level or None,
+        "reviewer": request_data.reviewer or None,
+        "day": request_data.day.isoformat() if request_data.day else None,
+    }
+
+    return _invoke_report_lambda(payload=payload, report_name="infection-control")

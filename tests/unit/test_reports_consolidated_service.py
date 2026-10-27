@@ -30,10 +30,12 @@ import pytest
 
 from config import Config
 from exception.authorization_error import AuthorizationError
+from exception.validation_error import ValidationError
 from mobile import app
 from models.enums import NoHarmENV
 from models.requests.reports_consolidated_request import (
     EconomyReportRequest,
+    InfectionControlReportRequest,
     InterventionReportRequest,
     PatientDayReportRequest,
     PrescriptionReportRequest,
@@ -503,3 +505,87 @@ class TestInterventionReport:
                     reports_consolidated_service.get_intervention_report(
                         request_data=InterventionReportRequest(year=2026)
                     )
+
+
+class TestInfectionControlReport:
+    """Teste reports_consolidated_service - get_infection_control_report"""
+
+    request_data = InfectionControlReportRequest(
+        year=2026,
+        start_date=date(2026, 3, 1),
+        end_date=date(2026, 3, 31),
+        id_department=[5],
+        aware_level=[1, 2],
+        reviewer=[],
+    )
+
+    @pytest.fixture(autouse=True)
+    def feature_on(self):
+        """The schema has the INFECTION_CONTROL feature"""
+        with patch.object(
+            reports_consolidated_service.feature_service,
+            "has_feature",
+            return_value=True,
+        ):
+            yield
+
+    def test_builds_the_infection_control_payload(self):
+        """O payload leva o comando, o schema do usuário e os filtros informados"""
+        with lambda_answering({}) as lambda_client:
+            with acting_as([Role.INFECTION_CONTROLLER.value]):
+                reports_consolidated_service.get_infection_control_report(
+                    request_data=self.request_data
+                )
+
+        assert sent_payload(lambda_client) == {
+            "command": "lambda_query_reports.get_infection_control_report",
+            "schema": SCHEMA,
+            "year": 2026,
+            "start_date": "2026-03-01",
+            "end_date": "2026-03-31",
+            "id_department": [5],
+            "segment": None,
+            "substance": None,
+            "aware_level": [1, 2],
+            "reviewer": None,
+            "day": None,
+        }
+
+    def test_sends_the_day_of_the_day_view(self):
+        """A visão do dia envia o dia em ISO"""
+        with lambda_answering({}) as lambda_client:
+            with acting_as([Role.INFECTION_CONTROLLER.value]):
+                reports_consolidated_service.get_infection_control_report(
+                    request_data=InfectionControlReportRequest(
+                        year=2026, day=date(2026, 10, 26)
+                    )
+                )
+
+        assert sent_payload(lambda_client)["day"] == "2026-10-26"
+
+    def test_requires_read_infection_control(self):
+        """Sem READ_INFECTION_CONTROL a chamada é negada e a lambda não é chamada"""
+        with lambda_answering({}) as lambda_client:
+            with acting_as(NO_REPORT_ROLES):
+                with pytest.raises(AuthorizationError):
+                    reports_consolidated_service.get_infection_control_report(
+                        request_data=self.request_data
+                    )
+
+        lambda_client.invoke.assert_not_called()
+
+    def test_requires_the_feature(self):
+        """Sem a feature INFECTION_CONTROL a chamada é recusada"""
+        with lambda_answering({}) as lambda_client:
+            with acting_as([Role.INFECTION_CONTROLLER.value]):
+                with patch.object(
+                    reports_consolidated_service.feature_service,
+                    "has_feature",
+                    return_value=False,
+                ):
+                    with pytest.raises(ValidationError):
+                        reports_consolidated_service.get_infection_control_report(
+                            request_data=self.request_data
+                        )
+
+        lambda_client.invoke.assert_not_called()

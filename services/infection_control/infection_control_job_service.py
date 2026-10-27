@@ -14,6 +14,7 @@ from decorators.has_permission_decorator import Permission, has_permission
 from models.enums import InfectionControlOriginEnum
 from models.main import User, db
 from services.infection_control import infection_control_status_service as rule
+from services.infection_control import infection_control_summary_service
 from utils import db_utils
 
 JOB_USER_ID = 0
@@ -54,6 +55,11 @@ def sync_followed_admission(
 
     if admission is None:
         return "skipped"
+
+    # the summary's culture facts read DynamoDB, keyed by schema: once a day
+    infection_control_summary_service.refresh_cultures(
+        admission=admission, schema=schema, now=now
+    )
 
     # apply_rule moves status_date only when the status changes
     return "changed" if admission.status_date == now else "processed"
