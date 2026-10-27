@@ -7,7 +7,7 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import aliased
 
 from models.enums import PrescriptionAuditTypeEnum, PrescriptionDrugAuditTypeEnum
-from models.main import db
+from models.main import DrugAttributes, db
 from models.prescription import (
     PrescriptionAudit,
     PrescriptionDrug,
@@ -161,3 +161,22 @@ def get_last_check_data(id_prescription: int):
     )
 
     return db.session.execute(query).first()
+
+
+def get_items_source_and_whitelist(id_prescription: int, id_segment: int):
+    """Source and white list flag of each item of a prescription (automatic check)"""
+    query = (
+        select(PrescriptionDrug.source, DrugAttributes.whiteList)
+        .select_from(PrescriptionDrug)
+        .outerjoin(
+            DrugAttributes,
+            and_(
+                DrugAttributes.idDrug == PrescriptionDrug.idDrug,
+                DrugAttributes.idSegment
+                == func.coalesce(PrescriptionDrug.idSegment, id_segment),
+            ),
+        )
+        .where(PrescriptionDrug.idPrescription == id_prescription)
+    )
+
+    return db.session.execute(query).all()
