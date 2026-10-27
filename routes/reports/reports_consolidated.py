@@ -3,6 +3,7 @@ from flask import Blueprint, request
 from decorators.api_endpoint_decorator import api_endpoint
 from models.requests.reports_consolidated_request import (
     EconomyReportRequest,
+    InfectionControlReportRequest,
     InterventionReportRequest,
     PatientDayReportRequest,
     PrescriptionReportRequest,
@@ -41,4 +42,13 @@ def get_economy_report():
 def get_intervention_report():
     return reports_consolidated_service.get_intervention_report(
         request_data=InterventionReportRequest(**request.get_json())
+    )
+
+
+@app_rpt_consolidated.route("/reports/consolidated/infection-control", methods=["POST"])
+@api_endpoint()
+def get_infection_control_report():
+    """Infection control report: indicators of a period, or the view of a day"""
+    return reports_consolidated_service.get_infection_control_report(
+        request_data=InfectionControlReportRequest(**request.get_json())
     )

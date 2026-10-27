@@ -51,3 +51,17 @@ class InterventionReportRequest(BaseModel):
     prescriber: Optional[list[str]] = None
     insurance: Optional[list[str]] = None
     reason: Optional[list[str]] = None
+
+
+class InfectionControlReportRequest(BaseModel):
+    """Filters of the infection control report: a period, or one day (day view)"""
+
+    year: int
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    id_department: Optional[list[int]] = None
+    segment: Optional[list[str]] = None
+    substance: Optional[list[int]] = None
+    aware_level: Optional[list[int]] = None
+    reviewer: Optional[list[int]] = None
+    day: Optional[date] = None
