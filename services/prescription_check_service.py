@@ -243,13 +243,14 @@ def _dispatch_presmed_checked(schema: str, id_user: int, id_prescription_list: l
         )
 
 
-def _update_agg_status(prescription: Prescription, user: User, extra={}):
+def get_agg_status_by_internals(agg_prescription: Prescription):
+    """Agg status from its internal prescriptions: "s" when all of them are checked"""
     is_pmc = memory_service.has_feature_nouser(FeatureEnum.PRIMARY_CARE.value)
-    is_cpoe = segment_service.is_cpoe(id_segment=prescription.idSegment)
+    is_cpoe = segment_service.is_cpoe(id_segment=agg_prescription.idSegment)
 
     unchecked_prescriptions = (
         prescription_view_repository.get_query_prescriptions_by_agg(
-            agg_prescription=prescription,
+            agg_prescription=agg_prescription,
             is_cpoe=is_cpoe,
             is_pmc=is_pmc,
             ignore_segments=segment_service.get_ignored_segments(is_cpoe_flag=is_cpoe),
@@ -266,7 +267,11 @@ def _update_agg_status(prescription: Prescription, user: User, extra={}):
     )
     unchecked_prescriptions = unchecked_prescriptions.filter(non_material_count > 0)
 
-    agg_status = "0" if unchecked_prescriptions.count() > 0 else "s"
+    return "0" if unchecked_prescriptions.count() > 0 else "s"
+
+
+def _update_agg_status(prescription: Prescription, user: User, extra={}):
+    agg_status = get_agg_status_by_internals(agg_prescription=prescription)
 
     agg_prescription = (
         db.session.query(Prescription)

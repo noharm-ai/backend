@@ -68,6 +68,11 @@ class FeatureEnum(Enum):
     DISABLE_CPOE = "DISABLE_CPOE"
     STAGING_ACCESS = "STAGING_ACCESS"
     AUTOMATIC_CHECK_IF_NOT_VALIDATED_ITENS = "AUTOMATIC_CHECK_IF_NOT_VALIDATED_ITENS"
+    # prescalc checks an individual prescription that only has diets
+    AUTOMATIC_CHECK_DIET_ONLY = "AUTOMATIC_CHECK_DIET_ONLY"
+    # prescalc checks an individual prescription whose drugs, solutions and
+    # procedures are all white list (linhabranca)
+    AUTOMATIC_CHECK_WHITELIST_ONLY = "AUTOMATIC_CHECK_WHITELIST_ONLY"
     REGULATION = "REGULATION"
     PATIENT_DAY_OUTPATIENT_FLOW = "PATIENT_DAY_OUTPATIENT_FLOW"
     # when schema is mixed (cpoe and non-cpoe segments), ignore non-cpoe segments in CPOE view

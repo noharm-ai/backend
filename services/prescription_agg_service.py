@@ -181,7 +181,24 @@ def create_agg_prescription_by_prescription(
     pAgg.aggDrugs = pAgg.features["drugIDs"]
     pAgg.aggDeps = pAgg.features["departmentList"]
 
-    if p.concilia is None and (pAgg.status == "s" or p.status == "s"):
+    automatic_check_reason = _get_automatic_check_reason(prescription=p)
+
+    if automatic_check_reason:
+        # nothing to validate: the prescription is checked and the agg is not
+        # made pending again
+        _automatic_check_by_prescription(
+            prescription=p,
+            agg_prescription=pAgg,
+            is_new_agg=is_new_prescription,
+            user_context=user_context,
+            extra={
+                "prescalc": True,
+                "processed_status": processed_status,
+                "automaticCheck": automatic_check_reason,
+                "prescalc_source": id_prescription,
+            },
+        )
+    elif p.concilia is None and (pAgg.status == "s" or p.status == "s"):
         prescalc_user = User()
         prescalc_user.id = 0
 
@@ -538,6 +555,93 @@ def _audit_create(prescription: Prescription):
     a.createdBy = 0
 
     db.session.add(a)
+
+
+# items that the pharmacist validates (the same ones the check audit counts)
+_VALIDATED_SOURCES = {
+    DrugTypeEnum.DRUG.value,
+    DrugTypeEnum.SOLUTION.value,
+    DrugTypeEnum.PROCEDURE.value,
+}
+# items that need no validation and may come along with the others
+_NOT_VALIDATED_SOURCES = {DrugTypeEnum.DIET.value, DrugTypeEnum.MATERIAL.value}
+
+
+def _get_automatic_check_reason(prescription: Prescription):
+    """Feature that makes prescalc check an individual prescription (None when none applies)
+
+    AUTOMATIC_CHECK_DIET_ONLY: only diets (materials may come along).
+    AUTOMATIC_CHECK_WHITELIST_ONLY: every drug, solution and procedure is white
+    list (diets and materials may come along).
+    """
+    diet_only = feature_service.has_feature(FeatureEnum.AUTOMATIC_CHECK_DIET_ONLY)
+    whitelist_only = feature_service.has_feature(
+        FeatureEnum.AUTOMATIC_CHECK_WHITELIST_ONLY
+    )
+
+    if not diet_only and not whitelist_only:
+        return None
+
+    items = prescalc_repository.get_items_source_and_whitelist(
+        id_prescription=prescription.id, id_segment=prescription.idSegment
+    )
+
+    validated = [i for i in items if i.source in _VALIDATED_SOURCES]
+    others = [i for i in items if i.source not in _VALIDATED_SOURCES]
+
+    if any(i.source not in _NOT_VALIDATED_SOURCES for i in others):
+        # unknown source: leave it to the pharmacist
+        return None
+
+    if (
+        diet_only
+        and not validated
+        and any(i.source == DrugTypeEnum.DIET.value for i in others)
+    ):
+        return FeatureEnum.AUTOMATIC_CHECK_DIET_ONLY.value
+
+    if whitelist_only and validated and all(i.whiteList for i in validated):
+        return FeatureEnum.AUTOMATIC_CHECK_WHITELIST_ONLY.value
+
+    return None
+
+
+def _automatic_check_by_prescription(
+    prescription: Prescription,
+    agg_prescription: Prescription,
+    is_new_agg: bool,
+    user_context: User,
+    extra: dict,
+):
+    """Checks an individual prescription that has nothing to validate.
+
+    The agg status is kept: a checked agg stays checked. A new agg is checked
+    when all of its prescriptions are checked.
+    """
+    if prescription.status != "s":
+        prescription.status = "s"
+        prescription.update = datetime.today()
+        prescription.user = user_context.id
+        prescription_check_service.audit_check(
+            prescription=prescription, user=user_context, extra=extra
+        )
+        db.session.flush()
+
+    if (
+        is_new_agg
+        and agg_prescription.status != "s"
+        and prescription_check_service.get_agg_status_by_internals(
+            agg_prescription=agg_prescription
+        )
+        == "s"
+    ):
+        agg_prescription.status = "s"
+        agg_prescription.user = user_context.id
+        prescription_check_service.audit_check(
+            prescription=agg_prescription,
+            user=user_context,
+            extra={**extra, "is_new_prescription": True},
+        )
 
 
 def _automatic_check(prescription: Prescription, features: dict, user_context: User):
