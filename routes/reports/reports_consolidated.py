@@ -48,7 +48,7 @@ def get_intervention_report():
 @app_rpt_consolidated.route("/reports/consolidated/infection-control", methods=["POST"])
 @api_endpoint()
 def get_infection_control_report():
-    """Infection control report: indicators of a period, or the view of a day"""
+    """Infection control report: indicators of a period, the view of a day, or a drill-down (admissions of a department, courses of an admission)"""
     return reports_consolidated_service.get_infection_control_report(
         request_data=InfectionControlReportRequest(**request.get_json())
     )
