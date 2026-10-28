@@ -159,8 +159,9 @@ def get_intervention_report(
 def get_infection_control_report(
     request_data: InfectionControlReportRequest, user_context: User
 ):
-    """The infection control report (indicators of a period, or the view of a
-    day), read by the private backend from the files long-running-tasks builds"""
+    """The infection control report (indicators of a period, the view of a day,
+    the admissions of a department or the courses of an admission), read by the
+    private backend from the files long-running-tasks builds"""
     if not feature_service.has_feature(FeatureEnum.INFECTION_CONTROL):
         raise ValidationError(
             "Controle de infecção não habilitado",
@@ -187,6 +188,8 @@ def get_infection_control_report(
         "aware_level": request_data.aware_level or None,
         "reviewer": request_data.reviewer or None,
         "day": request_data.day.isoformat() if request_data.day else None,
+        "admissions_of": request_data.admissions_of,
+        "courses_of": request_data.courses_of,
     }
 
     return _invoke_report_lambda(payload=payload, report_name="infection-control")

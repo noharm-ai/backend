@@ -54,7 +54,8 @@ class InterventionReportRequest(BaseModel):
 
 
 class InfectionControlReportRequest(BaseModel):
-    """Filters of the infection control report: a period, or one day (day view)"""
+    """Filters of the infection control report: a period, one day (day view), the
+    admissions of a department in the period or the courses of an admission"""
 
     year: int
     start_date: Optional[date] = None
@@ -65,3 +66,5 @@ class InfectionControlReportRequest(BaseModel):
     aware_level: Optional[list[int]] = None
     reviewer: Optional[list[int]] = None
     day: Optional[date] = None
+    admissions_of: Optional[int] = None
+    courses_of: Optional[int] = None

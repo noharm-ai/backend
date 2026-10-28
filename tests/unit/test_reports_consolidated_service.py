@@ -549,6 +549,8 @@ class TestInfectionControlReport:
             "aware_level": [1, 2],
             "reviewer": None,
             "day": None,
+            "admissions_of": None,
+            "courses_of": None,
         }
 
     def test_sends_the_day_of_the_day_view(self):
@@ -562,6 +564,20 @@ class TestInfectionControlReport:
                 )
 
         assert sent_payload(lambda_client)["day"] == "2026-10-26"
+
+    def test_sends_the_drill_down(self):
+        """O detalhamento envia o setor dos atendimentos e o atendimento dos cursos"""
+        with lambda_answering({}) as lambda_client:
+            with acting_as([Role.INFECTION_CONTROLLER.value]):
+                reports_consolidated_service.get_infection_control_report(
+                    request_data=InfectionControlReportRequest(
+                        year=2026, admissions_of=5, courses_of=12345
+                    )
+                )
+
+        payload = sent_payload(lambda_client)
+        assert payload["admissions_of"] == 5
+        assert payload["courses_of"] == 12345
 
     def test_requires_read_infection_control(self):
         """Sem READ_INFECTION_CONTROL a chamada é negada e a lambda não é chamada"""
