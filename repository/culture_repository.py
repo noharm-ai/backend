@@ -105,22 +105,6 @@ def get_culture_headers_of_exam(
     return db.session.execute(query).all()
 
 
-def get_cultures_collected(
-    id_patient: int, collected_since: datetime, collected_until: datetime
-) -> list:
-    """The patient's cultures collected between two dates, oldest first"""
-
-    query = (
-        select(CultureHeader.id, CultureHeader.idExamItem, CultureHeader.collectionDate)
-        .where(CultureHeader.idPatient == id_patient)
-        .where(CultureHeader.collectionDate >= collected_since)
-        .where(CultureHeader.collectionDate <= collected_until)
-        .order_by(CultureHeader.collectionDate, CultureHeader.id)
-    )
-
-    return db.session.execute(query).all()
-
-
 def get_microorganisms(id_exam_items: list[int]) -> dict[int, list[str]]:
     """The microorganisms the antibiogram rows (cultura) name for each exam
     item. A row with no microorganism is a prediction or a pending one."""

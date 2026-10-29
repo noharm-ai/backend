@@ -48,10 +48,7 @@ from services import (
     feature_service,
     intervention_service,
 )
-from services.infection_control import (
-    antimicrobial_timeline_service,
-    infection_control_summary_service,
-)
+from services.infection_control import antimicrobial_timeline_service
 from services.infection_control import (
     infection_control_status_service as rule,
 )
@@ -890,9 +887,6 @@ def backfill_summary(request_data: InfectionControlBackfillRequest, user_context
         if admission is None or admission.summary is None:
             continue
 
-        infection_control_summary_service.refresh_cultures(
-            admission=admission, schema=user_context.schema, now=now
-        )
         filled += 1
 
     return {
