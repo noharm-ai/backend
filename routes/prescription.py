@@ -9,6 +9,7 @@ from decorators.api_endpoint_decorator import api_endpoint
 from models.requests.interaction_trace_request import InteractionTraceRequest
 from models.requests.prioritization_request import PrioritizationRequest
 from services import (
+    allergy_service,
     interaction_trace_service,
     prescription_check_service,
     prescription_drug_service,
@@ -132,6 +133,13 @@ def trace_interaction():
     return interaction_trace_service.trace_interaction(
         request_data=InteractionTraceRequest(**request.args.to_dict(flat=True))
     )
+
+
+@app_pres.route("/prescriptions/<int:id_prescription>/allergy-records", methods=["GET"])
+@api_endpoint()
+def list_allergy_records(id_prescription: int):
+    """Every allergy record of the prescription's patient, for maintainers"""
+    return allergy_service.list_allergy_records(id_prescription=id_prescription)
 
 
 @app_pres.route("/prescriptions/<int:idPrescription>", methods=["GET"])
