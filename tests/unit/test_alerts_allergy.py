@@ -231,7 +231,11 @@ def test_find_alerts_without_records_keeps_the_flag():
     assert len(_allergy_alerts(rows, None).get("83", [])) == 1
 
 
-ListedRecord = namedtuple("ListedRecord", "name active createdAt")
+ListedRecord = namedtuple(
+    "ListedRecord",
+    "name active createdAt drugId drugName substance",
+    defaults=(None, None, None),
+)
 
 
 def test_the_listed_records_are_one_per_name_dated_by_the_latest():
@@ -251,9 +255,50 @@ def test_the_listed_records_are_one_per_name_dated_by_the_latest():
     )
 
     assert listed == [
-        {"date": "2026-02-01T00:00:00", "text": "Dipirona", "source": "pep"},
-        {"date": "2026-03-01T00:00:00", "text": "Sulfa", "source": "pep"},
+        {
+            "date": "2026-02-01T00:00:00",
+            "text": "Dipirona",
+            "source": "pep",
+            "drugNames": [],
+            "hasSubstance": False,
+        },
+        {
+            "date": "2026-03-01T00:00:00",
+            "text": "Sulfa",
+            "source": "pep",
+            "drugNames": [],
+            "hasSubstance": False,
+        },
     ]
+
+
+def test_a_substance_from_the_record_name_lists_the_recorded_names():
+    """Without a medicamento record the substance came from the recorded name,
+    so that name is listed too; with one, only the substance is"""
+    date = datetime(2026, 1, 1)
+    listed = prescription_view_service._list_allergy_records(
+        allergies=[
+            # substance of the record's own name
+            ListedRecord("Dipirona", True, date, None, "DIPIRONA GOTAS", "Dipirona"),
+            ListedRecord("Dipirona", True, date, None, "NOVALGINA ", "Dipirona"),
+            # the same name as the substance adds nothing
+            ListedRecord("Dipirona", True, date, None, "DIPIRONA", "Dipirona"),
+            # a drug record: the substance is the drug's
+            ListedRecord("Dipirona", True, date, 501, "DIPIRONA 1G", "Dipirona"),
+            ListedRecord("Dipirona", False, date, None, "INATIVA", "Dipirona"),
+            # no substance: the name listed is the recorded one
+            ListedRecord("CONTRASTE IODADO", True, date, None, "CONTRASTE IODADO"),
+        ]
+    )
+
+    assert {item["text"]: item["drugNames"] for item in listed} == {
+        "CONTRASTE IODADO": [],
+        "Dipirona": ["DIPIRONA GOTAS", "NOVALGINA"],
+    }
+    assert {item["text"]: item["hasSubstance"] for item in listed} == {
+        "CONTRASTE IODADO": False,
+        "Dipirona": True,
+    }
 
 
 def test_the_listed_records_are_cut_at_the_limit():
