@@ -6,6 +6,7 @@ from flask import Blueprint, request
 from markupsafe import escape as escape_html
 
 from decorators.api_endpoint_decorator import api_endpoint
+from models.requests.allergy_request import AllergySubstanceRequest
 from models.requests.interaction_trace_request import InteractionTraceRequest
 from models.requests.prioritization_request import PrioritizationRequest
 from services import (
@@ -140,6 +141,15 @@ def trace_interaction():
 def list_allergy_records(id_prescription: int):
     """Every allergy record of the prescription's patient, for maintainers"""
     return allergy_service.list_allergy_records(id_prescription=id_prescription)
+
+
+@app_pres.route("/allergy-records/substance", methods=["PUT"])
+@api_endpoint()
+def update_allergy_substance():
+    """Set the substance of the allergy records of a drug name, for maintainers"""
+    return allergy_service.update_allergy_substance(
+        request_data=AllergySubstanceRequest(**request.get_json())
+    )
 
 
 @app_pres.route("/prescriptions/<int:idPrescription>", methods=["GET"])

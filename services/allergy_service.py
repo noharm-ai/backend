@@ -2,9 +2,10 @@
 
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
-from models.main import db
+from models.main import Drug, Substance, User, db
 from models.prescription import Prescription
-from repository import allergy_repository
+from models.requests.allergy_request import AllergySubstanceRequest
+from repository import allergy_repository, culture_drug_repository
 from utils import dateutils, status
 
 
@@ -45,6 +46,63 @@ def list_allergy_records(id_prescription: int):
         }
         for record in records
     ]
+
+
+@has_permission(Permission.MAINTAINER)
+def update_allergy_substance(
+    request_data: AllergySubstanceRequest, user_context: User = None
+):
+    """Set the substance of the allergy records of a drug name without a
+    medicamento record: every record, of every patient, with the same
+    fkmedicamento and nome_medicamento. Without sctid the substance is
+    removed. Returns the updated row count.
+
+    The drug name -> sctid mapping (DynamoDB) is updated too. backend-private
+    fills alergia.sctid of new records from it and rewrites every record of the
+    name created in the last hours that differs, so without it the fix would
+    be undone by the next record of the name"""
+
+    if (
+        request_data.idDrug is not None
+        and db.session.get(Drug, request_data.idDrug) is not None
+    ):
+        raise ValidationError(
+            "O registro possui medicamento cadastrado: a substância vem do medicamento",
+            "errors.invalidParams",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    substance = None
+    if request_data.sctid is not None:
+        substance = db.session.get(Substance, request_data.sctid)
+        if substance is None:
+            raise ValidationError(
+                "Substância não encontrada",
+                "errors.notFound",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+    count = allergy_repository.update_sctid(
+        id_drug=request_data.idDrug,
+        drug_name=request_data.drugName,
+        sctid=substance.id if substance else None,
+        id_user=user_context.id,
+    )
+    if count == 0:
+        raise ValidationError(
+            "Registro inexistente", "errors.invalidRecord", status.HTTP_400_BAD_REQUEST
+        )
+
+    # a blank name has no mapping (backend-private skips blank names too)
+    if request_data.drugName and request_data.drugName.strip():
+        # after the update: a failure here rolls it back
+        culture_drug_repository.put_sctid(
+            name=request_data.drugName,
+            sctid=substance.id if substance else None,
+            idclass=substance.idclass if substance else None,
+        )
+
+    return {"updated": count}
 
 
 def _to_str(value):

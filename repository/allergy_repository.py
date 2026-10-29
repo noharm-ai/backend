@@ -1,6 +1,8 @@
 """Repository: patient allergies (alergia)"""
 
-from sqlalchemy import desc, func, nullslast
+from datetime import datetime
+
+from sqlalchemy import desc, func, nullslast, update
 from sqlalchemy.orm import aliased
 
 from models.main import Allergy, Drug, Substance, db
@@ -62,3 +64,19 @@ def list_allergy_records(id_patient: int):
         .order_by(desc(Allergy.active), nullslast(desc(Allergy.createdAt)))
         .all()
     )
+
+
+def update_sctid(
+    id_drug: int | None, drug_name: str | None, sctid: int | None, id_user: int
+):
+    """Set (or remove, with no sctid) the substance of every allergy record (of
+    every patient) with the given fkmedicamento and nome_medicamento, returning
+    the row count"""
+
+    return db.session.execute(
+        update(Allergy)
+        .where(Allergy.idDrug.is_not_distinct_from(id_drug))
+        .where(Allergy.drugName.is_not_distinct_from(drug_name))
+        .values(sctid=sctid, updatedAt=datetime.now(), updatedBy=id_user)
+        .execution_options(synchronize_session=False)
+    ).rowcount
