@@ -46,7 +46,11 @@ def _clear_null_drug_records():
     """Rows without fkmedicamento escape the cleanup of the seed fixture."""
     yield
     session.execute(
-        text("DELETE FROM demo.alergia WHERE nome_medicamento LIKE 'ZZTest%'")
+        text(
+            "DELETE FROM demo.alergia WHERE nome_medicamento LIKE 'ZZTest%' "
+            "OR (fkpessoa = :other_patient AND fkmedicamento IS NULL)"
+        ),
+        {"other_patient": _OTHER_PATIENT},
     )
     session_commit()
 
@@ -283,6 +287,23 @@ def test_a_record_without_name_is_not_mapped(client, curator_headers, mapping_wr
 
     assert response.status_code == 200, response.get_json()
     assert _sctids(_DANGLING_DRUG, None) == {_SEED_PATIENT: _SUBSTANCE_B[0]}
+    assert mapping_writes == []
+
+
+@pytest.mark.parametrize("body", [{}, {"drugName": "  "}])
+def test_a_request_without_drug_or_name_is_refused(
+    client, curator_headers, mapping_writes, body
+):
+    """It would match every record with no drug and no name."""
+    _register_record(None, None, None, id_patient=_OTHER_PATIENT)
+    _register_record(None, "  ", None, id_patient=_OTHER_PATIENT)
+
+    response = _set_substance(client, curator_headers, sctid=_SUBSTANCE_B[0], **body)
+
+    assert response.status_code == 400
+    assert response.get_json()["message"] == "Informe o medicamento ou o nome do registro"
+    assert _sctids(None, None)[_OTHER_PATIENT] is None
+    assert _sctids(None, "  ")[_OTHER_PATIENT] is None
     assert mapping_writes == []
 
 

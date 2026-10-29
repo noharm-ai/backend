@@ -62,6 +62,16 @@ def update_allergy_substance(
     name created in the last hours that differs, so without it the fix would
     be undone by the next record of the name"""
 
+    # without both, the update would match every record with no drug and no name
+    if request_data.idDrug is None and not (
+        request_data.drugName and request_data.drugName.strip()
+    ):
+        raise ValidationError(
+            "Informe o medicamento ou o nome do registro",
+            "errors.invalidParams",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
     if (
         request_data.idDrug is not None
         and db.session.get(Drug, request_data.idDrug) is not None
