@@ -4,14 +4,9 @@ written only when it changes"""
 
 from datetime import datetime, timedelta
 
-import pytest
 from sqlalchemy import inspect, text
 
-from models.enums import (
-    CultureResultTypeEnum,
-    InfectionControlOriginEnum,
-    InfectionControlStatusEnum,
-)
+from models.enums import InfectionControlOriginEnum, InfectionControlStatusEnum
 from models.infection_control import InfectionControlAdmission
 from models.main import db, dbSession
 from services.infection_control import (
@@ -23,7 +18,6 @@ from tests.integration.infection_control.helpers import (
     ANTIMICROBIAL_DRUG,
     CLOSED,
     CPOE_SEGMENT,
-    PATIENT_ID,
     PENDING,
     _day,
     _discharge,
@@ -37,27 +31,17 @@ from tests.integration.infection_control.helpers import (
 from utils import status
 from utils.static_context import static_user_context
 
-# dedicated ids so the rows never collide with seed data or other tests
-FIRST_CULTURE = 900301
-TEST_SUBSTANCE = 10301
-MICROORGANISM = "Escherichia coli teste"
 
-
-def _sync(admission_number, now=None, cultures=False):
-    """Apply the rule to the admission at `now`, as the scheduled job does,
-    refreshing the culture facts of the summary when asked"""
+def _sync(admission_number, now=None):
+    """Apply the rule to the admission at `now`, as the scheduled job does"""
     with static_user_context("demo"):
         dbSession.setSchema("demo")
-        admission = infection_control_status_service.sync_admission(
+        infection_control_status_service.sync_admission(
             admission_number=admission_number,
             origin=InfectionControlOriginEnum.JOB,
             user_id=0,
             now=now,
         )
-        if cultures and admission is not None:
-            infection_control_summary_service.refresh_cultures(
-                admission=admission, schema="demo", now=now
-            )
         db.session.commit()
         db.session.remove()
     session_commit()
@@ -66,82 +50,6 @@ def _sync(admission_number, now=None, cultures=False):
 def _summary(admission_number):
     record = _record(admission_number)
     return record["resumo_acompanhamento"] if record else None
-
-
-@pytest.fixture
-def culture():
-    """A culture of the test patient collected yesterday, with an antibiogram
-    naming a microorganism"""
-    session.execute(
-        text(
-            "INSERT INTO demo.cultura_cabecalho "
-            "(idculturacab, fkpessoa, fkexame, fkitemexame, nomeexame, nomematerial, "
-            " dtcoleta, dtliberacao) "
-            "VALUES (:id, :patient, :id, :id, 'HEMOCULTURA TESTE', 'SANGUE TESTE', "
-            " :collected, :released)"
-        ),
-        {
-            "id": FIRST_CULTURE,
-            "patient": PATIENT_ID,
-            "collected": _day(-1),
-            "released": _day(0),
-        },
-    )
-    session.execute(
-        text(
-            "INSERT INTO demo.cultura "
-            "(fkexame, fkitemexame, fkmedicamento, nomemedicamento, "
-            " nomemicroorganismo, resultado) "
-            "VALUES (:id, :id, 1, 'AMPICILINA TESTE', :microorganism, 'R')"
-        ),
-        {"id": FIRST_CULTURE, "microorganism": MICROORGANISM},
-    )
-    session_commit()
-
-    yield FIRST_CULTURE
-
-    session.execute(
-        text("DELETE FROM demo.cultura WHERE fkitemexame >= :first"),
-        {"first": FIRST_CULTURE},
-    )
-    session.execute(
-        text("DELETE FROM demo.cultura_cabecalho WHERE idculturacab >= :first"),
-        {"first": FIRST_CULTURE},
-    )
-    session_commit()
-
-
-@pytest.fixture
-def antimicrobial_substance():
-    """Give the antimicrobial drug a substance, as the culture summary keys
-    resistance by substance"""
-    original = session.execute(
-        text("SELECT sctid FROM demo.medicamento WHERE fkmedicamento = :id"),
-        {"id": ANTIMICROBIAL_DRUG},
-    ).scalar()
-    session.execute(
-        text(
-            "INSERT INTO public.substancia (sctid, nome) VALUES (:id, 'SUBSTANCIA TESTE')"
-        ),
-        {"id": TEST_SUBSTANCE},
-    )
-    session.execute(
-        text("UPDATE demo.medicamento SET sctid = :sctid WHERE fkmedicamento = :id"),
-        {"sctid": TEST_SUBSTANCE, "id": ANTIMICROBIAL_DRUG},
-    )
-    session_commit()
-
-    yield TEST_SUBSTANCE
-
-    session.execute(
-        text("UPDATE demo.medicamento SET sctid = :sctid WHERE fkmedicamento = :id"),
-        {"sctid": original, "id": ANTIMICROBIAL_DRUG},
-    )
-    session.execute(
-        text("DELETE FROM public.substancia WHERE sctid = :id"),
-        {"id": TEST_SUBSTANCE},
-    )
-    session_commit()
 
 
 def test_summary_written_on_first_run(infection_control, admission):
@@ -175,6 +83,27 @@ def test_summary_not_rewritten_without_changes(infection_control, admission):
     _sync(admission, now=datetime.now() + timedelta(minutes=30))
 
     assert _summary(admission)["savedAt"] == first["savedAt"]
+
+
+def test_culture_facts_of_an_older_summary_are_dropped(infection_control, admission):
+    """A summary saved while the job still refreshed the cultures loses them
+    on the next run: the report no longer reads them"""
+    _prescribe_today(admission)
+    session.execute(
+        text(
+            "UPDATE demo.ci_atendimento "
+            "SET resumo_acompanhamento = resumo_acompanhamento "
+            "|| CAST(:culture AS jsonb) "
+            "WHERE nratendimento = :admission"
+        ),
+        {"admission": admission, "culture": '{"culture": {"collected": 1}}'},
+    )
+    session_commit()
+    assert "culture" in _summary(admission)
+
+    _sync(admission, now=datetime.now() + timedelta(minutes=30))
+
+    assert "culture" not in _summary(admission)
 
 
 def test_running_cpoe_course_not_rewritten_every_hour(
@@ -279,67 +208,6 @@ def test_summary_matches_the_timeline(
     ]
 
 
-def test_cultures_refreshed_only_when_stale(infection_control, admission, culture):
-    """The culture facts are read when missing and again only after
-    CULTURE_REFRESH"""
-    _prescribe_today(admission, job=False)
-    now = datetime.now()
-    _sync(admission, now=now, cultures=True)
-
-    facts = _summary(admission)["culture"]
-    assert facts["checkedAt"] == now.isoformat()
-    assert facts["collected"] >= 1
-    assert MICROORGANISM in facts["microorganisms"]
-    assert facts["byCourse"]["1"]["collectedBefore"] is True
-    assert facts["byCourse"]["1"]["collectedAt"] == _day(-1).isoformat()
-
-    _sync(admission, now=now + timedelta(hours=1), cultures=True)
-    assert _summary(admission)["culture"]["checkedAt"] == now.isoformat()
-
-    later = now + infection_control_summary_service.CULTURE_REFRESH
-    _sync(admission, now=later, cultures=True)
-    assert _summary(admission)["culture"]["checkedAt"] == later.isoformat()
-
-
-def test_resistant_release_while_running(
-    monkeypatch, infection_control, antimicrobial_substance, admission
-):
-    """A resistant antibiogram of the course's substance released while it
-    runs is kept on the course, read as the cultureResistant alert reads it"""
-    released = _day(0)
-    monkeypatch.setattr(
-        infection_control_summary_service.feature_service,
-        "has_feature",
-        lambda feature: True,
-    )
-    monkeypatch.setattr(
-        infection_control_summary_service.culture_service,
-        "get_culture_summary",
-        lambda schema, id_patient: [
-            {
-                "drug": "AMPICILINA TESTE",
-                "sctid": antimicrobial_substance,
-                "items": [
-                    {
-                        "result": "R",
-                        "resultType": CultureResultTypeEnum.RESISTANT.value,
-                        "releaseDate": released.isoformat(),
-                    }
-                ],
-            }
-        ],
-    )
-    _prescribe_today(admission, job=False)
-
-    _sync(admission, cultures=True)
-
-    summary = _summary(admission)
-    assert summary["courses"][0]["idSubstance"] == antimicrobial_substance
-    assert summary["culture"]["byCourse"]["1"]["resistantReleasedAt"] == [
-        released.isoformat()
-    ]
-
-
 def test_summary_is_not_loaded_with_the_record(infection_control, admission):
     """The worklist loads records without the summary (deferred column)"""
     _prescribe_today(admission)
@@ -370,7 +238,7 @@ def test_backfill_summary_fills_closed_admission(
     client, admin_utils_headers, infection_control, admission
 ):
     """A closed admission without a summary (closed before it existed) gets
-    one from its courses, with the culture facts"""
+    one from its courses"""
     _suspend(_prescribe_today(admission))
     _sync(admission)
     session.execute(
@@ -394,5 +262,4 @@ def test_backfill_summary_fills_closed_admission(
     summary = _summary(admission)
     assert summary["status"] == CLOSED
     assert summary["courses"][0]["ongoing"] is False
-    assert "checkedAt" in summary["culture"]
     assert _record(admission)["tp_status"] == CLOSED
