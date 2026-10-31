@@ -68,7 +68,8 @@ def test_summary_written_on_first_run(infection_control, admission):
     assert course["endedBy"] is None
     assert course["coveredUntil"] == datetime.now().date().isoformat()
     assert course["start"] == _day(-1).isoformat()
-    assert course["treatmentDays"] == 2
+    # the course started yesterday at 08:00: D2 begins only at 08:00 today
+    assert course["treatmentDays"] == (2 if datetime.now() >= _day(0) else 1)
     assert [r["dose"] for r in course["regimens"]] == [2.0]
     assert summary["days"]
     assert summary["days"][-1]["idDepartment"] is not None
