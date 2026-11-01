@@ -20,7 +20,9 @@ apply_rule writes the plan; a saved review also records its evaluations here
 * with nothing running (or after discharge) the record is closed.
 
 Each time it also keeps on the record what it saw (admission_features): the
-worklist filters by it without going through the prescriptions.
+worklist filters by it without going through the prescriptions. And it keeps
+the summary the infection control report reads (resumo_acompanhamento, see
+infection_control_summary_service).
 
 Prescalc runs many times a day, so it doesn't apply the rule: it only
 follows the admissions that start (or restart) an antimicrobial, and the
@@ -56,6 +58,7 @@ from repository.infection_control import (
     infection_control_repository,
 )
 from services import feature_service
+from services.infection_control import infection_control_summary_service
 from services.infection_control.antimicrobial_timeline_service import (
     GAP_TOLERANCE,
     Course,
@@ -643,6 +646,10 @@ def apply_rule(
         )
     )
     admission.recalculated_at = now
+    # what the infection control report reads of the admission
+    infection_control_summary_service.update_summary(
+        admission=admission, admission_courses=admission_courses, status=plan.status
+    )
     db.session.flush()
 
 

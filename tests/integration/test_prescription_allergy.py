@@ -250,3 +250,40 @@ def test_the_screen_lists_the_active_allergy_records(client, analyst_headers):
         _SUBSTANCE_A[1],
         _SUBSTANCE_ALLERGEN[1],
     ]
+    has_substance = {
+        a["text"]: a["hasSubstance"]
+        for a in payload["notesAllergies"]
+        if a["source"] == "pep"
+    }
+    # recorded by name only: no substance
+    assert has_substance["ZZTest Alergia Sem Cadastro"] is False
+    assert has_substance[_SUBSTANCE_A[1]] is True
+    assert has_substance[_SUBSTANCE_ALLERGEN[1]] is True
+
+
+def test_a_substance_from_the_recorded_name_lists_that_name(client, analyst_headers):
+    """Without a medicamento record the substance came from the recorded name,
+    so the screen shows that name next to the substance; a record of a drug
+    adds only the substance"""
+    _register_allergy(_SEED_PATIENT, _DRUG_A[0])
+    session.execute(
+        text(
+            "INSERT INTO demo.alergia "
+            "(fkpessoa, fkmedicamento, nome_medicamento, sctid, ativo, "
+            "created_at, created_by) "
+            "VALUES (:id_patient, :code, :name, :sctid, true, now(), 1)"
+        ),
+        {
+            "id_patient": _SEED_PATIENT,
+            "code": _UNMAPPED_CODE,
+            "name": "ZZTest Nome Registrado",
+            "sctid": _SUBSTANCE_A[0],
+        },
+    )
+    session_commit()
+    id_prescription, _ = _create([{"idDrug": _DRUG_A[0]}])
+
+    payload = _view(client, analyst_headers, id_prescription)
+
+    (listed,) = [a for a in payload["notesAllergies"] if a["text"] == _SUBSTANCE_A[1]]
+    assert listed["drugNames"] == ["ZZTest Nome Registrado"]

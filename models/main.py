@@ -280,6 +280,8 @@ class Allergy(db.Model):
     sctid = db.Column("sctid", db.BigInteger, nullable=True)
     active = db.Column("ativo", db.Boolean, nullable=False)
     createdAt = db.Column("created_at", db.DateTime, nullable=True)
+    updatedAt = db.Column("updated_at", db.DateTime, nullable=True)
+    updatedBy = db.Column("updated_by", db.BigInteger, nullable=True)
 
 
 class Outlier(db.Model):

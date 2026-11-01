@@ -716,12 +716,30 @@ def _get_clinical_notes_stats(
 def _list_allergy_records(allergies: list) -> list:
     """The active allergy records of the patient as the screen lists them: one
     per name, alphabetical, dated by its latest record. Only information (the
-    alert reads every record), so the list is cut at _ALLERGY_RECORDS_LIMIT"""
+    alert reads every record), so the list is cut at _ALLERGY_RECORDS_LIMIT.
+
+    A substance resolved from the record's own name (no medicamento record)
+    lists that name too (drugNames), so the screen shows what was recorded.
+    hasSubstance is false for a name no record resolved to a substance"""
     latest = {}
+    drug_names = {}
+    with_substance = set()
     for record in allergies:
         name = record.name.strip() if record.name else ""
         if not record.active or not name:
             continue
+
+        if record.substance:
+            with_substance.add(name)
+
+        drug_name = record.drugName.strip() if record.drugName else ""
+        if (
+            record.drugId is None
+            and record.substance
+            and drug_name
+            and drug_name.upper() != name.upper()
+        ):
+            drug_names.setdefault(name, set()).add(drug_name)
 
         current = latest.get(name)
         if current is None or (
@@ -735,6 +753,8 @@ def _list_allergy_records(allergies: list) -> list:
             "date": dateutils.to_iso(latest[name].createdAt),
             "text": name,
             "source": "pep",
+            "drugNames": sorted(drug_names.get(name, [])),
+            "hasSubstance": name in with_substance,
         }
         for name in sorted(latest)[:_ALLERGY_RECORDS_LIMIT]
     ]

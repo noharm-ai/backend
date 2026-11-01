@@ -163,6 +163,37 @@ def get_last_prescription_day_id(admission_number: int) -> int | None:
     )
 
 
+def get_prescription_days(admission_number: int, since: datetime) -> list:
+    """The prescription-days of an admission from `since` on, oldest first,
+    with the department and segment the patient was in"""
+    return (
+        db.session.query(
+            Prescription.date,
+            Prescription.idDepartment.label("id_department"),
+            Prescription.idSegment.label("id_segment"),
+        )
+        .filter(Prescription.admissionNumber == admission_number)
+        .filter(Prescription.agg == True)
+        .filter(Prescription.date >= since)
+        .order_by(Prescription.date, Prescription.id)
+        .all()
+    )
+
+
+def get_summary_backfill_candidates(after: int, limit: int) -> list[int]:
+    """Followed admissions without a summary yet, in admission number order
+    starting after `after`"""
+    return [
+        row.admission_number
+        for row in db.session.query(InfectionControlAdmission.admission_number)
+        .filter(InfectionControlAdmission.summary == None)
+        .filter(InfectionControlAdmission.admission_number > after)
+        .order_by(InfectionControlAdmission.admission_number)
+        .limit(limit)
+        .all()
+    ]
+
+
 def open_pending(
     admission_number: int,
     pending_type: int,
