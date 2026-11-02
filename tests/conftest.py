@@ -125,9 +125,6 @@ def _cleanup():
         text("DELETE FROM demo.prescricao_evolucao WHERE fkprescricao = 20")
     )
 
-    # Admin global-memory test records (reserved kind prefix, includes _bkp rows)
-    session.execute(text("DELETE FROM public.memoria WHERE tipo LIKE 'zztest-gm%'"))
-
     # Daily activity counters of the synthetic users (ids >= 99900) used by
     # test_user_activity.py; the real users' rows are left alone because the
     # whole suite writes to them on every login

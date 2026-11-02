@@ -64,7 +64,6 @@ class Role(Enum):
             Permission.WRITE_TAGS,
             Permission.READ_PROTOCOLS,
             Permission.WRITE_PROTOCOLS,
-            Permission.ADMIN_NZERO,
             Permission.UPDATE_USER_SG,
             Permission.READ_NAV,
             Permission.WRITE_CUSTOM_FORMS,

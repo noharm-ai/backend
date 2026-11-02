@@ -400,8 +400,6 @@ All endpoints in this section require administrator-level authorization.
 |---|---|---|
 | `POST` | `/admin/memory/list` | List admin memory records. |
 | `PUT` | `/admin/memory` | Create or update an admin memory record. |
-| `POST` | `/admin/global-memory/list` | List global memory entries. |
-| `POST` | `/admin/global-memory/update` | Update a global memory entry. |
 
 ### Knowledge Base
 
