@@ -14,9 +14,8 @@ drug can be scored at all:
 * ``remove_outlier`` (``POST /outliers/generate/remove-outlier/<segment>/<drug>``)
   — drops a drug's outliers, but only while it has no prescription history.
 
-Only the drug-scoped operations are exercised: the segment-wide entry points
-(``refresh-agg``, ``generate/segment``) invoke AWS Lambda and would rebuild
-every outlier in the segment, which other tests read from.
+The Lambda-backed ``single`` entry point is covered in
+``test_outlier_generate_scores.py``.
 
 All fixtures use the reserved ``>= 90000`` id range so ``clean_test_artifacts``
 removes them, and prescriptions come from ``test_counters`` (ids >= 100000).

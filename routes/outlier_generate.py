@@ -6,23 +6,6 @@ from services import drug_service, outlier_service
 app_gen = Blueprint("app_gen", __name__)
 
 
-@app_gen.route("/outliers/generate/refresh-agg", methods=["GET"])
-@api_endpoint()
-def refresh_agg():
-    """Recalculate prescricaoagg data"""
-    return outlier_service.refresh_agg()
-
-
-@app_gen.route("/outliers/generate/segment", methods=["POST"])
-@api_endpoint()
-def generate_segment_scores():
-    data = request.get_json()
-
-    return outlier_service.generate_segment_scores(
-        id_segment=data.get("idSegment", None),
-    )
-
-
 @app_gen.route(
     "/outliers/generate/add-history/<int:id_segment>/<int:id_drug>", methods=["POST"]
 )
