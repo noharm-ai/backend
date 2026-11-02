@@ -30,6 +30,16 @@ MIN_UPSTREAM_TIMEOUT = 1
 MAX_MULTIPLE_IDS = 5000
 MAX_SEARCH_RESULTS = 150
 EXTRA_DATA_ALLOWED_KEYS = {"fone"}
+# What a name lookup turns into a placeholder instead of raising: the upstream
+# failing (network, timeout, OAuth token refused) or answering in an unexpected
+# shape (non-JSON body, missing keys).
+_LOOKUP_ERRORS = (
+    requests.exceptions.RequestException,
+    ValidationError,
+    KeyError,
+    TypeError,
+    ValueError,
+)
 
 
 class NameServiceStrategy(ABC):
@@ -301,7 +311,7 @@ class NHInternalNameService(NameServiceStrategy):
             )
             logger.backend_logger.warning(f"URL: {url}, Params: {params}")
 
-        except requests.exceptions.RequestException as e:
+        except _LOOKUP_ERRORS as e:
             logger.backend_logger.warning(
                 f"NH Internal service request error for schema {self.schema}: {str(e)}"
             )
@@ -348,7 +358,7 @@ class NHInternalNameService(NameServiceStrategy):
                     f"NH Internal multiple service warning: {response.status_code} for schema {self.schema}"
                 )
 
-        except requests.exceptions.RequestException as e:
+        except _LOOKUP_ERRORS as e:
             logger.backend_logger.warning(
                 f"NH Internal multiple service request warning for schema {self.schema}: {str(e)}"
             )
@@ -442,9 +452,9 @@ class ExternalNameService(NameServiceStrategy):
         url = self._get_url()
         auth_prefix = self.config["getname"].get("authPrefix", "")
         params = dict(self.config["getname"]["params"], **{"cd_paciente": id_patient})
-        token = self._get_token()
 
         try:
+            token = self._get_token()
             response = requests.get(
                 url,
                 headers={"Authorization": f"{auth_prefix}{token}"},
@@ -468,7 +478,7 @@ class ExternalNameService(NameServiceStrategy):
             )
             logger.backend_logger.warning(f"URL: {url}, Params: {params}")
 
-        except requests.exceptions.RequestException as e:
+        except _LOOKUP_ERRORS as e:
             logger.backend_logger.warning(
                 f"External service request warning for schema {self.schema}: {str(e)}"
             )
@@ -478,7 +488,6 @@ class ExternalNameService(NameServiceStrategy):
     def get_multiple_names(self, ids_list: list, deadline: float | None = None) -> list:
         url = self._get_url()
         auth_prefix = self.config["getname"].get("authPrefix", "")
-        token = self._get_token(deadline=deadline)
         params = dict(
             self.config["getname"]["params"],
             **{"cd_paciente": " ".join(str(id) for id in ids_list)},
@@ -488,6 +497,8 @@ class ExternalNameService(NameServiceStrategy):
         found = []
 
         try:
+            # the token call fails like the data call: placeholders, not an exception
+            token = self._get_token(deadline=deadline)
             response = requests.get(
                 url,
                 headers={"Authorization": f"{auth_prefix}{token}"},
@@ -512,7 +523,7 @@ class ExternalNameService(NameServiceStrategy):
                     f"External multiple service warning: {response.status_code} for schema {self.schema}"
                 )
 
-        except requests.exceptions.RequestException as e:
+        except _LOOKUP_ERRORS as e:
             logger.backend_logger.warning(
                 f"External multiple service request warning for schema {self.schema}: {str(e)}"
             )
@@ -564,7 +575,7 @@ class GetNameProxyService(ExternalNameService):
             )
             logger.backend_logger.warning(f"URL: {url}, Params: {params}")
 
-        except requests.exceptions.RequestException as e:
+        except _LOOKUP_ERRORS as e:
             logger.backend_logger.warning(
                 f"Proxy service request warning for schema {self.schema}: {str(e)}"
             )
@@ -606,7 +617,7 @@ class GetNameProxyService(ExternalNameService):
                     f"Proxy multiple service warning: {response.status_code} for schema {self.schema}"
                 )
 
-        except requests.exceptions.RequestException as e:
+        except _LOOKUP_ERRORS as e:
             logger.backend_logger.warning(
                 f"Proxy multiple service request warning for schema {self.schema}: {str(e)}"
             )

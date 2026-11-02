@@ -61,7 +61,9 @@ def proxy_multiple():
         logger.backend_logger.warning(
             f"Warning getting multiple patient names: {str(e)}", exc_info=True
         )
-        return [], status.HTTP_500_INTERNAL_SERVER_ERROR
+        # ids are omitted, not answered with placeholders: a placeholder means
+        # "not found", an omitted id is retried by the frontend
+        return [], status.HTTP_200_OK
 
 
 @app_names.route("/names/auth-token", methods=["GET"])
