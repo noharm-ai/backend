@@ -394,13 +394,6 @@ All endpoints in this section require administrator-level authorization.
 | `POST` | `/admin/tag/list` | List all tags. |
 | `POST` | `/admin/tag/upsert` | Create or update a tag. |
 
-### Memory & Configuration
-
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/admin/memory/list` | List admin memory records. |
-| `PUT` | `/admin/memory` | Create or update an admin memory record. |
-
 ### Knowledge Base
 
 | Method | Path | Description |
