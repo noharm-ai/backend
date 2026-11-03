@@ -1,4 +1,5 @@
-"""Integration tests for the prioritization filters of ``GET /prescriptions``.
+"""Integration tests for the prioritization filters of ``GET /prescriptions``
+(and ``POST /prescriptions``, which takes the same filters as a JSON body).
 
 The pharmacist work queue is a single query built by
 ``prioritization_repository._build_base_query``: every panel filter of the
@@ -609,6 +610,55 @@ class TestDateWindow:
         )
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+class TestJsonBody:
+    """POST takes the filters as a JSON body: a long list of filters made the
+    GET URL too long for the server (414 Request-URI Too Large)"""
+
+    def _post_ids(self, client, headers, body: dict):
+        """Prescription ids returned by the prioritization list posted as JSON."""
+        response = client.post(
+            "/prescriptions",
+            json={"startDate": _DATE_PARAM, **body},
+            headers=headers,
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+
+        return {int(item["idPrescription"]) for item in response.get_json()["data"]}
+
+    def test_post_filters_as_get_does(self, client, analyst_headers):
+        """lists, booleans and nulls read as the query string reads them"""
+        assert self._post_ids(client, analyst_headers, {}) == {_MATCH, _OTHER}
+        assert self._post_ids(
+            client,
+            analyst_headers,
+            {"idSegment": [1, 2], "idDrug": [3, 4], "allDrugs": True, "bed": None},
+        ) == {_MATCH}
+        assert self._post_ids(client, analyst_headers, {"agg": 1}) == {
+            _AGG_PENDING,
+            _AGG_REVIEWED,
+        }
+        assert self._post_ids(client, analyst_headers, {"idSegment": [2]}) == set()
+
+    def test_post_takes_a_list_too_long_for_a_url(self, client, analyst_headers):
+        """thousands of ids fit in the body"""
+        assert self._post_ids(
+            client,
+            analyst_headers,
+            {"idDrug": [3, 5, *range(1_000_000, 1_005_000)], "endDate": "all"},
+        ) == {_MATCH, _OTHER}
+
+    def test_post_requires_read_prescription(self, client, user_manager_headers):
+        """the work queue is closed to a role without READ_PRESCRIPTION [401]"""
+        response = client.post(
+            "/prescriptions",
+            json={"startDate": _DATE_PARAM},
+            headers=user_manager_headers,
+        )
+
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
 
 def test_prioritization_requires_read_prescription(client, user_manager_headers):
