@@ -126,6 +126,27 @@ def test_the_flag_stands_without_allergy_records(client, analyst_headers):
     assert _why(payload, id_a) == ("S", None)
 
 
+def test_the_allergy_alert_type_turned_off_by_the_schema(
+    client, analyst_headers, monkeypatch
+):
+    """The schema params (noharm-store, section alerts) turns the allergy alert
+    type off: no alert and no count. The item's allergy flag is patient
+    information and stays"""
+    monkeypatch.setattr(
+        "repository.store_repository.get_items_data",
+        lambda pk, sks: {"demo": {"alerts": {"types": {"allergy": {"enabled": False}}}}}
+        if pk == "schema_params" and "demo" in sks
+        else {},
+    )
+    id_prescription, (id_a,) = _create([{"idDrug": _DRUG_A[0], "allergy": "S"}])
+
+    payload = _view(client, analyst_headers, id_prescription)
+
+    assert not any(a["type"] == "allergy" for a in _alerts_of(payload, id_a))
+    assert payload["alertStats"]["allergy"] == 0
+    assert _item(payload, id_a)["allergy"] is True
+
+
 def test_an_inactivated_allergy_drops_the_flag(client, analyst_headers):
     """Flagged on arrival, inactivated afterwards: no longer an alert"""
     id_prescription, (id_a,) = _create([{"idDrug": _DRUG_A[0], "allergy": "S"}])

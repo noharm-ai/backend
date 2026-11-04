@@ -23,6 +23,7 @@ from tests.integration.test_prescription_interactions import (  # noqa: F401
     _DRUG_ALLERGEN,
     _DRUG_B,
     _DRUG_NO_SUBSTANCE,
+    _IV_ROUTE,
     _SEED_PATIENT,
     _SUBSTANCE_A,
     _SUBSTANCE_ALLERGEN,
@@ -278,6 +279,67 @@ def test_the_trace_agrees_with_the_prescription_alerts(
     assert trace["alerted"] is False
     rules = _kind(trace, "dm")["directions"][0]["rules"]
     assert [r["rule"] for r in rules if not r["passed"]] == ["not_now_frequency"]
+
+
+def test_the_schema_alert_config_hides_the_alert_and_the_trace_says_why(
+    client, analyst_headers, maintainer_headers, monkeypatch
+):
+    """The schema params (noharm-store, section alerts) hides an ``iy`` with an
+    SN item from the view and its counts, and the trace names the config rule."""
+    store = {
+        "demo": {
+            "alerts": {
+                "interactions": {
+                    "iy": {
+                        "ignoreFrequencies": [33, 44],
+                        "requireIntervalIntersection": True,
+                    }
+                }
+            }
+        },
+    }
+    monkeypatch.setattr(
+        "repository.store_repository.get_items_data",
+        lambda pk, sks: {sk: store[sk] for sk in sks if sk in store}
+        if pk == "schema_params"
+        else {},
+    )
+    _add_relation(_SUBSTANCE_A[0], _SUBSTANCE_B[0], "iy", "high")
+    intravenous = {"route": _IV_ROUTE, "interval": "08:00 20:00"}
+    id_prescription, (id_a, id_b) = _prescription(
+        [
+            {"idDrug": _DRUG_A[0], **intravenous},
+            {"idDrug": _DRUG_B[0], **intravenous, "frequency": 33.0},
+        ]
+    )
+
+    payload = client.get(
+        f"/prescriptions/{id_prescription}", headers=analyst_headers
+    ).get_json()["data"]
+    assert payload["alertStats"]["interactions"].get("iy", 0) == 0
+
+    data = _trace(
+        client,
+        maintainer_headers,
+        idPrescription=id_prescription,
+        idPrescriptionDrugFrom=id_a,
+        idPrescriptionDrugTo=id_b,
+    )
+    assert data["alertConfig"]["interactions"]["iy"] == {
+        "ignoreFrequencies": [33.0, 44.0],
+        "requireIntervalIntersection": True,
+    }
+
+    trace = data["trace"]
+    assert trace["alerted"] is False
+    rules = _kind(trace, "iy")["directions"][0]["rules"]
+    assert [r["rule"] for r in rules if not r["passed"]] == [
+        "config_ignored_frequency"
+    ]
+    # the items share an administration time
+    assert next(r for r in rules if r["rule"] == "config_interval_intersection")[
+        "passed"
+    ]
 
 
 def test_the_same_item_twice_is_rejected(client, maintainer_headers):

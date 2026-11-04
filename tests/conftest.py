@@ -72,6 +72,15 @@ def _update_roles(email, roles):
         session_commit()
 
 
+@pytest.fixture(autouse=True)
+def no_noharm_store(monkeypatch):
+    """Tests never call AWS: the noharm-store reads find no item (the schema
+    params are the code defaults). A test that needs items patches it again"""
+    monkeypatch.setattr(
+        "repository.store_repository.get_items_data", lambda pk, sks: {}
+    )
+
+
 @pytest.fixture(scope="session", autouse=True)
 def clean_test_artifacts():
     """Wipe test-generated rows before and after the test session.

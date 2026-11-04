@@ -436,6 +436,18 @@ The rule holds even when the real value would be convenient or is already visibl
 - Checks drug-drug interactions
 - Multiple severity levels
 
+### Schema Params in the noharm-store (written by admin, only read here)
+- Settings of a schema that clients can change, one section per feature, in the DynamoDB `noharm-store` (`Config.NOHARM_STORE_TABLE`): `pk = schema_params`, `sk = <schema>`, the sections in `data`. **The admin project writes and validates it; this project only reads it** (`repository/store_repository.py`, `services/schema_params_service.py`, root model `models/schema_params.py`, one model per section). Change a section together with admin
+- There is no global item: whatever the schema's item does not set comes from the code defaults (the model defaults), which keep the behaviour the system has without any config. Each section is validated on its own: an invalid one falls back to its defaults and the others still apply. When the table can't be read (1s timeouts, no retry) the defaults apply, so a failure never changes behaviour. Loaded with the other configs of the prescription view (`_get_configs` → `config_data["schema_params"]`), once per request (one read for every section). Named params, not config, because `public.schema_config` is a different thing (the client's infra/integration settings)
+- New section: a model whose defaults keep today's behaviour, a field in `SchemaParams`, and the same section in admin
+- Tests never call AWS: an autouse fixture in `tests/conftest.py` makes the store return no item. Tests: `tests/unit/test_schema_params.py`
+
+#### Section `alerts`
+- `types`: each `alert_service` alert type (`DrugAlertTypeEnum` value, e.g. `kidney`, `allergy`, `maxDose`) can be turned off (`enabled: false`): `find_alerts` neither lists nor counts it. The culture class alert never stands in for a `cultureResistant` turned off. The item's `allergy` flag in the drug list is patient information and stays when the allergy alert is off
+- `interactions`, per relation kind (`it`, `dt`, `dm`, `iy`, `sl`, `rx`): `ignoreFrequencies` (either item's `presmed.frequenciadia` in the list, e.g. SN 33 / ACM 44; not for `rx`) and `requireIntervalIntersection` (`iy` only: shown only when the items share an administration time). Applied as rules in `alert_interaction_service.evaluate_kind_rules` (`config_ignored_frequency`, `config_interval_intersection`, only when configured), so the prescription view and the interaction trace (which also returns `alertConfig`) agree
+- Model: `models/alert_config.py`. Read by `_get_alerts` from `config_data["schema_params"].alerts` (the trace gets the same from `get_interaction_evaluation_context`), so the view and prescalc (`alertStats` → prioritization) agree; prescriptions already processed keep their counts until prescalc runs again
+- Tests: `tests/unit/test_alert_config.py`, `tests/integration/test_interaction_trace.py` and `tests/integration/test_prescription_allergy.py`
+
 ### Allergy Alert
 - Rule: `alert_service.is_allergic`, used by the allergy alert and by the item's `allergy` flag in the drug list (`utils/drug_list.py`)
 - The flag on `presmed.alergia` is set when the item arrives; the prescription view confirms it with the patient's `alergia` records (`repository/allergy_repository.py`): an active record of the item raises the alert, only inactive ones drop it, and with no record of the item the flag stands (some clients have no `alergia` records)

@@ -4,6 +4,7 @@ import re
 from datetime import datetime
 from typing import List, Union
 
+from models.alert_config import AlertConfig
 from models.appendix import Frequency
 from models.enums import (
     AllergyRecordStatusEnum,
@@ -29,6 +30,7 @@ def find_alerts(
     is_cpoe: bool,
     cultures: Union[List[dict], None] = None,
     allergies: Union[list, None] = None,
+    alert_config: Union[AlertConfig, None] = None,
 ):
     """
     Find alerts for a list of drugs
@@ -37,7 +39,11 @@ def find_alerts(
         (services/culture_service.get_culture_summary)
     :param allergies: allergy records of the patient, active and inactive
         (repository/allergy_repository.get_allergy_records). They confirm the
-        allergy flag of each item (is_allergic); None keeps the flag as is"""
+        allergy flag of each item (is_allergic); None keeps the flag as is
+    :param alert_config: the schema's alert config
+        (schema_params_service); an alert type turned off there is neither
+        listed nor counted. None keeps every type"""
+    alert_config = alert_config or AlertConfig()
     filtered_list = _filter_drug_list(drug_list=drug_list)
     resistant_cultures = _index_resistant_cultures(cultures=cultures)
     dose_total = _get_dose_total(drug_list=filtered_list, exams=exams)
@@ -45,7 +51,7 @@ def find_alerts(
     stats = _get_empty_stats()
 
     def add_alert(a, handling_types=[]):
-        if a != None:
+        if a != None and alert_config.alert_type(a["type"]).enabled:
             key = a["idPrescriptionDrug"]
             stats[a["type"]] += 1
             a["text"] = re.sub(" {2,}", "", a["text"])
@@ -147,7 +153,8 @@ def find_alerts(
 
         # culture: resistant to another substance of the same class. Only worth
         # saying when the substance itself was not tested as resistant, which
-        # is the stronger statement of the two
+        # is the stronger statement of the two (even when the schema turned
+        # that one off: the class alert never stands in for it)
         if culture_alert is None:
             add_alert(
                 _alert_culture_resistant_class(
