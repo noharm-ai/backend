@@ -369,15 +369,17 @@ def _config_rules(
             }
         )
 
-    if kind == "iy" and kind_config.requireIntervalIntersection:
+    # rx: the second side is an allergy, which has no administration time
+    if kind_config.requireIntervalIntersection and kind != "rx":
         rules.append(
             {
                 "rule": "config_interval_intersection",
                 "passed": _has_interval_intersection(
                     interval1=drug_from["interval"], interval2=drug_to["interval"]
                 ),
-                "message": "Configuração da instituição: incompatibilidade em Y só "
-                "é exibida quando os itens têm horário de administração em comum "
+                "message": "Configuração da instituição: alertas de "
+                f"{examutils.typeRelations.get(kind, kind)} só são exibidos quando "
+                "os itens têm horário de administração em comum "
                 f"({drug_from['drug']}: {drug_from['interval'] or '--'}; "
                 f"{drug_to['drug']}: {drug_to['interval'] or '--'}).",
             }

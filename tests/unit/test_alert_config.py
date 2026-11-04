@@ -117,13 +117,51 @@ def test_interval_intersection_rule(interval_from, interval_to, passed):
     assert rules["config_interval_intersection"] is passed
 
 
-def test_interval_intersection_only_for_iy():
-    """requireIntervalIntersection só vale para iy"""
+@pytest.mark.parametrize("kind", ["it", "dt", "dm", "iy", "sl"])
+def test_interval_intersection_applies_to_every_drug_pair_kind(kind):
+    """requireIntervalIntersection vale para todo tipo entre dois itens"""
+    from utils import examutils
+
+    config = _config(**{kind: {"requireIntervalIntersection": True}})
+
+    apart = evaluate_kind_rules(
+        kind=kind,
+        drug_from=_relation_item(interval="08:00"),
+        drug_to=_relation_item(id="2", interval="14:00"),
+        alert_config=config,
+    )
+    together = _rules(
+        kind,
+        _relation_item(interval="08:00 20:00"),
+        _relation_item(id="2", interval="20:00"),
+        alert_config=config,
+    )
+    rule = next(r for r in apart if r["rule"] == "config_interval_intersection")
+
+    assert rule["passed"] is False
+    assert examutils.typeRelations[kind] in rule["message"]
+    assert together["config_interval_intersection"] is True
+
+
+def test_interval_intersection_does_not_apply_to_rx():
+    """Reatividade cruzada (alergia) não tem horário: a regra não vale"""
+    rules = _rules(
+        "rx",
+        _relation_item(interval="08:00", rx=True),
+        _relation_item(id=None, interval="-", rx=True),
+        alert_config=_config(rx={"requireIntervalIntersection": True}),
+    )
+
+    assert "config_interval_intersection" not in rules
+
+
+def test_interval_intersection_is_per_kind():
+    """A config de um tipo não vale para os outros"""
     rules = _rules(
         "it",
         _relation_item(interval="08:00"),
         _relation_item(id="2", interval="14:00"),
-        alert_config=_config(it={"requireIntervalIntersection": True}),
+        alert_config=_config(iy={"requireIntervalIntersection": True}),
     )
 
     assert "config_interval_intersection" not in rules
@@ -699,3 +737,31 @@ def test_find_relations_hides_a_disabled_kind(monkeypatch):
     assert {a["type"] for alerts in configured["alerts"].values() for a in alerts} == {
         "iy"
     }
+
+
+def test_find_relations_it_requires_interval_intersection(monkeypatch):
+    """it sem horário em comum some (e da contagem); com horário em comum continua"""
+    monkeypatch.setattr(
+        "services.alert_interaction_service._get_allergies", lambda **kw: []
+    )
+    monkeypatch.setattr(
+        "services.alert_interaction_service._get_active_relations",
+        _relations_mock(kinds=["it"]),
+    )
+    config = _config(it={"requireIntervalIntersection": True})
+
+    apart = find_relations(
+        _iy_drug_list(interval_a="08:00", interval_b="14:00"),
+        id_patient=1,
+        is_cpoe=False,
+        alert_config=config,
+    )
+    together = find_relations(
+        _iy_drug_list(interval_a="08:00 20:00", interval_b="20:00"),
+        id_patient=1,
+        is_cpoe=False,
+        alert_config=config,
+    )
+
+    assert apart["stats"]["it"] == 0
+    assert together["stats"]["it"] == 1

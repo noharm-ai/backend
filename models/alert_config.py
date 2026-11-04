@@ -91,7 +91,8 @@ class InteractionKindConfig(BaseModel):
     # is in the list (e.g. FrequencyEnum.SN 33, FrequencyEnum.ACM 44); not
     # applied to rx, whose second side is an allergy
     ignoreFrequencies: list[float] = Field(default_factory=list)
-    # iy only: shows the alert only when the items share an administration time
+    # shows the alert only when the items share an administration time; not
+    # applied to rx, whose second side is an allergy
     requireIntervalIntersection: bool = False
 
 
