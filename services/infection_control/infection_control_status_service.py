@@ -297,6 +297,8 @@ def record_evaluation(
     )
     evaluation.id_substitute_drug = evaluation_data.substituteDrug
     evaluation.notes = evaluation_data.notes
+    evaluation.treatment_type = evaluation_data.treatmentType
+    evaluation.infection_focus = evaluation_data.infectionFocus
     evaluation.posology = posology_snapshot(course)
     evaluation.valid_from = evaluation_data.validFrom or now
     evaluation.valid_until = evaluation_data.validUntil

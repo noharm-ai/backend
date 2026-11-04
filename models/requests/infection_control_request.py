@@ -23,6 +23,10 @@ class AntimicrobialEvaluationRequest(BaseModel):
     idDrug: int
     conforming: bool
     notes: str | None = None
+    # why the drug is given (AntimicrobialTreatmentTypeEnum) and the infection
+    # it is given for (InfectionFocusEnum, not required for a prophylaxis)
+    treatmentType: int | None = None
+    infectionFocus: int | None = None
     # intervention reasons of a non-conformity (flagged for infection control)
     interventionReasons: list[int] = []
     # the drug recommended instead, for reasons related to another drug

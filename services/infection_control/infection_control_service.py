@@ -1,8 +1,9 @@
 """Service: infection control follow-up
 
 The infectologist reviews the patients on antimicrobials: each running drug is
-judged conforming or not (valid until a date), optionally watching for its
-expiry or a posology change, and a next review date can be scheduled. The admission
+judged conforming or not (valid until a date), with why it is given (empirical,
+culture guided or prophylaxis) and the infection focus, optionally watching for
+its expiry or a posology change, and a next review date can be scheduled. The admission
 status and its pending reasons are kept by the rule in
 infection_control_status_service; this service records the reviews and serves
 the follow-up data.
@@ -18,9 +19,11 @@ from exception.validation_error import ValidationError
 from models.enums import (
     AntimicrobialEvaluationClosingEnum,
     AntimicrobialEvaluationStatusEnum,
+    AntimicrobialTreatmentTypeEnum,
     FeatureEnum,
     InfectionControlOriginEnum,
     InfectionControlStatusEnum,
+    InfectionFocusEnum,
     InterventionReasonRelationTypeEnum,
     PrescriptionClinicalNoteStatusEnum,
 )
@@ -33,6 +36,7 @@ from models.infection_control import (
 from models.main import User, db
 from models.prescription import Prescription, PrescriptionClinicalNote
 from models.requests.infection_control_request import (
+    AntimicrobialEvaluationRequest,
     InfectionControlBackfillRequest,
     InfectionControlListRequest,
     InfectionControlReviewRequest,
@@ -65,6 +69,9 @@ COUNT_LIMIT = 5000
 WORKLIST_STATEMENT_TIMEOUT_MS = 10000
 # postgres query_canceled, raised when statement_timeout runs out
 QUERY_CANCELED = "57014"
+# what an evaluation tells of why the drug is given
+TREATMENT_TYPES = {t.value for t in AntimicrobialTreatmentTypeEnum}
+INFECTION_FOCI = {f.value for f in InfectionFocusEnum}
 
 
 def _check_feature():
@@ -130,6 +137,8 @@ def _serialize_evaluation(
             for i in interventions.get(evaluation.id, [])
         ],
         "notes": evaluation.notes,
+        "treatmentType": evaluation.treatment_type,
+        "infectionFocus": evaluation.infection_focus,
         "posology": evaluation.posology,
         "validFrom": dateutils.to_iso(evaluation.valid_from),
         "validUntil": dateutils.to_iso(evaluation.valid_until),
@@ -314,6 +323,31 @@ def get_admission_view(admission_number: int, user_context: User):
     return {**timeline, "followUp": follow_up}
 
 
+def _validate_indication(evaluation: AntimicrobialEvaluationRequest):
+    """Check why the drug is given and the infection it is given for: both
+    asked, the focus only when the drug does not prevent an infection"""
+    if evaluation.treatmentType not in TREATMENT_TYPES:
+        raise ValidationError(
+            "Informe o tipo de tratamento",
+            "errors.invalidParams",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    if evaluation.infectionFocus is None:
+        if evaluation.treatmentType not in AntimicrobialTreatmentTypeEnum.prophylaxis():
+            raise ValidationError(
+                "Informe o foco infeccioso",
+                "errors.invalidParams",
+                status.HTTP_400_BAD_REQUEST,
+            )
+    elif evaluation.infectionFocus not in INFECTION_FOCI:
+        raise ValidationError(
+            "Foco infeccioso inválido",
+            "errors.invalidParams",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+
 def _validate_review(
     request_data: InfectionControlReviewRequest,
     admission_courses: rule.AdmissionCourses,
@@ -368,6 +402,8 @@ def _validate_review(
                 "errors.invalidParams",
                 status.HTTP_400_BAD_REQUEST,
             )
+
+        _validate_indication(evaluation)
 
         # a non-conformity is given its reasons, and may record an intervention
         if evaluation.conforming and (

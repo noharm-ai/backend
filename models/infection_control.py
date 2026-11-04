@@ -77,6 +77,11 @@ class AntimicrobialEvaluation(db.Model):
         "fkmedicamento_substituto", db.BigInteger, nullable=True
     )
     notes = db.Column("observacao", db.String, nullable=True)
+    # why the drug is given (AntimicrobialTreatmentTypeEnum) and the infection
+    # it is given for (InfectionFocusEnum); empty in evaluations made before
+    # they were asked
+    treatment_type = db.Column("tp_tratamento", db.SmallInteger, nullable=True)
+    infection_focus = db.Column("tp_foco_infeccao", db.SmallInteger, nullable=True)
     posology = db.Column("posologia", postgresql.JSONB, nullable=False)
     # when the verdict starts to apply: the review, or earlier when the
     # infectologist backdates it (up to the course start)
