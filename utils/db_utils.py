@@ -2,6 +2,7 @@
 
 import logging
 import time
+from contextlib import contextmanager
 
 from flask_sqlalchemy.session import Session
 from sqlalchemy import text
@@ -12,6 +13,12 @@ from models.main import db, dbSession
 from utils import status
 
 logger = logging.getLogger("noharm.backend")
+
+# postgres query_canceled, raised when statement_timeout runs out
+QUERY_CANCELED = "57014"
+
+# the settings local_timeout may change
+_TIMEOUT_SETTINGS = ("lock_timeout", "statement_timeout")
 
 
 def set_schema(schema: str):
@@ -72,3 +79,39 @@ def run_with_deadlock_retry(fn, max_retries=3, base_delay=0.1, on_retry=None):
                 time.sleep(delay)
                 continue
             raise
+
+
+@contextmanager
+def local_timeout(setting: str, timeout_ms: int | None):
+    """Set a timeout (lock_timeout, statement_timeout) inside the block: running
+    out raises OperationalError.
+
+    Restored when the block succeeds, so it doesn't leak into the rest of the
+    transaction. When it fails the transaction (or the savepoint the block runs
+    in) is rolled back, and that undoes the setting too: run the block inside
+    db.session.begin_nested() when the request carries on after the timeout.
+    """
+    if setting not in _TIMEOUT_SETTINGS:
+        raise ValueError(f"unsupported timeout setting: {setting}")
+
+    if timeout_ms is None:
+        yield
+        return
+
+    # set_config(..., true) is SET LOCAL with a bind param
+    db.session.execute(
+        text("SELECT set_config(:setting, :timeout, true)"),
+        {"setting": setting, "timeout": f"{int(timeout_ms)}ms"},
+    )
+    yield
+    db.session.execute(text(f"SET LOCAL {setting} = DEFAULT"))
+
+
+def lock_timeout(lock_timeout_ms: int | None):
+    """Bound the lock waits inside the block (see local_timeout)"""
+    return local_timeout("lock_timeout", lock_timeout_ms)
+
+
+def statement_timeout(statement_timeout_ms: int | None):
+    """Bound each query inside the block (see local_timeout)"""
+    return local_timeout("statement_timeout", statement_timeout_ms)

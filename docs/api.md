@@ -394,15 +394,6 @@ All endpoints in this section require administrator-level authorization.
 | `POST` | `/admin/tag/list` | List all tags. |
 | `POST` | `/admin/tag/upsert` | Create or update a tag. |
 
-### Memory & Configuration
-
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/admin/memory/list` | List admin memory records. |
-| `PUT` | `/admin/memory` | Create or update an admin memory record. |
-| `POST` | `/admin/global-memory/list` | List global memory entries. |
-| `POST` | `/admin/global-memory/update` | Update a global memory entry. |
-
 ### Knowledge Base
 
 | Method | Path | Description |
@@ -431,8 +422,6 @@ Endpoints that trigger background outlier and scoring jobs.
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/outliers/generate/refresh-agg` | Refresh aggregated prescription data. |
-| `POST` | `/outliers/generate/segment` | Generate scores for an entire segment. |
 | `POST` | `/outliers/generate/config/<idSegment>/<idDrug>` | Configure scoring parameters for a drug. |
 | `POST` | `/outliers/generate/config/<idSegment>/<idDrug>/v2` | Configure scoring parameters (v2). |
 | `POST` | `/outliers/generate/prepare/<idSegment>/<idDrug>` | Prepare data for scoring. |

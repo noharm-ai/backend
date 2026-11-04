@@ -10,7 +10,8 @@ that asked: the contract every strategy keeps is that
   ("Paciente <id>") for the patient it could not resolve;
 * a multiple-names lookup answers for *every* id it was given, in the shape
   above, whatever part of the batch the upstream lost;
-* the failure is logged as a warning (an error for DynamoDB) instead of raised;
+* the failure is logged as a warning (an error for DynamoDB) instead of raised,
+  including a failed OAuth token call and an answer in an unexpected shape;
 * a search that fails comes back empty, and a plain "no results" (404) from
   the internal service is not logged as a failure.
 
@@ -313,6 +314,73 @@ class TestExternalFailures:
 
         assert all(r["status"] == "error" for r in result)
         assert len(result) == 2
+        assert mock_logger.warning.called
+
+    @patch("services.name_service.requests.get")
+    @patch("services.name_service.requests.post")
+    def test_single_name_token_timeout_returns_placeholder(
+        self, mock_post, mock_get, service, mock_logger
+    ):
+        """A token call that times out is the placeholder, logged."""
+        mock_post.side_effect = requests.exceptions.ReadTimeout("slow")
+
+        _assert_placeholder(service.get_single_name(PATIENT_ID))
+        assert mock_logger.warning.called
+        mock_get.assert_not_called()
+
+    @patch("services.name_service.requests.get")
+    @patch("services.name_service.requests.post")
+    def test_single_name_token_refused_returns_placeholder(
+        self, mock_post, mock_get, service, mock_logger
+    ):
+        """A token call answered with an error is the placeholder, logged."""
+        mock_post.return_value = _response(401)
+
+        _assert_placeholder(service.get_single_name(PATIENT_ID))
+        assert mock_logger.warning.called
+        mock_get.assert_not_called()
+
+    @patch("services.name_service.requests.get")
+    @patch("services.name_service.requests.post")
+    def test_multiple_names_token_timeout_returns_a_placeholder_per_id(
+        self, mock_post, mock_get, service, mock_logger
+    ):
+        """A token call that times out answers every id with a placeholder."""
+        mock_post.side_effect = requests.exceptions.ReadTimeout("slow")
+
+        result = service.get_multiple_names([1, 2])
+
+        assert [r["idPatient"] for r in result] == [1, 2]
+        assert all(r["status"] == "error" for r in result)
+        assert mock_logger.warning.called
+        mock_get.assert_not_called()
+
+    @patch("services.name_service.requests.get")
+    @patch("services.name_service.requests.post")
+    def test_multiple_names_token_refused_returns_a_placeholder_per_id(
+        self, mock_post, mock_get, service, mock_logger
+    ):
+        """A token call answered with an error answers every id with a placeholder."""
+        mock_post.return_value = _response(401)
+
+        result = service.get_multiple_names([1, 2])
+
+        assert [r["idPatient"] for r in result] == [1, 2]
+        assert all(r["status"] == "error" for r in result)
+        assert mock_logger.warning.called
+        mock_get.assert_not_called()
+
+    @patch("services.name_service.requests.get")
+    def test_multiple_names_malformed_answer_returns_a_placeholder_per_id(
+        self, mock_get, service, token_ok, mock_logger
+    ):
+        """A 200 answer without the expected shape answers every id with a placeholder."""
+        mock_get.return_value = _response(200, {"unexpected": []})
+
+        result = service.get_multiple_names([1, 2])
+
+        assert [r["idPatient"] for r in result] == [1, 2]
+        assert all(r["status"] == "error" for r in result)
         assert mock_logger.warning.called
 
     def test_search_is_not_supported(self, service, mock_logger):

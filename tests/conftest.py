@@ -72,6 +72,15 @@ def _update_roles(email, roles):
         session_commit()
 
 
+@pytest.fixture(autouse=True)
+def no_noharm_store(monkeypatch):
+    """Tests never call AWS: the noharm-store reads find no item (the schema
+    params are the code defaults). A test that needs items patches it again"""
+    monkeypatch.setattr(
+        "repository.store_repository.get_item_data", lambda pk, sk: None
+    )
+
+
 @pytest.fixture(scope="session", autouse=True)
 def clean_test_artifacts():
     """Wipe test-generated rows before and after the test session.
@@ -124,9 +133,6 @@ def _cleanup():
     session.execute(
         text("DELETE FROM demo.prescricao_evolucao WHERE fkprescricao = 20")
     )
-
-    # Admin global-memory test records (reserved kind prefix, includes _bkp rows)
-    session.execute(text("DELETE FROM public.memoria WHERE tipo LIKE 'zztest-gm%'"))
 
     # Daily activity counters of the synthetic users (ids >= 99900) used by
     # test_user_activity.py; the real users' rows are left alone because the

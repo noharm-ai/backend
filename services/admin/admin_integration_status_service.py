@@ -1,7 +1,7 @@
 """Service to manage and retrieve integration status information for the admin interface."""
 
 from models.main import db
-from models.appendix import SchemaConfig, Frequency
+from models.appendix import SchemaConfig
 from exception.validation_error import ValidationError
 from utils import status
 
@@ -19,7 +19,3 @@ def get_integration_status(schema):
         )
 
     return config.status
-
-
-def _get_pending_frequencies():
-    return db.session.query(Frequency).filter(Frequency.dailyFrequency == None).count()

@@ -6,12 +6,16 @@
 no measure-unit or frequency catalogue — and in exchange it computes the two
 fields the catalogue route always leaves empty:
 
-* ``routes`` — the routes used for that drug/segment in the last 15 days,
+* ``routes`` — the routes used for that drug/segment in the last 5 days,
   falling back to the routes configured in the ``map-routes`` memory when the
   drug has no recent history;
 * ``intervals`` — the schedules used in the same window, each rendered as
   readable text, unless the ``transcription-remove-fields`` memory hides the
   field.
+
+Both come from one query bounded by a statement timeout: on a schema where it
+runs out the summary still opens, with the ``map-routes`` routes and no
+intervals.
 
 Fixtures use the reserved id ranges wiped by ``tests/conftest.py``: drugs and
 aggregates >= 90000, prescriptions from ``test_counters`` (>= 100000) and
@@ -24,9 +28,13 @@ from datetime import datetime, timedelta
 
 import pytest
 from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
 
+from mobile import app as flask_app
 from models.enums import MemoryEnum
-from models.main import Drug, PrescriptionAgg
+from models.main import Drug, PrescriptionAgg, db
+from repository import drugs_repository
+from services import drug_service
 from tests.conftest import session, session_commit
 from tests.utils.utils_test_prescription import (
     create_prescription,
@@ -37,6 +45,7 @@ from tests.utils.utils_test_unit_conversion import (
     create_test_drug,
     create_test_substance,
 )
+from utils import db_utils
 
 URL = "/drugs/summary"
 
@@ -58,7 +67,7 @@ ROUTE_ONLY_SUBSTANCE = 90603
 UNIT_MG = "1"
 FREQUENCY_8H = "3"
 
-# the routes query only looks at the last 15 days
+# the routes query only looks at the last 5 days
 INSIDE_WINDOW = datetime.now() - timedelta(days=2)
 OUTSIDE_WINDOW = datetime.now() - timedelta(days=40)
 
@@ -233,7 +242,7 @@ def test_drug_summary_returns_the_drug_and_what_was_already_prescribed(
 def test_drug_summary_returns_the_recently_prescribed_routes(
     client, analyst_headers, summary_drug
 ):
-    """GET /drugs/summary - lista as vias usadas nos últimos 15 dias"""
+    """GET /drugs/summary - lista as vias usadas nos últimos 5 dias"""
     data = _get(client, analyst_headers, id_drug=summary_drug).get_json()["data"]
 
     assert sorted(r["id"] for r in data["routes"]) == ["SNE", "VO"]
@@ -244,7 +253,7 @@ def test_drug_summary_returns_the_recently_prescribed_routes(
 def test_drug_summary_ignores_routes_prescribed_before_the_window(
     client, analyst_headers, summary_drug
 ):
-    """GET /drugs/summary - desconsidera as vias prescritas fora da janela de 15 dias"""
+    """GET /drugs/summary - desconsidera as vias prescritas fora da janela de 5 dias"""
     data = _get(client, analyst_headers, id_drug=summary_drug).get_json()["data"]
 
     assert "IV" not in [r["id"] for r in data["routes"]]
@@ -336,7 +345,7 @@ def test_drug_summary_renders_the_recently_prescribed_intervals(
 def test_drug_summary_ignores_intervals_prescribed_before_the_window(
     client, analyst_headers, summary_drug
 ):
-    """GET /drugs/summary - desconsidera os horários prescritos fora da janela de 15 dias"""
+    """GET /drugs/summary - desconsidera os horários prescritos fora da janela de 5 dias"""
     data = _get(client, analyst_headers, id_drug=summary_drug).get_json()["data"]
 
     assert "22" not in [i["id"] for i in data["intervals"]]
@@ -406,3 +415,77 @@ def test_drug_summary_requires_prescription_read_permission(
 ):
     """GET /drugs/summary - deve retornar erro [401 UNAUTHORIZED] sem permissão de leitura de prescrição"""
     assert _get(client, user_manager_headers).status_code == 401
+
+
+def _sleep(**_kwargs):
+    """Stand-in for the recent routes query that outlasts any short timeout."""
+    return db.session.execute(text("SELECT pg_sleep(1)")).all()
+
+
+def test_drug_summary_falls_back_when_the_recent_items_query_times_out(
+    client, analyst_headers, summary_drug, monkeypatch
+):
+    """GET /drugs/summary - consulta lenta é cancelada e o resumo abre com as vias da memória map-routes"""
+    monkeypatch.setattr(drug_service, "DRUG_SUMMARY_STATEMENT_TIMEOUT_MS", 50)
+    monkeypatch.setattr(drugs_repository, "get_recent_routes_and_intervals", _sleep)
+
+    with _memory(
+        MemoryEnum.MAP_ROUTES.value, '[{"id": "IM", "value": "Intramuscular"}]'
+    ):
+        response = _get(client, analyst_headers, id_drug=summary_drug)
+
+    assert response.status_code == 200
+
+    data = response.get_json()["data"]
+    # the memory is read after the cancelled statement: the request's
+    # transaction survived it
+    assert data["routes"] == [{"id": "IM", "description": "Intramuscular"}]
+    assert data["intervals"] == []
+    # what was read before the timed query is still there
+    assert data["drug"] == {"id": summary_drug, "name": "Medicamento Resumo"}
+    assert data["units"] == [{"id": UNIT_MG, "description": "mg", "amount": 5}]
+
+
+def test_drug_summary_raises_other_database_errors(
+    client, analyst_headers, summary_drug, monkeypatch
+):
+    """GET /drugs/summary - erros de banco que não são timeout não viram fallback"""
+
+    def _fail(**_kwargs):
+        raise OperationalError("SELECT ...", {}, Exception("connection reset"))
+
+    monkeypatch.setattr(drugs_repository, "get_recent_routes_and_intervals", _fail)
+
+    response = _get(client, analyst_headers, id_drug=summary_drug)
+
+    assert response.status_code == 500
+
+
+def test_statement_timeout_does_not_outlive_its_block():
+    """db_utils.statement_timeout - o limite vale só dentro do bloco, com ou sem cancelamento"""
+    with flask_app.app_context():
+        try:
+            before = db.session.execute(text("SHOW statement_timeout")).scalar()
+
+            with db.session.begin_nested():
+                with db_utils.statement_timeout(50):
+                    assert (
+                        db.session.execute(text("SHOW statement_timeout")).scalar()
+                        == "50ms"
+                    )
+
+            assert db.session.execute(text("SHOW statement_timeout")).scalar() == before
+
+            with pytest.raises(OperationalError) as cancelled:
+                with db.session.begin_nested():
+                    with db_utils.statement_timeout(50):
+                        db.session.execute(text("SELECT pg_sleep(1)"))
+
+            assert getattr(cancelled.value.orig, "pgcode", None) == (
+                db_utils.QUERY_CANCELED
+            )
+            # rolled back to the savepoint: the transaction is still usable and
+            # the limit went with it
+            assert db.session.execute(text("SHOW statement_timeout")).scalar() == before
+        finally:
+            db.session.rollback()

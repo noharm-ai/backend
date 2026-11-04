@@ -4,6 +4,7 @@ import re
 from datetime import datetime
 from typing import List, Union
 
+from models.alert_config import AlertConfig, KidneyAlertConfig
 from models.appendix import Frequency
 from models.enums import (
     AllergyRecordStatusEnum,
@@ -29,6 +30,7 @@ def find_alerts(
     is_cpoe: bool,
     cultures: Union[List[dict], None] = None,
     allergies: Union[list, None] = None,
+    alert_config: Union[AlertConfig, None] = None,
 ):
     """
     Find alerts for a list of drugs
@@ -37,7 +39,12 @@ def find_alerts(
         (services/culture_service.get_culture_summary)
     :param allergies: allergy records of the patient, active and inactive
         (repository/allergy_repository.get_allergy_records). They confirm the
-        allergy flag of each item (is_allergic); None keeps the flag as is"""
+        allergy flag of each item (is_allergic); None keeps the flag as is
+    :param alert_config: the schema's alert config
+        (schema_params_service); an alert type turned off there is neither
+        listed nor counted, and a type with a level of its own takes it. None
+        keeps every type as it is"""
+    alert_config = alert_config or AlertConfig()
     filtered_list = _filter_drug_list(drug_list=drug_list)
     resistant_cultures = _index_resistant_cultures(cultures=cultures)
     dose_total = _get_dose_total(drug_list=filtered_list, exams=exams)
@@ -45,7 +52,15 @@ def find_alerts(
     stats = _get_empty_stats()
 
     def add_alert(a, handling_types=[]):
-        if a != None:
+        type_config = alert_config.alert_type(a["type"]) if a != None else None
+        if a != None and type_config.enabled:
+            # the schema's level for the type (protocol: each protocol sets its own)
+            if (
+                type_config.level is not None
+                and a["type"] != DrugAlertTypeEnum.PROTOCOL.value
+            ):
+                a["level"] = type_config.level
+
             key = a["idPrescriptionDrug"]
             stats[a["type"]] += 1
             a["text"] = re.sub(" {2,}", "", a["text"])
@@ -87,6 +102,7 @@ def find_alerts(
                 drug_attributes=drug_attributes,
                 exams=exams,
                 dialysis=dialisys,
+                kidney_config=alert_config.types.kidney,
             ),
             handling_types=handling_types,
         )
@@ -147,7 +163,8 @@ def find_alerts(
 
         # culture: resistant to another substance of the same class. Only worth
         # saying when the substance itself was not tested as resistant, which
-        # is the stronger statement of the two
+        # is the stronger statement of the two (even when the schema turned
+        # that one off: the class alert never stands in for it)
         if culture_alert is None:
             add_alert(
                 _alert_culture_resistant_class(
@@ -202,6 +219,7 @@ def find_alerts(
                 dose_total=dose_total,
                 dialysis=dialisys,
                 cn_data=cn_data,
+                kidney_config=alert_config.types.kidney,
             ),
             handling_types=handling_types,
         )
@@ -345,7 +363,13 @@ def _alert_ira(
     dose_total: dict,
     dialysis: str,
     cn_data: dict,
+    kidney_config: Union[KidneyAlertConfig, None] = None,
 ):
+    """IRA (acute kidney injury) risk of vancomycin: daily dose / renal
+    function / weight above 0,6219. The renal function is the one the adult
+    kidney alert reads (kidney_config.adultExams: the first exam with a value;
+    defaults ckd21, ckd)"""
+    kidney_config = kidney_config or KidneyAlertConfig()
     alert = _create_alert(
         id_prescription_drug=str(prescription_drug.id),
         key="",
@@ -358,7 +382,7 @@ def _alert_ira(
         expireDay = prescription_expire_date.day if prescription_expire_date else 0
         idDrugAgg = str(prescription_drug.idDrug) + "_" + str(expireDay)
         maxdose = dose_total[idDrugAgg]["value"] if idDrugAgg in dose_total else None
-        ckd = _get_ckd_value(exams=exams)
+        _, ckd = _first_renal_exam(exams=exams, exam_types=kidney_config.adultExams)
         weight = exams["weight"]
         dialysis_ia_count = (
             cn_data.get("cn_stats", {}).get("dialysis", 0) if cn_data else 0
@@ -1013,7 +1037,14 @@ def _alert_kidney(
     drug_attributes: DrugAttributes,
     exams: dict,
     dialysis: str,
+    kidney_config: Union[KidneyAlertConfig, None] = None,
 ):
+    """Kidney alert: the patient in dialysis, or a renal function exam below
+    the drug's kidney limit. Which exams (tpexam) count, for adults and for
+    children, comes from the schema params (kidney_config; defaults: ckd21 or
+    ckd, swrtz2 or swrtz1)"""
+    kidney_config = kidney_config or KidneyAlertConfig()
+
     if not drug_attributes or not exams:
         return None
 
@@ -1054,13 +1085,19 @@ def _alert_kidney(
         return alert
 
     if exams["age"] > 17:
-        ckd_value = _get_ckd_value(exams=exams)
-        if ckd_value and drug_attributes.kidney > ckd_value:
-            alert["text"] = f"""
-                Avaliar se o medicamento já está com o ajuste adequado conforme a função renal ou suspenso no caso de contraindicação, já que a função renal do paciente (
-                {str(ckd_value)} mL/min) está abaixo de {str(drug_attributes.kidney)} mL/min.
-            """
-            return alert
+        # the first exam with a value decides
+        exam_type, value = _first_renal_exam(
+            exams=exams, exam_types=kidney_config.adultExams
+        )
+        if exam_type is not None:
+            if drug_attributes.kidney > value:
+                alert["text"] = _kidney_exam_text(
+                    exam_type=exam_type,
+                    exam=exams[exam_type],
+                    value=value,
+                    limit=drug_attributes.kidney,
+                )
+                return alert
 
         # avaliando necessidade deste alerta
         # if not ckd_value:
@@ -1069,31 +1106,73 @@ def _alert_kidney(
         #     )
         #     return alert
     else:
-        if (
-            "swrtz2" in exams
-            and exams["swrtz2"]["value"]
-            and drug_attributes.kidney > exams["swrtz2"]["value"]
-        ):
-            alert["text"] = f"""
-                Avaliar se o medicamento já está com o ajuste adequado conforme a função renal ou suspenso no caso de contraindicação, já que a função renal do paciente
-                ({str(exams["swrtz2"]["value"])} mL/min/1.73m²) está abaixo de
-                {str(drug_attributes.kidney)} mL/min. (Schwartz 2)
-            """
-            return alert
-
-        if (
-            "swrtz1" in exams
-            and exams["swrtz1"]["value"]
-            and drug_attributes.kidney > exams["swrtz1"]["value"]
-        ):
-            alert["text"] = f"""
-                Avaliar se o medicamento já está com o ajuste adequado conforme a função renal ou suspenso no caso de contraindicação, já que a função renal do paciente
-                ({str(exams["swrtz1"]["value"])} mL/min/1.73m²) está abaixo de {str(drug_attributes.kidney)}
-                mL/min. (Schwartz 1)
-            """
-            return alert
+        # the first exam below the limit raises the alert
+        for exam_type in kidney_config.pediatricExams:
+            value = _renal_exam_value(exams=exams, exam_type=exam_type)
+            if value is not None and drug_attributes.kidney > value:
+                alert["text"] = _kidney_exam_text(
+                    exam_type=exam_type,
+                    exam=exams[exam_type],
+                    value=value,
+                    limit=drug_attributes.kidney,
+                )
+                return alert
 
     return None
+
+
+def _renal_exam_value(exams: dict, exam_type: str):
+    """The value of a renal function exam of the patient (exams keyed by
+    tpexam); None when it has none (a zero or a non numeric value counts as
+    none)"""
+    exam = exams.get(exam_type)
+    if not isinstance(exam, dict) or not exam.get("value"):
+        return None
+
+    try:
+        float(exam["value"])
+    except (TypeError, ValueError):
+        return None
+
+    return exam["value"]
+
+
+def _first_renal_exam(exams: dict, exam_types: list[str]) -> tuple:
+    """(tpexam, value) of the first exam in exam_types the patient has a value
+    for; (None, None) when none has"""
+    for exam_type in exam_types:
+        value = _renal_exam_value(exams=exams, exam_type=exam_type)
+        if value is not None:
+            return exam_type, value
+
+    return None, None
+
+
+def _kidney_exam_text(exam_type: str, exam: dict, value, limit) -> str:
+    """Kidney alert text for the renal function exam that raised it"""
+    advice = (
+        "Avaliar se o medicamento já está com o ajuste adequado conforme a função "
+        "renal ou suspenso no caso de contraindicação, já que a função renal do "
+        "paciente"
+    )
+
+    if exam_type in ("ckd21", "ckd"):
+        return f"{advice} ({str(value)} mL/min) está abaixo de {str(limit)} mL/min."
+
+    if exam_type in ("swrtz2", "swrtz1"):
+        formula = "Schwartz 2" if exam_type == "swrtz2" else "Schwartz 1"
+        return (
+            f"{advice} ({str(value)} mL/min/1.73m²) está abaixo de "
+            f"{str(limit)} mL/min. ({formula})"
+        )
+
+    # an exam the schema chose: named as the schema registered it
+    label = exam.get("initials") or exam.get("name") or exam_type
+    unit = stringutils.strNone(exam.get("unit")).strip()
+    return (
+        f"{advice} ({label}: {str(value)}{' ' + unit if unit else ''}) está abaixo "
+        f"de {str(limit)} mL/min."
+    )
 
 
 def _filter_drug_list(drug_list):
@@ -1116,16 +1195,6 @@ def _filter_drug_list(drug_list):
         filtered_list.append(item)
 
     return filtered_list
-
-
-def _get_ckd_value(exams: dict):
-    if "ckd21" in exams and exams["ckd21"]["value"]:
-        return exams["ckd21"]["value"]
-
-    if "ckd" in exams and exams["ckd"]["value"]:
-        return exams["ckd"]["value"]
-
-    return None
 
 
 def _alert_protocol(prescription_drug: PrescriptionDrug, protocols: List[dict]):

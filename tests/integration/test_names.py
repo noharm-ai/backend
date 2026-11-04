@@ -27,6 +27,7 @@ from urllib.parse import quote
 
 import jwt
 import pytest
+import requests
 from sqlalchemy import text
 
 from services import name_service
@@ -205,12 +206,13 @@ def test_single_name_without_configuration_returns_the_placeholder(
 def test_multiple_names_without_configuration_returns_an_empty_list(
     client, analyst_headers, no_getname_config
 ):
-    """The batch endpoint reports the failure but never breaks the caller."""
+    """The batch endpoint logs the failure and answers no name, so the frontend
+    can retry the ids instead of marking them not found."""
     response = client.post(
         "/names", headers=analyst_headers, json={"patients": [1, 2, 3]}
     )
 
-    assert response.status_code == 500
+    assert response.status_code == 200
     assert response.get_json() == []
 
 
@@ -823,6 +825,39 @@ def test_external_multiple_names_shrink_upstream_timeouts_to_the_remaining_budge
     assert response.status_code == 200
     assert mock_requests.post.call_args.kwargs["timeout"] == 12
     assert mock_requests.get.call_args.kwargs["timeout"] == 5
+
+
+def test_external_multiple_names_token_timeout_returns_placeholders(
+    client, analyst_headers, getname_config
+):
+    """An OAuth token call that times out is a lost batch, not a 500."""
+    getname_config(
+        {
+            "url": "https://ext.example/getname",
+            "token": {
+                "url": "https://ext.example/oauth",
+                "params": {"client_id": "zztest"},
+            },
+            "params": {"tenant": "demo"},
+        }
+    )
+
+    with (
+        patch("services.name_service.requests.post") as mock_post,
+        patch("services.name_service.requests.get") as mock_get,
+    ):
+        mock_post.side_effect = requests.exceptions.ReadTimeout("read timed out")
+
+        response = client.post(
+            "/names", headers=analyst_headers, json={"patients": [1, 2]}
+        )
+
+    assert response.status_code == 200
+    assert response.get_json() == [
+        {"status": "error", "idPatient": 1, "name": "Paciente 1"},
+        {"status": "error", "idPatient": 2, "name": "Paciente 2"},
+    ]
+    mock_get.assert_not_called()
 
 
 def test_multiple_names_reject_lists_over_the_cap(

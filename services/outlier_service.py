@@ -21,8 +21,7 @@ from models.main import (
     db,
 )
 from services import data_authorization_service
-from services.admin import admin_drug_service, admin_integration_status_service
-from utils import aws, logger, status
+from utils import aws, status
 
 FOLD_SIZE = 10
 
@@ -381,57 +380,6 @@ def _refresh_agg(id_drug, id_segment, schema):
 
 
 @has_permission(Permission.WRITE_SEGMENT_SCORE)
-def generate_segment_scores(id_segment: int, user_context: User):
-    logger.backend_logger.info(
-        "%s - Generating segment scores: %s", user_context.schema, id_segment
-    )
-
-    history_count = (
-        db.session.query(PrescriptionAgg)
-        .filter(PrescriptionAgg.idSegment == id_segment)
-        .filter(PrescriptionAgg.frequency != None)
-        .filter(PrescriptionAgg.doseconv != None)
-        .filter(PrescriptionAgg.dose > 0)
-        .count()
-    )
-
-    if history_count == 0:
-        raise ValidationError(
-            "Não é possível gerar escores, pois o segmento não possui histórico de prescrição.",
-            "errors.businessRules",
-            status.HTTP_400_BAD_REQUEST,
-        )
-
-    result = refresh_outliers(id_segment=id_segment, user=user_context)
-    logger.backend_logger.info(
-        "%s - RowCount: %s", user_context.schema, result.rowcount
-    )
-
-    # fix inconsistencies after outlier insert
-    admin_drug_service.fix_inconsistency()
-
-    # invoke function to generate score async
-    payload = {
-        "command": "lambda_scores.process_segment_scores",
-        "schema": user_context.schema,
-        "id_user": user_context.id,
-        "id_segment": id_segment,
-    }
-    lambda_client = aws.get_client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
-    response = lambda_client.invoke(
-        FunctionName=Config.BACKEND_FUNCTION_NAME,
-        InvocationType="Event",
-        Payload=json.dumps(payload),
-    )
-
-    # Return Lambda request ID for tracking
-    return {
-        "request_id": response.get("ResponseMetadata", {}).get("RequestId"),
-        "status_code": response.get("StatusCode"),
-    }
-
-
-@has_permission(Permission.WRITE_SEGMENT_SCORE)
 def remove_outlier(id_drug, id_segment):
     count = (
         db.session.query(PrescriptionAgg)
@@ -568,33 +516,3 @@ def get_outlier_drugs(
         )
 
     return items
-
-
-@has_permission(Permission.WRITE_SEGMENT_SCORE)
-def refresh_agg(user_context: User):
-    pending_frequencies = admin_integration_status_service._get_pending_frequencies()
-    if pending_frequencies > 0:
-        raise ValidationError(
-            "Existem frequências pendentes de conversão. Configure todas as frequências antes de gerar os escores.",
-            "errors.businessRules",
-            status.HTTP_400_BAD_REQUEST,
-        )
-
-    """Recalculate prescricaoagg"""
-    payload = {
-        "command": "lambda_scores.recalculate_agg",
-        "schema": user_context.schema,
-    }
-
-    lambda_client = aws.get_client("lambda", region_name=Config.NIFI_SQS_QUEUE_REGION)
-    response = lambda_client.invoke(
-        FunctionName=Config.BACKEND_FUNCTION_NAME,
-        InvocationType="Event",
-        Payload=json.dumps(payload),
-    )
-
-    # Return Lambda request ID for tracking
-    return {
-        "request_id": response.get("ResponseMetadata", {}).get("RequestId"),
-        "status_code": response.get("StatusCode"),
-    }
