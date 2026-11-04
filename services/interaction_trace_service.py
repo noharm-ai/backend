@@ -410,6 +410,21 @@ def _evaluate_direction(
     alert = alert_interaction_service.build_alert(
         kind=kind, relation=relation, drug_from=drug_from, drug_to=drug_to
     )
+
+    # the schema may ignore the kind's alerts of the level it ended up with
+    level_rule = alert_interaction_service.evaluate_level_rule(
+        kind=kind, level=alert["level"], alert_config=alert_config
+    )
+    if level_rule is not None:
+        direction["rules"].append(level_rule)
+
+        if not level_rule["passed"]:
+            direction["message"] = (
+                "Há relação ativa e as regras foram atendidas, mas a configuração "
+                "da instituição ignora alertas deste nível."
+            )
+            return direction
+
     names_by_id = {
         drug_from["id"]: drug_from["drug"],
         drug_to["id"]: drug_to["drug"],

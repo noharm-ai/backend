@@ -329,6 +329,7 @@ def test_the_schema_alert_config_hides_the_alert_and_the_trace_says_why(
         "enabled": True,
         "ignoreFrequencies": [33.0, 44.0],
         "requireIntervalIntersection": True,
+        "ignoreLevels": [],
     }
 
     trace = data["trace"]
@@ -376,6 +377,47 @@ def test_a_kind_disabled_by_the_schema_is_hidden_and_explained(
     assert trace["alerted"] is False
     rules = _kind(trace, "dm")["directions"][0]["rules"]
     assert [r["rule"] for r in rules if not r["passed"]] == ["config_kind_disabled"]
+
+
+def test_a_level_ignored_by_the_schema_is_hidden_and_explained(
+    client, analyst_headers, maintainer_headers, monkeypatch
+):
+    """The schema params ignore low ``iy`` alerts: a low one (no shared time) is
+    neither shown nor counted, and the trace names the level rule."""
+    store = {"demo": {"alerts": {"interactions": {"iy": {"ignoreLevels": ["low"]}}}}}
+    monkeypatch.setattr(
+        "repository.store_repository.get_items_data",
+        lambda pk, sks: {sk: store[sk] for sk in sks if sk in store}
+        if pk == "schema_params"
+        else {},
+    )
+    _add_relation(_SUBSTANCE_A[0], _SUBSTANCE_B[0], "iy", "low")
+    id_prescription, (id_a, id_b) = _prescription(
+        [
+            {"idDrug": _DRUG_A[0], "route": _IV_ROUTE, "interval": "06:00"},
+            {"idDrug": _DRUG_B[0], "route": _IV_ROUTE, "interval": "18:00"},
+        ]
+    )
+
+    payload = client.get(
+        f"/prescriptions/{id_prescription}", headers=analyst_headers
+    ).get_json()["data"]
+    assert payload["alertStats"]["interactions"].get("iy", 0) == 0
+
+    trace = _trace(
+        client,
+        maintainer_headers,
+        idPrescription=id_prescription,
+        idPrescriptionDrugFrom=id_a,
+        idPrescriptionDrugTo=id_b,
+    )["trace"]
+
+    assert trace["alerted"] is False
+    direction = _kind(trace, "iy")["directions"][0]
+    assert [r["rule"] for r in direction["rules"] if not r["passed"]] == [
+        "config_ignored_level"
+    ]
+    assert "nível" in direction["message"]
 
 
 def test_the_same_item_twice_is_rejected(client, maintainer_headers):

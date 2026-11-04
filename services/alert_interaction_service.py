@@ -93,6 +93,21 @@ def find_relations(
             ):
                 continue
 
+            alert = build_alert(
+                kind=kind,
+                relation=active_relations[key],
+                drug_from=drug_from,
+                drug_to=drug_to,
+            )
+
+            # the schema may ignore the kind's alerts of some levels (the level
+            # is only known once the alert is built)
+            level_rule = evaluate_level_rule(
+                kind=kind, level=alert["level"], alert_config=alert_config
+            )
+            if level_rule is not None and not level_rule["passed"]:
+                continue
+
             if is_cpoe:
                 uniq_key = key
                 uniq_invert_key = invert_key
@@ -107,13 +122,6 @@ def find_relations(
                 stats[kind] += 1
                 unique_relations[uniq_key] = 1
                 unique_relations[uniq_invert_key] = 1
-
-            alert = build_alert(
-                kind=kind,
-                relation=active_relations[key],
-                drug_from=drug_from,
-                drug_to=drug_to,
-            )
 
             for id in alert["ids"]:
                 alert_obj = {
@@ -406,6 +414,28 @@ def _frequency_label(frequency) -> str:
 def _frequency_list(frequencies: list[float]) -> str:
     """The configured frequencies, as shown in the rule messages"""
     return ", ".join(_frequency_label(f) for f in frequencies)
+
+
+def evaluate_level_rule(
+    kind: str, level, alert_config: AlertConfig = None
+) -> dict | None:
+    """Rule of the schema's alert config on the level of a built alert (its
+    final level, after build_alert's adjustments): fails when the kind ignores
+    that level. None when the kind ignores no level"""
+    if alert_config is None:
+        return None
+
+    ignored = alert_config.interaction(kind).ignoreLevels
+    if not ignored:
+        return None
+
+    return {
+        "rule": "config_ignored_level",
+        "passed": level not in ignored,
+        "message": "Configuração da instituição: alertas de "
+        f"{examutils.typeRelations.get(kind, kind)} de nível "
+        f"{', '.join(ignored)} não são exibidos (nível deste alerta: {level}).",
+    }
 
 
 def build_alert(kind: str, relation: dict, drug_from: dict, drug_to: dict) -> dict:

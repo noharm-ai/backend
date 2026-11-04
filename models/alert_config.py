@@ -108,6 +108,18 @@ class InteractionKindConfig(BaseModel):
     # shows the alert only when the items share an administration time; not
     # applied to rx, whose second side is an allergy
     requireIntervalIntersection: bool = False
+    # low | medium | high: alerts of these levels are neither shown nor counted
+    # (the alert's final level, after the dm SN and iy shared time adjustments)
+    ignoreLevels: list[str] = Field(default_factory=list)
+
+    @field_validator("ignoreLevels", mode="before")
+    @classmethod
+    def _known_levels(cls, levels):
+        """Only the known levels count (never invalidates the section)"""
+        if not isinstance(levels, list):
+            return []
+
+        return [level for level in levels if level in _ALERT_LEVELS]
 
 
 _DEFAULT_KIND_CONFIG = InteractionKindConfig()

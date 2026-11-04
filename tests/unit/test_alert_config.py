@@ -866,3 +866,126 @@ def test_unknown_alert_type_level_keeps_the_alerts_own(level):
     assert config.types.kidney.level is None
     result = _alerts_with(_kidney_and_max_dose_plus_drugs(), config)
     assert _levels(result, "61")["kidney"] == "medium"
+
+
+# --- interaction ignoreLevels --------------------------------------------------
+
+
+def test_ignore_levels_keeps_only_known_levels():
+    """ignoreLevels: só níveis conhecidos; outro formato vira lista vazia"""
+    config = _config(
+        iy={"ignoreLevels": ["low", "urgent", 1, "medium"]},
+        dm={"ignoreLevels": "low"},
+    )
+
+    assert config.interaction("iy").ignoreLevels == ["low", "medium"]
+    assert config.interaction("dm").ignoreLevels == []
+    assert config.interaction("it").ignoreLevels == []
+
+
+def test_level_rule_only_when_configured():
+    """Sem ignoreLevels (ou sem config), nenhuma regra de nível"""
+    from services.alert_interaction_service import evaluate_level_rule
+
+    assert evaluate_level_rule(kind="iy", level="low", alert_config=None) is None
+    assert (
+        evaluate_level_rule(kind="iy", level="low", alert_config=AlertConfig()) is None
+    )
+    assert (
+        evaluate_level_rule(
+            kind="it", level="low", alert_config=_config(iy={"ignoreLevels": ["low"]})
+        )
+        is None
+    )
+
+
+@pytest.mark.parametrize(
+    "level,passed", [("low", False), ("medium", True), ("high", True)]
+)
+def test_level_rule(level, passed):
+    """Nível ignorado: a regra falha e a mensagem nomeia tipo e nível"""
+    from services.alert_interaction_service import evaluate_level_rule
+
+    rule = evaluate_level_rule(
+        kind="iy", level=level, alert_config=_config(iy={"ignoreLevels": ["low"]})
+    )
+
+    assert rule["rule"] == "config_ignored_level"
+    assert rule["passed"] is passed
+    assert "Incompatibilidade em Y" in rule["message"]
+    assert f"nível deste alerta: {level}" in rule["message"]
+
+
+def test_find_relations_ignores_iy_low_by_its_final_level(iy_relation):
+    """iy baixo é ignorado; com horário em comum ele sobe a médio e continua"""
+    config = _config(iy={"ignoreLevels": ["low"]})
+
+    low = find_relations(
+        _iy_drug_list(interval_a="08:00", interval_b="14:00"),
+        id_patient=1,
+        is_cpoe=False,
+        alert_config=config,
+    )
+    raised = find_relations(
+        _iy_drug_list(interval_a="08:00 20:00", interval_b="20:00"),
+        id_patient=1,
+        is_cpoe=False,
+        alert_config=config,
+    )
+
+    assert low["alerts"] == {}
+    assert low["stats"]["iy"] == 0
+    assert raised["stats"]["iy"] == 1
+    assert raised["alerts"]["1"][0]["level"] == "medium"
+
+
+def test_find_relations_ignores_dm_reduced_to_low(monkeypatch):
+    """dm médio com item SN cai para baixo: ignorado quando baixo é ignorado"""
+
+    def relations(*args, **kwargs):
+        return {
+            "211111-111111-dm": {
+                "sctida": "211111",
+                "sctidb": "111111",
+                "kind": "dm",
+                "text": "Drug A duplicates Drug B",
+                "level": "medium",
+            }
+        }
+
+    monkeypatch.setattr(
+        "services.alert_interaction_service._get_allergies", lambda **kw: []
+    )
+    monkeypatch.setattr(
+        "services.alert_interaction_service._get_active_relations", relations
+    )
+    config = _config(dm={"ignoreLevels": ["low"]})
+
+    plain = find_relations(
+        _iy_drug_list(), id_patient=1, is_cpoe=False, alert_config=config
+    )
+    with_sn = find_relations(
+        _iy_drug_list(frequency_b=SN), id_patient=1, is_cpoe=False, alert_config=config
+    )
+
+    assert plain["stats"]["dm"] == 1
+    assert with_sn["stats"]["dm"] == 0
+
+
+def test_ignored_levels_are_per_kind(monkeypatch):
+    """Ignorar iy baixo não afeta it baixo"""
+    monkeypatch.setattr(
+        "services.alert_interaction_service._get_allergies", lambda **kw: []
+    )
+    monkeypatch.setattr(
+        "services.alert_interaction_service._get_active_relations",
+        _relations_mock(kinds=["it", "iy"]),
+    )
+    config = _config(iy={"ignoreLevels": ["low"]})
+
+    result = find_relations(
+        _iy_drug_list(), id_patient=1, is_cpoe=False, alert_config=config
+    )
+
+    assert result["stats"]["iy"] == 0
+    assert result["stats"]["it"] == 1
