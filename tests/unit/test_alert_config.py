@@ -615,3 +615,87 @@ def test_ira_uses_the_configured_adult_exams(exams, alerted):
     config = _kidney_config(adultExams=["tfg", "ckd"])
 
     assert bool(_ira_alerts(exams, config)) is alerted
+
+
+# --- interaction kind on/off --------------------------------------------------
+
+
+def test_interaction_kinds_are_on_by_default():
+    """Sem config, todos os tipos de interação continuam (nenhuma regra nova)"""
+    for alert_config in (AlertConfig(), _config(dm={"enabled": True})):
+        rules = _rules(
+            "dm", _relation_item(), _relation_item(id="2"), alert_config=alert_config
+        )
+        assert "config_kind_disabled" not in rules
+
+
+@pytest.mark.parametrize("kind", ["it", "dt", "dm", "iy", "sl", "rx"])
+def test_a_disabled_interaction_kind_fails_its_rule(kind):
+    """Tipo desligado: a regra falha e a mensagem (trace) nomeia o tipo"""
+    from utils import examutils
+
+    rules = evaluate_kind_rules(
+        kind=kind,
+        drug_from=_relation_item(rx=kind == "rx"),
+        drug_to=_relation_item(id="2"),
+        alert_config=_config(**{kind: {"enabled": False}}),
+    )
+    rule = next(r for r in rules if r["rule"] == "config_kind_disabled")
+
+    assert rule["passed"] is False
+    assert examutils.typeRelations[kind] in rule["message"]
+
+
+def test_disabling_a_kind_does_not_touch_the_others():
+    """Desligar dm não afeta iy"""
+    rules = _rules(
+        "iy",
+        _relation_item(),
+        _relation_item(id="2"),
+        alert_config=_config(dm={"enabled": False}),
+    )
+
+    assert "config_kind_disabled" not in rules
+
+
+def _relations_mock(kinds: list[str]):
+    """Active relations of Drug A -> Drug B for the given kinds"""
+
+    def mock(*args, **kwargs):
+        return {
+            f"211111-111111-{kind}": {
+                "sctida": "211111",
+                "sctidb": "111111",
+                "kind": kind,
+                "text": "Drug A interacts with Drug B",
+                "level": "low",
+            }
+            for kind in kinds
+        }
+
+    return mock
+
+
+def test_find_relations_hides_a_disabled_kind(monkeypatch):
+    """dm desligado some do alerta e da contagem; iy continua"""
+    monkeypatch.setattr(
+        "services.alert_interaction_service._get_allergies", lambda **kw: []
+    )
+    monkeypatch.setattr(
+        "services.alert_interaction_service._get_active_relations",
+        _relations_mock(kinds=["dm", "iy"]),
+    )
+    config = _config(dm={"enabled": False}, iy={"enabled": True})
+
+    shown = find_relations(_iy_drug_list(), id_patient=1, is_cpoe=False)
+    configured = find_relations(
+        _iy_drug_list(), id_patient=1, is_cpoe=False, alert_config=config
+    )
+
+    assert shown["stats"]["dm"] == 1
+    assert shown["stats"]["iy"] == 1
+    assert configured["stats"]["dm"] == 0
+    assert configured["stats"]["iy"] == 1
+    assert {a["type"] for alerts in configured["alerts"].values() for a in alerts} == {
+        "iy"
+    }

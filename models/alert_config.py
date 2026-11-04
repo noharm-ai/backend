@@ -85,6 +85,8 @@ class InteractionKindConfig(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
+    # off: the kind is neither shown nor counted
+    enabled: bool = True
     # hides the alert when either item's daily frequency (presmed.frequenciadia)
     # is in the list (e.g. FrequencyEnum.SN 33, FrequencyEnum.ACM 44); not
     # applied to rx, whose second side is an allergy

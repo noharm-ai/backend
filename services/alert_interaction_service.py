@@ -343,6 +343,16 @@ def _config_rules(
     kind_config = alert_config.interaction(kind)
     rules = []
 
+    if not kind_config.enabled:
+        rules.append(
+            {
+                "rule": "config_kind_disabled",
+                "passed": False,
+                "message": "Configuração da instituição: alertas de "
+                f"{examutils.typeRelations.get(kind, kind)} estão desativados.",
+            }
+        )
+
     # rx: the second side is an allergy, which has no frequency
     if kind_config.ignoreFrequencies and kind != "rx":
         ignored = set(kind_config.ignoreFrequencies)

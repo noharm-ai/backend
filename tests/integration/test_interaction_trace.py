@@ -326,6 +326,7 @@ def test_the_schema_alert_config_hides_the_alert_and_the_trace_says_why(
         idPrescriptionDrugTo=id_b,
     )
     assert data["alertConfig"]["interactions"]["iy"] == {
+        "enabled": True,
         "ignoreFrequencies": [33.0, 44.0],
         "requireIntervalIntersection": True,
     }
@@ -340,6 +341,41 @@ def test_the_schema_alert_config_hides_the_alert_and_the_trace_says_why(
     assert next(r for r in rules if r["rule"] == "config_interval_intersection")[
         "passed"
     ]
+
+
+def test_a_kind_disabled_by_the_schema_is_hidden_and_explained(
+    client, analyst_headers, maintainer_headers, monkeypatch
+):
+    """A relation kind turned off in the schema params (``dm``) is neither shown
+    nor counted, and the trace names the config rule."""
+    store = {"demo": {"alerts": {"interactions": {"dm": {"enabled": False}}}}}
+    monkeypatch.setattr(
+        "repository.store_repository.get_items_data",
+        lambda pk, sks: {sk: store[sk] for sk in sks if sk in store}
+        if pk == "schema_params"
+        else {},
+    )
+    _add_relation(_SUBSTANCE_A[0], _SUBSTANCE_B[0], "dm", "high")
+    id_prescription, (id_a, id_b) = _prescription(
+        [{"idDrug": _DRUG_A[0]}, {"idDrug": _DRUG_B[0]}]
+    )
+
+    payload = client.get(
+        f"/prescriptions/{id_prescription}", headers=analyst_headers
+    ).get_json()["data"]
+    assert payload["alertStats"]["interactions"].get("dm", 0) == 0
+
+    trace = _trace(
+        client,
+        maintainer_headers,
+        idPrescription=id_prescription,
+        idPrescriptionDrugFrom=id_a,
+        idPrescriptionDrugTo=id_b,
+    )["trace"]
+
+    assert trace["alerted"] is False
+    rules = _kind(trace, "dm")["directions"][0]["rules"]
+    assert [r["rule"] for r in rules if not r["passed"]] == ["config_kind_disabled"]
 
 
 def test_the_same_item_twice_is_rejected(client, maintainer_headers):
