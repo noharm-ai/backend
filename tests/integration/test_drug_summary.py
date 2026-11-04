@@ -6,7 +6,7 @@
 no measure-unit or frequency catalogue — and in exchange it computes the two
 fields the catalogue route always leaves empty:
 
-* ``routes`` — the routes used for that drug/segment in the last 15 days,
+* ``routes`` — the routes used for that drug/segment in the last 5 days,
   falling back to the routes configured in the ``map-routes`` memory when the
   drug has no recent history;
 * ``intervals`` — the schedules used in the same window, each rendered as
@@ -67,7 +67,7 @@ ROUTE_ONLY_SUBSTANCE = 90603
 UNIT_MG = "1"
 FREQUENCY_8H = "3"
 
-# the routes query only looks at the last 15 days
+# the routes query only looks at the last 5 days
 INSIDE_WINDOW = datetime.now() - timedelta(days=2)
 OUTSIDE_WINDOW = datetime.now() - timedelta(days=40)
 
@@ -242,7 +242,7 @@ def test_drug_summary_returns_the_drug_and_what_was_already_prescribed(
 def test_drug_summary_returns_the_recently_prescribed_routes(
     client, analyst_headers, summary_drug
 ):
-    """GET /drugs/summary - lista as vias usadas nos últimos 15 dias"""
+    """GET /drugs/summary - lista as vias usadas nos últimos 5 dias"""
     data = _get(client, analyst_headers, id_drug=summary_drug).get_json()["data"]
 
     assert sorted(r["id"] for r in data["routes"]) == ["SNE", "VO"]
@@ -253,7 +253,7 @@ def test_drug_summary_returns_the_recently_prescribed_routes(
 def test_drug_summary_ignores_routes_prescribed_before_the_window(
     client, analyst_headers, summary_drug
 ):
-    """GET /drugs/summary - desconsidera as vias prescritas fora da janela de 15 dias"""
+    """GET /drugs/summary - desconsidera as vias prescritas fora da janela de 5 dias"""
     data = _get(client, analyst_headers, id_drug=summary_drug).get_json()["data"]
 
     assert "IV" not in [r["id"] for r in data["routes"]]
@@ -345,7 +345,7 @@ def test_drug_summary_renders_the_recently_prescribed_intervals(
 def test_drug_summary_ignores_intervals_prescribed_before_the_window(
     client, analyst_headers, summary_drug
 ):
-    """GET /drugs/summary - desconsidera os horários prescritos fora da janela de 15 dias"""
+    """GET /drugs/summary - desconsidera os horários prescritos fora da janela de 5 dias"""
     data = _get(client, analyst_headers, id_drug=summary_drug).get_json()["data"]
 
     assert "22" not in [i["id"] for i in data["intervals"]]

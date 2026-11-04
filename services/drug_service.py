@@ -38,10 +38,10 @@ from utils import (
 )
 
 # the drug summary lists the routes and intervals prescribed in these last days
-DRUG_SUMMARY_RECENT_DAYS = 15
+DRUG_SUMMARY_RECENT_DAYS = 5
 # the recent routes and intervals stop after this: the request has 30s in all,
 # and the summary opens without them (see _get_recent_routes_and_intervals)
-DRUG_SUMMARY_STATEMENT_TIMEOUT_MS = 5000
+DRUG_SUMMARY_STATEMENT_TIMEOUT_MS = 10000
 
 
 def _get_recent_routes_and_intervals(id_drug: int, id_segment: int) -> list:
