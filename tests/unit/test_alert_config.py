@@ -333,3 +333,285 @@ def test_culture_class_alert_does_not_stand_in_for_a_type_turned_off():
     assert result["alerts"] == {}
     assert result["stats"]["cultureResistant"] == 0
     assert result["stats"]["cultureResistantClass"] == 0
+
+
+# --- kidney alert exams ----------------------------------------------------
+
+
+def test_types_cover_every_alert_type():
+    """Cada tipo de alerta (DrugAlertTypeEnum) tem sua entrada em types"""
+    from models.alert_config import AlertTypesConfig
+    from models.enums import DrugAlertTypeEnum
+
+    assert set(AlertTypesConfig.model_fields) == {t.value for t in DrugAlertTypeEnum}
+
+
+def test_unknown_alert_type_is_the_default():
+    """Tipo desconhecido (ou atributo do modelo) não quebra: padrão"""
+    config = AlertConfig()
+
+    assert config.alert_type("other").enabled is True
+    assert config.alert_type("model_config").enabled is True
+
+
+def test_kidney_exams_defaults():
+    """Padrão: os exames de hoje (ckd21/ckd adulto, swrtz2/swrtz1 pediátrico)"""
+    kidney = AlertConfig().types.kidney
+
+    assert kidney.adultExams == ["ckd21", "ckd"]
+    assert kidney.pediatricExams == ["swrtz2", "swrtz1"]
+
+
+def test_kidney_exams_are_normalized():
+    """tpexam em minúsculas, sem repetição; lista vazia mantém o padrão"""
+    kidney = AlertConfig.model_validate(
+        {
+            "types": {
+                "kidney": {
+                    "adultExams": [" TFG ", "tfg", "CKD21"],
+                    "pediatricExams": [],
+                }
+            }
+        }
+    ).types.kidney
+
+    assert kidney.adultExams == ["tfg", "ckd21"]
+    assert kidney.pediatricExams == ["swrtz2", "swrtz1"]
+
+
+def _kidney_alerts(exams: dict, alert_config=None, kidney_limit=30):
+    from services import alert_service
+
+    drugs = [
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=61, dose=10, frequency=1, kidney=kidney_limit
+        )
+    ]
+    result = alert_service.find_alerts(
+        drug_list=drugs,
+        exams=exams,
+        dialisys=None,
+        pregnant=None,
+        lactating=None,
+        schedules_fasting=None,
+        cn_data=None,
+        protocols=None,
+        is_cpoe=False,
+        alert_config=alert_config,
+    )
+    return [a for a in result["alerts"].get("61", []) if a["type"] == "kidney"]
+
+
+def _kidney_config(**kidney) -> AlertConfig:
+    return AlertConfig.model_validate({"types": {"kidney": kidney}})
+
+
+@pytest.mark.parametrize(
+    "exams,alerted",
+    [
+        # ckd21 decides when it has a value, even if ckd is below the limit
+        ({"ckd21": {"value": 50}, "ckd": {"value": 10}}, False),
+        ({"ckd21": {"value": 10}, "ckd": {"value": 50}}, True),
+        # ckd only without ckd21
+        ({"ckd": {"value": 10}}, True),
+        ({"ckd21": {"value": None}, "ckd": {"value": 10}}, True),
+        ({}, False),
+    ],
+)
+def test_kidney_adult_defaults_keep_todays_behaviour(exams, alerted):
+    """Adulto, sem config: o primeiro exame com valor decide (ckd21, ckd)"""
+    alerts = _kidney_alerts({"age": 50, "weight": 80, **exams})
+
+    assert bool(alerts) is alerted
+
+
+@pytest.mark.parametrize(
+    "exams,alerted",
+    [
+        # any exam below the limit raises, in order
+        ({"swrtz2": {"value": 50}, "swrtz1": {"value": 10}}, True),
+        ({"swrtz2": {"value": 10}}, True),
+        ({"swrtz1": {"value": 10}}, True),
+        ({"swrtz2": {"value": 50}, "swrtz1": {"value": 50}}, False),
+    ],
+)
+def test_kidney_pediatric_defaults_keep_todays_behaviour(exams, alerted):
+    """Pediátrico, sem config: o primeiro exame abaixo do limite (swrtz2, swrtz1)"""
+    alerts = _kidney_alerts({"age": 10, "weight": 30, **exams})
+
+    assert bool(alerts) is alerted
+
+
+def test_kidney_default_texts():
+    """Os textos dos exames de hoje continuam (com espaçamento corrigido)"""
+    adult = _kidney_alerts({"age": 50, "weight": 80, "ckd21": {"value": 10}})
+    child = _kidney_alerts({"age": 10, "weight": 30, "swrtz1": {"value": 10}})
+
+    assert adult[0]["text"].endswith(
+        "função renal do paciente (10 mL/min) está abaixo de 30 mL/min."
+    )
+    assert child[0]["text"].endswith(
+        "(10 mL/min/1.73m²) está abaixo de 30 mL/min. (Schwartz 1)"
+    )
+
+
+def test_kidney_adult_uses_the_configured_exam():
+    """Adulto: usa o tpexam configurado; os padrões deixam de contar"""
+    config = _kidney_config(adultExams=["tfg"])
+    tfg = {"value": 20, "initials": "TFG", "unit": "mL/min/1.73m²"}
+
+    alerts = _kidney_alerts(
+        {"age": 50, "weight": 80, "ckd21": {"value": 50}, "tfg": tfg}, config
+    )
+    not_configured = _kidney_alerts(
+        {"age": 50, "weight": 80, "ckd21": {"value": 10}}, config
+    )
+
+    assert len(alerts) == 1
+    assert "(TFG: 20 mL/min/1.73m²) está abaixo de 30 mL/min." in alerts[0]["text"]
+    assert not_configured == []
+
+
+def test_kidney_adult_configured_order():
+    """Adulto: na ordem configurada, o primeiro com valor decide"""
+    config = _kidney_config(adultExams=["tfg", "ckd21"])
+
+    with_tfg = _kidney_alerts(
+        {"age": 50, "weight": 80, "tfg": {"value": 50}, "ckd21": {"value": 10}},
+        config,
+    )
+    without_tfg = _kidney_alerts(
+        {"age": 50, "weight": 80, "ckd21": {"value": 10}}, config
+    )
+
+    assert with_tfg == []
+    assert len(without_tfg) == 1
+
+
+def test_kidney_pediatric_uses_the_configured_exam():
+    """Pediátrico: usa o tpexam configurado"""
+    config = _kidney_config(pediatricExams=["tfgped"])
+
+    alerts = _kidney_alerts(
+        {
+            "age": 10,
+            "weight": 30,
+            "swrtz2": {"value": 10},
+            "tfgped": {"value": 20, "name": "TFG pediátrica", "unit": None},
+        },
+        config,
+    )
+    above = _kidney_alerts({"age": 10, "weight": 30, "tfgped": {"value": 50}}, config)
+
+    assert len(alerts) == 1
+    assert "(TFG pediátrica: 20) está abaixo de 30 mL/min." in alerts[0]["text"]
+    assert above == []
+
+
+@pytest.mark.parametrize("exam_type", ["age", "weight", "missing"])
+def test_kidney_exam_that_is_not_an_exam_is_ignored(exam_type):
+    """tpexam que não é exame (ou não existe) é ignorado, sem erro"""
+    config = _kidney_config(adultExams=[exam_type, "ckd"])
+
+    alerts = _kidney_alerts({"age": 50, "weight": 80, "ckd": {"value": 10}}, config)
+
+    assert len(alerts) == 1
+
+
+def test_kidney_non_numeric_value_is_ignored():
+    """Valor não numérico não quebra a tela: o próximo exame vale"""
+    config = _kidney_config(adultExams=["tfg", "ckd"])
+
+    alerts = _kidney_alerts(
+        {"age": 50, "weight": 80, "tfg": {"value": "n/a"}, "ckd": {"value": 10}},
+        config,
+    )
+
+    assert len(alerts) == 1
+
+
+def test_dialysis_alert_ignores_the_exams():
+    """Em diálise o alerta não depende dos exames configurados"""
+    from services import alert_service
+
+    drugs = [
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=61, dose=10, frequency=1, kidney=30
+        )
+    ]
+    result = alert_service.find_alerts(
+        drug_list=drugs,
+        exams={"age": 50, "weight": 80},
+        dialisys="c",
+        pregnant=None,
+        lactating=None,
+        schedules_fasting=None,
+        cn_data=None,
+        protocols=None,
+        is_cpoe=False,
+        alert_config=_kidney_config(adultExams=["tfg"]),
+    )
+
+    assert [a["type"] for a in result["alerts"]["61"]] == ["kidney"]
+
+
+# --- IRA follows the kidney adult exams ---------------------------------------
+
+
+def _ira_alerts(exams: dict, alert_config=None):
+    """IRA alerts of a vancomycin item: daily dose 100, weight 80, so a renal
+    function of 1 raises it (100 / 1 / 80 > 0,6219) and 300 does not"""
+    from services import alert_service
+
+    drugs = [
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=61, dose=10, frequency=10, drug_name="xxx vancoyyy"
+        )
+    ]
+    result = alert_service.find_alerts(
+        drug_list=drugs,
+        exams={"weight": 80, **exams},
+        dialisys=None,
+        pregnant=None,
+        lactating=None,
+        schedules_fasting=None,
+        cn_data=None,
+        protocols=None,
+        is_cpoe=False,
+        alert_config=alert_config,
+    )
+    return [a for a in result["alerts"].get("61", []) if a["type"] == "ira"]
+
+
+@pytest.mark.parametrize(
+    "exams,alerted",
+    [
+        # ckd21 decides when it has a value
+        ({"ckd21": {"value": 300}, "ckd": {"value": 1}}, False),
+        ({"ckd21": {"value": 1}, "ckd": {"value": 300}}, True),
+        # ckd only without ckd21
+        ({"ckd": {"value": 1}}, True),
+        ({}, False),
+    ],
+)
+def test_ira_defaults_keep_todays_behaviour(exams, alerted):
+    """IRA, sem config: a função renal é ckd21, ou ckd sem ckd21"""
+    assert bool(_ira_alerts(exams)) is alerted
+
+
+@pytest.mark.parametrize(
+    "exams,alerted",
+    [
+        ({"tfg": {"value": 1}}, True),
+        ({"tfg": {"value": 300}, "ckd": {"value": 1}}, False),
+        # a default exam no longer counts when the schema chose others
+        ({"ckd21": {"value": 1}}, False),
+        # in order: the next exam when the first has no value
+        ({"tfg": {"value": None}, "ckd": {"value": 1}}, True),
+    ],
+)
+def test_ira_uses_the_configured_adult_exams(exams, alerted):
+    """IRA usa os exames de adulto configurados no alerta renal (o primeiro com valor)"""
+    config = _kidney_config(adultExams=["tfg", "ckd"])
+
+    assert bool(_ira_alerts(exams, config)) is alerted
