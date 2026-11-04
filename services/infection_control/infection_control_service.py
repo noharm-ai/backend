@@ -53,7 +53,7 @@ from services.infection_control import (
     infection_control_status_service as rule,
 )
 from services.infection_control.antimicrobial_timeline_service import GAP_TOLERANCE
-from utils import dateutils, logger, status
+from utils import dateutils, db_utils, logger, status
 
 
 # letters typed before the drugs are searched
@@ -64,7 +64,7 @@ COUNT_LIMIT = 5000
 # each worklist query stops after this: the request has 30s in all
 WORKLIST_STATEMENT_TIMEOUT_MS = 10000
 # postgres query_canceled, raised when statement_timeout runs out
-QUERY_CANCELED = "57014"
+QUERY_CANCELED = db_utils.QUERY_CANCELED
 
 
 def _check_feature():
