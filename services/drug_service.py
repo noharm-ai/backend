@@ -1,7 +1,9 @@
+import json
 from datetime import datetime
 from typing import List
 
 from sqlalchemy import and_, asc, func
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import undefer
 
 from decorators.has_permission_decorator import Permission, has_permission
@@ -23,11 +25,57 @@ from models.main import (
     User,
     db,
 )
-from models.prescription import Prescription, PrescriptionDrug
 from models.segment import Segment
 from repository import drugs_repository, outlier_repository
 from services import data_authorization_service, memory_service
-from utils import lambdautils, numberutils, prescriptionutils, status
+from utils import (
+    db_utils,
+    lambdautils,
+    logger,
+    numberutils,
+    prescriptionutils,
+    status,
+)
+
+# the drug summary lists the routes and intervals prescribed in these last days
+DRUG_SUMMARY_RECENT_DAYS = 5
+# the recent routes and intervals stop after this: the request has 30s in all,
+# and the summary opens without them (see _get_recent_routes_and_intervals)
+DRUG_SUMMARY_STATEMENT_TIMEOUT_MS = 10000
+
+
+def _get_recent_routes_and_intervals(id_drug: int, id_segment: int) -> list:
+    """The drug's recent (route, interval, idFrequency), bounded by
+    DRUG_SUMMARY_STATEMENT_TIMEOUT_MS.
+
+    On a large schema the query can take longer than the whole request has
+    (30s): running out of time returns nothing, so the summary still opens
+    with the map-routes memory and no intervals. The savepoint rolls back the
+    cancelled statement, so the rest of the request can keep reading.
+    """
+    try:
+        with db.session.begin_nested():
+            with db_utils.statement_timeout(DRUG_SUMMARY_STATEMENT_TIMEOUT_MS):
+                return drugs_repository.get_recent_routes_and_intervals(
+                    id_drug=id_drug,
+                    id_segment=id_segment,
+                    days=DRUG_SUMMARY_RECENT_DAYS,
+                )
+    except OperationalError as e:
+        if getattr(e.orig, "pgcode", None) != db_utils.QUERY_CANCELED:
+            raise
+
+        logger.backend_logger.warning(
+            json.dumps(
+                {
+                    "event": "drug_summary_recent_items_timeout",
+                    "id_drug": id_drug,
+                    "id_segment": id_segment,
+                    "timeout_ms": DRUG_SUMMARY_STATEMENT_TIMEOUT_MS,
+                }
+            )
+        )
+        return []
 
 
 @has_permission(Permission.READ_PRESCRIPTION)
@@ -73,25 +121,12 @@ def get_drug_summary(
     )
 
     if complete:
-        max_days = 15
-
-        routes = (
-            db.session.query(PrescriptionDrug.route)
-            .select_from(PrescriptionDrug)
-            .join(Prescription, Prescription.id == PrescriptionDrug.idPrescription)
-            .filter(
-                and_(
-                    PrescriptionDrug.idDrug == id_drug,
-                    PrescriptionDrug.idSegment == id_segment,
-                    Prescription.date > func.current_date() - max_days,
-                )
-            )
-            .group_by(PrescriptionDrug.route)
-            .all()
+        recent_items = _get_recent_routes_and_intervals(
+            id_drug=id_drug, id_segment=id_segment
         )
 
-        for r in routes:
-            routeResults.append({"id": r.route, "description": r.route})
+        for route in dict.fromkeys(item.route for item in recent_items):
+            routeResults.append({"id": route, "description": route})
 
         if not routeResults:
             map_routes = memory_service.get_memory(MemoryEnum.MAP_ROUTES.value)
@@ -107,30 +142,18 @@ def get_drug_summary(
             has_intervals = False
 
         if has_intervals:
-            intervals = (
-                db.session.query(
-                    PrescriptionDrug.interval, PrescriptionDrug.idFrequency
-                )
-                .select_from(PrescriptionDrug)
-                .join(Prescription, Prescription.id == PrescriptionDrug.idPrescription)
-                .filter(
-                    and_(
-                        PrescriptionDrug.idDrug == id_drug,
-                        PrescriptionDrug.idSegment == id_segment,
-                        Prescription.date > func.current_date() - max_days,
-                        PrescriptionDrug.interval != None,
-                    )
-                )
-                .group_by(PrescriptionDrug.interval, PrescriptionDrug.idFrequency)
-                .all()
+            intervals = dict.fromkeys(
+                (item.interval, item.idFrequency)
+                for item in recent_items
+                if item.interval is not None
             )
 
-            for i in intervals:
+            for interval, id_frequency in intervals:
                 intervalResults.append(
                     {
-                        "id": i.interval,
-                        "idFrequency": i.idFrequency,
-                        "description": prescriptionutils.timeValue(i.interval),
+                        "id": interval,
+                        "idFrequency": id_frequency,
+                        "description": prescriptionutils.timeValue(interval),
                     }
                 )
 

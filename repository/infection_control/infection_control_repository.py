@@ -1,6 +1,5 @@
 """Repository: infection control follow-up (ci_* tables)"""
 
-from contextlib import contextmanager
 from datetime import datetime, timedelta
 
 from sqlalchemy import (
@@ -13,7 +12,6 @@ from sqlalchemy import (
     false,
     func,
     or_,
-    text,
     update,
 )
 from sqlalchemy.dialects.postgresql import JSONB, insert
@@ -35,6 +33,7 @@ from models.requests.infection_control_request import (
     AntimicrobialCriterionRequest,
     InfectionControlListRequest,
 )
+from utils import db_utils
 
 
 def create_admission(
@@ -65,36 +64,14 @@ def create_admission(
     return db.session.execute(stmt).rowcount > 0
 
 
-@contextmanager
-def _local_timeout(setting: str, timeout_ms: int | None):
-    """Set a timeout (lock_timeout, statement_timeout) inside the block: running
-    out raises OperationalError.
-
-    Restored when the block succeeds, so it doesn't leak into the rest of the
-    transaction. When it fails the transaction (or the savepoint the block runs
-    in) is rolled back, and that undoes the setting too.
-    """
-    if timeout_ms is None:
-        yield
-        return
-
-    # set_config(..., true) is SET LOCAL with a bind param
-    db.session.execute(
-        text("SELECT set_config(:setting, :timeout, true)"),
-        {"setting": setting, "timeout": f"{int(timeout_ms)}ms"},
-    )
-    yield
-    db.session.execute(text(f"SET LOCAL {setting} = DEFAULT"))
-
-
 def lock_timeout(lock_timeout_ms: int | None):
-    """Bound the lock waits inside the block (see _local_timeout)"""
-    return _local_timeout("lock_timeout", lock_timeout_ms)
+    """Bound the lock waits inside the block (see db_utils.local_timeout)"""
+    return db_utils.lock_timeout(lock_timeout_ms)
 
 
 def statement_timeout(statement_timeout_ms: int | None):
-    """Bound each query inside the block (see _local_timeout)"""
-    return _local_timeout("statement_timeout", statement_timeout_ms)
+    """Bound each query inside the block (see db_utils.local_timeout)"""
+    return db_utils.statement_timeout(statement_timeout_ms)
 
 
 def lock_admission(
