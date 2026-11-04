@@ -57,6 +57,9 @@ class Config:
     PRESCRIPTION_PRESENCE_TABLE_NAME = (
         getenv("PRESCRIPTION_PRESENCE_TABLE_NAME") or "noharm_prescription_presence"
     )
+    # generic DynamoDB store shared by NoHarm projects (pk = feature, sk = item);
+    # this project only reads it (e.g. the schema params written by admin)
+    NOHARM_STORE_TABLE = getenv("NOHARM_STORE_TABLE") or "noharm-store"
 
     ODOO_API_DB = getenv("ODOO_API_DB") or ""
     ODOO_API_KEY = getenv("ODOO_API_KEY") or ""

@@ -348,6 +348,15 @@ class SchemaConfigAuditTypeEnum(Enum):
     GETNAME_DNS = 3
     SECURITY_GROUP = 4
     USER_SECURITY_GROUP = 5
+    # 6-10 are written by the admin project (same table): keep in step with its
+    # SchemaConfigAuditTypeEnum so a code is never reused for something else
+    CENTRAL_SECRETS = 6
+    CENTRAL_VPN = 7
+    AWS_ACCESS_KEY = 8
+    NOHARM_DB_USER = 9
+    # noharm-store `schema_params` item of the schema (extra.section names the
+    # section changed)
+    STORE_SCHEMA_PARAMS = 10
 
 
 class InterventionAuditEnum(Enum):

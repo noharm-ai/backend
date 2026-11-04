@@ -45,6 +45,7 @@ from services import (
     memory_service,
     patient_service,
     prescription_service,
+    schema_params_service,
     segment_service,
 )
 from utils import dateutils, prescriptionutils, status
@@ -154,7 +155,10 @@ def get_drug_alerts(
     """
 
     config_data = _get_configs(
-        prescription=prescription, patient=patient, is_complete=False
+        prescription=prescription,
+        patient=patient,
+        is_complete=False,
+        schema=user_context.schema,
     )
 
     allergies = allergy_repository.get_allergy_records(id_patient=patient.idPatient)
@@ -223,7 +227,10 @@ def _internal_get_prescription(
     )
 
     config_data = _get_configs(
-        prescription=prescription, patient=patient, is_complete=is_complete
+        prescription=prescription,
+        patient=patient,
+        is_complete=is_complete,
+        schema=user_context.schema,
     )
 
     interventions = _get_interventions(
@@ -563,7 +570,11 @@ def _get_drug_list_configs(prescription: Prescription) -> dict:
 
 
 @timed()
-def _get_configs(prescription: Prescription, patient: Patient, is_complete: bool):
+def _get_configs(
+    prescription: Prescription, patient: Patient, is_complete: bool, schema: str
+):
+    """Configs of the prescription view: memory, features, segment, patient
+    and the schema params (noharm-store, written by admin)"""
     data = {}
 
     # memory
@@ -599,6 +610,9 @@ def _get_configs(prescription: Prescription, patient: Patient, is_complete: bool
     )
 
     data.update(_get_patient_configs(patient=patient))
+
+    # schema params (noharm-store, written by admin): code defaults without them
+    data["schema_params"] = schema_params_service.get_schema_params(schema=schema)
 
     # previous admissions
     data["previous_admissions"] = patient_repository.get_previous_admissions(
@@ -905,10 +919,14 @@ def _get_alerts(
     """allergies: the patient's allergy records
     (allergy_repository.get_allergy_records), which confirm the allergy flag of
     the items (alert_service.is_allergic)"""
+    # which alerts the schema shows
+    alert_config = config_data["schema_params"].alerts
+
     relations = alert_interaction_service.find_relations(
         drug_list=drug_list,
         is_cpoe=config_data["is_cpoe"],
         id_patient=patient.idPatient,
+        alert_config=alert_config,
     )
 
     protocol_extra_info = ProtocolExtraInfo()
@@ -939,6 +957,7 @@ def _get_alerts(
         is_cpoe=config_data["is_cpoe"],
         cultures=culture_data,
         allergies=allergies,
+        alert_config=alert_config,
     )
 
     return {
@@ -958,7 +977,10 @@ def get_protocol_evaluation_context(id_prescription: int, user_context: User) ->
     )
 
     config_data = _get_configs(
-        prescription=prescription, patient=patient, is_complete=False
+        prescription=prescription,
+        patient=patient,
+        is_complete=False,
+        schema=user_context.schema,
     )
 
     cn_data = _get_clinical_notes_stats(
@@ -1020,7 +1042,10 @@ def get_interaction_evaluation_context(
     )
 
     config_data = _get_configs(
-        prescription=prescription, patient=patient, is_complete=False
+        prescription=prescription,
+        patient=patient,
+        is_complete=False,
+        schema=user_context.schema,
     )
 
     drug_list = _get_drug_list(
@@ -1035,6 +1060,7 @@ def get_interaction_evaluation_context(
         "patient": patient,
         "drug_list": drug_list,
         "is_cpoe": config_data["is_cpoe"],
+        "alert_config": config_data["schema_params"].alerts,
     }
 
 
