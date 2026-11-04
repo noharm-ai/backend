@@ -42,7 +42,8 @@ def find_alerts(
         allergy flag of each item (is_allergic); None keeps the flag as is
     :param alert_config: the schema's alert config
         (schema_params_service); an alert type turned off there is neither
-        listed nor counted. None keeps every type"""
+        listed nor counted, and a type with a level of its own takes it. None
+        keeps every type as it is"""
     alert_config = alert_config or AlertConfig()
     filtered_list = _filter_drug_list(drug_list=drug_list)
     resistant_cultures = _index_resistant_cultures(cultures=cultures)
@@ -51,7 +52,15 @@ def find_alerts(
     stats = _get_empty_stats()
 
     def add_alert(a, handling_types=[]):
-        if a != None and alert_config.alert_type(a["type"]).enabled:
+        type_config = alert_config.alert_type(a["type"]) if a != None else None
+        if a != None and type_config.enabled:
+            # the schema's level for the type (protocol: each protocol sets its own)
+            if (
+                type_config.level is not None
+                and a["type"] != DrugAlertTypeEnum.PROTOCOL.value
+            ):
+                a["level"] = type_config.level
+
             key = a["idPrescriptionDrug"]
             stats[a["type"]] += 1
             a["text"] = re.sub(" {2,}", "", a["text"])

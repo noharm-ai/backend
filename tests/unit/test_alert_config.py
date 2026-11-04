@@ -765,3 +765,104 @@ def test_find_relations_it_requires_interval_intersection(monkeypatch):
 
     assert apart["stats"]["it"] == 0
     assert together["stats"]["it"] == 1
+
+
+# --- alert_service type level ----------------------------------------------
+
+
+def _alerts_with(drugs, alert_config=None, pregnant=None, protocols=None, dialysis="c"):
+    from services import alert_service
+
+    return alert_service.find_alerts(
+        drug_list=drugs,
+        exams={"age": 50, "weight": 80},
+        dialisys=dialysis,
+        pregnant=pregnant,
+        lactating=None,
+        schedules_fasting=None,
+        cn_data=None,
+        protocols=protocols,
+        is_cpoe=False,
+        alert_config=alert_config,
+    )
+
+
+def _levels(result, id_prescription_drug: str) -> dict:
+    return {
+        a["type"]: a["level"] for a in result["alerts"].get(id_prescription_drug, [])
+    }
+
+
+def test_alert_type_level_defaults_to_the_alerts_own():
+    """Sem level: cada alerta mantém o nível de hoje"""
+    result = _alerts_with(_kidney_and_max_dose_plus_drugs(), AlertConfig())
+
+    assert _levels(result, "61") == {"kidney": "medium", "maxDosePlus": "high"}
+
+
+def test_alert_type_level_replaces_the_alerts_own():
+    """level do tipo substitui o nível do alerta; os outros tipos não mudam"""
+    config = AlertConfig.model_validate({"types": {"kidney": {"level": "high"}}})
+
+    result = _alerts_with(_kidney_and_max_dose_plus_drugs(), config)
+
+    assert _levels(result, "61") == {"kidney": "high", "maxDosePlus": "high"}
+    assert _levels(result, "62") == {"kidney": "high", "maxDosePlus": "high"}
+
+
+def test_alert_type_level_replaces_every_level_of_the_type():
+    """Gestante: D (medium) e X (high) passam ao nível configurado"""
+    drugs = [
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=61, dose=10, frequency=1, pregnant="D"
+        ),
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=62, dose=10, frequency=1, pregnant="X"
+        ),
+    ]
+
+    default = _alerts_with(drugs, pregnant=True, dialysis=None)
+    low = _alerts_with(
+        drugs,
+        AlertConfig.model_validate({"types": {"pregnant": {"level": "low"}}}),
+        pregnant=True,
+        dialysis=None,
+    )
+
+    assert (_levels(default, "61"), _levels(default, "62")) == (
+        {"pregnant": "medium"},
+        {"pregnant": "high"},
+    )
+    assert (_levels(low, "61"), _levels(low, "62")) == (
+        {"pregnant": "low"},
+        {"pregnant": "low"},
+    )
+
+
+def test_protocol_keeps_the_level_each_protocol_sets():
+    """protocol: o nível vem de cada protocolo, não do tipo"""
+    drugs = [
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=71, dose=10, frequency=1
+        )
+    ]
+    protocols = [
+        {"related_items": [71], "message": "Ajustar dose", "level": "medium", "id": 1}
+    ]
+    config = AlertConfig.model_validate({"types": {"protocol": {"level": "low"}}})
+
+    result = _alerts_with(drugs, config, protocols=protocols, dialysis=None)
+
+    assert _levels(result, "71") == {"protocol": "medium"}
+
+
+@pytest.mark.parametrize("level", ["urgent", "", 1, None])
+def test_unknown_alert_type_level_keeps_the_alerts_own(level):
+    """Nível desconhecido não invalida a seção: o alerta mantém o seu"""
+    config = AlertConfig.model_validate(
+        {"types": {"kidney": {"level": level, "enabled": True}}}
+    )
+
+    assert config.types.kidney.level is None
+    result = _alerts_with(_kidney_and_max_dose_plus_drugs(), config)
+    assert _levels(result, "61")["kidney"] == "medium"

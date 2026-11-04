@@ -134,9 +134,11 @@ def test_the_allergy_alert_type_turned_off_by_the_schema(
     information and stays"""
     monkeypatch.setattr(
         "repository.store_repository.get_items_data",
-        lambda pk, sks: {"demo": {"alerts": {"types": {"allergy": {"enabled": False}}}}}
-        if pk == "schema_params" and "demo" in sks
-        else {},
+        lambda pk, sks: (
+            {"demo": {"alerts": {"types": {"allergy": {"enabled": False}}}}}
+            if pk == "schema_params" and "demo" in sks
+            else {}
+        ),
     )
     id_prescription, (id_a,) = _create([{"idDrug": _DRUG_A[0], "allergy": "S"}])
 
@@ -145,6 +147,34 @@ def test_the_allergy_alert_type_turned_off_by_the_schema(
     assert not any(a["type"] == "allergy" for a in _alerts_of(payload, id_a))
     assert payload["alertStats"]["allergy"] == 0
     assert _item(payload, id_a)["allergy"] is True
+
+
+def test_the_allergy_alert_level_set_by_the_schema(
+    client, analyst_headers, monkeypatch
+):
+    """The schema params set the allergy alert to low: the alert and the
+    prescription level (alertStats, read by the prioritization) follow it"""
+    id_prescription, (id_a,) = _create([{"idDrug": _DRUG_A[0], "allergy": "S"}])
+
+    default = _view(client, analyst_headers, id_prescription)
+
+    monkeypatch.setattr(
+        "repository.store_repository.get_items_data",
+        lambda pk, sks: (
+            {"demo": {"alerts": {"types": {"allergy": {"level": "low"}}}}}
+            if pk == "schema_params" and "demo" in sks
+            else {}
+        ),
+    )
+    configured = _view(client, analyst_headers, id_prescription)
+
+    def allergy_levels(payload):
+        return [a["level"] for a in _alerts_of(payload, id_a) if a["type"] == "allergy"]
+
+    assert allergy_levels(default) == ["high"]
+    assert default["alertStats"]["level"] == "high"
+    assert allergy_levels(configured) == ["low"]
+    assert configured["alertStats"]["level"] == "low"
 
 
 def test_an_inactivated_allergy_drops_the_flag(client, analyst_headers):

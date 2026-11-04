@@ -7,6 +7,10 @@ shown, as it is calculated today.
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from models.enums import DrugAlertLevelEnum
+
+_ALERT_LEVELS = {level.value for level in DrugAlertLevelEnum}
+
 
 class AlertTypeConfig(BaseModel):
     """Config of one alert type of alert_service (DrugAlertTypeEnum value)"""
@@ -15,6 +19,16 @@ class AlertTypeConfig(BaseModel):
 
     # off: the alert type is neither shown nor counted
     enabled: bool = True
+    # low | medium | high: replaces the level the alert sets (also when it varies
+    # within the type, e.g. pregnant D/X); None keeps it. Not applied to
+    # protocol, whose level each protocol sets
+    level: str | None = None
+
+    @field_validator("level", mode="before")
+    @classmethod
+    def _known_level(cls, level):
+        """An unknown level keeps the alert's own (never invalidates the section)"""
+        return level if level in _ALERT_LEVELS else None
 
 
 DEFAULT_KIDNEY_ADULT_EXAMS = ["ckd21", "ckd"]
