@@ -34,6 +34,7 @@ from routes.prescription_clinical_note import app_pres_clinical_note
 from routes.prescription_crud import app_pres_crud
 from routes.protocol import app_protocol
 from routes.queue import app_queue
+from routes.schema_params import app_schema_params
 
 # Regulation routes
 from routes.regulation.regulation import app_regulation
@@ -70,6 +71,7 @@ def register_blueprints(app):
     app.register_blueprint(app_auth)
     app.register_blueprint(app_out)
     app.register_blueprint(app_pres)
+    app.register_blueprint(app_schema_params)
     app.register_blueprint(app_seg)
     app.register_blueprint(app_gen)
     app.register_blueprint(app_itrv)

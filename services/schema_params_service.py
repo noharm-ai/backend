@@ -14,6 +14,8 @@ alert).
 from flask import g, has_app_context
 from pydantic import ValidationError as PydanticValidationError
 
+from decorators.has_permission_decorator import Permission, has_permission
+from models.main import User
 from models.schema_params import SchemaParams
 from repository import store_repository
 from utils import logger
@@ -23,6 +25,22 @@ STORE_PK = "schema_params"
 _SECTIONS = {
     name: field.annotation for name, field in SchemaParams.model_fields.items()
 }
+
+
+@has_permission(Permission.MAINTAINER)
+def view_schema_params(user_context: User = None) -> dict:
+    """The schema params of the user's schema, for maintainers (read only: the
+    admin project edits them). `params` is what is in force (code defaults
+    filled in), `custom` only what the schema's item sets"""
+    loaded = _load_with_status(schema=user_context.schema)
+
+    return {
+        "schema": user_context.schema,
+        "status": loaded["status"],
+        "invalidSections": loaded["invalidSections"],
+        "params": loaded["params"].model_dump(),
+        "custom": loaded["params"].model_dump(exclude_unset=True),
+    }
 
 
 def get_schema_params(schema: str | None) -> SchemaParams:
@@ -40,8 +58,16 @@ def get_schema_params(schema: str | None) -> SchemaParams:
 def _load(schema: str | None) -> SchemaParams:
     """Reads the schema's item; the code defaults without one or when the table
     fails"""
+    return _load_with_status(schema=schema)["params"]
+
+
+def _load_with_status(schema: str | None) -> dict:
+    """The params in force and how they were read: status `found`, `not_found`
+    (no item: code defaults), `read_error` (the table failed: code defaults) or
+    `no_schema`; invalidSections lists the sections of the item left out"""
+    result = {"params": SchemaParams(), "status": "no_schema", "invalidSections": []}
     if not schema:
-        return SchemaParams()
+        return result
 
     try:
         items = store_repository.get_items_data(pk=STORE_PK, sks=[schema])
@@ -51,21 +77,33 @@ def _load(schema: str | None) -> SchemaParams:
             schema,
             e,
         )
-        return SchemaParams()
+        result["status"] = "read_error"
+        return result
 
     if schema not in items:
-        return SchemaParams()
+        result["status"] = "not_found"
+        return result
 
-    return SchemaParams(**_validated_sections(data=items[schema], schema=schema))
+    invalid = []
+    result["params"] = SchemaParams(
+        **_validated_sections(data=items[schema], schema=schema, invalid=invalid)
+    )
+    result["status"] = "found"
+    result["invalidSections"] = invalid
+
+    return result
 
 
-def _validated_sections(data, schema: str) -> dict:
+def _validated_sections(data, schema: str, invalid: list | None = None) -> dict:
     """The item's sections that validate; an invalid one is left out (its code
-    defaults apply)"""
+    defaults apply) and named in `invalid`, when given"""
+    invalid = invalid if invalid is not None else []
+
     if not isinstance(data, dict):
         logger.backend_logger.error(
             "schema params: item %s/%s ignored, data is not a map", STORE_PK, schema
         )
+        invalid.append("data")
         return {}
 
     sections = {}
@@ -76,6 +114,7 @@ def _validated_sections(data, schema: str) -> dict:
         try:
             sections[section] = model.model_validate(data[section])
         except PydanticValidationError as e:
+            invalid.append(section)
             logger.backend_logger.error(
                 "schema params: section %s of %s/%s ignored: %s",
                 section,
