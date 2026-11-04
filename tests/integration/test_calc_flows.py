@@ -526,3 +526,66 @@ def test_prescalc_skips_when_admission_locked(monkeypatch):
         .first()
     )
     assert patient_day is None
+
+
+def test_prescalc_fails_fast_when_prescription_row_locked(monkeypatch):
+    """prescalc: a row of prescricao held by another writer (e.g. a client's
+    integration idle in transaction) fails prescalc after the row lock timeout
+    instead of waiting for the statement timeout; once released, it runs."""
+
+    prescription = utils_test_prescription.create_basic_prescription()
+
+    monkeypatch.setattr(prescalc_repository, "PRESCALC_ROW_LOCK_TIMEOUT_MS", 200)
+
+    # hold the prescription row from the test session — transaction stays open
+    session.execute(
+        text("SELECT 1 FROM demo.prescricao WHERE fkprescricao = :id FOR UPDATE"),
+        {"id": prescription.id},
+    )
+
+    result = {}
+
+    def run_prescalc():
+        result["response"] = prescalc(
+            {"schema": "demo", "id_prescription": prescription.id, "force": False},
+            None,
+        )
+
+    try:
+        start = time.time()
+        t = threading.Thread(target=run_prescalc)
+        t.start()
+        t.join(timeout=10)
+        elapsed = time.time() - start
+        assert not t.is_alive(), "prescalc must not wait for the row lock"
+    finally:
+        # release the row
+        session_commit()
+        t.join(timeout=10)
+
+    assert json.loads(result["response"]).get("status") == "error"
+    assert elapsed < 5
+
+    patient_day = (
+        session.query(Prescription)
+        .filter(Prescription.agg)
+        .filter(Prescription.admissionNumber == prescription.admissionNumber)
+        .first()
+    )
+    assert patient_day is None
+
+    # items were left unprocessed: the next prescalc event processes them
+    response = prescalc(
+        {"schema": "demo", "id_prescription": prescription.id, "force": False},
+        None,
+    )
+    assert json.loads(response).get("status") == "success"
+
+    session_commit()
+    patient_day = (
+        session.query(Prescription)
+        .filter(Prescription.agg)
+        .filter(Prescription.admissionNumber == prescription.admissionNumber)
+        .first()
+    )
+    assert patient_day is not None

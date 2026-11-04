@@ -16,6 +16,11 @@ from models.prescription import (
 
 
 PRESCALC_LOCK_TIMEOUT_SECONDS = 15
+# row locks the prescalc transaction waits for after the admission lock (e.g.
+# UPDATE prescricao SET indicadores): a writer holding the row, like a client's
+# integration left idle in transaction, makes it fail in seconds instead of
+# holding the Lambda and a pooled connection until the statement timeout
+PRESCALC_ROW_LOCK_TIMEOUT_MS = 5000
 
 
 def acquire_admission_lock(
@@ -31,6 +36,11 @@ def acquire_admission_lock(
     Waits up to timeout_seconds (default PRESCALC_LOCK_TIMEOUT_SECONDS) for the
     lock. Returns True if acquired; False on timeout — in that case the aborted
     transaction is rolled back and the caller should skip processing.
+
+    Once acquired, the rest of the transaction waits at most
+    PRESCALC_ROW_LOCK_TIMEOUT_MS for each row lock: running out raises
+    OperationalError (lock_not_available) and the prescalc fails, leaving its
+    items unmarked as PROCESSED so the next prescalc event reprocesses them.
     """
     timeout = (
         timeout_seconds if timeout_seconds is not None else PRESCALC_LOCK_TIMEOUT_SECONDS
@@ -43,9 +53,10 @@ def acquire_admission_lock(
             text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"),
             {"key": f"prescalc:{schema}:{admission_number}"},
         )
-        # restore the session value so the timeout doesn't leak into later
-        # row-lock waits in the same transaction
-        db.session.execute(text("SET LOCAL lock_timeout = DEFAULT"))
+        # bound the row-lock waits of the rest of the transaction
+        db.session.execute(
+            text(f"SET LOCAL lock_timeout = '{int(PRESCALC_ROW_LOCK_TIMEOUT_MS)}'")
+        )
         return True
     except OperationalError as e:
         if getattr(e.orig, "pgcode", None) == "55P03":  # lock_not_available
