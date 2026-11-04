@@ -299,10 +299,8 @@ def test_the_schema_alert_config_hides_the_alert_and_the_trace_says_why(
         },
     }
     monkeypatch.setattr(
-        "repository.store_repository.get_items_data",
-        lambda pk, sks: {sk: store[sk] for sk in sks if sk in store}
-        if pk == "schema_params"
-        else {},
+        "repository.store_repository.get_item_data",
+        lambda pk, sk: store.get(sk) if pk == "schema_params" else None,
     )
     _add_relation(_SUBSTANCE_A[0], _SUBSTANCE_B[0], "iy", "high")
     intravenous = {"route": _IV_ROUTE, "interval": "08:00 20:00"}
@@ -351,10 +349,8 @@ def test_a_kind_disabled_by_the_schema_is_hidden_and_explained(
     nor counted, and the trace names the config rule."""
     store = {"demo": {"alerts": {"interactions": {"dm": {"enabled": False}}}}}
     monkeypatch.setattr(
-        "repository.store_repository.get_items_data",
-        lambda pk, sks: {sk: store[sk] for sk in sks if sk in store}
-        if pk == "schema_params"
-        else {},
+        "repository.store_repository.get_item_data",
+        lambda pk, sk: store.get(sk) if pk == "schema_params" else None,
     )
     _add_relation(_SUBSTANCE_A[0], _SUBSTANCE_B[0], "dm", "high")
     id_prescription, (id_a, id_b) = _prescription(
@@ -386,10 +382,8 @@ def test_a_level_ignored_by_the_schema_is_hidden_and_explained(
     neither shown nor counted, and the trace names the level rule."""
     store = {"demo": {"alerts": {"interactions": {"iy": {"ignoreLevels": ["low"]}}}}}
     monkeypatch.setattr(
-        "repository.store_repository.get_items_data",
-        lambda pk, sks: {sk: store[sk] for sk in sks if sk in store}
-        if pk == "schema_params"
-        else {},
+        "repository.store_repository.get_item_data",
+        lambda pk, sk: store.get(sk) if pk == "schema_params" else None,
     )
     _add_relation(_SUBSTANCE_A[0], _SUBSTANCE_B[0], "iy", "low")
     id_prescription, (id_a, id_b) = _prescription(

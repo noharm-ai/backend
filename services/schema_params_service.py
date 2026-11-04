@@ -12,7 +12,6 @@ alert).
 """
 
 from flask import g, has_app_context
-from pydantic import ValidationError as PydanticValidationError
 
 from decorators.has_permission_decorator import Permission, has_permission
 from models.main import User
@@ -70,7 +69,7 @@ def _load_with_status(schema: str | None) -> dict:
         return result
 
     try:
-        items = store_repository.get_items_data(pk=STORE_PK, sks=[schema])
+        data = store_repository.get_item_data(pk=STORE_PK, sk=schema)
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.backend_logger.error(
             "schema params: noharm-store read failed (schema %s), using defaults: %s",
@@ -80,13 +79,13 @@ def _load_with_status(schema: str | None) -> dict:
         result["status"] = "read_error"
         return result
 
-    if schema not in items:
+    if data is None:
         result["status"] = "not_found"
         return result
 
     invalid = []
     result["params"] = SchemaParams(
-        **_validated_sections(data=items[schema], schema=schema, invalid=invalid)
+        **_validated_sections(data=data, schema=schema, invalid=invalid)
     )
     result["status"] = "found"
     result["invalidSections"] = invalid
@@ -111,9 +110,10 @@ def _validated_sections(data, schema: str, invalid: list | None = None) -> dict:
         if section not in data:
             continue
 
+        # any error, not only pydantic's: a bad value never breaks the view
         try:
             sections[section] = model.model_validate(data[section])
-        except PydanticValidationError as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
             invalid.append(section)
             logger.backend_logger.error(
                 "schema params: section %s of %s/%s ignored: %s",

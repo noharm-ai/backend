@@ -22,12 +22,8 @@ def maintainer_headers(client):
 
 def _store(monkeypatch, items: dict):
     monkeypatch.setattr(
-        "repository.store_repository.get_items_data",
-        lambda pk, sks: (
-            {sk: items[sk] for sk in sks if sk in items}
-            if pk == "schema_params"
-            else {}
-        ),
+        "repository.store_repository.get_item_data",
+        lambda pk, sk: items.get(sk) if pk == "schema_params" else None,
     )
 
 
@@ -113,10 +109,10 @@ def test_an_invalid_section_is_named(client, maintainer_headers, monkeypatch):
 def test_a_read_failure_is_reported(client, maintainer_headers, monkeypatch):
     """The table could not be read: the defaults are in force, and it says so"""
 
-    def fail(pk, sks):
+    def fail(pk, sk):
         raise RuntimeError("timeout")
 
-    monkeypatch.setattr("repository.store_repository.get_items_data", fail)
+    monkeypatch.setattr("repository.store_repository.get_item_data", fail)
 
     data = _view(client, maintainer_headers)
 

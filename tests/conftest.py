@@ -77,7 +77,7 @@ def no_noharm_store(monkeypatch):
     """Tests never call AWS: the noharm-store reads find no item (the schema
     params are the code defaults). A test that needs items patches it again"""
     monkeypatch.setattr(
-        "repository.store_repository.get_items_data", lambda pk, sks: {}
+        "repository.store_repository.get_item_data", lambda pk, sk: None
     )
 
 

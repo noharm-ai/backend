@@ -28,7 +28,7 @@ class AlertTypeConfig(BaseModel):
     @classmethod
     def _known_level(cls, level):
         """An unknown level keeps the alert's own (never invalidates the section)"""
-        return level if level in _ALERT_LEVELS else None
+        return level if isinstance(level, str) and level in _ALERT_LEVELS else None
 
 
 DEFAULT_KIDNEY_ADULT_EXAMS = ["ckd21", "ckd"]
@@ -64,6 +64,7 @@ class KidneyAlertConfig(AlertTypeConfig):
 
 
 def _type_field():
+    """Field of an alert type with no options of its own (defaults: on, own level)"""
     return Field(default_factory=AlertTypeConfig)
 
 
@@ -119,7 +120,11 @@ class InteractionKindConfig(BaseModel):
         if not isinstance(levels, list):
             return []
 
-        return [level for level in levels if level in _ALERT_LEVELS]
+        return [
+            level
+            for level in levels
+            if isinstance(level, str) and level in _ALERT_LEVELS
+        ]
 
 
 _DEFAULT_KIND_CONFIG = InteractionKindConfig()

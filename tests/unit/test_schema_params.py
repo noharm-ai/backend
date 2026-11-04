@@ -13,19 +13,19 @@ ACM = FrequencyEnum.ACM.value
 
 
 def _store(items: dict, calls: list | None = None):
-    """get_items_data stub returning the items present among the keys asked"""
+    """get_item_data stub returning the item's data (None when it has no item)"""
 
-    def get_items_data(pk, sks):
+    def get_item_data(pk, sk):
         if calls is not None:
-            calls.append((pk, tuple(sks)))
-        return {sk: items[sk] for sk in sks if sk in items}
+            calls.append((pk, sk))
+        return items.get(sk)
 
-    return get_items_data
+    return get_item_data
 
 
 def _load(monkeypatch, items: dict, schema="demo") -> SchemaParams:
     monkeypatch.setattr(
-        "repository.store_repository.get_items_data", _store(items=items)
+        "repository.store_repository.get_item_data", _store(items=items)
     )
     return schema_params_service._load(schema=schema)
 
@@ -49,19 +49,19 @@ def test_only_the_schema_item_is_read(monkeypatch):
     """Só o item do schema é lido (não há item global)"""
     calls = []
     monkeypatch.setattr(
-        "repository.store_repository.get_items_data", _store(items={}, calls=calls)
+        "repository.store_repository.get_item_data", _store(items={}, calls=calls)
     )
 
     schema_params_service._load(schema="demo")
 
-    assert calls == [("schema_params", ("demo",))]
+    assert calls == [("schema_params", "demo")]
 
 
 def test_without_schema_nothing_is_read(monkeypatch):
     """Sem schema (ex.: contexto sem usuário): padrões, sem leitura"""
     calls = []
     monkeypatch.setattr(
-        "repository.store_repository.get_items_data", _store(items={}, calls=calls)
+        "repository.store_repository.get_item_data", _store(items={}, calls=calls)
     )
 
     assert schema_params_service._load(schema=None) == SchemaParams()
@@ -172,10 +172,10 @@ def test_unknown_keys_and_sections_are_ignored(monkeypatch):
 def test_read_failure_is_the_defaults(monkeypatch):
     """Falha na leitura: padrões (nenhum alerta escondido)"""
 
-    def fail(pk, sks):
+    def fail(pk, sk):
         raise RuntimeError("timeout")
 
-    monkeypatch.setattr("repository.store_repository.get_items_data", fail)
+    monkeypatch.setattr("repository.store_repository.get_item_data", fail)
 
     assert schema_params_service._load(schema="demo") == SchemaParams()
 
@@ -186,11 +186,52 @@ def test_read_once_per_request(monkeypatch):
 
     calls = []
     monkeypatch.setattr(
-        "repository.store_repository.get_items_data", _store(items={}, calls=calls)
+        "repository.store_repository.get_item_data", _store(items={}, calls=calls)
     )
 
     with app.test_request_context():
         schema_params_service.get_schema_params(schema="demo")
         schema_params_service.get_schema_params(schema="demo")
 
-    assert calls == [("schema_params", ("demo",))]
+    assert calls == [("schema_params", "demo")]
+
+
+def test_values_of_the_wrong_type_never_break_the_view(monkeypatch):
+    """Nível que não é texto (lista, mapa): ignorado, sem erro (padrão do alerta)"""
+    config = _load(
+        monkeypatch,
+        items={
+            "demo": _alerts(
+                types={"liver": {"level": ["high"]}, "elderly": {"level": {}}},
+                interactions={"iy": {"ignoreLevels": [["low"], {}, "high"]}},
+            )
+        },
+    )
+
+    assert config.alerts.alert_type("liver").level is None
+    assert config.alerts.alert_type("elderly").level is None
+    assert config.alerts.interaction("iy").ignoreLevels == ["high"]
+
+
+def test_an_unexpected_error_in_a_section_is_the_defaults(monkeypatch):
+    """Erro inesperado (não de validação) ao ler uma seção: a seção cai nos
+    padrões e é apontada como inválida, sem derrubar a tela"""
+
+    class Broken:
+        """Section model that fails with an error pydantic does not wrap"""
+
+        @staticmethod
+        def model_validate(data):
+            raise TypeError("unhashable type: 'list'")
+
+    monkeypatch.setitem(schema_params_service._SECTIONS, "alerts", Broken)
+    monkeypatch.setattr(
+        "repository.store_repository.get_item_data",
+        _store(items={"demo": _alerts(types={"kidney": {"enabled": False}})}),
+    )
+
+    loaded = schema_params_service._load_with_status(schema="demo")
+
+    assert loaded["status"] == "found"
+    assert loaded["invalidSections"] == ["alerts"]
+    assert loaded["params"] == SchemaParams()
