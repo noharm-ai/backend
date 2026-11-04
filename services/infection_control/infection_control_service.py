@@ -138,7 +138,7 @@ def _serialize_evaluation(
         ],
         "notes": evaluation.notes,
         "treatmentType": evaluation.treatment_type,
-        "infectionFocus": evaluation.infection_focus,
+        "infectionFoci": evaluation.infection_foci or [],
         "posology": evaluation.posology,
         "validFrom": dateutils.to_iso(evaluation.valid_from),
         "validUntil": dateutils.to_iso(evaluation.valid_until),
@@ -324,8 +324,8 @@ def get_admission_view(admission_number: int, user_context: User):
 
 
 def _validate_indication(evaluation: AntimicrobialEvaluationRequest):
-    """Check why the drug is given and the infection it is given for: both
-    asked, the focus only when the drug does not prevent an infection"""
+    """Check why the drug is given and the infections it is given for: both
+    asked, the foci only when the drug does not prevent an infection"""
     if evaluation.treatmentType not in TREATMENT_TYPES:
         raise ValidationError(
             "Informe o tipo de tratamento",
@@ -333,14 +333,16 @@ def _validate_indication(evaluation: AntimicrobialEvaluationRequest):
             status.HTTP_400_BAD_REQUEST,
         )
 
-    if evaluation.infectionFocus is None:
-        if evaluation.treatmentType not in AntimicrobialTreatmentTypeEnum.prophylaxis():
-            raise ValidationError(
-                "Informe o foco infeccioso",
-                "errors.invalidParams",
-                status.HTTP_400_BAD_REQUEST,
-            )
-    elif evaluation.infectionFocus not in INFECTION_FOCI:
+    if (
+        not evaluation.infectionFoci
+        and evaluation.treatmentType not in AntimicrobialTreatmentTypeEnum.prophylaxis()
+    ):
+        raise ValidationError(
+            "Informe o foco infeccioso",
+            "errors.invalidParams",
+            status.HTTP_400_BAD_REQUEST,
+        )
+    if not set(evaluation.infectionFoci) <= INFECTION_FOCI:
         raise ValidationError(
             "Foco infeccioso inválido",
             "errors.invalidParams",

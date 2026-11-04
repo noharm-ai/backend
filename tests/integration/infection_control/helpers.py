@@ -238,8 +238,8 @@ def _review(client, headers, admission_number, evaluations=(), **kwargs):
                 "treatmentType": kwargs.get(
                     "treatment_type", AntimicrobialTreatmentTypeEnum.EMPIRICAL.value
                 ),
-                "infectionFocus": kwargs.get(
-                    "infection_focus", InfectionFocusEnum.URINARY.value
+                "infectionFoci": kwargs.get(
+                    "infection_foci", [InfectionFocusEnum.URINARY.value]
                 ),
                 "interventionReasons": kwargs.get("intervention_reasons", []),
                 "createIntervention": kwargs.get("create_intervention", False),

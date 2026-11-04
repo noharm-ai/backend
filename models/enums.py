@@ -550,7 +550,7 @@ class AntimicrobialTreatmentTypeEnum(Enum):
 
 
 class InfectionFocusEnum(Enum):
-    """Enum: the infection focus an antimicrobial is given for, as judged in an evaluation (ci_avaliacao_atm.tp_foco_infeccao)"""
+    """Enum: an infection focus an antimicrobial is given for, as judged in an evaluation (ci_avaliacao_atm.tp_focos_infeccao, one or more)"""
 
     # lower respiratory tract: pneumonia, tracheobronchitis
     RESPIRATORY = 1

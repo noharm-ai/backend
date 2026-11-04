@@ -453,7 +453,8 @@ def test_review_rejects_admission_not_followed(
 def test_evaluation_records_treatment_type_and_focus(
     client, infection_controller_headers, infection_control, admission
 ):
-    """Each evaluated drug keeps why it is given and the infection focus"""
+    """Each evaluated drug keeps why it is given and its infection foci, sorted
+    and without repeats"""
     _prescribe_today(admission)
 
     response = _review(
@@ -462,7 +463,11 @@ def test_evaluation_records_treatment_type_and_focus(
         admission,
         evaluations=[ANTIMICROBIAL_DRUG],
         treatment_type=AntimicrobialTreatmentTypeEnum.CULTURE_GUIDED.value,
-        infection_focus=InfectionFocusEnum.ABDOMINAL.value,
+        infection_foci=[
+            InfectionFocusEnum.URINARY.value,
+            InfectionFocusEnum.ABDOMINAL.value,
+            InfectionFocusEnum.URINARY.value,
+        ],
     )
 
     assert response.status_code == status.HTTP_200_OK, response.get_json()
@@ -470,13 +475,14 @@ def test_evaluation_records_treatment_type_and_focus(
     assert evaluation["treatmentType"] == (
         AntimicrobialTreatmentTypeEnum.CULTURE_GUIDED.value
     )
-    assert evaluation["infectionFocus"] == InfectionFocusEnum.ABDOMINAL.value
+    foci = [InfectionFocusEnum.URINARY.value, InfectionFocusEnum.ABDOMINAL.value]
+    assert evaluation["infectionFoci"] == foci
 
     [record] = _evaluations(admission)
     assert (
         record["tp_tratamento"] == AntimicrobialTreatmentTypeEnum.CULTURE_GUIDED.value
     )
-    assert record["tp_foco_infeccao"] == InfectionFocusEnum.ABDOMINAL.value
+    assert record["tp_focos_infeccao"] == foci
 
 
 @pytest.mark.parametrize(
@@ -498,13 +504,16 @@ def test_prophylaxis_needs_no_focus(
         admission,
         evaluations=[ANTIMICROBIAL_DRUG],
         treatment_type=treatment_type,
-        infection_focus=None,
+        infection_foci=[],
     )
 
     assert response.status_code == status.HTTP_200_OK, response.get_json()
     [record] = _evaluations(admission)
     assert record["tp_tratamento"] == treatment_type
-    assert record["tp_foco_infeccao"] is None
+    assert record["tp_focos_infeccao"] is None
+    assert (
+        response.get_json()["data"]["courses"][0]["evaluation"]["infectionFoci"] == []
+    )
 
 
 @pytest.mark.parametrize(
@@ -516,13 +525,15 @@ def test_prophylaxis_needs_no_focus(
         # a treatment needs its focus
         {
             "treatment_type": AntimicrobialTreatmentTypeEnum.EMPIRICAL.value,
-            "infection_focus": None,
+            "infection_foci": [],
         },
         {
             "treatment_type": AntimicrobialTreatmentTypeEnum.CULTURE_GUIDED.value,
-            "infection_focus": None,
+            "infection_foci": [],
         },
-        {"infection_focus": 99},
+        # every focus must be known
+        {"infection_foci": [99]},
+        {"infection_foci": [InfectionFocusEnum.URINARY.value, 99]},
     ],
 )
 def test_review_rejects_invalid_treatment_type_or_focus(
