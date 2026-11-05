@@ -391,6 +391,7 @@ def _has_valid_roles(roles):
         Role.REGULATOR.value,
         Role.SUPPORT_REQUESTER.value,
         Role.SUPPORT_MANAGER.value,
+        Role.INFECTION_CONTROLLER.value,
     ]
 
     for r in roles:

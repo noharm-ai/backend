@@ -67,6 +67,7 @@ class TestHasValidRoles:
             Role.REGULATOR.value,
             Role.SUPPORT_REQUESTER.value,
             Role.SUPPORT_MANAGER.value,
+            Role.INFECTION_CONTROLLER.value,
         ],
     )
     def test_each_assignable_role_is_valid(self, role):
