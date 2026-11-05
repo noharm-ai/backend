@@ -159,6 +159,18 @@ def _record(admission_number):
     )
 
 
+def _queued(admission_number):
+    """The admission's row in the light job's queue (ci_fila), None when not queued"""
+    return (
+        session.execute(
+            text("SELECT * FROM demo.ci_fila WHERE nratendimento = :admission"),
+            {"admission": admission_number},
+        )
+        .mappings()
+        .first()
+    )
+
+
 def _last_prescription_day(admission_number):
     return session.execute(
         text(

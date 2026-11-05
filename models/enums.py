@@ -494,6 +494,13 @@ class InfectionControlOriginEnum(Enum):
     MANUAL = 5
 
 
+class InfectionControlQueueReasonEnum(Enum):
+    """Enum: what queued an admission for the light infection control job
+    (ci_fila.motivos)"""
+
+    PRESCALC = "prescalc"
+
+
 class InfectionControlPendingTypeEnum(Enum):
     """Enum: why an admission is pending (ci_pendencia.tp_pendencia)"""
 

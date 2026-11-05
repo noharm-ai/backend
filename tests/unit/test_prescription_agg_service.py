@@ -183,6 +183,13 @@ def prescalc_env(
         p(patch.object(module, "db", fake_db))
         p(patch.object(module.db_utils, "set_schema"))
         mocks.logger = p(patch.object(module.logger, "backend_logger"))
+        # the infection control hook has its own session and tests
+        # (tests/integration/infection_control)
+        mocks.follow_from_prescalc = p(
+            patch.object(
+                module.infection_control_status_service, "follow_from_prescalc"
+            )
+        )
 
         mocks.acquire_lock = p(
             patch.object(

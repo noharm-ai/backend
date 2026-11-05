@@ -121,3 +121,19 @@ class InfectionControlPending(db.Model):
 
     created_at = db.Column("created_at", db.DateTime, nullable=False)
     created_by = db.Column("created_by", db.Integer, nullable=False)
+
+
+class InfectionControlQueue(db.Model):
+    """A followed admission with a change the infection control job has not
+    seen yet: queued by prescalc, dequeued by the job once it ran the rule"""
+
+    __tablename__ = "ci_fila"
+
+    admission_number = db.Column("nratendimento", db.BigInteger, primary_key=True)
+    # the last time it was queued: the job dequeues only if it did not change
+    # while the rule ran
+    queued_at = db.Column("dt_fila", db.DateTime, nullable=False)
+    # what queued it since it was last dequeued (InfectionControlQueueReasonEnum)
+    reasons = db.Column("motivos", postgresql.ARRAY(db.String(50)), nullable=False)
+    # the first time it was queued since it was last dequeued
+    created_at = db.Column("created_at", db.DateTime, nullable=False)
