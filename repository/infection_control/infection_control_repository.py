@@ -9,6 +9,7 @@ from sqlalchemy import (
     and_,
     case,
     column,
+    exists,
     false,
     func,
     or_,
@@ -62,6 +63,20 @@ def create_admission(
         .on_conflict_do_nothing(index_elements=["nratendimento"])
     )
     return db.session.execute(stmt).rowcount > 0
+
+
+def followed_condition(admission_number: int):
+    """Condition that holds while the admission is followed (pending or
+    revised): its infection control queue takes only those"""
+    return exists().where(
+        InfectionControlAdmission.admission_number == admission_number,
+        InfectionControlAdmission.status.in_(
+            [
+                InfectionControlStatusEnum.PENDING.value,
+                InfectionControlStatusEnum.REVISED.value,
+            ]
+        ),
+    )
 
 
 def lock_timeout(lock_timeout_ms: int | None):

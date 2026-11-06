@@ -107,7 +107,13 @@ def _cleanup():
 
     # infection control follow-up: no seed rows, and prescalc fills it for
     # seed admissions too
-    for table in ("ci_pendencia", "ci_avaliacao_atm", "ci_revisao", "ci_atendimento"):
+    for table in (
+        "fila_atendimento",
+        "ci_pendencia",
+        "ci_avaliacao_atm",
+        "ci_revisao",
+        "ci_atendimento",
+    ):
         session.execute(text(f"DELETE FROM demo.{table}"))
 
     # patients created for conciliation flows (seed admissions stay below 100000)

@@ -538,3 +538,17 @@ class AntimicrobialEvaluationClosingEnum(Enum):
     # recorded for a period over before the evaluation in force started: it
     # goes straight to the history and leaves that one in force
     RETROACTIVE = 4
+
+
+class AdmissionQueueEnum(Enum):
+    """Enum: the consumer of an admission queue (fila_atendimento.tp_fila), see
+    admission_queue_service"""
+
+    # the light infection control run (infection_control_job_service)
+    INFECTION_CONTROL = 1
+
+
+class AdmissionQueueReasonEnum(Enum):
+    """Enum: what queued an admission (fila_atendimento.motivos)"""
+
+    PRESCALC = "prescalc"
