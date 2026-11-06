@@ -1,26 +1,29 @@
-"""Tests: infection control follow-up, the light job's queue (ci_fila)
+"""Tests: infection control follow-up, the light job's queue (fila_atendimento,
+the infection control consumer of admission_queue_service)
 
 Prescalc queues every followed admission it sees, with or without an
 antimicrobial in the prescription-day; the job entry dequeues the admission it
 applied the rule to, unless it was queued again while the rule ran or the
-record was held by a writer."""
+record was held by a writer. Other consumers' rows are never touched."""
 
 import json
 from datetime import datetime, timedelta
 
 from sqlalchemy import text
 
-from models.enums import InfectionControlQueueReasonEnum
+from models.enums import AdmissionQueueEnum, AdmissionQueueReasonEnum
 from models.main import db, dbSession
-from repository.infection_control import infection_control_repository
+from repository import admission_queue_repository
 from services.infection_control import infection_control_job_service
 from static import infection_control_sync
 from tests.conftest import session, session_commit
 from tests.integration.infection_control.helpers import (
     CLOSED,
+    INFECTION_CONTROL_QUEUE,
     OTHER_DRUG,
     _discharge,
     _hold_record,
+    _last_prescription_day,
     _prescalc,
     _prescribe_today,
     _queued,
@@ -30,28 +33,47 @@ from tests.integration.infection_control.helpers import (
 )
 from utils.static_context import static_user_context
 
-PRESCALC = InfectionControlQueueReasonEnum.PRESCALC.value
+PRESCALC = AdmissionQueueReasonEnum.PRESCALC.value
+# a consumer that doesn't exist: its rows must be left alone
+OTHER_QUEUE = 99
 
 
 def _unqueue(admission_number):
-    """Empty the admission's queue row, as a job run would"""
+    """Empty the admission's queue rows, as a job run would"""
     session.execute(
-        text("DELETE FROM demo.ci_fila WHERE nratendimento = :admission"),
+        text("DELETE FROM demo.fila_atendimento WHERE nratendimento = :admission"),
         {"admission": admission_number},
     )
     session_commit()
 
 
-def _queue(admission_number, reasons, queued_at):
+def _queue(admission_number, reasons, queued_at, queue=INFECTION_CONTROL_QUEUE):
     """Queue the admission by hand"""
     session.execute(
         text(
-            "INSERT INTO demo.ci_fila (nratendimento, dt_fila, motivos, created_at) "
-            "VALUES (:admission, :queued_at, :reasons, :queued_at)"
+            "INSERT INTO demo.fila_atendimento "
+            "(tp_fila, nratendimento, dt_fila, motivos, created_at) "
+            "VALUES (:queue, :admission, :queued_at, :reasons, :queued_at)"
         ),
-        {"admission": admission_number, "reasons": reasons, "queued_at": queued_at},
+        {
+            "queue": queue,
+            "admission": admission_number,
+            "reasons": reasons,
+            "queued_at": queued_at,
+        },
     )
     session_commit()
+
+
+def _queue_row(admission_number, queue):
+    """The admission's row in a consumer's queue, None when not queued"""
+    return session.execute(
+        text(
+            "SELECT * FROM demo.fila_atendimento "
+            "WHERE tp_fila = :queue AND nratendimento = :admission"
+        ),
+        {"queue": queue, "admission": admission_number},
+    ).first()
 
 
 def _sync(admission_number):
@@ -93,19 +115,21 @@ def test_prescalc_queues_followed_admission_without_antimicrobial(
 def test_prescalc_follows_even_when_queueing_fails(
     infection_control, admission, monkeypatch
 ):
-    """A failure to queue (e.g. a schema without ci_fila yet) does not undo the
-    follow, which the full job can't make up for"""
+    """A failure to queue (e.g. a schema without fila_atendimento yet) does not
+    undo the follow, which the full job can't make up for, nor the
+    prescription-day"""
 
     def fail(*args, **kwargs):
         raise RuntimeError("queue failure")
 
     monkeypatch.setattr(
-        "repository.infection_control.infection_control_repository.enqueue_followed",
+        "repository.admission_queue_repository.enqueue",
         fail,
     )
 
     _prescribe_today(admission, job=False)
 
+    assert _last_prescription_day(admission) is not None
     assert _record(admission) is not None
     assert _queued(admission) is None
 
@@ -228,8 +252,10 @@ def test_dequeue_keeps_admission_queued_again(infection_control, admission):
 
     with static_user_context("demo"):
         dbSession.setSchema("demo")
-        removed = infection_control_repository.dequeue(
-            admission_number=admission, queued_at=read_at
+        removed = admission_queue_repository.dequeue(
+            queue=AdmissionQueueEnum.INFECTION_CONTROL,
+            admission_number=admission,
+            queued_at=read_at,
         )
         db.session.commit()
         db.session.remove()
@@ -237,3 +263,15 @@ def test_dequeue_keeps_admission_queued_again(infection_control, admission):
 
     assert removed is False
     assert _queued(admission) is not None
+
+
+def test_job_leaves_other_queues_alone(infection_control, admission):
+    """Dequeuing the infection control row keeps the admission queued for the
+    other consumers, which have not run on it yet"""
+    _prescribe_today(admission, job=False)
+    _queue(admission, [PRESCALC], datetime.now(), queue=OTHER_QUEUE)
+
+    assert _sync(admission) == "processed"
+
+    assert _queued(admission) is None
+    assert _queue_row(admission, OTHER_QUEUE) is not None

@@ -25,9 +25,10 @@ the summary the infection control report reads (resumo_acompanhamento, see
 infection_control_summary_service).
 
 Prescalc runs many times a day, so it doesn't apply the rule: it only
-follows the admissions that start (or restart) an antimicrobial and queues
-the followed ones it sees (ci_fila). The scheduled job applies the rule: the
-light run to the queued admissions, the full run to every followed one.
+follows the admissions that start (or restart) an antimicrobial, and queues
+the followed ones it sees (fila_atendimento, see admission_queue_service). The
+scheduled job applies the rule: the light run to the queued admissions, the
+full run to every followed one.
 
 The functions here carry no permission check: they run inside callers that
 have one (the static context or a decorated endpoint).
@@ -43,7 +44,6 @@ from models.enums import (
     FeatureEnum,
     InfectionControlOriginEnum,
     InfectionControlPendingTypeEnum,
-    InfectionControlQueueReasonEnum,
     InfectionControlResolutionEnum,
     InfectionControlStatusEnum,
 )
@@ -664,25 +664,26 @@ def follow_from_prescalc(
     id_prescription: int | None = None,
 ):
     """Prescalc hook: follow an admission whose prescription-day has an
-    antimicrobial, and queue a followed admission for the light job.
+    antimicrobial.
 
     Only what can't wait for the job, and cheap enough for prescalc (no
     antimicrobial history, no wait for a record being reviewed):
     * an admission not followed yet gets its record, pending and never
       reviewed, pointed at this prescription-day (the job keeps it on the
       latest one);
-    * a closed record is reopened as pending (the antimicrobial restarted);
-    * a followed admission (just now or before) is queued (ci_fila), with or
-      without an antimicrobial in this prescription-day: the light job applies
-      the rule to the queued ones only, the full job to every followed one.
+    * a closed record is reopened as pending (the antimicrobial restarted).
 
-    A discharged patient is not followed (a followed one is still queued: the
-    rule closes it). Only for schemas with the INFECTION_CONTROL feature.
+    A discharged patient is left alone.
+
+    A followed record is left to the job, which also opens the reasons of each
+    drug: prescalc queues it for the light run right after this hook
+    (admission_queue_service.notify). Only for schemas with the
+    INFECTION_CONTROL feature.
 
     Runs in a savepoint and never raises: the prescription-day is the core
     product and must be saved even if this step fails.
     """
-    if not features:
+    if not features or not features.get("am"):
         return
 
     # flush prescalc's own changes first: begin_nested() would flush them inside
@@ -697,65 +698,26 @@ def follow_from_prescalc(
             if not feature_service.has_feature(FeatureEnum.INFECTION_CONTROL):
                 return
 
-            now = datetime.now()
-            if features.get("am"):
-                _follow_from_prescalc(
-                    admission_number=admission_number,
-                    user_id=user_id,
-                    now=now,
-                    id_prescription_day=id_prescription_day,
-                    id_prescription=id_prescription,
-                )
-
-            # after the follow above, so an admission it just followed is queued
-            _enqueue_from_prescalc(
-                schema=schema, admission_number=admission_number, now=now
+            _follow_from_prescalc(
+                admission_number=admission_number,
+                user_id=user_id,
+                now=datetime.now(),
+                id_prescription_day=id_prescription_day,
+                id_prescription=id_prescription,
             )
     except Exception as e:  # noqa: BLE001 - must not break the prescription-day
-        _log_prescalc_hook_error(
-            schema=schema,
-            admission_number=admission_number,
-            error=e,
-            path="infection_control_status_service.follow_from_prescalc",
-        )
-
-
-def _enqueue_from_prescalc(schema: str, admission_number: int, now: datetime):
-    """Queue a followed admission for the light job, in a savepoint of its own:
-    a failure here (e.g. a schema without ci_fila yet) must not undo the follow,
-    which the full job can't make up for"""
-    try:
-        with db.session.begin_nested():
-            infection_control_repository.enqueue_followed(
-                admission_number=admission_number,
-                reason=InfectionControlQueueReasonEnum.PRESCALC.value,
-                now=now,
+        # same event as the static context's errors, which is the one monitored
+        logger.backend_logger.error(
+            json.dumps(
+                {
+                    "event": "backend_exception",
+                    "path": "infection_control_status_service.follow_from_prescalc",
+                    "schema": schema,
+                    "message": str(e),
+                    "admission_number": admission_number,
+                }
             )
-    except Exception as e:  # noqa: BLE001 - must not undo the follow
-        _log_prescalc_hook_error(
-            schema=schema,
-            admission_number=admission_number,
-            error=e,
-            path="infection_control_status_service.enqueue_from_prescalc",
         )
-
-
-def _log_prescalc_hook_error(
-    schema: str, admission_number: int, error: Exception, path: str
-):
-    """Log a failure of the prescalc hook on the static context's error event,
-    which is the one monitored"""
-    logger.backend_logger.error(
-        json.dumps(
-            {
-                "event": "backend_exception",
-                "path": path,
-                "schema": schema,
-                "message": str(error),
-                "admission_number": admission_number,
-            }
-        )
-    )
 
 
 def _follow_from_prescalc(

@@ -7,19 +7,15 @@ from sqlalchemy import (
     DateTime,
     Integer,
     and_,
-    any_,
     case,
     column,
-    delete,
     exists,
     false,
     func,
-    literal,
     or_,
-    select,
     update,
 )
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB, insert
+from sqlalchemy.dialects.postgresql import JSONB, insert
 
 from models.appendix import Department, InterventionReason
 from models.enums import (
@@ -30,7 +26,6 @@ from models.infection_control import (
     AntimicrobialEvaluation,
     InfectionControlAdmission,
     InfectionControlPending,
-    InfectionControlQueue,
     InfectionControlReview,
 )
 from models.main import Drug, DrugAttributes, db
@@ -70,13 +65,10 @@ def create_admission(
     return db.session.execute(stmt).rowcount > 0
 
 
-def enqueue_followed(admission_number: int, reason: str, now: datetime) -> bool:
-    """Queue the admission for the light job when it is followed (pending or
-    revised), adding the reason to the ones already queued.
-
-    Returns True when it was queued.
-    """
-    followed = exists().where(
+def followed_condition(admission_number: int):
+    """Condition that holds while the admission is followed (pending or
+    revised): its infection control queue takes only those"""
+    return exists().where(
         InfectionControlAdmission.admission_number == admission_number,
         InfectionControlAdmission.status.in_(
             [
@@ -85,62 +77,6 @@ def enqueue_followed(admission_number: int, reason: str, now: datetime) -> bool:
             ]
         ),
     )
-    stmt = insert(InfectionControlQueue).from_select(
-        ["nratendimento", "dt_fila", "motivos", "created_at"],
-        select(
-            literal(admission_number, BigInteger),
-            literal(now, DateTime),
-            literal([reason], ARRAY(db.String(50))),
-            literal(now, DateTime),
-        ).where(followed),
-    )
-    stmt = stmt.on_conflict_do_update(
-        index_elements=["nratendimento"],
-        set_={
-            "dt_fila": stmt.excluded.dt_fila,
-            "motivos": case(
-                (
-                    literal(reason) == any_(InfectionControlQueue.reasons),
-                    InfectionControlQueue.reasons,
-                ),
-                else_=func.array_append(InfectionControlQueue.reasons, reason),
-            ),
-        },
-    )
-    return db.session.execute(stmt).rowcount > 0
-
-
-def get_queued_at(admission_number: int) -> datetime | None:
-    """When the admission was last queued, None when it is not queued"""
-    return (
-        db.session.query(InfectionControlQueue.queued_at)
-        .filter(InfectionControlQueue.admission_number == admission_number)
-        .scalar()
-    )
-
-
-def dequeue(admission_number: int, queued_at: datetime) -> bool:
-    """Remove the admission from the queue, unless it was queued again after
-    `queued_at` (the change is still to be seen) or is being queued right now
-    (its row is locked: it will be, so it is not waited for).
-
-    Returns True when it was removed.
-    """
-    unchanged = (
-        select(InfectionControlQueue.admission_number)
-        .where(
-            InfectionControlQueue.admission_number == admission_number,
-            InfectionControlQueue.queued_at == queued_at,
-        )
-        .with_for_update(skip_locked=True)
-        .scalar_subquery()
-    )
-    stmt = (
-        delete(InfectionControlQueue)
-        .where(InfectionControlQueue.admission_number == unchanged)
-        .execution_options(synchronize_session=False)
-    )
-    return db.session.execute(stmt).rowcount > 0
 
 
 def lock_timeout(lock_timeout_ms: int | None):

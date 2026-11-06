@@ -190,6 +190,10 @@ def prescalc_env(
                 module.infection_control_status_service, "follow_from_prescalc"
             )
         )
+        # the admission queues too (tests/integration/infection_control/test_queue.py)
+        mocks.notify_admission_queues = p(
+            patch.object(module.admission_queue_service, "notify")
+        )
 
         mocks.acquire_lock = p(
             patch.object(

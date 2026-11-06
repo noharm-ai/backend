@@ -1,7 +1,8 @@
 """Service: infection control job, one admission of the scheduled sync
 
 The scheduled job in backend-private lists the admissions of each schema (the
-full run every followed one, the light run the queued ones, ci_fila) and calls
+full run every followed one, the light run the ones queued for it in
+fila_atendimento, see admission_queue_service) and calls
 static.infection_control_sync for one admission at a time, waiting for each, so
 a single backend invocation (and database session) per run is at work at once.
 The rule itself lives only in this repository.
@@ -16,9 +17,9 @@ from datetime import datetime
 from sqlalchemy.exc import OperationalError
 
 from decorators.has_permission_decorator import Permission, has_permission
-from models.enums import InfectionControlOriginEnum
+from models.enums import AdmissionQueueEnum, InfectionControlOriginEnum
 from models.main import User, db
-from repository.infection_control import infection_control_repository
+from repository import admission_queue_repository
 from services.infection_control import infection_control_status_service as rule
 from utils import db_utils
 
@@ -44,8 +45,8 @@ def sync_followed_admission(
     now = datetime.now()
     # read before the rule reads the prescriptions: queued again after this,
     # it stays queued
-    queued_at = infection_control_repository.get_queued_at(
-        admission_number=admission_number
+    queued_at = admission_queue_repository.get_queued_at(
+        queue=AdmissionQueueEnum.INFECTION_CONTROL, admission_number=admission_number
     )
 
     try:
@@ -65,8 +66,10 @@ def sync_followed_admission(
         return "skipped"
 
     if queued_at is not None:
-        infection_control_repository.dequeue(
-            admission_number=admission_number, queued_at=queued_at
+        admission_queue_repository.dequeue(
+            queue=AdmissionQueueEnum.INFECTION_CONTROL,
+            admission_number=admission_number,
+            queued_at=queued_at,
         )
 
     # not followed: dequeued too, there is nothing to run until prescalc

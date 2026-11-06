@@ -108,7 +108,7 @@ def _cleanup():
     # infection control follow-up: no seed rows, and prescalc fills it for
     # seed admissions too
     for table in (
-        "ci_fila",
+        "fila_atendimento",
         "ci_pendencia",
         "ci_avaliacao_atm",
         "ci_revisao",

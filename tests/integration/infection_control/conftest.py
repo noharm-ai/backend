@@ -84,7 +84,7 @@ def _admit():
 
     for table in (
         "prescricao_evolucao",
-        "ci_fila",
+        "fila_atendimento",
         "ci_pendencia",
         "ci_avaliacao_atm",
         "ci_revisao",
