@@ -8,6 +8,7 @@ from sqlalchemy import desc, text
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
 from models.enums import (
+    AdmissionQueueReasonEnum,
     DrugTypeEnum,
     FeatureEnum,
     PatientConciliationStatusEnum,
@@ -22,6 +23,7 @@ from models.prescription import (
 )
 from repository import prescalc_repository, prescription_repository
 from services import (
+    admission_queue_service,
     feature_service,
     memory_service,
     prescription_check_service,
@@ -290,6 +292,12 @@ def create_agg_prescription_by_prescription(
         id_prescription_day=pAgg.id,
         id_prescription=p.id,
     )
+    # after the hooks above, so an admission they just followed is queued
+    admission_queue_service.notify(
+        schema=schema,
+        admission_number=p.admissionNumber,
+        reason=AdmissionQueueReasonEnum.PRESCALC,
+    )
 
     _log_processed_date(id_prescription_array=[id_prescription], schema=schema)
 
@@ -429,6 +437,12 @@ def create_agg_prescription_by_date(
         features=features,
         user_id=user_context.id,
         id_prescription_day=agg_p.id,
+    )
+    # after the hooks above, so an admission they just followed is queued
+    admission_queue_service.notify(
+        schema=schema,
+        admission_number=agg_p.admissionNumber,
+        reason=AdmissionQueueReasonEnum.PRESCALC,
     )
 
 

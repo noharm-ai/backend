@@ -348,6 +348,15 @@ class SchemaConfigAuditTypeEnum(Enum):
     GETNAME_DNS = 3
     SECURITY_GROUP = 4
     USER_SECURITY_GROUP = 5
+    # 6-10 are written by the admin project (same table): keep in step with its
+    # SchemaConfigAuditTypeEnum so a code is never reused for something else
+    CENTRAL_SECRETS = 6
+    CENTRAL_VPN = 7
+    AWS_ACCESS_KEY = 8
+    NOHARM_DB_USER = 9
+    # noharm-store `schema_params` item of the schema (extra.section names the
+    # section changed)
+    STORE_SCHEMA_PARAMS = 10
 
 
 class InterventionAuditEnum(Enum):
@@ -574,3 +583,17 @@ class InfectionFocusEnum(Enum):
     # sepsis whose focus is not known
     UNKNOWN = 14
     OTHER = 15
+
+
+class AdmissionQueueEnum(Enum):
+    """Enum: the consumer of an admission queue (fila_atendimento.tp_fila), see
+    admission_queue_service"""
+
+    # the light infection control run (infection_control_job_service)
+    INFECTION_CONTROL = 1
+
+
+class AdmissionQueueReasonEnum(Enum):
+    """Enum: what queued an admission (fila_atendimento.motivos)"""
+
+    PRESCALC = "prescalc"

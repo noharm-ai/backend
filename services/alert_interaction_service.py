@@ -5,6 +5,7 @@ from typing import List
 
 from sqlalchemy import func, text
 
+from models.alert_config import AlertConfig
 from models.enums import DrugAlertLevelEnum, DrugTypeEnum, FrequencyEnum
 from models.main import Allergy, Drug, DrugAttributes, Substance, db
 from models.prescription import PrescriptionDrug
@@ -15,12 +16,16 @@ RELATION_KINDS = ["it", "dt", "dm", "iy", "sl", "rx"]
 
 # analyze interactions between drugs.
 # drug_list (PrescriptionDrug.findByPrescription)
-def find_relations(drug_list, id_patient: int, is_cpoe: bool):
+def find_relations(
+    drug_list, id_patient: int, is_cpoe: bool, alert_config: AlertConfig = None
+):
     """
     Find interactions between drugs in a prescription.
     :param drug_list: List of drugs in the prescription.
     :param id_patient: ID of the patient.
     :param is_cpoe: Boolean indicating if the prescription is CPOE.
+    :param alert_config: the schema's alert config (schema_params_service);
+        None keeps every alert (the defaults).
     :return: Dictionary with alerts, stats, and list of interactions."""
 
     filtered_list = _filter_drug_list(drug_list=drug_list)
@@ -80,9 +85,27 @@ def find_relations(drug_list, id_patient: int, is_cpoe: bool):
             if not all(
                 rule["passed"]
                 for rule in evaluate_kind_rules(
-                    kind=kind, drug_from=drug_from, drug_to=drug_to
+                    kind=kind,
+                    drug_from=drug_from,
+                    drug_to=drug_to,
+                    alert_config=alert_config,
                 )
             ):
+                continue
+
+            alert = build_alert(
+                kind=kind,
+                relation=active_relations[key],
+                drug_from=drug_from,
+                drug_to=drug_to,
+            )
+
+            # the schema may ignore the kind's alerts of some levels (the level
+            # is only known once the alert is built)
+            level_rule = evaluate_level_rule(
+                kind=kind, level=alert["level"], alert_config=alert_config
+            )
+            if level_rule is not None and not level_rule["passed"]:
                 continue
 
             if is_cpoe:
@@ -99,13 +122,6 @@ def find_relations(drug_list, id_patient: int, is_cpoe: bool):
                 stats[kind] += 1
                 unique_relations[uniq_key] = 1
                 unique_relations[uniq_invert_key] = 1
-
-            alert = build_alert(
-                kind=kind,
-                relation=active_relations[key],
-                drug_from=drug_from,
-                drug_to=drug_to,
-            )
 
             for id in alert["ids"]:
                 alert_obj = {
@@ -220,9 +236,12 @@ def _yes_no(value) -> str:
     return "sim" if value else "não"
 
 
-def evaluate_kind_rules(kind: str, drug_from: dict, drug_to: dict) -> list[dict]:
+def evaluate_kind_rules(
+    kind: str, drug_from: dict, drug_to: dict, alert_config: AlertConfig = None
+) -> list[dict]:
     """Rules a relation kind requires to raise an alert from drug_from to drug_to.
-    An alert is raised only when every rule passes"""
+    An alert is raised only when every rule passes. alert_config adds the rules
+    the schema configured (None: none)"""
     rules = []
 
     # rx rules
@@ -311,7 +330,112 @@ def evaluate_kind_rules(kind: str, drug_from: dict, drug_to: dict) -> list[dict]
             }
         )
 
+    if alert_config is not None:
+        rules.extend(
+            _config_rules(
+                kind=kind,
+                drug_from=drug_from,
+                drug_to=drug_to,
+                alert_config=alert_config,
+            )
+        )
+
     return rules
+
+
+def _config_rules(
+    kind: str, drug_from: dict, drug_to: dict, alert_config: AlertConfig
+) -> list[dict]:
+    """Rules the schema's alert config adds to a relation kind (only the
+    configured ones, so the trace lists what is in force)"""
+    kind_config = alert_config.interaction(kind)
+    rules = []
+
+    if not kind_config.enabled:
+        rules.append(
+            {
+                "rule": "config_kind_disabled",
+                "passed": False,
+                "message": "Configuração da instituição: alertas de "
+                f"{examutils.typeRelations.get(kind, kind)} estão desativados.",
+            }
+        )
+
+    # rx: the second side is an allergy, which has no frequency
+    if kind_config.ignoreFrequencies and kind != "rx":
+        ignored = set(kind_config.ignoreFrequencies)
+        rules.append(
+            {
+                "rule": "config_ignored_frequency",
+                "passed": drug_from["frequency"] not in ignored
+                and drug_to["frequency"] not in ignored,
+                "message": "Configuração da instituição: alertas deste tipo não "
+                "são exibidos quando um dos itens tem frequência "
+                f"{_frequency_list(kind_config.ignoreFrequencies)} "
+                f"({drug_from['drug']}: {_frequency_label(drug_from['frequency'])}; "
+                f"{drug_to['drug']}: {_frequency_label(drug_to['frequency'])}).",
+            }
+        )
+
+    # rx: the second side is an allergy, which has no administration time
+    if kind_config.requireIntervalIntersection and kind != "rx":
+        rules.append(
+            {
+                "rule": "config_interval_intersection",
+                "passed": _has_interval_intersection(
+                    interval1=drug_from["interval"], interval2=drug_to["interval"]
+                ),
+                "message": "Configuração da instituição: alertas de "
+                f"{examutils.typeRelations.get(kind, kind)} só são exibidos quando "
+                "os itens têm horário de administração em comum "
+                f"({drug_from['drug']}: {drug_from['interval'] or '--'}; "
+                f"{drug_to['drug']}: {drug_to['interval'] or '--'}).",
+            }
+        )
+
+    return rules
+
+
+def _frequency_label(frequency) -> str:
+    """A daily frequency as shown in the rule messages (SN, ACM... by name)"""
+    if frequency is None:
+        return "sem frequência"
+
+    value = f"{frequency:g}"
+    if float(frequency).is_integer():
+        try:
+            return f"{FrequencyEnum(int(frequency)).name} ({value})"
+        except ValueError:
+            pass
+
+    return value
+
+
+def _frequency_list(frequencies: list[float]) -> str:
+    """The configured frequencies, as shown in the rule messages"""
+    return ", ".join(_frequency_label(f) for f in frequencies)
+
+
+def evaluate_level_rule(
+    kind: str, level, alert_config: AlertConfig = None
+) -> dict | None:
+    """Rule of the schema's alert config on the level of a built alert (its
+    final level, after build_alert's adjustments): fails when the kind ignores
+    that level. None when the kind ignores no level"""
+    if alert_config is None:
+        return None
+
+    ignored = alert_config.interaction(kind).ignoreLevels
+    if not ignored:
+        return None
+
+    return {
+        "rule": "config_ignored_level",
+        "passed": level not in ignored,
+        "message": "Configuração da instituição: alertas de "
+        f"{examutils.typeRelations.get(kind, kind)} de nível "
+        f"{', '.join(ignored)} não são exibidos (nível deste alerta: {level}).",
+    }
 
 
 def build_alert(kind: str, relation: dict, drug_from: dict, drug_to: dict) -> dict:

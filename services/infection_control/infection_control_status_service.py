@@ -25,8 +25,10 @@ the summary the infection control report reads (resumo_acompanhamento, see
 infection_control_summary_service).
 
 Prescalc runs many times a day, so it doesn't apply the rule: it only
-follows the admissions that start (or restart) an antimicrobial, and the
-scheduled job applies the rule to every followed admission.
+follows the admissions that start (or restart) an antimicrobial, and queues
+the followed ones it sees (fila_atendimento, see admission_queue_service). The
+scheduled job applies the rule: the light run to the queued admissions, the
+full run to every followed one.
 
 The functions here carry no permission check: they run inside callers that
 have one (the static context or a decorated endpoint).
@@ -676,7 +678,9 @@ def follow_from_prescalc(
     A discharged patient is left alone.
 
     A followed record is left to the job, which also opens the reasons of each
-    drug. Only for schemas with the INFECTION_CONTROL feature.
+    drug: prescalc queues it for the light run right after this hook
+    (admission_queue_service.notify). Only for schemas with the
+    INFECTION_CONTROL feature.
 
     Runs in a savepoint and never raises: the prescription-day is the core
     product and must be saved even if this step fails.
@@ -696,39 +700,13 @@ def follow_from_prescalc(
             if not feature_service.has_feature(FeatureEnum.INFECTION_CONTROL):
                 return
 
-            now = datetime.now()
-            # a discharged patient's prescriptions are still recalculated
-            # (e.g. drugs suspended at discharge): they start nothing
-            if infection_control_repository.is_discharged(
-                admission_number=admission_number, now=now
-            ):
-                return
-
-            created = infection_control_repository.create_admission(
+            _follow_from_prescalc(
                 admission_number=admission_number,
-                origin=InfectionControlOriginEnum.PRESCALC.value,
                 user_id=user_id,
-                now=now,
-                id_last_prescription=id_prescription_day,
+                now=datetime.now(),
+                id_prescription_day=id_prescription_day,
+                id_prescription=id_prescription,
             )
-            reopened = (
-                None
-                if created
-                else infection_control_repository.reopen_admission(
-                    admission_number=admission_number, user_id=user_id, now=now
-                )
-            )
-
-            # reopened after a review: the job opens the reasons of its drugs
-            if created or (reopened and reopened.id_last_review is None):
-                infection_control_repository.open_pending(
-                    admission_number=admission_number,
-                    pending_type=InfectionControlPendingTypeEnum.NEVER_REVIEWED.value,
-                    origin=InfectionControlOriginEnum.PRESCALC.value,
-                    user_id=user_id,
-                    now=now,
-                    id_prescription=id_prescription,
-                )
     except Exception as e:  # noqa: BLE001 - must not break the prescription-day
         # same event as the static context's errors, which is the one monitored
         logger.backend_logger.error(
@@ -741,4 +719,47 @@ def follow_from_prescalc(
                     "admission_number": admission_number,
                 }
             )
+        )
+
+
+def _follow_from_prescalc(
+    admission_number: int,
+    user_id: int,
+    now: datetime,
+    id_prescription_day: int,
+    id_prescription: int | None,
+):
+    """Create or reopen the record of an admission whose prescription-day has
+    an antimicrobial (see follow_from_prescalc)"""
+    # a discharged patient's prescriptions are still recalculated
+    # (e.g. drugs suspended at discharge): they start nothing
+    if infection_control_repository.is_discharged(
+        admission_number=admission_number, now=now
+    ):
+        return
+
+    created = infection_control_repository.create_admission(
+        admission_number=admission_number,
+        origin=InfectionControlOriginEnum.PRESCALC.value,
+        user_id=user_id,
+        now=now,
+        id_last_prescription=id_prescription_day,
+    )
+    reopened = (
+        None
+        if created
+        else infection_control_repository.reopen_admission(
+            admission_number=admission_number, user_id=user_id, now=now
+        )
+    )
+
+    # reopened after a review: the job opens the reasons of its drugs
+    if created or (reopened and reopened.id_last_review is None):
+        infection_control_repository.open_pending(
+            admission_number=admission_number,
+            pending_type=InfectionControlPendingTypeEnum.NEVER_REVIEWED.value,
+            origin=InfectionControlOriginEnum.PRESCALC.value,
+            user_id=user_id,
+            now=now,
+            id_prescription=id_prescription,
         )

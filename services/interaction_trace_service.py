@@ -7,10 +7,14 @@ from sqlalchemy import and_, or_
 
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
+from models.alert_config import AlertConfig
 from models.main import Allergy, Drug, Relation, Substance, User, db
 from models.prescription import Prescription
 from models.requests.interaction_trace_request import InteractionTraceRequest
-from services import alert_interaction_service, prescription_view_service
+from services import (
+    alert_interaction_service,
+    prescription_view_service,
+)
 from utils import examutils, status
 
 _DRUG_PAIR_KINDS = [k for k in alert_interaction_service.RELATION_KINDS if k != "rx"]
@@ -27,6 +31,7 @@ def trace_interaction(request_data: InteractionTraceRequest, user_context: User 
     prescription: Prescription = context["prescription"]
     drug_list = context["drug_list"]
     is_cpoe = context["is_cpoe"]
+    alert_config: AlertConfig = context["alert_config"]
 
     allergies = alert_interaction_service._get_allergies(
         id_patient=prescription.idPatient
@@ -42,6 +47,7 @@ def trace_interaction(request_data: InteractionTraceRequest, user_context: User 
         "allergiesWithoutSubstance": _get_allergies_without_substance(
             id_patient=prescription.idPatient
         ),
+        "alertConfig": alert_config.model_dump(),
         "trace": None,
     }
 
@@ -72,7 +78,10 @@ def trace_interaction(request_data: InteractionTraceRequest, user_context: User 
             )
 
         result["trace"] = _trace_allergy(
-            item_from=item_from, allergy=allergy, is_cpoe=is_cpoe
+            item_from=item_from,
+            allergy=allergy,
+            is_cpoe=is_cpoe,
+            alert_config=alert_config,
         )
     else:
         if request_data.idPrescriptionDrugTo == request_data.idPrescriptionDrugFrom:
@@ -84,7 +93,10 @@ def trace_interaction(request_data: InteractionTraceRequest, user_context: User 
 
         item_to = _find_item(drug_list, request_data.idPrescriptionDrugTo)
         result["trace"] = _trace_drug_pair(
-            item_from=item_from, item_to=item_to, is_cpoe=is_cpoe
+            item_from=item_from,
+            item_to=item_to,
+            is_cpoe=is_cpoe,
+            alert_config=alert_config,
         )
 
     return result
@@ -156,7 +168,9 @@ def _trace_side(item) -> dict:
     return details
 
 
-def _trace_drug_pair(item_from, item_to, is_cpoe: bool) -> dict:
+def _trace_drug_pair(
+    item_from, item_to, is_cpoe: bool, alert_config: AlertConfig
+) -> dict:
     """Explains the analysis between two prescribed items (both directions)"""
     side_from = _trace_side(item=item_from)
     side_to = _trace_side(item=item_to)
@@ -203,8 +217,12 @@ def _trace_drug_pair(item_from, item_to, is_cpoe: bool) -> dict:
                     "kind": kind,
                     "label": examutils.typeRelations[kind],
                     "directions": [
-                        _evaluate_direction(kind, drug_from, drug_to, relations),
-                        _evaluate_direction(kind, drug_to, drug_from, relations),
+                        _evaluate_direction(
+                            kind, drug_from, drug_to, relations, alert_config
+                        ),
+                        _evaluate_direction(
+                            kind, drug_to, drug_from, relations, alert_config
+                        ),
                     ],
                 }
             )
@@ -220,7 +238,9 @@ def _trace_drug_pair(item_from, item_to, is_cpoe: bool) -> dict:
     )
 
 
-def _trace_allergy(item_from, allergy: dict, is_cpoe: bool) -> dict:
+def _trace_allergy(
+    item_from, allergy: dict, is_cpoe: bool, alert_config: AlertConfig
+) -> dict:
     """Explains the cross reactivity analysis between a prescribed item and one
     of the patient's allergies (evaluated only from the item to the allergy)"""
     side_from = _trace_side(item=item_from)
@@ -254,7 +274,9 @@ def _trace_allergy(item_from, allergy: dict, is_cpoe: bool) -> dict:
                 "kind": "rx",
                 "label": examutils.typeRelations["rx"],
                 "directions": [
-                    _evaluate_direction("rx", drug_from, allergy, relations),
+                    _evaluate_direction(
+                        "rx", drug_from, allergy, relations, alert_config
+                    ),
                 ],
             }
         )
@@ -339,10 +361,15 @@ def _get_registered_relations(sctid_a, sctid_b) -> list[dict]:
 
 
 def _evaluate_direction(
-    kind: str, drug_from: dict, drug_to: dict, relations: list[dict]
+    kind: str,
+    drug_from: dict,
+    drug_to: dict,
+    relations: list[dict],
+    alert_config: AlertConfig,
 ) -> dict:
     """Evaluates one relation kind from drug_from to drug_to, exactly as
-    find_relations does, keeping every intermediate decision"""
+    find_relations does (with the schema's alert config), keeping every
+    intermediate decision"""
     relation = next(
         (
             r
@@ -372,7 +399,7 @@ def _evaluate_direction(
         return direction
 
     direction["rules"] = alert_interaction_service.evaluate_kind_rules(
-        kind=kind, drug_from=drug_from, drug_to=drug_to
+        kind=kind, drug_from=drug_from, drug_to=drug_to, alert_config=alert_config
     )
 
     failed = [r for r in direction["rules"] if not r["passed"]]
@@ -383,6 +410,21 @@ def _evaluate_direction(
     alert = alert_interaction_service.build_alert(
         kind=kind, relation=relation, drug_from=drug_from, drug_to=drug_to
     )
+
+    # the schema may ignore the kind's alerts of the level it ended up with
+    level_rule = alert_interaction_service.evaluate_level_rule(
+        kind=kind, level=alert["level"], alert_config=alert_config
+    )
+    if level_rule is not None:
+        direction["rules"].append(level_rule)
+
+        if not level_rule["passed"]:
+            direction["message"] = (
+                "Há relação ativa e as regras foram atendidas, mas a configuração "
+                "da instituição ignora alertas deste nível."
+            )
+            return direction
+
     names_by_id = {
         drug_from["id"]: drug_from["drug"],
         drug_to["id"]: drug_to["drug"],

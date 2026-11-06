@@ -72,6 +72,15 @@ def _update_roles(email, roles):
         session_commit()
 
 
+@pytest.fixture(autouse=True)
+def no_noharm_store(monkeypatch):
+    """Tests never call AWS: the noharm-store reads find no item (the schema
+    params are the code defaults). A test that needs items patches it again"""
+    monkeypatch.setattr(
+        "repository.store_repository.get_item_data", lambda pk, sk: None
+    )
+
+
 @pytest.fixture(scope="session", autouse=True)
 def clean_test_artifacts():
     """Wipe test-generated rows before and after the test session.
@@ -98,7 +107,13 @@ def _cleanup():
 
     # infection control follow-up: no seed rows, and prescalc fills it for
     # seed admissions too
-    for table in ("ci_pendencia", "ci_avaliacao_atm", "ci_revisao", "ci_atendimento"):
+    for table in (
+        "fila_atendimento",
+        "ci_pendencia",
+        "ci_avaliacao_atm",
+        "ci_revisao",
+        "ci_atendimento",
+    ):
         session.execute(text(f"DELETE FROM demo.{table}"))
 
     # patients created for conciliation flows (seed admissions stay below 100000)

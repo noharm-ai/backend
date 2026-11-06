@@ -111,7 +111,7 @@ def test_running_cpoe_course_not_rewritten_every_hour(
     infection_control, cpoe_antimicrobial, admission
 ):
     """An open-ended order runs until now on every run: the summary keeps it
-    at day precision, so the next hourly run changes nothing"""
+    at day precision, so the next scheduled run changes nothing"""
     _prescribe(admission, _day(-3), None, id_segment=CPOE_SEGMENT)
     now = datetime.now().replace(hour=10, minute=0, second=0, microsecond=0)
     _sync(admission, now=now)

@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import text
 
 from models.enums import (
+    AdmissionQueueEnum,
     AntimicrobialTreatmentTypeEnum,
     InfectionControlOriginEnum,
     InfectionControlPendingTypeEnum,
@@ -42,6 +43,7 @@ NO_EVALUATION = InfectionControlPendingTypeEnum.NO_EVALUATION.value
 EXPIRED = InfectionControlPendingTypeEnum.EXPIRED.value
 SCHEDULED_DATE = InfectionControlPendingTypeEnum.SCHEDULED_DATE.value
 POSOLOGY_CHANGED = InfectionControlPendingTypeEnum.POSOLOGY_CHANGED.value
+INFECTION_CONTROL_QUEUE = AdmissionQueueEnum.INFECTION_CONTROL.value
 
 
 def _day(offset):
@@ -155,6 +157,22 @@ def _record(admission_number):
         session.execute(
             text("SELECT * FROM demo.ci_atendimento WHERE nratendimento = :admission"),
             {"admission": admission_number},
+        )
+        .mappings()
+        .first()
+    )
+
+
+def _queued(admission_number):
+    """The admission's row in the infection control queue (fila_atendimento),
+    None when not queued"""
+    return (
+        session.execute(
+            text(
+                "SELECT * FROM demo.fila_atendimento "
+                "WHERE tp_fila = :queue AND nratendimento = :admission"
+            ),
+            {"queue": INFECTION_CONTROL_QUEUE, "admission": admission_number},
         )
         .mappings()
         .first()
