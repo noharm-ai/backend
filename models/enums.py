@@ -540,6 +540,51 @@ class AntimicrobialEvaluationClosingEnum(Enum):
     RETROACTIVE = 4
 
 
+class AntimicrobialTreatmentTypeEnum(Enum):
+    """Enum: why an antimicrobial is given, as judged in an evaluation (ci_avaliacao_atm.tp_tratamento)"""
+
+    # before the agent is known, by the likely ones of the infection
+    EMPIRICAL = 1
+    # directed by a culture result (agent and antibiogram)
+    CULTURE_GUIDED = 2
+    # to prevent the infection of a surgery
+    SURGICAL_PROPHYLAXIS = 3
+    # to prevent an infection outside surgery (e.g. neutropenia, exposure)
+    MEDICAL_PROPHYLAXIS = 4
+
+    @classmethod
+    def prophylaxis(cls) -> set[int]:
+        """Treatment types given to prevent an infection: no focus is required"""
+        return {cls.SURGICAL_PROPHYLAXIS.value, cls.MEDICAL_PROPHYLAXIS.value}
+
+
+class InfectionFocusEnum(Enum):
+    """Enum: an infection focus an antimicrobial is given for, as judged in an evaluation (ci_avaliacao_atm.tp_focos_infeccao, one or more)"""
+
+    # lower respiratory tract: pneumonia, tracheobronchitis
+    RESPIRATORY = 1
+    # upper respiratory tract: sinusitis, otitis, pharyngitis
+    UPPER_RESPIRATORY = 2
+    URINARY = 3
+    # intra-abdominal: peritonitis, abscess, biliary tract
+    ABDOMINAL = 4
+    # gastrointestinal: infectious diarrhea, C. difficile
+    GASTROINTESTINAL = 5
+    SKIN_SOFT_TISSUE = 6
+    BONE_JOINT = 7
+    # primary or catheter-related bloodstream infection
+    BLOODSTREAM = 8
+    CENTRAL_NERVOUS_SYSTEM = 9
+    # endocarditis, vascular graft or device
+    CARDIOVASCULAR = 10
+    SURGICAL_SITE = 11
+    GYNECOLOGIC_OBSTETRIC = 12
+    FEBRILE_NEUTROPENIA = 13
+    # sepsis whose focus is not known
+    UNKNOWN = 14
+    OTHER = 15
+
+
 class AdmissionQueueEnum(Enum):
     """Enum: the consumer of an admission queue (fila_atendimento.tp_fila), see
     admission_queue_service"""

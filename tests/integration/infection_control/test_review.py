@@ -9,7 +9,9 @@ from sqlalchemy import text
 from models.enums import (
     AntimicrobialEvaluationClosingEnum,
     AntimicrobialEvaluationStatusEnum,
+    AntimicrobialTreatmentTypeEnum,
     InfectionControlResolutionEnum,
+    InfectionFocusEnum,
 )
 from tests.conftest import session
 from tests.integration.infection_control.helpers import (
@@ -446,3 +448,108 @@ def test_review_rejects_admission_not_followed(
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.get_json()["code"] == "errors.invalidRecord"
     assert _record(admission) is None
+
+
+def test_evaluation_records_treatment_type_and_focus(
+    client, infection_controller_headers, infection_control, admission
+):
+    """Each evaluated drug keeps why it is given and its infection foci, sorted
+    and without repeats"""
+    _prescribe_today(admission)
+
+    response = _review(
+        client,
+        infection_controller_headers,
+        admission,
+        evaluations=[ANTIMICROBIAL_DRUG],
+        treatment_type=AntimicrobialTreatmentTypeEnum.CULTURE_GUIDED.value,
+        infection_foci=[
+            InfectionFocusEnum.URINARY.value,
+            InfectionFocusEnum.ABDOMINAL.value,
+            InfectionFocusEnum.URINARY.value,
+        ],
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.get_json()
+    evaluation = response.get_json()["data"]["courses"][0]["evaluation"]
+    assert evaluation["treatmentType"] == (
+        AntimicrobialTreatmentTypeEnum.CULTURE_GUIDED.value
+    )
+    foci = [InfectionFocusEnum.URINARY.value, InfectionFocusEnum.ABDOMINAL.value]
+    assert evaluation["infectionFoci"] == foci
+
+    [record] = _evaluations(admission)
+    assert (
+        record["tp_tratamento"] == AntimicrobialTreatmentTypeEnum.CULTURE_GUIDED.value
+    )
+    assert record["tp_focos_infeccao"] == foci
+
+
+@pytest.mark.parametrize(
+    "treatment_type",
+    [
+        AntimicrobialTreatmentTypeEnum.SURGICAL_PROPHYLAXIS.value,
+        AntimicrobialTreatmentTypeEnum.MEDICAL_PROPHYLAXIS.value,
+    ],
+)
+def test_prophylaxis_needs_no_focus(
+    client, infection_controller_headers, infection_control, admission, treatment_type
+):
+    """A drug that prevents an infection may be evaluated without a focus"""
+    _prescribe_today(admission)
+
+    response = _review(
+        client,
+        infection_controller_headers,
+        admission,
+        evaluations=[ANTIMICROBIAL_DRUG],
+        treatment_type=treatment_type,
+        infection_foci=[],
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.get_json()
+    [record] = _evaluations(admission)
+    assert record["tp_tratamento"] == treatment_type
+    assert record["tp_focos_infeccao"] is None
+    assert (
+        response.get_json()["data"]["courses"][0]["evaluation"]["infectionFoci"] == []
+    )
+
+
+@pytest.mark.parametrize(
+    "indication",
+    [
+        # no treatment type
+        {"treatment_type": None},
+        {"treatment_type": 99},
+        # a treatment needs its focus
+        {
+            "treatment_type": AntimicrobialTreatmentTypeEnum.EMPIRICAL.value,
+            "infection_foci": [],
+        },
+        {
+            "treatment_type": AntimicrobialTreatmentTypeEnum.CULTURE_GUIDED.value,
+            "infection_foci": [],
+        },
+        # every focus must be known
+        {"infection_foci": [99]},
+        {"infection_foci": [InfectionFocusEnum.URINARY.value, 99]},
+    ],
+)
+def test_review_rejects_invalid_treatment_type_or_focus(
+    client, infection_controller_headers, infection_control, admission, indication
+):
+    """400 without a valid treatment type, or a treatment without its focus"""
+    _prescribe_today(admission)
+
+    response = _review(
+        client,
+        infection_controller_headers,
+        admission,
+        evaluations=[ANTIMICROBIAL_DRUG],
+        **indication,
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.get_json()["code"] == "errors.invalidParams"
+    assert _evaluations(admission) == []
