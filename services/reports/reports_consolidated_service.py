@@ -187,6 +187,8 @@ def get_infection_control_report(
         "substance": request_data.substance or None,
         "aware_level": request_data.aware_level or None,
         "reviewer": request_data.reviewer or None,
+        "treatment_type": request_data.treatment_type or None,
+        "infection_focus": request_data.infection_focus or None,
         "day": request_data.day.isoformat() if request_data.day else None,
         "admissions_of": request_data.admissions_of,
         "courses_of": request_data.courses_of,
