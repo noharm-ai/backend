@@ -79,6 +79,8 @@ class InfectionControlListRequest(BaseModel):
     status: list[int] = []
     # department of the latest prescription of the admission
     idDepartment: list[int] = []
+    # segment of the latest prescription of the admission
+    idSegment: list[int] = []
     # admissions with an open pending reason of any of these types
     pendingTypes: list[int] = []
     admissionNumbers: list[int] = []
