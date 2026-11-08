@@ -26,7 +26,9 @@ infection_control_summary_service).
 
 Prescalc runs many times a day, so it doesn't apply the rule: it only
 follows the admissions that start (or restart) an antimicrobial, and queues
-the followed ones it sees (fila_atendimento, see admission_queue_service). The
+the followed ones whose change the rule has something to do for
+(fila_atendimento, see admission_queue_service and
+infection_control_repository.queue_condition). The
 scheduled job applies the rule: the light run to the queued admissions, the
 full run to every followed one.
 
@@ -678,9 +680,10 @@ def follow_from_prescalc(
     A discharged patient is left alone.
 
     A followed record is left to the job, which also opens the reasons of each
-    drug: prescalc queues it for the light run right after this hook
-    (admission_queue_service.notify). Only for schemas with the
-    INFECTION_CONTROL feature.
+    drug: prescalc queues it for the light run right after this hook when its
+    change needs the rule (admission_queue_service.notify; a record created or
+    reopened here always does). Only for schemas with the INFECTION_CONTROL
+    feature.
 
     Runs in a savepoint and never raises: the prescription-day is the core
     product and must be saved even if this step fails.

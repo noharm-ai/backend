@@ -7,9 +7,11 @@ flow's job (in backend-private) runs only on the queued ones.
 
 Each consumer has its own queue (tp_fila, AdmissionQueueEnum), one row per
 admission:
-* a producer calls notify, which queues the admission for every consumer whose
-  feature is on and whose condition the admission meets, in the producer's
-  transaction (the queue row commits with the change that queued it);
+* a producer calls notify with what it changed (AdmissionChange), which queues
+  the admission for every consumer whose feature is on and whose condition
+  holds for that change, in the producer's transaction (the queue row commits
+  with the change that queued it). The condition keeps out the changes the
+  consumer has nothing to do for;
 * the consumer reads when the admission was queued (get_queued_at) before
   reading its data, and dequeues it in the same transaction as its work only
   if that did not change (dequeue): queued again meanwhile, the change may have
@@ -42,28 +44,48 @@ LOCK_TIMEOUT_MS = 5000
 
 
 @dataclass(frozen=True)
+class AdmissionChange:
+    """What a producer changed in an admission: each consumer's condition
+    decides from it whether the admission needs the consumer"""
+
+    admission_number: int
+    reason: AdmissionQueueReasonEnum
+    # antimicrobials prescribed (not suspended) in what the producer processed
+    antimicrobial_drugs: tuple[int, ...] = ()
+
+
+@dataclass(frozen=True)
 class QueueConsumer:
     """A flow that runs on the admissions queued for it"""
 
     queue: AdmissionQueueEnum
     # queued only in the schemas with this feature on (None: every schema)
     feature: FeatureEnum | None
-    # queued only when this condition on the admission holds (None: always)
-    condition: Callable[[int], ColumnElement[bool]] | None
+    # queued only when this condition holds for the change (None: always)
+    condition: Callable[[AdmissionChange], ColumnElement[bool]] | None
+
+
+def _infection_control_condition(change: AdmissionChange) -> ColumnElement[bool]:
+    """The admission is followed and the change can open a reason (see
+    infection_control_repository.queue_condition)"""
+    return infection_control_repository.queue_condition(
+        admission_number=change.admission_number,
+        antimicrobial_drugs=list(change.antimicrobial_drugs),
+    )
 
 
 CONSUMERS = (
     # the light infection control run applies the rule to the followed
-    # admissions that changed
+    # admissions where a running course may start
     QueueConsumer(
         queue=AdmissionQueueEnum.INFECTION_CONTROL,
         feature=FeatureEnum.INFECTION_CONTROL,
-        condition=infection_control_repository.followed_condition,
+        condition=_infection_control_condition,
     ),
 )
 
 
-def notify(schema: str, admission_number: int, reason: AdmissionQueueReasonEnum):
+def notify(schema: str, change: AdmissionChange):
     """Queue the admission for every consumer that wants it.
 
     Each consumer in a savepoint of its own, and never raises: the producer's
@@ -89,13 +111,11 @@ def notify(schema: str, admission_number: int, reason: AdmissionQueueReasonEnum)
 
                 admission_queue_repository.enqueue(
                     queue=consumer.queue,
-                    admission_number=admission_number,
-                    reason=reason,
+                    admission_number=change.admission_number,
+                    reason=change.reason,
                     now=now,
                     only_if=(
-                        consumer.condition(admission_number)
-                        if consumer.condition
-                        else None
+                        consumer.condition(change) if consumer.condition else None
                     ),
                 )
         except Exception as e:  # noqa: BLE001 - must not break the producer
@@ -107,9 +127,9 @@ def notify(schema: str, admission_number: int, reason: AdmissionQueueReasonEnum)
                         "path": "admission_queue_service.notify",
                         "schema": schema,
                         "message": str(e),
-                        "admission_number": admission_number,
+                        "admission_number": change.admission_number,
                         "queue": consumer.queue.name,
-                        "reason": reason.value,
+                        "reason": change.reason.value,
                     }
                 )
             )

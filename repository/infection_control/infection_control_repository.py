@@ -12,6 +12,7 @@ from sqlalchemy import (
     exists,
     false,
     func,
+    literal,
     or_,
     update,
 )
@@ -65,9 +66,26 @@ def create_admission(
     return db.session.execute(stmt).rowcount > 0
 
 
-def followed_condition(admission_number: int):
-    """Condition that holds while the admission is followed (pending or
-    revised): its infection control queue takes only those"""
+def queue_condition(admission_number: int, antimicrobial_drugs: list[int]):
+    """Condition under which a prescalc run needs the rule: the admission is
+    followed (pending or revised) and an antimicrobial prescribed is not among
+    the running courses the rule last saw (indicadores.courses), a new drug or
+    a course restarting, which open a reason. A record prescalc just created
+    has no courses yet and one it reopened has none running, so every
+    antimicrobial counts. Its infection control queue takes only those.
+
+    The rest is left to the full run: what only time changes (an evaluation
+    expiring, a course ending, a discharge), a running drug's posology and a
+    new prescription-day, which the record points at for the worklist's
+    department, bed and segment.
+    """
+    if not antimicrobial_drugs:
+        return false()
+
+    running_courses = func.coalesce(
+        InfectionControlAdmission.features["courses"], literal([], JSONB)
+    )
+
     return exists().where(
         InfectionControlAdmission.admission_number == admission_number,
         InfectionControlAdmission.status.in_(
@@ -75,6 +93,9 @@ def followed_condition(admission_number: int):
                 InfectionControlStatusEnum.PENDING.value,
                 InfectionControlStatusEnum.REVISED.value,
             ]
+        ),
+        ~running_courses.bool_op("@>")(
+            literal([{"idDrug": id_drug} for id_drug in antimicrobial_drugs], JSONB)
         ),
     )
 
