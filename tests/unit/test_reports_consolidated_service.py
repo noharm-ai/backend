@@ -517,6 +517,8 @@ class TestInfectionControlReport:
         id_department=[5],
         aware_level=[1, 2],
         reviewer=[],
+        treatment_type=[2],
+        infection_focus=[3, 4],
     )
 
     @pytest.fixture(autouse=True)
@@ -548,6 +550,8 @@ class TestInfectionControlReport:
             "substance": None,
             "aware_level": [1, 2],
             "reviewer": None,
+            "treatment_type": [2],
+            "infection_focus": [3, 4],
             "day": None,
             "admissions_of": None,
             "courses_of": None,

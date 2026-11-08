@@ -65,6 +65,10 @@ class InfectionControlReportRequest(BaseModel):
     substance: Optional[list[int]] = None
     aware_level: Optional[list[int]] = None
     reviewer: Optional[list[int]] = None
+    # the indication of the evaluations (AntimicrobialTreatmentTypeEnum,
+    # InfectionFocusEnum codes)
+    treatment_type: Optional[list[int]] = None
+    infection_focus: Optional[list[int]] = None
     day: Optional[date] = None
     admissions_of: Optional[int] = None
     courses_of: Optional[int] = None

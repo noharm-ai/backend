@@ -8,9 +8,11 @@ from sqlalchemy import text
 
 from models.enums import (
     AdmissionQueueEnum,
+    AntimicrobialTreatmentTypeEnum,
     InfectionControlOriginEnum,
     InfectionControlPendingTypeEnum,
     InfectionControlStatusEnum,
+    InfectionFocusEnum,
 )
 from models.main import db, dbSession
 from services.infection_control import infection_control_status_service
@@ -251,6 +253,12 @@ def _review(client, headers, admission_number, evaluations=(), **kwargs):
                 "idDrug": id_drug,
                 "conforming": kwargs.get("conforming", True),
                 "notes": kwargs.get("evaluation_notes", "Indicação adequada"),
+                "treatmentType": kwargs.get(
+                    "treatment_type", AntimicrobialTreatmentTypeEnum.EMPIRICAL.value
+                ),
+                "infectionFoci": kwargs.get(
+                    "infection_foci", [InfectionFocusEnum.URINARY.value]
+                ),
                 "interventionReasons": kwargs.get("intervention_reasons", []),
                 "createIntervention": kwargs.get("create_intervention", False),
                 "substituteDrug": kwargs.get("substitute_drug"),

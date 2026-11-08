@@ -186,6 +186,36 @@ def test_worklist_filters_by_department(
     assert listed(idDepartment=[DEPARTMENT_BY_SEGMENT[CPOE_SEGMENT]]) == []
 
 
+def test_worklist_filters_by_segment(
+    client, infection_controller_headers, infection_control, admission
+):
+    """The segment of the latest prescription narrows the worklist, along with
+    the department"""
+    _prescribe_today(admission)
+
+    def listed(**filters):
+        data = _worklist(client, infection_controller_headers, admission, **filters)
+        return [a["admissionNumber"] for a in data["admissions"]]
+
+    assert listed(idSegment=[ADULT_SEGMENT]) == [admission]
+    assert listed(idSegment=[CPOE_SEGMENT]) == []
+    assert listed(idSegment=[ADULT_SEGMENT, CPOE_SEGMENT]) == [admission]
+    assert (
+        listed(
+            idSegment=[ADULT_SEGMENT],
+            idDepartment=[DEPARTMENT_BY_SEGMENT[ADULT_SEGMENT]],
+        )
+        == [admission]
+    )
+    assert (
+        listed(
+            idSegment=[CPOE_SEGMENT],
+            idDepartment=[DEPARTMENT_BY_SEGMENT[ADULT_SEGMENT]],
+        )
+        == []
+    )
+
+
 def test_worklist_follows_patient_to_another_department(
     client, infection_controller_headers, infection_control, admission
 ):

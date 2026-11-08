@@ -23,6 +23,11 @@ class AntimicrobialEvaluationRequest(BaseModel):
     idDrug: int
     conforming: bool
     notes: str | None = None
+    # why the drug is given (AntimicrobialTreatmentTypeEnum) and the infections
+    # it is given for (InfectionFocusEnum, one or more; none is required for a
+    # prophylaxis)
+    treatmentType: int | None = None
+    infectionFoci: list[int] = []
     # intervention reasons of a non-conformity (flagged for infection control)
     interventionReasons: list[int] = []
     # the drug recommended instead, for reasons related to another drug
@@ -74,6 +79,8 @@ class InfectionControlListRequest(BaseModel):
     status: list[int] = []
     # department of the latest prescription of the admission
     idDepartment: list[int] = []
+    # segment of the latest prescription of the admission
+    idSegment: list[int] = []
     # admissions with an open pending reason of any of these types
     pendingTypes: list[int] = []
     admissionNumbers: list[int] = []
