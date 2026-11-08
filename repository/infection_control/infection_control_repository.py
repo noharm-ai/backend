@@ -9,10 +9,8 @@ from sqlalchemy import (
     and_,
     case,
     column,
-    exists,
     false,
     func,
-    literal,
     or_,
     update,
 )
@@ -66,38 +64,24 @@ def create_admission(
     return db.session.execute(stmt).rowcount > 0
 
 
-def queue_condition(admission_number: int, antimicrobial_drugs: list[int]):
-    """Condition under which a prescalc run needs the rule: the admission is
-    followed (pending or revised) and an antimicrobial prescribed is not among
-    the running courses the rule last saw (indicadores.courses), a new drug or
-    a course restarting, which open a reason. A record prescalc just created
-    has no courses yet and one it reopened has none running, so every
-    antimicrobial counts. Its infection control queue takes only those.
-
-    The rest is left to the full run: what only time changes (an evaluation
-    expiring, a course ending, a discharge), a running drug's posology and a
-    new prescription-day, which the record points at for the worklist's
-    department, bed and segment.
-    """
-    if not antimicrobial_drugs:
-        return false()
-
-    running_courses = func.coalesce(
-        InfectionControlAdmission.features["courses"], literal([], JSONB)
+def get_followed_features(admission_number: int) -> tuple[bool, dict | None]:
+    """Whether the admission is followed (pending or revised) and, if it is,
+    what the rule last kept on its record (indicadores, None before the rule
+    ran on it)"""
+    row = (
+        db.session.query(InfectionControlAdmission.features)
+        .filter(InfectionControlAdmission.admission_number == admission_number)
+        .filter(
+            InfectionControlAdmission.status.in_(
+                [
+                    InfectionControlStatusEnum.PENDING.value,
+                    InfectionControlStatusEnum.REVISED.value,
+                ]
+            )
+        )
+        .first()
     )
-
-    return exists().where(
-        InfectionControlAdmission.admission_number == admission_number,
-        InfectionControlAdmission.status.in_(
-            [
-                InfectionControlStatusEnum.PENDING.value,
-                InfectionControlStatusEnum.REVISED.value,
-            ]
-        ),
-        ~running_courses.bool_op("@>")(
-            literal([{"idDrug": id_drug} for id_drug in antimicrobial_drugs], JSONB)
-        ),
-    )
+    return row is not None, row.features if row is not None else None
 
 
 def lock_timeout(lock_timeout_ms: int | None):

@@ -550,7 +550,14 @@ class TestAdmissionFeatures:
     def test_non_conforming(self, verdicts, expected):
         """Any evaluation in force judged non conforming marks the record"""
         evaluations = [
-            SimpleNamespace(id=index, conforming=conforming)
+            SimpleNamespace(
+                id=index,
+                conforming=conforming,
+                id_drug=None,
+                course_start=None,
+                posology=None,
+                triggers=[],
+            )
             for index, conforming in enumerate(verdicts)
         ]
 
@@ -559,6 +566,113 @@ class TestAdmissionFeatures:
         )
 
         assert features["nonConforming"] is expected
+
+    def test_course_watching_posology_keeps_the_evaluated_posology(self):
+        """A course whose evaluation watches its posology keeps the posology it
+        was evaluated with, for prescalc to compare"""
+        course = _running()
+        evaluation = _evaluation(
+            1, id_drug=1, course_start=course.start, triggers=POSOLOGY_TRIGGER
+        )
+        evaluation.conforming = True
+
+        (features,) = rule.admission_features(
+            ongoing=[course], evaluations=[evaluation]
+        )["courses"]
+
+        assert features["evaluatedPosology"] == POSOLOGY
+
+    @pytest.mark.parametrize(
+        "triggers, posology_pending_drugs",
+        [(EXPIRED_TRIGGER, set()), (POSOLOGY_TRIGGER, {1})],
+    )
+    def test_course_not_watching_posology_keeps_none(
+        self, triggers, posology_pending_drugs
+    ):
+        """No posology is kept when the evaluation doesn't watch it, nor while
+        a posology reason of the drug is open"""
+        course = _running()
+        evaluation = _evaluation(1, id_drug=1, course_start=course.start, triggers=triggers)
+        evaluation.conforming = True
+
+        (features,) = rule.admission_features(
+            ongoing=[course],
+            evaluations=[evaluation],
+            posology_pending_drugs=posology_pending_drugs,
+        )["courses"]
+
+        assert "evaluatedPosology" not in features
+
+
+def _antimicrobial(id_drug=1, **posology):
+    """An antimicrobial item prescalc processed"""
+    return rule.PrescribedAntimicrobial(id_drug=id_drug, posology={**POSOLOGY, **posology})
+
+
+class TestPrescalcNeedsRule:
+    """Whether what prescalc processed can open a reason on a followed record"""
+
+    def test_record_the_rule_never_ran_on_needs_it(self):
+        """Without courses yet, every antimicrobial counts"""
+        assert rule.prescalc_needs_rule(None, [_antimicrobial()])
+
+    def test_drug_not_running_needs_it(self):
+        """A new drug, or one restarting, opens a reason"""
+        features = {"courses": [{"idDrug": 4}]}
+
+        assert rule.prescalc_needs_rule(features, [_antimicrobial(id_drug=1)])
+
+    def test_running_drug_needs_nothing(self):
+        """The daily repeat of a running drug changes nothing"""
+        features = {"courses": [{"idDrug": 1}]}
+
+        assert not rule.prescalc_needs_rule(features, [_antimicrobial(dose=4.0)])
+
+    @pytest.mark.parametrize(
+        "posologies, needs",
+        [
+            ([{}], False),
+            ([{"dose": 4.0, "doseconv": 4.0}], True),
+            ([{"dailyFrequency": 2.0}], True),
+            ([{"route": "VO"}], True),
+            # a drug written in two lines: one matching is enough
+            ([{"dose": 1.0, "doseconv": 1.0}, {}], False),
+        ],
+    )
+    def test_watched_posology(self, posologies, needs):
+        """A course watching its posology needs the rule when none of the
+        drug's items is prescribed as evaluated (same_posology)"""
+        features = {"courses": [{"idDrug": 1, "evaluatedPosology": POSOLOGY}]}
+
+        antimicrobials = [_antimicrobial(**posology) for posology in posologies]
+
+        assert rule.prescalc_needs_rule(features, antimicrobials) is needs
+
+    def test_record_without_evaluated_posology_waits_for_full_run(self):
+        """A course kept before the posology was stored doesn't trigger a
+        posology change"""
+        features = {"courses": [{"idDrug": 1, "idSubstance": None}]}
+
+        assert not rule.prescalc_needs_rule(
+            features, [_antimicrobial(dose=4.0, doseconv=4.0)]
+        )
+
+
+class TestDrugListPosology:
+    """The posology of a drug list item, as the rule describes it"""
+
+    def test_maps_the_drug_list_fields(self):
+        """The same fields as item_posology, from the prescription view"""
+        item = {
+            "dose": 2.0,
+            "doseconv": 2.0,
+            "measureUnit": {"value": "1", "label": "g"},
+            "frequency": {"value": "3", "label": "8/8h"},
+            "dayFrequency": 3.0,
+            "route": "EV",
+        }
+
+        assert rule.drug_list_posology(item) == POSOLOGY
 
 
 def _today_dates():

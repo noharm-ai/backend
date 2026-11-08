@@ -2,12 +2,12 @@
 the infection control consumer of admission_queue_service)
 
 Prescalc queues a followed admission only when an antimicrobial it processed
-is not among the running courses the rule last saw
-(infection_control_repository.queue_condition); the rest waits for the full
-run. The job entry
-dequeues the admission it applied the rule to, unless it was queued again
-while the rule ran or the record was held by a writer. Other consumers' rows
-are never touched."""
+can open a reason (infection_control_status_service.prescalc_needs_rule): it
+is not among the running courses the rule last saw, or its course watches the
+posology and it is no longer prescribed as evaluated. The rest waits for the
+full run. The job entry dequeues the admission it applied the rule to, unless
+it was queued again while the rule ran or the record was held by a writer.
+Other consumers' rows are never touched."""
 
 import json
 from datetime import datetime, timedelta
@@ -19,6 +19,7 @@ from models.main import db, dbSession
 from repository import admission_queue_repository
 from services.infection_control import infection_control_job_service
 from static import infection_control_sync
+from utils import status
 from tests.conftest import session, session_commit
 from tests.integration.infection_control.helpers import (
     ANTIMICROBIAL_DRUG,
@@ -27,15 +28,19 @@ from tests.integration.infection_control.helpers import (
     OTHER_ADULT_DEPARTMENT,
     OTHER_DRUG,
     PENDING,
+    POSOLOGY_CHANGED,
+    REVISED,
     _day,
     _discharge,
     _hold_record,
     _last_prescription_day,
+    _open_pendings,
     _prescalc,
     _prescribe,
     _prescribe_today,
     _queued,
     _record,
+    _review,
     _run_job,
     _suspend,
 )
@@ -110,6 +115,29 @@ def _prescribe_next_day(admission_number, drugs, id_department=None):
     )
     _prescalc(id_prescription)
     return id_prescription
+
+
+def _reviewed_watching_posology(client, headers, admission_number):
+    """An admission on an antimicrobial (dose 2.0), evaluated watching its
+    posology and revised, out of the queue"""
+    _prescribe_today(admission_number)
+    response = _review(
+        client,
+        headers,
+        admission_number,
+        evaluations=[ANTIMICROBIAL_DRUG],
+        triggers=[POSOLOGY_CHANGED],
+    )
+    assert response.status_code == status.HTTP_200_OK, response.get_json()
+    assert _record(admission_number)["tp_status"] == REVISED
+    _unqueue(admission_number)
+
+
+def _evaluated_posology(admission_number):
+    """The posology the record keeps for the antimicrobial's course, None
+    when it keeps none"""
+    (course,) = _record(admission_number)["indicadores"]["courses"]
+    return course.get("evaluatedPosology")
 
 
 def _sync(admission_number):
@@ -362,3 +390,53 @@ def test_job_leaves_other_queues_alone(infection_control, admission):
 
     assert _queued(admission) is None
     assert _queue_row(admission, OTHER_QUEUE) is not None
+
+
+def test_prescalc_queues_watched_posology_change(
+    client, infection_controller_headers, infection_control, admission
+):
+    """A course whose evaluation watches its posology is queued when prescalc
+    sees it prescribed otherwise, so the light run opens the reason; while the
+    reason is open the posology is no longer watched"""
+    _reviewed_watching_posology(client, infection_controller_headers, admission)
+    assert _evaluated_posology(admission)["dose"] == 2.0
+
+    _prescalc(_prescribe(admission, _day(0), _day(2), dose=4.0))
+    assert _queued(admission) is not None
+
+    assert _sync(admission) == "changed"
+    (pending,) = _open_pendings(admission)
+    assert pending["tp_pendencia"] == POSOLOGY_CHANGED
+    assert _evaluated_posology(admission) is None
+
+    _prescalc(_prescribe(admission, _day(0), _day(2), dose=6.0))
+    assert _queued(admission) is None
+
+
+def test_prescalc_does_not_queue_watched_posology_unchanged(
+    client, infection_controller_headers, infection_control, admission
+):
+    """The daily prescription repeating the evaluated posology is not queued"""
+    _reviewed_watching_posology(client, infection_controller_headers, admission)
+
+    _prescalc(_prescribe(admission, _day(0), _day(2), dose=2.0))
+
+    assert _queued(admission) is None
+
+
+def test_prescalc_ignores_posology_of_record_kept_before(
+    client, infection_controller_headers, infection_control, admission
+):
+    """A record whose courses were kept before the evaluated posology was
+    stored doesn't queue a posology change: it waits for the full run, which
+    opens the reason"""
+    _reviewed_watching_posology(client, infection_controller_headers, admission)
+    _set_running_courses(admission, [ANTIMICROBIAL_DRUG])
+    assert _evaluated_posology(admission) is None
+
+    _prescalc(_prescribe(admission, _day(0), _day(2), dose=4.0))
+    assert _queued(admission) is None
+
+    _run_job(admission)
+    (pending,) = _open_pendings(admission)
+    assert pending["tp_pendencia"] == POSOLOGY_CHANGED

@@ -452,7 +452,8 @@ def _admission_change(
     admission_number: int, prescription_data: dict
 ) -> admission_queue_service.AdmissionChange:
     """What prescalc changed in the admission, for the admission queues: the
-    antimicrobials prescribed (not suspended) in what it processed"""
+    antimicrobials prescribed (not suspended) in what it processed, with their
+    posology"""
     drugs = (
         prescription_data["prescription"]
         + prescription_data["solution"]
@@ -462,10 +463,13 @@ def _admission_change(
     return admission_queue_service.AdmissionChange(
         admission_number=admission_number,
         reason=AdmissionQueueReasonEnum.PRESCALC,
-        antimicrobial_drugs=tuple(
-            sorted(
-                {int(d["idDrug"]) for d in drugs if d.get("am") and not d["suspended"]}
+        antimicrobials=tuple(
+            infection_control_status_service.PrescribedAntimicrobial(
+                id_drug=int(d["idDrug"]),
+                posology=infection_control_status_service.drug_list_posology(d),
             )
+            for d in drugs
+            if d.get("am") and not d["suspended"]
         ),
     )
 
