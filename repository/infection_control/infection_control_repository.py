@@ -391,6 +391,10 @@ def _filter_admissions(query, filters: InfectionControlListRequest, now: datetim
         # the department shown in the worklist, of the latest prescription-day
         query = query.filter(Prescription.idDepartment.in_(filters.idDepartment))
 
+    if filters.idSegment:
+        # the segment of the same prescription-day
+        query = query.filter(Prescription.idSegment.in_(filters.idSegment))
+
     if filters.admissionNumbers:
         query = query.filter(
             InfectionControlAdmission.admission_number.in_(filters.admissionNumbers)
