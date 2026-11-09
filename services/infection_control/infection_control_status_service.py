@@ -14,6 +14,9 @@ apply_rule writes the plan; a saved review also records its evaluations here
 * a running course whose evaluation expired (the drug runs past its
   validity), or whose posology changed from the evaluated one, opens a reason
   when its evaluation opted into that trigger;
+* so does an exam result that meets an exam trigger rule its evaluation
+  turned on (exam_trigger_service; the full run sees these, as exams don't
+  go through prescalc);
 * an admission never reviewed opens a reason of its own, and so does one
   whose scheduled review date arrived;
 * when a drug stops, its reasons are resolved and its evaluation is closed;
@@ -61,7 +64,10 @@ from repository.infection_control import (
     infection_control_repository,
 )
 from services import feature_service
-from services.infection_control import infection_control_summary_service
+from services.infection_control import (
+    exam_trigger_service,
+    infection_control_summary_service,
+)
 from services.infection_control.antimicrobial_timeline_service import (
     GAP_TOLERANCE,
     Course,
@@ -84,6 +90,7 @@ EVALUATION_RESOLVED_TYPES = [
     InfectionControlPendingTypeEnum.NO_EVALUATION.value,
     InfectionControlPendingTypeEnum.EXPIRED.value,
     InfectionControlPendingTypeEnum.POSOLOGY_CHANGED.value,
+    InfectionControlPendingTypeEnum.EXAM_RESULT.value,
 ]
 # reasons an evaluation may opt into (the others always apply)
 OPTIONAL_TRIGGERS = {
@@ -118,6 +125,12 @@ class RulePlan:
         default_factory=dict
     )
     status: InfectionControlStatusEnum = InfectionControlStatusEnum.CLOSED
+
+
+def pending_triggers(evaluation: AntimicrobialEvaluation) -> list[int]:
+    """The optional reasons an evaluation watches for (pending types): its
+    triggers (gatilhos) also keep the triggers with parameters, as objects"""
+    return [t for t in evaluation.triggers or [] if isinstance(t, int)]
 
 
 def course_drug(course: Course) -> int:
@@ -304,11 +317,14 @@ def record_evaluation(
     open_pendings: list[InfectionControlPending],
     user_id: int,
     now: datetime,
+    exam_triggers: list[dict] | None = None,
 ) -> AntimicrobialEvaluation:
     """Record the evaluation of a running course made in a review.
 
     The new evaluation replaces the one in force and resolves the reasons of
-    its drug. When it only covers a period over before the evaluation in force
+    its drug. `exam_triggers` are the exam trigger rules it turns on, with
+    their baselines (exam_trigger_service.snapshot), kept among its triggers
+    after the pending types. When it only covers a period over before the evaluation in force
     started, it is a record of the past: it goes straight to the history and
     leaves that evaluation and its reasons as they are.
     """
@@ -340,7 +356,7 @@ def record_evaluation(
     evaluation.posology = posology_snapshot(course)
     evaluation.valid_from = evaluation_data.validFrom or now
     evaluation.valid_until = evaluation_data.validUntil
-    evaluation.triggers = sorted(set(evaluation_data.triggers))
+    evaluation.triggers = sorted(set(evaluation_data.triggers)) + (exam_triggers or [])
     evaluation.status = AntimicrobialEvaluationStatusEnum.ACTIVE.value
     evaluation.created_at = now
     evaluation.created_by = user_id
@@ -402,6 +418,7 @@ def resolve_on_review(
 
 def sync_admission(
     admission_number: int,
+    schema: str,
     origin: InfectionControlOriginEnum,
     user_id: int,
     now: datetime | None = None,
@@ -436,6 +453,7 @@ def sync_admission(
     apply_rule(
         admission=admission,
         admission_courses=admission_courses,
+        schema=schema,
         origin=origin,
         user_id=user_id,
     )
@@ -444,10 +462,13 @@ def sync_admission(
 
 
 def course_reasons(
-    course: Course, evaluation: AntimicrobialEvaluation | None, now: datetime
+    course: Course,
+    evaluation: AntimicrobialEvaluation | None,
+    now: datetime,
+    exam_results: exam_trigger_service.ExamResults | None = None,
 ) -> list[tuple[InfectionControlPendingTypeEnum, dict]]:
     """The reasons a running course gives, with their details, judged by its
-    active evaluation"""
+    active evaluation (and, for its exam triggers, the exam results)"""
     if evaluation is None:
         return [
             (
@@ -456,7 +477,7 @@ def course_reasons(
             )
         ]
 
-    triggers = evaluation.triggers or []
+    triggers = pending_triggers(evaluation)
     reasons = []
     # expired only while the drug runs past the validity: a course kept in
     # the gap tolerance after its last order ended is not running past it
@@ -486,6 +507,16 @@ def course_reasons(
             )
         )
 
+    # one reason per evaluation (the open reasons' unique index), naming
+    # every rule a result met
+    matches = exam_trigger_service.exam_matches(
+        evaluation=evaluation, course=course, results=exam_results, now=now
+    )
+    if matches:
+        reasons.append(
+            (InfectionControlPendingTypeEnum.EXAM_RESULT, {"matches": matches})
+        )
+
     return reasons
 
 
@@ -497,9 +528,11 @@ def plan_rule(
     open_pendings: list[InfectionControlPending],
     now: datetime,
     next_review_date: datetime | None = None,
+    exam_results: exam_trigger_service.ExamResults | None = None,
 ) -> RulePlan:
     """Decide which evaluations close, which reasons open or resolve and the
-    resulting status, without touching the database"""
+    resulting status, without touching the database (the exam results the
+    evaluations' exam triggers watch are read before)"""
     plan = RulePlan()
 
     # evaluations of courses that are over are no longer in force
@@ -537,7 +570,9 @@ def plan_rule(
                 (e for e in kept_evaluations if evaluation_matches_course(e, course)),
                 None,
             )
-            for pending_type, details in course_reasons(course, evaluation, now):
+            for pending_type, details in course_reasons(
+                course, evaluation, now, exam_results=exam_results
+            ):
                 plan.open_pendings.append(
                     {
                         "pending_type": pending_type,
@@ -615,7 +650,7 @@ def admission_features(
             evaluation is not None
             and evaluation.posology
             and InfectionControlPendingTypeEnum.POSOLOGY_CHANGED.value
-            in (evaluation.triggers or [])
+            in pending_triggers(evaluation)
             and course_drug(course) not in posology_pending_drugs
         ):
             features["evaluatedPosology"] = {
@@ -671,6 +706,7 @@ def prescalc_needs_rule(
 def apply_rule(
     admission: InfectionControlAdmission,
     admission_courses: AdmissionCourses,
+    schema: str,
     origin: InfectionControlOriginEnum,
     user_id: int,
 ):
@@ -694,6 +730,11 @@ def apply_rule(
         open_pendings=open_pendings,
         now=now,
         next_review_date=admission.next_review_date,
+        exam_results=exam_trigger_service.load_results(
+            admission_number=admission_number,
+            schema=schema,
+            evaluations=active_evaluations,
+        ),
     )
 
     evaluations_by_id = {e.id: e for e in active_evaluations}

@@ -26,6 +26,8 @@ class MemoryEnum(Enum):
     CUSTOM_FORMS = "custom-forms"
     TRANSCRIPTION_FIELDS = "transcription-fields"
     TRANSCRIPTION_REMOVE_FIELDS = "transcription-remove-fields"
+    # the infection control exam trigger rules (models/infection_control_config.py)
+    INFECTION_CONTROL_EXAM_TRIGGERS = "infection-control-exam-triggers"
 
 
 class GlobalMemoryEnum(Enum):
@@ -509,6 +511,9 @@ class InfectionControlPendingTypeEnum(Enum):
     # the posology of a course changed from the one its evaluation judged (a
     # trigger the evaluation opts into)
     POSOLOGY_CHANGED = 6
+    # an exam result met an exam trigger rule the evaluation turned on
+    # (models/infection_control_config.py)
+    EXAM_RESULT = 7
 
 
 class InfectionControlResolutionEnum(Enum):
@@ -597,3 +602,6 @@ class AdmissionQueueReasonEnum(Enum):
     """Enum: what queued an admission (fila_atendimento.motivos)"""
 
     PRESCALC = "prescalc"
+    # new results of an exam an evaluation watches, cached by the exams cache
+    # job of backend-private (which writes the queue itself)
+    EXAMS_CACHE = "exams_cache"

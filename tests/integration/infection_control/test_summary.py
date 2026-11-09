@@ -38,6 +38,7 @@ def _sync(admission_number, now=None):
         dbSession.setSchema("demo")
         infection_control_status_service.sync_admission(
             admission_number=admission_number,
+            schema="demo",
             origin=InfectionControlOriginEnum.JOB,
             user_id=0,
             now=now,

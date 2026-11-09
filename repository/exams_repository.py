@@ -1,6 +1,6 @@
 """Repository: exams related operations"""
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from boto3.dynamodb.conditions import Key
 from sqlalchemy import asc, desc, func
@@ -10,7 +10,8 @@ from models.appendix import GlobalExam
 from models.enums import NoHarmENV
 from models.main import db
 from models.segment import Exams, SegmentExam
-from utils import aws
+from services import cache_service
+from utils import aws, logger
 
 
 def get_exams_by_patient(idPatient: int, days: int):
@@ -122,3 +123,70 @@ def get_configured_exam_ref_types():
         .distinct()
         .all()
     ]
+
+
+def get_exam_types_by_ref(exam_refs: set[str]) -> dict[str, str]:
+    """The active exams of the schema mapped to these references
+    (segmentoexame.tpexame_ref): tpexame -> its reference, both in lower case"""
+    if not exam_refs:
+        return {}
+
+    rows = (
+        db.session.query(SegmentExam.typeExam, SegmentExam.tp_exam_ref)
+        .filter(SegmentExam.active == True)
+        .filter(func.lower(SegmentExam.tp_exam_ref).in_(list(exam_refs)))
+        .distinct()
+        .all()
+    )
+    return {exam_type.lower(): exam_ref.lower() for exam_type, exam_ref in rows}
+
+
+def get_creatinine_exam_types() -> set[str]:
+    """The active exams of the schema that are the creatinine (abbreviation
+    "creatinina", as get_exams_reference finds it), tpexame in lower case"""
+    rows = (
+        db.session.query(SegmentExam.typeExam)
+        .filter(SegmentExam.active == True)
+        .filter(func.lower(func.trim(SegmentExam.initials)) == "creatinina")
+        .distinct()
+        .all()
+    )
+    return {exam_type.lower() for (exam_type,) in rows}
+
+
+def get_patient_results(
+    id_patient: int,
+    exam_types: set[str],
+    until: datetime | None = None,
+) -> list[Exams]:
+    """The results of a patient for these exams (tpexame in lower case), oldest
+    first, up to `until` when given. The table keeps the last days only (older
+    results are archived in DynamoDB)"""
+    if not exam_types:
+        return []
+
+    query = (
+        db.session.query(Exams)
+        .filter(Exams.idPatient == id_patient)
+        .filter(func.lower(Exams.typeExam).in_(list(exam_types)))
+        .filter(Exams.value != None)
+    )
+    if until is not None:
+        query = query.filter(Exams.date <= until)
+
+    return query.order_by(asc(Exams.date)).all()
+
+
+def get_cached_exams(schema: str, id_patient: int) -> dict[str, dict]:
+    """The latest result of each exam of a patient in the exams cache (Redis,
+    `{schema}:{id_patient}:exames`, filled by the exams cache job of
+    backend-private: value, unit, date and the previous value), by tpexame in
+    lower case. Empty when the patient has none or the cache can't be read"""
+    key = f"{schema}:{id_patient}:exames"
+    try:
+        cached = cache_service.get_hgetall(key=key) or {}
+    except ValueError as e:
+        logger.backend_logger.error(f"Invalid exams cache {key}: {e}")
+        return {}
+
+    return {exam_type.lower(): exam for exam_type, exam in cached.items()}

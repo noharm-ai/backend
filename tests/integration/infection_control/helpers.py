@@ -117,6 +117,7 @@ def _run_job(admission_number):
         dbSession.setSchema("demo")
         infection_control_status_service.sync_admission(
             admission_number=admission_number,
+            schema="demo",
             origin=InfectionControlOriginEnum.JOB,
             user_id=0,
         )
@@ -267,6 +268,7 @@ def _review(client, headers, admission_number, evaluations=(), **kwargs):
                     "valid_until", (datetime.now() + timedelta(days=7)).isoformat()
                 ),
                 "triggers": kwargs.get("triggers", []),
+                "examTriggers": kwargs.get("exam_triggers", []),
             }
             for id_drug in evaluations
         ],
