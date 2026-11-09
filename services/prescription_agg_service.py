@@ -295,8 +295,9 @@ def create_agg_prescription_by_prescription(
     # after the hooks above, so an admission they just followed is queued
     admission_queue_service.notify(
         schema=schema,
-        admission_number=p.admissionNumber,
-        reason=AdmissionQueueReasonEnum.PRESCALC,
+        change=_admission_change(
+            admission_number=p.admissionNumber, prescription_data=prescription_data
+        ),
     )
 
     _log_processed_date(id_prescription_array=[id_prescription], schema=schema)
@@ -441,8 +442,35 @@ def create_agg_prescription_by_date(
     # after the hooks above, so an admission they just followed is queued
     admission_queue_service.notify(
         schema=schema,
-        admission_number=agg_p.admissionNumber,
+        change=_admission_change(
+            admission_number=agg_p.admissionNumber, prescription_data=agg_data
+        ),
+    )
+
+
+def _admission_change(
+    admission_number: int, prescription_data: dict
+) -> admission_queue_service.AdmissionChange:
+    """What prescalc changed in the admission, for the admission queues: the
+    antimicrobials prescribed (not suspended) in what it processed, with their
+    posology"""
+    drugs = (
+        prescription_data["prescription"]
+        + prescription_data["solution"]
+        + prescription_data["procedures"]
+    )
+
+    return admission_queue_service.AdmissionChange(
+        admission_number=admission_number,
         reason=AdmissionQueueReasonEnum.PRESCALC,
+        antimicrobials=tuple(
+            infection_control_status_service.PrescribedAntimicrobial(
+                id_drug=int(d["idDrug"]),
+                posology=infection_control_status_service.drug_list_posology(d),
+            )
+            for d in drugs
+            if d.get("am") and not d["suspended"]
+        ),
     )
 
 

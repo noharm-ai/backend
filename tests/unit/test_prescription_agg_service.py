@@ -241,7 +241,8 @@ def prescalc_env(
             patch.object(
                 module.prescription_view_service,
                 "static_get_prescription",
-                return_value={"data": "irrelevant"},
+                # getFeatures is mocked; the drug lists feed the admission queues
+                return_value={"prescription": [], "solution": [], "procedures": []},
             )
         )
         mocks.get_features = p(

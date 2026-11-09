@@ -1,10 +1,13 @@
 """Tests: infection control follow-up, the light job's queue (fila_atendimento,
 the infection control consumer of admission_queue_service)
 
-Prescalc queues every followed admission it sees, with or without an
-antimicrobial in the prescription-day; the job entry dequeues the admission it
-applied the rule to, unless it was queued again while the rule ran or the
-record was held by a writer. Other consumers' rows are never touched."""
+Prescalc queues a followed admission only when an antimicrobial it processed
+can open a reason (infection_control_status_service.prescalc_needs_rule): it
+is not among the running courses the rule last saw, or its course watches the
+posology and it is no longer prescribed as evaluated. The rest waits for the
+full run. The job entry dequeues the admission it applied the rule to, unless
+it was queued again while the rule ran or the record was held by a writer.
+Other consumers' rows are never touched."""
 
 import json
 from datetime import datetime, timedelta
@@ -16,18 +19,28 @@ from models.main import db, dbSession
 from repository import admission_queue_repository
 from services.infection_control import infection_control_job_service
 from static import infection_control_sync
+from utils import status
 from tests.conftest import session, session_commit
 from tests.integration.infection_control.helpers import (
+    ANTIMICROBIAL_DRUG,
     CLOSED,
     INFECTION_CONTROL_QUEUE,
+    OTHER_ADULT_DEPARTMENT,
     OTHER_DRUG,
+    PENDING,
+    POSOLOGY_CHANGED,
+    REVISED,
+    _day,
     _discharge,
     _hold_record,
     _last_prescription_day,
+    _open_pendings,
     _prescalc,
+    _prescribe,
     _prescribe_today,
     _queued,
     _record,
+    _review,
     _run_job,
     _suspend,
 )
@@ -76,6 +89,57 @@ def _queue_row(admission_number, queue):
     ).first()
 
 
+def _set_running_courses(admission_number, drugs):
+    """Make the record hold these drugs as its running courses, as if the rule
+    last saw them"""
+    session.execute(
+        text(
+            "UPDATE demo.ci_atendimento SET indicadores = CAST(:features AS jsonb) "
+            "WHERE nratendimento = :admission"
+        ),
+        {
+            "features": json.dumps(
+                {"courses": [{"idDrug": d} for d in drugs], "nonConforming": False}
+            ),
+            "admission": admission_number,
+        },
+    )
+    session_commit()
+
+
+def _prescribe_next_day(admission_number, drugs, id_department=None):
+    """A prescription of today (a prescription-day after the daily one's), run
+    through prescalc only"""
+    id_prescription = _prescribe(
+        admission_number, _day(0), _day(2), drugs=drugs, id_department=id_department
+    )
+    _prescalc(id_prescription)
+    return id_prescription
+
+
+def _reviewed_watching_posology(client, headers, admission_number):
+    """An admission on an antimicrobial (dose 2.0), evaluated watching its
+    posology and revised, out of the queue"""
+    _prescribe_today(admission_number)
+    response = _review(
+        client,
+        headers,
+        admission_number,
+        evaluations=[ANTIMICROBIAL_DRUG],
+        triggers=[POSOLOGY_CHANGED],
+    )
+    assert response.status_code == status.HTTP_200_OK, response.get_json()
+    assert _record(admission_number)["tp_status"] == REVISED
+    _unqueue(admission_number)
+
+
+def _evaluated_posology(admission_number):
+    """The posology the record keeps for the antimicrobial's course, None
+    when it keeps none"""
+    (course,) = _record(admission_number)["indicadores"]["courses"]
+    return course.get("evaluatedPosology")
+
+
 def _sync(admission_number):
     """Call the job entry for one admission, as backend-private does"""
     response = json.loads(
@@ -99,17 +163,69 @@ def test_prescalc_queues_admission_it_follows(infection_control, admission):
     assert queued["motivos"] == [PRESCALC]
 
 
-def test_prescalc_queues_followed_admission_without_antimicrobial(
+def test_prescalc_does_not_queue_followed_admission_without_antimicrobial(
     infection_control, admission
 ):
-    """A followed admission is queued even when its prescription-day has no
-    antimicrobial: the drug may have been dropped"""
+    """A prescription without antimicrobials, on a day placing the patient
+    where the record already does, changes nothing the rule keeps: a dropped
+    drug ends its course with time, which the full run sees"""
     _prescribe_today(admission)
     _unqueue(admission)
 
-    _prescribe_today(admission, drugs=(OTHER_DRUG,), job=False)
+    _prescribe_next_day(admission, drugs=(OTHER_DRUG,))
+
+    assert _record(admission)["tp_status"] == PENDING
+    assert _queued(admission) is None
+
+
+def test_prescalc_does_not_queue_running_antimicrobial(infection_control, admission):
+    """The daily prescription repeating a running antimicrobial is not queued:
+    the rule already follows its course"""
+    _prescribe_today(admission)
+    _unqueue(admission)
+
+    _prescribe_today(admission, job=False)
+
+    assert _queued(admission) is None
+
+
+def test_prescalc_queues_antimicrobial_not_running(infection_control, admission):
+    """An antimicrobial that is not among the running courses the rule last
+    saw (a new drug or a course restarting) is queued, so its reason opens"""
+    _prescribe_today(admission)
+    _unqueue(admission)
+    _set_running_courses(admission, [ANTIMICROBIAL_DRUG + 1000])
+
+    _prescribe_today(admission, job=False)
 
     assert _queued(admission) is not None
+
+
+def test_prescalc_queues_admission_it_reopens(infection_control, admission):
+    """A record reopened by prescalc was closed with nothing running, so its
+    antimicrobials are all new to it: it is queued"""
+    _suspend(_prescribe_today(admission))
+    _run_job(admission)
+    assert _record(admission)["tp_status"] == CLOSED
+    _unqueue(admission)
+
+    _prescribe_today(admission, job=False)
+
+    assert _record(admission)["tp_status"] == PENDING
+    assert _queued(admission) is not None
+
+
+def test_prescalc_leaves_new_department_to_full_run(infection_control, admission):
+    """A new prescription-day in another department, without a new
+    antimicrobial, is not queued: the record points at it after the full run"""
+    _prescribe_today(admission)
+    _unqueue(admission)
+
+    _prescribe_next_day(
+        admission, drugs=(OTHER_DRUG,), id_department=OTHER_ADULT_DEPARTMENT
+    )
+
+    assert _queued(admission) is None
 
 
 def test_prescalc_follows_even_when_queueing_fails(
@@ -161,19 +277,18 @@ def test_prescalc_does_not_queue_closed_admission(infection_control, admission):
     assert _queued(admission) is None
 
 
-def test_prescalc_queues_followed_discharged_admission(infection_control, admission):
-    """A followed admission recalculated after discharge is queued, so the job
-    closes it"""
+def test_prescalc_leaves_discharge_to_full_run(infection_control, admission):
+    """A followed admission recalculated after discharge is not queued: the
+    full run closes it, as it does every discharge"""
     id_prescription = _prescribe_today(admission)
     _unqueue(admission)
     _discharge(admission)
 
     _prescalc(id_prescription)
-    assert _queued(admission) is not None
+    assert _queued(admission) is None
 
     assert _sync(admission) == "changed"
     assert _record(admission)["tp_status"] == CLOSED
-    assert _queued(admission) is None
 
 
 def test_queueing_again_keeps_one_row(infection_control, admission):
@@ -192,7 +307,7 @@ def test_queueing_again_keeps_one_row(infection_control, admission):
 
 def test_queueing_adds_its_reason(infection_control, admission):
     """A reason not queued yet is added to the ones already there"""
-    _prescribe_today(admission)
+    _prescribe_today(admission, job=False)
     _unqueue(admission)
     _queue(admission, ["other"], datetime.now() - timedelta(minutes=5))
 
@@ -275,3 +390,53 @@ def test_job_leaves_other_queues_alone(infection_control, admission):
 
     assert _queued(admission) is None
     assert _queue_row(admission, OTHER_QUEUE) is not None
+
+
+def test_prescalc_queues_watched_posology_change(
+    client, infection_controller_headers, infection_control, admission
+):
+    """A course whose evaluation watches its posology is queued when prescalc
+    sees it prescribed otherwise, so the light run opens the reason; while the
+    reason is open the posology is no longer watched"""
+    _reviewed_watching_posology(client, infection_controller_headers, admission)
+    assert _evaluated_posology(admission)["dose"] == 2.0
+
+    _prescalc(_prescribe(admission, _day(0), _day(2), dose=4.0))
+    assert _queued(admission) is not None
+
+    assert _sync(admission) == "changed"
+    (pending,) = _open_pendings(admission)
+    assert pending["tp_pendencia"] == POSOLOGY_CHANGED
+    assert _evaluated_posology(admission) is None
+
+    _prescalc(_prescribe(admission, _day(0), _day(2), dose=6.0))
+    assert _queued(admission) is None
+
+
+def test_prescalc_does_not_queue_watched_posology_unchanged(
+    client, infection_controller_headers, infection_control, admission
+):
+    """The daily prescription repeating the evaluated posology is not queued"""
+    _reviewed_watching_posology(client, infection_controller_headers, admission)
+
+    _prescalc(_prescribe(admission, _day(0), _day(2), dose=2.0))
+
+    assert _queued(admission) is None
+
+
+def test_prescalc_ignores_posology_of_record_kept_before(
+    client, infection_controller_headers, infection_control, admission
+):
+    """A record whose courses were kept before the evaluated posology was
+    stored doesn't queue a posology change: it waits for the full run, which
+    opens the reason"""
+    _reviewed_watching_posology(client, infection_controller_headers, admission)
+    _set_running_courses(admission, [ANTIMICROBIAL_DRUG])
+    assert _evaluated_posology(admission) is None
+
+    _prescalc(_prescribe(admission, _day(0), _day(2), dose=4.0))
+    assert _queued(admission) is None
+
+    _run_job(admission)
+    (pending,) = _open_pendings(admission)
+    assert pending["tp_pendencia"] == POSOLOGY_CHANGED

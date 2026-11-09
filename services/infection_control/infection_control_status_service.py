@@ -26,7 +26,8 @@ infection_control_summary_service).
 
 Prescalc runs many times a day, so it doesn't apply the rule: it only
 follows the admissions that start (or restart) an antimicrobial, and queues
-the followed ones it sees (fila_atendimento, see admission_queue_service). The
+the followed ones whose antimicrobials can open a reason (fila_atendimento,
+see admission_queue_service and prescalc_needs_rule). The
 scheduled job applies the rule: the light run to the queued admissions, the
 full run to every followed one.
 
@@ -158,6 +159,41 @@ def item_posology(item: TimelineItem) -> dict:
         "frequency": item.frequency,
         "dailyFrequency": item.daily_frequency,
         "route": item.route,
+    }
+
+
+# what same_posology compares, kept on a course that watches its posology
+COMPARED_POSOLOGY_FIELDS = (
+    "dose",
+    "doseconv",
+    "measureUnit",
+    "frequency",
+    "dailyFrequency",
+    "route",
+)
+
+
+@dataclass(frozen=True)
+class PrescribedAntimicrobial:
+    """An antimicrobial item prescalc processed, with its posology as
+    item_posology describes it"""
+
+    id_drug: int
+    posology: dict
+
+
+def drug_list_posology(item: dict) -> dict:
+    """The posology of an item of the prescription view's drug list (what
+    prescalc processes), with the same fields as item_posology"""
+    measure_unit = item.get("measureUnit") or {}
+    frequency = item.get("frequency") or {}
+    return {
+        "dose": item.get("dose"),
+        "doseconv": item.get("doseconv"),
+        "measureUnit": measure_unit.get("label"),
+        "frequency": frequency.get("label"),
+        "dailyFrequency": item.get("dayFrequency"),
+        "route": item.get("route"),
     }
 
 
@@ -545,7 +581,9 @@ def plan_rule(
 
 
 def admission_features(
-    ongoing: list[Course], evaluations: list[AntimicrobialEvaluation]
+    ongoing: list[Course],
+    evaluations: list[AntimicrobialEvaluation],
+    posology_pending_drugs: set[int] | None = None,
 ) -> dict:
     """What the worklist filters by, kept on the admission record (indicadores)
     as prescalc keeps the drugs of a prescription: joining the prescriptions of
@@ -555,19 +593,79 @@ def admission_features(
     be searched on a treatment day) and whether an evaluation in force judged
     one non conforming. Nothing runs on a closed record. It holds as of the
     last time the rule ran.
+
+    It also tells prescalc whether to queue the admission for the rule
+    (prescalc_needs_rule): the running drugs, and the posology a course was
+    evaluated with (evaluatedPosology) when its evaluation watches posology
+    changes and no posology reason of the drug is open (posology_pending_drugs).
     """
-    return {
-        "courses": [
-            {
-                "idDrug": course_drug(course),
-                "idSubstance": course.items[-1].id_substance,
-                "awareLevel": course.items[-1].atb_level,
-                "start": dateutils.to_iso(course.start),
+    posology_pending_drugs = posology_pending_drugs or set()
+
+    def course_features(course: Course) -> dict:
+        features = {
+            "idDrug": course_drug(course),
+            "idSubstance": course.items[-1].id_substance,
+            "awareLevel": course.items[-1].atb_level,
+            "start": dateutils.to_iso(course.start),
+        }
+        evaluation = next(
+            (e for e in evaluations if evaluation_matches_course(e, course)), None
+        )
+        if (
+            evaluation is not None
+            and evaluation.posology
+            and InfectionControlPendingTypeEnum.POSOLOGY_CHANGED.value
+            in (evaluation.triggers or [])
+            and course_drug(course) not in posology_pending_drugs
+        ):
+            features["evaluatedPosology"] = {
+                key: evaluation.posology.get(key) for key in COMPARED_POSOLOGY_FIELDS
             }
-            for course in ongoing
-        ],
+        return features
+
+    return {
+        "courses": [course_features(course) for course in ongoing],
         "nonConforming": any(not e.conforming for e in evaluations),
     }
+
+
+def prescalc_needs_rule(
+    features: dict | None, antimicrobials: list[PrescribedAntimicrobial]
+) -> bool:
+    """Whether the antimicrobials prescalc processed can open a reason on a
+    followed record, judged by what the rule last kept on it
+    (admission_features):
+    * a drug without a running course: a new drug or a course restarting. A
+      record the rule hasn't run on yet has no courses, so every drug counts;
+    * a drug whose course watches its posology (evaluatedPosology) and none of
+      whose items is prescribed as evaluated (same_posology). A course kept
+      before the posology was stored has none: its change waits for the full
+      run until the rule runs on it again.
+
+    Everything else (expiry, a course ending, discharge) only time changes,
+    and the full run sees it.
+    """
+    courses = {
+        course.get("idDrug"): course for course in (features or {}).get("courses") or []
+    }
+    posologies_by_drug: dict[int, list[dict]] = {}
+    for antimicrobial in antimicrobials:
+        posologies_by_drug.setdefault(antimicrobial.id_drug, []).append(
+            antimicrobial.posology
+        )
+
+    for id_drug, posologies in posologies_by_drug.items():
+        course = courses.get(id_drug)
+        if course is None:
+            return True
+
+        evaluated = course.get("evaluatedPosology")
+        if evaluated and not any(
+            same_posology(evaluated, posology) for posology in posologies
+        ):
+            return True
+
+    return False
 
 
 def apply_rule(
@@ -636,11 +734,28 @@ def apply_rule(
         admission.updated_at = now
         admission.updated_by = user_id
 
+    resolved = {
+        id_pending
+        for id_pending_list in plan.resolve_pendings.values()
+        for id_pending in id_pending_list
+    }
+    posology_changed = InfectionControlPendingTypeEnum.POSOLOGY_CHANGED
     admission.features = admission_features(
         ongoing=admission_courses.ongoing,
         evaluations=[
             e for e in active_evaluations if e.id not in plan.close_evaluations
         ],
+        # its reason is open: no need to watch the posology until it is reviewed
+        posology_pending_drugs={
+            p.id_drug
+            for p in open_pendings
+            if p.pending_type == posology_changed.value and p.id not in resolved
+        }
+        | {
+            p["id_drug"]
+            for p in plan.open_pendings
+            if p["pending_type"] == posology_changed
+        },
     )
     # prescalc points a new record at its prescription-day; the patient
     # changes department and bed after that
@@ -678,9 +793,10 @@ def follow_from_prescalc(
     A discharged patient is left alone.
 
     A followed record is left to the job, which also opens the reasons of each
-    drug: prescalc queues it for the light run right after this hook
-    (admission_queue_service.notify). Only for schemas with the
-    INFECTION_CONTROL feature.
+    drug: prescalc queues it for the light run right after this hook when its
+    antimicrobials can open a reason (admission_queue_service.notify,
+    prescalc_needs_rule; a record created or reopened here always can). Only
+    for schemas with the INFECTION_CONTROL feature.
 
     Runs in a savepoint and never raises: the prescription-day is the core
     product and must be saved even if this step fails.
