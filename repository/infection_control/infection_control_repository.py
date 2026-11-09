@@ -9,7 +9,6 @@ from sqlalchemy import (
     and_,
     case,
     column,
-    exists,
     false,
     func,
     or_,
@@ -65,18 +64,24 @@ def create_admission(
     return db.session.execute(stmt).rowcount > 0
 
 
-def followed_condition(admission_number: int):
-    """Condition that holds while the admission is followed (pending or
-    revised): its infection control queue takes only those"""
-    return exists().where(
-        InfectionControlAdmission.admission_number == admission_number,
-        InfectionControlAdmission.status.in_(
-            [
-                InfectionControlStatusEnum.PENDING.value,
-                InfectionControlStatusEnum.REVISED.value,
-            ]
-        ),
+def get_followed_features(admission_number: int) -> tuple[bool, dict | None]:
+    """Whether the admission is followed (pending or revised) and, if it is,
+    what the rule last kept on its record (indicadores, None before the rule
+    ran on it)"""
+    row = (
+        db.session.query(InfectionControlAdmission.features)
+        .filter(InfectionControlAdmission.admission_number == admission_number)
+        .filter(
+            InfectionControlAdmission.status.in_(
+                [
+                    InfectionControlStatusEnum.PENDING.value,
+                    InfectionControlStatusEnum.REVISED.value,
+                ]
+            )
+        )
+        .first()
     )
+    return row is not None, row.features if row is not None else None
 
 
 def lock_timeout(lock_timeout_ms: int | None):
