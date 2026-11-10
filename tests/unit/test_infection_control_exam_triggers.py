@@ -432,6 +432,32 @@ def test_results_from_the_exams_cache(monkeypatch):
     assert exam_triggers._cached_result("pcr", {"value": 1, "date": "x"}) is None
 
 
+def test_archived_results_that_are_not_numbers_are_no_baseline(monkeypatch):
+    """An archived result that is not a number ("<0.5", "negativo") is skipped
+    instead of failing the review save: the latest numeric one is the
+    baseline"""
+    monkeypatch.setattr(
+        exam_triggers.exams_repository,
+        "get_exams_by_patient_from_dynamodb",
+        lambda schema, id_patient: [
+            {"tpexame": "PCR", "dtexame": "2026-10-04T08:00:00", "resultado": "<0.5"},
+            {"tpexame": "pcr", "dtexame": "2026-10-03T08:00:00", "resultado": "12.5"},
+            {"tpexame": "tax", "dtexame": "2026-10-04T08:00:00", "resultado": "n/a"},
+        ],
+    )
+
+    latest = exam_triggers._latest_archived(
+        schema="demo",
+        id_patient=7,
+        sources={"pcru": {"pcr"}, "temp": {"tax"}},
+        until=NOW,
+    )
+
+    assert set(latest) == {"pcru"}
+    assert latest["pcru"].raw_value == 12.5
+    assert latest["pcru"].date == datetime(2026, 10, 3, 8)
+
+
 # --- the rule ---
 
 

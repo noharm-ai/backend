@@ -349,10 +349,16 @@ def _latest_archived(
         if date > until:
             continue
 
+        try:
+            raw_value = float(item.get("resultado"))
+        except (TypeError, ValueError):
+            # a result that is not a number ("<0.5", "negativo") is no baseline
+            continue
+
         result = ExamResult(
             exam_type=exam_type,
             date=date,
-            raw_value=float(item.get("resultado")),
+            raw_value=raw_value,
             unit=item.get("unidade"),
         )
         for exam_ref in exam_refs:
