@@ -4,6 +4,8 @@ from zoneinfo import ZoneInfo
 
 from pydantic import AfterValidator, BaseModel, Field
 
+from models.infection_control_config import ExamTriggerRuleInput
+
 # dates are stored as naive local (hospital) time
 LOCAL_TZ = ZoneInfo("America/Sao_Paulo")
 
@@ -41,6 +43,9 @@ class AntimicrobialEvaluationRequest(BaseModel):
     validUntil: LocalDatetime
     # optional reasons that send the patient back to pending (pending types)
     triggers: list[int] = []
+    # the exam trigger rules turned on (their ids; a rule deleted meanwhile is
+    # left out)
+    examTriggers: list[str] = []
 
 
 class InfectionControlClinicalNoteRequest(BaseModel):
@@ -110,3 +115,10 @@ class InfectionControlBackfillRequest(BaseModel):
 
     after: int = 0
     limit: int = Field(default=50, ge=1, le=200)
+
+
+class ExamTriggersSaveRequest(BaseModel):
+    """The schema's exam trigger rules, replacing those kept (a new rule has
+    no id; a kept one sends its own)"""
+
+    rules: list[ExamTriggerRuleInput] = Field(max_length=50)

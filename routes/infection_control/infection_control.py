@@ -1,9 +1,12 @@
 """Route: infection control"""
 
 from flask import Blueprint, request
+from pydantic import ValidationError as PydanticValidationError
 
 from decorators.api_endpoint_decorator import api_endpoint
+from exception.validation_error import ValidationError
 from models.requests.infection_control_request import (
+    ExamTriggersSaveRequest,
     InfectionControlBackfillRequest,
     InfectionControlListRequest,
     InfectionControlReviewRequest,
@@ -12,6 +15,7 @@ from services.infection_control import (
     infection_control_service,
     recent_cultures_service,
 )
+from utils import status
 
 app_infection_control = Blueprint("app_infection_control", __name__)
 
@@ -85,6 +89,32 @@ def search_antimicrobials():
 def list_clinical_note_types():
     """The clinical note types a review's note can be given"""
     return infection_control_service.list_clinical_note_types()
+
+
+@app_infection_control.route("/infection-control/exam-triggers", methods=["GET"])
+@api_endpoint()
+def list_exam_triggers():
+    """The schema's exam trigger rules a review can turn on, and the exams a
+    rule can watch"""
+    return infection_control_service.list_exam_triggers()
+
+
+@app_infection_control.route("/infection-control/exam-triggers", methods=["PUT"])
+@api_endpoint()
+def save_exam_triggers():
+    """Replace the schema's exam trigger rules"""
+    try:
+        request_data = ExamTriggersSaveRequest(**request.get_json())
+    except PydanticValidationError as e:
+        # the rule's own checks raise ValueError, which the generic pydantic
+        # answer can't serialize: answer with the first message
+        raise ValidationError(
+            f"Gatilho de exame inválido: {e.errors()[0]['msg']}",
+            "errors.invalidParams",
+            status.HTTP_400_BAD_REQUEST,
+        ) from e
+
+    return infection_control_service.save_exam_triggers(request_data=request_data)
 
 
 @app_infection_control.route("/infection-control/review", methods=["POST"])

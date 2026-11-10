@@ -89,7 +89,10 @@ class AntimicrobialEvaluation(db.Model):
     # infectologist backdates it (up to the course start)
     valid_from = db.Column("dt_inicio_validade", db.DateTime, nullable=False)
     valid_until = db.Column("dt_validade", db.DateTime, nullable=False)
-    # optional reasons this evaluation watches for (tp_pendencia values)
+    # what sends the patient back to pending while this evaluation is in
+    # force: the optional reasons it watches for (tp_pendencia values, ints)
+    # and the triggers with parameters (objects with a `type`: an exam trigger
+    # rule copied with its baseline, see exam_trigger_service)
     triggers = db.Column("gatilhos", postgresql.JSONB, nullable=False)
     status = db.Column("tp_status", db.Integer, nullable=False)
     closed_at = db.Column("dt_encerramento", db.DateTime, nullable=True)
