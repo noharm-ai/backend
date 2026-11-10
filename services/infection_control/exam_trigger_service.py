@@ -59,6 +59,7 @@ from models.infection_control_config import (
 )
 from models.main import db
 from repository import exams_repository, patient_repository
+from services import cache_service
 from services.infection_control.antimicrobial_timeline_service import (
     Course,
     started_days,
@@ -474,6 +475,21 @@ def watched_since(evaluation: AntimicrobialEvaluation, trigger: dict) -> datetim
     return evaluation.created_at
 
 
+def _get_cached_exams(schema: str, id_patient: int) -> dict[str, dict]:
+    """The latest result of each exam of a patient in the exams cache (Redis,
+    `{schema}:{id_patient}:exames`, filled by the exams cache job of
+    backend-private: value, unit, date and the previous value), by tpexame in
+    lower case. Empty when the patient has none or the cache can't be read"""
+    key = f"{schema}:{id_patient}:exames"
+    try:
+        cached = cache_service.get_hgetall(key=key) or {}
+    except ValueError as e:
+        logger.backend_logger.error(f"Invalid exams cache {key}: {e}")
+        return {}
+
+    return {exam_type.lower(): exam for exam_type, exam in cached.items()}
+
+
 def _cached_result(exam_type: str, cached: dict | None) -> ExamResult | None:
     """A result of the exams cache (None without a value or a valid date)"""
     if not cached or cached.get("value") is None or not cached.get("date"):
@@ -521,9 +537,7 @@ def load_results(
     refs_by_type = _refs_by_type(
         exam_sources({trigger["examRef"] for _, trigger in watching})
     )
-    cached = exams_repository.get_cached_exams(
-        schema=schema, id_patient=patient.idPatient
-    )
+    cached = _get_cached_exams(schema=schema, id_patient=patient.idPatient)
 
     # a reference may read several exams of the schema: the latest wins, as in
     # the prescription view (a tie keeps the first, in tpexame order)

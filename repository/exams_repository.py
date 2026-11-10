@@ -10,8 +10,7 @@ from models.appendix import GlobalExam
 from models.enums import NoHarmENV
 from models.main import db
 from models.segment import Exams, SegmentExam
-from services import cache_service
-from utils import aws, logger
+from utils import aws
 
 
 def get_exams_by_patient(idPatient: int, days: int):
@@ -175,18 +174,3 @@ def get_patient_results(
         query = query.filter(Exams.date <= until)
 
     return query.order_by(asc(Exams.date)).all()
-
-
-def get_cached_exams(schema: str, id_patient: int) -> dict[str, dict]:
-    """The latest result of each exam of a patient in the exams cache (Redis,
-    `{schema}:{id_patient}:exames`, filled by the exams cache job of
-    backend-private: value, unit, date and the previous value), by tpexame in
-    lower case. Empty when the patient has none or the cache can't be read"""
-    key = f"{schema}:{id_patient}:exames"
-    try:
-        cached = cache_service.get_hgetall(key=key) or {}
-    except ValueError as e:
-        logger.backend_logger.error(f"Invalid exams cache {key}: {e}")
-        return {}
-
-    return {exam_type.lower(): exam for exam_type, exam in cached.items()}

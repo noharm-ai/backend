@@ -435,9 +435,7 @@ def test_results_from_the_exams_cache(monkeypatch):
             "TAX": {"value": None, "date": "2026-10-07T10:00:00"},
         }
 
-    monkeypatch.setattr(
-        exam_triggers.exams_repository.cache_service, "get_hgetall", cached
-    )
+    monkeypatch.setattr(exam_triggers.cache_service, "get_hgetall", cached)
 
     results = exam_triggers.load_results(
         admission_number=1,
