@@ -9,6 +9,7 @@ from exception.validation_error import ValidationError
 from models.appendix import Memory
 from models.enums import MemoryEnum
 from models.main import User, db
+from services import feature_service
 from utils import dateutils, status
 
 EDITABLE_KINDS = ["tpl-care-plan"]
@@ -96,7 +97,14 @@ def has_feature(feature: str):
 
 
 def has_feature_nouser(feature):
-    """Check if a feature is enabled globally (no user context required)."""
+    """Check if a feature is enabled globally (no user context required).
+
+    Answered from the features this request already read, when it did
+    (feature_service): prescalc asks after the prescription view loaded them."""
+    cached_features = feature_service.get_cached_features()
+    if cached_features is not None:
+        return feature in cached_features
+
     features = db.session.query(Memory).filter(Memory.kind == "features").first()
 
     if features is None:

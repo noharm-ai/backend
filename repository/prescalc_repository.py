@@ -35,13 +35,21 @@ def acquire_admission_lock(
     timeout = (
         timeout_seconds if timeout_seconds is not None else PRESCALC_LOCK_TIMEOUT_SECONDS
     )
+    key = {"key": f"prescalc:{schema}:{admission_number}"}
 
+    # the lock is almost always free: taken without waiting it is a single
+    # statement, instead of the three of the wait below
+    if db.session.execute(
+        text("SELECT pg_try_advisory_xact_lock(hashtextextended(:key, 0))"), key
+    ).scalar():
+        return True
+
+    # held by a concurrent run: wait for it, up to the timeout
     try:
         # SET does not accept bind params; int() sanitizes. Value in ms.
         db.session.execute(text(f"SET LOCAL lock_timeout = '{int(timeout * 1000)}'"))
         db.session.execute(
-            text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"),
-            {"key": f"prescalc:{schema}:{admission_number}"},
+            text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"), key
         )
         # restore the session value so the timeout doesn't leak into later
         # row-lock waits in the same transaction

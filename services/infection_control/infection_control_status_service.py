@@ -804,6 +804,13 @@ def follow_from_prescalc(
     if not features or not features.get("am"):
         return
 
+    # before the savepoint and its lock timeout: they are four statements, and
+    # most prescriptions with an antimicrobial are of schemas without the
+    # feature. The features were read with the prescription view, so this
+    # runs no query in prescalc
+    if not feature_service.has_feature(FeatureEnum.INFECTION_CONTROL):
+        return
+
     # flush prescalc's own changes first: begin_nested() would flush them inside
     # the try below, and their errors must surface as prescalc errors
     db.session.flush()
@@ -813,9 +820,6 @@ def follow_from_prescalc(
             db.session.begin_nested(),
             infection_control_repository.lock_timeout(PRESCALC_LOCK_TIMEOUT_MS),
         ):
-            if not feature_service.has_feature(FeatureEnum.INFECTION_CONTROL):
-                return
-
             _follow_from_prescalc(
                 admission_number=admission_number,
                 user_id=user_id,

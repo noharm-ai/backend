@@ -155,3 +155,21 @@ class TestHasFeatureNoUser:
 
         find.assert_not_called()
         identity.assert_not_called()
+
+    def test_answers_from_the_features_the_request_already_read(self):
+        """When the request already read the tenant features (the prescription
+        view does), they answer and the memory is not read again."""
+        mock_db = _db_with_features([OTHER_FEATURE])
+
+        with (
+            patch.object(memory_service, "db", mock_db),
+            patch.object(
+                memory_service.feature_service,
+                "get_cached_features",
+                return_value=[FEATURE],
+            ),
+        ):
+            assert memory_service.has_feature_nouser(FEATURE) is True
+            assert memory_service.has_feature_nouser(OTHER_FEATURE) is False
+
+        mock_db.session.query.assert_not_called()

@@ -58,6 +58,44 @@ class TestHasFeature:
                 assert feature_service.has_feature(FeatureEnum.OAUTH) is False
 
 
+class TestSetFeatures:
+    """Tests for feature_service.set_features / get_cached_features (tenant
+    features a caller already read)."""
+
+    def test_given_features_answer_without_a_db_lookup(self):
+        """Features handed over by a caller that already read the memory are
+        the ones has_feature answers from."""
+        mock_db = _query_returning(MagicMock(value=[FeatureEnum.OAUTH.value]))
+        with app.test_request_context():
+            feature_service.set_features([FeatureEnum.CONCILIATION.value])
+
+            with patch.object(feature_service, "db", mock_db):
+                assert feature_service.has_feature(FeatureEnum.CONCILIATION) is True
+                assert feature_service.has_feature(FeatureEnum.OAUTH) is False
+
+            mock_db.session.query.assert_not_called()
+            assert feature_service.get_cached_features() == [
+                FeatureEnum.CONCILIATION.value
+            ]
+
+    def test_nothing_cached_before_the_features_are_read(self):
+        """Before any read (or with an empty list handed over) nothing is
+        cached, so the next check reads the memory."""
+        with app.test_request_context():
+            assert feature_service.get_cached_features() is None
+
+            feature_service.set_features([])
+            feature_service.set_features(None)
+
+            assert feature_service.get_cached_features() is None
+
+    def test_safe_outside_an_application_context(self):
+        """Without an application context there is no request to cache for."""
+        feature_service.set_features([FeatureEnum.OAUTH.value])
+
+        assert feature_service.get_cached_features() is None
+
+
 class TestHasUserFeature:
     """Tests for feature_service.has_user_feature (per-user features)."""
 

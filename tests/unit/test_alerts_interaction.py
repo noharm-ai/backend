@@ -586,3 +586,76 @@ def test_build_alert_explains_level_adjustments():
     assert alert["level"] == "medium"
     assert alert["ids"] == ["1"]
     assert len(alert["level_notes"]) == 1
+
+
+def test_find_relations_uses_given_allergies(monkeypatch):
+    """Alertas interação: allergies the caller already read are not read again"""
+
+    drug_list = [
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=2, dose=20, drug_name="Drug A"
+        ),
+    ]
+
+    def _fail(*args, **kwargs):
+        raise AssertionError("the allergies were read again")
+
+    monkeypatch.setattr("services.alert_interaction_service._get_allergies", _fail)
+    monkeypatch.setattr(
+        "services.alert_interaction_service._get_active_relations",
+        _mock_get_active_relations(kind="rx"),
+    )
+
+    results = find_relations(
+        drug_list,
+        id_patient=1,
+        is_cpoe=False,
+        allergies=[
+            {
+                "id": None,
+                "drug": "Drug test RX",
+                "sctid": "111111",
+                "intravenous": False,
+                "group": None,
+                "frequency": None,
+                "rx": True,
+            }
+        ],
+    )
+
+    assert results["stats"]["rx"] == 1
+    assert results["alerts"]["2"][0]["key"] == "211111-111111-rx"
+
+
+def test_find_relations_looks_up_each_pair_once(monkeypatch):
+    """Alertas interação: the relations of a pair of substances are looked up
+    once, in the order the pairs appear, however many items share them"""
+
+    drug_list = [
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=1, dose=10, drug_name="Drug A", sctid="1"
+        ),
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=2, dose=10, drug_name="Drug B", sctid="2"
+        ),
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=3, dose=10, drug_name="Drug A again", sctid="1"
+        ),
+    ]
+    looked_up = []
+
+    def _active_relations(uniq_overlap_keys):
+        looked_up.extend(uniq_overlap_keys)
+        return {}
+
+    monkeypatch.setattr(
+        "services.alert_interaction_service._get_allergies",
+        _mock_get_allergies(data=[]),
+    )
+    monkeypatch.setattr(
+        "services.alert_interaction_service._get_active_relations", _active_relations
+    )
+
+    find_relations(drug_list, id_patient=1, is_cpoe=False)
+
+    assert looked_up == ["(1,2)", "(1,1)", "(2,1)"]

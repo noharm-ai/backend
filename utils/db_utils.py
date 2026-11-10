@@ -21,6 +21,11 @@ QUERY_CANCELED = "57014"
 _TIMEOUT_SETTINGS = ("lock_timeout", "statement_timeout")
 
 
+# schemas this process already found in the database: a container runs the
+# static entries (prescalc) over and over for the same schemas
+_known_schemas: set[str] = set()
+
+
 def set_schema(schema: str):
     """
     Point the session at a tenant schema, after checking that it exists.
@@ -28,18 +33,28 @@ def set_schema(schema: str):
     Static entries take the schema from the event, so an unknown one must fail
     instead of querying the wrong tenant. The check runs in its own session and
     leaves the session's connection to the schema_translate_map.
-    """
-    probe_session = Session(db)
-    result = probe_session.execute(
-        text("SELECT schema_name FROM information_schema.schemata")
-    )
-    schema_exists = any(r[0] == schema for r in result)
-    probe_session.close()
 
-    if not schema_exists:
-        raise ValidationError(
-            "Schema Inexistente", "errors.invalidSchema", status.HTTP_400_BAD_REQUEST
+    A schema found once is not checked again by this process: the check is a
+    connection checkout and a query of its own on every prescalc. Only
+    existing schemas are remembered, so an unknown one is always looked up
+    (and refused).
+    """
+    if schema not in _known_schemas:
+        probe_session = Session(db)
+        result = probe_session.execute(
+            text("SELECT schema_name FROM information_schema.schemata")
         )
+        schema_exists = any(r[0] == schema for r in result)
+        probe_session.close()
+
+        if not schema_exists:
+            raise ValidationError(
+                "Schema Inexistente",
+                "errors.invalidSchema",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+        _known_schemas.add(schema)
 
     dbSession.setSchema(schema)
 

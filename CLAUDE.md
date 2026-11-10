@@ -465,6 +465,15 @@ The rule holds even when the real value would be convenient or is already visibl
 - CPOE has its own: `AUTOMATIC_CHECK_IF_NOT_VALIDATED_ITENS` checks the patient-day with no item to validate (`_automatic_check`)
 - Tests: `tests/integration/test_prescalc_automatic_check.py`
 
+### Prescalc Performance
+- Prescalc (`static.prescalc` and `static.atendcalc` → `prescription_agg_service`) is the most executed flow of the application, and almost all of its time is the prescription view (`prescription_view_service.static_get_prescription`). Each statement is a round trip to the database: before adding a read, look for one the run already does
+- **The admission's data is read once.** The non-CPOE entry builds the view twice in a row, of the prescription and of its prescription-day. It passes the same `admission_data` dict to both, and the second view reuses what the first read and does not depend on the items: configs, interventions, allergy records, allergies by substance, clinical notes stats, exams and cultures. `_admission_scope` empties the dict for another admission, patient, segment or conciliation. A new read of the view that doesn't depend on the items goes through `_once`; what the items change (drug list, alerts, protocols, headers) is read by both. The shared data is only read: don't change it in place
+- The view's first query (`_get_prescription_data`) loads the deferred columns `_format` always reads (`undefer`: `Prescription.notes`, `Patient.observation`, `Patient.alert`), `is_cpoe` comes from the segment it joins, and the features it reads with the other memories are kept for the request (`feature_service.set_features`), so `feature_service.has_feature` and `memory_service.has_feature_nouser` don't read them again
+- The hooks at the end (`follow_from_prescalc`, `admission_queue_service.notify`) check their feature before opening a savepoint: a schema without it pays no statement for an antimicrobial
+- `db_utils.set_schema` checks a schema once per process (only existing ones are remembered) and `prescalc_repository.acquire_admission_lock` tries the lock without waiting before the wait with `lock_timeout`
+- `alert_interaction_service.find_relations` compares every pair of items: keep what runs per pair cheap (the pairs are kept unique in a dict, pairs without any relation are skipped at once). It also runs on every load of the prescription screen
+- Tests: `tests/integration/test_prescalc_admission_data.py` (the reads, the view with shared data against the view alone, and `STATEMENT_BUDGET`, the statements a run may take) and `tests/unit/test_prescalc_repository.py` (the lock)
+
 ### Outlier Detection
 - Service: `services/outlier_service.py`
 - Statistical analysis of dose/frequency

@@ -1,4 +1,4 @@
-from flask import g
+from flask import g, has_app_context
 
 from config import Config
 from models.appendix import GlobalMemory, Memory
@@ -29,6 +29,22 @@ def has_feature(user_feature: FeatureEnum):
             g.features = features
 
     return user_feature.value in features
+
+
+def set_features(features: list | None):
+    """Keeps the tenant features for the rest of the request when a caller
+    already read the `features` memory along with others (the prescription
+    view), so has_feature doesn't read it again"""
+    if features and has_app_context():
+        g.features = features
+
+
+def get_cached_features() -> list | None:
+    """The tenant features this request already read (None: not read yet)"""
+    if not has_app_context():
+        return None
+
+    return g.get("features") or None
 
 
 def has_user_feature(user_feature: FeatureEnum):

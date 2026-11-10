@@ -112,8 +112,14 @@ def create_agg_prescription_by_prescription(
         admission_number=p.admissionNumber, is_concilia=p.concilia is not None
     )
 
+    # the view is built twice, for the prescription and for its
+    # prescription-day: what belongs to the admission is read once
+    admission_data = {}
+
     prescription_data = prescription_view_service.static_get_prescription(
-        id_prescription=id_prescription, user_context=user_context
+        id_prescription=id_prescription,
+        user_context=user_context,
+        admission_data=admission_data,
     )
     p.features = prescriptionutils.getFeatures(prescription_data)
     p.aggDrugs = p.features["drugIDs"]
@@ -170,7 +176,9 @@ def create_agg_prescription_by_prescription(
         _audit_create(prescription=pAgg)
 
     agg_data = prescription_view_service.static_get_prescription(
-        id_prescription=pAgg.id, user_context=user_context
+        id_prescription=pAgg.id,
+        user_context=user_context,
+        admission_data=admission_data,
     )
 
     features = prescriptionutils.getFeatures(

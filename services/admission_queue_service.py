@@ -109,7 +109,15 @@ def notify(schema: str, change: AdmissionChange):
     keep the admission from the others. A change no consumer finds relevant
     runs no query at all (prescalc is a hot path).
     """
-    consumers = [c for c in CONSUMERS if c.relevant is None or c.relevant(change)]
+    # the feature is checked before any savepoint: the features are read once
+    # per request (prescalc has them from the prescription view), so a schema
+    # without the consumer's feature runs no query either
+    consumers = [
+        c
+        for c in CONSUMERS
+        if (c.relevant is None or c.relevant(change))
+        and (c.feature is None or feature_service.has_feature(c.feature))
+    ]
     if not consumers:
         return
 
@@ -121,11 +129,6 @@ def notify(schema: str, change: AdmissionChange):
     for consumer in consumers:
         try:
             with db.session.begin_nested():
-                if consumer.feature and not feature_service.has_feature(
-                    consumer.feature
-                ):
-                    continue
-
                 if consumer.wants is not None and not consumer.wants(change):
                     continue
 

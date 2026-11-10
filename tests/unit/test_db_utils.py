@@ -118,6 +118,15 @@ class TestRunWithDeadlockRetry:
 class TestSetSchema:
     """Teste db_utils - set_schema"""
 
+    @pytest.fixture(autouse=True)
+    def forget_known_schemas(self):
+        """Each test starts with no schema checked by the process"""
+        known = set(db_utils._known_schemas)
+        db_utils._known_schemas.clear()
+        yield
+        db_utils._known_schemas.clear()
+        db_utils._known_schemas.update(known)
+
     def test_rejects_an_unknown_schema(self):
         """A bad schema name must fail loudly instead of querying the wrong tenant."""
         session = MagicMock()
@@ -150,3 +159,38 @@ class TestSetSchema:
         db_session.setSchema.assert_called_once_with("demo")
         # the probe session is not left open
         session.close.assert_called_once()
+
+    def test_checks_a_known_schema_only_once(self):
+        """A schema found once is not looked up again by the process (prescalc
+        sets the same schemas over and over), but is still switched to."""
+        session = MagicMock()
+        session.execute.return_value = [("public",), ("demo",)]
+
+        with (
+            patch.object(db_utils, "db"),
+            patch.object(db_utils, "Session", return_value=session) as probe,
+            patch.object(db_utils, "dbSession") as db_session,
+        ):
+            db_utils.set_schema("demo")
+            db_utils.set_schema("demo")
+
+        probe.assert_called_once()
+        assert db_session.setSchema.call_count == 2
+
+    def test_keeps_looking_up_an_unknown_schema(self):
+        """Only existing schemas are remembered: an unknown one is looked up
+        (and refused) every time."""
+        session = MagicMock()
+        session.execute.return_value = [("public",), ("demo",)]
+
+        with (
+            patch.object(db_utils, "db"),
+            patch.object(db_utils, "Session", return_value=session) as probe,
+            patch.object(db_utils, "dbSession") as db_session,
+        ):
+            for _ in range(2):
+                with pytest.raises(ValidationError):
+                    db_utils.set_schema("does_not_exist")
+
+        assert probe.call_count == 2
+        db_session.setSchema.assert_not_called()

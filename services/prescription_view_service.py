@@ -4,6 +4,7 @@ from datetime import date, datetime
 
 from sqlalchemy import and_, desc, func
 from sqlalchemy.dialects.postgresql import INTERVAL
+from sqlalchemy.orm import undefer
 
 from config import Config
 from decorators.has_permission_decorator import Permission, has_permission
@@ -65,9 +66,25 @@ def route_get_prescription(id_prescription: int, user_context: User = None):
 
 
 @has_permission(Permission.READ_STATIC)
-def static_get_prescription(id_prescription: int, user_context: User = None):
+def static_get_prescription(
+    id_prescription: int,
+    user_context: User = None,
+    admission_data: dict | None = None,
+):
+    """The prescription view prescalc computes the indicators from.
+
+    admission_data: prescalc builds the view of a prescription and then of its
+    prescription-day, one right after the other. Passing the same dict to both
+    reads once what belongs to the admission and not to the prescription
+    (configs, interventions, allergies, clinical notes stats, exams and
+    cultures): the second view reuses what the first one loaded. Nothing is
+    reused for another admission, patient or segment (_admission_scope).
+    """
     return _internal_get_prescription(
-        id_prescription=id_prescription, is_complete=False, user_context=user_context
+        id_prescription=id_prescription,
+        is_complete=False,
+        user_context=user_context,
+        admission_data=admission_data,
     )
 
 
@@ -221,45 +238,93 @@ def _internal_get_prescription(
     id_prescription: int,
     user_context: User,
     is_complete=False,
+    admission_data: dict | None = None,
 ):
+    """Assembles the prescription view.
+
+    admission_data: see static_get_prescription. None reads everything.
+    """
     prescription, patient, department, segment, prescription_user, icd = (
         _get_prescription_data(id_prescription=id_prescription)
     )
 
-    config_data = _get_configs(
+    admission_data = _admission_scope(
+        admission_data=admission_data,
         prescription=prescription,
         patient=patient,
         is_complete=is_complete,
-        schema=user_context.schema,
     )
 
-    interventions = _get_interventions(
-        admission_number=prescription.admissionNumber,
-        config_data=config_data,
-        concilia=prescription.concilia,
+    config_data = _once(
+        admission_data,
+        "config_data",
+        lambda: _get_configs(
+            prescription=prescription,
+            patient=patient,
+            is_complete=is_complete,
+            schema=user_context.schema,
+            segment=segment,
+        ),
+    )
+
+    interventions = _once(
+        admission_data,
+        "interventions",
+        lambda: _get_interventions(
+            admission_number=prescription.admissionNumber,
+            config_data=config_data,
+            concilia=prescription.concilia,
+        ),
     )
 
     # read once: they confirm the allergy alert and are listed with the notes
-    allergies = allergy_repository.get_allergy_records(id_patient=patient.idPatient)
-
-    cn_data = _get_clinical_notes_stats(
-        prescription=prescription,
-        patient=patient,
-        config_data=config_data,
-        user_context=user_context,
-        is_complete=is_complete,
-        allergies=allergies,
+    allergies = _once(
+        admission_data,
+        "allergies",
+        lambda: allergy_repository.get_allergy_records(id_patient=patient.idPatient),
     )
 
-    exam_data = _get_exams(
-        patient=patient,
-        prescription=prescription,
-        config_data=config_data,
-        is_complete=is_complete,
-        user_context=user_context,
+    cn_data = _once(
+        admission_data,
+        "cn_data",
+        lambda: _get_clinical_notes_stats(
+            prescription=prescription,
+            patient=patient,
+            config_data=config_data,
+            user_context=user_context,
+            is_complete=is_complete,
+            allergies=allergies,
+        ),
     )
 
-    culture_data = _get_cultures(patient=patient, user_context=user_context)
+    exam_data = _once(
+        admission_data,
+        "exam_data",
+        lambda: _get_exams(
+            patient=patient,
+            prescription=prescription,
+            config_data=config_data,
+            is_complete=is_complete,
+            user_context=user_context,
+        ),
+    )
+
+    # flag_prescribed_cultures below sets the flag of every culture again, so
+    # the list is safe to reuse with another drug list
+    culture_data = _once(
+        admission_data,
+        "culture_data",
+        lambda: _get_cultures(patient=patient, user_context=user_context),
+    )
+
+    # the patient's allergies by substance, for the cross reactivity alert
+    substance_allergies = _once(
+        admission_data,
+        "substance_allergies",
+        lambda: alert_interaction_service.get_substance_allergies(
+            id_patient=patient.idPatient
+        ),
+    )
 
     last_dept = _get_last_dept(prescription=prescription, is_complete=is_complete)
 
@@ -287,6 +352,7 @@ def _internal_get_prescription(
         segment=segment,
         culture_data=culture_data,
         allergies=allergies,
+        substance_allergies=substance_allergies,
     )
 
     drug_data = _get_drug_data(
@@ -320,6 +386,46 @@ def _internal_get_prescription(
         alerts_data=alerts_data,
         icd=icd,
     )
+
+
+def _admission_scope(
+    admission_data: dict | None,
+    prescription: Prescription,
+    patient: Patient,
+    is_complete: bool,
+) -> dict | None:
+    """The dict the view reuses admission data from (see
+    static_get_prescription), emptied when it was filled for anything else:
+    what it holds depends on the admission, the patient, the segment (exam
+    references, cpoe), the conciliation (its interventions are filtered) and on
+    how much the view loads (is_complete)"""
+    if admission_data is None:
+        return None
+
+    scope = (
+        prescription.admissionNumber,
+        patient.idPatient,
+        prescription.idSegment,
+        prescription.concilia,
+        is_complete,
+    )
+    if admission_data.get("scope") != scope:
+        admission_data.clear()
+        admission_data["scope"] = scope
+
+    return admission_data
+
+
+def _once(admission_data: dict | None, key: str, load):
+    """load() the first time, what it returned after that (always load()
+    without admission_data)"""
+    if admission_data is None:
+        return load()
+
+    if key not in admission_data:
+        admission_data[key] = load()
+
+    return admission_data[key]
 
 
 @timed()
@@ -490,6 +596,13 @@ def _get_prescription_data(
         )
         .outerjoin(Segment, Segment.id == Prescription.idSegment)
         .outerjoin(User, Prescription.user == User.id)
+        # the view always reads these deferred columns (_format): loaded here
+        # they cost nothing, left deferred each one is a query of its own
+        .options(
+            undefer(Prescription.notes),
+            undefer(Patient.observation),
+            undefer(Patient.alert),
+        )
         .filter(Prescription.id == id_prescription)
         .first()
     )
@@ -546,8 +659,15 @@ def _get_patient_configs(patient: Patient) -> dict:
     return data
 
 
-def _get_segment_configs(prescription: Prescription) -> dict:
-    is_cpoe = segment_service.is_cpoe(id_segment=prescription.idSegment)
+def _get_segment_configs(
+    prescription: Prescription, segment: Segment | None = None
+) -> dict:
+    """segment: the prescription's segment when the caller already loaded it
+    (_get_prescription_data joins it), read here otherwise"""
+    if segment is not None and segment.id == prescription.idSegment:
+        is_cpoe = segment.cpoe
+    else:
+        is_cpoe = segment_service.is_cpoe(id_segment=prescription.idSegment)
 
     return {
         "is_cpoe": is_cpoe,
@@ -571,10 +691,16 @@ def _get_drug_list_configs(prescription: Prescription) -> dict:
 
 @timed()
 def _get_configs(
-    prescription: Prescription, patient: Patient, is_complete: bool, schema: str
+    prescription: Prescription,
+    patient: Patient,
+    is_complete: bool,
+    schema: str,
+    segment: Segment | None = None,
 ):
     """Configs of the prescription view: memory, features, segment, patient
-    and the schema params (noharm-store, written by admin)"""
+    and the schema params (noharm-store, written by admin).
+
+    segment: the prescription's segment, when the caller already loaded it"""
     data = {}
 
     # memory
@@ -587,6 +713,9 @@ def _get_configs(
             MemoryEnum.FEATURES.value,
         ]
     )
+    # the features came along: the feature checks of this request read them
+    feature_service.set_features(memory_itens.get(MemoryEnum.FEATURES.value))
+
     data["schedules_fasting"] = memory_itens.get(
         MemoryEnum.MAP_SCHEDULES_FASTING.value, []
     )
@@ -606,7 +735,7 @@ def _get_configs(
     )
 
     data.update(
-        _get_segment_configs(prescription=prescription),
+        _get_segment_configs(prescription=prescription, segment=segment),
     )
 
     data.update(_get_patient_configs(patient=patient))
@@ -915,10 +1044,14 @@ def _get_alerts(
     segment: Segment,
     culture_data: list,
     allergies: list,
+    substance_allergies: list | None = None,
 ):
     """allergies: the patient's allergy records
     (allergy_repository.get_allergy_records), which confirm the allergy flag of
-    the items (alert_service.is_allergic)"""
+    the items (alert_service.is_allergic).
+    substance_allergies: the patient's allergies by substance
+    (alert_interaction_service.get_substance_allergies) when the caller already
+    has them, read here otherwise"""
     # which alerts the schema shows
     alert_config = config_data["schema_params"].alerts
 
@@ -927,6 +1060,7 @@ def _get_alerts(
         is_cpoe=config_data["is_cpoe"],
         id_patient=patient.idPatient,
         alert_config=alert_config,
+        allergies=substance_allergies,
     )
 
     protocol_extra_info = ProtocolExtraInfo()

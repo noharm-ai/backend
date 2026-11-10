@@ -17,7 +17,11 @@ RELATION_KINDS = ["it", "dt", "dm", "iy", "sl", "rx"]
 # analyze interactions between drugs.
 # drug_list (PrescriptionDrug.findByPrescription)
 def find_relations(
-    drug_list, id_patient: int, is_cpoe: bool, alert_config: AlertConfig = None
+    drug_list,
+    id_patient: int,
+    is_cpoe: bool,
+    alert_config: AlertConfig = None,
+    allergies: list | None = None,
 ):
     """
     Find interactions between drugs in a prescription.
@@ -26,10 +30,14 @@ def find_relations(
     :param is_cpoe: Boolean indicating if the prescription is CPOE.
     :param alert_config: the schema's alert config (schema_params_service);
         None keeps every alert (the defaults).
+    :param allergies: the patient's allergies by substance
+        (get_substance_allergies) when the caller already read them; None
+        reads them here.
     :return: Dictionary with alerts, stats, and list of interactions."""
 
     filtered_list = _filter_drug_list(drug_list=drug_list)
-    allergies = _get_allergies(id_patient=id_patient)
+    if allergies is None:
+        allergies = _get_allergies(id_patient=id_patient)
     overlap_drugs = []
 
     # built once per item: the pairs below only compare them
@@ -56,13 +64,20 @@ def find_relations(
     if len(overlap_drugs) == 0:
         return {"alerts": {}, "list": {}, "stats": {}}
 
-    uniq_overlap_keys = []
-    for d in overlap_drugs:
-        key = f"""({d["from"]["sctid"]},{d["to"]["sctid"]})"""
-        if key not in uniq_overlap_keys:
-            uniq_overlap_keys.append(key)
+    # a dict keeps the pairs unique and in order: the pairs grow with the
+    # square of the items, and looking each one up in a list made this the
+    # slowest step of the view on long prescriptions
+    uniq_overlap_keys = list(
+        dict.fromkeys(
+            f"""({d["from"]["sctid"]},{d["to"]["sctid"]})""" for d in overlap_drugs
+        )
+    )
 
     active_relations = _get_active_relations(uniq_overlap_keys)
+    # most pairs have no relation of any kind: they are skipped at once
+    related_pairs = {
+        f"""{r["sctida"]}-{r["sctidb"]}""" for r in active_relations.values()
+    }
 
     alerts = {}
     stats = {}
@@ -74,6 +89,9 @@ def find_relations(
     for drug in overlap_drugs:
         drug_from = drug["from"]
         drug_to = drug["to"]
+
+        if f"""{drug_from["sctid"]}-{drug_to["sctid"]}""" not in related_pairs:
+            continue
 
         for kind in RELATION_KINDS:
             key = f"""{drug_from["sctid"]}-{drug_to["sctid"]}-{kind}"""
@@ -588,6 +606,13 @@ def _get_solution_group_key(pd: PrescriptionDrug, is_cpoe: bool):
             return f"{pd.idPrescription}-{pd.solutionGroup}"
 
     return None
+
+
+def get_substance_allergies(id_patient: int) -> list:
+    """The patient's active allergies by substance, as find_relations compares
+    them: read once and passed as its `allergies` when several drug lists of
+    the patient are analyzed"""
+    return _get_allergies(id_patient=id_patient)
 
 
 def _get_allergies(id_patient: int):

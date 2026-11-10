@@ -4,7 +4,8 @@ prescription-day"""
 import json
 from datetime import datetime, timedelta
 
-from sqlalchemy import text
+from sqlalchemy import event, text
+from sqlalchemy.engine import Engine
 
 from models.enums import InfectionControlOriginEnum
 from static import atendcalc, prescalc
@@ -38,6 +39,26 @@ def test_prescalc_without_feature_follows_nothing(admission):
     """A schema without the INFECTION_CONTROL feature is not followed"""
     _prescribe_today(admission, job=False)
 
+    assert _record(admission) is None
+
+
+def test_prescalc_without_feature_opens_no_savepoint(admission):
+    """Without the feature, an antimicrobial costs prescalc no statement: the
+    hook and the queue leave before their savepoints and lock timeouts"""
+    id_prescription = _prescribe(admission, _day(-1), _day(1))
+    statements = []
+
+    def record(conn, cursor, statement, parameters, context, executemany):
+        statements.append(statement)
+
+    event.listen(Engine, "before_cursor_execute", record)
+    try:
+        _prescalc(id_prescription)
+    finally:
+        event.remove(Engine, "before_cursor_execute", record)
+
+    assert statements
+    assert not [s for s in statements if "SAVEPOINT" in s or "lock_timeout" in s]
     assert _record(admission) is None
 
 
