@@ -418,11 +418,19 @@ def _cached_result(exam_type: str, cached: dict | None) -> ExamResult | None:
     )
 
 
+# load_results reads the patient itself unless given one (None included)
+_READ_PATIENT = object()
+
+
 def load_results(
-    admission_number: int, schema: str, evaluations: list[AntimicrobialEvaluation]
+    admission_number: int,
+    schema: str,
+    evaluations: list[AntimicrobialEvaluation],
+    patient=_READ_PATIENT,
 ) -> ExamResults | None:
     """The results the exam triggers of these evaluations watch, from the
-    exams cache: the latest of each exam (None when none watches an exam)"""
+    exams cache: the latest of each exam (None when none watches an exam).
+    The admission's patient record is read unless given (None: it has none)"""
     watching = [
         (evaluation, trigger)
         for evaluation in evaluations
@@ -431,7 +439,8 @@ def load_results(
     if not watching:
         return None
 
-    patient = patient_repository.get_patient_by_admission(admission_number)
+    if patient is _READ_PATIENT:
+        patient = patient_repository.get_patient_by_admission(admission_number)
     if patient is None:
         return ExamResults()
 

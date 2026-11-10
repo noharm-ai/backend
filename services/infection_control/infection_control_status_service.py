@@ -58,7 +58,9 @@ from models.infection_control import (
     InfectionControlReview,
 )
 from models.main import db
+from models.prescription import Patient
 from models.requests.infection_control_request import AntimicrobialEvaluationRequest
+from repository import patient_repository
 from repository.infection_control import (
     antimicrobial_repository,
     infection_control_repository,
@@ -108,6 +110,9 @@ class AdmissionCourses:
     # courses still running (or that may still continue, see is_ongoing)
     ongoing: list[Course] = field(default_factory=list)
     discharged: bool = False
+    # the admission's patient record, read once for the rule (discharge, the
+    # exam triggers' calculated exams, the summary)
+    patient: Patient | None = None
 
     def ongoing_course(self, id_drug: int) -> Course | None:
         """The running course of a drug"""
@@ -283,8 +288,14 @@ def load_courses(admission_number: int, now: datetime) -> AdmissionCourses:
     ]
     courses = group_courses(items)
 
-    discharged = infection_control_repository.is_discharged(
-        admission_number=admission_number, now=now
+    # discharged as infection_control_repository.is_discharged tells it
+    patient = patient_repository.get_patient_by_admission(
+        admission_number=admission_number
+    )
+    discharged = (
+        patient is not None
+        and patient.dischargeDate is not None
+        and patient.dischargeDate <= now
     )
 
     return AdmissionCourses(
@@ -292,6 +303,7 @@ def load_courses(admission_number: int, now: datetime) -> AdmissionCourses:
         courses=courses,
         ongoing=[] if discharged else [c for c in courses if is_ongoing(c, now)],
         discharged=discharged,
+        patient=patient,
     )
 
 
@@ -715,9 +727,15 @@ def apply_rule(
     what the worklist filters by"""
     now = admission_courses.now
     admission_number = admission.admission_number
-    active_evaluations = infection_control_repository.get_active_evaluations(
+    # every evaluation, for the summary; the rule judges the ones in force
+    evaluations = infection_control_repository.get_evaluations(
         admission_number=admission_number
     )
+    active_evaluations = [
+        e
+        for e in evaluations
+        if e.status == AntimicrobialEvaluationStatusEnum.ACTIVE.value
+    ]
     open_pendings = infection_control_repository.get_open_pendings(
         admission_number=admission_number
     )
@@ -734,6 +752,7 @@ def apply_rule(
             admission_number=admission_number,
             schema=schema,
             evaluations=active_evaluations,
+            patient=admission_courses.patient,
         ),
     )
 
@@ -798,18 +817,24 @@ def apply_rule(
             if p["pending_type"] == posology_changed
         },
     )
-    # prescalc points a new record at its prescription-day; the patient
-    # changes department and bed after that
-    admission.id_last_prescription = (
-        infection_control_repository.get_last_prescription_day_id(
-            admission_number=admission_number
+    # the reads below don't depend on the changes above: without autoflush
+    # the record is written once, by the flush at the end
+    with db.session.no_autoflush:
+        # prescalc points a new record at its prescription-day; the patient
+        # changes department and bed after that
+        admission.id_last_prescription = (
+            infection_control_repository.get_last_prescription_day_id(
+                admission_number=admission_number
+            )
         )
-    )
-    admission.recalculated_at = now
-    # what the infection control report reads of the admission
-    infection_control_summary_service.update_summary(
-        admission=admission, admission_courses=admission_courses, status=plan.status
-    )
+        admission.recalculated_at = now
+        # what the infection control report reads of the admission
+        infection_control_summary_service.update_summary(
+            admission=admission,
+            admission_courses=admission_courses,
+            status=plan.status,
+            evaluations=evaluations,
+        )
     db.session.flush()
 
 
