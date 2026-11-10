@@ -10,7 +10,9 @@ evaluation; while the evaluation is in force, a result that meets every
 condition of a rule opens a reason of the drug
 (InfectionControlPendingTypeEnum.EXAM_RESULT), settled by a new evaluation.
 
-* load_rules / save_rules: the rules kept in the memoria record;
+* load_rules / save_rules: the rules kept in the memoria record. A schema
+  that never defined them gets a copy of the global ones (public.memoria, same
+  tipo) the first time they are read;
 * snapshot (review save): each rule turned on is copied on the evaluation
   with its baseline, among its triggers (ci_avaliacao_atm.gatilhos, as an
   object with `type` TRIGGER_TYPE_EXAM next to the pending types), the latest
@@ -44,7 +46,7 @@ from datetime import datetime
 
 from dateutil import parser
 
-from models.appendix import Memory
+from models.appendix import GlobalMemory, Memory
 from models.enums import MemoryEnum
 from models.infection_control import AntimicrobialEvaluation
 from models.infection_control_config import (
@@ -124,14 +126,57 @@ def _rules_record() -> Memory | None:
     return (
         db.session.query(Memory)
         .filter(Memory.kind == MemoryEnum.INFECTION_CONTROL_EXAM_TRIGGERS.value)
+        .order_by(Memory.key)
         .first()
     )
 
 
-def load_rules() -> list[ExamTriggerRule]:
-    """The schema's exam trigger rules (none when never defined)"""
+def _global_rules() -> list[ExamTriggerRule]:
+    """The rules NoHarm keeps in public.memoria for the schemas that never
+    defined theirs: each keeps its id, or gets one when it has none (an
+    invalid rule, or one repeating an id, is left out)"""
+    record = (
+        db.session.query(GlobalMemory)
+        .filter(
+            GlobalMemory.kind == MemoryEnum.INFECTION_CONTROL_EXAM_TRIGGERS.value
+        )
+        .order_by(GlobalMemory.key)
+        .first()
+    )
+    if record is None or not isinstance(record.value, list):
+        return []
+
+    return parse_exam_trigger_rules(
+        [
+            {**item, "id": item.get("id") or uuid.uuid4().hex}
+            for item in record.value
+            if isinstance(item, dict)
+        ]
+    )
+
+
+def load_rules(user_id: int, now: datetime) -> list[ExamTriggerRule]:
+    """The schema's exam trigger rules. A schema that never defined them (no
+    record: an empty list is a schema that removed them all) gets a copy of
+    the global ones (public.memoria), saved as its own so the users edit them
+    from then on; none when there are no global ones either"""
     record = _rules_record()
-    return parse_exam_trigger_rules(record.value if record else None)
+    if record is not None:
+        return parse_exam_trigger_rules(record.value)
+
+    rules = _global_rules()
+    if not rules:
+        return []
+
+    record = Memory()
+    record.kind = MemoryEnum.INFECTION_CONTROL_EXAM_TRIGGERS.value
+    record.value = [rule.model_dump() for rule in rules]
+    record.update = now
+    record.user = user_id
+    db.session.add(record)
+    db.session.flush()
+
+    return rules
 
 
 def save_rules(
@@ -139,7 +184,7 @@ def save_rules(
 ) -> list[ExamTriggerRule]:
     """Replaces the schema's rules: a new rule gets an id, a kept one keeps
     its own (an id that isn't a rule of the schema raises ValueError)"""
-    current_ids = {rule.id for rule in load_rules()}
+    current_ids = {rule.id for rule in load_rules(user_id=user_id, now=now)}
     saved = []
     seen = set()
     for rule in rules:

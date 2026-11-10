@@ -82,6 +82,48 @@ def no_rules():
     _delete_rules()
 
 
+def _delete_global_rules():
+    """Removes the global rules (public.memoria)"""
+    session.execute(
+        text("DELETE FROM public.memoria WHERE tipo = :kind"), {"kind": RULES_KIND}
+    )
+    session_commit()
+
+
+@pytest.fixture
+def global_rules(no_rules):
+    """Global rules in public.memoria (one with an id, one without, one
+    invalid), the schema without its own; removed afterwards"""
+    _delete_global_rules()
+    session.execute(
+        text(
+            "INSERT INTO public.memoria (tipo, valor, update_at, update_by) "
+            "VALUES (:kind, :value, now(), 0)"
+        ),
+        {
+            "kind": RULES_KIND,
+            "value": json.dumps(
+                [
+                    {**PCR_RISE, "id": "global-pcr"},
+                    FEVER_AFTER_D3,
+                    {**FEVER_AFTER_D3, "examRef": "creatinina"},
+                ]
+            ),
+        },
+    )
+    session_commit()
+    yield
+    _delete_global_rules()
+
+
+def _schema_rules_records():
+    """The schema's memoria records keeping the rules"""
+    return session.execute(
+        text("SELECT valor FROM demo.memoria WHERE tipo = :kind"),
+        {"kind": RULES_KIND},
+    ).all()
+
+
 def _save(client, headers, rules):
     """Saves the schema's rules"""
     return client.put(URL, json={"rules": rules}, headers=headers)
@@ -234,6 +276,63 @@ def test_no_rules_until_the_users_define_them(
         "van",
     ]
     assert data["exams"][0]["name"] == "PCR"
+
+
+def test_a_schema_without_rules_gets_a_copy_of_the_global_ones(
+    client, infection_controller_headers, infection_control, global_rules
+):
+    """The first read copies the valid global rules into the schema (keeping
+    an id, giving one to a rule without it), once"""
+    data = _listed(client, infection_controller_headers)
+
+    assert [r["name"] for r in data["rules"]] == ["PCR em elevação", "Febre após D3"]
+    pcr, fever = data["rules"]
+    assert pcr["id"] == "global-pcr"
+    assert fever["id"]
+
+    (record,) = _schema_rules_records()
+    assert [r["id"] for r in record.valor] == ["global-pcr", fever["id"]]
+
+    # read again: the schema's own, not a new copy
+    assert _listed(client, infection_controller_headers)["rules"] == data["rules"]
+    assert len(_schema_rules_records()) == 1
+
+
+def test_the_copy_is_the_schemas_own(
+    client, infection_controller_headers, infection_control, global_rules
+):
+    """The users edit the copied rules by their ids; removing them all keeps
+    the schema without rules (no new copy)"""
+    _listed(client, infection_controller_headers)
+
+    response = _save(
+        client,
+        infection_controller_headers,
+        [{**PCR_RISE, "id": "global-pcr", "valueAbove": 80}],
+    )
+    assert response.status_code == status.HTTP_200_OK, response.get_json()
+    (pcr,) = _listed(client, infection_controller_headers)["rules"]
+    assert pcr["valueAbove"] == 80
+
+    assert _save(client, infection_controller_headers, []).status_code == 200
+    assert _listed(client, infection_controller_headers)["rules"] == []
+
+
+def test_saving_before_reading_edits_the_copy(
+    client, infection_controller_headers, infection_control, global_rules
+):
+    """A save that comes first copies the global rules too, so their ids are
+    the schema's"""
+    response = _save(
+        client,
+        infection_controller_headers,
+        [{**PCR_RISE, "id": "global-pcr", "valueAbove": 70}],
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.get_json()
+    (pcr,) = _listed(client, infection_controller_headers)["rules"]
+    assert pcr["id"] == "global-pcr"
+    assert pcr["valueAbove"] == 70
 
 
 def test_saves_the_rules(client, infection_controller_headers, rules):

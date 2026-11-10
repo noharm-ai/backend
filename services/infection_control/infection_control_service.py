@@ -621,7 +621,10 @@ def save_review(request_data: InfectionControlReviewRequest, user_context: User)
     reasons = _validate_review(
         request_data=request_data, admission_courses=admission_courses, now=now
     )
-    exam_trigger_rules = {r.id: r for r in exam_trigger_service.load_rules()}
+    exam_trigger_rules = {
+        r.id: r
+        for r in exam_trigger_service.load_rules(user_id=user_context.id, now=now)
+    }
 
     admission = infection_control_repository.lock_admission(
         admission_number=admission_number
@@ -754,12 +757,14 @@ def _exam_triggers_view(rules: list) -> dict:
 
 
 @has_permission(Permission.READ_INFECTION_CONTROL)
-def list_exam_triggers():
+def list_exam_triggers(user_context: User):
     """The schema's exam trigger rules, which a review turns on per drug
     evaluation, and the exams a rule can watch"""
     _check_feature()
 
-    return _exam_triggers_view(exam_trigger_service.load_rules())
+    return _exam_triggers_view(
+        exam_trigger_service.load_rules(user_id=user_context.id, now=datetime.now())
+    )
 
 
 @has_permission(Permission.WRITE_INFECTION_CONTROL)
