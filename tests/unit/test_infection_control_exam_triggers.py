@@ -190,6 +190,32 @@ def test_inclusive_conditions():
     assert matched({**fall, "valueAtMost": None, "variationAtMost": -40}, 30)
 
 
+def test_a_zero_baseline():
+    """A zero baseline is a baseline: any rise from it is unbounded (a rise rule
+    is met, a fall rule is not), staying at zero is no variation, and the match
+    keeps no variation (the JSON has no infinity)"""
+    rise = {**PCR_RISE, "valueAbove": None, "baseline": _baseline(0.0)}
+    fall = {**rise, "variationAbove": None, "variationBelow": -25}
+    flat = {**rise, "variationAbove": None, "variationAtMost": 0}
+    date = NOW - timedelta(hours=3)
+
+    def matches(trigger, value):
+        """The matches of a result of this value"""
+        return exam_triggers.exam_matches(
+            evaluation=_evaluation(trigger),
+            course=_course(),
+            results=_results({"pcru": [(date, value)]}),
+            now=NOW,
+        )
+
+    [match] = matches(rise, 80)
+    assert match["variation"] is None
+    assert match["baseline"]["value"] == 0.0
+    assert matches(fall, 80) == []
+    assert matches(rise, 0) == []
+    assert [m["variation"] for m in matches(flat, 0)] == [0.0]
+
+
 def test_match_details():
     """The reason names the rule, the result, the baseline and the variation"""
     baseline = _baseline(1.0)

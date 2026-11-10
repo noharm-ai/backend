@@ -31,7 +31,7 @@ Only results the reviewer could not have seen count: dated after the baseline
 (or after the evaluation was made, when it had none). So a new evaluation,
 taking the latest result as its baseline, never reopens the reason on the
 result that opened it. A variation is measured from the baseline and is not
-met without one.
+met without one; from a zero baseline any rise is unbounded.
 
 The rule reads only the cache: the exams cache job of backend-private, after
 caching new results, queues the patient's followed admissions for the light run
@@ -40,6 +40,7 @@ latest result of each exam, so a result the cache replaced before the rule ran
 (two results of the exam between updates) isn't seen.
 """
 
+import math
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -552,12 +553,23 @@ _COMPARISONS = (
 )
 
 
+def _variation(value: float, baseline_value: float | None) -> float | None:
+    """The variation from the baseline, in percent (None without one). From a
+    zero baseline the percent is unbounded: any rise is infinite (a rise rule
+    is met, a fall rule is not) and staying at zero is no variation"""
+    if baseline_value is None:
+        return None
+    if baseline_value == 0:
+        return math.copysign(math.inf, value) if value else 0.0
+
+    return round((value - baseline_value) / baseline_value * 100, 2)
+
+
 def _meets(trigger: dict, value: float, baseline_value: float | None) -> dict | None:
     """Whether a value meets every condition of a rule; the variation from the
-    baseline (percent) when it does"""
-    variation = None
-    if baseline_value:
-        variation = round((value - baseline_value) / baseline_value * 100, 2)
+    baseline (percent) when it does (None from a zero baseline: the JSON kept
+    on the reason has no infinity)"""
+    variation = _variation(value, baseline_value)
 
     for subject, compared in (("value", value), ("variation", variation)):
         for suffix, met in _COMPARISONS:
@@ -567,7 +579,11 @@ def _meets(trigger: dict, value: float, baseline_value: float | None) -> dict | 
             if compared is None or not met(compared, limit):
                 return None
 
-    return {"variation": variation}
+    return {
+        "variation": (
+            variation if variation is None or math.isfinite(variation) else None
+        )
+    }
 
 
 def exam_matches(

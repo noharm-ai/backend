@@ -60,7 +60,8 @@ class ExamTriggerRuleData(BaseModel):
     valueAtMost: float | None = None
     # the variation from the baseline, in percent, compared the same way
     # (signed: variationAbove 30 means a rise of more than 30%, variationBelow
-    # -25 a fall of more than 25%); not met without a baseline
+    # -25 a fall of more than 25%); not met without a baseline, and from a
+    # zero baseline any rise is unbounded (a rise is met, a fall is not)
     variationAbove: float | None = None
     variationAtLeast: float | None = None
     variationBelow: float | None = None
