@@ -625,6 +625,23 @@ def save_review(request_data: InfectionControlReviewRequest, user_context: User)
         r.id: r
         for r in exam_trigger_service.load_rules(user_id=user_context.id, now=now)
     }
+    # the rules each evaluation turns on (a rule deleted since the form loaded
+    # is left out) and their baselines, read once for all of them before the
+    # admission is locked, so the lock isn't held over the exams reads
+    evaluations_rules = [
+        [
+            exam_trigger_rules[id_rule]
+            for id_rule in dict.fromkeys(evaluation_data.examTriggers)
+            if id_rule in exam_trigger_rules
+        ]
+        for evaluation_data in request_data.evaluations
+    ]
+    baselines = exam_trigger_service.load_baselines(
+        exam_refs={r.examRef for rules in evaluations_rules for r in rules},
+        admission_number=admission_number,
+        schema=user_context.schema,
+        now=now,
+    )
 
     admission = infection_control_repository.lock_admission(
         admission_number=admission_number
@@ -669,7 +686,9 @@ def save_review(request_data: InfectionControlReviewRequest, user_context: User)
     )
 
     id_department = None
-    for evaluation_data in request_data.evaluations:
+    for evaluation_data, evaluation_rules in zip(
+        request_data.evaluations, evaluations_rules
+    ):
         evaluation = rule.record_evaluation(
             review=review,
             course=admission_courses.ongoing_course(evaluation_data.idDrug),
@@ -679,15 +698,7 @@ def save_review(request_data: InfectionControlReviewRequest, user_context: User)
             user_id=user_context.id,
             now=now,
             exam_triggers=exam_trigger_service.snapshot(
-                # a rule deleted since the form loaded is left out
-                rules=[
-                    exam_trigger_rules[id_rule]
-                    for id_rule in dict.fromkeys(evaluation_data.examTriggers)
-                    if id_rule in exam_trigger_rules
-                ],
-                admission_number=admission_number,
-                schema=user_context.schema,
-                now=now,
+                rules=evaluation_rules, baselines=baselines
             ),
         )
 

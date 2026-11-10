@@ -13,8 +13,8 @@ condition of a rule opens a reason of the drug
 * load_rules / save_rules: the rules kept in the memoria record. A schema
   that never defined them gets a copy of the global ones (public.memoria, same
   tipo) the first time they are read;
-* snapshot (review save): each rule turned on is copied on the evaluation
-  with its baseline, among its triggers (ci_avaliacao_atm.gatilhos, as an
+* load_baselines / snapshot (review save): each rule turned on is copied on
+  the evaluation with its baseline, among its triggers (ci_avaliacao_atm.gatilhos, as an
   object with `type` TRIGGER_TYPE_EXAM next to the pending types), the latest
   result of the exam when the review is saved (from the exame table, or the
   DynamoDB archive when the table has none). Editing or deleting a rule never
@@ -369,60 +369,78 @@ def _latest_archived(
     return latest
 
 
-def snapshot(
-    rules: list[ExamTriggerRule],
+@dataclass
+class Baselines:
+    """The latest result of each exam reference up to the review, read once for
+    every evaluation of a review, and the patient the calculated exams need"""
+
+    latest: dict[str, ExamResult] = field(default_factory=dict)
+    patient: PatientData = field(default_factory=PatientData)
+
+
+def load_baselines(
+    exam_refs: set[str],
     admission_number: int,
     schema: str,
     now: datetime,
-) -> list[dict]:
-    """The rules turned on in an evaluation, each with its baseline: the latest
-    result of its exam up to now (None when there is none)"""
-    if not rules:
-        return []
+) -> Baselines:
+    """The latest result of each reference up to now (from the exame table, or
+    the DynamoDB archive when the table has none). The review save reads it
+    once, before locking the admission, for every rule any evaluation turned
+    on; with no reference it reads nothing"""
+    if not exam_refs:
+        return Baselines()
 
     patient = patient_repository.get_patient_by_admission(admission_number)
-    patient_data = PatientData.of(patient)
-    sources = exam_sources({rule.examRef for rule in rules})
+    baselines = Baselines(patient=PatientData.of(patient))
+    if patient is None:
+        return baselines
 
-    latest: dict[str, ExamResult] = {}
-    if patient is not None:
-        refs_by_type = _refs_by_type(sources)
-        for row in exams_repository.get_patient_results(
-            id_patient=patient.idPatient, exam_types=set(refs_by_type), until=now
-        ):
-            exam_type = row.typeExam.lower()
-            for exam_ref in refs_by_type[exam_type]:
-                latest[exam_ref] = ExamResult(
-                    exam_type=exam_type,
-                    date=row.date,
-                    raw_value=row.value,
-                    unit=row.unit,
-                )
-
-        missing = {
-            exam_ref: exam_types
-            for exam_ref, exam_types in sources.items()
-            if exam_types and exam_ref not in latest
-        }
-        if missing:
-            latest.update(
-                _latest_archived(
-                    schema=schema,
-                    id_patient=patient.idPatient,
-                    sources=missing,
-                    until=now,
-                )
+    sources = exam_sources(exam_refs)
+    latest = baselines.latest
+    refs_by_type = _refs_by_type(sources)
+    for row in exams_repository.get_patient_results(
+        id_patient=patient.idPatient, exam_types=set(refs_by_type), until=now
+    ):
+        exam_type = row.typeExam.lower()
+        for exam_ref in refs_by_type[exam_type]:
+            latest[exam_ref] = ExamResult(
+                exam_type=exam_type,
+                date=row.date,
+                raw_value=row.value,
+                unit=row.unit,
             )
 
+    missing = {
+        exam_ref: exam_types
+        for exam_ref, exam_types in sources.items()
+        if exam_types and exam_ref not in latest
+    }
+    if missing:
+        latest.update(
+            _latest_archived(
+                schema=schema,
+                id_patient=patient.idPatient,
+                sources=missing,
+                until=now,
+            )
+        )
+
+    return baselines
+
+
+def snapshot(rules: list[ExamTriggerRule], baselines: Baselines) -> list[dict]:
+    """The rules turned on in an evaluation, each with its baseline: the latest
+    result of its exam up to the review (None when there is none)"""
     entries = []
     for rule in rules:
-        baseline = latest.get(rule.examRef)
+        baseline = baselines.latest.get(rule.examRef)
         entries.append(
             {
                 "type": TRIGGER_TYPE_EXAM,
                 **rule.model_dump(exclude={"enabledByDefault"}),
                 "baseline": (
-                    _result_entry(baseline, rule.examRef, patient_data)
+                    _result_entry(baseline, rule.examRef, baselines.patient)
                     if baseline
                     else None
                 ),

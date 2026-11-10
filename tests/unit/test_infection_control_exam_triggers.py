@@ -432,6 +432,65 @@ def test_results_from_the_exams_cache(monkeypatch):
     assert exam_triggers._cached_result("pcr", {"value": 1, "date": "x"}) is None
 
 
+def test_baselines_are_read_once_for_every_evaluation(monkeypatch):
+    """The review save reads the baselines of every rule turned on in one go
+    (one patient read, one exame query); each evaluation's snapshot only
+    copies its rules with them, and no reference reads nothing"""
+    reads = []
+    monkeypatch.setattr(
+        exam_triggers.patient_repository,
+        "get_patient_by_admission",
+        lambda admission_number: reads.append("patient")
+        or SimpleNamespace(
+            idPatient=7,
+            birthdate=ADULT.birthdate,
+            gender="F",
+            skinColor=None,
+            height=None,
+            weight=None,
+        ),
+    )
+    monkeypatch.setattr(
+        exam_triggers,
+        "exam_sources",
+        lambda refs: {"pcru": {"pcr"}, "temp": {"tax"}} if refs else {},
+    )
+
+    def patient_results(id_patient, exam_types, until):
+        """The exame rows of the patient"""
+        reads.append(("exame", frozenset(exam_types)))
+        return [
+            SimpleNamespace(
+                typeExam="PCR", date=REVIEWED_AT, value=40, unit="mg/L"
+            ),
+            SimpleNamespace(
+                typeExam="tax", date=REVIEWED_AT, value=37.2, unit="C"
+            ),
+        ]
+
+    monkeypatch.setattr(
+        exam_triggers.exams_repository, "get_patient_results", patient_results
+    )
+    pcr, fever = parse_exam_trigger_rules([PCR_RISE, FEVER_AFTER_D3])
+
+    assert exam_triggers.load_baselines(
+        exam_refs=set(), admission_number=1, schema="demo", now=NOW
+    ) == exam_triggers.Baselines()
+    assert reads == []
+
+    baselines = exam_triggers.load_baselines(
+        exam_refs={"pcru", "temp"}, admission_number=1, schema="demo", now=NOW
+    )
+
+    assert reads == ["patient", ("exame", frozenset({"pcr", "tax"}))]
+    (first,) = exam_triggers.snapshot(rules=[pcr], baselines=baselines)
+    (second,) = exam_triggers.snapshot(rules=[fever], baselines=baselines)
+    assert first["id"] == "pcr-rise" and first["baseline"]["value"] == 40
+    assert second["id"] == "fever" and second["baseline"]["value"] == 37.2
+    assert exam_triggers.snapshot(rules=[], baselines=baselines) == []
+    assert len(reads) == 2
+
+
 def test_archived_results_that_are_not_numbers_are_no_baseline(monkeypatch):
     """An archived result that is not a number ("<0.5", "negativo") is skipped
     instead of failing the review save: the latest numeric one is the
