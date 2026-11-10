@@ -19,7 +19,9 @@ condition of a rule opens a reason of the drug
   changes what an evaluation already watches;
 * load_results (the rule): the results of the exams the evaluations in force
   watch, from the exams cache (Redis, the latest result of each exam, as
-  prescalc reads it);
+  prescalc reads it). A reference mapped to several exams (or the
+  creatinines, for the CKDs) reads only the latest of them, as the prescription
+  view and the protocols do;
 * exam_matches (the rule, without the database): the rules a course's
   evaluation turned on that a result meets.
 
@@ -103,7 +105,8 @@ class ExamResult:
 @dataclass
 class ExamResults:
     """The results of the exam references the evaluations in force watch,
-    oldest first, and the patient the calculated exams need"""
+    oldest first (load_results keeps only the latest of each), and the patient
+    the calculated exams need"""
 
     by_ref: dict[str, list[ExamResult]] = field(default_factory=dict)
     patient: PatientData = field(default_factory=PatientData)
@@ -429,7 +432,8 @@ def load_results(
     patient=_READ_PATIENT,
 ) -> ExamResults | None:
     """The results the exam triggers of these evaluations watch, from the
-    exams cache: the latest of each exam (None when none watches an exam).
+    exams cache: the latest of each reference, among the exams mapped to it
+    (None when none watches an exam).
     The admission's patient record is read unless given (None: it has none)"""
     watching = [
         (evaluation, trigger)
@@ -451,19 +455,22 @@ def load_results(
         schema=schema, id_patient=patient.idPatient
     )
 
-    by_ref: dict[str, list[ExamResult]] = {}
-    for exam_type, exam_refs in refs_by_type.items():
+    # a reference may read several exams of the schema: the latest wins, as in
+    # the prescription view (a tie keeps the first, in tpexame order)
+    latest: dict[str, ExamResult] = {}
+    for exam_type in sorted(refs_by_type):
         result = _cached_result(exam_type, cached.get(exam_type))
         if result is None:
             continue
-        for exam_ref in exam_refs:
-            by_ref.setdefault(exam_ref, []).append(result)
+        for exam_ref in refs_by_type[exam_type]:
+            current = latest.get(exam_ref)
+            if current is None or result.date > current.date:
+                latest[exam_ref] = result
 
-    # a reference may read several exams of the schema: oldest first
-    for results in by_ref.values():
-        results.sort(key=lambda r: r.date)
-
-    return ExamResults(by_ref=by_ref, patient=PatientData.of(patient))
+    return ExamResults(
+        by_ref={exam_ref: [result] for exam_ref, result in latest.items()},
+        patient=PatientData.of(patient),
+    )
 
 
 # the conditions of a rule, by the suffix of their key (valueAbove,

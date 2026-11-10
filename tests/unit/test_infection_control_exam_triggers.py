@@ -378,9 +378,9 @@ def test_no_exam_triggers():
 
 
 def test_results_from_the_exams_cache(monkeypatch):
-    """The rule reads the latest result of each watched exam from the cache
-    (tpexame in any case); an entry without a value or a valid date is left
-    out"""
+    """The rule reads the latest result of each watched reference from the
+    cache (tpexame in any case), among the exams mapped to it; an entry without
+    a value or a valid date is left out"""
     monkeypatch.setattr(
         exam_triggers.patient_repository,
         "get_patient_by_admission",
@@ -424,8 +424,8 @@ def test_results_from_the_exams_cache(monkeypatch):
     )
 
     assert keys == ["demo:7:exames"]
+    # two exams mapped to the reference: the latest wins
     assert [(r.exam_type, r.raw_value, r.date) for r in results.results("pcru")] == [
-        ("pcr2", 60, datetime(2026, 10, 6, 10)),
         ("pcr", 80, datetime(2026, 10, 7, 10)),
     ]
     assert results.results("temp") == []
