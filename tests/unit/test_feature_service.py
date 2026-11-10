@@ -57,6 +57,41 @@ class TestHasFeature:
             with patch.object(feature_service, "db", _query_returning(None)):
                 assert feature_service.has_feature(FeatureEnum.OAUTH) is False
 
+    def test_an_empty_feature_list_is_not_read_again(self):
+        """A tenant with no feature enabled is an answer too: cached like any other."""
+        memory_row = MagicMock(value=[])
+        mock_db = _query_returning(memory_row)
+        with app.test_request_context():
+            with patch.object(feature_service, "db", mock_db):
+                assert feature_service.has_feature(FeatureEnum.OAUTH) is False
+                assert feature_service.has_feature(FeatureEnum.CONCILIATION) is False
+
+            assert mock_db.session.query.call_count == 1
+            assert g.features == []
+
+    def test_set_features_keeps_what_the_caller_read(self):
+        """Features a caller has just read are reused, with no lookup of their own."""
+        mock_db = _query_returning(None)
+        with app.test_request_context():
+            feature_service.set_features([FeatureEnum.OAUTH.value])
+
+            with patch.object(feature_service, "db", mock_db):
+                assert feature_service.has_feature(FeatureEnum.OAUTH) is True
+                assert feature_service.has_feature(FeatureEnum.CONCILIATION) is False
+
+            mock_db.session.query.assert_not_called()
+
+    def test_set_features_keeps_an_empty_list(self):
+        """An empty list set by the caller is not looked up again either."""
+        mock_db = _query_returning(None)
+        with app.test_request_context():
+            feature_service.set_features([])
+
+            with patch.object(feature_service, "db", mock_db):
+                assert feature_service.has_feature(FeatureEnum.OAUTH) is False
+
+            mock_db.session.query.assert_not_called()
+
 
 class TestHasUserFeature:
     """Tests for feature_service.has_user_feature (per-user features)."""
@@ -117,3 +152,38 @@ class TestHasFeatureFlag:
                     feature_service.has_feature_flag(AppFeatureFlagEnum.REDIS_CACHE)
                     is False
                 )
+
+    def test_no_flags_is_read_once_per_request(self):
+        """A missing GlobalMemory row is cached: the next flag check does not read it again."""
+        mock_db = _query_returning(None)
+        with app.test_request_context():
+            with patch.object(feature_service, "db", mock_db):
+                assert (
+                    feature_service.has_feature_flag(AppFeatureFlagEnum.REDIS_CACHE)
+                    is False
+                )
+                assert (
+                    feature_service.has_feature_flag(
+                        AppFeatureFlagEnum.REDIS_CACHE_EXAMS
+                    )
+                    is False
+                )
+
+            assert mock_db.session.query.call_count == 1
+            assert g.feature_flags == {}
+
+    def test_an_empty_flags_row_is_read_once_per_request(self):
+        """A GlobalMemory row with no flag set is cached the same way."""
+        mock_db = _query_returning(MagicMock(value={}))
+        with app.test_request_context():
+            with patch.object(feature_service, "db", mock_db):
+                assert (
+                    feature_service.has_feature_flag(AppFeatureFlagEnum.REDIS_CACHE)
+                    is False
+                )
+                assert (
+                    feature_service.has_feature_flag(AppFeatureFlagEnum.REDIS_CACHE)
+                    is False
+                )
+
+            assert mock_db.session.query.call_count == 1
