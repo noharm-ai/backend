@@ -32,6 +32,7 @@ from routes.patient import app_pat
 from routes.prescription import app_pres
 from routes.prescription_clinical_note import app_pres_clinical_note
 from routes.prescription_crud import app_pres_crud
+from routes.prescription_test_case import app_pres_test_case
 from routes.protocol import app_protocol
 from routes.queue import app_queue
 from routes.schema_params import app_schema_params
@@ -97,6 +98,7 @@ def register_blueprints(app):
     app.register_blueprint(app_navigation)
     app.register_blueprint(app_user_admin)
     app.register_blueprint(app_pres_crud)
+    app.register_blueprint(app_pres_test_case)
     app.register_blueprint(app_pres_clinical_note)
     app.register_blueprint(app_help_text)
     app.register_blueprint(app_infection_control)

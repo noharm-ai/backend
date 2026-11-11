@@ -88,6 +88,9 @@ class FeatureEnum(Enum):
     CULTURE = "CULTURE"
     # infection control follow-up pages and reviews (ci_* tables);
     INFECTION_CONTROL = "INFECTION_CONTROL"
+    # maintainers create test case prescriptions (POST /prescriptions/test-case);
+    # only in a schema they alone use, never a hospital's
+    PRESCRIPTION_TEST_CASE = "PRESCRIPTION_TEST_CASE"
 
 
 class PrescriptionAuditTypeEnum(Enum):
