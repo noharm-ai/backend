@@ -35,10 +35,11 @@ result that opened it. A variation is measured from the baseline and is not
 met without one; from a zero baseline any rise is unbounded.
 
 The rule reads only the cache: the exams cache job of backend-private, after
-caching new results, queues the patient's followed admissions for the light run
-of the job, so each update of the cache is seen soon after. The cache keeps the
-latest result of each exam, so a result the cache replaced before the rule ran
-(two results of the exam between updates) isn't seen.
+caching new results, queues the patient's followed admissions with an active
+evaluation watching an exam trigger on that exam for the light run of the job,
+so each update of the cache is seen soon after. The cache keeps the latest result of
+each exam, so a result the cache replaced before the rule ran (two results of
+the exam between updates) isn't seen.
 """
 
 import math
@@ -66,7 +67,10 @@ from services.infection_control.antimicrobial_timeline_service import (
 )
 from utils import dateutils, examutils, logger
 
-# the `type` of an exam trigger in the evaluation's triggers (gatilhos)
+# the `type` of an exam trigger in the evaluation's triggers (gatilhos); the
+# exams cache job of backend-private reads it too, with its `examRef` (it queues
+# only admissions with an active evaluation holding one on the exam of a new
+# result): change them in both repositories
 TRIGGER_TYPE_EXAM = "exam"
 # CKD and CKD21 are adult formulas (the exams screen calculates them over 17)
 CALCULATED_MIN_AGE = 18
