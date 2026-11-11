@@ -246,7 +246,7 @@ def save_patient(
 
             new_tags = _get_tags(tags=tags, user_context=user_context)
 
-            if Permission.READ_NAV not in user_permissions:
+            if Permission.WRITE_NAV not in user_permissions:
                 existing_nav_tags = [
                     t for t in (p.tags or []) if t.startswith("NAVEGACAO_")
                 ]
@@ -258,7 +258,7 @@ def save_patient(
     if Permission.ADMIN_PATIENT in user_permissions:
         if "dischargeDate" in request_data.keys():
             p.dischargeDate = request_data.get("dischargeDate", None)
-    elif Permission.READ_NAV in user_permissions:
+    elif Permission.WRITE_NAV in user_permissions:
         if "dischargeDate" in request_data.keys():
             user = db.session.query(User).filter(User.id == user_context.id).first()
             if user.schema == user_context.schema:
@@ -402,7 +402,7 @@ def _get_tags(tags: list[str], user_context: User):
 
             user_permissions = g.get("user_permissions", [])
 
-            is_navigation = Permission.READ_NAV in user_permissions
+            is_navigation = Permission.WRITE_NAV in user_permissions
             if is_navigation and not tag.startswith("NAVEGACAO_"):
                 raise ValidationError(
                     "Marcador de navegação deve começar com o prefixo NAVEGACAO_",

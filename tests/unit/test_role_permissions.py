@@ -123,6 +123,42 @@ class TestCustomReportPermissions:
             assert Permission.WRITE_CUSTOM_REPORTS not in role.permissions
 
 
+class TestNavigationPermissions:
+    """Teste security.role - READ_NAV views navigation data, WRITE_NAV acts on it"""
+
+    def test_only_full_navigation_roles_write_nav(self):
+        """SOAP generation and digital signature stay with the acting roles."""
+        holders = {
+            role.value for role in Role if Permission.WRITE_NAV in role.permissions
+        }
+
+        assert holders == {Role.ADMIN.value, Role.CURATOR.value, Role.NAVIGATOR.value}
+
+    def test_navigation_viewer_reads_navigation_data(self):
+        """The read-only navigator sees navigation patients and their summaries."""
+        permissions = Role.NAVIGATION_VIEWER.permissions
+
+        assert Permission.READ_NAV in permissions
+        assert Permission.READ_PRESCRIPTION in permissions
+        assert Permission.READ_DISCHARGE_SUMMARY in permissions
+
+    def test_navigation_viewer_writes_nothing(self):
+        """No write, copy, admin or schema-switch permission reaches the read-only navigator."""
+        forbidden = [
+            p
+            for p in Role.NAVIGATION_VIEWER.permissions
+            if p.name.startswith(("WRITE_", "ADMIN_"))
+            or p
+            in (
+                Permission.NAV_COPY_PATIENT,
+                Permission.MULTI_SCHEMA,
+                Permission.MAINTAINER,
+            )
+        ]
+
+        assert forbidden == []
+
+
 class TestGetSpecialRoles:
     """Teste security.role - get_special_roles (non-assignable roles)"""
 
@@ -135,6 +171,7 @@ class TestGetSpecialRoles:
             Role.STATIC_USER.value,
             Role.SERVICE_INTEGRATOR.value,
             Role.NAVIGATOR.value,
+            Role.NAVIGATION_VIEWER.value,
             Role.TRAINING.value,
         ]
 

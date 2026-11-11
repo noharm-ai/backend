@@ -9,7 +9,8 @@ Tag rules exercised here:
   * at most 10 tags per patient;
   * an unknown name creates a marcador row, typed by the caller's role;
   * a navigator may only create tags prefixed with NAVEGACAO_;
-  * a caller without READ_NAV keeps the navigation tags already on the patient.
+  * a caller without WRITE_NAV keeps the navigation tags already on the patient,
+    even when READ_NAV shows them (NAVIGATION_VIEWER).
 """
 
 from datetime import datetime
@@ -189,13 +190,35 @@ def test_navigator_tag_with_prefix_is_navigation_type(
 def test_non_navigator_keeps_navigation_tags(
     client, analyst_headers, navigator_headers, patient
 ):
-    """A caller without READ_NAV cannot drop the navigation tags already set."""
+    """A caller without WRITE_NAV cannot drop the navigation tags already set."""
     assert _save(client, navigator_headers, {"tags": [TAG_NAV]}).status_code == 200
 
     response = _save(client, analyst_headers, {"tags": [TAG_EXISTING]})
 
     assert response.status_code == 200
     assert _stored_tags() == [TAG_EXISTING, TAG_NAV]
+
+
+def test_navigation_viewer_keeps_navigation_tags(
+    client, analyst_navigation_viewer_headers, navigator_headers, patient
+):
+    """Seeing the navigation tags (READ_NAV) is not enough to drop them."""
+    assert _save(client, navigator_headers, {"tags": [TAG_NAV]}).status_code == 200
+
+    response = _save(client, analyst_navigation_viewer_headers, {"tags": []})
+
+    assert response.status_code == 200
+    assert _stored_tags() == [TAG_NAV]
+
+
+def test_navigation_viewer_creates_patient_tags(
+    client, analyst_navigation_viewer_headers, patient
+):
+    """Without WRITE_NAV a new tag is an ordinary patient tag, no prefix needed."""
+    response = _save(client, analyst_navigation_viewer_headers, {"tags": [TAG_NEW]})
+
+    assert response.status_code == 200
+    assert _tag_type(TAG_NEW) == TagTypeEnum.PATIENT.value
 
 
 def test_save_name_without_permission(client, analyst_headers, patient):

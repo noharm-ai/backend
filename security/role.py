@@ -66,6 +66,7 @@ class Role(Enum):
             Permission.WRITE_PROTOCOLS,
             Permission.UPDATE_USER_SG,
             Permission.READ_NAV,
+            Permission.WRITE_NAV,
             Permission.WRITE_CUSTOM_FORMS,
             Permission.ADMIN_APP_FEATURES,
             Permission.WRITE_HELP_TEXT,
@@ -112,6 +113,7 @@ class Role(Enum):
             Permission.READ_INFECTION_CONTROL,
             Permission.UPDATE_USER_SG,
             Permission.READ_NAV,
+            Permission.WRITE_NAV,
             Permission.READ_PROTOCOLS,
             Permission.READ_CUSTOM_REPORTS,
             Permission.WRITE_CUSTOM_REPORTS_GRAPHS,
@@ -239,10 +241,26 @@ class Role(Enum):
             Permission.NAV_COPY_PATIENT,
             Permission.MULTI_SCHEMA,
             Permission.READ_NAV,
+            Permission.WRITE_NAV,
             Permission.WRITE_CUSTOM_FORMS,
             Permission.WRITE_NAME,
             Permission.WRITE_PATIENT_TAGS,
             Permission.WRITE_CUSTOM_REPORTS_GRAPHS,
+        ],
+    )
+
+    # read-only navigator: sees the navigation patients and settings of its own
+    # schema, changes nothing. Like NAVIGATOR it is granted by NoHarm, not by
+    # the client's user managers, and it has no MULTI_SCHEMA
+    NAVIGATION_VIEWER = (
+        "NAVIGATION_VIEWER",
+        [
+            Permission.READ_REPORTS,
+            Permission.READ_PRESCRIPTION,
+            Permission.READ_BASIC_FEATURES,
+            Permission.READ_DISCHARGE_SUMMARY,
+            Permission.READ_SUPPORT,
+            Permission.READ_NAV,
         ],
     )
 
@@ -320,5 +338,6 @@ class Role(Enum):
             Role.STATIC_USER.value,
             Role.SERVICE_INTEGRATOR.value,
             Role.NAVIGATOR.value,
+            Role.NAVIGATION_VIEWER.value,
             Role.TRAINING.value,
         ]

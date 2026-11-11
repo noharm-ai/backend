@@ -323,3 +323,46 @@ def test_put_unique_memory_update(client, analyst_headers):
     assert mem.value == "new"
 
     _delete_memory(id_memory)
+
+
+# --- NAVIGATION_VIEWER: reads the navigation settings, writes nothing ---
+
+
+def test_navigation_viewer_reads_custom_forms(client, navigation_viewer_headers):
+    """Test get /memory/custom-forms - the read-only navigator lists the forms [200]"""
+    response = client.get("/memory/custom-forms", headers=navigation_viewer_headers)
+
+    assert response.status_code == 200
+
+
+def test_navigation_viewer_reads_editable_memories(client, navigation_viewer_headers):
+    """Test get /memory - the read-only navigator lists the care plan templates [200]"""
+    _delete_memory_by_kind("tpl-care-plan")
+    id_memory = _add_memory("tpl-care-plan", {"foo": "bar"})
+
+    response = client.get("/memory", headers=navigation_viewer_headers)
+    single = client.get(f"/memory/id/{id_memory}", headers=navigation_viewer_headers)
+
+    assert response.status_code == 200
+    assert [r["key"] for r in response.get_json()["data"]] == [id_memory]
+    assert single.status_code == 200
+
+    _delete_memory(id_memory)
+
+
+def test_navigation_viewer_cannot_save_custom_form(client, navigation_viewer_headers):
+    """Test put /memory/custom-forms - the read-only navigator lacks WRITE_CUSTOM_FORMS [401]"""
+    data = {"value": {"field": "x"}}
+    response = client.put(
+        "/memory/custom-forms", json=data, headers=navigation_viewer_headers
+    )
+
+    assert response.status_code == 401
+
+
+def test_navigation_viewer_cannot_save_memory(client, navigation_viewer_headers):
+    """Test put /memory/ - the read-only navigator lacks WRITE_BASIC_FEATURES [401]"""
+    data = {"type": "tpl-care-plan", "value": {"foo": "bar"}}
+    response = client.put("/memory/", json=data, headers=navigation_viewer_headers)
+
+    assert response.status_code == 401
