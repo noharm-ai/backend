@@ -471,6 +471,13 @@ The rule holds even when the real value would be convenient or is already visibl
 - CPOE has its own: `AUTOMATIC_CHECK_IF_NOT_VALIDATED_ITENS` checks the patient-day with no item to validate (`_automatic_check`)
 - Tests: `tests/integration/test_prescalc_automatic_check.py`
 
+### Prescription Test Cases (maintainers, test schema only)
+- Maintainers create prescriptions to build test cases (`POST /prescriptions/test-case`, `services/prescription_test_case_service.py`, `Permission.MAINTAINER`), only in a schema with the `PRESCRIPTION_TEST_CASE` feature (schema features only, never a user's), turned on only in a schema the maintainers alone use: any other schema is refused. Never name a schema in the code. The route is `is_admin` (not served in production). The frontend shows its page (`/prescricao-teste`, menu Curadoria, `src/features/prescription/PrescriptionTestCase/`) by the same feature
+- For a new admission (a `pessoa` with the next free admission number and patient id) or an existing one. The prescription id is the next after the hospital's (not prescription-days nor conciliations), its items `<id>000`, `<id>001`... as the prescription edit numbers them; ids are allocated under an advisory lock per schema
+- Inserted as the integration inserts them (`repository/prescription_test_case_repository.py`): the `prescricao` and `presmed` insert triggers set the segment, `doseconv`, `frequenciadia`, outlier and score. The item kind is sent as the value the schema maps to it (`memoria` `map-origin-*`), and set afterwards when the schema maps none (the trigger falls back to Medicamentos)
+- Prescalc runs in the request, as the static user (id 0, no user features), by prescription or, in a CPOE segment, by admission and date, so the prescription-day is in the prioritization when it returns; prescalc central then finds it processed. When prescalc can't take the admission lock it rolls the transaction back and the request fails asking to try again
+- Tests: `tests/integration/test_prescription_test_case.py` (the feature is turned on in demo)
+
 ### Outlier Detection
 - Service: `services/outlier_service.py`
 - Statistical analysis of dose/frequency
