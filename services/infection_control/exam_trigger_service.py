@@ -2,7 +2,8 @@
 
 The users define the exam trigger rules (models/infection_control_config.py,
 kept in the schema's memoria): conditions on the results of an exam of the
-catalog (EXAM_TRIGGER_EXAMS), named by its reference
+catalog (the active public.exame flagged gatilho_controle_infeccao, see
+trigger_exams), named by its reference
 (segmentoexame.tpexame_ref, normalized in every schema). CKD and CKD21 are not
 results of their own: they are calculated from the creatinine with the
 patient's data (CALCULATED_EXAMS). The reviewer turns the rules on per drug
@@ -52,7 +53,6 @@ from models.enums import MemoryEnum
 from models.infection_control import AntimicrobialEvaluation
 from models.infection_control_config import (
     CALCULATED_EXAMS,
-    EXAM_TRIGGER_EXAMS,
     ExamTriggerRule,
     ExamTriggerRuleInput,
     parse_exam_trigger_rules,
@@ -185,13 +185,20 @@ def save_rules(
     rules: list[ExamTriggerRuleInput], user_id: int, now: datetime
 ) -> list[ExamTriggerRule]:
     """Replaces the schema's rules: a new rule gets an id, a kept one keeps
-    its own (an id that isn't a rule of the schema raises ValueError)"""
-    current_ids = {rule.id for rule in load_rules(user_id=user_id, now=now)}
+    its own (an id that isn't a rule of the schema raises ValueError). A new
+    rule, or one moved to another exam, must watch an exam of the catalog
+    (ValueError otherwise); a kept rule on an exam the catalog no longer offers
+    may stay as it is, so the others can still be saved"""
+    current = {rule.id: rule for rule in load_rules(user_id=user_id, now=now)}
+    catalog = trigger_exams()
     saved = []
     seen = set()
     for rule in rules:
-        if rule.id is not None and (rule.id not in current_ids or rule.id in seen):
+        if rule.id is not None and (rule.id not in current or rule.id in seen):
             raise ValueError(f"exam trigger rule not found: {rule.id}")
+        kept_exam = rule.id is not None and current[rule.id].examRef == rule.examRef
+        if rule.examRef not in catalog and not kept_exam:
+            raise ValueError(f"exam not available for a trigger: {rule.examRef}")
 
         id_rule = rule.id or uuid.uuid4().hex
         seen.add(id_rule)
@@ -213,6 +220,12 @@ def save_rules(
 # --- the exams ---
 
 
+def trigger_exams() -> dict[str, str]:
+    """The catalog: the exams a rule can watch (the active public.exame
+    flagged gatilho_controle_infeccao), reference -> name, by name"""
+    return exams_repository.get_infection_control_trigger_exams()
+
+
 def exam_sources(exam_refs: set[str]) -> dict[str, set[str]]:
     """The exams of the schema (tpexame, lower case) whose results each
     reference reads: those mapped to it, or the creatinine for a calculated
@@ -232,12 +245,12 @@ def exam_sources(exam_refs: set[str]) -> dict[str, set[str]]:
     return sources
 
 
-def available_exams() -> set[str]:
-    """The references of the catalog the schema has results for (a rule on
-    another would never fire)"""
+def available_exams(exam_refs: set[str]) -> set[str]:
+    """The references of the catalog (exam_refs, see trigger_exams) the schema
+    has results for (a rule on another would never fire)"""
     return {
         exam_ref
-        for exam_ref, exam_types in exam_sources(set(EXAM_TRIGGER_EXAMS)).items()
+        for exam_ref, exam_types in exam_sources(exam_refs).items()
         if exam_types
     }
 

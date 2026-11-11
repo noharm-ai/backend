@@ -2,7 +2,8 @@
 
 The users define the exam trigger rules (GET/PUT
 /infection-control/exam-triggers, kept in the schema's memoria) on the exams
-of a fixed catalog, matched by their reference (segmentoexame.tpexame_ref);
+of the catalog (the active public.exame flagged gatilho_controle_infeccao),
+matched by their reference (segmentoexame.tpexame_ref);
 CKD21 is calculated from the creatinine. A review turns rules on per drug
 evaluation, keeping each with its baseline (from the exame table); the job
 opens an EXAM_RESULT reason when a later result in the exams cache (Redis,
@@ -45,6 +46,19 @@ PCR_TYPE = "PCR_CI_TEST"
 TEMPERATURE_TYPE = "TAX_CI_TEST"
 CREATININE_TYPE = "CR_CI_TEST"
 
+# the catalog: public.exame rows (tpexame, nome, ativo, gatilho_controle_infeccao)
+CATALOG = (
+    ("pcru", "PCR", True, True),
+    ("temp", "Temperatura", True, True),
+    ("ckd", "CKD", True, True),
+    ("ckd21", "CKD21", True, True),
+    ("h_conleuc", "Leucócitos Absoluto", True, True),
+    # left out of the catalog: inactive, or not flagged for the triggers
+    ("van", "Vancocinemia", False, True),
+    ("k", "Potássio", True, False),
+)
+CATALOG_REFS = ["ckd", "ckd21", "h_conleuc", "pcru", "temp"]  # by name
+
 PCR_RISE = {
     "name": "PCR em elevação",
     "examRef": "pcru",
@@ -64,6 +78,39 @@ EGFR_FALL = {
     "valueBelow": 60,
     "variationBelow": -25,
 }
+
+
+def _delete_catalog():
+    """Removes the catalog's exams from public.exame"""
+    session.execute(
+        text("DELETE FROM public.exame WHERE tpexame = ANY(:types)"),
+        {"types": [row[0] for row in CATALOG]},
+    )
+    session_commit()
+
+
+@pytest.fixture(autouse=True)
+def catalog():
+    """The global exams (public.exame) the rules can watch, and two they
+    can't; removed afterwards"""
+    _delete_catalog()
+    for exam_type, name, active, trigger in CATALOG:
+        session.execute(
+            text(
+                "INSERT INTO public.exame (tpexame, nome, abrev, unidade, ativo, "
+                "gatilho_controle_infeccao, created_at, created_by) "
+                "VALUES (:exam_type, :name, :name, '-', :active, :trigger, now(), 0)"
+            ),
+            {
+                "exam_type": exam_type,
+                "name": name,
+                "active": active,
+                "trigger": trigger,
+            },
+        )
+    session_commit()
+    yield
+    _delete_catalog()
 
 
 def _delete_rules():
@@ -93,7 +140,7 @@ def _delete_global_rules():
 @pytest.fixture
 def global_rules(no_rules):
     """Global rules in public.memoria (one with an id, one without, one
-    invalid), the schema without its own; removed afterwards"""
+    invalid: no condition), the schema without its own; removed afterwards"""
     _delete_global_rules()
     session.execute(
         text(
@@ -106,7 +153,7 @@ def global_rules(no_rules):
                 [
                     {**PCR_RISE, "id": "global-pcr"},
                     FEVER_AFTER_D3,
-                    {**FEVER_AFTER_D3, "examRef": "creatinina"},
+                    {**FEVER_AFTER_D3, "name": "Sem condição", "valueAbove": None},
                 ]
             ),
         },
@@ -262,20 +309,13 @@ def _listed(client, headers):
 def test_no_rules_until_the_users_define_them(
     client, infection_controller_headers, infection_control, no_rules
 ):
-    """No rules; the catalog lists the exams a rule can watch"""
+    """No rules; the catalog lists the exams a rule can watch: the active
+    public.exame flagged for the triggers, by name"""
     data = _listed(client, infection_controller_headers)
 
     assert data["rules"] == []
-    assert [e["examRef"] for e in data["exams"]] == [
-        "pcru",
-        "temp",
-        "ckd",
-        "ckd21",
-        "h_conleuc",
-        "procalcitonina_adult",
-        "van",
-    ]
-    assert data["exams"][0]["name"] == "PCR"
+    assert [e["examRef"] for e in data["exams"]] == CATALOG_REFS
+    assert {e["examRef"]: e["name"] for e in data["exams"]}["pcru"] == "PCR"
 
 
 def test_a_schema_without_rules_gets_a_copy_of_the_global_ones(
@@ -373,17 +413,58 @@ def test_editing_keeps_the_id_and_a_rule_left_out_is_deleted(
     "rule",
     [
         {**FEVER_AFTER_D3, "examRef": "creatinina"},
+        {**FEVER_AFTER_D3, "examRef": "van"},
+        {**FEVER_AFTER_D3, "examRef": "k"},
         {**FEVER_AFTER_D3, "valueAbove": None},
         {**FEVER_AFTER_D3, "name": ""},
         {**FEVER_AFTER_D3, "id": "unknown"},
     ],
 )
 def test_refuses_an_invalid_rule(client, infection_controller_headers, rules, rule):
-    """An exam out of the catalog, no condition, no name or an id that isn't
-    a rule: nothing changes"""
+    """An exam out of the catalog (unknown, inactive or not flagged), no
+    condition, no name or an id that isn't a rule: nothing changes"""
     response = _save(client, infection_controller_headers, [rule])
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert len(_listed(client, infection_controller_headers)["rules"]) == 3
+
+
+def _unflag(exam_type):
+    """Takes an exam out of the catalog"""
+    session.execute(
+        text(
+            "UPDATE public.exame SET gatilho_controle_infeccao = false "
+            "WHERE tpexame = :t"
+        ),
+        {"t": exam_type},
+    )
+    session_commit()
+
+
+def test_a_rule_on_an_exam_taken_out_of_the_catalog_stays_unavailable(
+    client, infection_controller_headers, rules
+):
+    """A kept rule whose exam is no longer flagged stays, unavailable, and
+    can be saved again as it is; it can't be moved to an exam out of the
+    catalog, and a new rule on it is refused"""
+    _unflag("temp")
+
+    data = _listed(client, infection_controller_headers)
+    fever = next(r for r in data["rules"] if r["name"] == "Febre após D3")
+    assert fever["available"] is False
+    assert "temp" not in [e["examRef"] for e in data["exams"]]
+
+    kept = [{k: v for k, v in r.items() if k != "available"} for r in data["rules"]]
+    response = _save(client, infection_controller_headers, kept)
+    assert response.status_code == status.HTTP_200_OK, response.get_json()
+    assert len(_listed(client, infection_controller_headers)["rules"]) == 3
+
+    moved = [{**r, "examRef": "k"} if r["id"] == fever["id"] else r for r in kept]
+    assert _save(client, infection_controller_headers, moved).status_code == 400
+
+    assert (
+        _save(client, infection_controller_headers, [FEVER_AFTER_D3]).status_code == 400
+    )
     assert len(_listed(client, infection_controller_headers)["rules"]) == 3
 
 

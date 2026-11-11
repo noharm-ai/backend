@@ -106,6 +106,20 @@ def get_global_exams():
     )
 
 
+def get_infection_control_trigger_exams() -> dict[str, str]:
+    """The exams the infection control exam triggers can watch: the active
+    global exams flagged for them (public.exame), tpexame in lower case -> its
+    name, by name"""
+    rows = (
+        db.session.query(GlobalExam.tp_exam, GlobalExam.name)
+        .filter(GlobalExam.active == True)
+        .filter(GlobalExam.infection_control_trigger == True)
+        .order_by(GlobalExam.name.asc())
+        .all()
+    )
+    return {tp_exam.lower(): name for tp_exam, name in rows}
+
+
 def get_configured_exam_ref_types():
     """Get the reference exam types actually bound to active exams of this schema.
 

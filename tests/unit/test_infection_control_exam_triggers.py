@@ -104,13 +104,13 @@ def _match_ids(evaluation, results, course=None):
 # --- the rules' model ---
 
 
-def test_a_rule_needs_a_name_an_exam_of_the_catalog_and_a_condition():
-    """The users write the rules: anything else is refused"""
+def test_a_rule_needs_a_name_an_exam_and_a_condition():
+    """The users write the rules: anything else is refused (whether the exam
+    is in the catalog, public.exame, is checked when the rules are saved)"""
     ExamTriggerRuleInput.model_validate({**FEVER_AFTER_D3, "id": None})
 
     for invalid in (
         {**FEVER_AFTER_D3, "name": "  "},
-        {**FEVER_AFTER_D3, "examRef": "creatinina"},
         {**FEVER_AFTER_D3, "valueAbove": None},
         {**FEVER_AFTER_D3, "fromCourseDay": 0},
     ):
@@ -131,7 +131,7 @@ def test_kept_rules_drop_invalid_ones_on_their_own():
     rules = parse_exam_trigger_rules(
         [
             PCR_RISE,
-            {**FEVER_AFTER_D3, "examRef": "x"},
+            {**FEVER_AFTER_D3, "valueAbove": None},
             {**EGFR_FALL, "id": "pcr-rise"},
             {**EGFR_FALL, "id": None},
             EGFR_FALL,

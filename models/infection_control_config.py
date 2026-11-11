@@ -14,17 +14,12 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from utils import logger
 
-# the exams a rule can watch, by their reference (segmentoexame.tpexame_ref,
-# normalized in every schema), with the name the users see
-EXAM_TRIGGER_EXAMS = {
-    "pcru": "PCR",
-    "temp": "Temperatura",
-    "ckd": "CKD",
-    "ckd21": "CKD21",
-    "h_conleuc": "Leucócitos Absoluto",
-    "procalcitonina_adult": "Procalcitonina",
-    "van": "Vancocinemia",
-}
+# the exams a rule can watch are the active global exams flagged for it
+# (public.exame.gatilho_controle_infeccao), by their reference
+# (segmentoexame.tpexame_ref, normalized in every schema): see
+# exams_repository.get_infection_control_trigger_exams. Checked when the rules
+# are saved, not here: a kept rule whose exam is no longer offered stays, shown
+# as unavailable.
 # not results of their own: calculated from the creatinine (the schema's exam
 # whose abbreviation is "creatinina", as the exams screen finds it) with the
 # patient's data, only for adults, as the exams screen does
@@ -51,7 +46,7 @@ class ExamTriggerRuleData(BaseModel):
 
     # shown to the reviewer and in the pending reason
     name: str = Field(min_length=1, max_length=100)
-    # the exam reference (EXAM_TRIGGER_EXAMS)
+    # the exam reference (a flagged public.exame.tpexame)
     examRef: str
     # the value is over (>) / at least (>=) / under (<) / at most (<=) these
     valueAbove: float | None = None
@@ -74,14 +69,12 @@ class ExamTriggerRuleData(BaseModel):
 
     @model_validator(mode="after")
     def _valid(self):
-        """A name, an exam of the catalog and a condition (a rule without one
-        would fire on any result)"""
+        """A name, an exam and a condition (a rule without one would fire on
+        any result)"""
         self.name = self.name.strip()
         self.examRef = self.examRef.strip().lower()
         if not self.name:
             raise ValueError("an exam trigger rule needs a name")
-        if self.examRef not in EXAM_TRIGGER_EXAMS:
-            raise ValueError(f"exam not available for a trigger: {self.examRef}")
         if all(getattr(self, c) is None for c in EXAM_TRIGGER_CONDITIONS):
             raise ValueError("an exam trigger rule needs a condition")
         return self

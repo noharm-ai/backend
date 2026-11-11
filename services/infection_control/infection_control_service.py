@@ -48,7 +48,6 @@ from repository import (
     user_repository,
 )
 from repository.infection_control import infection_control_repository
-from models.infection_control_config import EXAM_TRIGGER_EXAMS
 from services import (
     data_authorization_service,
     feature_service,
@@ -752,17 +751,19 @@ def list_clinical_note_types():
 
 
 def _exam_triggers_view(rules: list) -> dict:
-    """The rules and the exams they can watch; `available` is false when the
-    schema has no result for the exam (no active exam mapped to the
-    reference, or no creatinine for a CKD): a rule on it would never fire"""
-    available = exam_trigger_service.available_exams()
+    """The rules and the exams they can watch (the catalog, public.exame);
+    `available` is false when the schema has no result for the exam (no active
+    exam mapped to the reference, or no creatinine for a CKD) or the catalog no
+    longer offers it: a rule on it would never fire"""
+    catalog = exam_trigger_service.trigger_exams()
+    available = exam_trigger_service.available_exams(set(catalog))
     return {
         "rules": [
             {**r.model_dump(), "available": r.examRef in available} for r in rules
         ],
         "exams": [
             {"examRef": exam_ref, "name": name, "available": exam_ref in available}
-            for exam_ref, name in EXAM_TRIGGER_EXAMS.items()
+            for exam_ref, name in catalog.items()
         ],
     }
 
