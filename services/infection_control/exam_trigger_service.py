@@ -444,6 +444,25 @@ def load_baselines(
     return baselines
 
 
+def current_results(
+    exam_refs: set[str], admission_number: int, schema: str, now: datetime
+) -> dict[str, dict | None]:
+    """The latest result of each reference up to now, as a review saved now
+    would keep it for its baseline (None without one, or when a CKD can't be
+    calculated)"""
+    baselines = load_baselines(
+        exam_refs=exam_refs, admission_number=admission_number, schema=schema, now=now
+    )
+    return {
+        exam_ref: (
+            _result_entry(baselines.latest[exam_ref], exam_ref, baselines.patient)
+            if exam_ref in baselines.latest
+            else None
+        )
+        for exam_ref in exam_refs
+    }
+
+
 def snapshot(rules: list[ExamTriggerRule], baselines: Baselines) -> list[dict]:
     """The rules turned on in an evaluation, each with its baseline: the latest
     result of its exam up to the review (None when there is none)"""

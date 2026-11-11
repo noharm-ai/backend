@@ -517,6 +517,42 @@ def test_available_when_the_schema_has_the_exam(
     }
 
 
+def test_the_current_results_of_the_admission(
+    client, infection_controller_headers, infection_control, mapped_exams, admission
+):
+    """With an admission, the latest result of each exam the schema has, as a
+    review saved now would keep it (a CKD calculated from the creatinine);
+    none for an exam without results, and nothing without an admission"""
+    _exam(PCR_TYPE, 30, datetime.now() - timedelta(days=2))
+    _exam(PCR_TYPE, 40, datetime.now() - timedelta(hours=5))
+    _exam(CREATININE_TYPE, 0.8, datetime.now() - timedelta(hours=3))
+
+    response = client.get(
+        f"{URL}?admissionNumber={admission}", headers=infection_controller_headers
+    )
+    assert response.status_code == status.HTTP_200_OK, response.get_json()
+    current = response.get_json()["data"]["current"]
+
+    assert set(current) == {"pcru", "temp", "ckd", "ckd21"}
+    assert current["pcru"]["value"] == 40
+    assert current["pcru"]["examType"] == PCR_TYPE.lower()
+    assert current["temp"] is None
+    assert current["ckd21"]["rawValue"] == 0.8
+    assert current["ckd21"]["value"] > 60
+    assert "current" not in _listed(client, infection_controller_headers)
+
+
+def test_refuses_an_admission_number_that_isnt_one(
+    client, infection_controller_headers, infection_control
+):
+    """The admission number is read as a number"""
+    response = client.get(
+        f"{URL}?admissionNumber=abc", headers=infection_controller_headers
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
 # --- the review and the rule ---
 
 
