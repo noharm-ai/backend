@@ -117,6 +117,13 @@ class InfectionControlBackfillRequest(BaseModel):
     limit: int = Field(default=50, ge=1, le=200)
 
 
+class ExamTriggersListRequest(BaseModel):
+    """The rules and the exams; with an admission, its patient's current
+    result of each exam too"""
+
+    admissionNumber: int | None = None
+
+
 class ExamTriggersSaveRequest(BaseModel):
     """The schema's exam trigger rules, replacing those kept (a new rule has
     no id; a kept one sends its own)"""

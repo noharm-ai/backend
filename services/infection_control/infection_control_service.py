@@ -769,14 +769,26 @@ def _exam_triggers_view(rules: list) -> dict:
 
 
 @has_permission(Permission.READ_INFECTION_CONTROL)
-def list_exam_triggers(user_context: User):
+def list_exam_triggers(user_context: User, admission_number: int | None = None):
     """The schema's exam trigger rules, which a review turns on per drug
-    evaluation, and the exams a rule can watch"""
+    evaluation, and the exams a rule can watch. With an admission, `current`
+    has its patient's latest result of each exam the schema has (None without
+    one): the baseline a review saved now would keep"""
     _check_feature()
 
-    return _exam_triggers_view(
-        exam_trigger_service.load_rules(user_id=user_context.id, now=datetime.now())
+    now = datetime.now()
+    view = _exam_triggers_view(
+        exam_trigger_service.load_rules(user_id=user_context.id, now=now)
     )
+    if admission_number is not None:
+        view["current"] = exam_trigger_service.current_results(
+            exam_refs={e["examRef"] for e in view["exams"] if e["available"]},
+            admission_number=admission_number,
+            schema=user_context.schema,
+            now=now,
+        )
+
+    return view
 
 
 @has_permission(Permission.WRITE_INFECTION_CONTROL)

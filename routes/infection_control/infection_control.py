@@ -6,6 +6,7 @@ from pydantic import ValidationError as PydanticValidationError
 from decorators.api_endpoint_decorator import api_endpoint
 from exception.validation_error import ValidationError
 from models.requests.infection_control_request import (
+    ExamTriggersListRequest,
     ExamTriggersSaveRequest,
     InfectionControlBackfillRequest,
     InfectionControlListRequest,
@@ -95,8 +96,11 @@ def list_clinical_note_types():
 @api_endpoint()
 def list_exam_triggers():
     """The schema's exam trigger rules a review can turn on, and the exams a
-    rule can watch"""
-    return infection_control_service.list_exam_triggers()
+    rule can watch; with an admission, its patient's current result of each"""
+    request_data = ExamTriggersListRequest(**request.args.to_dict(flat=True))
+    return infection_control_service.list_exam_triggers(
+        admission_number=request_data.admissionNumber
+    )
 
 
 @app_infection_control.route("/infection-control/exam-triggers", methods=["PUT"])
