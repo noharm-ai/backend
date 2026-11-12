@@ -8,6 +8,7 @@ released results of the DynamoDB culture summary count, as the protocol
 variable cultureReleaseTime reads them.
 """
 
+import time
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 
@@ -71,13 +72,14 @@ def _course(id_drug=1):
     return course
 
 
-def _summary_item(release_date, result="R", **kwargs):
+def _summary_item(release_date, result="R", arrival=None, **kwargs):
     """An item of the culture summary as culture_service groups it"""
     return {
         "material": kwargs.get("material", "URINA"),
         "microorganism": kwargs.get("microorganism", "E. COLI"),
         "result": result,
         "releaseDate": release_date.isoformat() if release_date else None,
+        "resultArrival": arrival.isoformat() if arrival else None,
     }
 
 
@@ -208,12 +210,47 @@ def test_the_listed_cultures_are_bounded():
     assert details["cultures"][0]["microorganism"] == "MO 0"
 
 
-def test_a_release_date_with_an_offset_is_read_in_local_time():
-    """The evaluations are kept in local time"""
-    aware = datetime(2026, 10, 7, 13, 0).astimezone()
-    (culture,) = _released({**_summary_item(None), "releaseDate": aware.isoformat()})
+def test_dates_with_an_offset_are_read_in_local_time(monkeypatch):
+    """The evaluations are kept in local time (America/Sao_Paulo, UTC-3)"""
+    monkeypatch.setenv("TZ", "America/Sao_Paulo")
+    time.tzset()
+    try:
+        (culture,) = _released(
+            {
+                **_summary_item(None),
+                "releaseDate": "2026-10-07T13:00:00+00:00",
+                # the culture cache job writes the arrival in UTC
+                "resultArrival": "2026-10-07T14:30:00+00:00",
+            }
+        )
+    finally:
+        monkeypatch.undo()
+        time.tzset()
 
-    assert culture.release_date == datetime(2026, 10, 7, 13, 0)
+    assert culture.release_date == datetime(2026, 10, 7, 10, 0)
+    assert culture.arrival == datetime(2026, 10, 7, 11, 30)
+
+
+def test_counts_a_result_by_when_it_reached_the_summary():
+    """A result released before the evaluation that reached the summary after
+    it was not seen by the reviewer: it opens a reason, naming its release"""
+    released = EVALUATED_AT - timedelta(hours=2)
+    late = _summary_item(released, arrival=EVALUATED_AT + timedelta(minutes=2))
+
+    (pending,) = _plan(_evaluation(), _released(late)).open_pendings
+    assert pending["details"]["releaseDate"] == released.isoformat()
+
+    # released after the evaluation but already there before it: an
+    # integration clock ahead of the summary's; it was seen
+    seen = _summary_item(
+        EVALUATED_AT + timedelta(hours=1), arrival=EVALUATED_AT - timedelta(minutes=1)
+    )
+    assert _plan(_evaluation(), _released(seen)).open_pendings == []
+
+    # without an arrival (written before it was kept) the release counts
+    assert _plan(
+        _evaluation(), _released(_summary_item(NOW - timedelta(hours=1)))
+    ).open_pendings
 
 
 def test_reads_the_summary_only_when_an_evaluation_watches_cultures(monkeypatch):
@@ -221,6 +258,7 @@ def test_reads_the_summary_only_when_an_evaluation_watches_cultures(monkeypatch)
     calls = []
 
     def fake_summary(schema, id_patient):
+        """Record the read and answer two items of the patient"""
         calls.append((schema, id_patient))
         return [
             {

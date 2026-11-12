@@ -8,7 +8,7 @@ backend-private fills it), and a new evaluation settles it without reopening
 it on the same culture.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -45,6 +45,7 @@ def culture_summary(monkeypatch):
     _reads.clear()
 
     def fake_summary(schema, id_patient):
+        """Record the read and answer the patient's items"""
         _reads.append((schema, id_patient))
         return list(_summary.get(id_patient, []))
 
@@ -56,20 +57,24 @@ def culture_summary(monkeypatch):
 
 
 def _culture(release_date, result="Resistente", drug="AMICACINA", **kwargs):
-    """A culture item of the test patient, as the culture cache job writes it"""
-    _summary.setdefault(PATIENT_ID, []).append(
-        {
-            "schema_fkpessoa": f"demo:{PATIENT_ID}",
-            "chave": f"URINA#E. COLI#{drug}",
-            "ativo": kwargs.get("active", True),
-            "nomemedicamento": drug,
-            "nomematerial": "URINA",
-            "microorganismo": "E. COLI",
-            "resultado": result,
-            "datacoleta": (release_date - timedelta(days=2)).isoformat(),
-            "dataliberacao": release_date.isoformat(),
-        }
-    )
+    """A culture item of the test patient, as the culture cache job writes it
+    (resultado_em: when it first wrote the result, in UTC)"""
+    material = kwargs.get("material", "URINA")
+    microorganism = kwargs.get("microorganism", "E. COLI")
+    item = {
+        "schema_fkpessoa": f"demo:{PATIENT_ID}",
+        "chave": f"{material}#{microorganism}#{drug}",
+        "ativo": kwargs.get("active", True),
+        "nomemedicamento": drug,
+        "nomematerial": material,
+        "microorganismo": microorganism,
+        "resultado": result,
+        "datacoleta": (release_date - timedelta(days=2)).isoformat(),
+        "dataliberacao": release_date.isoformat(),
+    }
+    if kwargs.get("arrival"):
+        item["resultado_em"] = kwargs["arrival"].astimezone(timezone.utc).isoformat()
+    _summary.setdefault(PATIENT_ID, []).append(item)
 
 
 def _reviewed(client, headers, admission_number, triggers):
@@ -105,6 +110,8 @@ def test_a_new_culture_sends_the_patient_back_to_pending(
     # seen by the reviewer
     _culture(datetime.now() - timedelta(days=1), drug="CEFTRIAXONA")
     _reviewed(client, infection_controller_headers, admission, [CULTURE_RESULT])
+    # the review save leaves the summary to the job
+    assert _reads == []
 
     _run_job(admission)
     assert _record(admission)["tp_status"] == REVISED
@@ -161,3 +168,46 @@ def test_an_evaluation_not_watching_cultures_ignores_them(
 
     assert _record(admission)["tp_status"] == REVISED
     assert _reads == []
+
+
+def test_a_culture_that_reached_the_summary_after_the_review_counts(
+    client, infection_controller_headers, infection_control, admission
+):
+    """Released by the lab before the review but written to the summary after
+    it: the reviewer couldn't have seen it"""
+    _prescribe_today(admission)
+    _reviewed(client, infection_controller_headers, admission, [CULTURE_RESULT])
+
+    released = datetime.now() - timedelta(hours=3)
+    _culture(released, arrival=datetime.now())
+    _run_job(admission)
+
+    assert _record(admission)["tp_status"] == PENDING
+    (pending,) = _open_pendings(admission)
+    assert pending["detalhes"]["releaseDate"] == released.isoformat()
+
+
+def test_an_open_reason_names_the_cultures_that_came_after_it(
+    client, infection_controller_headers, infection_control, admission
+):
+    """The reason opened on one culture lists the next one too"""
+    _prescribe_today(admission)
+    _reviewed(client, infection_controller_headers, admission, [CULTURE_RESULT])
+
+    urine = datetime.now()
+    _culture(urine)
+    _run_job(admission)
+    (pending,) = _open_pendings(admission)
+    assert [c["material"] for c in pending["detalhes"]["cultures"]] == ["URINA"]
+
+    blood = datetime.now()
+    _culture(blood, material="SANGUE", microorganism="S. AUREUS", drug="OXACILINA")
+    _run_job(admission)
+
+    (refreshed,) = _open_pendings(admission)
+    assert refreshed["idci_pendencia"] == pending["idci_pendencia"]
+    assert refreshed["detalhes"]["releaseDate"] == blood.isoformat()
+    assert [c["material"] for c in refreshed["detalhes"]["cultures"]] == [
+        "SANGUE",
+        "URINA",
+    ]
