@@ -15,7 +15,7 @@ _ALERT_LEVELS = {level.value for level in DrugAlertLevelEnum}
 class AlertTypeConfig(BaseModel):
     """Config of one alert type of alert_service (DrugAlertTypeEnum value)"""
 
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="ignore", frozen=True)
 
     # off: the alert type is neither shown nor counted
     enabled: bool = True
@@ -72,7 +72,7 @@ class AlertTypesConfig(BaseModel):
     """One entry per alert_service alert type (DrugAlertTypeEnum values); a type
     with options of its own has its own model (e.g. kidney)"""
 
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="ignore", frozen=True)
 
     kidney: KidneyAlertConfig = Field(default_factory=KidneyAlertConfig)
     liver: AlertTypeConfig = _type_field()
@@ -98,7 +98,7 @@ _DEFAULT_TYPE_CONFIG = AlertTypeConfig()
 class InteractionKindConfig(BaseModel):
     """Config of one interaction relation kind (it, dt, dm, iy, sl, rx)"""
 
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="ignore", frozen=True)
 
     # off: the kind is neither shown nor counted
     enabled: bool = True
@@ -133,7 +133,7 @@ _DEFAULT_KIND_CONFIG = InteractionKindConfig()
 class AlertConfig(BaseModel):
     """Which alerts a schema shows"""
 
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="ignore", frozen=True)
 
     # alert_service alerts, by type (DrugAlertTypeEnum value, e.g. "kidney")
     types: AlertTypesConfig = Field(default_factory=AlertTypesConfig)
