@@ -88,8 +88,13 @@ def test_saves_nothing(request, client, role, infection_control, admission):
 
 def test_config_manager_needs_the_feature(client, config_manager_headers, admission):
     """Without the feature, READ_INFECTION_CONTROL alone opens neither the
-    cultures nor the exams"""
-    for url in (_cultures_url(admission), _exams_url(admission)):
+    timeline, the cultures nor the exams"""
+    for url in (
+        f"/infection-control/antimicrobial-timeline/{admission}",
+        _cultures_url(admission),
+        _exams_url(admission),
+        "/intervention/reasons",
+    ):
         response = client.get(url, headers=config_manager_headers)
         assert response.status_code == status.HTTP_400_BAD_REQUEST, url
 
@@ -104,6 +109,10 @@ def test_analyst_reads_cultures_and_exams_without_the_feature(
     client, analyst_headers, admission
 ):
     """READ_PRESCRIPTION keeps opening them, feature or not"""
-    for url in (_cultures_url(admission), _exams_url(admission)):
+    for url in (
+        f"/infection-control/antimicrobial-timeline/{admission}",
+        _cultures_url(admission),
+        _exams_url(admission),
+    ):
         response = client.get(url, headers=analyst_headers)
         assert response.status_code == status.HTTP_200_OK, url
