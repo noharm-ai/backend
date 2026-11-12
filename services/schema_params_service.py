@@ -11,11 +11,14 @@ time. The maintainers' view (view_schema_params) always reads the table.
 
 Each section is validated on its own: an invalid one falls back to the code
 defaults and the other sections still apply. When the table can't be read the
-last params read stay in force, or the code defaults when nothing was read yet:
-a failure never makes the system hide more than the schema configured.
+last params read stay in force, but only up to STALE_MAX_SECONDS after that
+read; then (or when nothing was read yet) the code defaults apply, which hide
+no alert. So a failure can delay a change made in admin by a few minutes at
+most, never keep it from applying.
 """
 
 import time
+from typing import NamedTuple
 
 from flask import g, has_app_context
 
@@ -30,8 +33,21 @@ STORE_PK = "schema_params"
 CACHE_TTL_SECONDS = 60
 # after a failed read: how long until the table is read again
 ERROR_RETRY_SECONDS = 10
-# schema -> (expires at, on the time.monotonic() clock; params): per container
-_cache: dict[str, tuple[float, SchemaParams]] = {}
+# while reads fail: how long after the last read its params stay in force
+STALE_MAX_SECONDS = 300
+
+
+class _Entry(NamedTuple):
+    """Params cached for a schema; times on the _now() clock"""
+
+    expires_at: float
+    params: SchemaParams
+    # when the table was last read (None: never read)
+    read_at: float | None
+
+
+# schema -> its entry: per container
+_cache: dict[str, _Entry] = {}
 # section name -> its model, as declared in SchemaParams
 _SECTIONS = {
     name: field.annotation for name, field in SchemaParams.model_fields.items()
@@ -72,27 +88,42 @@ def clear_cache():
     _cache.clear()
 
 
+def _now() -> float:
+    """The cache clock (monotonic seconds)"""
+    return time.monotonic()
+
+
 def _get_cached(schema: str | None) -> SchemaParams:
     """The params cached in the container, read again once expired. When the
-    read fails, the last params read stay in force (the code defaults if there
-    are none) and the table is read again after ERROR_RETRY_SECONDS, so an
-    outage costs one slow read every few seconds, not one per request"""
+    read fails, the last params read stay in force up to STALE_MAX_SECONDS
+    after that read (then the code defaults) and the table is read again after
+    ERROR_RETRY_SECONDS, so an outage costs one slow read every few seconds,
+    not one per request"""
     if not schema:
         return _load(schema=schema)
 
-    now = time.monotonic()
+    now = _now()
     cached = _cache.get(schema)
-    if cached is not None and now < cached[0]:
-        return cached[1]
+    if cached is not None and now < cached.expires_at:
+        return cached.params
 
     loaded = _load_with_status(schema=schema)
-    if loaded["status"] == "read_error":
-        params = cached[1] if cached is not None else loaded["params"]
-        _cache[schema] = (now + ERROR_RETRY_SECONDS, params)
-        return params
+    if loaded["status"] != "read_error":
+        _cache[schema] = _Entry(
+            expires_at=now + CACHE_TTL_SECONDS, params=loaded["params"], read_at=now
+        )
+        return loaded["params"]
 
-    _cache[schema] = (now + CACHE_TTL_SECONDS, loaded["params"])
-    return loaded["params"]
+    read_at = cached.read_at if cached is not None else None
+    if read_at is not None and now - read_at <= STALE_MAX_SECONDS:
+        params = cached.params
+    else:
+        params = loaded["params"]
+
+    _cache[schema] = _Entry(
+        expires_at=now + ERROR_RETRY_SECONDS, params=params, read_at=read_at
+    )
+    return params
 
 
 def _load(schema: str | None) -> SchemaParams:

@@ -84,6 +84,7 @@ def no_noharm_store(monkeypatch):
     )
     monkeypatch.setattr("services.schema_params_service.CACHE_TTL_SECONDS", 0)
     monkeypatch.setattr("services.schema_params_service.ERROR_RETRY_SECONDS", 0)
+    monkeypatch.setattr("services.schema_params_service.STALE_MAX_SECONDS", 0)
     schema_params_service.clear_cache()
     yield
     schema_params_service.clear_cache()

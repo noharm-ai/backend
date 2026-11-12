@@ -3,6 +3,9 @@ the code defaults, section by section, and what a failure falls back to"""
 
 from decimal import Decimal
 
+import pytest
+from pydantic import ValidationError
+
 from models.alert_config import AlertConfig
 from models.enums import FrequencyEnum
 from models.schema_params import SchemaParams
@@ -239,10 +242,11 @@ def test_an_unexpected_error_in_a_section_is_the_defaults(monkeypatch):
 
 def _with_cache(monkeypatch, clock: list):
     """Turns the container cache on (conftest turns it off) with a fake clock:
-    clock[0] is time.monotonic()"""
+    clock[0] is the service's _now(), not the process-wide time.monotonic"""
     monkeypatch.setattr(schema_params_service, "CACHE_TTL_SECONDS", 60)
     monkeypatch.setattr(schema_params_service, "ERROR_RETRY_SECONDS", 10)
-    monkeypatch.setattr(schema_params_service.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(schema_params_service, "STALE_MAX_SECONDS", 300)
+    monkeypatch.setattr(schema_params_service, "_now", lambda: clock[0])
 
 
 def test_cached_in_the_container_until_it_expires(monkeypatch):
@@ -372,3 +376,49 @@ def test_a_failed_first_read_is_the_defaults_and_retried_soon(monkeypatch):
 
     assert len(calls) == 2
     assert config.alerts.alert_type("kidney").enabled is False
+
+
+def test_stale_params_give_way_to_the_defaults(monkeypatch):
+    """Falhas seguidas: os últimos parâmetros lidos valem só até
+    STALE_MAX_SECONDS depois da leitura; depois, os padrões (que não escondem
+    nenhum alerta), para uma mudança feita no admin não ficar presa pela queda"""
+    clock = [1000.0]
+    _with_cache(monkeypatch, clock)
+    state = {"fail": False}
+    items = {"demo": _alerts(types={"kidney": {"enabled": False}})}
+
+    def get_item_data(pk, sk):
+        if state["fail"]:
+            raise RuntimeError("timeout")
+        return items.get(sk)
+
+    monkeypatch.setattr("repository.store_repository.get_item_data", get_item_data)
+
+    schema_params_service.get_schema_params(schema="demo")
+    state["fail"] = True
+
+    clock[0] += 300
+    stale = schema_params_service.get_schema_params(schema="demo")
+    assert stale.alerts.alert_type("kidney").enabled is False
+
+    clock[0] += 10
+    expired = schema_params_service.get_schema_params(schema="demo")
+    assert expired == SchemaParams()
+
+    clock[0] += 10
+    assert schema_params_service.get_schema_params(schema="demo") == SchemaParams()
+
+
+def test_the_cached_params_cannot_be_changed_in_place(monkeypatch):
+    """O mesmo objeto atende todas as requests do container: os modelos são
+    congelados, uma request não muda os parâmetros das outras"""
+    clock = [1000.0]
+    _with_cache(monkeypatch, clock)
+    config = schema_params_service.get_schema_params(schema="demo")
+
+    with pytest.raises(ValidationError):
+        config.alerts.types.kidney.enabled = False
+    with pytest.raises(ValidationError):
+        config.alerts = AlertConfig()
+
+    assert schema_params_service.get_schema_params(schema="demo") == SchemaParams()

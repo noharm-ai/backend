@@ -21,7 +21,7 @@ from models.alert_config import AlertConfig
 class SchemaParams(BaseModel):
     """The schema params in force (the schema's item over the code defaults)"""
 
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="ignore", frozen=True)
 
     # which alerts are shown (models/alert_config.py)
     alerts: AlertConfig = Field(default_factory=AlertConfig)
