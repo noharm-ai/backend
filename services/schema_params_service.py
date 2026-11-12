@@ -11,8 +11,8 @@ time. The maintainers' view (view_schema_params) always reads the table.
 
 Each section is validated on its own: an invalid one falls back to the code
 defaults and the other sections still apply. When the table can't be read the
-code defaults apply: a failure never changes behaviour (e.g. never hides an
-alert).
+last params read stay in force, or the code defaults when nothing was read yet:
+a failure never makes the system hide more than the schema configured.
 """
 
 import time
@@ -30,7 +30,7 @@ STORE_PK = "schema_params"
 CACHE_TTL_SECONDS = 60
 # after a failed read: how long until the table is read again
 ERROR_RETRY_SECONDS = 10
-# schema -> (expires at, time.monotonic(); params): per container
+# schema -> (expires at, on the time.monotonic() clock; params): per container
 _cache: dict[str, tuple[float, SchemaParams]] = {}
 # section name -> its model, as declared in SchemaParams
 _SECTIONS = {
