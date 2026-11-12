@@ -16,7 +16,8 @@ apply_rule writes the plan; a saved review also records its evaluations here
   when its evaluation opted into that trigger;
 * so does an exam result that meets an exam trigger rule its evaluation
   turned on (exam_trigger_service; the full run sees these, as exams don't
-  go through prescalc);
+  go through prescalc), and a culture result released after an evaluation
+  that watches cultures (culture_trigger_service, same);
 * an admission never reviewed opens a reason of its own, and so does one
   whose scheduled review date arrived;
 * when a drug stops, its reasons are resolved and its evaluation is closed;
@@ -67,6 +68,7 @@ from repository.infection_control import (
 )
 from services import feature_service
 from services.infection_control import (
+    culture_trigger_service,
     exam_trigger_service,
     infection_control_summary_service,
 )
@@ -93,11 +95,13 @@ EVALUATION_RESOLVED_TYPES = [
     InfectionControlPendingTypeEnum.EXPIRED.value,
     InfectionControlPendingTypeEnum.POSOLOGY_CHANGED.value,
     InfectionControlPendingTypeEnum.EXAM_RESULT.value,
+    InfectionControlPendingTypeEnum.CULTURE_RESULT.value,
 ]
 # reasons an evaluation may opt into (the others always apply)
 OPTIONAL_TRIGGERS = {
     InfectionControlPendingTypeEnum.EXPIRED.value,
     InfectionControlPendingTypeEnum.POSOLOGY_CHANGED.value,
+    InfectionControlPendingTypeEnum.CULTURE_RESULT.value,
 }
 
 
@@ -478,9 +482,11 @@ def course_reasons(
     evaluation: AntimicrobialEvaluation | None,
     now: datetime,
     exam_results: exam_trigger_service.ExamResults | None = None,
+    cultures: list[culture_trigger_service.CultureRelease] | None = None,
 ) -> list[tuple[InfectionControlPendingTypeEnum, dict]]:
     """The reasons a running course gives, with their details, judged by its
-    active evaluation (and, for its exam triggers, the exam results)"""
+    active evaluation (and, for its exam and culture triggers, the exam results
+    and the released cultures)"""
     if evaluation is None:
         return [
             (
@@ -529,6 +535,12 @@ def course_reasons(
             (InfectionControlPendingTypeEnum.EXAM_RESULT, {"matches": matches})
         )
 
+    culture = culture_trigger_service.culture_match(
+        evaluation=evaluation, cultures=cultures, now=now
+    )
+    if culture:
+        reasons.append((InfectionControlPendingTypeEnum.CULTURE_RESULT, culture))
+
     return reasons
 
 
@@ -541,10 +553,12 @@ def plan_rule(
     now: datetime,
     next_review_date: datetime | None = None,
     exam_results: exam_trigger_service.ExamResults | None = None,
+    cultures: list[culture_trigger_service.CultureRelease] | None = None,
 ) -> RulePlan:
     """Decide which evaluations close, which reasons open or resolve and the
     resulting status, without touching the database (the exam results the
-    evaluations' exam triggers watch are read before)"""
+    evaluations' exam triggers watch and the released cultures are read
+    before)"""
     plan = RulePlan()
 
     # evaluations of courses that are over are no longer in force
@@ -583,7 +597,7 @@ def plan_rule(
                 None,
             )
             for pending_type, details in course_reasons(
-                course, evaluation, now, exam_results=exam_results
+                course, evaluation, now, exam_results=exam_results, cultures=cultures
             ):
                 plan.open_pendings.append(
                     {
@@ -750,6 +764,11 @@ def apply_rule(
         next_review_date=admission.next_review_date,
         exam_results=exam_trigger_service.load_results(
             admission_number=admission_number,
+            schema=schema,
+            evaluations=active_evaluations,
+            patient=admission_courses.patient,
+        ),
+        cultures=culture_trigger_service.load_cultures(
             schema=schema,
             evaluations=active_evaluations,
             patient=admission_courses.patient,

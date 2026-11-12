@@ -517,6 +517,9 @@ class InfectionControlPendingTypeEnum(Enum):
     # an exam result met an exam trigger rule the evaluation turned on
     # (models/infection_control_config.py)
     EXAM_RESULT = 7
+    # a culture result was released after the evaluation (a trigger the
+    # evaluation opts into, culture_trigger_service)
+    CULTURE_RESULT = 8
 
 
 class InfectionControlResolutionEnum(Enum):
@@ -608,3 +611,7 @@ class AdmissionQueueReasonEnum(Enum):
     # new results of an exam an evaluation watches, cached by the exams cache
     # job of backend-private (which writes the queue itself)
     EXAMS_CACHE = "exams_cache"
+    # new culture results of a patient whose evaluation watches cultures, fed
+    # to the DynamoDB culture summary by the culture cache job of
+    # backend-private (which writes the queue itself)
+    CULTURE_CACHE = "culture_cache"
