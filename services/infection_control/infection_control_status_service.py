@@ -16,7 +16,8 @@ apply_rule writes the plan; a saved review also records its evaluations here
   when its evaluation opted into that trigger;
 * so does an exam result that meets an exam trigger rule its evaluation
   turned on (exam_trigger_service; the full run sees these, as exams don't
-  go through prescalc);
+  go through prescalc), and a culture result released after an evaluation
+  that watches cultures (culture_trigger_service, same);
 * an admission never reviewed opens a reason of its own, and so does one
   whose scheduled review date arrived;
 * when a drug stops, its reasons are resolved and its evaluation is closed;
@@ -67,9 +68,11 @@ from repository.infection_control import (
 )
 from services import feature_service
 from services.infection_control import (
+    culture_trigger_service,
     exam_trigger_service,
     infection_control_summary_service,
 )
+from services.infection_control.evaluation_triggers import pending_triggers
 from services.infection_control.antimicrobial_timeline_service import (
     GAP_TOLERANCE,
     Course,
@@ -93,11 +96,13 @@ EVALUATION_RESOLVED_TYPES = [
     InfectionControlPendingTypeEnum.EXPIRED.value,
     InfectionControlPendingTypeEnum.POSOLOGY_CHANGED.value,
     InfectionControlPendingTypeEnum.EXAM_RESULT.value,
+    InfectionControlPendingTypeEnum.CULTURE_RESULT.value,
 ]
 # reasons an evaluation may opt into (the others always apply)
 OPTIONAL_TRIGGERS = {
     InfectionControlPendingTypeEnum.EXPIRED.value,
     InfectionControlPendingTypeEnum.POSOLOGY_CHANGED.value,
+    InfectionControlPendingTypeEnum.CULTURE_RESULT.value,
 }
 
 
@@ -130,12 +135,6 @@ class RulePlan:
         default_factory=dict
     )
     status: InfectionControlStatusEnum = InfectionControlStatusEnum.CLOSED
-
-
-def pending_triggers(evaluation: AntimicrobialEvaluation) -> list[int]:
-    """The optional reasons an evaluation watches for (pending types): its
-    triggers (gatilhos) also keep the triggers with parameters, as objects"""
-    return [t for t in evaluation.triggers or [] if isinstance(t, int)]
 
 
 def course_drug(course: Course) -> int:
@@ -478,9 +477,11 @@ def course_reasons(
     evaluation: AntimicrobialEvaluation | None,
     now: datetime,
     exam_results: exam_trigger_service.ExamResults | None = None,
+    cultures: list[culture_trigger_service.CultureRelease] | None = None,
 ) -> list[tuple[InfectionControlPendingTypeEnum, dict]]:
     """The reasons a running course gives, with their details, judged by its
-    active evaluation (and, for its exam triggers, the exam results)"""
+    active evaluation (and, for its exam and culture triggers, the exam results
+    and the released cultures)"""
     if evaluation is None:
         return [
             (
@@ -529,6 +530,12 @@ def course_reasons(
             (InfectionControlPendingTypeEnum.EXAM_RESULT, {"matches": matches})
         )
 
+    culture = culture_trigger_service.culture_match(
+        evaluation=evaluation, cultures=cultures, now=now
+    )
+    if culture:
+        reasons.append((InfectionControlPendingTypeEnum.CULTURE_RESULT, culture))
+
     return reasons
 
 
@@ -541,10 +548,12 @@ def plan_rule(
     now: datetime,
     next_review_date: datetime | None = None,
     exam_results: exam_trigger_service.ExamResults | None = None,
+    cultures: list[culture_trigger_service.CultureRelease] | None = None,
 ) -> RulePlan:
     """Decide which evaluations close, which reasons open or resolve and the
     resulting status, without touching the database (the exam results the
-    evaluations' exam triggers watch are read before)"""
+    evaluations' exam triggers watch and the released cultures are read
+    before)"""
     plan = RulePlan()
 
     # evaluations of courses that are over are no longer in force
@@ -583,7 +592,7 @@ def plan_rule(
                 None,
             )
             for pending_type, details in course_reasons(
-                course, evaluation, now, exam_results=exam_results
+                course, evaluation, now, exam_results=exam_results, cultures=cultures
             ):
                 plan.open_pendings.append(
                     {
@@ -754,6 +763,17 @@ def apply_rule(
             evaluations=active_evaluations,
             patient=admission_courses.patient,
         ),
+        # read by the scheduled job only: a review save holds the record meanwhile, and a
+        # culture it would see the next run sees (light runs follow the culture cache)
+        cultures=(
+            culture_trigger_service.load_cultures(
+                schema=schema,
+                evaluations=active_evaluations,
+                patient=admission_courses.patient,
+            )
+            if origin == InfectionControlOriginEnum.JOB
+            else None
+        ),
     )
 
     evaluations_by_id = {e.id: e for e in active_evaluations}
@@ -765,8 +785,9 @@ def apply_rule(
         evaluation.updated_at = now
         evaluation.updated_by = user_id
 
+    open_by_evaluation = {(p.pending_type, p.id_evaluation): p for p in open_pendings}
     for pending in plan.open_pendings:
-        infection_control_repository.open_pending(
+        opened = infection_control_repository.open_pending(
             admission_number=admission_number,
             pending_type=pending["pending_type"].value,
             origin=origin.value,
@@ -777,6 +798,18 @@ def apply_rule(
             id_evaluation=pending.get("id_evaluation"),
             details=pending.get("details"),
         )
+        # an open culture reason names every culture released since its
+        # evaluation, including the ones that came after it opened
+        if (
+            not opened
+            and pending["pending_type"]
+            == InfectionControlPendingTypeEnum.CULTURE_RESULT
+        ):
+            current = open_by_evaluation.get(
+                (pending["pending_type"].value, pending.get("id_evaluation"))
+            )
+            if current is not None and current.details != pending.get("details"):
+                current.details = pending.get("details")
 
     pendings_by_id = {p.id: p for p in open_pendings}
     for resolution, id_pending_list in plan.resolve_pendings.items():
