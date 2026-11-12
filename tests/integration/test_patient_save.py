@@ -8,7 +8,7 @@ the observation note, and the discharge date.
 
 What is exercised here:
   * which fields each permission may write — WRITE_PRESCRIPTION for the
-    clinical data, ADMIN_PATIENT/READ_NAV for the discharge date,
+    clinical data, ADMIN_PATIENT/WRITE_NAV for the discharge date,
     WRITE_NAME for the patient name;
   * the weight bookkeeping: a changed weight stamps `dtpeso` and asks the
     caller to recalculate the prescription, an unchanged one does not;
@@ -356,7 +356,7 @@ class TestAuthorization:
     def test_analyst_cannot_set_the_discharge_date(
         self, client, analyst_headers, patient
     ):
-        """The discharge date needs ADMIN_PATIENT or READ_NAV, which an analyst lacks."""
+        """The discharge date needs ADMIN_PATIENT or WRITE_NAV, which an analyst lacks."""
         response = _save(
             client, analyst_headers, {"dischargeDate": "2026-01-10T00:00:00"}
         )
@@ -367,13 +367,26 @@ class TestAuthorization:
     def test_navigator_sets_the_discharge_date(
         self, client, navigator_headers, patient
     ):
-        """A navigator holds READ_NAV, so the discharge date is written [200 OK]."""
+        """A navigator holds WRITE_NAV, so the discharge date is written [200 OK]."""
         response = _save(
             client, navigator_headers, {"dischargeDate": "2026-01-10T00:00:00"}
         )
 
         assert response.status_code == 200
         assert _stored().dischargeDate == datetime(2026, 1, 10)
+
+    def test_navigation_viewer_cannot_set_the_discharge_date(
+        self, client, analyst_navigation_viewer_headers, patient
+    ):
+        """READ_NAV only views: next to an analyst it still leaves the date alone."""
+        response = _save(
+            client,
+            analyst_navigation_viewer_headers,
+            {"dischargeDate": "2026-01-10T00:00:00"},
+        )
+
+        assert response.status_code == 200
+        assert _stored().dischargeDate is None
 
     def test_navigator_cannot_write_clinical_data(
         self, client, navigator_headers, patient

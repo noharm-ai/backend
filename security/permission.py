@@ -110,7 +110,8 @@ class Permission(Enum):
     READ_INFECTION_CONTROL = "READ_INFECTION_CONTROL"
     WRITE_INFECTION_CONTROL = "WRITE_INFECTION_CONTROL"  # permission to review patients and evaluate antimicrobials
 
-    READ_NAV = "READ_NAV"  # permission to navigation data
+    READ_NAV = "READ_NAV"  # permission to view navigation data
+    WRITE_NAV = "WRITE_NAV"  # permission to act on navigation data (SOAP, signature)
     NAV_COPY_PATIENT = "NAV_COPY_PATIENT"  # permission to copy patient data
 
     WRITE_CUSTOM_FORMS = "WRITE_CUSTOM_FORMS"  # permission to write custom forms

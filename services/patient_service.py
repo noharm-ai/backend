@@ -25,6 +25,9 @@ from services.admin import admin_tag_service
 from utils import dateutils, status
 from utils.dateutils import to_iso
 
+# a navigation tag is told apart by its name (see utils/tagutils.py)
+NAV_TAG_PREFIX = "NAVEGACAO_"
+
 
 def _format_patients(patients):
     """Serialize (Patient, Prescription, appointment_date) tuples."""
@@ -236,6 +239,10 @@ def save_patient(
         if "tags" in request_data.keys():
             tags = request_data.get("tags", None)
 
+            kept_nav_tags = []
+            if Permission.WRITE_NAV not in user_permissions:
+                tags, kept_nav_tags = _split_nav_tags(tags=tags, current_tags=p.tags)
+
             MAX_TAGS = 10
             if tags and len(tags) > MAX_TAGS:
                 raise ValidationError(
@@ -246,19 +253,15 @@ def save_patient(
 
             new_tags = _get_tags(tags=tags, user_context=user_context)
 
-            if Permission.READ_NAV not in user_permissions:
-                existing_nav_tags = [
-                    t for t in (p.tags or []) if t.startswith("NAVEGACAO_")
-                ]
-                if existing_nav_tags:
-                    new_tags = (new_tags or []) + existing_nav_tags
+            if kept_nav_tags:
+                new_tags = (new_tags or []) + kept_nav_tags
 
             p.tags = new_tags
 
     if Permission.ADMIN_PATIENT in user_permissions:
         if "dischargeDate" in request_data.keys():
             p.dischargeDate = request_data.get("dischargeDate", None)
-    elif Permission.READ_NAV in user_permissions:
+    elif Permission.WRITE_NAV in user_permissions:
         if "dischargeDate" in request_data.keys():
             user = db.session.query(User).filter(User.id == user_context.id).first()
             if user.schema == user_context.schema:
@@ -353,6 +356,31 @@ def _to_dict(patient: Patient):
     }
 
 
+def _split_nav_tags(tags: list[str], current_tags: list[str]):
+    """Keep a patient's navigation tags for a caller without WRITE_NAV.
+
+    Returns the request's other tags and the navigation tags already on the
+    patient, which are kept as they are. A caller with READ_NAV sees them and
+    sends them back, so those are dropped from the request instead of stored
+    twice; any other NAVEGACAO_ tag would add one, which needs WRITE_NAV.
+    """
+    kept = [t for t in (current_tags or []) if t.startswith(NAV_TAG_PREFIX)]
+
+    others = []
+    for tag in tags or []:
+        if tag.upper().startswith(NAV_TAG_PREFIX):
+            if tag.upper() not in kept:
+                raise ValidationError(
+                    "Permissão insuficiente para adicionar marcador de navegação",
+                    "errors.businessRules",
+                    status.HTTP_403_FORBIDDEN,
+                )
+            continue
+        others.append(tag)
+
+    return others, kept
+
+
 def _get_tags(tags: list[str], user_context: User):
     if not tags:
         return None
@@ -402,8 +430,8 @@ def _get_tags(tags: list[str], user_context: User):
 
             user_permissions = g.get("user_permissions", [])
 
-            is_navigation = Permission.READ_NAV in user_permissions
-            if is_navigation and not tag.startswith("NAVEGACAO_"):
+            is_navigation = Permission.WRITE_NAV in user_permissions
+            if is_navigation and not tag.startswith(NAV_TAG_PREFIX):
                 raise ValidationError(
                     "Marcador de navegação deve começar com o prefixo NAVEGACAO_",
                     "errors.businessRules",

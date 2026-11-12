@@ -95,6 +95,13 @@ class TestHasValidRoles:
         """A non-assignable special role (e.g. ADMIN) is rejected."""
         assert user_admin_service._has_valid_roles([Role.ADMIN.value]) is False
 
+    @pytest.mark.parametrize(
+        "role", [Role.NAVIGATOR.value, Role.NAVIGATION_VIEWER.value]
+    )
+    def test_navigation_roles_are_not_assignable(self, role):
+        """Navigation roles are granted by NoHarm (usuario_extra), never by a user manager."""
+        assert user_admin_service._has_valid_roles([role]) is False
+
     def test_mix_of_valid_and_invalid_is_invalid(self):
         """One invalid role makes the whole list invalid."""
         roles = [Role.VIEWER.value, "bogus"]

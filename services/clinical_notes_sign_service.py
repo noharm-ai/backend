@@ -22,7 +22,7 @@ from utils import status
 _EMAIL_REGEX = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
-@has_permission(Permission.READ_NAV)
+@has_permission(Permission.WRITE_NAV)
 def request_signature(
     request_data: ClinicalNoteSignRequest, user_context: User
 ) -> dict:
