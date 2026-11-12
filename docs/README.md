@@ -7,6 +7,7 @@
 | [user-guide.md](user-guide.md) | Call the API as a client: authentication, tenants, the core clinical workflows, error handling, FAQ |
 | [api.md](api.md) | Look up a specific endpoint, its parameters and its payload |
 | [deployment.md](deployment.md) | Deploy to a server or to AWS Lambda, and run the upgrade checklist |
+| [agents/](agents/) | Read the business rules of a domain (prescription view, schema params, admission queues, drug config, test cases) as written for AI coding agents, indexed in `../CLAUDE.md`; infection control is in `../services/infection_control/CLAUDE.md` |
 
 At the repository root:
 
