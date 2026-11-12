@@ -33,14 +33,14 @@ Most queries need this context; be explicit about schema names when joining acro
 ```python
 @has_permission(Permission.READ_PRESCRIPTION, Permission.WRITE_PRESCRIPTION)
 def some_service_function(user_permissions: list[Permission]):
-    # A function with @has_permission must accept user_permissions
+    # user_permissions is injected only when the function declares it
 ```
-Permissions are defined in `decorators/has_permission_decorator.py`.
+The `Permission` enum is in `security/permission.py`, the permissions of each role in `security/role.py`. Every service function a route calls needs `@has_permission`: `@api_endpoint` answers 401 when no permission check ran.
 
 ### Feature Flags
 
 ```python
-if feature_service.is_feature_enabled(FeatureEnum.FEATURE_NAME, user):
+if feature_service.has_feature(FeatureEnum.FEATURE_NAME):
     ...
 ```
 
@@ -62,7 +62,7 @@ Environment variables in `config.py`. Required: `ENV` (development/production/te
 
 ### Adding a New API Endpoint
 
-Route → service → repository, with a Pydantic request model. `routes/prescription_test_case.py` with its service, repository and request model is a complete example.
+Route → service → repository, with a Pydantic request model. A small complete example: `routes/tag.py` → `tag_service.list_tags` → `tag_repository.list_tags`, with `TagListRequest` in `models/requests/tag_request.py`.
 
 1. **Request model** in `models/requests/<domain>_request.py` (a `pydantic.BaseModel`; optional fields default to `None`)
 2. **Route** in `routes/<domain>.py`, wrapped by `@api_endpoint()` (`decorators/api_endpoint_decorator.py`):
@@ -76,7 +76,7 @@ def create_action():
     )
 ```
    For POST/PUT use `request.get_json()`; for GET `request.args.to_dict(flat=True)`. Path params as `<int:id>`
-3. **Service** in `services/<domain>_service.py`: `@has_permission(...)`, receives the typed `request_data` and `user_permissions`, applies the business rules, calls the repository
+3. **Service** in `services/<domain>_service.py`: `@has_permission(...)`, receives the typed `request_data` (and `user_permissions` if it declares it), applies the business rules, calls the repository
 4. **Repository** in `repository/<domain>_repository.py`: queries with `db.session`; `db.session.add` + `flush` to get ids
 5. **Register** a new blueprint in `app/blueprints.py`
 
@@ -117,7 +117,7 @@ make db-reset     # full reset if something is broken
 - Tests use the `demo` schema (set via `schema_translate_map` in `tests/conftest.py`)
 - A session-scoped `clean_test_artifacts` fixture in `tests/conftest.py` deletes test-generated rows before and after each test session — tests are re-runnable without manual cleanup
 - Test-generated prescriptions use IDs ≥ 100,000 (see `tests/utils/utils_test_prescription.py`); seed substance IDs are < 10,000, test substances use IDs ≥ 10,000
-- Tests never call AWS (an autouse fixture in `tests/conftest.py` makes the noharm-store return no item; Lambda calls are stubbed)
+- Tests never call AWS: an autouse fixture in `tests/conftest.py` makes the noharm-store return no item, and nothing else is stubbed for you. A test of a service that calls a Lambda patches it itself (e.g. `utils.lambdautils.aws.get_client` in `tests/integration/test_drug_attributes.py`)
 
 ### Test Data — Never Use Real People
 **Never put a real person's data in code, tests, fixtures, comments, docstrings or commit messages.** This covers names, e-mail addresses, phone numbers, CPF, CNS, addresses, patient records and login credentials — and it explicitly includes the maintainers' and the user's own names. Do not reach for the name of whoever you are talking to, the git author, or anyone appearing in the repo as convenient sample data.
@@ -137,7 +137,7 @@ Each area below has rules that are easy to break from a distance. **Before chang
 
 - **Prescription view** (`GET /prescriptions/<id>`, `prescription_view_service`), **drug interactions** (`alert_interaction_service`) and **allergy alert** (`alert_service.is_allergic`, `allergy_repository`) → [`docs/agents/prescription-view.md`](docs/agents/prescription-view.md). The most used endpoint, and prescalc runs the same pipeline: don't add a query to it (what was read once is passed along; `tests/integration/test_prescription_view_queries.py` guards it), and never query or search a list per item or per pair of items
 - **Schema params** (`schema_params_service`, `store_repository`, `models/schema_params.py`, `models/alert_config.py`: alert types and interaction rules per schema, in the DynamoDB `noharm-store`) → [`docs/agents/schema-params.md`](docs/agents/schema-params.md). ⚠ Written and validated by **admin**, only read here: change a section together with admin; the defaults must keep today's behaviour
-- **Infection control** (`services/infection_control/`, its routes, models and `tests/integration/infection_control/`) → [`services/infection_control/CLAUDE.md`](services/infection_control/CLAUDE.md). ⚠ The scheduled job contract and the exams cache queue are shared with **backend-private**; the report summary (`resumo_acompanhamento`) with **long-running-tasks**; the enums with the frontend
+- **Infection control** → [`services/infection_control/CLAUDE.md`](services/infection_control/CLAUDE.md). It loads by itself only for files under `services/infection_control/`: read it before changing `routes/infection_control/`, `repository/infection_control/` (the `gatilhos` contract lives there too), `models/infection_control*.py` or `tests/integration/infection_control/`. ⚠ The scheduled job contract and the exams cache queue are shared with **backend-private**; the report summary (`resumo_acompanhamento`) with **long-running-tasks**; the enums with the frontend
 - **Admission queues** (`admission_queue_service`, `fila_atendimento`) → [`docs/agents/admission-queues.md`](docs/agents/admission-queues.md). ⚠ backend-private writes the infection control queue and runs the consumers' jobs
 - **Prescalc automatic check** (`prescription_agg_service`, features `AUTOMATIC_CHECK_*`) → [`docs/agents/prescalc-automatic-check.md`](docs/agents/prescalc-automatic-check.md)
 - **Prescription test cases** (`POST /prescriptions/test-case`, maintainers, test schema only) → [`docs/agents/prescription-test-cases.md`](docs/agents/prescription-test-cases.md). Never name a schema in the code
