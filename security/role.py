@@ -143,6 +143,8 @@ class Role(Enum):
             Permission.WRITE_PATIENT_TAGS,
             Permission.READ_TAGS,
             Permission.READ_CONFIG_EXAMS,
+            # the infection control pages, only in a schema with the feature
+            Permission.READ_INFECTION_CONTROL,
         ],
     )
 
@@ -178,6 +180,10 @@ class Role(Enum):
             Permission.READ_SUPPORT,
             Permission.READ_TAGS,
             Permission.WRITE_TAGS,
+            # the infection control pages, only in a schema with the feature
+            # (it has no READ_PRESCRIPTION: the reads those pages make accept
+            # READ_INFECTION_CONTROL too)
+            Permission.READ_INFECTION_CONTROL,
         ],
     )
 

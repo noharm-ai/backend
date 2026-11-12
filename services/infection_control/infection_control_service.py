@@ -56,6 +56,7 @@ from services import (
 from services.infection_control import (
     antimicrobial_timeline_service,
     exam_trigger_service,
+    infection_control_access_service,
 )
 from services.infection_control import (
     infection_control_status_service as rule,
@@ -79,12 +80,8 @@ INFECTION_FOCI = {f.value for f in InfectionFocusEnum}
 
 
 def _check_feature():
-    if not feature_service.has_feature(FeatureEnum.INFECTION_CONTROL):
-        raise ValidationError(
-            "Controle de infecção não está habilitado",
-            "errors.businessRules",
-            status.HTTP_400_BAD_REQUEST,
-        )
+    """Raises when the schema doesn't have the infection control feature on"""
+    infection_control_access_service.check_feature()
 
 
 def _serialize_pending(pending: InfectionControlPending) -> dict:
@@ -811,7 +808,7 @@ def save_exam_triggers(request_data: ExamTriggersSaveRequest, user_context: User
     return _exam_triggers_view(rules)
 
 
-@has_permission(Permission.READ_PRESCRIPTION)
+@has_permission(Permission.READ_PRESCRIPTION, Permission.READ_INFECTION_CONTROL)
 def search_antimicrobials(term: str | None):
     """Antimicrobials by name, to recommend one instead of another"""
     _check_feature()

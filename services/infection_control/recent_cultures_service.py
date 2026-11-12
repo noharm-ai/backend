@@ -18,6 +18,7 @@ from exception.validation_error import ValidationError
 from repository import culture_repository, patient_repository
 from repository.infection_control import antimicrobial_repository
 from services import culture_service
+from services.infection_control import infection_control_access_service
 from utils import dateutils, status
 
 # a culture released before this is old news for the treatment now
@@ -121,14 +122,18 @@ def _sort_key(culture: dict):
     return (culture["collectionDate"] or "", culture["releaseDate"] or "")
 
 
-@has_permission(Permission.READ_PRESCRIPTION)
-def get_recent_cultures(admission_number: int):
+@has_permission(Permission.READ_PRESCRIPTION, Permission.READ_INFECTION_CONTROL)
+def get_recent_cultures(admission_number: int, user_permissions: list[Permission]):
     """The latest culture of each exam and material of the patient released in
     the last FRESHNESS, newest collection first.
 
     The result (previousResult) goes as the lab wrote it: some send HTML, some
     plain text, and the page sanitizes it before showing it.
     """
+    infection_control_access_service.check_read_access(
+        user_permissions=user_permissions, own=[Permission.READ_PRESCRIPTION]
+    )
+
     id_patient = _get_id_patient(admission_number=admission_number)
     released_since = datetime.now() - FRESHNESS
 
@@ -144,8 +149,10 @@ def get_recent_cultures(admission_number: int):
     }
 
 
-@has_permission(Permission.READ_PRESCRIPTION)
-def get_culture_history(admission_number: int, id_culture: int):
+@has_permission(Permission.READ_PRESCRIPTION, Permission.READ_INFECTION_CONTROL)
+def get_culture_history(
+    admission_number: int, id_culture: int, user_permissions: list[Permission]
+):
     """Every culture of the patient with the exam and material of the given
     one, newest collection first, released at any time, each with its
     antibiogram: what a row of the recent cultures opens. The antibiogram of
@@ -155,6 +162,10 @@ def get_culture_history(admission_number: int, id_culture: int):
     The culture must be the patient's, so that the admission on screen never
     opens another patient's history.
     """
+    infection_control_access_service.check_read_access(
+        user_permissions=user_permissions, own=[Permission.READ_PRESCRIPTION]
+    )
+
     id_patient = _get_id_patient(admission_number=admission_number)
     culture = culture_repository.get_culture_header(
         id_culture=id_culture, id_patient=id_patient
