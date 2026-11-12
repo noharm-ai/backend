@@ -56,7 +56,6 @@ from services import (
 from services.infection_control import (
     antimicrobial_timeline_service,
     exam_trigger_service,
-    infection_control_access_service,
 )
 from services.infection_control import (
     infection_control_status_service as rule,
@@ -80,8 +79,12 @@ INFECTION_FOCI = {f.value for f in InfectionFocusEnum}
 
 
 def _check_feature():
-    """Raises when the schema doesn't have the infection control feature on"""
-    infection_control_access_service.check_feature()
+    if not feature_service.has_feature(FeatureEnum.INFECTION_CONTROL):
+        raise ValidationError(
+            "Controle de infecção não está habilitado",
+            "errors.businessRules",
+            status.HTTP_400_BAD_REQUEST,
+        )
 
 
 def _serialize_pending(pending: InfectionControlPending) -> dict:
@@ -283,23 +286,13 @@ def get_admission_state(admission_number: int):
 
 
 @has_permission(Permission.READ_INFECTION_CONTROL)
-def get_admission_view(
-    admission_number: int, user_context: User, user_permissions: list[Permission]
-):
+def get_admission_view(admission_number: int, user_context: User):
     """The infection control page of an admission: the antimicrobial timeline
     and its follow-up, built from the same courses judged at the same time.
-
-    The timeline is the patient's prescriptions: with the feature off only
-    READ_PRESCRIPTION still loads it (followUp disabled); READ_INFECTION_CONTROL
-    alone (CONFIG_MANAGER) needs the feature on.
 
     The follow-up runs last, in a savepoint, and never raises: the timeline is
     shown without it (followUp None) and the page offers to load it again.
     """
-    infection_control_access_service.check_read_access(
-        user_permissions=user_permissions, own=[Permission.READ_PRESCRIPTION]
-    )
-
     now = datetime.now()
     admission_courses = rule.load_courses(admission_number=admission_number, now=now)
     timeline = antimicrobial_timeline_service.get_timeline(

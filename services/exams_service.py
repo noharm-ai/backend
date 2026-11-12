@@ -20,7 +20,6 @@ from models.requests.exam_request import (
 from models.segment import Exams
 from repository import exams_repository
 from services import cache_service, patient_service
-from services.infection_control import infection_control_access_service
 from utils import dateutils, examutils, logger, numberutils, status, stringutils
 
 
@@ -190,20 +189,11 @@ def _get_textual_exams(admission_number: int = None, id_patient: int = None):
 @has_permission(
     Permission.READ_PRESCRIPTION,
     Permission.READ_REGULATION,
+    # the infection control page reads them too
     Permission.READ_INFECTION_CONTROL,
 )
-def get_exams_by_admission(
-    admission_number: int,
-    id_segment: int,
-    user_context: User,
-    user_permissions: list[Permission],
-):
-    """Get exams by admission number (the infection control page reads them
-    too: READ_INFECTION_CONTROL alone needs the feature on)"""
-    infection_control_access_service.check_read_access(
-        user_permissions=user_permissions,
-        own=[Permission.READ_PRESCRIPTION, Permission.READ_REGULATION],
-    )
+def get_exams_by_admission(admission_number: int, id_segment: int, user_context: User):
+    """Get exams by admission number"""
 
     patient = (
         db.session.query(Patient)

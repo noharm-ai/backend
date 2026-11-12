@@ -6,7 +6,6 @@ from decorators.has_permission_decorator import Permission, has_permission
 from models.appendix import InterventionReason
 from models.main import db
 from models.prescription import Intervention
-from services.infection_control import infection_control_access_service
 
 
 @has_permission(
@@ -15,14 +14,7 @@ from services.infection_control import infection_control_access_service
     # the infection control review lists them
     Permission.READ_INFECTION_CONTROL,
 )
-def get_reasons(id=None, active_only=False, user_permissions: list[Permission] = None):
-    """The intervention reasons (READ_INFECTION_CONTROL alone needs the
-    infection control feature on)"""
-    infection_control_access_service.check_read_access(
-        user_permissions=user_permissions or [],
-        own=[Permission.ADMIN_INTERVENTION_REASON, Permission.READ_PRESCRIPTION],
-    )
-
+def get_reasons(id=None, active_only=False):
     parent = db.aliased(InterventionReason)
     query_editable = (
         db.session.query(func.count(Intervention.id))
