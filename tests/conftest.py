@@ -11,6 +11,7 @@ from config import Config
 from mobile import app
 from models.enums import FeatureEnum, NoHarmENV
 from models.main import User
+from services import schema_params_service
 
 
 def pytest_configure(config):  # noqa: ARG001
@@ -75,10 +76,17 @@ def _update_roles(email, roles):
 @pytest.fixture(autouse=True)
 def no_noharm_store(monkeypatch):
     """Tests never call AWS: the noharm-store reads find no item (the schema
-    params are the code defaults). A test that needs items patches it again"""
+    params are the code defaults). A test that needs items patches it again.
+    The schema params container cache is off (read on every request, so a
+    test can patch the store between two views); its own tests turn it on"""
     monkeypatch.setattr(
         "repository.store_repository.get_item_data", lambda pk, sk: None
     )
+    monkeypatch.setattr("services.schema_params_service.CACHE_TTL_SECONDS", 0)
+    monkeypatch.setattr("services.schema_params_service.ERROR_RETRY_SECONDS", 0)
+    schema_params_service.clear_cache()
+    yield
+    schema_params_service.clear_cache()
 
 
 @pytest.fixture(scope="session", autouse=True)

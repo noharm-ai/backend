@@ -118,3 +118,19 @@ def test_a_read_failure_is_reported(client, maintainer_headers, monkeypatch):
 
     assert data["status"] == "read_error"
     assert data["custom"] == {}
+
+
+def test_the_view_skips_the_container_cache(client, maintainer_headers, monkeypatch):
+    """The prescription view caches the params per container; this view always
+    reads the table, so it shows what admin saved before the cache expires"""
+    from services import schema_params_service
+
+    monkeypatch.setattr(schema_params_service, "CACHE_TTL_SECONDS", 60)
+    _store(monkeypatch, {})
+    schema_params_service.get_schema_params(schema="demo")
+
+    _store(monkeypatch, {"demo": {"alerts": {"types": {"kidney": {"enabled": False}}}}})
+    data = _view(client, maintainer_headers)
+
+    assert data["status"] == "found"
+    assert data["custom"]["alerts"]["types"]["kidney"]["enabled"] is False

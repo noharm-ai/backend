@@ -235,3 +235,140 @@ def test_an_unexpected_error_in_a_section_is_the_defaults(monkeypatch):
     assert loaded["status"] == "found"
     assert loaded["invalidSections"] == ["alerts"]
     assert loaded["params"] == SchemaParams()
+
+
+def _with_cache(monkeypatch, clock: list):
+    """Turns the container cache on (conftest turns it off) with a fake clock:
+    clock[0] is time.monotonic()"""
+    monkeypatch.setattr(schema_params_service, "CACHE_TTL_SECONDS", 60)
+    monkeypatch.setattr(schema_params_service, "ERROR_RETRY_SECONDS", 10)
+    monkeypatch.setattr(schema_params_service.time, "monotonic", lambda: clock[0])
+
+
+def test_cached_in_the_container_until_it_expires(monkeypatch):
+    """Cache por container: requests seguidas não leem a tabela de novo até o
+    TTL vencer; depois disso a mudança feita no admin passa a valer"""
+    clock = [1000.0]
+    _with_cache(monkeypatch, clock)
+    calls = []
+    items = {"demo": _alerts(types={"kidney": {"enabled": False}})}
+    monkeypatch.setattr(
+        "repository.store_repository.get_item_data", _store(items=items, calls=calls)
+    )
+
+    first = schema_params_service.get_schema_params(schema="demo")
+    items["demo"] = {}
+    clock[0] += 59
+    second = schema_params_service.get_schema_params(schema="demo")
+
+    assert calls == [("schema_params", "demo")]
+    assert first.alerts.alert_type("kidney").enabled is False
+    assert second == first
+
+    clock[0] += 1
+    third = schema_params_service.get_schema_params(schema="demo")
+
+    assert len(calls) == 2
+    assert third == SchemaParams()
+
+
+def test_cached_per_schema(monkeypatch):
+    """Cada schema tem a sua entrada no cache"""
+    clock = [1000.0]
+    _with_cache(monkeypatch, clock)
+    calls = []
+    items = {"demo": _alerts(types={"kidney": {"enabled": False}})}
+    monkeypatch.setattr(
+        "repository.store_repository.get_item_data", _store(items=items, calls=calls)
+    )
+
+    demo = schema_params_service.get_schema_params(schema="demo")
+    other = schema_params_service.get_schema_params(schema="other")
+    schema_params_service.get_schema_params(schema="demo")
+
+    assert calls == [("schema_params", "demo"), ("schema_params", "other")]
+    assert demo.alerts.alert_type("kidney").enabled is False
+    assert other == SchemaParams()
+
+
+def test_no_item_is_cached_too(monkeypatch):
+    """Schema sem item (padrões) também fica em cache: não lê a tabela a cada
+    request"""
+    clock = [1000.0]
+    _with_cache(monkeypatch, clock)
+    calls = []
+    monkeypatch.setattr(
+        "repository.store_repository.get_item_data", _store(items={}, calls=calls)
+    )
+
+    schema_params_service.get_schema_params(schema="demo")
+    schema_params_service.get_schema_params(schema="demo")
+
+    assert calls == [("schema_params", "demo")]
+
+
+def test_a_failed_read_keeps_the_last_params_read(monkeypatch):
+    """Falha ao reler depois do TTL: continuam valendo os últimos parâmetros
+    lidos (não os padrões), e a tabela é lida de novo depois de
+    ERROR_RETRY_SECONDS, não a cada request"""
+    clock = [1000.0]
+    _with_cache(monkeypatch, clock)
+    calls = []
+    state = {"fail": False}
+    items = {"demo": _alerts(types={"kidney": {"enabled": False}})}
+
+    def get_item_data(pk, sk):
+        calls.append((pk, sk))
+        if state["fail"]:
+            raise RuntimeError("timeout")
+        return items.get(sk)
+
+    monkeypatch.setattr("repository.store_repository.get_item_data", get_item_data)
+
+    schema_params_service.get_schema_params(schema="demo")
+    state["fail"] = True
+    clock[0] += 60
+    stale = schema_params_service.get_schema_params(schema="demo")
+    clock[0] += 9
+    schema_params_service.get_schema_params(schema="demo")
+
+    assert len(calls) == 2
+    assert stale.alerts.alert_type("kidney").enabled is False
+
+    state["fail"] = False
+    items["demo"] = {}
+    clock[0] += 1
+    recovered = schema_params_service.get_schema_params(schema="demo")
+
+    assert len(calls) == 3
+    assert recovered == SchemaParams()
+
+
+def test_a_failed_first_read_is_the_defaults_and_retried_soon(monkeypatch):
+    """Falha sem nada em cache: padrões, e a tabela é lida de novo depois de
+    ERROR_RETRY_SECONDS (não fica com os padrões pelo TTL inteiro)"""
+    clock = [1000.0]
+    _with_cache(monkeypatch, clock)
+    calls = []
+    state = {"fail": True}
+    items = {"demo": _alerts(types={"kidney": {"enabled": False}})}
+
+    def get_item_data(pk, sk):
+        calls.append((pk, sk))
+        if state["fail"]:
+            raise RuntimeError("timeout")
+        return items.get(sk)
+
+    monkeypatch.setattr("repository.store_repository.get_item_data", get_item_data)
+
+    assert schema_params_service.get_schema_params(schema="demo") == SchemaParams()
+    clock[0] += 9
+    schema_params_service.get_schema_params(schema="demo")
+    assert len(calls) == 1
+
+    state["fail"] = False
+    clock[0] += 1
+    config = schema_params_service.get_schema_params(schema="demo")
+
+    assert len(calls) == 2
+    assert config.alerts.alert_type("kidney").enabled is False

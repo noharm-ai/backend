@@ -5,11 +5,17 @@ pk `schema_params`, sk `<schema>`, the config in `data`, one key per section
 (models/schema_params.py). Whatever the item does not set comes from the
 code defaults, which keep the behaviour the system has without any config.
 
+The params in force are cached per container for CACHE_TTL_SECONDS, so a
+change made in admin reaches the prescription view (and prescalc) within that
+time. The maintainers' view (view_schema_params) always reads the table.
+
 Each section is validated on its own: an invalid one falls back to the code
 defaults and the other sections still apply. When the table can't be read the
 code defaults apply: a failure never changes behaviour (e.g. never hides an
 alert).
 """
+
+import time
 
 from flask import g, has_app_context
 
@@ -20,6 +26,12 @@ from repository import store_repository
 from utils import logger
 
 STORE_PK = "schema_params"
+# how long the params read stay in force in a container
+CACHE_TTL_SECONDS = 60
+# after a failed read: how long until the table is read again
+ERROR_RETRY_SECONDS = 10
+# schema -> (expires at, time.monotonic(); params): per container
+_cache: dict[str, tuple[float, SchemaParams]] = {}
 # section name -> its model, as declared in SchemaParams
 _SECTIONS = {
     name: field.annotation for name, field in SchemaParams.model_fields.items()
@@ -43,15 +55,44 @@ def view_schema_params(user_context: User = None) -> dict:
 
 
 def get_schema_params(schema: str | None) -> SchemaParams:
-    """The schema params in force, read once per request"""
-    cache = g.setdefault("schema_params", {}) if has_app_context() else {}
-    if schema in cache:
-        return cache[schema]
+    """The schema params in force: the same for the whole request, read from
+    the table at most once per CACHE_TTL_SECONDS in a container"""
+    request_cache = g.setdefault("schema_params", {}) if has_app_context() else {}
+    if schema in request_cache:
+        return request_cache[schema]
 
-    config = _load(schema=schema)
-    cache[schema] = config
+    config = _get_cached(schema=schema)
+    request_cache[schema] = config
 
     return config
+
+
+def clear_cache():
+    """Forgets the params cached in this container"""
+    _cache.clear()
+
+
+def _get_cached(schema: str | None) -> SchemaParams:
+    """The params cached in the container, read again once expired. When the
+    read fails, the last params read stay in force (the code defaults if there
+    are none) and the table is read again after ERROR_RETRY_SECONDS, so an
+    outage costs one slow read every few seconds, not one per request"""
+    if not schema:
+        return _load(schema=schema)
+
+    now = time.monotonic()
+    cached = _cache.get(schema)
+    if cached is not None and now < cached[0]:
+        return cached[1]
+
+    loaded = _load_with_status(schema=schema)
+    if loaded["status"] == "read_error":
+        params = cached[1] if cached is not None else loaded["params"]
+        _cache[schema] = (now + ERROR_RETRY_SECONDS, params)
+        return params
+
+    _cache[schema] = (now + CACHE_TTL_SECONDS, loaded["params"])
+    return loaded["params"]
 
 
 def _load(schema: str | None) -> SchemaParams:
@@ -72,7 +113,7 @@ def _load_with_status(schema: str | None) -> dict:
         data = store_repository.get_item_data(pk=STORE_PK, sk=schema)
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.backend_logger.error(
-            "schema params: noharm-store read failed (schema %s), using defaults: %s",
+            "schema params: noharm-store read failed (schema %s): %s",
             schema,
             e,
         )
