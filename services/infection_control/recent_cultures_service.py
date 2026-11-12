@@ -121,7 +121,7 @@ def _sort_key(culture: dict):
     return (culture["collectionDate"] or "", culture["releaseDate"] or "")
 
 
-@has_permission(Permission.READ_PRESCRIPTION)
+@has_permission(Permission.READ_PRESCRIPTION, Permission.READ_INFECTION_CONTROL)
 def get_recent_cultures(admission_number: int):
     """The latest culture of each exam and material of the patient released in
     the last FRESHNESS, newest collection first.
@@ -144,7 +144,7 @@ def get_recent_cultures(admission_number: int):
     }
 
 
-@has_permission(Permission.READ_PRESCRIPTION)
+@has_permission(Permission.READ_PRESCRIPTION, Permission.READ_INFECTION_CONTROL)
 def get_culture_history(admission_number: int, id_culture: int):
     """Every culture of the patient with the exam and material of the given
     one, newest collection first, released at any time, each with its

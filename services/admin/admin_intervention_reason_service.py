@@ -8,7 +8,12 @@ from models.main import db
 from models.prescription import Intervention
 
 
-@has_permission(Permission.ADMIN_INTERVENTION_REASON, Permission.READ_PRESCRIPTION)
+@has_permission(
+    Permission.ADMIN_INTERVENTION_REASON,
+    Permission.READ_PRESCRIPTION,
+    # the infection control review lists them
+    Permission.READ_INFECTION_CONTROL,
+)
 def get_reasons(id=None, active_only=False):
     parent = db.aliased(InterventionReason)
     query_editable = (

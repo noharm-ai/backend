@@ -811,7 +811,7 @@ def save_exam_triggers(request_data: ExamTriggersSaveRequest, user_context: User
     return _exam_triggers_view(rules)
 
 
-@has_permission(Permission.READ_PRESCRIPTION)
+@has_permission(Permission.READ_PRESCRIPTION, Permission.READ_INFECTION_CONTROL)
 def search_antimicrobials(term: str | None):
     """Antimicrobials by name, to recommend one instead of another"""
     _check_feature()
