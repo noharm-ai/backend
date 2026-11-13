@@ -2,10 +2,12 @@
 
 The culture card of the screening reads the antibiograms by drug, which does
 not tell which culture exams were made nor what they found. The infection
-control page shows them apart: the latest culture of each exam and material,
-with its gram and the lab's result, released in the last days. It is only
-informative, so it is served apart from the antimicrobial timeline and a
-failure here never takes the page down.
+control page shows them apart, released in the last days: every collection
+(an exam and material collected at one time) with each of its cultures, their
+gram, the lab's result and the antibiogram, and the latest culture of each
+exam and material, which the page's report and the review's clinical note
+list. It is only informative, so it is served apart from the antimicrobial
+timeline and a failure here never takes the page down.
 
 The cultures are the patient's, not only the admission's: a culture from a
 recent earlier admission still matters to the treatment now.
@@ -121,10 +123,58 @@ def _sort_key(culture: dict):
     return (culture["collectionDate"] or "", culture["releaseDate"] or "")
 
 
+def _latest_of_each_exam(headers: list) -> list:
+    """The latest culture of each exam and material: the newest collection,
+    whatever it says (a pending one takes the place of an older result). The
+    headers come newest collection first (a missing collection date last),
+    so the first of each exam and material is its latest"""
+    latest = {}
+    for header in headers:
+        latest.setdefault((header.examName, header.examMaterialName), header)
+
+    return list(latest.values())
+
+
+def _collections(cultures: list[dict]) -> list[dict]:
+    """The cultures grouped by collection (exam, material and collection
+    date), newest collection first. A collection may hold several cultures
+    (one per bottle, a partial and a final report): they go in the order the
+    lab released them"""
+    groups: dict[tuple, list[dict]] = {}
+    for culture in cultures:
+        key = (culture["examName"], culture["material"], culture["collectionDate"])
+        groups.setdefault(key, []).append(culture)
+
+    collections = []
+    for (exam_name, material, collection_date), items in groups.items():
+        items = sorted(items, key=lambda c: (c["releaseDate"] or "", int(c["id"])))
+        collections.append(
+            {
+                # the first culture of the collection names it
+                "id": items[0]["id"],
+                "examName": exam_name,
+                "material": material,
+                "collectionDate": collection_date,
+                "cultures": items,
+            }
+        )
+
+    return sorted(
+        collections,
+        key=lambda c: (c["collectionDate"] or "", int(c["id"])),
+        reverse=True,
+    )
+
+
 @has_permission(Permission.READ_PRESCRIPTION, Permission.READ_INFECTION_CONTROL)
 def get_recent_cultures(admission_number: int):
-    """The latest culture of each exam and material of the patient released in
-    the last FRESHNESS, newest collection first.
+    """The cultures of the patient released in the last FRESHNESS:
+
+    - collections: every collection, newest first, each with its cultures and
+      their antibiograms (what the culture card lists)
+    - cultures: the latest culture of each exam and material, newest
+      collection first, without the antibiogram (what the report and the
+      review's clinical note list)
 
     The result (previousResult) goes as the lab wrote it: some send HTML, some
     plain text, and the page sanitizes it before showing it.
@@ -132,15 +182,26 @@ def get_recent_cultures(admission_number: int):
     id_patient = _get_id_patient(admission_number=admission_number)
     released_since = datetime.now() - FRESHNESS
 
-    headers = culture_repository.get_latest_culture_headers(
+    headers = culture_repository.get_culture_headers_released_since(
         id_patient=id_patient, released_since=released_since
     )
-    cultures = _serialize(headers)
+    cultures = _serialize(headers, with_antibiogram=True)
+    by_id = {culture["id"]: culture for culture in cultures}
+
+    latest = [
+        {
+            key: value
+            for key, value in by_id[str(header.id)].items()
+            if key != "antibiogram"
+        }
+        for header in _latest_of_each_exam(headers)
+    ]
 
     return {
         "admissionNumber": admission_number,
         "releasedSince": dateutils.to_iso(released_since),
-        "cultures": sorted(cultures, key=_sort_key, reverse=True),
+        "collections": _collections(cultures),
+        "cultures": sorted(latest, key=_sort_key, reverse=True),
     }
 
 
