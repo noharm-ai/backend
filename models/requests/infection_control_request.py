@@ -51,8 +51,9 @@ class AntimicrobialEvaluationRequest(BaseModel):
 class InfectionControlClinicalNoteRequest(BaseModel):
     """The clinical note a review writes in the patient's record"""
 
-    # an active clinical note type (tipoevolucao)
-    idClinicalNoteType: str
+    # an active clinical note type (tipoevolucao); none only when the schema
+    # has no active type
+    idClinicalNoteType: str | None = None
     text: str
 
 

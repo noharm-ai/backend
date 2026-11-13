@@ -517,7 +517,13 @@ def _validate_clinical_note(
             active=True
         )
     }
-    if clinical_note.idClinicalNoteType not in note_types:
+    # a schema with no active type writes the note without one
+    valid_type = (
+        clinical_note.idClinicalNoteType in note_types
+        if note_types
+        else clinical_note.idClinicalNoteType is None
+    )
+    if not valid_type:
         raise ValidationError(
             "Tipo de evolução inválido",
             "errors.invalidParams",

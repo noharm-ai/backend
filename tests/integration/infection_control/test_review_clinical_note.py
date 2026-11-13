@@ -1,8 +1,9 @@
 """Tests: infection control follow-up, the clinical note a review writes: on the
 prescription-day the record points at (ci_atendimento.fkprescricao_ultima),
 always a prescription clinical note
-(prescricao_evolucao) whatever MULTI_CLINICAL_NOTES says, with an active type,
-and saved with the review or not at all"""
+(prescricao_evolucao) whatever MULTI_CLINICAL_NOTES says, with an active type
+(none when the schema has no active type), and saved with the review or not
+at all"""
 
 from sqlalchemy import text
 
@@ -167,6 +168,73 @@ def test_review_clinical_note_requires_active_type(
 
     assert _clinical_notes(admission) == []
     assert _reviews(admission) == []
+
+
+def test_review_clinical_note_requires_type_when_schema_has_types(
+    client,
+    infection_controller_headers,
+    infection_control,
+    clinical_note_types,
+    admission,
+):
+    """With an active type in the schema, a note without one rejects the
+    whole review"""
+    _prescribe_today(admission)
+
+    for clinical_note in (
+        {"text": NOTE_TEXT},
+        {"idClinicalNoteType": None, "text": NOTE_TEXT},
+    ):
+        response = _review(
+            client,
+            infection_controller_headers,
+            admission,
+            evaluations=[ANTIMICROBIAL_DRUG],
+            clinical_note=clinical_note,
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.get_json()["code"] == "errors.invalidParams"
+
+    assert _clinical_notes(admission) == []
+    assert _reviews(admission) == []
+
+
+def test_review_clinical_note_without_type_when_schema_has_none(
+    client,
+    infection_controller_headers,
+    infection_control,
+    without_clinical_note_types,
+    admission,
+):
+    """A schema with no active type writes the note without one, and rejects
+    one that names a type"""
+    _prescribe_today(admission)
+
+    response = _review(
+        client,
+        infection_controller_headers,
+        admission,
+        evaluations=[ANTIMICROBIAL_DRUG],
+        clinical_note={"idClinicalNoteType": "CI-INEXISTENTE", "text": NOTE_TEXT},
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.get_json()["code"] == "errors.invalidParams"
+    assert _reviews(admission) == []
+
+    response = _review(
+        client,
+        infection_controller_headers,
+        admission,
+        evaluations=[ANTIMICROBIAL_DRUG],
+        clinical_note={"idClinicalNoteType": None, "text": NOTE_TEXT},
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.get_json()
+    notes = _clinical_notes(admission)
+    assert len(notes) == 1
+    assert notes[0].idtipoevolucao is None
+    assert notes[0].texto == NOTE_TEXT
 
 
 def test_review_clinical_note_requires_text(
