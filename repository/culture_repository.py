@@ -4,7 +4,6 @@ from datetime import datetime
 
 from boto3.dynamodb.conditions import Key
 from sqlalchemy import desc, func, select
-from sqlalchemy.dialects.postgresql import distinct_on
 
 from config import Config
 from models.appendix import Culture, CultureHeader
@@ -44,23 +43,18 @@ _HEADER_COLUMNS = (
 )
 
 
-def get_latest_culture_headers(id_patient: int, released_since: datetime) -> list:
-    """The latest culture of each exam and material of the patient, among the
-    ones released since the given date.
-
-    The latest is the newest collection, whatever it says: a collection still
-    waiting for the lab also gets a release date (about the collection time),
-    so it counts as fresh and takes the place of the older result.
-    """
+def get_culture_headers_released_since(
+    id_patient: int, released_since: datetime
+) -> list:
+    """Every culture header of the patient released since the given date. A
+    collection still waiting for the lab also gets a release date (about the
+    collection time), so a pending one is among them."""
 
     query = (
         select(*_HEADER_COLUMNS)
         .where(CultureHeader.idPatient == id_patient)
         .where(CultureHeader.releaseDate >= released_since)
-        .ext(distinct_on(CultureHeader.examName, CultureHeader.examMaterialName))
         .order_by(
-            CultureHeader.examName,
-            CultureHeader.examMaterialName,
             desc(CultureHeader.collectionDate).nulls_last(),
             desc(CultureHeader.releaseDate),
             desc(CultureHeader.id),
