@@ -4,7 +4,7 @@
 
 NoHarm is a healthcare/pharmacy clinical decision support system that helps prevent adverse drug events. This Flask-based backend provides APIs for prescription management, drug interaction checking, clinical interventions, patient monitoring, and regulatory compliance.
 
-**Tech Stack:** Flask 3.1.3, SQLAlchemy 2.1.6, PostgreSQL, Redis, AWS (S3, SQS, Lambda, DynamoDB), deployed to AWS Lambda via Zappa (`zappa_settings.json`). Python 3.12+.
+**Tech Stack:** Flask 3.1.3, SQLAlchemy 2.1.8, PostgreSQL, Redis, AWS (S3, SQS, Lambda, DynamoDB), deployed to AWS Lambda via Zappa (`zappa_settings.json`). Python 3.12+.
 
 This file holds what applies to every change. The rules of each domain live in their own docs, listed under [Domain Rules](#domain-rules): **read the doc of an area before changing it**. A longer architecture overview for humans is in `docs/architecture.md`.
 

@@ -67,18 +67,18 @@ PostgreSQL schema.
 |---|---|---|
 | Language | Python | 3.12+ |
 | Web framework | Flask | 3.1.3 |
-| ORM | SQLAlchemy / Flask-SQLAlchemy | 2.1.6 / 3.1.1 |
+| ORM | SQLAlchemy / Flask-SQLAlchemy | 2.1.8 / 3.1.1 |
 | Database | PostgreSQL | 16 (11.6 supported) |
 | Database driver | psycopg2-binary | 2.9.13 |
-| Cache | Redis | 8.0.1 (client) |
+| Cache | Redis | 8.1.0 (client) |
 | Authentication | Flask-JWT-Extended | 4.7.4 |
-| Request validation | Pydantic | 2.13.4 |
-| AI agents | Strands Agents | 1.50.1 |
+| Request validation | Pydantic | 2.14.3 |
+| AI agents | Strands Agents | 1.64.0 |
 | LLM providers | Azure OpenAI / OpenAI, Maritaca | — |
-| Cloud SDK | boto3 | 1.43.56 |
-| Serverless packaging | Zappa | 0.62.1 |
-| Tests | pytest (+ flask, cov, order) | 9.1.1 |
-| Lint | Ruff | 0.15.8 |
+| Cloud SDK | boto3 | 1.43.126 |
+| Serverless packaging | Zappa | 0.63.0 |
+| Tests | pytest (+ flask, cov, order) | 9.2.0 |
+| Lint | Ruff | 0.17.4 |
 
 Full pinned lists: [`requirements.txt`](requirements.txt) (development) and
 [`requirements-prod.txt`](requirements-prod.txt) (deployment).
