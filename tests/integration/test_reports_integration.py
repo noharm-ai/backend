@@ -2,7 +2,7 @@
 
 The NiFi lint report is a gzip file kept in S3. The endpoint does not stream
 it: it answers with a short-lived presigned link and the date the file was last
-written (S3 ``last-modified``, shifted to America/Sao_Paulo).
+written (S3 ``last-modified`` minus a fixed 3 hours, without timezone).
 
 It is an admin tool on two levels: the route is marked ``is_admin`` (refused in
 production whatever the role) and the service requires INTEGRATION_UTILS, which
@@ -50,7 +50,8 @@ def test_admin_gets_a_presigned_link(client, admin_headers, s3_client):
     assert response.get_json()["data"] == {
         "cached": True,
         "url": _PRESIGNED_LINK,
-        # 15:30 GMT is 12:30 in São Paulo, returned without timezone
+        # the service subtracts a fixed 3 hours from the GMT date (no timezone
+        # conversion) and drops the tzinfo: 15:30 GMT becomes 12:30
         "updatedAt": "2026-03-10T12:30:00",
     }
 

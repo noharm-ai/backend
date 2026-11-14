@@ -125,6 +125,10 @@ def _cleanup():
     ):
         session.execute(text(f"DELETE FROM demo.{table}"))
 
+    # regulation indicators panel: no seed rows, filled only by
+    # tests/integration/test_reports_regulation.py
+    session.execute(text("DELETE FROM demo.rel_painel_juntos"))
+
     # patients created for conciliation flows (seed admissions stay below 100000)
     session.execute(text("DELETE FROM demo.pessoa WHERE nratendimento >= 100000"))
     session.execute(text("DELETE FROM demo.pessoa_audit WHERE nratendimento >= 100000"))

@@ -13,8 +13,10 @@ with a mocked database; here the requests go through the routes, the permission
 gate and the real PostgreSQL queries (filters, ordering, the window count and
 the summary aggregation).
 
-The seed leaves the table empty, so the module inserts its own fictitious
-records (ids prefixed with ``_ID_PREFIX``) and removes them afterwards.
+The seed leaves the table empty and the summary aggregates every row, so the
+module empties the table, inserts its own fictitious records and empties it
+again afterwards (the session ``_cleanup`` in ``tests/conftest.py`` empties it
+too, for an interrupted run).
 """
 
 import csv
@@ -34,74 +36,78 @@ SUMMARY_URL = "/reports/regulation/indicators-summary"
 # every record written by this module has an id starting with this prefix
 _ID_PREFIX = "9900000"
 
-# fictitious citizens: (id, name, age, gender, health unit, team, agent, cpf,
-# fez_mamografia, fez_hpv, fez_vacina, fez_consulta_sex, fez_consulta_gest,
-# v_atual_ficha)
+
+def _record(**kwargs):
+    """A fictitious citizen record: the defaults, overridden by kwargs. The
+    indicator columns default to None (not applicable)"""
+    record = {
+        "admission": 1,
+        "birthdate": "1990-01-01",
+        "mammo_date": "2026-03-10",
+        "mammo": None,
+        "hpv": None,
+        "vaccine": None,
+        "sex": None,
+        "gest": None,
+        "current": True,
+    }
+    record.update(kwargs)
+    return record
+
+
 _RECORDS = [
-    (
-        f"{_ID_PREFIX}01",
-        "Fulano Beltrano Teste",
-        30,
-        "F",
-        "UBS Centro Teste",
-        "Equipe Azul",
-        "Agente Ciclano",
-        "00000000001",
-        True,
-        True,
-        None,
-        True,
-        None,
-        True,
+    _record(
+        id=f"{_ID_PREFIX}01",
+        name="Fulano Beltrano Teste",
+        age=30,
+        gender="F",
+        unit="UBS Centro Teste",
+        team="Equipe Azul",
+        agent="Agente Ciclano",
+        cpf="00000000001",
+        mammo=True,
+        hpv=True,
+        sex=True,
     ),
-    (
-        f"{_ID_PREFIX}02",
-        "Maria Teste",
-        45,
-        "F",
-        "UBS Centro Teste",
-        "Equipe Verde",
-        "Agente Beltrano",
-        "00000000002",
-        False,
-        True,
-        True,
-        False,
-        True,
-        True,
+    _record(
+        id=f"{_ID_PREFIX}02",
+        name="Maria Teste",
+        admission=45001,
+        age=45,
+        gender="F",
+        unit="UBS Centro Teste",
+        team="Equipe Verde",
+        agent="Agente Beltrano",
+        cpf="00000000002",
+        mammo=False,
+        hpv=True,
+        vaccine=True,
+        sex=False,
+        gest=True,
     ),
-    (
-        f"{_ID_PREFIX}03",
-        "Ciclano de Tal",
-        12,
-        "M",
-        "UBS Bairro Teste",
-        "Equipe Azul",
-        "Agente Ciclano",
-        "00000000003",
-        None,
-        None,
-        False,
-        None,
-        None,
-        True,
+    _record(
+        id=f"{_ID_PREFIX}03",
+        name="Ciclano de Tal",
+        age=12,
+        gender="M",
+        unit="UBS Bairro Teste",
+        team="Equipe Azul",
+        agent="Agente Ciclano",
+        cpf="00000000003",
+        vaccine=False,
     ),
     # an outdated version of a record: never listed by the panel
-    (
-        f"{_ID_PREFIX}04",
-        "Fulano Versao Antiga",
-        30,
-        "F",
-        "UBS Centro Teste",
-        "Equipe Azul",
-        "Agente Ciclano",
-        "00000000004",
-        True,
-        None,
-        None,
-        None,
-        None,
-        False,
+    _record(
+        id=f"{_ID_PREFIX}04",
+        name="Fulano Versao Antiga",
+        age=30,
+        gender="F",
+        unit="UBS Centro Teste",
+        team="Equipe Azul",
+        agent="Agente Ciclano",
+        cpf="00000000004",
+        mammo=True,
+        current=False,
     ),
 ]
 
@@ -113,9 +119,9 @@ _INSERT = text(
         dtatendimento_mamo, fez_mamografia, fez_hpv, fez_vacina,
         fez_consulta_sex, fez_consulta_gest, v_atual_ficha
     ) VALUES (
-        :id, 1, 1, :name, '1990-01-01', :age,
+        :id, 1, :admission, :name, :birthdate, :age,
         :gender, :unit, :team, :agent, :cpf,
-        '2026-03-10', :mammo, :hpv, :vaccine,
+        :mammo_date, :mammo, :hpv, :vaccine,
         :sex, :gest, :current
     )
     """
@@ -123,10 +129,10 @@ _INSERT = text(
 
 
 def _delete_records():
-    session.execute(
-        text("DELETE FROM demo.rel_painel_juntos WHERE co_unico_ficha LIKE :prefix"),
-        {"prefix": f"{_ID_PREFIX}%"},
-    )
+    """Empty the panel table: the seed leaves it empty and the summary
+    aggregates every row, so no other row may be there (see also _cleanup in
+    tests/conftest.py)"""
+    session.execute(text("DELETE FROM demo.rel_painel_juntos"))
     session_commit()
 
 
@@ -134,26 +140,8 @@ def _delete_records():
 def panel_records():
     """Insert the fictitious panel records for the module and remove them after"""
     _delete_records()
-    for r in _RECORDS:
-        session.execute(
-            _INSERT,
-            {
-                "id": r[0],
-                "name": r[1],
-                "age": r[2],
-                "gender": r[3],
-                "unit": r[4],
-                "team": r[5],
-                "agent": r[6],
-                "cpf": r[7],
-                "mammo": r[8],
-                "hpv": r[9],
-                "vaccine": r[10],
-                "sex": r[11],
-                "gest": r[12],
-                "current": r[13],
-            },
-        )
+    for record in _RECORDS:
+        session.execute(_INSERT, record)
     session_commit()
     yield
     _delete_records()
@@ -178,12 +166,14 @@ def _payload(**kwargs):
 
 
 def _panel(client, headers, **kwargs):
+    """POST a panel request and return its data, asserting it succeeded"""
     response = client.post(PANEL_URL, json=_payload(**kwargs), headers=headers)
     assert response.status_code == status.HTTP_200_OK, response.get_json()
     return response.get_json()["data"]
 
 
 def _names(data):
+    """The names of the listed records, in order"""
     return [r["name"] for r in data["data"]]
 
 
@@ -313,10 +303,13 @@ def test_panel_paginates_and_keeps_the_total_count(client, regulator_headers):
 
 
 def test_panel_serializes_the_row(client, regulator_headers):
-    """Dates come as ISO strings and the indicator booleans as they are stored"""
+    """Dates come as ISO strings, the numeric columns as numbers and the
+    indicator booleans as they are stored"""
     data = _panel(client, regulator_headers, indicator="HPV_VACCINE", name="Maria")
     row = data["data"][0]
 
+    assert row["age"] == 45
+    assert row["admission_number"] == 45001
     assert row["birthdate"] == "1990-01-01"
     assert row["mammogram_appointment_date"] == "2026-03-10"
     assert row["hpv_vaccine_date"] is None
