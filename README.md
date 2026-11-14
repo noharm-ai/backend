@@ -67,7 +67,7 @@ PostgreSQL schema.
 |---|---|---|
 | Language | Python | 3.12+ |
 | Web framework | Flask | 3.1.3 |
-| ORM | SQLAlchemy / Flask-SQLAlchemy | 2.1.6 / 3.1.1 |
+| ORM | SQLAlchemy / Flask-SQLAlchemy | 2.1.8 / 3.1.1 |
 | Database | PostgreSQL | 16 (11.6 supported) |
 | Database driver | psycopg2-binary | 2.9.13 |
 | Cache | Redis | 8.0.1 (client) |
