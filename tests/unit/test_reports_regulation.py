@@ -9,9 +9,10 @@ served from it:
 * ``/reports/regulation/indicators-panel-csv`` — the same rows as a CSV file;
 * ``/reports/regulation/indicators-summary`` — the weighted score per indicator.
 
-The regulation tables live in a separate DDL file that neither CI nor the local
-``make test-setup`` loads, so these are unit tests (same approach as
-``tests/unit/test_regulation_solicitation.py``): ``db`` is replaced with a
+The real queries, routes and permission gate are covered against PostgreSQL by
+``tests/integration/test_reports_regulation.py``. These unit tests (same
+approach as ``tests/unit/test_regulation_solicitation.py``) pin the row mapping
+and the CSV layout in isolation: ``db`` is replaced with a
 recording double and the repository is patched when testing the service. Real
 SQLAlchemy model instances and real query expressions are still used, so the
 column mapping and the filters are exercised for real — the filter and ordering
