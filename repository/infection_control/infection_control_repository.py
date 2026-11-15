@@ -15,6 +15,7 @@ from sqlalchemy import (
     update,
 )
 from sqlalchemy.dialects.postgresql import JSONB, insert
+from sqlalchemy.orm import undefer
 
 from models.appendix import Department, InterventionReason
 from models.enums import (
@@ -102,10 +103,14 @@ def lock_admission(
     Every writer (review save, the job) changes the pending reasons and the
     status under this lock, so the two never disagree. With lock_timeout_ms
     the wait is bounded: a timeout raises OperationalError.
+
+    Loads the summary too (deferred elsewhere): every writer goes on to the
+    rule, which compares it before writing it.
     """
     with lock_timeout(lock_timeout_ms):
         return (
             db.session.query(InfectionControlAdmission)
+            .options(undefer(InfectionControlAdmission.summary))
             .filter(InfectionControlAdmission.admission_number == admission_number)
             .with_for_update()
             .first()

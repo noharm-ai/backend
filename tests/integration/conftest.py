@@ -29,6 +29,27 @@ def navigator_headers(client):
 
 
 @pytest.fixture
+def navigation_viewer_headers(client):
+    """Headers with NAVIGATION_VIEWER role — read-only navigator"""
+    return make_headers(get_access(client, roles=[Role.NAVIGATION_VIEWER.value]))
+
+
+@pytest.fixture
+def analyst_navigation_viewer_headers(client):
+    """Headers with PRESCRIPTION_ANALYST + NAVIGATION_VIEWER.
+
+    NAVIGATION_VIEWER is granted on usuario_extra and added to the user's own
+    roles, so READ_NAV must not unlock any navigation write next to them.
+    """
+    return make_headers(
+        get_access(
+            client,
+            roles=[Role.PRESCRIPTION_ANALYST.value, Role.NAVIGATION_VIEWER.value],
+        )
+    )
+
+
+@pytest.fixture
 def training_headers(client):
     """Headers with TRAINING role — user used to record training videos"""
     return make_headers(get_access(client, roles=[Role.TRAINING.value]))

@@ -198,6 +198,30 @@ def clinical_note_types():
 
 
 @pytest.fixture
+def without_clinical_note_types():
+    """No active clinical note type in the schema: the active ones are turned
+    off for the test and back on after it"""
+    active = [
+        row.idtipoevolucao
+        for row in session.execute(
+            text("SELECT idtipoevolucao FROM demo.tipoevolucao WHERE ativo")
+        ).all()
+    ]
+    statement = text(
+        "UPDATE demo.tipoevolucao SET ativo = :active WHERE idtipoevolucao IN :ids"
+    ).bindparams(bindparam("ids", expanding=True))
+    if active:
+        session.execute(statement, {"active": False, "ids": active})
+        session_commit()
+
+    yield
+
+    if active:
+        session.execute(statement, {"active": True, "ids": active})
+        session_commit()
+
+
+@pytest.fixture
 def without_multi_clinical_notes(infection_control):
     """INFECTION_CONTROL on and MULTI_CLINICAL_NOTES off"""
     original = _read_features()

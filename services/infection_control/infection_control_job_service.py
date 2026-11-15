@@ -52,6 +52,7 @@ def sync_followed_admission(
     try:
         admission = rule.sync_admission(
             admission_number=admission_number,
+            schema=schema,
             origin=InfectionControlOriginEnum.JOB,
             user_id=JOB_USER_ID,
             now=now,

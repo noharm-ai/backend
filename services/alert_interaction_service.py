@@ -3,12 +3,13 @@
 from datetime import datetime, timedelta
 from typing import List
 
-from sqlalchemy import func, text
+from sqlalchemy import text
 
 from models.alert_config import AlertConfig
 from models.enums import DrugAlertLevelEnum, DrugTypeEnum, FrequencyEnum
-from models.main import Allergy, Drug, DrugAttributes, Substance, db
+from models.main import Drug, DrugAttributes, db
 from models.prescription import PrescriptionDrug
+from repository import allergy_repository
 from utils import dateutils, examutils, prescriptionutils, stringutils
 
 RELATION_KINDS = ["it", "dt", "dm", "iy", "sl", "rx"]
@@ -17,7 +18,11 @@ RELATION_KINDS = ["it", "dt", "dm", "iy", "sl", "rx"]
 # analyze interactions between drugs.
 # drug_list (PrescriptionDrug.findByPrescription)
 def find_relations(
-    drug_list, id_patient: int, is_cpoe: bool, alert_config: AlertConfig = None
+    drug_list,
+    id_patient: int,
+    is_cpoe: bool,
+    alert_config: AlertConfig = None,
+    allergy_records: list | None = None,
 ):
     """
     Find interactions between drugs in a prescription.
@@ -26,10 +31,13 @@ def find_relations(
     :param is_cpoe: Boolean indicating if the prescription is CPOE.
     :param alert_config: the schema's alert config (schema_params_service);
         None keeps every alert (the defaults).
+    :param allergy_records: the patient's allergy records
+        (allergy_repository.get_allergy_records) when the caller already read
+        them; None reads them here.
     :return: Dictionary with alerts, stats, and list of interactions."""
 
     filtered_list = _filter_drug_list(drug_list=drug_list)
-    allergies = _get_allergies(id_patient=id_patient)
+    allergies = _get_allergies(id_patient=id_patient, allergy_records=allergy_records)
     overlap_drugs = []
 
     # built once per item: the pairs below only compare them
@@ -56,15 +64,24 @@ def find_relations(
     if len(overlap_drugs) == 0:
         return {"alerts": {}, "list": {}, "stats": {}}
 
-    uniq_overlap_keys = []
-    for d in overlap_drugs:
-        key = f"""({d["from"]["sctid"]},{d["to"]["sctid"]})"""
-        if key not in uniq_overlap_keys:
-            uniq_overlap_keys.append(key)
+    # each substance pair once. A dict, not a list: the pairs grow with the
+    # square of the items, and looking each one up in a list made this the
+    # slowest step of a long prescription
+    uniq_overlap_pairs = list(
+        dict.fromkeys((d["from"]["sctid"], d["to"]["sctid"]) for d in overlap_drugs)
+    )
 
-    active_relations = _get_active_relations(uniq_overlap_keys)
+    active_relations = _get_active_relations(uniq_overlap_pairs)
+
+    # most pairs have no relation at all: they are skipped with one lookup,
+    # before the kinds are tried
+    related_pairs = {
+        f"""{r["sctida"]}-{r["sctidb"]}""" for r in active_relations.values()
+    }
 
     alerts = {}
+    # texts already listed for each item (avoid alert repetition)
+    alert_texts = {}
     stats = {}
     unique_relations = {}
 
@@ -75,12 +92,17 @@ def find_relations(
         drug_from = drug["from"]
         drug_to = drug["to"]
 
+        pair_key = f"""{drug_from["sctid"]}-{drug_to["sctid"]}"""
+        if pair_key not in related_pairs:
+            continue
+
         for kind in RELATION_KINDS:
-            key = f"""{drug_from["sctid"]}-{drug_to["sctid"]}-{kind}"""
-            invert_key = f"""{drug_to["sctid"]}-{drug_from["sctid"]}-{kind}"""
+            key = f"{pair_key}-{kind}"
 
             if key not in active_relations:
                 continue
+
+            invert_key = f"""{drug_to["sctid"]}-{drug_from["sctid"]}-{kind}"""
 
             if not all(
                 rule["passed"]
@@ -133,13 +155,13 @@ def find_relations(
                     "text": alert["text"],
                 }
 
-                if id in alerts:
+                item_texts = alert_texts.setdefault(id, set())
+                if alert["text"] in item_texts:
                     # avoid alert repetition
-                    text_array = [a["text"] for a in alerts[id]]
-                    if alert["text"] not in text_array:
-                        alerts[id].append(alert_obj)
-                else:
-                    alerts[id] = [alert_obj]
+                    continue
+
+                item_texts.add(alert["text"])
+                alerts.setdefault(id, []).append(alert_obj)
 
     return {"alerts": alerts, "stats": stats}
 
@@ -590,61 +612,84 @@ def _get_solution_group_key(pd: PrescriptionDrug, is_cpoe: bool):
     return None
 
 
-def _get_allergies(id_patient: int):
+def _get_allergies(id_patient: int, allergy_records: list | None = None):
     """Active allergies of the patient by substance: the record's sctid when it
-    has one (trusted), otherwise the substance of its fkmedicamento"""
-    allergies = (
-        db.session.query(Substance.id, Substance.name)
-        .select_from(Allergy)
-        .outerjoin(Drug, Allergy.idDrug == Drug.id)
-        .join(Substance, Substance.id == func.coalesce(Allergy.sctid, Drug.sctid))
-        .filter(Allergy.idPatient == id_patient)
-        .filter(Allergy.active == True)
-        .group_by(Substance.id, Substance.name)
-        .all()
-    )
+    has one (trusted), otherwise the substance of its fkmedicamento.
 
-    results = []
-    for a in allergies:
-        if a.id != None:
-            results.append(
-                {
-                    "id": None,
-                    "drug": a.name,
-                    "sctid": a.id,
-                    "intravenous": False,
-                    "group": None,
-                    "frequency": None,
-                    "rx": True,
-                    "interval": "-",
-                }
-            )
+    Resolved from the patient's allergy records
+    (allergy_repository.get_allergy_records, which joins the substance that
+    way): the prescription view has already read them, so allergy_records
+    saves the query. None reads them here. Ordered by substance"""
+    if allergy_records is None:
+        allergy_records = allergy_repository.get_allergy_records(id_patient=id_patient)
 
-    return results
+    substances = {}
+    for record in allergy_records:
+        # substance: the name of the substance the record resolved to, None
+        # when its sctid (or its drug's) is not a substance
+        if record.active is not True or record.substance is None:
+            continue
+
+        sctid = record.sctid if record.sctid is not None else record.drugSctid
+        substances.setdefault(sctid, record.substance)
+
+    return [
+        {
+            "id": None,
+            "drug": substances[sctid],
+            "sctid": sctid,
+            "intravenous": False,
+            "group": None,
+            "frequency": None,
+            "rx": True,
+            "interval": "-",
+        }
+        for sctid in sorted(substances)
+    ]
 
 
-def _get_active_relations(uniq_overlap_keys: List[str]):
-    query = text(
-        f"""
-        with cruzamento as (
-            select * from (values {",".join(uniq_overlap_keys)}) AS t (sctida, sctidb)
-        )
-        select
-            r.sctida,
-            r.sctidb,
-            r.tprelacao as "kind",
-            r.texto as "text",
-            r.nivel as "level"
-        from
-            public.relacao r
-            inner join cruzamento c on (r.sctida = c.sctida and r.sctidb = c.sctidb)
-        where
-	        r.ativo = true
+# the pairs go as two arrays (one row per pair once unnested), so the statement
+# is the same whatever the prescription and each pair is an index lookup: a
+# VALUES list with every pair was written and parsed again for each
+# prescription, and took most of the time of this query on long ones
+_ACTIVE_RELATIONS_QUERY = text(
     """
-    )
+    select
+        r.sctida,
+        r.sctidb,
+        r.tprelacao as "kind",
+        r.texto as "text",
+        r.nivel as "level"
+    from
+        unnest(cast(:sctidas as bigint[]), cast(:sctidbs as bigint[]))
+            as c (sctida, sctidb)
+        inner join public.relacao r on (r.sctida = c.sctida and r.sctidb = c.sctidb)
+    where
+        r.ativo = true
+    """
+)
+
+
+def _to_array_literal(values) -> str:
+    """A PostgreSQL array literal ({1,2,3}) of integer ids: sent as one string,
+    it is far cheaper to parse than an ARRAY[...] of as many expressions"""
+    return "{" + ",".join(str(int(value)) for value in values) + "}"
+
+
+def _get_active_relations(pairs: List[tuple]):
+    """The active relations between the substance pairs (sctida, sctidb), keyed
+    by sctida-sctidb-kind"""
     active_relations = {}
 
-    for item in db.session.execute(query).all():
+    rows = db.session.execute(
+        _ACTIVE_RELATIONS_QUERY,
+        {
+            "sctidas": _to_array_literal(pair[0] for pair in pairs),
+            "sctidbs": _to_array_literal(pair[1] for pair in pairs),
+        },
+    ).all()
+
+    for item in rows:
         key = f"{item.sctida}-{item.sctidb}-{item.kind}"
         active_relations[key] = {
             "sctida": item.sctida,

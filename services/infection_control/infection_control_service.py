@@ -37,6 +37,7 @@ from models.main import User, db
 from models.prescription import Prescription, PrescriptionClinicalNote
 from models.requests.infection_control_request import (
     AntimicrobialEvaluationRequest,
+    ExamTriggersSaveRequest,
     InfectionControlBackfillRequest,
     InfectionControlListRequest,
     InfectionControlReviewRequest,
@@ -52,7 +53,10 @@ from services import (
     feature_service,
     intervention_service,
 )
-from services.infection_control import antimicrobial_timeline_service
+from services.infection_control import (
+    antimicrobial_timeline_service,
+    exam_trigger_service,
+)
 from services.infection_control import (
     infection_control_status_service as rule,
 )
@@ -142,7 +146,9 @@ def _serialize_evaluation(
         "posology": evaluation.posology,
         "validFrom": dateutils.to_iso(evaluation.valid_from),
         "validUntil": dateutils.to_iso(evaluation.valid_until),
-        "triggers": evaluation.triggers or [],
+        "triggers": rule.pending_triggers(evaluation),
+        # the exam trigger rules turned on, as copied with their baselines
+        "examTriggers": exam_trigger_service.evaluation_exam_triggers(evaluation),
         "status": evaluation.status,
         "closedAt": dateutils.to_iso(evaluation.closed_at),
         "closingType": evaluation.closing_type,
@@ -511,7 +517,13 @@ def _validate_clinical_note(
             active=True
         )
     }
-    if clinical_note.idClinicalNoteType not in note_types:
+    # a schema with no active type writes the note without one
+    valid_type = (
+        clinical_note.idClinicalNoteType in note_types
+        if note_types
+        else clinical_note.idClinicalNoteType is None
+    )
+    if not valid_type:
         raise ValidationError(
             "Tipo de evolução inválido",
             "errors.invalidParams",
@@ -614,6 +626,27 @@ def save_review(request_data: InfectionControlReviewRequest, user_context: User)
     reasons = _validate_review(
         request_data=request_data, admission_courses=admission_courses, now=now
     )
+    exam_trigger_rules = {
+        r.id: r
+        for r in exam_trigger_service.load_rules(user_id=user_context.id, now=now)
+    }
+    # the rules each evaluation turns on (a rule deleted since the form loaded
+    # is left out) and their baselines, read once for all of them before the
+    # admission is locked, so the lock isn't held over the exams reads
+    evaluations_rules = [
+        [
+            exam_trigger_rules[id_rule]
+            for id_rule in dict.fromkeys(evaluation_data.examTriggers)
+            if id_rule in exam_trigger_rules
+        ]
+        for evaluation_data in request_data.evaluations
+    ]
+    baselines = exam_trigger_service.load_baselines(
+        exam_refs={r.examRef for rules in evaluations_rules for r in rules},
+        admission_number=admission_number,
+        schema=user_context.schema,
+        now=now,
+    )
 
     admission = infection_control_repository.lock_admission(
         admission_number=admission_number
@@ -658,7 +691,9 @@ def save_review(request_data: InfectionControlReviewRequest, user_context: User)
     )
 
     id_department = None
-    for evaluation_data in request_data.evaluations:
+    for evaluation_data, evaluation_rules in zip(
+        request_data.evaluations, evaluations_rules
+    ):
         evaluation = rule.record_evaluation(
             review=review,
             course=admission_courses.ongoing_course(evaluation_data.idDrug),
@@ -667,6 +702,9 @@ def save_review(request_data: InfectionControlReviewRequest, user_context: User)
             open_pendings=open_pendings,
             user_id=user_context.id,
             now=now,
+            exam_triggers=exam_trigger_service.snapshot(
+                rules=evaluation_rules, baselines=baselines
+            ),
         )
 
         if evaluation_data.createIntervention:
@@ -697,6 +735,7 @@ def save_review(request_data: InfectionControlReviewRequest, user_context: User)
     rule.apply_rule(
         admission=admission,
         admission_courses=admission_courses,
+        schema=user_context.schema,
         origin=InfectionControlOriginEnum.REVIEW,
         user_id=user_context.id,
     )
@@ -717,7 +756,68 @@ def list_clinical_note_types():
     ]
 
 
-@has_permission(Permission.READ_PRESCRIPTION)
+def _exam_triggers_view(rules: list) -> dict:
+    """The rules and the exams they can watch (the catalog, public.exame);
+    `available` is false when the schema has no result for the exam (no active
+    exam mapped to the reference, or no creatinine for a CKD) or the catalog no
+    longer offers it: a rule on it would never fire"""
+    catalog = exam_trigger_service.trigger_exams()
+    available = exam_trigger_service.available_exams(set(catalog))
+    return {
+        "rules": [
+            {**r.model_dump(), "available": r.examRef in available} for r in rules
+        ],
+        "exams": [
+            {"examRef": exam_ref, "name": name, "available": exam_ref in available}
+            for exam_ref, name in catalog.items()
+        ],
+    }
+
+
+@has_permission(Permission.READ_INFECTION_CONTROL)
+def list_exam_triggers(user_context: User, admission_number: int | None = None):
+    """The schema's exam trigger rules, which a review turns on per drug
+    evaluation, and the exams a rule can watch. With an admission, `current`
+    has its patient's latest result of each exam the schema has (None without
+    one): the baseline a review saved now would keep"""
+    _check_feature()
+
+    now = datetime.now()
+    view = _exam_triggers_view(
+        exam_trigger_service.load_rules(user_id=user_context.id, now=now)
+    )
+    if admission_number is not None:
+        view["current"] = exam_trigger_service.current_results(
+            exam_refs={e["examRef"] for e in view["exams"] if e["available"]},
+            admission_number=admission_number,
+            schema=user_context.schema,
+            now=now,
+        )
+
+    return view
+
+
+@has_permission(Permission.WRITE_INFECTION_CONTROL)
+def save_exam_triggers(request_data: ExamTriggersSaveRequest, user_context: User):
+    """Replaces the schema's exam trigger rules (the evaluations keep the
+    copies they made)"""
+    _check_feature()
+
+    try:
+        rules = exam_trigger_service.save_rules(
+            rules=request_data.rules, user_id=user_context.id, now=datetime.now()
+        )
+    except ValueError as e:
+        raise ValidationError(
+            "Gatilho de exame inexistente",
+            "errors.invalidRecord",
+            status.HTTP_400_BAD_REQUEST,
+        ) from e
+
+    return _exam_triggers_view(rules)
+
+
+@has_permission(Permission.READ_PRESCRIPTION, Permission.READ_INFECTION_CONTROL)
 def search_antimicrobials(term: str | None):
     """Antimicrobials by name, to recommend one instead of another"""
     _check_feature()
@@ -753,6 +853,7 @@ def follow_admission(admission_number: int, user_context: User):
 
     admission = rule.sync_admission(
         admission_number=admission_number,
+        schema=user_context.schema,
         origin=InfectionControlOriginEnum.MANUAL,
         user_id=user_context.id,
         now=now,
@@ -883,6 +984,7 @@ def backfill(request_data: InfectionControlBackfillRequest, user_context: User):
     for admission_number in candidates:
         admission = rule.sync_admission(
             admission_number=admission_number,
+            schema=user_context.schema,
             origin=InfectionControlOriginEnum.BACKFILL,
             user_id=user_context.id,
             now=now,
@@ -918,6 +1020,7 @@ def backfill_summary(request_data: InfectionControlBackfillRequest, user_context
     for admission_number in candidates:
         admission = rule.sync_admission(
             admission_number=admission_number,
+            schema=user_context.schema,
             origin=InfectionControlOriginEnum.BACKFILL,
             user_id=user_context.id,
             now=now,

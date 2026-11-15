@@ -17,7 +17,7 @@ SOAP_DEFAULT_MAX_TOKENS = 4096
 SOAP_INPUT_MAX_CHARS = 60000
 
 
-@has_permission(Permission.READ_NAV)
+@has_permission(Permission.WRITE_NAV)
 def generate_soap(request_data: GenerateSoapRequest, user_context: User):
     """Generate a SOAP-format pharmaceutical evolution from a clinical note via LLM."""
 

@@ -4,6 +4,7 @@ from datetime import date, datetime
 
 from sqlalchemy import and_, desc, func
 from sqlalchemy.dialects.postgresql import INTERVAL
+from sqlalchemy.orm import undefer
 
 from config import Config
 from decorators.has_permission_decorator import Permission, has_permission
@@ -80,7 +81,7 @@ def route_get_prescription_cultures(id_prescription: int, user_context: User = N
     the screen, so it is fetched here when the tab is opened.
     """
 
-    prescription, patient, _, _, _, _ = _get_prescription_data(
+    prescription, patient, _, segment, _, _ = _get_prescription_data(
         id_prescription=id_prescription
     )
 
@@ -97,7 +98,7 @@ def route_get_prescription_cultures(id_prescription: int, user_context: User = N
     drug_list = _get_drug_list(
         prescription=prescription,
         patient=patient,
-        config_data=_get_drug_list_configs(prescription=prescription),
+        config_data=_get_drug_list_configs(prescription=prescription, segment=segment),
         user_context=user_context,
     )
 
@@ -159,6 +160,7 @@ def get_drug_alerts(
         patient=patient,
         is_complete=False,
         schema=user_context.schema,
+        segment=segment,
     )
 
     allergies = allergy_repository.get_allergy_records(id_patient=patient.idPatient)
@@ -231,6 +233,7 @@ def _internal_get_prescription(
         patient=patient,
         is_complete=is_complete,
         schema=user_context.schema,
+        segment=segment,
     )
 
     interventions = _get_interventions(
@@ -490,6 +493,13 @@ def _get_prescription_data(
         )
         .outerjoin(Segment, Segment.id == Prescription.idSegment)
         .outerjoin(User, Prescription.user == User.id)
+        # deferred in the models, but the view shows them (_format): loaded
+        # here, each one is not a query of its own later
+        .options(
+            undefer(Prescription.notes),
+            undefer(Patient.observation),
+            undefer(Patient.alert),
+        )
         .filter(Prescription.id == id_prescription)
         .first()
     )
@@ -546,8 +556,18 @@ def _get_patient_configs(patient: Patient) -> dict:
     return data
 
 
-def _get_segment_configs(prescription: Prescription) -> dict:
-    is_cpoe = segment_service.is_cpoe(id_segment=prescription.idSegment)
+def _get_segment_configs(
+    prescription: Prescription, segment: Segment | None = None
+) -> dict:
+    """Whether the prescription's segment is CPOE and the segments it ignores.
+
+    segment: the prescription's segment when the caller already has it
+    (_get_prescription_data joins it), which saves reading it again; without
+    it (or with another segment) it is read here"""
+    if segment is not None and segment.id == prescription.idSegment:
+        is_cpoe = segment.cpoe if prescription.idSegment else False
+    else:
+        is_cpoe = segment_service.is_cpoe(id_segment=prescription.idSegment)
 
     return {
         "is_cpoe": is_cpoe,
@@ -555,26 +575,46 @@ def _get_segment_configs(prescription: Prescription) -> dict:
     }
 
 
-def _get_drug_list_configs(prescription: Prescription) -> dict:
+def _get_drug_list_configs(
+    prescription: Prescription, segment: Segment | None = None
+) -> dict:
     """Only what _get_drug_list reads, for the endpoints that do not assemble
     the whole view (the same keys _get_configs fills)"""
 
-    features = memory_service.get_by_kind([MemoryEnum.FEATURES.value]).get(
-        MemoryEnum.FEATURES.value, []
-    )
+    memory_itens = memory_service.get_by_kind([MemoryEnum.FEATURES.value])
+    features = _keep_features(memory_itens=memory_itens)
 
     return {
         "is_pmc": FeatureEnum.PRIMARY_CARE.value in features,
-        **_get_segment_configs(prescription=prescription),
+        **_get_segment_configs(prescription=prescription, segment=segment),
     }
+
+
+def _keep_features(memory_itens: dict) -> list:
+    """The tenant features among the memory items just read, kept for the rest
+    of the request: the feature checks that follow (feature_service.has_feature)
+    don't read the features memory again"""
+    if MemoryEnum.FEATURES.value not in memory_itens:
+        return []
+
+    features = memory_itens[MemoryEnum.FEATURES.value]
+    feature_service.set_features(features)
+
+    return features
 
 
 @timed()
 def _get_configs(
-    prescription: Prescription, patient: Patient, is_complete: bool, schema: str
+    prescription: Prescription,
+    patient: Patient,
+    is_complete: bool,
+    schema: str,
+    segment: Segment | None = None,
 ):
     """Configs of the prescription view: memory, features, segment, patient
-    and the schema params (noharm-store, written by admin)"""
+    and the schema params (noharm-store, written by admin).
+
+    segment: the prescription's segment, when the caller already has it"""
     data = {}
 
     # memory
@@ -597,16 +637,12 @@ def _get_configs(
     data["admission_reports_internal"] = memory_itens.get(
         MemoryEnum.ADMISSION_REPORTS_INTERNAL.value, []
     )
-    data["is_pmc"] = FeatureEnum.PRIMARY_CARE.value in memory_itens.get(
-        MemoryEnum.FEATURES.value, []
-    )
-    data["disable_solution_tab"] = (
-        FeatureEnum.DISABLE_SOLUTION_TAB.value
-        in memory_itens.get(MemoryEnum.FEATURES.value, [])
-    )
+    features = _keep_features(memory_itens=memory_itens)
+    data["is_pmc"] = FeatureEnum.PRIMARY_CARE.value in features
+    data["disable_solution_tab"] = FeatureEnum.DISABLE_SOLUTION_TAB.value in features
 
     data.update(
-        _get_segment_configs(prescription=prescription),
+        _get_segment_configs(prescription=prescription, segment=segment),
     )
 
     data.update(_get_patient_configs(patient=patient))
@@ -927,6 +963,8 @@ def _get_alerts(
         is_cpoe=config_data["is_cpoe"],
         id_patient=patient.idPatient,
         alert_config=alert_config,
+        # already read: the cross reactivity doesn't read them again
+        allergy_records=allergies,
     )
 
     protocol_extra_info = ProtocolExtraInfo()
@@ -981,6 +1019,7 @@ def get_protocol_evaluation_context(id_prescription: int, user_context: User) ->
         patient=patient,
         is_complete=False,
         schema=user_context.schema,
+        segment=segment,
     )
 
     cn_data = _get_clinical_notes_stats(
@@ -1037,7 +1076,7 @@ def get_interaction_evaluation_context(
     """Builds the same inputs _get_alerts uses for the interaction analysis.
     Reused by the interaction trace endpoint to replay the analysis."""
 
-    prescription, patient, _, _, _, _ = _get_prescription_data(
+    prescription, patient, _, segment, _, _ = _get_prescription_data(
         id_prescription=id_prescription
     )
 
@@ -1046,6 +1085,7 @@ def get_interaction_evaluation_context(
         patient=patient,
         is_complete=False,
         schema=user_context.schema,
+        segment=segment,
     )
 
     drug_list = _get_drug_list(

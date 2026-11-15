@@ -160,9 +160,18 @@ def test_digital_signature_no_token(client):
 
 
 def test_digital_signature_permission_denied(client, viewer_headers):
-    """POST /notes/digital-signature — returns 401 without READ_NAV permission"""
+    """POST /notes/digital-signature — returns 401 without WRITE_NAV permission"""
     response = client.post(
         URL, json={"id": SIGN_NOTE_ID, **SIGNER}, headers=viewer_headers
+    )
+
+    assert response.status_code == 401
+
+
+def test_digital_signature_navigation_viewer_denied(client, navigation_viewer_headers):
+    """POST /notes/digital-signature — READ_NAV only views, signing needs WRITE_NAV [401]"""
+    response = client.post(
+        URL, json={"id": SIGN_NOTE_ID, **SIGNER}, headers=navigation_viewer_headers
     )
 
     assert response.status_code == 401

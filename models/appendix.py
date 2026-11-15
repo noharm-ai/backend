@@ -284,6 +284,11 @@ class GlobalExam(db.Model):
     max_pediatric = db.Column("max_pediatrico", db.Float, nullable=False)
     ref_pediatric = db.Column("referencia_pediatrico", db.String(250), nullable=False)
 
+    # offered to the infection control exam triggers (when active)
+    infection_control_trigger = db.Column(
+        "gatilho_controle_infeccao", db.Boolean, nullable=True, default=False
+    )
+
     updated_at = db.Column("updated_at", db.DateTime, nullable=True)
     updated_by = db.Column("updated_by", db.BigInteger, nullable=True)
     created_at = db.Column("created_at", db.DateTime, nullable=False)

@@ -12,6 +12,12 @@ from services import feature_service
 from utils import dateutils
 
 
+def _to_int(value) -> int | None:
+    """A numeric column as an int: idade and nratendimento are numeric in the
+    table, read as Decimal, which the JSON response would render as a string"""
+    return int(value) if value is not None else None
+
+
 @has_permission(Permission.READ_REPORTS)
 def get_indicators_panel_report(request_data: RegIndicatorsPanelReportRequest) -> dict:
     query_result = reports_regulation_repository.get_indicators_panel_report(
@@ -27,12 +33,14 @@ def get_indicators_panel_report(request_data: RegIndicatorsPanelReportRequest) -
             {
                 "id": row.RegIndicatorsPanelReport.id,
                 "id_citizen": row.RegIndicatorsPanelReport.id_citizen,
-                "admission_number": row.RegIndicatorsPanelReport.admission_number,
+                "admission_number": _to_int(
+                    row.RegIndicatorsPanelReport.admission_number
+                ),
                 "name": "***" if hide_names else row.RegIndicatorsPanelReport.name,
                 "birthdate": row.RegIndicatorsPanelReport.birthdate.isoformat()
                 if row.RegIndicatorsPanelReport.birthdate
                 else None,
-                "age": row.RegIndicatorsPanelReport.age,
+                "age": _to_int(row.RegIndicatorsPanelReport.age),
                 "address": "***"
                 if hide_names
                 else row.RegIndicatorsPanelReport.address,

@@ -22,8 +22,7 @@ until they are next written; the report ignores it.
 from datetime import date, datetime, time
 
 from models.enums import InfectionControlStatusEnum
-from models.infection_control import InfectionControlAdmission
-from repository import patient_repository
+from models.infection_control import AntimicrobialEvaluation, InfectionControlAdmission
 from repository.infection_control import infection_control_repository
 from services.infection_control.antimicrobial_timeline_service import (
     Course,
@@ -166,19 +165,20 @@ def build_summary(
     admission_number: int,
     admission_courses,
     status: InfectionControlStatusEnum,
+    evaluations: list[AntimicrobialEvaluation] | None = None,
 ) -> dict:
-    """The summary of an admission from the courses the rule loaded"""
+    """The summary of an admission from the courses (and the patient) the rule
+    loaded; every evaluation of the admission is read unless given"""
     now = admission_courses.now
-    evaluations = infection_control_repository.get_evaluations(
-        admission_number=admission_number
-    )
-
-    discharge_date = None
-    if admission_courses.discharged:
-        patient = patient_repository.get_patient_by_admission(
+    if evaluations is None:
+        evaluations = infection_control_repository.get_evaluations(
             admission_number=admission_number
         )
-        discharge_date = patient.dischargeDate if patient else None
+
+    patient = admission_courses.patient
+    discharge_date = (
+        patient.dischargeDate if admission_courses.discharged and patient else None
+    )
 
     ongoing = {id(c) for c in admission_courses.ongoing}
     courses = [
@@ -223,13 +223,16 @@ def update_summary(
     admission: InfectionControlAdmission,
     admission_courses,
     status: InfectionControlStatusEnum,
+    evaluations: list[AntimicrobialEvaluation] | None = None,
 ) -> bool:
     """Bring the summary of a record up to date with the courses the rule
-    loaded (called by apply_rule); returns whether it was written"""
+    loaded (called by apply_rule, which passes every evaluation it read);
+    returns whether it was written"""
     summary = build_summary(
         admission_number=admission.admission_number,
         admission_courses=admission_courses,
         status=status,
+        evaluations=evaluations,
     )
 
     return save_summary(admission=admission, summary=summary)

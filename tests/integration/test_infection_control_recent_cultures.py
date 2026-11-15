@@ -1,8 +1,10 @@
 """Tests: GET /infection-control/admission/<admission_number>/cultures
 
-The latest culture of each exam and material of the admission's patient,
-released in the last 60 days, with the microorganisms its antibiogram names.
-Pinned down here: which culture is the latest (the newest collection, even a
+The cultures of the admission's patient released in the last 60 days: every
+collection (exam, material and collection date) with its cultures and their
+antibiograms, and the latest culture of each exam and material with the
+microorganisms its antibiogram names. Pinned down here: how cultures group
+into collections, which culture is the latest (the newest collection, even a
 pending one), the freshness cutoff, the patient scope and the payload.
 """
 
@@ -173,6 +175,7 @@ def test_no_cultures(client, analyst_headers, admission):
 
     assert data["admissionNumber"] == admission
     assert data["cultures"] == []
+    assert data["collections"] == []
 
 
 def test_latest_of_each_exam_and_material(client, analyst_headers, admission):
@@ -230,6 +233,7 @@ def test_only_released_in_the_last_60_days(client, analyst_headers, admission):
     data = _get(client, analyst_headers, admission)
 
     assert [c["id"] for c in data["cultures"]] == [str(fresh)]
+    assert [c["id"] for c in data["collections"]] == [str(fresh)]
 
 
 def test_cultures_of_the_patient_only(client, analyst_headers, admission):
@@ -239,6 +243,7 @@ def test_cultures_of_the_patient_only(client, analyst_headers, admission):
     data = _get(client, analyst_headers, admission)
 
     assert data["cultures"] == []
+    assert data["collections"] == []
 
 
 def test_microorganisms_of_the_antibiogram(client, analyst_headers, admission):
@@ -271,6 +276,73 @@ def test_blank_fields_are_none(client, analyst_headers, admission):
 
     assert data["cultures"][0]["gram"] is None
     assert data["cultures"][0]["previousResult"] is None
+
+
+def test_collections_group_the_cultures_of_one_collection(
+    client, analyst_headers, admission
+):
+    """Cultures of the same exam and material collected at the same time make
+    one collection, in the order the lab released them; another collection
+    time is a collection of its own. Newest collection first"""
+    final = _add_header(_day(-3), _day(-1), result="Positivo (final)")
+    partial = _add_header(_day(-3), _day(-2), result="Crescimento em 14 horas")
+    older = _add_header(_day(-6), _day(-4), result="Negativo")
+    newest = _add_header(_day(-1), _day(-1), exam=URINE, material=URINE_MATERIAL)
+
+    data = _get(client, analyst_headers, admission)
+
+    collections = data["collections"]
+    assert [[c["id"] for c in col["cultures"]] for col in collections] == [
+        [str(newest)],
+        [str(partial), str(final)],
+        [str(older)],
+    ]
+
+    blood = collections[1]
+    # the first culture released names the collection
+    assert blood["id"] == str(partial)
+    assert blood["examName"] == BLOOD
+    assert blood["material"] == BLOOD_MATERIAL
+    assert blood["collectionDate"] == _day(-3).isoformat()
+    assert [c["previousResult"] for c in blood["cultures"]] == [
+        "Crescimento em 14 horas",
+        "Positivo (final)",
+    ]
+
+    # the latest culture of the exam and material is still the newest
+    # collection, whichever of its cultures was released last
+    assert [c["id"] for c in data["cultures"]] == [str(newest), str(final)]
+
+
+def test_collections_of_another_material(client, analyst_headers, admission):
+    """The same exam collected at the same time from another material is
+    another collection"""
+    blood = _add_header(_day(-3), _day(-1))
+    other_material = _add_header(_day(-3), _day(-1), material=URINE_MATERIAL)
+
+    data = _get(client, analyst_headers, admission)
+
+    assert sorted(c["id"] for c in data["collections"]) == sorted(
+        [str(blood), str(other_material)]
+    )
+    assert all(len(c["cultures"]) == 1 for c in data["collections"])
+
+
+def test_collections_with_the_antibiogram(client, analyst_headers, admission):
+    """Each culture of a collection carries its released antibiogram and the
+    microorganisms it names; a prediction is never served as a result"""
+    id_header = _add_header(_day(-3), _day(-1), result="Positivo")
+    _add_antibiogram(id_header, "Microrganismo teste", "DROGA A", result="R", mic=">8")
+    _add_antibiogram(id_header, "Microrganismo teste", "DROGA B", result="Sensível")
+    _add_antibiogram(id_header, None, "DROGA C", result=None, prediction="R")
+
+    data = _get(client, analyst_headers, admission)
+
+    culture = data["collections"][0]["cultures"][0]
+    assert culture["microorganisms"] == ["Microrganismo teste"]
+    assert [
+        (row["drug"], row["resultType"], row["mic"]) for row in culture["antibiogram"]
+    ] == [("DROGA A", "R", ">8"), ("DROGA B", "S", None)]
 
 
 def _history_url(admission_number, id_culture):
@@ -347,7 +419,8 @@ def test_history_of_another_patient(client, analyst_headers, admission):
 
 
 def test_recent_cultures_without_antibiogram(client, analyst_headers, admission):
-    """The card only names the microorganisms: the drugs stay in the history"""
+    """The latest culture of each exam only names the microorganisms: the
+    drugs go with the collections"""
     id_header = _add_header(_day(-3), _day(-1), result="Positivo")
     _add_antibiogram(id_header, "Microrganismo teste", "DROGA A")
 

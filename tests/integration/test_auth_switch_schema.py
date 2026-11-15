@@ -190,6 +190,15 @@ def test_switching_requires_multi_schema(client, analyst_headers):
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
 
+def test_a_navigation_viewer_cannot_switch(client, navigation_viewer_headers):
+    """The read-only navigator has no MULTI_SCHEMA: it stays in its own schema [401]."""
+    response = client.post(
+        SWITCH_URL, json={"schema": OTHER_SCHEMA}, headers=navigation_viewer_headers
+    )
+
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+
 def test_a_maintainer_switches_into_any_configured_schema(client, admin_headers):
     """MAINTAINER skips the list check — every configured schema is reachable."""
     response = client.post(

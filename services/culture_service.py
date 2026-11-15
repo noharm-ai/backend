@@ -2,6 +2,7 @@
 
 import re
 import unicodedata
+from datetime import datetime
 from decimal import Decimal
 
 from models.enums import CultureResultTypeEnum
@@ -249,6 +250,10 @@ def _group_by_drug(items: list):
                 "probability": probability,
                 "collectionDate": dateutils.to_iso(item.get("datacoleta")),
                 "releaseDate": dateutils.to_iso(item.get("dataliberacao")),
+                # when the culture cache job of backend-private first wrote
+                # this result (UTC), which can be long after the lab released
+                # it; absent on items written before it was kept
+                "resultArrival": dateutils.to_iso(item.get("resultado_em")),
             }
         )
 
@@ -358,6 +363,38 @@ def antimicrobial_sctids(cultures: list) -> list:
     ]
 
 
+def released_items(cultures: list):
+    """The released results among the cultures grouped by drug: an item
+    without a lab result is a prediction or a pending collection, which has no
+    antibiogram yet. Read by latest_release_date and by the culture trigger of
+    the infection control (culture_trigger_service), so both read them alike.
+    """
+
+    for drug in cultures or []:
+        for item in drug.get("items") or []:
+            if item.get("result") is not None:
+                yield item
+
+
+def parse_local_datetime(value) -> datetime | None:
+    """A date of the culture summary as a local datetime without offset (None
+    when missing or invalid): the integration may or may not carry an offset,
+    and one that does is converted to local time"""
+
+    if not value:
+        return None
+
+    try:
+        date = datetime.fromisoformat(f"{value}")
+    except (TypeError, ValueError):
+        return None
+
+    if date.tzinfo is not None:
+        date = date.astimezone().replace(tzinfo=None)
+
+    return date
+
+
 def latest_release_date(cultures: list):
     """The newest release date across every culture of the patient, as ISO text.
 
@@ -373,18 +410,13 @@ def latest_release_date(cultures: list):
 
     latest = None
 
-    for drug in cultures or []:
-        for item in drug.get("items") or []:
-            # a prediction is not a result: the collection is still pending
-            if item.get("result") is None:
-                continue
+    for item in released_items(cultures):
+        release_date = item.get("releaseDate")
 
-            release_date = item.get("releaseDate")
-
-            # the dates share one format (dateutils.to_iso), so the text order
-            # is the chronological order
-            if release_date and (latest is None or release_date > latest):
-                latest = release_date
+        # the dates share one format (dateutils.to_iso), so the text order
+        # is the chronological order
+        if release_date and (latest is None or release_date > latest):
+            latest = release_date
 
     return latest
 

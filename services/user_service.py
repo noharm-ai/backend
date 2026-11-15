@@ -144,7 +144,7 @@ def reset_password(token: str, password: str):
             status.HTTP_400_BAD_REQUEST,
         )
 
-    update = {"password": func.crypt(password, func.gen_salt("bf", 8))}
+    update = {"password": func.public.crypt(password, func.public.gen_salt("bf", 8))}
     db.session.query(User).filter(User.id == user.id).update(
         update, synchronize_session="fetch"
     )
@@ -393,7 +393,7 @@ def update_password(password, newpassword, user_context: User):
             status.HTTP_400_BAD_REQUEST,
         )
 
-    update = {"password": func.crypt(newpassword, func.gen_salt("bf", 8))}
+    update = {"password": func.public.crypt(newpassword, func.public.gen_salt("bf", 8))}
     db.session.query(User).filter(User.id == user.id).update(
         update, synchronize_session="fetch"
     )

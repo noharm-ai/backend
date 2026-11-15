@@ -1,8 +1,13 @@
+from collections import namedtuple
 from typing import List
 
 import pytest
 
-from services.alert_interaction_service import find_relations
+from services.alert_interaction_service import (
+    _get_allergies,
+    _to_array_literal,
+    find_relations,
+)
 from tests.utils import utils_test_prescription
 
 
@@ -586,3 +591,210 @@ def test_build_alert_explains_level_adjustments():
     assert alert["level"] == "medium"
     assert alert["ids"] == ["1"]
     assert len(alert["level_notes"]) == 1
+
+
+# --- the patient's allergies, resolved from the allergy records -----------------
+
+# the fields of allergy_repository.get_allergy_records that _get_allergies reads
+_AllergyRecord = namedtuple("_AllergyRecord", "sctid drugSctid active substance")
+
+
+def _fail_on_read(*args, **kwargs):
+    """Stands in for the repository read where it must not happen"""
+    raise AssertionError("the allergy records were given: they must not be read again")
+
+
+def _allergy_sctids(records: list) -> list:
+    """The substances the records resolve to as active allergies"""
+    return [a["sctid"] for a in _get_allergies(id_patient=1, allergy_records=records)]
+
+
+def test_allergies_come_from_the_records_given(monkeypatch):
+    """Alertas interação: alergias resolvidas dos registros já lidos, sem nova consulta"""
+    monkeypatch.setattr(
+        "repository.allergy_repository.get_allergy_records", _fail_on_read
+    )
+
+    allergies = _get_allergies(
+        id_patient=1,
+        allergy_records=[
+            _AllergyRecord(
+                sctid=90302, drugSctid=None, active=True, substance="Substância B"
+            )
+        ],
+    )
+
+    assert allergies == [
+        {
+            "id": None,
+            "drug": "Substância B",
+            "sctid": 90302,
+            "intravenous": False,
+            "group": None,
+            "frequency": None,
+            "rx": True,
+            "interval": "-",
+        }
+    ]
+
+
+def test_allergies_are_read_when_no_records_are_given(monkeypatch):
+    """Alertas interação: sem os registros, a função os consulta"""
+    read = []
+
+    def records_of(id_patient):
+        """The repository read, noting which patient was asked for"""
+        read.append(id_patient)
+        return [_AllergyRecord(sctid=90301, drugSctid=None, active=True, substance="A")]
+
+    monkeypatch.setattr("repository.allergy_repository.get_allergy_records", records_of)
+
+    assert [a["sctid"] for a in _get_allergies(id_patient=7)] == [90301]
+    assert read == [7]
+
+
+def test_the_record_sctid_comes_before_the_substance_of_its_drug():
+    """Alertas interação: o sctid do registro prevalece sobre o do medicamento"""
+    assert _allergy_sctids(
+        [_AllergyRecord(sctid=90301, drugSctid=90302, active=True, substance="A")]
+    ) == [90301]
+
+    assert _allergy_sctids(
+        [_AllergyRecord(sctid=None, drugSctid=90302, active=True, substance="B")]
+    ) == [90302]
+
+
+@pytest.mark.parametrize(
+    "record",
+    [
+        _AllergyRecord(sctid=90301, drugSctid=None, active=False, substance="A"),
+        _AllergyRecord(sctid=90301, drugSctid=None, active=None, substance="A"),
+        # an sctid that is not a substance (or a drug with none) resolves no name
+        _AllergyRecord(sctid=90301, drugSctid=None, active=True, substance=None),
+        _AllergyRecord(sctid=None, drugSctid=None, active=True, substance=None),
+    ],
+    ids=["inactive", "active_unknown", "sctid_not_a_substance", "no_substance"],
+)
+def test_records_that_are_not_an_active_allergy_to_a_substance_are_left_out(record):
+    """Alertas interação: só alergia ativa com substância entra na reatividade cruzada"""
+    assert _allergy_sctids([record]) == []
+
+
+def test_each_substance_is_listed_once_ordered_by_sctid():
+    """Alertas interação: uma entrada por substância, em ordem estável"""
+    records = [
+        _AllergyRecord(sctid=90303, drugSctid=None, active=True, substance="C"),
+        _AllergyRecord(sctid=None, drugSctid=90301, active=True, substance="A"),
+        _AllergyRecord(sctid=90303, drugSctid=90301, active=True, substance="C"),
+        _AllergyRecord(sctid=90301, drugSctid=None, active=False, substance="A"),
+    ]
+
+    assert _allergy_sctids(records) == [90301, 90303]
+
+
+def test_find_relations_uses_the_allergy_records_given(monkeypatch):
+    """Alertas interação: a reatividade cruzada lê os registros recebidos"""
+    monkeypatch.setattr(
+        "repository.allergy_repository.get_allergy_records", _fail_on_read
+    )
+    monkeypatch.setattr(
+        "services.alert_interaction_service._get_active_relations",
+        _mock_get_active_relations(kind="rx"),
+    )
+
+    drug_list = [
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=2, dose=10, drug_name="Drug A"
+        ),
+    ]
+
+    results = find_relations(
+        drug_list,
+        id_patient=1,
+        is_cpoe=False,
+        allergy_records=[
+            _AllergyRecord(
+                sctid="111111", drugSctid=None, active=True, substance="Drug test RX"
+            )
+        ],
+    )
+
+    assert results["stats"]["rx"] == 1
+    assert results["alerts"]["2"][0]["key"] == "211111-111111-rx"
+
+
+# --- the pairs sent to the relation query ---------------------------------------
+
+
+def test_each_substance_pair_is_asked_once(monkeypatch):
+    """Alertas interação: pares de substância repetidos são consultados uma vez"""
+    asked = []
+
+    def active_relations(pairs):
+        """The relation query, noting the pairs it was asked for"""
+        asked.append(pairs)
+        return {}
+
+    monkeypatch.setattr(
+        "services.alert_interaction_service._get_allergies",
+        _mock_get_allergies(data=[]),
+    )
+    monkeypatch.setattr(
+        "services.alert_interaction_service._get_active_relations", active_relations
+    )
+
+    # the same two substances prescribed twice each: 12 ordered item pairs
+    drug_list = [
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=id_prescription_drug, dose=10, sctid=sctid
+        )
+        for id_prescription_drug, sctid in [(1, 501), (2, 502), (3, 501), (4, 502)]
+    ]
+
+    find_relations(drug_list, id_patient=1, is_cpoe=False)
+
+    assert len(asked) == 1
+    assert asked[0] == [(501, 502), (501, 501), (502, 501), (502, 502)]
+
+
+def test_a_repeated_alert_text_is_listed_once_per_item(monkeypatch):
+    """Alertas interação: o mesmo texto não se repete no item"""
+    monkeypatch.setattr(
+        "services.alert_interaction_service._get_allergies",
+        _mock_get_allergies(data=[]),
+    )
+    monkeypatch.setattr(
+        "services.alert_interaction_service._get_active_relations",
+        _mock_get_active_relations(kind="it"),
+    )
+
+    # item 2 interacts with items 1 and 3, which are the same drug: one text
+    drug_list = [
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=id_prescription_drug,
+            dose=10,
+            drug_name=name,
+            sctid=sctid,
+        )
+        for id_prescription_drug, name, sctid in [
+            (1, "Drug B", "111111"),
+            (2, "Drug A", "211111"),
+            (3, "Drug B", "111111"),
+        ]
+    ]
+
+    results = find_relations(drug_list, id_patient=1, is_cpoe=False)
+
+    assert len(results["alerts"]["2"]) == 1
+    assert results["stats"]["it"] == 1
+
+
+def test_ids_go_to_the_query_as_an_array_literal():
+    """Alertas interação: ids enviados como um literal de array do PostgreSQL"""
+    assert _to_array_literal([900001, 900002]) == "{900001,900002}"
+    assert _to_array_literal(iter([5])) == "{5}"
+    assert _to_array_literal([]) == "{}"
+
+    # only integer ids make it into the literal
+    with pytest.raises(ValueError):
+        _to_array_literal(["1},{2"])

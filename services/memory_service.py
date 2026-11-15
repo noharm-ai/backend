@@ -241,6 +241,8 @@ def is_admin_memory(key):
         MemoryEnum.MAP_ORIGIN_MATERIAL.value,
         MemoryEnum.MAP_ORIGIN_CUSTOM.value,
         MemoryEnum.TRANSCRIPTION_FIELDS.value,
+        # written only by its own endpoint, which validates it
+        MemoryEnum.INFECTION_CONTROL_EXAM_TRIGGERS.value,
     ]
 
 

@@ -200,7 +200,7 @@ def upsert_user(data: dict, user_context: User, user_permissions: list[Permissio
         pwo.minlen = 6
         pwo.maxlen = 16
         password = pwo.generate()
-        new_user.password = func.crypt(password, func.gen_salt("bf", 8))
+        new_user.password = func.public.crypt(password, func.public.gen_salt("bf", 8))
         new_user.config = {"roles": data.get("roles", []), "features": []}
         new_user.reports_config = {"ignore": data.get("ignoreReports", [])}
 

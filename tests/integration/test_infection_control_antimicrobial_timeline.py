@@ -200,9 +200,9 @@ def _day(offset):
     ) + timedelta(days=offset)
 
 
-def test_requires_read_infection_control(client, analyst_headers, admission):
+def test_requires_read_infection_control(client, viewer_headers, admission):
     """401 without READ_INFECTION_CONTROL, even with READ_PRESCRIPTION"""
-    response = client.get(_url(admission), headers=analyst_headers)
+    response = client.get(_url(admission), headers=viewer_headers)
 
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
 

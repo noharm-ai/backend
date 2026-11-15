@@ -31,10 +31,10 @@ from tests.integration.infection_control.helpers import (
 from utils import status
 
 
-def test_state_requires_permission(client, analyst_headers, admission):
+def test_state_requires_permission(client, viewer_headers, admission):
     """401 without READ_INFECTION_CONTROL, even with READ_PRESCRIPTION"""
     response = client.get(
-        f"/infection-control/admission/{admission}", headers=analyst_headers
+        f"/infection-control/admission/{admission}", headers=viewer_headers
     )
 
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
@@ -124,7 +124,7 @@ def test_view_survives_follow_up_failure(
 
 
 def test_worklist_requires_permission(
-    client, analyst_headers, infection_control, admission
+    client, viewer_headers, infection_control, admission
 ):
     """401 without READ_INFECTION_CONTROL, even with READ_PRESCRIPTION"""
     _prescribe_today(admission)
@@ -132,7 +132,7 @@ def test_worklist_requires_permission(
     response = client.post(
         "/infection-control/admissions",
         json={"status": [PENDING], "limit": 500},
-        headers=analyst_headers,
+        headers=viewer_headers,
     )
 
     assert response.status_code == status.HTTP_401_UNAUTHORIZED

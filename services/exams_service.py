@@ -186,7 +186,12 @@ def _get_textual_exams(admission_number: int = None, id_patient: int = None):
     )
 
 
-@has_permission(Permission.READ_PRESCRIPTION, Permission.READ_REGULATION)
+@has_permission(
+    Permission.READ_PRESCRIPTION,
+    Permission.READ_REGULATION,
+    # the infection control page reads them too
+    Permission.READ_INFECTION_CONTROL,
+)
 def get_exams_by_admission(admission_number: int, id_segment: int, user_context: User):
     """Get exams by admission number"""
 

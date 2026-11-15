@@ -104,8 +104,19 @@ def test_generate_soap_no_token(client):
 
 
 def test_generate_soap_permission_denied(client, viewer_headers):
-    """POST /notes/soap — returns 401 for users without READ_NAV permission"""
+    """POST /notes/soap — returns 401 for users without WRITE_NAV permission"""
     response = client.post(URL, json={"id": SOAP_NOTE_ID}, headers=viewer_headers)
+
+    assert response.status_code == 401
+
+
+def test_generate_soap_navigation_viewer_denied(
+    client, navigation_viewer_headers, soap_test_data
+):
+    """POST /notes/soap — READ_NAV only views navigation data, generating needs WRITE_NAV [401]"""
+    response = client.post(
+        URL, json={"id": SOAP_NOTE_ID}, headers=navigation_viewer_headers
+    )
 
     assert response.status_code == 401
 
@@ -214,7 +225,7 @@ def test_generate_soap_missing_config(client, navigator_headers):
 
 
 def test_create_note_as_navigator(client, navigator_headers):
-    """POST /notes — returns 401 for navigators (READ_NAV does not allow note creation)"""
+    """POST /notes — returns 401 for navigators (READ_NAV/WRITE_NAV do not allow note creation)"""
     payload = {
         "admissionNumber": ADMISSION_NUMBER,
         "notes": "Evolução SOAP de teste",
@@ -227,7 +238,7 @@ def test_create_note_as_navigator(client, navigator_headers):
 
 
 def test_create_note_permission_denied(client, viewer_headers):
-    """POST /notes — returns 401 for users without WRITE_PRESCRIPTION or READ_NAV"""
+    """POST /notes — returns 401 for users without WRITE_PRESCRIPTION"""
     payload = {
         "admissionNumber": ADMISSION_NUMBER,
         "notes": "não autorizado",
