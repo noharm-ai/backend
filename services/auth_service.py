@@ -32,6 +32,7 @@ from models.main import User, UserExtra, db, dbSession
 from models.segment import Segment
 from repository import (
     notification_repository,
+    organization_repository,
     user_activity_repository,
     user_attribute_repository,
     user_repository,
@@ -91,7 +92,7 @@ def _prepare_user(user: User) -> User:
     extra = db.session.query(UserExtra).filter(UserExtra.idUser == user.id).first()
     if extra:
         extra_roles = extra.config.get("roles", [])
-        extra_schemas = extra.config.get("schemas", [])
+        extra_schemas = organization_repository.get_extra_schemas(extra.config)
         user.config = dict(
             user.config,
             roles=user.config.get("roles", []) + extra_roles,
@@ -390,7 +391,7 @@ def get_switch_schema_data(user_permissions: list[Permission], user_context: Use
     )
     schemas = []
     if extra:
-        schemas = extra.config.get("schemas", [])
+        schemas = organization_repository.get_extra_schemas(extra.config)
 
     return {"maintainer": False, "schemas": schemas}
 

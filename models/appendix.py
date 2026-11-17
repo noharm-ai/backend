@@ -131,6 +131,28 @@ class SchemaConfig(db.Model):
     crm_data = db.Column("crm", postgresql.JSONB, nullable=True)
 
 
+class Organization(db.Model):
+    """table organizacao: a group of hospitals (schemas), managed in the admin"""
+
+    __tablename__ = "organizacao"
+    __table_args__ = {"schema": "public"}
+
+    id = db.Column("idorganizacao", db.Integer, primary_key=True)
+    name = db.Column("nome", db.String, nullable=False)
+
+
+class OrganizationSchema(db.Model):
+    """table organizacao_schema: the schemas of an organization (one organization
+    per schema) and the friendly name shown in the schema picker"""
+
+    __tablename__ = "organizacao_schema"
+    __table_args__ = {"schema": "public"}
+
+    schemaName = db.Column("schema_name", db.String, primary_key=True)
+    idOrganization = db.Column("idorganizacao", db.Integer, nullable=False)
+    name = db.Column("nome", db.String, nullable=False)
+
+
 class SchemaConfigAudit(db.Model):
     """table schema_config_audit: audit record for schema_config changes"""
 

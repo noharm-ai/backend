@@ -427,6 +427,37 @@ def test_admin_support_also_sees_the_schemas_granted_out_of_band(
     assert schema_condition[2] == [DEMO_SCHEMA, _OTHER_SCHEMA, "zztest_supl_third"]
 
 
+def test_admin_support_sees_every_schema_of_its_organization(client, monkeypatch):
+    """An organization-wide grant (config['organization']['allSchemas']) brings
+    the organization's schemas, resolved now, into the organization query"""
+    org_id = session.execute(
+        text("SELECT idorganizacao FROM public.organizacao WHERE nome = 'Organização Demo'")
+    ).scalar()
+    session.execute(
+        text(
+            "INSERT INTO public.usuario_extra "
+            "(idusuario, config, created_at, created_by) "
+            "VALUES (:uid, CAST(:config AS json), now(), :uid)"
+        ),
+        {
+            "uid": DEMO_USER_ID,
+            "config": json.dumps(
+                {"schemas": [], "organization": {"id": org_id, "allSchemas": True}}
+            ),
+        },
+    )
+    session_commit()
+    stub = _install(monkeypatch, OdooStub(partner=[{"id": 7}]))
+    headers = _headers(client, MANAGER_ROLES)
+
+    client.get(LIST_URL, headers=headers)
+
+    domain = stub.ticket_query("x_studio_schema_1")["payload"][0]
+    schema_condition = next(c for c in domain if c[0] == "x_studio_schema_1")
+    # the user's own schema, then the organization's (demo again, and teste)
+    assert schema_condition[2] == [DEMO_SCHEMA, "demo", "teste"]
+
+
 def test_extra_schemas_without_a_name_are_skipped(client, monkeypatch):
     """A malformed UserExtra entry must not put a null into the Odoo domain"""
     session.execute(

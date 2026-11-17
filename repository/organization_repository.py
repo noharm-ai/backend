@@ -1,0 +1,55 @@
+"""Repository: organizations (public.organizacao_schema) and the schemas
+usuario_extra grants through them"""
+
+from models.appendix import OrganizationSchema
+from models.main import db
+
+
+def get_organization_schemas(id_organization: int) -> list[dict]:
+    """The schemas of an organization, as usuario_extra.config['schemas'] entries"""
+    rows = (
+        db.session.query(OrganizationSchema)
+        .filter(OrganizationSchema.idOrganization == id_organization)
+        .order_by(OrganizationSchema.name, OrganizationSchema.schemaName)
+        .all()
+    )
+    return [{"name": row.schemaName, "friendlyName": row.name} for row in rows]
+
+
+def get_organization_grant(config) -> dict | None:
+    """usuario_extra.config['organization'] as {"id": int, "allSchemas": bool},
+    or None when absent or malformed"""
+    if not isinstance(config, dict):
+        return None
+    raw = config.get("organization")
+    if not isinstance(raw, dict):
+        return None
+    raw_id = raw.get("id")
+    if isinstance(raw_id, bool) or not isinstance(raw_id, int):
+        return None
+    return {"id": raw_id, "allSchemas": raw.get("allSchemas") is True}
+
+
+def get_extra_schemas(config) -> list[dict]:
+    """The schemas a usuario_extra.config grants.
+
+    The fixed list in config['schemas'], plus, when the user manages every
+    schema of an organization (config['organization']['allSchemas']), the
+    organization's current schemas: a schema added to the organization later
+    is reached without touching the user.
+    """
+    if not isinstance(config, dict):
+        return []
+    schemas = config.get("schemas", [])
+    schemas = list(schemas) if isinstance(schemas, list) else []
+
+    grant = get_organization_grant(config)
+    if grant is None or not grant["allSchemas"]:
+        return schemas
+
+    names = {s.get("name") for s in schemas if isinstance(s, dict)}
+    for schema in get_organization_schemas(grant["id"]):
+        if schema["name"] not in names:
+            schemas.append(schema)
+            names.add(schema["name"])
+    return schemas
