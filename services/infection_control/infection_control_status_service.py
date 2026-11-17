@@ -365,13 +365,7 @@ def record_evaluation(
     evaluation.treatment_type = evaluation_data.treatmentType
     evaluation.infection_foci = sorted(set(evaluation_data.infectionFoci)) or None
     evaluation.posology = posology_snapshot(course)
-    # a start within the first second of the course (sent at second precision)
-    # is the course start
-    evaluation.valid_from = (
-        max(evaluation_data.validFrom, course.start)
-        if evaluation_data.validFrom
-        else now
-    )
+    evaluation.valid_from = evaluation_data.validFrom or now
     evaluation.valid_until = evaluation_data.validUntil
     evaluation.triggers = sorted(set(evaluation_data.triggers)) + (exam_triggers or [])
     evaluation.status = AntimicrobialEvaluationStatusEnum.ACTIVE.value

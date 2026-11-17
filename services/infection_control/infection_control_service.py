@@ -387,10 +387,18 @@ def _validate_review(
             )
 
         # clients send the start at second precision, the course start keeps
-        # the fractional seconds of its prescription date
+        # the fractional seconds of its prescription date: the start sent at
+        # the second of the course start is the course start. Done before the
+        # checks, so they and the saved row use the same value
+        if (
+            evaluation.validFrom is not None
+            and evaluation.validFrom < course.start
+            and evaluation.validFrom >= course.start.replace(microsecond=0)
+        ):
+            evaluation.validFrom = course.start
+
         if evaluation.validFrom is not None and (
-            evaluation.validFrom > now
-            or evaluation.validFrom < course.start.replace(microsecond=0)
+            evaluation.validFrom > now or evaluation.validFrom < course.start
         ):
             raise ValidationError(
                 "O início da avaliação deve estar entre o início do tratamento e agora",
