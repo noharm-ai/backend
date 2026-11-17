@@ -123,6 +123,7 @@ def _row(
     attributes=None,
     measure_unit="mg",
     prev_notes=None,
+    convert_factor=None,
 ):
     """Build a prescription row shaped like the ones ``_process_drugs`` consumes."""
     items = [
@@ -150,7 +151,7 @@ def _row(
         prescription_date=None,
         prescription_expire=None,
         default_measure_unit_nh=None,
-        measure_unit_convert_factor=None,
+        measure_unit_convert_factor=convert_factor,
         measure_unit_solution_convert_factor=None,
     )
 
@@ -286,6 +287,7 @@ class TestDosePerWeightConversion:
                 _row(
                     _prescription_drug(dose=100, frequency=2, doseconv=100000),
                     attributes=attributes,
+                    convert_factor=1000,
                 )
             ],
             exams=_exams(weight=50),
@@ -293,25 +295,105 @@ class TestDosePerWeightConversion:
         assert results[0]["doseWeight"] == "2,00 mg/Kg ou 2.000,00 mcg/Kg"
         assert results[0]["doseWeightDay"] == "4,00 mg/Kg/Dia ou 4.000,00 mcg/Kg/Dia"
 
-    def test_use_weight_drug_is_flagged_as_a_rounded_range(self):
-        """For dose-range drugs doseconv is already per Kg, and it is marked as such."""
-        attributes = _drug_attributes(idMeasureUnit="mcg", useWeight=True)
+    def test_no_conversion_factor_has_no_converted_dose(self):
+        """Without a factor prescalc stores the dose unconverted, in the
+        prescribed unit: it is not shown under the default unit."""
+        attributes = _drug_attributes(idMeasureUnit="mcg")
         results = _process(
             [
                 _row(
-                    _prescription_drug(dose=100, frequency=2, doseconv=5),
+                    # doseconv = the 100 mg as prescribed, not 100.000 mcg
+                    _prescription_drug(dose=100, frequency=2, doseconv=100),
                     attributes=attributes,
                 )
             ],
             exams=_exams(weight=50),
         )
-        assert (
-            results[0]["doseWeight"] == "2,00 mg/Kg ou 5,00 mcg/Kg (faixa arredondada)"
+        assert results[0]["doseWeight"] == "2,00 mg/Kg"
+        assert results[0]["doseWeightDay"] == "4,00 mg/Kg/Dia"
+
+    def test_use_weight_without_ranges_divides_doseconv_by_the_weight(self):
+        """Without dose ranges doseconv is the plain converted dose, even when
+        the drug is flagged to use the weight."""
+        attributes = _drug_attributes(idMeasureUnit="mcg", useWeight=True)
+        results = _process(
+            [
+                _row(
+                    _prescription_drug(dose=100, frequency=2, doseconv=100000),
+                    attributes=attributes,
+                    convert_factor=1000,
+                )
+            ],
+            exams=_exams(weight=50),
         )
-        assert (
-            results[0]["doseWeightDay"]
-            == "4,00 mg/Kg/Dia ou 10,00 mcg/Kg/Dia (faixa arredondada)"
+        assert results[0]["doseWeight"] == "2,00 mg/Kg ou 2.000,00 mcg/Kg"
+        assert results[0]["doseWeightDay"] == "4,00 mg/Kg/Dia ou 4.000,00 mcg/Kg/Dia"
+
+    def test_dose_range_drug_ignores_the_rounded_doseconv(self):
+        """A range drug's doseconv is the outlier range, rounded up and divided
+        by the weight prescalc found: the prescribed dose is converted instead."""
+        attributes = _drug_attributes(idMeasureUnit="mcg", useWeight=True, division=10)
+        results = _process(
+            [
+                _row(
+                    # 100 mg / 50 Kg = 2.000 mcg/Kg, stored as its range: 2.010
+                    _prescription_drug(dose=100, frequency=2, doseconv=2010),
+                    attributes=attributes,
+                    convert_factor=1000,
+                )
+            ],
+            exams=_exams(weight=50),
         )
+        assert results[0]["doseWeight"] == "2,00 mg/Kg ou 2.000,00 mcg/Kg"
+        assert results[0]["doseWeightDay"] == "4,00 mg/Kg/Dia ou 4.000,00 mcg/Kg/Dia"
+
+    def test_dose_range_drug_calculated_without_a_weight(self):
+        """When prescalc ran before the weight was known it divided by 1, so
+        doseconv is the whole dose; the current weight is used instead."""
+        attributes = _drug_attributes(idMeasureUnit="mcg", useWeight=True, division=10)
+        results = _process(
+            [
+                _row(
+                    _prescription_drug(dose=100, frequency=2, doseconv=100000),
+                    attributes=attributes,
+                    convert_factor=1000,
+                )
+            ],
+            exams=_exams(weight=50),
+        )
+        assert results[0]["doseWeight"] == "2,00 mg/Kg ou 2.000,00 mcg/Kg"
+        assert "faixa arredondada" not in results[0]["doseWeight"]
+
+    def test_dose_range_drug_without_weight_flag(self):
+        """Ranges without the weight still round doseconv up, so it is not used."""
+        attributes = _drug_attributes(idMeasureUnit="mcg", division=500)
+        results = _process(
+            [
+                _row(
+                    # 0,3 mg = 300 mcg, stored as its range: 500
+                    _prescription_drug(dose=0.3, frequency=1, doseconv=500),
+                    attributes=attributes,
+                    convert_factor=1000,
+                )
+            ],
+            exams=_exams(weight=3),
+        )
+        assert results[0]["doseWeight"] == "0,10 mg/Kg ou 100,00 mcg/Kg"
+
+    def test_dose_range_drug_without_a_conversion_factor(self):
+        """Without a factor for the prescribed unit there is no converted dose."""
+        attributes = _drug_attributes(idMeasureUnit="mcg", useWeight=True, division=10)
+        results = _process(
+            [
+                _row(
+                    _prescription_drug(dose=100, frequency=2, doseconv=2010),
+                    attributes=attributes,
+                )
+            ],
+            exams=_exams(weight=50),
+        )
+        assert results[0]["doseWeight"] == "2,00 mg/Kg"
+        assert results[0]["doseWeightDay"] == "4,00 mg/Kg/Dia"
 
     def test_same_unit_is_not_converted(self):
         """When the default unit equals the prescribed one there is nothing to show."""

@@ -2,7 +2,7 @@
 
 from sqlalchemy import and_, func, or_
 
-from models.appendix import Department, Frequency, MeasureUnit
+from models.appendix import Department, Frequency, MeasureUnit, MeasureUnitConvert
 from models.main import DrugAttributes, Drug, Substance, db
 from models.prescription import Prescription, PrescriptionDrug
 from models.segment import Segment
@@ -49,7 +49,8 @@ def get_admission_antimicrobials(admission_number: int):
             # to tell the dose per weight in the drug's default unit
             PrescriptionDrug.idMeasureUnit.label("id_measure_unit"),
             DrugAttributes.idMeasureUnit.label("default_measure_unit"),
-            DrugAttributes.useWeight.label("use_weight"),
+            DrugAttributes.division.label("division"),
+            MeasureUnitConvert.factor.label("convert_factor"),
         )
         .join(Prescription, Prescription.id == PrescriptionDrug.idPrescription)
         .join(
@@ -75,6 +76,15 @@ def get_admission_antimicrobials(admission_number: int):
             and_(
                 Frequency.id == PrescriptionDrug.idFrequency,
                 Frequency.idHospital == Prescription.idHospital,
+            ),
+        )
+        .outerjoin(
+            MeasureUnitConvert,
+            and_(
+                MeasureUnitConvert.idSegment
+                == func.coalesce(PrescriptionDrug.idSegment, Prescription.idSegment),
+                MeasureUnitConvert.idDrug == PrescriptionDrug.idDrug,
+                MeasureUnitConvert.idMeasureUnit == PrescriptionDrug.idMeasureUnit,
             ),
         )
         .filter(Prescription.admissionNumber == admission_number)

@@ -76,7 +76,10 @@ class TimelineItem:
     # prescribed and default measure unit ids, for the dose per weight
     id_measure_unit: str | None = None
     default_measure_unit: str | None = None
-    use_weight: bool = False
+    # dose ranges and the factor to the default unit: a range drug's doseconv
+    # is the rounded outlier range, not a dose
+    division: float | None = None
+    convert_factor: float | None = None
     # the observation written on the prescribed item (complemento)
     notes: str | None = None
     id_substance: int | None = None
@@ -138,7 +141,8 @@ def build_item(row, now: datetime) -> TimelineItem:
         daily_frequency=row.daily_frequency,
         id_measure_unit=row.id_measure_unit,
         default_measure_unit=row.default_measure_unit,
-        use_weight=bool(row.use_weight),
+        division=row.division,
+        convert_factor=row.convert_factor,
         notes=row.notes,
         id_substance=row.id_substance,
     )
@@ -238,8 +242,12 @@ def _dose_per_weight(item: TimelineItem, weight: float | None) -> dict:
         frequency=item.daily_frequency,
         unit=item.id_measure_unit,
         default_unit=item.default_measure_unit,
-        doseconv=item.doseconv,
-        use_weight=item.use_weight,
+        converted_dose=prescriptionutils.get_converted_dose(
+            dose=item.dose,
+            doseconv=item.doseconv,
+            convert_factor=item.convert_factor,
+            has_dose_ranges=bool(item.division),
+        ),
         unit_label=item.measure_unit or item.id_measure_unit,
     )
 
