@@ -355,14 +355,30 @@ def get_prescription_item_period(
 _NON_DAILY_FREQUENCIES = [33, 44, 55, 66, 99]
 
 
+def get_converted_dose(dose, convert_factor=None):
+    """The prescribed dose in the drug's default measure unit, or None
+    without a dose or a factor for the prescribed unit (unidadeconverte).
+
+    The stored `doseconv` is not used. Prescalc wrote it with the factor and
+    the drug attributes of that moment: without a factor then, it is the
+    dose in the prescribed unit, and for a drug with dose ranges
+    (`division`) it is the outlier range, rounded up and divided by the
+    weight it found. Converting the dose with the current factor always
+    matches the factor that was looked up.
+    """
+    if not dose or not convert_factor:
+        return None
+
+    return dose * convert_factor
+
+
 def get_dose_per_weight(
     dose,
     weight,
     frequency,
     unit: str | None,
     default_unit: str | None = None,
-    doseconv=None,
-    use_weight: bool = False,
+    converted_dose=None,
     unit_label: str | None = None,
 ) -> dict:
     """The dose per Kg and per Kg a day, as the screening shows them
@@ -370,7 +386,8 @@ def get_dose_per_weight(
     is prescribed in another one ("ou 2,00 mg/Kg").
 
     `unit` is the prescribed measure unit id, `unit_label` how to show it
-    (the id when not given). Every value is None without a dose or a weight.
+    (the id when not given), `converted_dose` the dose in `default_unit`
+    (see get_converted_dose). Every value is None without a dose or a weight.
     """
     result = {
         "doseWeight": None,
@@ -388,11 +405,9 @@ def get_dose_per_weight(
     frequency = numberutils.none2zero(frequency)
 
     has_conv = (
-        default_unit is not None and default_unit != unit and doseconv is not None
+        default_unit is not None and default_unit != unit and converted_dose is not None
     )
-    conv_per_kg = None
-    if has_conv:
-        conv_per_kg = doseconv if use_weight else round(doseconv / float(weight), 2)
+    conv_per_kg = converted_dose / float(weight) if has_conv else None
 
     for multiplier, suffix, key in [
         (1, "/Kg", "doseWeight"),
@@ -408,13 +423,8 @@ def get_dose_per_weight(
         text = f"{value} {unit_label}{suffix}"
 
         if has_conv:
-            conv_value = stringutils.strFormatBR(
-                round(conv_per_kg * multiplier, 2)
-                if not use_weight
-                else conv_per_kg * multiplier
-            )
-            conv_suffix = " (faixa arredondada)" if use_weight else ""
-            text += f" ou {conv_value} {default_unit}{suffix}{conv_suffix}"
+            conv_value = stringutils.strFormatBR(round(conv_per_kg * multiplier, 2))
+            text += f" ou {conv_value} {default_unit}{suffix}"
 
         result[f"{key}Value"] = value
         result[key] = text
