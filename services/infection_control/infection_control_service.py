@@ -386,6 +386,17 @@ def _validate_review(
                 status.HTTP_400_BAD_REQUEST,
             )
 
+        # clients send the start at second precision, the course start keeps
+        # the fractional seconds of its prescription date: the start sent at
+        # the second of the course start is the course start. Done before the
+        # checks, so they and the saved row use the same value
+        if (
+            evaluation.validFrom is not None
+            and evaluation.validFrom < course.start
+            and evaluation.validFrom >= course.start.replace(microsecond=0)
+        ):
+            evaluation.validFrom = course.start
+
         if evaluation.validFrom is not None and (
             evaluation.validFrom > now or evaluation.validFrom < course.start
         ):
