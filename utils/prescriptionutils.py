@@ -356,20 +356,59 @@ _NON_DAILY_FREQUENCIES = [33, 44, 55, 66, 99]
 
 
 def get_converted_dose(dose, convert_factor=None):
-    """The prescribed dose in the drug's default measure unit, or None
-    without a dose or a factor for the prescribed unit (unidadeconverte).
+    """The prescribed dose in the drug's default measure unit, as the dose
+    per weight shows it: the dose on the row times the current factor for
+    the prescribed unit (unidadeconverte). None without a dose or a factor.
 
-    The stored `doseconv` is not used. Prescalc wrote it with the factor and
-    the drug attributes of that moment: without a factor then, it is the
-    dose in the prescribed unit, and for a drug with dose ranges
+    The stored `doseconv` is not used: for a drug with dose ranges
     (`division`) it is the outlier range, rounded up and divided by the
-    weight it found. Converting the dose with the current factor always
-    matches the factor that was looked up.
+    weight prescalc found. And a re-sent item gets a new `doseconv` from the
+    data sent again, while most schemas' presmed triggers keep the `dose` and
+    unit of the first insert, so it may not match the dose shown next to it.
+    The max dose alerts and the solution calculator still read `doseconv`.
     """
     if not dose or not convert_factor:
         return None
 
     return dose * convert_factor
+
+
+def is_convert_factor_missing(
+    unit,
+    default_unit,
+    convert_factor,
+    unit_nh: str | None = None,
+    default_unit_nh: str | None = None,
+) -> bool:
+    """True when the item is prescribed in a unit other than the drug's
+    default one and unidadeconverte has no factor for it: its dose can't be
+    converted (no dose per weight in the default unit, and the max dose
+    alerts read the dose as if it were in the default unit).
+
+    Two ids with the same normalized unit (unidademedida_nh, e.g.
+    "MILIGRAMA" and "mg") are the same unit: nothing to convert."""
+    if not unit or not default_unit:
+        return False
+
+    if is_same_unit(unit, default_unit, unit_nh, default_unit_nh):
+        return False
+
+    return not convert_factor
+
+
+def is_same_unit(
+    unit,
+    default_unit,
+    unit_nh: str | None = None,
+    default_unit_nh: str | None = None,
+) -> bool:
+    """True when the prescribed unit is the drug's default one: the same id,
+    or two ids with the same normalized unit (unidademedida_nh, e.g.
+    "MILIGRAMA" and "mg")."""
+    if unit is not None and unit == default_unit:
+        return True
+
+    return bool(unit_nh) and unit_nh == default_unit_nh
 
 
 def get_dose_per_weight(
@@ -380,6 +419,8 @@ def get_dose_per_weight(
     default_unit: str | None = None,
     converted_dose=None,
     unit_label: str | None = None,
+    unit_nh: str | None = None,
+    default_unit_nh: str | None = None,
 ) -> dict:
     """The dose per Kg and per Kg a day, as the screening shows them
     ("2,00 mg/Kg"), followed by the dose in the drug's default unit when it
@@ -387,7 +428,9 @@ def get_dose_per_weight(
 
     `unit` is the prescribed measure unit id, `unit_label` how to show it
     (the id when not given), `converted_dose` the dose in `default_unit`
-    (see get_converted_dose). Every value is None without a dose or a weight.
+    (see get_converted_dose), `unit_nh`/`default_unit_nh` their normalized
+    names: the same unit under two ids gets no "ou ...". Every value is None
+    without a dose or a weight.
     """
     result = {
         "doseWeight": None,
@@ -405,7 +448,9 @@ def get_dose_per_weight(
     frequency = numberutils.none2zero(frequency)
 
     has_conv = (
-        default_unit is not None and default_unit != unit and converted_dose is not None
+        default_unit is not None
+        and not is_same_unit(unit, default_unit, unit_nh, default_unit_nh)
+        and converted_dose is not None
     )
     conv_per_kg = converted_dose / float(weight) if has_conv else None
 

@@ -78,6 +78,9 @@ class TimelineItem:
     default_measure_unit: str | None = None
     # factor from the prescribed unit to the default one (unidadeconverte)
     convert_factor: float | None = None
+    # normalized unit names (unidademedida_nh): the same unit under two ids
+    measure_unit_nh: str | None = None
+    default_measure_unit_nh: str | None = None
     # the observation written on the prescribed item (complemento)
     notes: str | None = None
     id_substance: int | None = None
@@ -140,6 +143,8 @@ def build_item(row, now: datetime) -> TimelineItem:
         id_measure_unit=row.id_measure_unit,
         default_measure_unit=row.default_measure_unit,
         convert_factor=row.convert_factor,
+        measure_unit_nh=row.measure_unit_nh,
+        default_measure_unit_nh=row.default_measure_unit_nh,
         notes=row.notes,
         id_substance=row.id_substance,
     )
@@ -244,6 +249,8 @@ def _dose_per_weight(item: TimelineItem, weight: float | None) -> dict:
             convert_factor=item.convert_factor,
         ),
         unit_label=item.measure_unit or item.id_measure_unit,
+        unit_nh=item.measure_unit_nh,
+        default_unit_nh=item.default_measure_unit_nh,
     )
 
     return {

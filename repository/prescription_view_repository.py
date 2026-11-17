@@ -179,7 +179,8 @@ def find_drugs_by_prescription(
                 MeasureUnitConvert.idSegment
                 == func.coalesce(PrescriptionDrug.idSegment, Prescription.idSegment),
                 MeasureUnitConvert.idDrug == PrescriptionDrug.idDrug,
-                MeasureUnitConvert.idMeasureUnit == MeasureUnit.id,
+                # the prescribed unit, also when unidademedida doesn't list it
+                MeasureUnitConvert.idMeasureUnit == PrescriptionDrug.idMeasureUnit,
             ),
         )
         .outerjoin(

@@ -230,6 +230,8 @@ class DrugList:
                         dose=pd[0].dose,
                         convert_factor=pd.measure_unit_convert_factor,
                     ),
+                    unit_nh=pd[2].measureunit_nh if pd[2] else None,
+                    default_unit_nh=pd.default_measure_unit_nh,
                 )
                 doseWeightStr = dose_weight["doseWeight"]
                 doseWeightValue = dose_weight["doseWeightValue"]
@@ -319,6 +321,15 @@ class DrugList:
                     "idMeasureUnitDefault": pd_drug_attributes.idMeasureUnit
                     if pd_drug_attributes
                     else None,
+                    "missingConvertFactor": prescriptionutils.is_convert_factor_missing(
+                        unit=pd[0].idMeasureUnit,
+                        default_unit=pd_drug_attributes.idMeasureUnit
+                        if pd_drug_attributes
+                        else None,
+                        convert_factor=pd.measure_unit_convert_factor,
+                        unit_nh=pd[2].measureunit_nh if pd[2] else None,
+                        default_unit_nh=pd.default_measure_unit_nh,
+                    ),
                     "useWeight": pd_drug_attributes.useWeight
                     if pd_drug_attributes
                     else None,
