@@ -61,7 +61,6 @@ def _row(id_drug=1, date=None, expire=None, suspended_date=None, cpoe=False, **k
         period_total=None,
         id_measure_unit=kwargs.get("measure_unit", "g"),
         default_measure_unit=None,
-        division=None,
         convert_factor=None,
         notes=None,
     )

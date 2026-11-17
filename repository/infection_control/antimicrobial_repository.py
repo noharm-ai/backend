@@ -49,7 +49,6 @@ def get_admission_antimicrobials(admission_number: int):
             # to tell the dose per weight in the drug's default unit
             PrescriptionDrug.idMeasureUnit.label("id_measure_unit"),
             DrugAttributes.idMeasureUnit.label("default_measure_unit"),
-            DrugAttributes.division.label("division"),
             MeasureUnitConvert.factor.label("convert_factor"),
         )
         .join(Prescription, Prescription.id == PrescriptionDrug.idPrescription)

@@ -312,14 +312,14 @@ class TestDosePerWeightConversion:
         assert results[0]["doseWeight"] == "2,00 mg/Kg"
         assert results[0]["doseWeightDay"] == "4,00 mg/Kg/Dia"
 
-    def test_use_weight_without_ranges_divides_doseconv_by_the_weight(self):
-        """Without dose ranges doseconv is the plain converted dose, even when
-        the drug is flagged to use the weight."""
-        attributes = _drug_attributes(idMeasureUnit="mcg", useWeight=True)
+    def test_doseconv_stored_before_the_factor_is_not_used(self):
+        """prescalc ran before the mg -> mcg factor was registered, so it
+        stored the 100 mg unconverted: the current factor converts the dose."""
+        attributes = _drug_attributes(idMeasureUnit="mcg")
         results = _process(
             [
                 _row(
-                    _prescription_drug(dose=100, frequency=2, doseconv=100000),
+                    _prescription_drug(dose=100, frequency=2, doseconv=100),
                     attributes=attributes,
                     convert_factor=1000,
                 )

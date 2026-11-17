@@ -355,32 +355,21 @@ def get_prescription_item_period(
 _NON_DAILY_FREQUENCIES = [33, 44, 55, 66, 99]
 
 
-def get_converted_dose(
-    dose,
-    doseconv,
-    convert_factor=None,
-    has_dose_ranges: bool = False,
-):
-    """The prescribed dose in the drug's default measure unit, or None when
-    it cannot be told.
+def get_converted_dose(dose, convert_factor=None):
+    """The prescribed dose in the drug's default measure unit, or None
+    without a dose or a factor for the prescribed unit (unidadeconverte).
 
-    Without a factor for the prescribed unit there is none: the prescription
-    calculation then stores the dose unconverted, in the prescribed unit, as
-    `doseconv`.
-
-    For a drug with dose ranges (`division`, with or without `useWeight`)
-    the stored `doseconv` is no dose either: the prescription calculation
-    rounds it up to the outlier range, divided by the patient weight it
-    found then (or by 1 when there was none). So the prescribed dose is
-    converted with the unit factor instead.
+    The stored `doseconv` is not used. Prescalc wrote it with the factor and
+    the drug attributes of that moment: without a factor then, it is the
+    dose in the prescribed unit, and for a drug with dose ranges
+    (`division`) it is the outlier range, rounded up and divided by the
+    weight it found. Converting the dose with the current factor always
+    matches the factor that was looked up.
     """
-    if not convert_factor:
+    if not dose or not convert_factor:
         return None
 
-    if has_dose_ranges:
-        return dose * convert_factor if dose else None
-
-    return doseconv
+    return dose * convert_factor
 
 
 def get_dose_per_weight(

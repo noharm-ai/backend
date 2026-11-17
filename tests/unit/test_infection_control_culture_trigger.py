@@ -63,7 +63,6 @@ def _course(id_drug=1):
             period_total=None,
             id_measure_unit="g",
             default_measure_unit=None,
-            division=None,
             convert_factor=None,
             notes=None,
         )

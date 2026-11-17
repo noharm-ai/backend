@@ -228,9 +228,7 @@ class DrugList:
                     default_unit=pd[6].idMeasureUnit,
                     converted_dose=prescriptionutils.get_converted_dose(
                         dose=pd[0].dose,
-                        doseconv=pd[0].doseconv,
                         convert_factor=pd.measure_unit_convert_factor,
-                        has_dose_ranges=bool(pd[6].division),
                     ),
                 )
                 doseWeightStr = dose_weight["doseWeight"]

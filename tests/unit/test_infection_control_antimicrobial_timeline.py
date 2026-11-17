@@ -34,7 +34,6 @@ def _row(
     id_prescription=None,
     doseconv=None,
     default_measure_unit=None,
-    division=None,
     convert_factor=None,
     notes=None,
 ):
@@ -61,7 +60,6 @@ def _row(
         period_total=period_total,
         id_measure_unit="g",
         default_measure_unit=default_measure_unit,
-        division=division,
         convert_factor=convert_factor,
         notes=notes,
     )
@@ -295,15 +293,15 @@ class TestDosePerWeight:
         assert regimen["doseWeight"] == "0,04 g/Kg"
         assert regimen["doseWeightDay"] == "0,12 g/Kg/Dia"
 
-    def test_dose_range_drug_converts_the_prescribed_dose(self):
-        """A range drug's doseconv is the rounded outlier range, not a dose"""
+    def test_stored_doseconv_is_not_used(self):
+        """The dose is converted with the current factor: the stored doseconv
+        may be a range drug's rounded outlier range, or out of date"""
         row = _row(
             T0,
             expire=T0 + DAY,
             dose=2,
             doseconv=50,
             default_measure_unit="mg",
-            division=50,
             convert_factor=1000,
         )
         regimen = self._regimen([row], weight=50)[0]
