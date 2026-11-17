@@ -390,6 +390,76 @@ def test_evaluation_can_be_backdated_to_the_course_start(
     assert _evaluations(admission)[0]["dt_inicio_validade"] == _day(-1)
 
 
+def test_evaluation_starting_at_a_course_start_with_fractional_seconds(
+    client, infection_controller_headers, infection_control, admission
+):
+    """The course start keeps the fractional seconds of its prescription date,
+    but clients send the start at second precision: starting at the course
+    start (as the form formats it) is accepted and recorded at the course start"""
+    course_start = _day(-1).replace(microsecond=654321)
+    id_prescription = _prescribe(admission, course_start, _day(1))
+    _prescalc(id_prescription)
+    _run_job(admission)
+
+    response = _review(
+        client,
+        infection_controller_headers,
+        admission,
+        evaluations=[ANTIMICROBIAL_DRUG],
+        valid_from=course_start.replace(microsecond=0).isoformat(),
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.get_json()
+    assert _evaluations(admission)[0]["dt_inicio_validade"] == course_start
+
+
+def test_evaluation_ending_within_the_second_of_the_course_start_is_not_inverted(
+    client, infection_controller_headers, infection_control, admission
+):
+    """The start sent at the second of a course start with fractional seconds
+    is the course start, so a validity ending at that second still ends
+    before the evaluation starts and is rejected"""
+    course_start = _day(-1).replace(microsecond=654321)
+    id_prescription = _prescribe(admission, course_start, _day(1))
+    _prescalc(id_prescription)
+    _run_job(admission)
+
+    response = _review(
+        client,
+        infection_controller_headers,
+        admission,
+        evaluations=[ANTIMICROBIAL_DRUG],
+        valid_from=course_start.replace(microsecond=0).isoformat(),
+        valid_until=course_start.replace(microsecond=0).isoformat(),
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert _evaluations(admission) == []
+
+
+def test_review_rejects_start_before_the_second_of_a_course_start(
+    client, infection_controller_headers, infection_control, admission
+):
+    """The tolerance is the fractional part of the course start second only"""
+    course_start = _day(-1).replace(microsecond=654321)
+    id_prescription = _prescribe(admission, course_start, _day(1))
+    _prescalc(id_prescription)
+    _run_job(admission)
+
+    response = _review(
+        client,
+        infection_controller_headers,
+        admission,
+        evaluations=[ANTIMICROBIAL_DRUG],
+        valid_from=(
+            course_start.replace(microsecond=0) - timedelta(seconds=1)
+        ).isoformat(),
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert _evaluations(admission) == []
+
+
 @pytest.mark.parametrize(
     "valid_from",
     [

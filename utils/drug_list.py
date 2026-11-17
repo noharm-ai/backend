@@ -226,8 +226,10 @@ class DrugList:
                     frequency=pd[0].frequency,
                     unit=pdUnit,
                     default_unit=pd[6].idMeasureUnit,
-                    doseconv=pd[0].doseconv,
-                    use_weight=pd[6].useWeight,
+                    converted_dose=prescriptionutils.get_converted_dose(
+                        dose=pd[0].dose,
+                        convert_factor=pd.measure_unit_convert_factor,
+                    ),
                 )
                 doseWeightStr = dose_weight["doseWeight"]
                 doseWeightValue = dose_weight["doseWeightValue"]
