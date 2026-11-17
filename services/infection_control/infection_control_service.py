@@ -386,8 +386,11 @@ def _validate_review(
                 status.HTTP_400_BAD_REQUEST,
             )
 
+        # clients send the start at second precision, the course start keeps
+        # the fractional seconds of its prescription date
         if evaluation.validFrom is not None and (
-            evaluation.validFrom > now or evaluation.validFrom < course.start
+            evaluation.validFrom > now
+            or evaluation.validFrom < course.start.replace(microsecond=0)
         ):
             raise ValidationError(
                 "O início da avaliação deve estar entre o início do tratamento e agora",
