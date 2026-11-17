@@ -293,19 +293,19 @@ def _get_dose_conv(
         else prescription_drug.frequency
     )
 
-    if drug_attributes != None and drug_attributes.division != None:
-        return (
-            numberutils.none2zero(prescription_drug.dose)
-            * (
-                measure_unit_convert_factor
-                if measure_unit_convert_factor != None
-                else 1
-            )
-            * numberutils.none2zero(pd_frequency)
-        )
+    # without a factor the dose is taken as already in the default unit
+    converted_dose = prescriptionutils.get_converted_dose(
+        dose=prescription_drug.dose,
+        convert_factor=(
+            measure_unit_convert_factor if measure_unit_convert_factor != None else 1
+        ),
+        doseconv=prescription_drug.doseconv,
+        has_dose_ranges=drug_attributes != None and drug_attributes.division != None,
+    )
 
-    return numberutils.none2zero(prescription_drug.doseconv) * numberutils.none2zero(
-        pd_frequency
+    # rounded: what the max dose is compared with is what the alert prints
+    return numberutils.round_significant(
+        numberutils.none2zero(converted_dose) * numberutils.none2zero(pd_frequency)
     )
 
 
@@ -338,7 +338,10 @@ def _get_dose_total(drug_list, exams: dict):
         if idDrugAgg not in dose_total:
             dose_total[idDrugAgg] = {"value": pd_dose_conv, "count": 1}
         else:
-            dose_total[idDrugAgg]["value"] += pd_dose_conv
+            # rounded, or the sum brings the float noise back (0.1 + 0.2)
+            dose_total[idDrugAgg]["value"] = numberutils.round_significant(
+                dose_total[idDrugAgg]["value"] + pd_dose_conv
+            )
             dose_total[idDrugAgg]["count"] += 1
 
         # dose / kg
@@ -349,7 +352,9 @@ def _get_dose_total(drug_list, exams: dict):
         if idDrugAggWeight not in dose_total:
             dose_total[idDrugAggWeight] = {"value": doseWeight, "count": 1}
         else:
-            dose_total[idDrugAggWeight]["value"] += doseWeight
+            dose_total[idDrugAggWeight]["value"] = numberutils.round_significant(
+                dose_total[idDrugAggWeight]["value"] + doseWeight
+            )
             dose_total[idDrugAggWeight]["count"] += 1
 
     return dose_total
@@ -443,9 +448,9 @@ def _alert_max_dose(
                 )
             else:
                 alert["text"] = f"""
-                    Dose diária prescrita ({stringutils.strFormatBR(doseWeight)} {str(drug_attributes.idMeasureUnit)}/Kg)
+                    Dose diária prescrita ({stringutils.format_number_br(doseWeight)} {str(drug_attributes.idMeasureUnit)}/Kg)
                      maior que a dose de alerta
-                    ({stringutils.strFormatBR(drug_attributes.maxDose)} {str(drug_attributes.idMeasureUnit)}/Kg)
+                    ({stringutils.format_number_br(drug_attributes.maxDose)} {str(drug_attributes.idMeasureUnit)}/Kg)
                      usualmente recomendada (considerada a dose diária independente da indicação).
                 """
 
@@ -454,8 +459,8 @@ def _alert_max_dose(
     else:
         if drug_attributes.maxDose and drug_attributes.maxDose < pd_dose_conv:
             alert["text"] = f"""
-                Dose diária prescrita ({str(pd_dose_conv)} {str(drug_attributes.idMeasureUnit)})
-                 maior que a dose de alerta ({str(drug_attributes.maxDose)} {str(drug_attributes.idMeasureUnit)})
+                Dose diária prescrita ({stringutils.format_number_br(pd_dose_conv)} {str(drug_attributes.idMeasureUnit)})
+                 maior que a dose de alerta ({stringutils.format_number_br(drug_attributes.maxDose)} {str(drug_attributes.idMeasureUnit)})
                  usualmente recomendada (considerada a dose diária independente da indicação).
             """
 
@@ -503,9 +508,9 @@ def _alert_max_dose_total(
             else:
                 alert["text"] = f"""
                     Dose diária prescrita SOMADA (
-                    {str(dose_total[idDrugAggWeight]["value"])} {str(drug_attributes.idMeasureUnit)}/Kg) maior
+                    {stringutils.format_number_br(dose_total[idDrugAggWeight]["value"])} {str(drug_attributes.idMeasureUnit)}/Kg) maior
                     que a dose de alerta (
-                    {str(drug_attributes.maxDose)} {str(drug_attributes.idMeasureUnit)}/Kg)
+                    {stringutils.format_number_br(drug_attributes.maxDose)} {str(drug_attributes.idMeasureUnit)}/Kg)
                     usualmente recomendada (Frequência "AGORA" não é considerada no cálculo)."
                 """
 
@@ -521,8 +526,8 @@ def _alert_max_dose_total(
         ):
             alert["text"] = f"""
                 Dose diária prescrita SOMADA (
-                {str(dose_total[idDrugAgg]["value"])} {str(drug_attributes.idMeasureUnit)}) maior que a
-                dose de alerta ({str(drug_attributes.maxDose)} {str(drug_attributes.idMeasureUnit)})
+                {stringutils.format_number_br(dose_total[idDrugAgg]["value"])} {str(drug_attributes.idMeasureUnit)}) maior que a
+                dose de alerta ({stringutils.format_number_br(drug_attributes.maxDose)} {str(drug_attributes.idMeasureUnit)})
                 usualmente recomendada (Frequência "AGORA" não é considerada no cálculo).
             """
 

@@ -157,6 +157,7 @@ def _row(
     ]
     return _FakeRow(
         items,
+        MeasureUnit=items[2],  # a Row names its entities too
         idDepartment=1,
         prescription_date=None,
         prescription_expire=None,
@@ -284,6 +285,83 @@ class TestDosePerWeight:
             exams=_exams(weight=50),
         )
         assert results[0]["doseWeight"] is None
+
+
+class TestConvertedDose:
+    """convertedDose: the item's dose in the drug's default unit, the value
+    the alerts read (doseconv is prescalc's score key)."""
+
+    def _converted(
+        self,
+        dose=100,
+        doseconv=None,
+        unit="mg",
+        default_unit="mcg",
+        convert_factor=None,
+        division=None,
+        unit_nh=_SAME_AS_ID,
+        default_unit_nh=None,
+    ):
+        """convertedDose of one item prescribed in ``unit``."""
+        results = _process(
+            [
+                _row(
+                    _prescription_drug(
+                        dose=dose, frequency=2, doseconv=doseconv, idMeasureUnit=unit
+                    ),
+                    attributes=_drug_attributes(
+                        idMeasureUnit=default_unit, division=division
+                    ),
+                    measure_unit=unit,
+                    convert_factor=convert_factor,
+                    measure_unit_nh=unit_nh,
+                    default_measure_unit_nh=default_unit_nh,
+                )
+            ]
+        )
+        return results[0]["convertedDose"]
+
+    def test_dose_times_the_current_factor(self):
+        """100 mg with mg -> mcg factor 1000"""
+        assert self._converted(convert_factor=1000) == 100000
+
+    def test_stored_doseconv_is_not_read(self):
+        """prescalc stored the 100 mg unconverted: the current factor converts it"""
+        assert self._converted(doseconv=100, convert_factor=1000) == 100000
+
+    def test_range_drug_converts_the_dose(self):
+        """A range drug's doseconv is the rounded range, not a dose"""
+        assert (
+            self._converted(doseconv=2010, convert_factor=1000, division=10) == 100000
+        )
+
+    def test_another_unit_without_a_factor_is_none(self):
+        """It can't be told"""
+        assert self._converted(doseconv=100) is None
+
+    def test_default_unit_needs_no_factor(self):
+        """Prescribed in the default unit, unidadeconverte may have no row"""
+        assert self._converted(unit="mcg") == 100
+
+    def test_same_normalized_unit_needs_no_factor(self):
+        """MILIGRAMA and mg are the same unit"""
+        assert (
+            self._converted(
+                unit="MILIGRAMA", default_unit="mg", unit_nh="mg", default_unit_nh="mg"
+            )
+            == 100
+        )
+
+    def test_differentiated_dose_is_the_stored_daily_total(self):
+        """Dose diferenciada: dose 0, doseconv the daily total"""
+        assert self._converted(dose=0, doseconv=30, convert_factor=1000) == 30
+
+    def test_differentiated_dose_of_a_range_drug_is_none(self):
+        """A range drug's doseconv is the rounded range"""
+        assert (
+            self._converted(dose=0, doseconv=30, convert_factor=1000, division=10)
+            is None
+        )
 
 
 class TestMissingConvertFactor:

@@ -82,3 +82,23 @@ class TestNone2Zero:
         result = numberutils.none2zero(5)
         assert isinstance(result, float)
         assert result == 5.0
+
+
+class TestRoundSignificant:
+    """round_significant: drops the float noise of a product or a sum."""
+
+    @pytest.mark.parametrize(
+        "value, expected",
+        [
+            (0.1 * 3, 0.3),
+            (0.1 + 0.2, 0.3),
+            (1522.6200000000001, 1522.62),
+            (86.39999999999999, 86.4),
+            (1234567.0, 1234567.0),
+            (0.0025, 0.0025),
+            (0, 0),
+        ],
+    )
+    def test_round(self, value, expected):
+        """The value without the noise; real digits stay."""
+        assert numberutils.round_significant(value) == expected

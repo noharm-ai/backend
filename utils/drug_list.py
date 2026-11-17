@@ -330,6 +330,9 @@ class DrugList:
                         unit_nh=pd[2].measureunit_nh if pd[2] else None,
                         default_unit_nh=pd.default_measure_unit_nh,
                     ),
+                    # the dose in the default unit, as the alerts read it
+                    # (doseconv below is the score key prescalc computed)
+                    "convertedDose": self.get_converted_dose(pd),
                     "useWeight": pd_drug_attributes.useWeight
                     if pd_drug_attributes
                     else None,
@@ -562,6 +565,33 @@ class DrugList:
             "missing_ckd": missing_ckd,
         }
 
+    @staticmethod
+    def get_converted_dose(pd):
+        """The item's dose in the drug's default unit
+        (prescriptionutils.get_converted_dose), None without a factor for a
+        unit other than the default one. Prescribed in the default unit (the
+        same id or unidademedida_nh) it needs no factor: unidadeconverte may
+        have no row for it."""
+        prescription_drug = pd[0]
+        drug_attributes = pd[6]
+        convert_factor = pd.measure_unit_convert_factor
+        if not convert_factor and prescriptionutils.is_same_unit(
+            unit=prescription_drug.idMeasureUnit,
+            default_unit=drug_attributes.idMeasureUnit if drug_attributes else None,
+            unit_nh=pd.MeasureUnit.measureunit_nh if pd.MeasureUnit else None,
+            default_unit_nh=pd.default_measure_unit_nh,
+        ):
+            convert_factor = 1
+
+        return prescriptionutils.get_converted_dose(
+            dose=prescription_drug.dose,
+            convert_factor=convert_factor,
+            doseconv=prescription_drug.doseconv,
+            has_dose_ranges=bool(drug_attributes.division)
+            if drug_attributes
+            else False,
+        )
+
     def get_solution_dose(self, pd):
         """Get solution dose for infusion calculations (always in ml)"""
 
@@ -570,19 +600,9 @@ class DrugList:
         prescribed_unit = pd.MeasureUnit.measureunit_nh if pd.MeasureUnit else None
         default_unit = pd.default_measure_unit_nh
         dose = pd[0].dose
-        dose_conv = pd[0].doseconv
-        has_dose_ranges = pd[6].division if pd[6] else False
-        measure_unit_default_convert_factor = pd.measure_unit_convert_factor
+        # in the default unit; 0 without a factor: the total can't be told
+        dose_conv = numberutils.none2zero(self.get_converted_dose(pd))
         measure_unit_solution_convert_factor = pd.measure_unit_solution_convert_factor
-
-        if has_dose_ranges:
-            # cant use doseconv when there are dose ranges
-
-            if measure_unit_default_convert_factor and dose:
-                # need to convert dose to ml (without ranges)
-                dose_conv = dose * measure_unit_default_convert_factor
-            else:
-                dose_conv = 0
 
         if prescribed_unit == solution_unit:
             # dose is already in ml

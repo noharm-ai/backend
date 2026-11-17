@@ -355,22 +355,32 @@ def get_prescription_item_period(
 _NON_DAILY_FREQUENCIES = [33, 44, 55, 66, 99]
 
 
-def get_converted_dose(dose, convert_factor=None):
-    """The prescribed dose in the drug's default measure unit, as the dose
-    per weight shows it: the dose on the row times the current factor for
-    the prescribed unit (unidadeconverte). None without a dose or a factor.
+def get_converted_dose(
+    dose,
+    convert_factor=None,
+    doseconv=None,
+    has_dose_ranges: bool = False,
+):
+    """The converted dose: the prescribed dose in the drug's default measure
+    unit, the dose shown on the screen times the current factor for the
+    prescribed unit (unidadeconverte). Every reader of a dose in the default
+    unit goes through here: the dose per weight, the max dose and IRA alerts,
+    the solution calculator and the dose popover. None when it can't be told
+    (no factor); each reader decides what that means.
 
-    The stored `doseconv` is not used: for a drug with dose ranges
-    (`division`) it is the outlier range, rounded up and divided by the
-    weight prescalc found. And a re-sent item gets a new `doseconv` from the
-    data sent again, while most schemas' presmed triggers keep the `dose` and
-    unit of the first insert, so it may not match the dose shown next to it.
-    The max dose alerts and the solution calculator still read `doseconv`.
+    The stored `presmed.doseconv` is not a dose: it is the key prescalc
+    computed for the outlier score (rounded to the dose range and divided by
+    the weight for a range drug), and a re-sent item gets a new one from the
+    data sent again while the row keeps the dose and unit of the first insert.
+    It is read only without a dose (dose diferenciada: a different dose for
+    each administration, `doseconv` holding their daily total), except for a
+    range drug. Comparisons of stored values (check history, posology
+    changes, outliers) keep reading `doseconv`.
     """
-    if not dose or not convert_factor:
-        return None
+    if dose:
+        return dose * convert_factor if convert_factor else None
 
-    return dose * convert_factor
+    return None if has_dose_ranges else doseconv
 
 
 def is_convert_factor_missing(
