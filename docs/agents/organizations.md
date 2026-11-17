@@ -1,7 +1,7 @@
 # Organizations (`ORGANIZATION_MANAGER` access to several schemas)
 
 - An organization is a group of hospitals: `public.organizacao` (name) and `public.organizacao_schema` (one row per schema, `schema_name` is the key, so a schema belongs to at most one organization; `nome` is the friendly name shown in the schema picker). Models `Organization` / `OrganizationSchema` in `models/appendix.py`, repository `repository/organization_repository.py`
-- ⚠ **Written by admin** (page Organizações, ADMIN only: `services/organization_service.py` there), only read here. The grant format below is a contract with admin: change it on both sides together
+- ⚠ **Written by admin**, only read here: the organizations on the page Organizações (ADMIN only, `services/organization_service.py` there), the managers on the page Usuários (ADMIN and CURATOR, for users of the current schema when it is in an organization: `services/organization_manager_service.py`). The grant format below is a contract with admin: change it on both sides together
 - A manager's grant lives in `usuario_extra.config`: `roles` with `ORGANIZATION_MANAGER`, `organization: {"id": <idorganizacao>, "allSchemas": true|false}` and `schemas` (`[{"name", "friendlyName"}]`)
   - `allSchemas: true`: `schemas` stays empty; the organization's schemas are read from `organizacao_schema` **on every login and switch**, so a schema added to (or removed from) the organization needs no change on the users. A token already issued keeps the list it was minted with until the next login/switch (refresh copies the claims)
   - `allSchemas: false`: only the fixed `schemas` list counts, as for grants written before organizations existed (no `organization` key) and for `NAVIGATOR`
