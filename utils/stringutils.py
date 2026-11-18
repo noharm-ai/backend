@@ -7,6 +7,8 @@ import unicodedata
 from typing import Union
 from urllib.parse import unquote
 
+from utils import numberutils
+
 
 def strip_control_chars(text: str) -> str:
     """Remove all non-printable characters (control chars, null bytes, etc.) from a string."""
@@ -29,7 +31,7 @@ def format_number_br(value) -> str:
     None reads None."""
     if value is None:
         return str(value)
-    value = float(f"{value:.7g}")
+    value = numberutils.round_significant(value)
     decimals = 2
     if 0 < abs(value) < 1:
         decimals = max(2, 2 - math.floor(math.log10(abs(value))))

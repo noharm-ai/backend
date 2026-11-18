@@ -16,12 +16,19 @@ def get_admission_antimicrobials(admission_number: int):
     A drug counts as antimicrobial when its attributes for the item's segment
     are flagged ``antimicro``.
     """
-    # the measure unit of an item may be registered for another hospital only
+    # the measure units (prescribed and the drug's default) may be registered
+    # for another hospital only
     measure_unit_any = db.aliased(MeasureUnit)
     default_measure_unit = db.aliased(MeasureUnit)
     measure_unit_hospital = (
         db.session.query(func.min(measure_unit_any.idHospital))
         .filter(measure_unit_any.id == PrescriptionDrug.idMeasureUnit)
+        .scalar_subquery()
+    )
+    default_measure_unit_any = db.aliased(MeasureUnit)
+    default_measure_unit_hospital = (
+        db.session.query(func.min(default_measure_unit_any.idHospital))
+        .filter(default_measure_unit_any.id == DrugAttributes.idMeasureUnit)
         .scalar_subquery()
     )
 
@@ -94,7 +101,7 @@ def get_admission_antimicrobials(admission_number: int):
             default_measure_unit,
             and_(
                 default_measure_unit.id == DrugAttributes.idMeasureUnit,
-                default_measure_unit.idHospital == Prescription.idHospital,
+                default_measure_unit.idHospital == default_measure_unit_hospital,
             ),
         )
         .filter(Prescription.admissionNumber == admission_number)

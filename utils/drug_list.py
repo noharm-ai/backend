@@ -526,7 +526,8 @@ class DrugList:
                         "missing_ckd": "weight_conversion",
                     }
 
-                dose = prescription_drug.doseconv
+                # computed live: doseconv is the outlier score key, not a dose
+                dose = self.get_converted_dose(pd)
 
         if not dose:
             return {

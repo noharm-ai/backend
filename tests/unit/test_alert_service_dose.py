@@ -235,6 +235,25 @@ class TestMaxDoseText:
         )
         assert alert is None
 
+    def test_small_dose_per_kg_fires_the_alert(self):
+        """0.2 mg a day for 50 Kg is 0.004 mg/Kg: above a max dose of 0.003
+        mg/Kg (rounded to 2 decimals it was 0.0 and never alerted)."""
+        attributes = _Attr()
+        attributes.useWeight = True
+        attributes.maxDose = 0.003
+        attributes.idMeasureUnit = "mg"
+        alert = alert_service._alert_max_dose(
+            prescription_drug=type(
+                "PD", (), {"id": 1, "dose": 0.1, "frequency": 2, "doseconv": None}
+            )(),
+            drug_attributes=attributes,
+            exams={"weight": 50},
+            measure_unit_convert_factor=1,
+        )
+        assert alert is not None
+        assert "(0,004 mg/Kg)" in alert["text"]
+        assert "(0,003 mg/Kg)" in alert["text"]
+
 
 class TestDoseTotalRounding:
     """The summed doses carry no float noise into the comparison."""
@@ -248,3 +267,13 @@ class TestDoseTotalRounding:
         result = alert_service._get_dose_total(rows, {"weight": 1})
         assert result["7_5"]["value"] == 0.3
         assert result["7_5kg"]["value"] == 0.3
+
+    def test_small_dose_per_kg_is_kept(self):
+        """The per Kg sum keeps a small dose: 0.2 mg for 50 Kg is 0.004 mg/Kg,
+        not 0.0."""
+        rows = [
+            _Row(_Drug(id_drug=7, frequency=1, dose=0.1), _Attr(), _ExpireDate(5), 1),
+            _Row(_Drug(id_drug=7, frequency=1, dose=0.1), _Attr(), _ExpireDate(5), 1),
+        ]
+        result = alert_service._get_dose_total(rows, {"weight": 50})
+        assert result["7_5kg"]["value"] == 0.004

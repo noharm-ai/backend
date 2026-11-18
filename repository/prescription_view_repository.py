@@ -120,6 +120,13 @@ def find_drugs_by_prescription(
         .filter(_MeasureUnitAny.id == PrescriptionDrug.idMeasureUnit)
         .scalar_subquery()
     )
+    # the drug's default unit too: registered for another hospital only
+    _DefaultUnitAny = db.aliased(MeasureUnit)
+    _default_unit_any_hospital = (
+        db.session.query(func.min(_DefaultUnitAny.idHospital))
+        .filter(_DefaultUnitAny.id == DrugAttributes.idMeasureUnit)
+        .scalar_subquery()
+    )
 
     ml_conversion_factor_subquery = (
         db.session.query(MeasureUnitSolutionConvert.factor)
@@ -202,7 +209,7 @@ def find_drugs_by_prescription(
             MeasureUnitDefault,
             and_(
                 MeasureUnitDefault.id == DrugAttributes.idMeasureUnit,
-                MeasureUnitDefault.idHospital == Prescription.idHospital,
+                MeasureUnitDefault.idHospital == _default_unit_any_hospital,
             ),
         )
         .outerjoin(Substance, Drug.sctid == Substance.id)

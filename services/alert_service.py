@@ -347,7 +347,8 @@ def _get_dose_total(drug_list, exams: dict):
         # dose / kg
         weight = numberutils.none2zero(exams["weight"])
         weight = weight if weight > 0 else 1
-        doseWeight = round(pd_dose_conv / float(weight), 2)
+        # rounded as the dose is: 2 decimals would zero a small dose per Kg
+        doseWeight = numberutils.round_significant(pd_dose_conv / float(weight))
 
         if idDrugAggWeight not in dose_total:
             dose_total[idDrugAggWeight] = {"value": doseWeight, "count": 1}
@@ -439,7 +440,8 @@ def _alert_max_dose(
     if drug_attributes.useWeight and prescription_drug.dose:
         weight = numberutils.none2zero(exams["weight"])
         weight = weight if weight > 0 else 1
-        doseWeight = round(pd_dose_conv / float(weight), 2)
+        # rounded as the dose is: 2 decimals would zero a small dose per Kg
+        doseWeight = numberutils.round_significant(pd_dose_conv / float(weight))
 
         if drug_attributes.maxDose and drug_attributes.maxDose < doseWeight:
             if numberutils.none2zero(exams["weight"]) == 0:

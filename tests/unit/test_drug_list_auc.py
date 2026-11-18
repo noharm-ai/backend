@@ -30,6 +30,8 @@ def make_pd(
     measureunit_nh=DefaultMeasureUnitEnum.MG.value,
     default_measure_unit_nh=DefaultMeasureUnitEnum.MG.value,
     use_weight=False,
+    convert_factor=None,
+    division=None,
     drug=None,  # pass sentinel to override pd[1]; None means "use default mock"
     measure_unit=None,  # pass sentinel to override pd[2]; None means "use default mock"
 ):
@@ -52,12 +54,17 @@ def make_pd(
 
     pd6 = MagicMock()
     pd6.useWeight = use_weight
+    pd6.division = division
+    pd6.idMeasureUnit = "mg"
+    pd0.idMeasureUnit = "mg" if measureunit_nh == pd6.idMeasureUnit else "other"
 
     items = {0: pd0, 1: pd1, 2: pd2, 6: pd6}
 
     pd = MagicMock()
     pd.__getitem__ = MagicMock(side_effect=lambda k: items[k])
     pd.default_measure_unit_nh = default_measure_unit_nh
+    pd.measure_unit_convert_factor = convert_factor
+    pd.MeasureUnit = pd2
     return pd
 
 
@@ -161,20 +168,68 @@ def test_uses_dose_when_measure_unit_is_mg():
     assert result["auc_cg"] == round(1000.0 / (75 + 25), 2)
 
 
-def test_uses_doseconv_when_default_unit_is_mg_and_prescribed_unit_differs():
-    """Should fall back to doseconv when prescribed unit is not MG but default is."""
+def test_converts_dose_when_default_unit_is_mg_and_prescribed_unit_differs():
+    """Prescribed in another unit, the dose is converted live with the current
+    factor; the stored doseconv (the outlier score key) is not read."""
     dl = make_drug_list(
         exams={"cg": {"value": 75}, "ckd21": {"value": 60}, "weight": 70, "height": 170}
     )
     pd = make_pd(
-        dose=500.0,
+        dose=50.0,
         doseconv=800.0,
         measureunit_nh=DefaultMeasureUnitEnum.ML.value,
         default_measure_unit_nh=DefaultMeasureUnitEnum.MG.value,
-        use_weight=False,
+        convert_factor=10,
     )
     result = dl.get_auc_value(pd)
-    # auc_cg = round(800 / (75 + 25), 2) = 8.0
+    # 50 ml * 10 = 500 mg: auc_cg = round(500 / (75 + 25), 2) = 5.0
+    assert result["auc_cg"] == round(500.0 / (75 + 25), 2)
+
+
+def test_converted_dose_ignores_range_rounded_doseconv():
+    """A drug with dose ranges has a doseconv rounded to the range: the AUC
+    uses the dose times the factor."""
+    dl = make_drug_list(exams={"cg": {"value": 75}})
+    pd = make_pd(
+        dose=45.0,
+        doseconv=500.0,
+        measureunit_nh=DefaultMeasureUnitEnum.ML.value,
+        default_measure_unit_nh=DefaultMeasureUnitEnum.MG.value,
+        convert_factor=10,
+        division=100,
+    )
+    result = dl.get_auc_value(pd)
+    assert result["auc_cg"] == round(450.0 / (75 + 25), 2)
+
+
+def test_returns_missing_dose_without_convert_factor():
+    """Prescribed in another unit with no factor, the dose in mg can't be
+    told: no AUC (doseconv would be the dose in the prescribed unit)."""
+    dl = make_drug_list(exams={"cg": {"value": 75}})
+    pd = make_pd(
+        dose=50.0,
+        doseconv=50.0,
+        measureunit_nh=DefaultMeasureUnitEnum.ML.value,
+        default_measure_unit_nh=DefaultMeasureUnitEnum.MG.value,
+        convert_factor=None,
+    )
+    result = dl.get_auc_value(pd)
+    assert result["auc_cg"] is None
+    assert result["missing_cg"] == "dose"
+    assert result["missing_ckd"] == "dose"
+
+
+def test_uses_doseconv_for_dose_diferenciada():
+    """Without a dose (dose diferenciada) doseconv is the daily total in the
+    default unit and is used."""
+    dl = make_drug_list(exams={"cg": {"value": 75}})
+    pd = make_pd(
+        dose=None,
+        doseconv=800.0,
+        measureunit_nh=DefaultMeasureUnitEnum.ML.value,
+        default_measure_unit_nh=DefaultMeasureUnitEnum.MG.value,
+    )
+    result = dl.get_auc_value(pd)
     assert result["auc_cg"] == round(800.0 / (75 + 25), 2)
 
 
