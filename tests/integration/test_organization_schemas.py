@@ -15,9 +15,11 @@ it back on the way out.
 import json
 
 import pytest
+from flask_jwt_extended import decode_token
 from sqlalchemy import text
 
 from models.appendix import Organization, OrganizationSchema
+from mobile import app
 from models.main import User
 from security.role import Role
 from tests.conftest import get_access, make_headers, session, session_commit
@@ -148,6 +150,38 @@ def test_all_schemas_switches_into_the_organization(client, org_grant):
     assert response.get_json()["data"]["schema"] == "teste"
 
 
+def _refresh_cookie(response) -> str:
+    """The refresh token the response set as a cookie (the login keeps it out of
+    the body)"""
+    for header in response.headers.getlist("Set-Cookie"):
+        name, _, rest = header.partition("=")
+        if name == "refresh_token_cookie":
+            return rest.split(";", 1)[0]
+    raise AssertionError("no refresh_token_cookie set")
+
+
+def test_the_schemas_stay_out_of_the_tokens(client, org_grant):
+    """Login and switch tokens carry the config without the schema list: an
+    organization's list would outgrow the refresh cookie, and the picker and the
+    switch reload it from the database anyway"""
+    headers = org_grant(_all_schemas_grant())
+
+    login = client.post(
+        "/authenticate",
+        json={"email": _ORG_MANAGER_EMAIL, "password": _ORG_MANAGER_EMAIL},
+    )
+    switch = client.post(SWITCH_URL, json={"schema": "teste"}, headers=headers)
+    assert switch.status_code == status.HTTP_200_OK
+
+    tokens = [login.get_json()["access_token"], _refresh_cookie(login)]
+    tokens += [switch.get_json()["data"]["access_token"], _refresh_cookie(switch)]
+    with app.app_context():
+        for token in tokens:
+            config = decode_token(token)["config"]
+            assert "schemas" not in config
+            assert Role.ORGANIZATION_MANAGER.value in config["roles"]
+
+
 def test_all_schemas_reaches_a_schema_added_later(client, org_grant, new_org_schema):
     """No change on the user: the next login already sees the new schema"""
     headers = org_grant(_all_schemas_grant())
@@ -211,6 +245,18 @@ def test_a_malformed_organization_grants_nothing_extra(client, org_grant):
     assert response.get_json()["data"]["schemas"] == []
 
 
+def test_the_organization_needs_the_manager_role(client, org_grant):
+    """A NAVIGATOR (or a former manager) with an organization left in its config
+    keeps only the fixed list"""
+    headers = org_grant(dict(_all_schemas_grant(), roles=[Role.NAVIGATOR.value]))
+
+    picker = client.get(SWITCH_URL, headers=headers).get_json()["data"]["schemas"]
+    assert picker == []
+
+    response = client.post(SWITCH_URL, json={"schema": "teste"}, headers=headers)
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+
 @pytest.fixture
 def outsider():
     """A user of the ``teste`` schema, to be listed in ``demo``'s user list"""
@@ -233,18 +279,28 @@ def outsider():
     session_commit()
 
 
-@pytest.mark.parametrize("all_schemas, listed", [(True, True), (False, False)])
+@pytest.mark.parametrize(
+    "role, all_schemas, id_as_text, listed",
+    [
+        (Role.ORGANIZATION_MANAGER, True, False, True),
+        (Role.ORGANIZATION_MANAGER, False, False, False),
+        # same rules as the login: no role or a malformed id grants nothing
+        (Role.NAVIGATOR, True, False, False),
+        (Role.ORGANIZATION_MANAGER, True, True, False),
+    ],
+)
 def test_users_list_shows_organization_managers(
-    client, admin_headers, outsider, all_schemas, listed
+    client, admin_headers, outsider, role, all_schemas, id_as_text, listed
 ):
     """A maintainer sees, read-only, who reaches this schema through the
     organization, as it does for the fixed list"""
+    org_id = str(_org_id()) if id_as_text else _org_id()
     _set_extra(
         outsider,
         {
-            "roles": [Role.ORGANIZATION_MANAGER.value],
+            "roles": [role.value],
             "schemas": [],
-            "organization": {"id": _org_id(), "allSchemas": all_schemas},
+            "organization": {"id": org_id, "allSchemas": all_schemas},
         },
     )
 

@@ -3,10 +3,15 @@ usuario_extra grants through them"""
 
 from models.appendix import OrganizationSchema
 from models.main import db
+from security.role import Role
 
 
 def get_organization_schemas(id_organization: int) -> list[dict]:
-    """The schemas of an organization, as usuario_extra.config['schemas'] entries"""
+    """The schemas of an organization, as usuario_extra.config['schemas'] entries.
+
+    No join to schema_config: organizacao_schema references it ON DELETE
+    CASCADE, so a removed schema leaves the organization with it
+    """
     rows = (
         db.session.query(OrganizationSchema)
         .filter(OrganizationSchema.idOrganization == id_organization)
@@ -18,8 +23,16 @@ def get_organization_schemas(id_organization: int) -> list[dict]:
 
 def get_organization_grant(config) -> dict | None:
     """usuario_extra.config['organization'] as {"id": int, "allSchemas": bool},
-    or None when absent or malformed"""
+    or None when absent, malformed or the config lacks ORGANIZATION_MANAGER
+    (a NAVIGATOR, or a former manager, keeps only the fixed list).
+
+    user_repository.get_extra_schema_users_list applies the same rules in SQL:
+    keep both in step
+    """
     if not isinstance(config, dict):
+        return None
+    roles = config.get("roles")
+    if not isinstance(roles, list) or Role.ORGANIZATION_MANAGER.value not in roles:
         return None
     raw = config.get("organization")
     if not isinstance(raw, dict):

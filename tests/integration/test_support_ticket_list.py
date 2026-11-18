@@ -442,7 +442,12 @@ def test_admin_support_sees_every_schema_of_its_organization(client, monkeypatch
         {
             "uid": DEMO_USER_ID,
             "config": json.dumps(
-                {"schemas": [], "organization": {"id": org_id, "allSchemas": True}}
+                {
+                    # the organization counts only with the role, as admin writes it
+                    "roles": [Role.ORGANIZATION_MANAGER.value],
+                    "schemas": [],
+                    "organization": {"id": org_id, "allSchemas": True},
+                }
             ),
         },
     )

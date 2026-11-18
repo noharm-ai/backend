@@ -122,8 +122,13 @@ def get_extra_schema_users_list(schema: str):
                 # containment matches the exact schema name (a LIKE would let
                 # "demo" match "demo2")
                 grant_config["schemas"].contains([{"name": schema}]),
+                # same rules as organization_repository.get_organization_grant:
+                # the role, allSchemas exactly true and an integer id (a string
+                # "5" has the same text as 5, hence the type check)
                 and_(
+                    grant_config["roles"].contains([Role.ORGANIZATION_MANAGER.value]),
                     grant_config["organization"].contains({"allSchemas": True}),
+                    func.jsonb_typeof(grant_config["organization"]["id"]) == "number",
                     grant_config["organization"]["id"].astext == organization_ids,
                 ),
             )

@@ -205,7 +205,11 @@ def _auth_user(
         .first()
     )
 
-    claims = {"schema": user_schema, "config": user_config}
+    # the extra schemas stay out of the tokens: the picker and the switch reload
+    # them from the database, and an organization's list (allSchemas) would grow
+    # the refresh token past the browser's 4KB cookie limit
+    token_config = {k: v for k, v in (user_config or {}).items() if k != "schemas"}
+    claims = {"schema": user_schema, "config": token_config}
     access_token = create_access_token(identity=str(user.id), additional_claims=claims)
     refresh_token = create_refresh_token(
         identity=str(user.id), additional_claims=claims
