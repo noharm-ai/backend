@@ -35,6 +35,8 @@ def _row(
     doseconv=None,
     default_measure_unit=None,
     convert_factor=None,
+    measure_unit_nh=None,
+    default_measure_unit_nh=None,
     notes=None,
 ):
     """A repository row of one prescribed antimicrobial item"""
@@ -61,6 +63,8 @@ def _row(
         id_measure_unit="g",
         default_measure_unit=default_measure_unit,
         convert_factor=convert_factor,
+        measure_unit_nh=measure_unit_nh,
+        default_measure_unit_nh=default_measure_unit_nh,
         notes=notes,
     )
 
@@ -307,6 +311,23 @@ class TestDosePerWeight:
         regimen = self._regimen([row], weight=50)[0]
 
         assert regimen["doseWeight"] == "0,04 g/Kg ou 40,00 mg/Kg"
+
+    def test_same_unit_under_another_id_is_not_converted(self):
+        """Prescribed in "g", default "GRAMA": both normalized to g, so the
+        dose is already in the default unit and no "ou ..." follows"""
+        row = _row(
+            T0,
+            expire=T0 + DAY,
+            dose=2,
+            default_measure_unit="GRAMA",
+            convert_factor=1,
+            measure_unit_nh="g",
+            default_measure_unit_nh="g",
+        )
+        regimen = self._regimen([row], weight=50)[0]
+
+        assert regimen["doseWeight"] == "0,04 g/Kg"
+        assert regimen["doseWeightDay"] == "0,12 g/Kg/Dia"
 
     def test_each_regimen_has_its_own_dose(self):
         rows = [

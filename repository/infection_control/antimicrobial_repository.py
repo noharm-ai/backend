@@ -16,11 +16,19 @@ def get_admission_antimicrobials(admission_number: int):
     A drug counts as antimicrobial when its attributes for the item's segment
     are flagged ``antimicro``.
     """
-    # the measure unit of an item may be registered for another hospital only
+    # the measure units (prescribed and the drug's default) may be registered
+    # for another hospital only
     measure_unit_any = db.aliased(MeasureUnit)
+    default_measure_unit = db.aliased(MeasureUnit)
     measure_unit_hospital = (
         db.session.query(func.min(measure_unit_any.idHospital))
         .filter(measure_unit_any.id == PrescriptionDrug.idMeasureUnit)
+        .scalar_subquery()
+    )
+    default_measure_unit_any = db.aliased(MeasureUnit)
+    default_measure_unit_hospital = (
+        db.session.query(func.min(default_measure_unit_any.idHospital))
+        .filter(default_measure_unit_any.id == DrugAttributes.idMeasureUnit)
         .scalar_subquery()
     )
 
@@ -50,6 +58,9 @@ def get_admission_antimicrobials(admission_number: int):
             PrescriptionDrug.idMeasureUnit.label("id_measure_unit"),
             DrugAttributes.idMeasureUnit.label("default_measure_unit"),
             MeasureUnitConvert.factor.label("convert_factor"),
+            # normalized names: two ids of the same unit need no conversion
+            MeasureUnit.measureunit_nh.label("measure_unit_nh"),
+            default_measure_unit.measureunit_nh.label("default_measure_unit_nh"),
         )
         .join(Prescription, Prescription.id == PrescriptionDrug.idPrescription)
         .join(
@@ -84,6 +95,13 @@ def get_admission_antimicrobials(admission_number: int):
                 == func.coalesce(PrescriptionDrug.idSegment, Prescription.idSegment),
                 MeasureUnitConvert.idDrug == PrescriptionDrug.idDrug,
                 MeasureUnitConvert.idMeasureUnit == PrescriptionDrug.idMeasureUnit,
+            ),
+        )
+        .outerjoin(
+            default_measure_unit,
+            and_(
+                default_measure_unit.id == DrugAttributes.idMeasureUnit,
+                default_measure_unit.idHospital == default_measure_unit_hospital,
             ),
         )
         .filter(Prescription.admissionNumber == admission_number)

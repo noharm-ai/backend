@@ -239,3 +239,34 @@ class TestSlugify:
 def test_mask_person_name(name, masked):
     """Teste stringutils - mask_person_name"""
     assert stringutils.mask_person_name(name) == masked
+
+
+class TestFormatNumberBR:
+    """format_number_br: Brazilian format, no float noise, small values keep
+    their significant digits."""
+
+    @pytest.mark.parametrize(
+        "value, expected",
+        [
+            (1522.6200000000001, "1.522,62"),
+            (86.39999999999999, "86,40"),
+            (14.080000000000002, "14,08"),
+            (0.6000000000000001, "0,60"),
+            (0.30000000000000004, "0,30"),
+            (1575.0, "1.575,00"),
+            (40000, "40.000,00"),
+            (100 / 3, "33,33"),
+            (2000 / 7, "285,71"),
+            (1 / 3, "0,333"),
+            (0.375, "0,375"),
+            (0.0025, "0,0025"),
+            (1.2e-06, "0,0000012"),
+            (0.9996, "1,00"),
+            (0, "0,00"),
+            (-0.375, "-0,375"),
+            (None, "None"),
+        ],
+    )
+    def test_format(self, value, expected):
+        """Each value as an alert text prints it."""
+        assert stringutils.format_number_br(value) == expected
