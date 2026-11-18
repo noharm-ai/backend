@@ -1,10 +1,11 @@
 """Repository: User related operations"""
 
 from typing import Iterable, Union, List
-from sqlalchemy import func, or_, desc, asc, cast
+from sqlalchemy import Text, and_, func, or_, desc, asc, cast
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import aliased
 
+from models.appendix import OrganizationSchema
 from models.main import db, User, UserAuthorization, UserExtra
 from security.role import Role
 
@@ -104,13 +105,34 @@ def get_extra_schema_users_list(schema: str):
     through UserExtra, removing staff users"""
     # aliased so it does not correlate with the UserExtra in _remove_staff_users
     grant = aliased(UserExtra)
+    grant_config = cast(grant.config, JSONB)
+    # managers of every schema of the organization this schema belongs to
+    # (usuario_extra.config['organization']['allSchemas'])
+    organization_ids = (
+        db.session.query(cast(OrganizationSchema.idOrganization, Text))
+        .filter(OrganizationSchema.schemaName == schema)
+        .scalar_subquery()
+    )
     query = (
         db.session.query(User)
         .join(grant, grant.idUser == User.id)
         .filter(User.schema != schema)
-        # containment matches the exact schema name (a LIKE would let "demo"
-        # match "demo2")
-        .filter(cast(grant.config["schemas"], JSONB).contains([{"name": schema}]))
+        .filter(
+            or_(
+                # containment matches the exact schema name (a LIKE would let
+                # "demo" match "demo2")
+                grant_config["schemas"].contains([{"name": schema}]),
+                # same rules as organization_service.get_organization_grant:
+                # the role, allSchemas exactly true and an integer id (a string
+                # "5" has the same text as 5, hence the type check)
+                and_(
+                    grant_config["roles"].contains([Role.ORGANIZATION_MANAGER.value]),
+                    grant_config["organization"].contains({"allSchemas": True}),
+                    func.jsonb_typeof(grant_config["organization"]["id"]) == "number",
+                    grant_config["organization"]["id"].astext == organization_ids,
+                ),
+            )
+        )
     )
 
     return _remove_staff_users(query).order_by(desc(User.active), asc(User.name)).all()

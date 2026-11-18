@@ -11,9 +11,17 @@ from models.main import User, UserExtra, db
 from models.requests.knowledge_base_request import (
     KnowledgeBaseListRequest,
 )
-from repository import knowledge_base_repository, user_repository
+from repository import (
+    knowledge_base_repository,
+    user_repository,
+)
 from security.role import Role
-from services import odoo_client, training_service, vector_search_service
+from services import (
+    odoo_client,
+    organization_service,
+    training_service,
+    vector_search_service,
+)
 from services.admin import admin_integration_status_service
 from utils import status
 
@@ -506,7 +514,7 @@ def list_tickets_v2(user_context: User, user_permissions: list[Permission]):
             db.session.query(UserExtra).filter(UserExtra.idUser == db_user.id).first()
         )
         if extra:
-            extra_schemas = extra.config.get("schemas", [])
+            extra_schemas = organization_service.get_extra_schemas(extra.config)
 
             for schema in extra_schemas:
                 schema_name = schema.get("name", None)
