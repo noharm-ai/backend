@@ -1,5 +1,6 @@
 """Tests: infection control follow-up, the reasons of a non-conformity and the
-intervention a review may record with them, kept by infection control"""
+intervention a review may record with them, changed by infection control or
+by the prescription screening"""
 
 from datetime import timedelta
 
@@ -362,29 +363,38 @@ def test_retroactive_non_conformity_records_no_intervention(
     assert _interventions(admission) == []
 
 
-def test_pharmacist_cannot_change_infection_control_intervention(
+def test_pharmacist_changes_infection_control_intervention(
     client, infection_control, admission, reasons, interventions
 ):
-    """401 to edit or close an intervention kept by infection control"""
+    """The prescription screening edits and closes an intervention recorded by
+    infection control, which keeps its link to the evaluation"""
     id_intervention = _ic_intervention(client, admission)
 
     response = client.put(
         "/intervention",
-        json={"idIntervention": id_intervention, "observation": "outra"},
+        json={
+            "idIntervention": id_intervention,
+            "idPrescriptionDrug": str(_interventions(admission)[0]["fkpresmed"]),
+            "observation": "Ajustado pela farmácia",
+        },
         headers=_as(client, Role.PRESCRIPTION_ANALYST),
     )
-    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+    assert response.status_code == status.HTTP_200_OK, response.get_json()
+    (served,) = response.get_json()["data"]
+    assert served["idInfectionControlEvaluation"] == str(
+        _evaluations(admission)[0]["idci_avaliacao_atm"]
+    )
 
     response = client.post(
         "/intervention/set-outcome",
         json=_outcome(id_intervention),
         headers=_as(client, Role.PRESCRIPTION_ANALYST),
     )
-    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+    assert response.status_code == status.HTTP_200_OK, response.get_json()
 
     (intervention,) = _interventions(admission)
-    assert intervention["observacao"] == "Espectro amplo"
-    assert intervention["status"] == "s"
+    assert intervention["observacao"] == "Ajustado pela farmácia"
+    assert intervention["status"] == "a"
 
 
 def test_infection_control_changes_its_intervention(
@@ -478,12 +488,13 @@ def test_reasons_list_flags_infection_control(client, reasons):
 
 @pytest.mark.parametrize(
     "role, locked",
-    [(Role.PRESCRIPTION_ANALYST, True), (Role.INFECTION_CONTROLLER, False)],
+    [(Role.PRESCRIPTION_ANALYST, False), (Role.INFECTION_CONTROLLER, False)],
 )
 def test_outcome_data_tells_who_can_change_it(
     client, infection_control, admission, reasons, interventions, role, locked
 ):
-    """The outcome form is locked for whoever cannot change the intervention"""
+    """The outcome form of an infection control intervention is open to both
+    the prescription screening and infection control"""
     id_intervention = _ic_intervention(client, admission)
 
     response = client.get(
@@ -495,6 +506,38 @@ def test_outcome_data_tells_who_can_change_it(
     header = response.get_json()["data"]["header"]
     assert header["infectionControl"] is True
     assert header["locked"] is locked
+
+
+def test_outcome_data_locks_screening_interventions_for_infection_control(
+    client, infection_control, admission, reasons, interventions
+):
+    """The outcome form of a screening intervention stays locked for the
+    infection control user"""
+    id_prescription = _prescribe_today(admission)
+    response = client.put(
+        "/intervention",
+        json={
+            "status": "s",
+            "admissionNumber": admission,
+            "idInterventionReason": [REASON_NOT_IC],
+            "idPrescriptionDrug": f"{id_prescription}001",
+            "observation": "triagem",
+        },
+        headers=_as(client, Role.PRESCRIPTION_ANALYST),
+    )
+    assert response.status_code == status.HTTP_200_OK, response.get_json()
+    (served,) = response.get_json()["data"]
+    session_commit()
+
+    response = client.get(
+        f"/intervention/outcome-data?idIntervention={served['idIntervention']}",
+        headers=_as(client, Role.INFECTION_CONTROLLER),
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.get_json()
+    header = response.get_json()["data"]["header"]
+    assert header["infectionControl"] is False
+    assert header["locked"] is True
 
 
 def test_undone_intervention_leaves_the_evaluation(
