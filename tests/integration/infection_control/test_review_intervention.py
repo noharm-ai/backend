@@ -249,6 +249,64 @@ def test_non_conformity_records_intervention(
     ]
 
 
+# no usuario_autorizacao row of the demo user names it
+UNAUTHORIZED_SEGMENT = 99
+
+
+@pytest.fixture
+def unauthorized_segment_antimicrobial():
+    """Flag the antimicrobial on the unauthorized segment too, so a drug moved
+    there still runs as an antimicrobial"""
+    params = {"id_drug": ANTIMICROBIAL_DRUG, "id_segment": UNAUTHORIZED_SEGMENT}
+    session.execute(
+        text(
+            "INSERT INTO demo.medatributos (fkmedicamento, idsegmento, antimicro) "
+            "VALUES (:id_drug, :id_segment, true)"
+        ),
+        params,
+    )
+    session_commit()
+
+    yield
+
+    for table in ("medatributos_audit", "medatributos"):
+        session.execute(
+            text(
+                f"DELETE FROM demo.{table} "
+                "WHERE fkmedicamento = :id_drug AND idsegmento = :id_segment"
+            ),
+            params,
+        )
+    session_commit()
+
+
+def test_non_conformity_intervention_keeps_the_drug_segment(
+    client,
+    infection_control,
+    admission,
+    reasons,
+    interventions,
+    unauthorized_segment_antimicrobial,
+):
+    """401 to record the intervention on a drug in a segment the user is not
+    authorized on, though the patient is in one they are; nothing is written"""
+    id_prescription = _prescribe_today(admission)
+    session.execute(
+        text("UPDATE demo.presmed SET idsegmento = :segment WHERE fkprescricao = :id"),
+        {"segment": UNAUTHORIZED_SEGMENT, "id": id_prescription},
+    )
+    session_commit()
+
+    response = _non_conformity(
+        client, admission, intervention_reasons=[REASON_IC], create_intervention=True
+    )
+
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+    assert "segmento" in response.get_json()["message"]
+    assert _evaluations(admission) == []
+    assert _interventions(admission) == []
+
+
 def test_intervention_economy_follows_the_reasons(
     client, infection_control, admission, reasons, interventions
 ):

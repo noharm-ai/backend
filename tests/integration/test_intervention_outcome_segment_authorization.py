@@ -11,9 +11,8 @@ depending on what the intervention was opened on:
 * an intervention on a whole prescription (fkpresmed = 0) takes the segment of
   the prescription, and is refused when that prescription is gone;
 * an intervention on a prescription drug takes the segment of the drug;
-* an intervention recorded by an infection control review follows the
-  admission, not the segment, for infection control, so it is not checked for
-  them; the prescription screening keeps its segments on it;
+* an intervention recorded by an infection control review is checked like
+  any other, for infection control and the prescription screening alike;
 * maintainers skip the check altogether.
 
 The other rules of the endpoint are covered by
@@ -290,10 +289,10 @@ class TestPrescriptionDrugIntervention:
 class TestInfectionControlIntervention:
     """Teste post /intervention/set-outcome - intervenção do controle de infecção"""
 
-    def test_infection_control_intervention_ignores_the_segment(
+    def test_infection_control_intervention_keeps_the_segment(
         self, client, analyst_headers, infection_controller_headers
     ):
-        """Intervenção do controle de infecção segue o atendimento, não o segmento"""
+        """Controle de infecção fora do segmento não fecha a intervenção"""
         id_intervention, id_prescription_drug = _open_on_drug(client, analyst_headers)
         _move_drug(id_prescription_drug, UNAUTHORIZED_SEGMENT)
         session.execute(
@@ -307,8 +306,9 @@ class TestInfectionControlIntervention:
 
         response = _set_outcome(client, infection_controller_headers, id_intervention)
 
-        assert response.status_code == status.HTTP_200_OK
-        assert _stored_status(id_intervention) == "a"
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+        assert "segmento" in response.get_json()["message"]
+        assert _stored_status(id_intervention) == "s"
 
     def test_infection_control_intervention_keeps_the_segment_for_the_screening(
         self, client, analyst_headers

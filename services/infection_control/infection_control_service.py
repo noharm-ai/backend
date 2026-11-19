@@ -47,7 +47,10 @@ from repository import (
     user_activity_repository,
     user_repository,
 )
-from repository.infection_control import infection_control_repository
+from repository.infection_control import (
+    antimicrobial_repository,
+    infection_control_repository,
+)
 from services import (
     data_authorization_service,
     feature_service,
@@ -506,6 +509,19 @@ def _validate_review(
     return reasons
 
 
+def _validate_segment_authorization(id_segment: int | None, user_context: User):
+    """The user may write on the patient's current segment, as the screening
+    checks before any write"""
+    if not data_authorization_service.has_segment_authorization(
+        id_segment=id_segment, user=user_context
+    ):
+        raise ValidationError(
+            "Usuário não autorizado neste segmento",
+            "errors.businessRules",
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
+
 def _validate_clinical_note(
     request_data: InfectionControlReviewRequest,
     admission: InfectionControlAdmission,
@@ -551,16 +567,6 @@ def _validate_clinical_note(
             "Atendimento sem prescrição para registrar a evolução",
             "errors.businessRules",
             status.HTTP_400_BAD_REQUEST,
-        )
-
-    # as a clinical note written on the prescription screen
-    if not data_authorization_service.has_segment_authorization(
-        id_segment=prescription.idSegment, user=user_context
-    ):
-        raise ValidationError(
-            "Usuário não autorizado neste segmento",
-            "errors.invalidRegister",
-            status.HTTP_401_UNAUTHORIZED,
         )
 
     return prescription
@@ -609,6 +615,11 @@ def _record_intervention(
             "errors.invalidParams",
             status.HTTP_400_BAD_REQUEST,
         )
+
+    # the drug may be in another segment than the patient now
+    intervention_service.validate_drug_segment_authorization(
+        id_prescription_drug=evaluation.id_prescription_drug, user=user_context
+    )
 
     intervention_service.create_drug_intervention(
         user_context=user_context,
@@ -670,6 +681,17 @@ def save_review(request_data: InfectionControlReviewRequest, user_context: User)
             "errors.invalidRecord",
             status.HTTP_400_BAD_REQUEST,
         )
+    # the segment of the prescription-day the record points at (the latest
+    # one), as the worklist shows it
+    last_prescription = (
+        db.session.get(Prescription, admission.id_last_prescription)
+        if admission.id_last_prescription is not None
+        else None
+    )
+    _validate_segment_authorization(
+        id_segment=last_prescription.idSegment if last_prescription else None,
+        user_context=user_context,
+    )
     note_prescription = (
         _validate_clinical_note(
             request_data=request_data, admission=admission, user_context=user_context
@@ -861,6 +883,17 @@ def follow_admission(admission_number: int, user_context: User):
             "errors.businessRules",
             status.HTTP_400_BAD_REQUEST,
         )
+    # the segment of the latest prescription, as the admission page shows it:
+    # an admission prescalc missed may have no prescription-day yet
+    last_prescription = antimicrobial_repository.get_last_prescription(
+        admission_number=admission_number
+    )
+    _validate_segment_authorization(
+        id_segment=last_prescription.Prescription.idSegment
+        if last_prescription
+        else None,
+        user_context=user_context,
+    )
 
     admission = rule.sync_admission(
         admission_number=admission_number,

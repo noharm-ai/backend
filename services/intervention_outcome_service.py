@@ -85,14 +85,11 @@ def set_intervention_outcome(
                 status.HTTP_400_BAD_REQUEST,
             )
 
-    if not intervention_service.skips_segment_authorization(
-        intervention=intervention, user=user_context
-    ):
-        _validate_authorization(
-            id_prescription=intervention.idPrescription,
-            id_prescription_drug=intervention.id,
-            user=user_context,
-        )
+    _validate_authorization(
+        id_prescription=intervention.idPrescription,
+        id_prescription_drug=intervention.id,
+        user=user_context,
+    )
 
     if outcome not in ["a", "n", "x", "j", "s"]:
         raise ValidationError(
