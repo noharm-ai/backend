@@ -26,16 +26,19 @@ from utils import logger
 CALCULATED_EXAMS = frozenset({"ckd", "ckd21"})
 
 # the conditions a rule may set; all that are set must hold on one result
-EXAM_TRIGGER_CONDITIONS = (
+VALUE_CONDITIONS = (
     "valueAbove",
     "valueAtLeast",
     "valueBelow",
     "valueAtMost",
+)
+VARIATION_CONDITIONS = (
     "variationAbove",
     "variationAtLeast",
     "variationBelow",
     "variationAtMost",
 )
+EXAM_TRIGGER_CONDITIONS = VALUE_CONDITIONS + VARIATION_CONDITIONS
 
 
 class ExamTriggerRuleData(BaseModel):
@@ -55,12 +58,18 @@ class ExamTriggerRuleData(BaseModel):
     valueAtMost: float | None = None
     # the variation from the baseline, in percent, compared the same way
     # (signed: variationAbove 30 means a rise of more than 30%, variationBelow
-    # -25 a fall of more than 25%); not met without a baseline, and from a
-    # zero baseline any rise is unbounded (a rise is met, a fall is not)
+    # -25 a fall of more than 25%); not met without a baseline (unless
+    # variationOptional), and from a zero baseline any rise is unbounded (a
+    # rise is met, a fall is not)
     variationAbove: float | None = None
     variationAtLeast: float | None = None
     variationBelow: float | None = None
     variationAtMost: float | None = None
+    # without a baseline (no result at review time), the variation conditions
+    # are skipped and the value conditions decide alone, instead of the rule
+    # never firing ("> 0.5 and, when there was a previous result, a fall of
+    # less than 50%"); needs a value condition, or it would fire on any result
+    variationOptional: bool = False
     # only results from this treatment day of the course on (D1 is the first
     # 24 hours, as the timeline counts; 4 means after D3)
     fromCourseDay: int | None = Field(default=None, ge=1)
@@ -77,6 +86,15 @@ class ExamTriggerRuleData(BaseModel):
             raise ValueError("an exam trigger rule needs a name")
         if all(getattr(self, c) is None for c in EXAM_TRIGGER_CONDITIONS):
             raise ValueError("an exam trigger rule needs a condition")
+        if self.variationOptional:
+            if all(getattr(self, c) is None for c in VARIATION_CONDITIONS):
+                # nothing to skip
+                self.variationOptional = False
+            elif all(getattr(self, c) is None for c in VALUE_CONDITIONS):
+                raise ValueError(
+                    "an exam trigger rule with an optional variation needs a "
+                    "value condition"
+                )
         return self
 
 
