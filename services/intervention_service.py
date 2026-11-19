@@ -41,6 +41,7 @@ def get_interventions(
     idDrug=None,
     id_intervention_reason_list=[],
     has_economy=None,
+    infection_control=None,
     status_list=[],
     responsible_name=None,
     prescriber_name=None,
@@ -208,6 +209,17 @@ def get_interventions(
             interventions = interventions.filter(Intervention.economy_type != None)
         else:
             interventions = interventions.filter(Intervention.economy_type == None)
+
+    # recorded by an infection control review or by the prescription screening
+    if infection_control != None and infection_control != "":
+        if infection_control:
+            interventions = interventions.filter(
+                Intervention.id_infection_control_evaluation != None
+            )
+        else:
+            interventions = interventions.filter(
+                Intervention.id_infection_control_evaluation == None
+            )
 
     if len(status_list) > 0:
         interventions = interventions.filter(Intervention.status.in_(status_list))
@@ -484,20 +496,33 @@ def add_multiple_interventions(
 
 
 def can_change_intervention(intervention: Intervention, user: User) -> bool:
-    """Interventions recorded by an infection control review are changed only
-    by infection control, the others by the prescription screening"""
-    permission = (
-        Permission.WRITE_INFECTION_CONTROL
-        if intervention.id_infection_control_evaluation
-        else Permission.WRITE_PRESCRIPTION
-    )
+    """Interventions recorded by an infection control review are changed by
+    infection control or by the prescription screening, the others only by the
+    prescription screening"""
+    permissions = Role.get_permissions_from_user(user=user)
+    if intervention.id_infection_control_evaluation:
+        return (
+            Permission.WRITE_INFECTION_CONTROL in permissions
+            or Permission.WRITE_PRESCRIPTION in permissions
+        )
 
-    return permission in Role.get_permissions_from_user(user=user)
+    return Permission.WRITE_PRESCRIPTION in permissions
 
 
 def validate_origin_permission(intervention: Intervention, user: User):
     if not can_change_intervention(intervention=intervention, user=user):
         raise AuthorizationError()
+
+
+def skips_segment_authorization(intervention: Intervention, user: User) -> bool:
+    """Infection control follows the admission, not the segment; the
+    prescription screening keeps its segments on the infection control
+    interventions too"""
+    return bool(
+        intervention.id_infection_control_evaluation
+    ) and Permission.WRITE_INFECTION_CONTROL in Role.get_permissions_from_user(
+        user=user
+    )
 
 
 @has_permission(Permission.WRITE_PRESCRIPTION, Permission.WRITE_INFECTION_CONTROL)
@@ -606,8 +631,7 @@ def save_intervention(
         # only the infection control review creates its interventions
         validate_origin_permission(intervention=i, user=user_context)
 
-    # infection control interventions follow the admission, not the segment
-    if not i.id_infection_control_evaluation:
+    if not skips_segment_authorization(intervention=i, user=user_context):
         _validate_authorization(
             id_prescription=i.idPrescription,
             id_prescription_drug=i.id,

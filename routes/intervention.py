@@ -76,6 +76,7 @@ def search_interventions():
         idDrug=data.get("idDrug", None),
         id_intervention_reason_list=data.get("idInterventionReasonList", []),
         has_economy=data.get("hasEconomy", None),
+        infection_control=data.get("infectionControl", None),
         status_list=data.get("statusList", []),
         responsible_name=data.get("responsibleName", None),
         prescriber_name=data.get("prescriberName", None),

@@ -2,9 +2,9 @@
 
 The search endpoint feeds the "Intervenções" screen and every report built on
 top of it. It is a single query with a dozen optional filters (period, segment,
-drug, prescription, reason, economy, status, responsible, prescriber) plus the
-fallbacks used to name the drug of an intervention whose prescription is no
-longer available.
+drug, prescription, reason, economy, infection control, status, responsible,
+prescriber) plus the fallbacks used to name the drug of an intervention whose
+prescription is no longer available.
 
 Each test builds its own interventions and always scopes the search to the test
 admission, so seed interventions never interfere with the assertions.
@@ -53,6 +53,9 @@ REASON_APRAZAMENTO = 2
 REASON_APRESENTACAO = 3
 REASON_DOSE = 12
 
+# the evaluation is not read by the search, so no ci_avaliacao_atm row backs it
+INFECTION_CONTROL_EVALUATION = 990000
+
 ECONOMY_TYPE_SUBSTITUTION = 2
 
 
@@ -76,6 +79,7 @@ def _add_intervention(
     user=RESPONSIBLE,
     economy_type=None,
     id_prescription=0,
+    id_infection_control_evaluation=None,
 ):
     """Persist one intervention for the search tests."""
     intervention = Intervention()
@@ -91,6 +95,7 @@ def _add_intervention(
     intervention.user = user
     intervention.economy_type = economy_type
     intervention.economy_day_value_manual = False
+    intervention.id_infection_control_evaluation = id_infection_control_evaluation
 
     session.add(intervention)
 
@@ -101,7 +106,8 @@ def _add_intervention(
 def dataset():
     """Five interventions on one admission, each differing on a single filter.
 
-    * ``current`` — segment 1, anlodipino, today, no economy, status "s"
+    * ``current`` — segment 1, anlodipino, today, no economy, status "s",
+      recorded by an infection control review
     * ``old`` — segment 2, bisacodil, five days ago, economy, status "a",
       another responsible and another prescriber
     * ``unknown_drug`` — prescribed item whose drug is not in the catalogue
@@ -154,6 +160,7 @@ def dataset():
             id_prescription_drug=current_drug,
             admission_number=admission,
             reasons=[REASON_APRAZAMENTO],
+            id_infection_control_evaluation=INFECTION_CONTROL_EVALUATION,
         ),
         "old": _add_intervention(
             id_intervention=FIRST_INTERVENTION_ID + 1,
@@ -356,6 +363,41 @@ def test_search_ignores_an_empty_economy_filter(client, analyst_headers, dataset
     result = _search(client, analyst_headers, dataset, hasEconomy="")
 
     assert _found_ids(result) == set(dataset.interventions.values())
+
+
+@pytest.mark.parametrize(
+    "infection_control, expected",
+    [
+        (True, ["current"]),
+        (False, ["old", "unknown_drug", "archived", "patient"]),
+        ("", ["current", "old", "unknown_drug", "archived", "patient"]),
+    ],
+)
+def test_search_by_infection_control(
+    client, analyst_headers, dataset, infection_control, expected
+):
+    """infectionControl splits the interventions recorded by an infection
+    control review from the ones of the prescription screening; empty is both"""
+    result = _search(
+        client, analyst_headers, dataset, infectionControl=infection_control
+    )
+
+    assert _found_ids(result) == {dataset.interventions[k] for k in expected}
+
+
+def test_search_serves_the_infection_control_evaluation(
+    client, analyst_headers, dataset
+):
+    """The list tags the interventions recorded by infection control"""
+    result = _search(client, analyst_headers, dataset)
+
+    assert _by_id(result, dataset.interventions["current"])[
+        "idInfectionControlEvaluation"
+    ] == str(INFECTION_CONTROL_EVALUATION)
+    assert (
+        _by_id(result, dataset.interventions["old"])["idInfectionControlEvaluation"]
+        is None
+    )
 
 
 def test_search_by_status(client, analyst_headers, dataset):

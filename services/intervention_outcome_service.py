@@ -85,8 +85,9 @@ def set_intervention_outcome(
                 status.HTTP_400_BAD_REQUEST,
             )
 
-    # infection control interventions follow the admission, not the segment
-    if not intervention.id_infection_control_evaluation:
+    if not intervention_service.skips_segment_authorization(
+        intervention=intervention, user=user_context
+    ):
         _validate_authorization(
             id_prescription=intervention.idPrescription,
             id_prescription_drug=intervention.id,
@@ -263,7 +264,7 @@ def get_outcome_data(id_intervention, user_context: User, edit=False):
 
     data = _get_outcome_data(record=record, user_context=user_context, edit=edit)
 
-    # who may change it: infection control keeps the ones its reviews recorded
+    # who may set the outcome: the ones infection control recorded are tagged
     intervention: Intervention = record[0]
     data["header"]["infectionControl"] = bool(
         intervention.id_infection_control_evaluation
