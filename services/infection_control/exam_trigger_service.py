@@ -32,7 +32,9 @@ Only results the reviewer could not have seen count: dated after the baseline
 (or after the evaluation was made, when it had none). So a new evaluation,
 taking the latest result as its baseline, never reopens the reason on the
 result that opened it. A variation is measured from the baseline and is not
-met without one; from a zero baseline any rise is unbounded.
+met without one, unless the rule makes it optional (variationOptional: then
+the value conditions decide alone); from a zero baseline any rise is
+unbounded.
 
 The rule reads only the cache: the exams cache job of backend-private, after
 caching new results, queues the patient's followed admissions with an active
@@ -620,8 +622,13 @@ def _meets(trigger: dict, value: float, baseline_value: float | None) -> dict | 
     baseline (percent) when it does (None from a zero baseline: the JSON kept
     on the reason has no infinity)"""
     variation = _variation(value, baseline_value)
+    subjects = [("value", value)]
+    # an optional variation is skipped without a baseline (a zero one is a
+    # baseline): the value conditions decide alone
+    if baseline_value is not None or not trigger.get("variationOptional"):
+        subjects.append(("variation", variation))
 
-    for subject, compared in (("value", value), ("variation", variation)):
+    for subject, compared in subjects:
         for suffix, met in _COMPARISONS:
             limit = trigger.get(subject + suffix)
             if limit is None:

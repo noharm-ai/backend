@@ -34,6 +34,7 @@ from tests.integration.infection_control.helpers import (
     _record,
     _review,
     _run_job,
+    _set,
 )
 from utils import status
 
@@ -390,6 +391,40 @@ def test_saves_the_rules(client, infection_controller_headers, rules):
     assert pcr["variationAtLeast"] == 20
     assert pcr["enabledByDefault"] is True
     assert data["rules"][1]["enabledByDefault"] is False
+    assert pcr["variationOptional"] is False
+
+
+def test_an_optional_variation_fires_on_the_value_without_a_baseline(
+    client, infection_controller_headers, rules, mapped_exams, admission
+):
+    """Saved with an optional variation, a rule reviewed without a result of
+    its exam fires on the value alone"""
+    response = _save(
+        client,
+        infection_controller_headers,
+        [{**PCR_RISE, "id": rules["PCR em elevação"], "variationOptional": True}],
+    )
+    assert response.status_code == status.HTTP_200_OK, response.get_json()
+    (pcr,) = _listed(client, infection_controller_headers)["rules"]
+    assert pcr["variationOptional"] is True
+
+    _prescribe_today(admission)
+    _reviewed(client, infection_controller_headers, admission, [pcr["id"]])
+    (evaluation,) = _evaluations(admission)
+    (trigger,) = evaluation["gatilhos"]
+    assert trigger["variationOptional"] is True
+    assert trigger["baseline"] is None
+
+    # without a baseline, results after the evaluation was made count
+    _set("ci_avaliacao_atm", admission, created_at=datetime.now() - timedelta(hours=2))
+    _exam(PCR_TYPE, 60, datetime.now() - timedelta(minutes=30))
+    _run_job(admission)
+
+    (pending,) = _open_pendings(admission)
+    (match,) = pending["detalhes"]["matches"]
+    assert match["result"]["value"] == 60
+    assert match["baseline"] is None
+    assert match["variation"] is None
 
 
 def test_editing_keeps_the_id_and_a_rule_left_out_is_deleted(
@@ -418,6 +453,8 @@ def test_editing_keeps_the_id_and_a_rule_left_out_is_deleted(
         {**FEVER_AFTER_D3, "valueAbove": None},
         {**FEVER_AFTER_D3, "name": ""},
         {**FEVER_AFTER_D3, "id": "unknown"},
+        # an optional variation needs a value condition
+        {**EGFR_FALL, "valueBelow": None, "variationOptional": True},
     ],
 )
 def test_refuses_an_invalid_rule(client, infection_controller_headers, rules, rule):
