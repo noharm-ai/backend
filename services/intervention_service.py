@@ -514,14 +514,11 @@ def validate_origin_permission(intervention: Intervention, user: User):
         raise AuthorizationError()
 
 
-def skips_segment_authorization(intervention: Intervention, user: User) -> bool:
-    """Infection control follows the admission, not the segment; the
-    prescription screening keeps its segments on the infection control
-    interventions too"""
-    return bool(
-        intervention.id_infection_control_evaluation
-    ) and Permission.WRITE_INFECTION_CONTROL in Role.get_permissions_from_user(
-        user=user
+def validate_drug_segment_authorization(id_prescription_drug, user: User):
+    """The user may change the prescribed drug's segment, as the screening
+    checks before an intervention on it is recorded"""
+    _validate_authorization(
+        id_prescription=0, id_prescription_drug=id_prescription_drug, user=user
     )
 
 
@@ -631,12 +628,11 @@ def save_intervention(
         # only the infection control review creates its interventions
         validate_origin_permission(intervention=i, user=user_context)
 
-    if not skips_segment_authorization(intervention=i, user=user_context):
-        _validate_authorization(
-            id_prescription=i.idPrescription,
-            id_prescription_drug=i.id,
-            user=user_context,
-        )
+    _validate_authorization(
+        id_prescription=i.idPrescription,
+        id_prescription_drug=i.id,
+        user=user_context,
+    )
 
     if admission_number:
         i.admissionNumber = admission_number
