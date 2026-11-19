@@ -11,10 +11,12 @@ from models.requests.infection_control_request import (
     InfectionControlBackfillRequest,
     InfectionControlListRequest,
     InfectionControlReviewRequest,
+    ReviewExceptionsSaveRequest,
 )
 from services.infection_control import (
     infection_control_service,
     recent_cultures_service,
+    review_exception_service,
 )
 from utils import status
 
@@ -119,6 +121,32 @@ def save_exam_triggers():
         ) from e
 
     return infection_control_service.save_exam_triggers(request_data=request_data)
+
+
+@app_infection_control.route("/infection-control/review-exceptions", methods=["GET"])
+@api_endpoint()
+def get_review_exceptions():
+    """The antimicrobials whose courses need no review"""
+    return review_exception_service.get_review_exceptions()
+
+
+@app_infection_control.route(
+    "/infection-control/review-exceptions/options", methods=["GET"]
+)
+@api_endpoint()
+def search_review_exception_options():
+    """Substances of antimicrobials and antimicrobial drugs without a
+    substance, by name, for the review exceptions"""
+    return review_exception_service.search_options(term=request.args.get("q", None))
+
+
+@app_infection_control.route("/infection-control/review-exceptions", methods=["PUT"])
+@api_endpoint()
+def save_review_exceptions():
+    """Replace the antimicrobials whose courses need no review"""
+    return review_exception_service.save_review_exceptions(
+        request_data=ReviewExceptionsSaveRequest(**request.get_json())
+    )
 
 
 @app_infection_control.route("/infection-control/review", methods=["POST"])

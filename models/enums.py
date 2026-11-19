@@ -28,6 +28,9 @@ class MemoryEnum(Enum):
     TRANSCRIPTION_REMOVE_FIELDS = "transcription-remove-fields"
     # the infection control exam trigger rules (models/infection_control_config.py)
     INFECTION_CONTROL_EXAM_TRIGGERS = "infection-control-exam-triggers"
+    # the antimicrobials whose courses need no infection control review
+    # (models/infection_control_config.py, ReviewExceptionsData)
+    INFECTION_CONTROL_REVIEW_EXCEPTIONS = "infection-control-review-exceptions"
 
 
 class GlobalMemoryEnum(Enum):
@@ -530,6 +533,9 @@ class InfectionControlResolutionEnum(Enum):
     DISMISSED = 3
     DRUG_NO_LONGER_ACTIVE = 4
     DISCHARGE = 5
+    # the drug was put on the schema's review exceptions while the reason was
+    # open (or every running drug is exempt, for the admission's own reasons)
+    NOT_REQUIRED = 6
 
 
 class AntimicrobialEvaluationStatusEnum(Enum):
@@ -615,3 +621,5 @@ class AdmissionQueueReasonEnum(Enum):
     # to the DynamoDB culture summary by the culture cache job of
     # backend-private (which writes the queue itself)
     CULTURE_CACHE = "culture_cache"
+    # the schema's review exceptions changed a drug the admission is running
+    REVIEW_EXCEPTIONS = "review_exceptions"

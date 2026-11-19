@@ -59,6 +59,7 @@ from services import (
 from services.infection_control import (
     antimicrobial_timeline_service,
     exam_trigger_service,
+    review_exception_service,
 )
 from services.infection_control import (
     infection_control_status_service as rule,
@@ -208,6 +209,7 @@ def _get_state(
         admission_courses = rule.load_courses(
             admission_number=admission_number, now=now
         )
+    exceptions = review_exception_service.load()
     courses = []
     for course in admission_courses.courses:
         history = [
@@ -228,6 +230,9 @@ def _get_state(
                 "idDrug": rule.course_drug(course),
                 "start": dateutils.to_iso(course.start),
                 "ongoing": any(c is course for c in admission_courses.ongoing),
+                # by the schema's review exceptions now: an exempt course opens
+                # no reason, but may still be evaluated
+                "reviewRequired": rule.review_required(course, exceptions),
                 "evaluation": active,
                 "history": history,
             }

@@ -136,3 +136,41 @@ def parse_exam_trigger_rules(value) -> list[ExamTriggerRule]:
         rules.append(rule)
 
     return rules
+
+
+# --- review exceptions ---
+
+# bounds what one schema can keep: far more than any formulary needs
+MAX_REVIEW_EXCEPTIONS = 500
+
+
+class ReviewExceptionsData(BaseModel):
+    """The antimicrobials of a schema whose courses need no review, kept in the
+    schema's memoria (kind MemoryEnum.INFECTION_CONTROL_REVIEW_EXCEPTIONS, one
+    record; GET/PUT /infection-control/review-exceptions).
+
+    A substance (public.substancia.sctid) covers every drug of it; a drug
+    (medicamento.fkmedicamento) is the fallback for the drugs without a
+    substance. A course is exempt when its drug or its substance is listed:
+    it still counts as antimicrobial therapy (timeline, DOT/LOT), but opens no
+    pending reason and is left out of the review indicators. Empty (no record)
+    reviews every antimicrobial, as before the list existed.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    substances: list[int] = Field(default=[], max_length=MAX_REVIEW_EXCEPTIONS)
+    drugs: list[int] = Field(default=[], max_length=MAX_REVIEW_EXCEPTIONS)
+
+
+def parse_review_exceptions(value) -> ReviewExceptionsData:
+    """The review exceptions kept in memoria; a record that can't be read
+    reviews every antimicrobial (as with no record), and is logged"""
+    if value is None:
+        return ReviewExceptionsData()
+
+    try:
+        return ReviewExceptionsData.model_validate(value)
+    except Exception:  # noqa: BLE001 - never break the rule on a bad record
+        logger.backend_logger.warning("invalid infection control review exceptions")
+        return ReviewExceptionsData()

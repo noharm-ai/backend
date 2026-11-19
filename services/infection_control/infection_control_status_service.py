@@ -21,6 +21,12 @@ apply_rule writes the plan; a saved review also records its evaluations here
 * an admission never reviewed opens a reason of its own, and so does one
   whose scheduled review date arrived;
 * when a drug stops, its reasons are resolved and its evaluation is closed;
+* a course of a drug the schema exempted from review (review_exception_service)
+  opens no reason and its open ones are resolved (NOT_REQUIRED); the
+  admission's own reasons (never reviewed, scheduled date) need a running
+  course that is not exempt. A record running only exempt courses stays
+  followed (its summary feeds DOT/LOT), revised, and the worklist hides it
+  unless asked (indicadores.reviewRequired);
 * with nothing running (or after discharge) the record is closed.
 
 Each time it also keeps on the record what it saw (admission_features): the
@@ -71,6 +77,11 @@ from services.infection_control import (
     culture_trigger_service,
     exam_trigger_service,
     infection_control_summary_service,
+    review_exception_service,
+)
+from services.infection_control.review_exception_service import (
+    NO_EXCEPTIONS,
+    ReviewExceptions,
 )
 from services.infection_control.evaluation_triggers import pending_triggers
 from services.infection_control.antimicrobial_timeline_service import (
@@ -142,6 +153,12 @@ def course_drug(course: Course) -> int:
     return course.items[0].id_drug
 
 
+def review_required(course: Course, exceptions: ReviewExceptions) -> bool:
+    """Whether the course needs review: its drug (or the drug's substance) is
+    not among the schema's review exceptions"""
+    return not exceptions.is_exempt(course_drug(course), course.items[-1].id_substance)
+
+
 def is_ongoing(course: Course, now: datetime) -> bool:
     """Whether the course is running at `now`.
 
@@ -197,6 +214,8 @@ class PrescribedAntimicrobial:
 
     id_drug: int
     posology: dict
+    # the drug's substance, to tell whether the schema exempted it from review
+    id_substance: int | None = None
 
 
 def drug_list_posology(item: dict) -> dict:
@@ -549,12 +568,16 @@ def plan_rule(
     next_review_date: datetime | None = None,
     exam_results: exam_trigger_service.ExamResults | None = None,
     cultures: list[culture_trigger_service.CultureRelease] | None = None,
+    exceptions: ReviewExceptions = NO_EXCEPTIONS,
 ) -> RulePlan:
     """Decide which evaluations close, which reasons open or resolve and the
     resulting status, without touching the database (the exam results the
-    evaluations' exam triggers watch and the released cultures are read
-    before)"""
+    evaluations' exam triggers watch, the released cultures and the review
+    exceptions are read before)"""
     plan = RulePlan()
+    # only these open reasons; an exempt course still runs (its evaluation
+    # stays in force, the record stays followed)
+    reviewable = [c for c in ongoing if review_required(c, exceptions)]
 
     # evaluations of courses that are over are no longer in force
     kept_evaluations = []
@@ -571,7 +594,7 @@ def plan_rule(
             else AntimicrobialEvaluationClosingEnum.COURSE_ENDED
         )
 
-    if ongoing:
+    if reviewable:
         if id_last_review is None:
             plan.open_pendings.append(
                 {"pending_type": InfectionControlPendingTypeEnum.NEVER_REVIEWED}
@@ -585,7 +608,7 @@ def plan_rule(
                 }
             )
 
-        for course in ongoing:
+        for course in reviewable:
             latest = course.items[-1]
             evaluation = next(
                 (e for e in kept_evaluations if evaluation_matches_course(e, course)),
@@ -604,8 +627,10 @@ def plan_rule(
                     }
                 )
 
-    # reasons of drugs that stopped running are resolved
+    # reasons of drugs that stopped running are resolved, and so are those of
+    # drugs exempted from review while they were open
     ongoing_drugs = {course_drug(c) for c in ongoing}
+    reviewable_drugs = {course_drug(c) for c in reviewable}
     still_open = 0
     for pending in open_pendings:
         if not ongoing:
@@ -619,6 +644,10 @@ def plan_rule(
         ) or pending.id_evaluation in plan.close_evaluations:
             # a drug restarted in a new course: the old evaluation's reasons go
             resolution = InfectionControlResolutionEnum.DRUG_NO_LONGER_ACTIVE
+        elif (pending.id_drug is None and not reviewable) or (
+            pending.id_drug is not None and pending.id_drug not in reviewable_drugs
+        ):
+            resolution = InfectionControlResolutionEnum.NOT_REQUIRED
         else:
             still_open += 1
             continue
@@ -640,6 +669,8 @@ def admission_features(
     ongoing: list[Course],
     evaluations: list[AntimicrobialEvaluation],
     posology_pending_drugs: set[int] | None = None,
+    exceptions: ReviewExceptions = NO_EXCEPTIONS,
+    courses: list[Course] | None = None,
 ) -> dict:
     """What the worklist filters by, kept on the admission record (indicadores)
     as prescalc keeps the drugs of a prescription: joining the prescriptions of
@@ -654,21 +685,32 @@ def admission_features(
     (prescalc_needs_rule): the running drugs, and the posology a course was
     evaluated with (evaluatedPosology) when its evaluation watches posology
     changes and no posology reason of the drug is open (posology_pending_drugs).
+
+    Each course says whether it needs review (the schema's review exceptions),
+    and the record whether any running course does (reviewRequired, the
+    worklist hides the records without one unless asked). With nothing running
+    the record keeps whether any of its courses (all of them, when given) did,
+    so a closed record that only ran exempt courses stays hidden too.
     """
     posology_pending_drugs = posology_pending_drugs or set()
 
     def course_features(course: Course) -> dict:
+        required = review_required(course, exceptions)
         features = {
             "idDrug": course_drug(course),
             "idSubstance": course.items[-1].id_substance,
             "awareLevel": course.items[-1].atb_level,
             "start": dateutils.to_iso(course.start),
+            "reviewRequired": required,
         }
         evaluation = next(
             (e for e in evaluations if evaluation_matches_course(e, course)), None
         )
+        # an exempt course opens no posology reason: nothing for prescalc to
+        # compare
         if (
-            evaluation is not None
+            required
+            and evaluation is not None
             and evaluation.posology
             and InfectionControlPendingTypeEnum.POSOLOGY_CHANGED.value
             in pending_triggers(evaluation)
@@ -679,9 +721,12 @@ def admission_features(
             }
         return features
 
+    judged = ongoing or courses or []
     return {
         "courses": [course_features(course) for course in ongoing],
         "nonConforming": any(not e.conforming for e in evaluations),
+        "reviewRequired": not judged
+        or any(review_required(c, exceptions) for c in judged),
     }
 
 
@@ -748,6 +793,7 @@ def apply_rule(
     open_pendings = infection_control_repository.get_open_pendings(
         admission_number=admission_number
     )
+    exceptions = review_exception_service.load()
 
     plan = plan_rule(
         ongoing=admission_courses.ongoing,
@@ -774,6 +820,7 @@ def apply_rule(
             if origin == InfectionControlOriginEnum.JOB
             else None
         ),
+        exceptions=exceptions,
     )
 
     evaluations_by_id = {e.id: e for e in active_evaluations}
@@ -849,6 +896,8 @@ def apply_rule(
             for p in plan.open_pendings
             if p["pending_type"] == posology_changed
         },
+        exceptions=exceptions,
+        courses=admission_courses.courses,
     )
     # the reads below don't depend on the changes above: without autoflush
     # the record is written once, by the flush at the end
@@ -867,6 +916,7 @@ def apply_rule(
             admission_courses=admission_courses,
             status=plan.status,
             evaluations=evaluations,
+            exceptions=exceptions,
         )
     db.session.flush()
 
@@ -878,6 +928,7 @@ def follow_from_prescalc(
     user_id: int,
     id_prescription_day: int,
     id_prescription: int | None = None,
+    antimicrobials: list[PrescribedAntimicrobial] | None = None,
 ):
     """Prescalc hook: follow an admission whose prescription-day has an
     antimicrobial.
@@ -889,7 +940,12 @@ def follow_from_prescalc(
       latest one);
     * a closed record is reopened as pending (the antimicrobial restarted).
 
-    A discharged patient is left alone.
+    A discharged patient is left alone. When every antimicrobial prescalc
+    processed (not suspended: `antimicrobials`) is exempt from review (the
+    schema's review exceptions), the record is created or reopened revised,
+    without the never reviewed reason and hidden from the worklist until the
+    rule runs on it (indicadores.reviewRequired false). Without any (all
+    suspended), it is followed as before.
 
     A followed record is left to the job, which also opens the reasons of each
     drug: prescalc queues it for the light run right after this hook when its
@@ -921,6 +977,7 @@ def follow_from_prescalc(
                 now=datetime.now(),
                 id_prescription_day=id_prescription_day,
                 id_prescription=id_prescription,
+                review_required=_prescalc_review_required(antimicrobials),
             )
     except Exception as e:  # noqa: BLE001 - must not break the prescription-day
         # same event as the static context's errors, which is the one monitored
@@ -937,12 +994,27 @@ def follow_from_prescalc(
         )
 
 
+def _prescalc_review_required(
+    antimicrobials: list[PrescribedAntimicrobial] | None,
+) -> bool:
+    """Whether an antimicrobial prescalc processed needs review (any, when it
+    processed none not suspended: followed as before the exceptions)"""
+    if not antimicrobials:
+        return True
+
+    exceptions = review_exception_service.load()
+    return any(
+        not exceptions.is_exempt(a.id_drug, a.id_substance) for a in antimicrobials
+    )
+
+
 def _follow_from_prescalc(
     admission_number: int,
     user_id: int,
     now: datetime,
     id_prescription_day: int,
     id_prescription: int | None,
+    review_required: bool = True,
 ):
     """Create or reopen the record of an admission whose prescription-day has
     an antimicrobial (see follow_from_prescalc)"""
@@ -953,22 +1025,39 @@ def _follow_from_prescalc(
     ):
         return
 
+    # only exempt antimicrobials: nothing to review until the rule says
+    # otherwise (it runs soon: prescalc queues a record it created or reopened)
+    status = (
+        InfectionControlStatusEnum.PENDING
+        if review_required
+        else InfectionControlStatusEnum.REVISED
+    )
+    features = None if review_required else {"reviewRequired": False}
     created = infection_control_repository.create_admission(
         admission_number=admission_number,
         origin=InfectionControlOriginEnum.PRESCALC.value,
         user_id=user_id,
         now=now,
         id_last_prescription=id_prescription_day,
+        status=status.value,
+        features=features,
     )
     reopened = (
         None
         if created
         else infection_control_repository.reopen_admission(
-            admission_number=admission_number, user_id=user_id, now=now
+            admission_number=admission_number,
+            user_id=user_id,
+            now=now,
+            status=status.value,
+            features=features,
         )
     )
 
     # reopened after a review: the job opens the reasons of its drugs
+    if not review_required:
+        return
+
     if created or (reopened and reopened.id_last_review is None):
         infection_control_repository.open_pending(
             admission_number=admission_number,

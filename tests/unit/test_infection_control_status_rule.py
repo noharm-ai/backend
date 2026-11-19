@@ -16,8 +16,13 @@ from models.enums import (
     InfectionControlResolutionEnum,
     InfectionControlStatusEnum,
 )
+from models.infection_control_config import (
+    ReviewExceptionsData,
+    parse_review_exceptions,
+)
 from services.infection_control import antimicrobial_timeline_service as timeline
 from services.infection_control import infection_control_status_service as rule
+from services.infection_control import review_exception_service
 
 NOW = datetime(2026, 10, 7, 14, 0)
 
@@ -529,22 +534,29 @@ class TestAdmissionFeatures:
                     "idSubstance": 500,
                     "awareLevel": 2,
                     "start": (NOW - timedelta(days=3)).isoformat(),
+                    "reviewRequired": True,
                 },
                 {
                     "idDrug": 4,
                     "idSubstance": None,
                     "awareLevel": None,
                     "start": (NOW - timedelta(hours=6)).isoformat(),
+                    "reviewRequired": True,
                 },
             ],
             "nonConforming": False,
+            "reviewRequired": True,
         }
 
     def test_nothing_running(self):
         """A closed record runs nothing"""
         features = rule.admission_features(ongoing=[], evaluations=[])
 
-        assert features == {"courses": [], "nonConforming": False}
+        assert features == {
+            "courses": [],
+            "nonConforming": False,
+            "reviewRequired": True,
+        }
 
     @pytest.mark.parametrize(
         "verdicts, expected", [([True], False), ([True, False], True)]
@@ -680,3 +692,171 @@ class TestDrugListPosology:
 def _today_dates():
     """The dates of a row of today's prescription, running"""
     return {"date": NOW - timedelta(hours=6), "expire": NOW + timedelta(hours=18)}
+
+
+# --- review exceptions ---
+
+
+def _exempt(drugs=(), substances=()):
+    """Review exceptions of the given drugs and substances"""
+    return review_exception_service.ReviewExceptions(
+        drugs=frozenset(drugs), substances=frozenset(substances)
+    )
+
+
+def _running_with_substance(id_drug, id_substance):
+    """A running daily course of a drug with a substance"""
+    (course,) = _courses(
+        _row(
+            id_drug=id_drug,
+            id_substance=id_substance,
+            date=NOW - timedelta(hours=6),
+            expire=NOW + timedelta(hours=18),
+        )
+    )
+    return course
+
+
+def _plan_exceptions(ongoing, exceptions, **kwargs):
+    """Plan an admission with the given running courses and exceptions"""
+    return rule.plan_rule(
+        now=NOW,
+        ongoing=ongoing,
+        discharged=False,
+        id_last_review=kwargs.get("id_last_review"),
+        active_evaluations=kwargs.get("active_evaluations", []),
+        open_pendings=kwargs.get("open_pendings", []),
+        next_review_date=kwargs.get("next_review_date"),
+        exceptions=exceptions,
+    )
+
+
+class TestReviewExceptions:
+    """Courses of drugs the schema exempted from review open no reason"""
+
+    def test_exempt_by_drug_or_by_substance(self):
+        """A drug is exempt by its own id or by its substance's"""
+        exceptions = _exempt(drugs=[1], substances=[500])
+
+        assert exceptions.is_exempt(1, None)
+        assert exceptions.is_exempt(2, 500)
+        assert not exceptions.is_exempt(2, 501)
+        assert not exceptions.is_exempt(2, None)
+        assert not review_exception_service.NO_EXCEPTIONS.is_exempt(1, 500)
+
+    def test_only_exempt_courses_open_nothing_and_are_revised(self):
+        """Neither the drug's reason nor the admission's own ones (never
+        reviewed, scheduled date) open; the record stays followed, revised"""
+        plan = _plan_exceptions(
+            [_running_with_substance(1, 500)],
+            _exempt(substances=[500]),
+            next_review_date=NOW - timedelta(hours=1),
+        )
+
+        assert plan.open_pendings == []
+        assert plan.status == Status.REVISED
+
+    def test_reviewable_course_is_reviewed_as_before(self):
+        """Next to an exempt course, the other one opens its reasons"""
+        plan = _plan_exceptions([_running(1), _running(2)], _exempt(drugs=[2]))
+
+        assert [(p["pending_type"], p.get("id_drug")) for p in plan.open_pendings] == [
+            (PendingType.NEVER_REVIEWED, None),
+            (PendingType.NO_EVALUATION, 1),
+        ]
+        assert plan.status == Status.PENDING
+
+    def test_evaluation_of_an_exempt_course_opens_no_trigger(self):
+        """An evaluation in force stays, but its triggers open nothing while
+        the drug is exempt"""
+        course = _running(1)
+        evaluation = _evaluation(
+            1,
+            id_drug=1,
+            course_start=course.start,
+            valid_until=NOW - timedelta(hours=1),
+            triggers=EXPIRED_TRIGGER,
+        )
+
+        plan = _plan_exceptions(
+            [course], _exempt(drugs=[1]), id_last_review=7, active_evaluations=[evaluation]
+        )
+
+        assert plan.open_pendings == []
+        assert plan.close_evaluations == []
+
+    def test_open_reasons_of_an_exempted_drug_are_not_required(self):
+        """The drug's reasons, and the admission's own ones once nothing to
+        review runs, are settled as not required"""
+        plan = _plan_exceptions(
+            [_running(1)],
+            _exempt(drugs=[1]),
+            open_pendings=[
+                _pending(1, PendingType.NEVER_REVIEWED.value),
+                _pending(2, PendingType.NO_EVALUATION.value, id_drug=1),
+            ],
+        )
+
+        assert plan.resolve_pendings == {Resolution.NOT_REQUIRED: [1, 2]}
+        assert plan.status == Status.REVISED
+
+    def test_admission_reasons_stay_while_a_drug_needs_review(self):
+        """The never reviewed reason stays open next to a reviewable drug"""
+        plan = _plan_exceptions(
+            [_running(1), _running(2)],
+            _exempt(drugs=[2]),
+            open_pendings=[
+                _pending(1, PendingType.NEVER_REVIEWED.value),
+                _pending(2, PendingType.NO_EVALUATION.value, id_drug=2),
+            ],
+        )
+
+        assert plan.resolve_pendings == {Resolution.NOT_REQUIRED: [2]}
+        assert plan.status == Status.PENDING
+
+    def test_features_tell_what_needs_review(self):
+        """Each course and the record say whether they need review; an exempt
+        course keeps no posology for prescalc to compare"""
+        course = _running(1)
+        evaluation = _evaluation(
+            1, id_drug=1, course_start=course.start, triggers=POSOLOGY_TRIGGER
+        )
+        evaluation.conforming = True
+
+        features = rule.admission_features(
+            ongoing=[course], evaluations=[evaluation], exceptions=_exempt(drugs=[1])
+        )
+
+        assert features["reviewRequired"] is False
+        (course_features,) = features["courses"]
+        assert course_features["reviewRequired"] is False
+        assert "evaluatedPosology" not in course_features
+
+    @pytest.mark.parametrize("exempt, expected", [([1], False), ([2], True)])
+    def test_closed_record_judged_by_all_its_courses(self, exempt, expected):
+        """With nothing running, the record keeps whether any of its courses
+        needed review"""
+        features = rule.admission_features(
+            ongoing=[],
+            evaluations=[],
+            exceptions=_exempt(drugs=exempt),
+            courses=[_running(1)],
+        )
+
+        assert features["reviewRequired"] is expected
+
+
+class TestParseReviewExceptions:
+    """The kept list never breaks the rule"""
+
+    @pytest.mark.parametrize("value", [None, "x", {"drugs": "x"}, [1, 2]])
+    def test_unreadable_reviews_everything(self, value):
+        """An unreadable record (or none) exempts nothing"""
+        assert parse_review_exceptions(value) == ReviewExceptionsData()
+
+    def test_reads_the_lists(self):
+        """Substances and drugs, unknown keys ignored"""
+        data = parse_review_exceptions({"substances": [5], "drugs": [1], "x": 1})
+
+        assert data.substances == [5]
+        assert data.drugs == [1]

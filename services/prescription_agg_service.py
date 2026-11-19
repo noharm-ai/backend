@@ -284,6 +284,9 @@ def create_agg_prescription_by_prescription(
                     },
                 )
 
+    change = _admission_change(
+        admission_number=p.admissionNumber, prescription_data=prescription_data
+    )
     infection_control_status_service.follow_from_prescalc(
         schema=schema,
         admission_number=p.admissionNumber,
@@ -291,14 +294,10 @@ def create_agg_prescription_by_prescription(
         user_id=user_context.id,
         id_prescription_day=pAgg.id,
         id_prescription=p.id,
+        antimicrobials=list(change.antimicrobials),
     )
     # after the hooks above, so an admission they just followed is queued
-    admission_queue_service.notify(
-        schema=schema,
-        change=_admission_change(
-            admission_number=p.admissionNumber, prescription_data=prescription_data
-        ),
-    )
+    admission_queue_service.notify(schema=schema, change=change)
 
     _log_processed_date(id_prescription_array=[id_prescription], schema=schema)
 
@@ -432,20 +431,19 @@ def create_agg_prescription_by_date(
     _update_patient_conciliation_status(
         admission_number=agg_p.admissionNumber, is_concilia=False
     )
+    change = _admission_change(
+        admission_number=agg_p.admissionNumber, prescription_data=agg_data
+    )
     infection_control_status_service.follow_from_prescalc(
         schema=schema,
         admission_number=agg_p.admissionNumber,
         features=features,
         user_id=user_context.id,
         id_prescription_day=agg_p.id,
+        antimicrobials=list(change.antimicrobials),
     )
     # after the hooks above, so an admission they just followed is queued
-    admission_queue_service.notify(
-        schema=schema,
-        change=_admission_change(
-            admission_number=agg_p.admissionNumber, prescription_data=agg_data
-        ),
-    )
+    admission_queue_service.notify(schema=schema, change=change)
 
 
 def _admission_change(
@@ -467,6 +465,9 @@ def _admission_change(
             infection_control_status_service.PrescribedAntimicrobial(
                 id_drug=int(d["idDrug"]),
                 posology=infection_control_status_service.drug_list_posology(d),
+                id_substance=(
+                    int(d["idSubstance"]) if d.get("idSubstance") is not None else None
+                ),
             )
             for d in drugs
             if d.get("am") and not d["suspended"]
