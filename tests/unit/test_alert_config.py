@@ -373,6 +373,106 @@ def test_culture_class_alert_does_not_stand_in_for_a_type_turned_off():
     assert result["stats"]["cultureResistantClass"] == 0
 
 
+# --- max dose total: NOW frequency -----------------------------------------
+
+
+def _max_dose_plus_with_now(**max_dose_plus):
+    """Item every 12h (10 x 2 = 20) and the same drug NOW (10): max dose 25 is
+    only passed when NOW is summed (30)"""
+    drugs = [
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=61, dose=10, frequency=2, max_dose=25
+        ),
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=62,
+            dose=10,
+            frequency=FrequencyEnum.NOW.value,
+            max_dose=25,
+        ),
+    ]
+    config = AlertConfig.model_validate({"types": {"maxDosePlus": max_dose_plus}})
+
+    return _find_alerts(drugs, config, dialysis=None)
+
+
+def test_max_dose_plus_leaves_now_out_by_default():
+    """Padrão: a frequência AGORA não entra na dose somada"""
+    assert AlertConfig().types.maxDosePlus.includeNowFrequency is False
+
+    result = _max_dose_plus_with_now()
+
+    assert result["stats"]["maxDosePlus"] == 0
+
+
+def test_max_dose_plus_sums_now_when_configured():
+    """includeNowFrequency: o item AGORA entra na soma (uma dose ao dia)"""
+    result = _max_dose_plus_with_now(includeNowFrequency=True)
+
+    assert result["stats"]["maxDosePlus"] == 2
+    alert = result["alerts"]["61"][0]
+    assert alert["type"] == "maxDosePlus"
+    assert "SOMADA (30,00 " in alert["text"]
+    assert 'Frequência "AGORA" é considerada no cálculo' in alert["text"]
+
+
+def test_max_dose_plus_default_text_says_now_is_left_out():
+    """Sem a opção, o texto continua dizendo que AGORA não é considerada"""
+    drugs = _kidney_and_max_dose_plus_drugs()
+
+    result = _find_alerts(drugs, dialysis=None)
+
+    assert (
+        'Frequência "AGORA" não é considerada no cálculo'
+        in (result["alerts"]["61"][0]["text"])
+    )
+
+
+def test_max_dose_plus_include_now_keeps_ira_sum():
+    """A opção é do maxDosePlus: o IRA (vancomicina) continua sem o AGORA"""
+    from services import alert_service
+
+    drugs = [
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=61, dose=10, frequency=1, drug_name="Vancomicina"
+        ),
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=62,
+            dose=4000,
+            frequency=FrequencyEnum.NOW.value,
+            drug_name="Vancomicina",
+        ),
+    ]
+    config = AlertConfig.model_validate(
+        {"types": {"maxDosePlus": {"includeNowFrequency": True}}}
+    )
+
+    result = alert_service.find_alerts(
+        drug_list=drugs,
+        exams={"age": 50, "weight": 80, "ckd21": {"value": 50}},
+        dialisys=None,
+        pregnant=None,
+        lactating=None,
+        schedules_fasting=None,
+        cn_data=None,
+        protocols=None,
+        is_cpoe=False,
+        alert_config=config,
+    )
+
+    assert result["stats"]["ira"] == 0
+
+
+@pytest.mark.parametrize("value", ["true", 1, None, "x"])
+def test_max_dose_plus_include_now_only_true_turns_it_on(value):
+    """Valor que não é true não liga a opção nem invalida a seção"""
+    config = AlertConfig.model_validate(
+        {"types": {"maxDosePlus": {"includeNowFrequency": value, "enabled": False}}}
+    )
+
+    assert config.types.maxDosePlus.includeNowFrequency is False
+    assert config.types.maxDosePlus.enabled is False
+
+
 # --- kidney alert exams ----------------------------------------------------
 
 

@@ -12,6 +12,7 @@ from models.enums import (
     DrugAlertLevelEnum,
     DrugAlertTypeEnum,
     DrugTypeEnum,
+    FrequencyEnum,
 )
 from models.main import Drug, DrugAttributes, Substance
 from models.prescription import PrescriptionDrug
@@ -48,6 +49,14 @@ def find_alerts(
     filtered_list = _filter_drug_list(drug_list=drug_list)
     resistant_cultures = _index_resistant_cultures(cultures=cultures)
     dose_total = _get_dose_total(drug_list=filtered_list, exams=exams)
+    # the max dose total may sum the NOW items too (schema's choice); the IRA
+    # alert keeps the sum without them
+    max_dose_plus_config = alert_config.types.maxDosePlus
+    max_dose_total = (
+        _get_dose_total(drug_list=filtered_list, exams=exams, include_now=True)
+        if max_dose_plus_config.includeNowFrequency
+        else dose_total
+    )
     alerts = {}
     stats = _get_empty_stats()
 
@@ -204,7 +213,8 @@ def find_alerts(
                 drug_attributes=drug_attributes,
                 exams=exams,
                 prescription_expire_date=prescription_expire_date,
-                dose_total=dose_total,
+                dose_total=max_dose_total,
+                include_now=max_dose_plus_config.includeNowFrequency,
             ),
             handling_types=handling_types,
         )
@@ -309,7 +319,10 @@ def _get_dose_conv(
     )
 
 
-def _get_dose_total(drug_list, exams: dict):
+def _get_dose_total(drug_list, exams: dict, include_now: bool = False):
+    """Daily dose of each drug summed per expire day (key idDrug_day) and per Kg
+    (key idDrug_daykg), with the number of items summed. Items with frequency
+    NOW (66) are left out unless include_now (then they count as one dose)"""
     dose_total = {}
     for item in drug_list:
         prescription_drug: PrescriptionDrug = item[0]
@@ -327,8 +340,8 @@ def _get_dose_total(drug_list, exams: dict):
             measure_unit_convert_factor=measure_unit_convert_factor,
         )
 
-        if prescription_drug.frequency in [66]:
-            # do not sum some types of frequency
+        if not include_now and prescription_drug.frequency == FrequencyEnum.NOW.value:
+            # NOW is left out of the sum unless the schema includes it
             continue
 
         idDrugAgg = str(prescription_drug.idDrug) + "_" + str(expireDay)
@@ -477,10 +490,19 @@ def _alert_max_dose_total(
     exams: dict,
     prescription_expire_date,
     dose_total,
+    include_now: bool = False,
 ):
+    """Max dose total (maxDosePlus): the daily doses of the same drug, summed
+    (dose_total, from _get_dose_total with the same include_now), above the
+    drug's max dose"""
     if not drug_attributes:
         return None
 
+    now_note = (
+        'Frequência "AGORA" é considerada no cálculo'
+        if include_now
+        else 'Frequência "AGORA" não é considerada no cálculo'
+    )
     alert = _create_alert(
         id_prescription_drug=str(prescription_drug.id),
         key="",
@@ -513,7 +535,7 @@ def _alert_max_dose_total(
                     {stringutils.format_number_br(dose_total[idDrugAggWeight]["value"])} {str(drug_attributes.idMeasureUnit)}/Kg) maior
                     que a dose de alerta (
                     {stringutils.format_number_br(drug_attributes.maxDose)} {str(drug_attributes.idMeasureUnit)}/Kg)
-                    usualmente recomendada (Frequência "AGORA" não é considerada no cálculo)."
+                    usualmente recomendada ({now_note}).
                 """
 
             return alert
@@ -530,7 +552,7 @@ def _alert_max_dose_total(
                 Dose diária prescrita SOMADA (
                 {stringutils.format_number_br(dose_total[idDrugAgg]["value"])} {str(drug_attributes.idMeasureUnit)}) maior que a
                 dose de alerta ({stringutils.format_number_br(drug_attributes.maxDose)} {str(drug_attributes.idMeasureUnit)})
-                usualmente recomendada (Frequência "AGORA" não é considerada no cálculo).
+                usualmente recomendada ({now_note}).
             """
 
             return alert

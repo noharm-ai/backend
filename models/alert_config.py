@@ -63,6 +63,21 @@ class KidneyAlertConfig(AlertTypeConfig):
         return list(DEFAULT_KIDNEY_PEDIATRIC_EXAMS)
 
 
+class MaxDosePlusAlertConfig(AlertTypeConfig):
+    """Max dose total alert (maxDosePlus): the daily doses of the same drug
+    summed over the prescription (alert_service._get_dose_total)"""
+
+    # sum the items whose frequency is NOW (FrequencyEnum.NOW, 66) too, as one
+    # dose a day. Default: left out of the sum, as it always was
+    includeNowFrequency: bool = False
+
+    @field_validator("includeNowFrequency", mode="before")
+    @classmethod
+    def _strict_bool(cls, value):
+        """Only a real true turns it on (never invalidates the section)"""
+        return value is True
+
+
 def _type_field():
     """Field of an alert type with no options of its own (defaults: on, own level)"""
     return Field(default_factory=AlertTypeConfig)
@@ -82,7 +97,7 @@ class AlertTypesConfig(BaseModel):
     allergy: AlertTypeConfig = _type_field()
     maxTime: AlertTypeConfig = _type_field()
     maxDose: AlertTypeConfig = _type_field()
-    maxDosePlus: AlertTypeConfig = _type_field()
+    maxDosePlus: MaxDosePlusAlertConfig = Field(default_factory=MaxDosePlusAlertConfig)
     ira: AlertTypeConfig = _type_field()
     pregnant: AlertTypeConfig = _type_field()
     lactating: AlertTypeConfig = _type_field()
