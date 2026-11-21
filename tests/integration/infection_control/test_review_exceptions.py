@@ -40,12 +40,18 @@ from utils import status
 
 URL = "/infection-control/review-exceptions"
 KIND = MemoryEnum.INFECTION_CONTROL_REVIEW_EXCEPTIONS.value
+PREVIOUS_KIND = MemoryEnum.INFECTION_CONTROL_REVIEW_EXCEPTIONS_PREVIOUS.value
+NOHARM_USER_EMAIL = "test-review-exceptions-noharm@example.com"
 SUBSTANCE = 9070101
 NOT_REQUIRED = InfectionControlResolutionEnum.NOT_REQUIRED.value
 
 
 def _delete_exceptions():
-    session.execute(text("DELETE FROM demo.memoria WHERE tipo = :kind"), {"kind": KIND})
+    """Delete the list and the version it replaced"""
+    session.execute(
+        text("DELETE FROM demo.memoria WHERE tipo IN (:kind, :previous)"),
+        {"kind": KIND, "previous": PREVIOUS_KIND},
+    )
     session_commit()
 
 
@@ -139,6 +145,8 @@ def test_empty_without_a_record(
         "substances": [],
         "drugs": [],
         "updatedAt": None,
+        "updatedBy": None,
+        "previous": None,
     }
 
 
@@ -255,6 +263,140 @@ def test_the_generic_memory_endpoints_cant_write_it(
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
     data = client.get(URL, headers=infection_controller_headers).get_json()["data"]
     assert [d["id"] for d in data["drugs"]] == [str(ANTIMICROBIAL_DRUG)]
+
+
+# --- the previous version ---
+
+
+def _demo_user_name():
+    """The name of the user the tests log in as"""
+    return session.execute(
+        text("SELECT nome FROM public.usuario WHERE email = 'demo'")
+    ).scalar()
+
+
+@pytest.fixture
+def noharm_user():
+    """A user of the NoHarm schema"""
+    session.execute(
+        text("DELETE FROM public.usuario WHERE email = :email"),
+        {"email": NOHARM_USER_EMAIL},
+    )
+    id_user = session.execute(
+        text(
+            "INSERT INTO public.usuario (nome, email, senha, schema, config, ativo) "
+            "VALUES ('Ciclano de Tal', :email, 'x', 'hsc_test', "
+            "CAST('{}' AS json), true) RETURNING idusuario"
+        ),
+        {"email": NOHARM_USER_EMAIL},
+    ).scalar()
+    session_commit()
+
+    yield id_user
+
+    session.execute(
+        text("DELETE FROM public.usuario WHERE email = :email"),
+        {"email": NOHARM_USER_EMAIL},
+    )
+    session_commit()
+
+
+def test_first_save_has_no_previous_version(
+    client, infection_controller_headers, infection_control
+):
+    """The first list replaces nothing; it shows who saved it"""
+    data = _saved(client, infection_controller_headers, drugs=[ANTIMICROBIAL_DRUG])
+
+    assert data["updatedBy"] == _demo_user_name()
+    assert data["previous"] is None
+
+
+def test_a_change_keeps_the_version_it_replaced(
+    client,
+    infection_controller_headers,
+    infection_control,
+    antimicrobial_substance,
+    second_antimicrobial,
+):
+    """The version replaced is kept, with its names, when and by whom"""
+    first = _saved(
+        client,
+        infection_controller_headers,
+        substances=[antimicrobial_substance],
+        drugs=[second_antimicrobial],
+    )
+    _saved(client, infection_controller_headers, drugs=[second_antimicrobial])
+
+    data = client.get(URL, headers=infection_controller_headers).get_json()["data"]
+    assert data["substances"] == []
+    assert data["drugs"] == [{"id": str(OTHER_DRUG), "name": "BISACODIL 5 mg CP"}]
+    assert data["previous"] == {
+        "substances": [
+            {"id": str(antimicrobial_substance), "name": "ZZTEST SUBSTANCIA ISENTA"}
+        ],
+        "drugs": [{"id": str(OTHER_DRUG), "name": "BISACODIL 5 mg CP"}],
+        "updatedAt": first["updatedAt"],
+        "updatedBy": _demo_user_name(),
+    }
+
+    # only the last version replaced is kept
+    _saved(client, infection_controller_headers)
+    data = client.get(URL, headers=infection_controller_headers).get_json()["data"]
+    assert data["drugs"] == []
+    assert data["previous"]["substances"] == []
+    assert [d["id"] for d in data["previous"]["drugs"]] == [str(OTHER_DRUG)]
+    assert (
+        session.execute(
+            text("SELECT count(*) FROM demo.memoria WHERE tipo = :kind"),
+            {"kind": PREVIOUS_KIND},
+        ).scalar()
+        == 1
+    )
+
+
+def test_saving_no_change_keeps_the_previous_version(
+    client, infection_controller_headers, infection_control
+):
+    """A save that changes nothing writes nothing"""
+    _saved(client, infection_controller_headers, drugs=[ANTIMICROBIAL_DRUG])
+    second = _saved(client, infection_controller_headers)
+
+    again = _saved(client, infection_controller_headers)
+
+    assert again["updatedAt"] == second["updatedAt"]
+    assert [d["id"] for d in again["previous"]["drugs"]] == [str(ANTIMICROBIAL_DRUG)]
+
+
+def test_a_change_by_noharm_shows_noharm(
+    client, infection_controller_headers, infection_control, noharm_user
+):
+    """A version saved by a user of the NoHarm schema shows NoHarm, not the
+    person, in the list and in the version it replaced"""
+    _saved(client, infection_controller_headers, drugs=[ANTIMICROBIAL_DRUG])
+    session.execute(
+        text("UPDATE demo.memoria SET update_by = :id WHERE tipo = :kind"),
+        {"id": noharm_user, "kind": KIND},
+    )
+    session_commit()
+
+    data = client.get(URL, headers=infection_controller_headers).get_json()["data"]
+    assert data["updatedBy"] == "NoHarm"
+
+    data = _saved(client, infection_controller_headers)
+    assert data["updatedBy"] == _demo_user_name()
+    assert data["previous"]["updatedBy"] == "NoHarm"
+
+
+def test_the_generic_memory_endpoints_cant_write_the_previous_version(
+    client, infection_controller_headers, infection_control
+):
+    """The version kept is written only by the save"""
+    response = client.put(
+        f"/memory/unique/{PREVIOUS_KIND}",
+        json={"value": {"drugs": [ANTIMICROBIAL_DRUG]}},
+        headers=infection_controller_headers,
+    )
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
 
 # --- the rule ---

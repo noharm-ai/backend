@@ -253,6 +253,7 @@ def is_admin_memory(key):
         # written only by its own endpoint, which validates it
         MemoryEnum.INFECTION_CONTROL_EXAM_TRIGGERS.value,
         MemoryEnum.INFECTION_CONTROL_REVIEW_EXCEPTIONS.value,
+        MemoryEnum.INFECTION_CONTROL_REVIEW_EXCEPTIONS_PREVIOUS.value,
     ]
 
 

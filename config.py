@@ -85,6 +85,10 @@ class Config:
     PROTOCOL_AGENT_REGION = getenv("PROTOCOL_AGENT_REGION", "us-east-1")
     PROTOCOL_AGENT_MAX_TURNS = int(getenv("PROTOCOL_AGENT_MAX_TURNS", "8"))
 
+    # the schema of the NoHarm team: a change made by one of its users is shown
+    # as made by NoHarm, not by the person
+    NOHARM_SCHEMA = getenv("NOHARM_SCHEMA") or "hsc_test"
+
     FEATURE_CONCILIATION_ALGORITHM = getenv("FEATURE_CONCILIATION_ALGORITHM", "FUZZY")
     # enable only after the onboarding/training app version is released
     FEATURE_USER_ONBOARDING = (

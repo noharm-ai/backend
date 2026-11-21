@@ -10,11 +10,14 @@ from models.infection_control import InfectionControlAdmission
 from models.main import Drug, DrugAttributes, Substance, db
 
 
-def get_record() -> Memory | None:
-    """The memoria record keeping the schema's review exceptions"""
+def get_record(
+    kind: MemoryEnum = MemoryEnum.INFECTION_CONTROL_REVIEW_EXCEPTIONS,
+) -> Memory | None:
+    """The memoria record keeping the schema's review exceptions (or, by its
+    kind, the version they replaced)"""
     return (
         db.session.query(Memory)
-        .filter(Memory.kind == MemoryEnum.INFECTION_CONTROL_REVIEW_EXCEPTIONS.value)
+        .filter(Memory.kind == kind.value)
         .order_by(Memory.key)
         .first()
     )

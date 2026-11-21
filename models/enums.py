@@ -31,6 +31,9 @@ class MemoryEnum(Enum):
     # the antimicrobials whose courses need no infection control review
     # (models/infection_control_config.py, ReviewExceptionsData)
     INFECTION_CONTROL_REVIEW_EXCEPTIONS = "infection-control-review-exceptions"
+    INFECTION_CONTROL_REVIEW_EXCEPTIONS_PREVIOUS = (
+        "infection-control-review-exceptions-previous"
+    )
 
 
 class GlobalMemoryEnum(Enum):

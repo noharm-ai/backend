@@ -12,11 +12,19 @@ report leaves it out of the review indicators (reviewRequired false on the
 summary course). The rule reads the list on every run (load), so a change
 reaches an admission on its next run: saving queues the followed admissions
 running a drug the change concerns for the light run.
+
+Saving a change keeps the version it replaces (kind
+INFECTION_CONTROL_REVIEW_EXCEPTIONS_PREVIOUS, one version only, with when and
+by whom it was saved), so the list shows who changed it and what it was
+before. A change made by a NoHarm user (Config.NOHARM_SCHEMA) shows NoHarm,
+not the person. A save that changes nothing writes nothing, and so keeps the
+previous version.
 """
 
 from dataclasses import dataclass, field
 from datetime import datetime
 
+from config import Config
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
 from models.appendix import Memory
@@ -32,7 +40,7 @@ from models.infection_control_config import (
 )
 from models.main import User, db
 from models.requests.infection_control_request import ReviewExceptionsSaveRequest
-from repository import admission_queue_repository
+from repository import admission_queue_repository, user_repository
 from repository.infection_control import (
     infection_control_repository,
     review_exception_repository,
@@ -42,6 +50,9 @@ from utils import dateutils, status
 
 # letters typed before the antimicrobials are searched
 MIN_SEARCH = 3
+
+# who a change made by a NoHarm user is shown as made by
+NOHARM_RESPONSIBLE = "NoHarm"
 
 
 @dataclass(frozen=True)
@@ -87,23 +98,58 @@ def _check_feature():
         )
 
 
-def _view(data: ReviewExceptionsData, record: Memory | None) -> dict:
-    """The list with the names of each substance and drug"""
-    substance_names = review_exception_repository.get_substance_names(
-        set(data.substances)
+def _responsible_names(id_users: set[int]) -> dict[int, str]:
+    """Who saved each version, by user id: NoHarm for the users of the NoHarm
+    schema, the person's name otherwise"""
+    return {
+        id_user: NOHARM_RESPONSIBLE if schema == Config.NOHARM_SCHEMA else name
+        for id_user, (name, schema) in user_repository.get_user_names_and_schemas(
+            id_users
+        ).items()
+    }
+
+
+def _view(record: Memory | None, previous_record: Memory | None) -> dict:
+    """The list with the names of each substance and drug, when and by whom it
+    was saved, and the version it replaced (previous, None without one)"""
+    data = parse_review_exceptions(record.value if record else None)
+    previous = (
+        parse_review_exceptions(previous_record.value) if previous_record else None
     )
-    drug_names = infection_control_repository.get_drug_names(set(data.drugs))
+    versions = [v for v in (data, previous) if v is not None]
+    substance_names = review_exception_repository.get_substance_names(
+        {i for v in versions for i in v.substances}
+    )
+    drug_names = infection_control_repository.get_drug_names(
+        {i for v in versions for i in v.drugs}
+    )
+    responsible = _responsible_names(
+        {r.user for r in (record, previous_record) if r is not None}
+    )
+
+    def version(kept: ReviewExceptionsData, kept_record: Memory | None) -> dict:
+        """One version of the list, with its names"""
+        return {
+            "substances": sorted(
+                (
+                    {"id": str(i), "name": substance_names.get(i)}
+                    for i in kept.substances
+                ),
+                key=lambda item: (item["name"] or "", item["id"]),
+            ),
+            "drugs": sorted(
+                ({"id": str(i), "name": drug_names.get(i)} for i in kept.drugs),
+                key=lambda item: (item["name"] or "", item["id"]),
+            ),
+            "updatedAt": dateutils.to_iso(kept_record.update) if kept_record else None,
+            "updatedBy": responsible.get(kept_record.user) if kept_record else None,
+        }
 
     return {
-        "substances": sorted(
-            ({"id": str(i), "name": substance_names.get(i)} for i in data.substances),
-            key=lambda item: (item["name"] or "", item["id"]),
+        **version(data, record),
+        "previous": (
+            version(previous, previous_record) if previous is not None else None
         ),
-        "drugs": sorted(
-            ({"id": str(i), "name": drug_names.get(i)} for i in data.drugs),
-            key=lambda item: (item["name"] or "", item["id"]),
-        ),
-        "updatedAt": dateutils.to_iso(record.update) if record else None,
     }
 
 
@@ -112,8 +158,12 @@ def get_review_exceptions():
     """The antimicrobials whose courses need no review"""
     _check_feature()
 
-    record = review_exception_repository.get_record()
-    return _view(parse_review_exceptions(record.value if record else None), record)
+    return _view(
+        review_exception_repository.get_record(),
+        review_exception_repository.get_record(
+            MemoryEnum.INFECTION_CONTROL_REVIEW_EXCEPTIONS_PREVIOUS
+        ),
+    )
 
 
 @has_permission(Permission.READ_INFECTION_CONTROL)
@@ -179,12 +229,16 @@ def _validate(request_data: ReviewExceptionsSaveRequest, current: ReviewExceptio
 def save_review_exceptions(
     request_data: ReviewExceptionsSaveRequest, user_context: User
 ):
-    """Replace the antimicrobials whose courses need no review, and queue the
-    followed admissions running a drug the change concerns, so the light run
-    opens or settles their reasons (the full run would, later)"""
+    """Replace the antimicrobials whose courses need no review, keeping the
+    version replaced, and queue the followed admissions running a drug the
+    change concerns, so the light run opens or settles their reasons (the full
+    run would, later)"""
     _check_feature()
 
     record = review_exception_repository.get_record()
+    previous_record = review_exception_repository.get_record(
+        MemoryEnum.INFECTION_CONTROL_REVIEW_EXCEPTIONS_PREVIOUS
+    )
     current = parse_review_exceptions(record.value if record else None)
     _validate(request_data=request_data, current=current)
 
@@ -192,8 +246,22 @@ def save_review_exceptions(
         substances=sorted(set(request_data.substances)),
         drugs=sorted(set(request_data.drugs)),
     )
+    if saved == current:
+        # nothing changed: the previous version stays the one before
+        return _view(record, previous_record)
+
     now = datetime.now()
-    if record is None:
+    if record is not None:
+        if previous_record is None:
+            previous_record = Memory()
+            previous_record.kind = (
+                MemoryEnum.INFECTION_CONTROL_REVIEW_EXCEPTIONS_PREVIOUS.value
+            )
+            db.session.add(previous_record)
+        previous_record.value = record.value
+        previous_record.update = record.update
+        previous_record.user = record.user
+    else:
         record = Memory()
         record.kind = MemoryEnum.INFECTION_CONTROL_REVIEW_EXCEPTIONS.value
         db.session.add(record)
@@ -213,4 +281,4 @@ def save_review_exceptions(
             now=now,
         )
 
-    return _view(saved, record)
+    return _view(record, previous_record)
