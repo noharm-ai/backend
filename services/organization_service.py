@@ -38,12 +38,15 @@ def get_extra_schemas(config) -> list[dict]:
     The fixed list in config['schemas'], plus, when the user manages every
     schema of an organization (config['organization']['allSchemas']), the
     organization's current schemas: a schema added to the organization later
-    is reached without touching the user.
+    is reached without touching the user. An entry of the fixed list that is
+    not a dict is dropped: the callers read each schema as a dict.
     """
     if not isinstance(config, dict):
         return []
     schemas = config.get("schemas", [])
-    schemas = list(schemas) if isinstance(schemas, list) else []
+    schemas = (
+        [s for s in schemas if isinstance(s, dict)] if isinstance(schemas, list) else []
+    )
 
     grant = get_organization_grant(config)
     if grant is None or not grant["allSchemas"]:
