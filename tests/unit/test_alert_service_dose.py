@@ -152,13 +152,22 @@ class TestGetDoseTotal:
         result = alert_service._get_dose_total([self._row(drug)], {"weight": 1})
         assert result == {}
 
-    def test_frequency_66_is_summed_with_include_now(self):
-        """include_now: a frequency 66 (AGORA) row counts as one dose a day."""
+    def test_frequency_66_is_summed_when_not_ignored(self):
+        """Without 66 in ignore_frequencies, an AGORA row counts as one dose."""
         drug = _Drug(id_drug=1, frequency=66, dose=10)
         result = alert_service._get_dose_total(
-            [self._row(drug)], {"weight": 1}, include_now=True
+            [self._row(drug)], {"weight": 1}, ignore_frequencies=[]
         )
         assert result["1_5"] == {"value": 10, "count": 1}
+
+    def test_ignored_frequencies_are_skipped(self):
+        """Any frequency in ignore_frequencies is left out of the totals."""
+        sn = _Drug(id_drug=1, frequency=33, dose=10)
+        twice = _Drug(id_drug=1, frequency=2, dose=10)
+        result = alert_service._get_dose_total(
+            [self._row(sn), self._row(twice)], {"weight": 1}, ignore_frequencies=[33]
+        )
+        assert result["1_5"] == {"value": 20, "count": 1}
 
     def test_missing_expire_date_uses_day_zero(self):
         """A row without an expiry date is bucketed under day 0."""

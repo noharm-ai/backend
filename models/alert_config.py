@@ -5,9 +5,11 @@ default keeps the behaviour the system has without any config: the alert is
 shown, as it is calculated today.
 """
 
+import math
+
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from models.enums import DrugAlertLevelEnum
+from models.enums import DrugAlertLevelEnum, FrequencyEnum
 
 _ALERT_LEVELS = {level.value for level in DrugAlertLevelEnum}
 
@@ -63,19 +65,40 @@ class KidneyAlertConfig(AlertTypeConfig):
         return list(DEFAULT_KIDNEY_PEDIATRIC_EXAMS)
 
 
+DEFAULT_MAX_DOSE_PLUS_IGNORE_FREQUENCIES = [FrequencyEnum.NOW.value]
+
+
 class MaxDosePlusAlertConfig(AlertTypeConfig):
     """Max dose total alert (maxDosePlus): the daily doses of the same drug
     summed over the prescription (alert_service._get_dose_total)"""
 
-    # sum the items whose frequency is NOW (FrequencyEnum.NOW, 66) too, as one
-    # dose a day. Default: left out of the sum, as it always was
-    includeNowFrequency: bool = False
+    # items with one of these daily frequencies (presmed.frequenciadia) are left
+    # out of the sum. Default: NOW (66), as it always was. An empty list sums
+    # every item (a special frequency counts as one dose a day)
+    ignoreFrequencies: list[float] = Field(
+        default_factory=lambda: list(DEFAULT_MAX_DOSE_PLUS_IGNORE_FREQUENCIES)
+    )
 
-    @field_validator("includeNowFrequency", mode="before")
+    @field_validator("ignoreFrequencies", mode="before")
     @classmethod
-    def _strict_bool(cls, value):
-        """Only a real true turns it on (never invalidates the section)"""
-        return value is True
+    def _known_frequencies(cls, frequencies):
+        """Not a list keeps the default; only positive numbers count (never
+        invalidates the section). An empty list is a choice: sum everything"""
+        if not isinstance(frequencies, list):
+            return list(DEFAULT_MAX_DOSE_PLUS_IGNORE_FREQUENCIES)
+
+        valid = []
+        for frequency in frequencies:
+            if isinstance(frequency, bool):
+                continue
+            try:
+                value = float(frequency)
+            except (TypeError, ValueError):
+                continue
+            if math.isfinite(value) and value > 0:
+                valid.append(value)
+
+        return valid
 
 
 def _type_field():
