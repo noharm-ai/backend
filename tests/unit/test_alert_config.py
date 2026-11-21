@@ -373,6 +373,134 @@ def test_culture_class_alert_does_not_stand_in_for_a_type_turned_off():
     assert result["stats"]["cultureResistantClass"] == 0
 
 
+# --- max dose total: ignored frequencies -----------------------------------
+
+
+def _max_dose_plus_with(frequency, alert_config=None):
+    """Item every 12h (10 x 2 = 20) and the same drug with `frequency` (one dose
+    a day, 10): max dose 25 is only passed when the second item is summed"""
+    drugs = [
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=61, dose=10, frequency=2, max_dose=25
+        ),
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=62, dose=10, frequency=frequency, max_dose=25
+        ),
+    ]
+
+    return _find_alerts(drugs, alert_config, dialysis=None)
+
+
+def _max_dose_plus_config(ignore_frequencies) -> AlertConfig:
+    return AlertConfig.model_validate(
+        {"types": {"maxDosePlus": {"ignoreFrequencies": ignore_frequencies}}}
+    )
+
+
+def test_max_dose_plus_ignores_now_by_default():
+    """Padrão: a frequência AGORA fica fora da dose somada; SN entra"""
+    assert AlertConfig().types.maxDosePlus.ignoreFrequencies == [66]
+
+    assert _max_dose_plus_with(FrequencyEnum.NOW.value)["stats"]["maxDosePlus"] == 0
+    assert _max_dose_plus_with(SN)["stats"]["maxDosePlus"] == 2
+
+
+def test_max_dose_plus_default_text_says_now_is_left_out():
+    """Sem config, o texto continua dizendo que AGORA não é considerada"""
+    result = _find_alerts(_kidney_and_max_dose_plus_drugs(), dialysis=None)
+
+    assert result["alerts"]["61"][0]["text"].endswith(
+        'usualmente recomendada (Frequência "AGORA" não é considerada no cálculo).'
+    )
+
+
+def test_max_dose_plus_empty_list_sums_everything():
+    """Lista vazia: o item AGORA entra na soma (uma dose ao dia) e o texto
+    não fala de frequência"""
+    result = _max_dose_plus_with(FrequencyEnum.NOW.value, _max_dose_plus_config([]))
+
+    assert result["stats"]["maxDosePlus"] == 2
+    alert = result["alerts"]["61"][0]
+    assert "SOMADA (30,00 " in alert["text"]
+    assert alert["text"].endswith("usualmente recomendada.")
+
+
+def test_max_dose_plus_ignores_the_configured_frequencies():
+    """SN configurada: fica fora da soma; AGORA, fora da lista, entra"""
+    config = _max_dose_plus_config([SN, ACM])
+
+    assert _max_dose_plus_with(SN, config)["stats"]["maxDosePlus"] == 0
+    result = _max_dose_plus_with(FrequencyEnum.NOW.value, config)
+    assert result["stats"]["maxDosePlus"] == 2
+    assert result["alerts"]["61"][0]["text"].endswith(
+        '(Frequências "SN" e "ACM" não são consideradas no cálculo).'
+    )
+
+
+def test_max_dose_plus_ignores_a_numeric_frequency():
+    """Frequência numérica (vezes ao dia) também pode ficar fora"""
+    config = _max_dose_plus_config([0.5])
+
+    assert _max_dose_plus_with(0.5, config)["stats"]["maxDosePlus"] == 0
+    result = _max_dose_plus_with(FrequencyEnum.NOW.value, config)
+    assert result["alerts"]["61"][0]["text"].endswith(
+        '(Frequência "0,5x/dia" não é considerada no cálculo).'
+    )
+
+
+def test_max_dose_plus_frequencies_keep_ira_sum():
+    """A lista é do maxDosePlus: o IRA (vancomicina) continua sem o AGORA"""
+    from services import alert_service
+
+    drugs = [
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=61, dose=10, frequency=1, drug_name="Vancomicina"
+        ),
+        utils_test_prescription.get_prescription_drug_mock_row(
+            id_prescription_drug=62,
+            dose=4000,
+            frequency=FrequencyEnum.NOW.value,
+            drug_name="Vancomicina",
+        ),
+    ]
+
+    result = alert_service.find_alerts(
+        drug_list=drugs,
+        exams={"age": 50, "weight": 80, "ckd21": {"value": 50}},
+        dialisys=None,
+        pregnant=None,
+        lactating=None,
+        schedules_fasting=None,
+        cn_data=None,
+        protocols=None,
+        is_cpoe=False,
+        alert_config=_max_dose_plus_config([]),
+    )
+
+    assert result["stats"]["ira"] == 0
+
+
+@pytest.mark.parametrize(
+    "value, expected",
+    [
+        (None, [66]),
+        ("66", [66]),
+        ({"a": 1}, [66]),
+        ([66, "x", True, -1, 0, None, "33"], [66, 33]),
+        ([], []),
+    ],
+)
+def test_max_dose_plus_frequencies_never_invalidate_the_section(value, expected):
+    """Valor fora do contrato não invalida a seção: não lista mantém o padrão,
+    itens inválidos são ignorados"""
+    config = AlertConfig.model_validate(
+        {"types": {"maxDosePlus": {"ignoreFrequencies": value, "enabled": False}}}
+    )
+
+    assert config.types.maxDosePlus.ignoreFrequencies == expected
+    assert config.types.maxDosePlus.enabled is False
+
+
 # --- kidney alert exams ----------------------------------------------------
 
 
