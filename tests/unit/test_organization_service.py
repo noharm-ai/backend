@@ -59,7 +59,7 @@ class TestGetOrganizationGrant:
 
     @pytest.mark.parametrize("value", ["true", 1, "yes", None, [True]])
     def test_all_schemas_must_be_exactly_true(self, value):
-        """A truthy value that is not the boolean true grants no organization"""
+        """allSchemas counts only as the boolean true; any other value reads as False"""
         config = {"roles": [MANAGER], "organization": {"id": 7, "allSchemas": value}}
 
         assert organization_service.get_organization_grant(config)["allSchemas"] is False
@@ -209,8 +209,8 @@ class TestGetExtraSchemas:
             {"name": "hospital_a", "friendlyName": "Hospital A"},
         ]
 
-    def test_all_schemas_ignores_malformed_fixed_entries(self, org_repository):
-        """A fixed entry that is not a dict is kept but does not hide a schema"""
+    def test_all_schemas_drops_malformed_fixed_entries(self, org_repository):
+        """A fixed entry that is not a dict is dropped and does not hide a schema"""
         config = {
             "roles": [MANAGER],
             "organization": {"id": 7, "allSchemas": True},
@@ -219,7 +219,15 @@ class TestGetExtraSchemas:
 
         result = organization_service.get_extra_schemas(config)
 
-        assert result == ["hospital_a"] + ORG_SCHEMAS
+        assert result == ORG_SCHEMAS
+
+    def test_fixed_list_drops_malformed_entries(self, org_repository):
+        """Without an organization, the entries that are not dicts are dropped
+        too: the callers (login, switch, support tickets) read each as a dict"""
+        fixed = [{"name": "hospital_c", "friendlyName": "Hospital C"}]
+        config = {"roles": [NAVIGATOR], "schemas": ["hospital_a", None, 7] + fixed}
+
+        assert organization_service.get_extra_schemas(config) == fixed
 
     def test_all_schemas_with_an_empty_organization(self, org_repository):
         """An organization without schemas leaves the fixed list as it is"""

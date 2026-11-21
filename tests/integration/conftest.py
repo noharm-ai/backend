@@ -18,7 +18,7 @@ def infection_controller_headers(client):
 
 @pytest.fixture
 def viewer_headers(client):
-    """Headers with VIEWER role — used to assert 401 responses"""
+    """Headers with VIEWER role (READ_REPORTS, READ_PRESCRIPTION, read only)"""
     return make_headers(get_access(client, roles=[Role.VIEWER.value]))
 
 
