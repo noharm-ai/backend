@@ -52,8 +52,10 @@ def _solution_row(
     The remaining positions are unused by the method but must exist so pd[6] is
     addressable.
     """
-    prescription_drug = SimpleNamespace(dose=dose, doseconv=doseconv)
-    drug_attributes = SimpleNamespace(division=division)
+    prescription_drug = SimpleNamespace(
+        dose=dose, doseconv=doseconv, idMeasureUnit=prescribed_unit
+    )
+    drug_attributes = SimpleNamespace(division=division, idMeasureUnit=default_unit)
     measure_unit = (
         SimpleNamespace(measureunit_nh=prescribed_unit)
         if prescribed_unit is not None
@@ -79,15 +81,27 @@ class TestGetSolutionDose:
         assert drug_list.get_solution_dose(row) == 100
 
     def test_default_unit_ml_returns_converted_dose(self):
-        """When the default unit is ml, the pre-converted dose (doseconv) is used."""
+        """When the default unit is ml, the dose converted to it is used."""
         drug_list = _make_drug_list()
-        row = _solution_row(dose=100, doseconv=50, prescribed_unit="mg", default_unit="ml")
+        row = _solution_row(
+            dose=100,
+            doseconv=50,
+            prescribed_unit="mg",
+            default_unit="ml",
+            default_convert_factor=0.5,
+        )
         assert drug_list.get_solution_dose(row) == 50
 
     def test_missing_measure_unit_falls_back_to_default_unit(self):
         """A row without a measure unit still resolves via the default unit."""
         drug_list = _make_drug_list()
-        row = _solution_row(dose=100, doseconv=30, prescribed_unit=None, default_unit="ml")
+        row = _solution_row(
+            dose=100,
+            doseconv=30,
+            prescribed_unit=None,
+            default_unit="ml",
+            default_convert_factor=0.3,
+        )
         assert drug_list.get_solution_dose(row) == 30
 
     def test_uses_solution_convert_factor_when_no_ml_unit(self):
@@ -138,6 +152,48 @@ class TestGetSolutionDose:
         )
         assert drug_list.get_solution_dose(row) == 0
 
+    def test_stored_doseconv_is_not_used_with_a_dose(self):
+        """prescalc stored the 100 mg unconverted, before the mg -> ml factor
+        was registered: the dose is converted with the current factor."""
+        drug_list = _make_drug_list()
+        row = _solution_row(
+            dose=100,
+            doseconv=100,
+            prescribed_unit="mg",
+            default_unit="ml",
+            default_convert_factor=0.5,
+        )
+        assert drug_list.get_solution_dose(row) == 50
+
+    def test_no_factor_for_another_unit_yields_zero(self):
+        """Prescribed in a unit other than the default one, without a factor
+        the dose can't be told in ml: it is not counted."""
+        drug_list = _make_drug_list()
+        row = _solution_row(
+            dose=100, doseconv=100, prescribed_unit="mg", default_unit="ml"
+        )
+        assert drug_list.get_solution_dose(row) == 0
+
+    def test_default_unit_needs_no_factor(self):
+        """Prescribed in the default unit, unidadeconverte may have no row:
+        the dose is already in it."""
+        drug_list = _make_drug_list()
+        row = _solution_row(
+            dose=10,
+            prescribed_unit="mg",
+            default_unit="mg",
+            solution_convert_factor=4,
+        )
+        assert drug_list.get_solution_dose(row) == 2.5
+
+    def test_differentiated_dose_uses_the_stored_daily_total(self):
+        """Dose diferenciada: dose is 0 and doseconv the daily total."""
+        drug_list = _make_drug_list()
+        row = _solution_row(
+            dose=0, doseconv=30, prescribed_unit="mg", default_unit="ml"
+        )
+        assert drug_list.get_solution_dose(row) == 30
+
     def test_dose_ranges_then_solution_factor(self):
         """Dose ranges recompute the dose, then the solution factor scales it."""
         drug_list = _make_drug_list()
@@ -184,6 +240,7 @@ def _infusion_row(
     prescribed_unit=None,
     default_unit=None,
     solution_convert_factor=None,
+    default_convert_factor=None,
     amount=None,
     amount_unit=None,
     measure_unit_id=None,
@@ -207,9 +264,13 @@ def _infusion_row(
         solutionDose=solution_dose,
         solutionUnit=solution_unit,
         suspendedDate=suspended_date,
+        idMeasureUnit=measure_unit_id,
     )
     drug_attributes = SimpleNamespace(
-        division=False, amount=amount, amountUnit=amount_unit
+        division=False,
+        amount=amount,
+        amountUnit=amount_unit,
+        idMeasureUnit=default_unit,
     )
     measure_unit = (
         SimpleNamespace(id=measure_unit_id) if measure_unit_id is not None else None
@@ -221,7 +282,7 @@ def _infusion_row(
         if prescribed_unit is not None
         else None,
         default_measure_unit_nh=default_unit,
-        measure_unit_convert_factor=None,
+        measure_unit_convert_factor=default_convert_factor,
         measure_unit_solution_convert_factor=solution_convert_factor,
     )
 
@@ -526,6 +587,7 @@ class TestGetInfusionList:
                     dose=30,
                     doseconv=12,
                     default_unit="ml",
+                    default_convert_factor=0.4,
                     amount=None,
                     amount_unit="mg",
                     measure_unit_id="MG",
@@ -548,6 +610,7 @@ class TestGetInfusionList:
                     dose=30,
                     doseconv=12,
                     default_unit="ml",
+                    default_convert_factor=0.4,
                     amount=0,
                     amount_unit="mg",
                     measure_unit_id="MG",

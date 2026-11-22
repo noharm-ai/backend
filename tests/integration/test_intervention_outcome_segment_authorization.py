@@ -11,8 +11,8 @@ depending on what the intervention was opened on:
 * an intervention on a whole prescription (fkpresmed = 0) takes the segment of
   the prescription, and is refused when that prescription is gone;
 * an intervention on a prescription drug takes the segment of the drug;
-* an intervention recorded by an infection control review follows the
-  admission, not the segment, so it is never checked;
+* an intervention recorded by an infection control review is checked like
+  any other, for infection control and the prescription screening alike;
 * maintainers skip the check altogether.
 
 The other rules of the endpoint are covered by
@@ -289,10 +289,10 @@ class TestPrescriptionDrugIntervention:
 class TestInfectionControlIntervention:
     """Teste post /intervention/set-outcome - intervenção do controle de infecção"""
 
-    def test_infection_control_intervention_ignores_the_segment(
+    def test_infection_control_intervention_keeps_the_segment(
         self, client, analyst_headers, infection_controller_headers
     ):
-        """Intervenção do controle de infecção segue o atendimento, não o segmento"""
+        """Controle de infecção fora do segmento não fecha a intervenção"""
         id_intervention, id_prescription_drug = _open_on_drug(client, analyst_headers)
         _move_drug(id_prescription_drug, UNAUTHORIZED_SEGMENT)
         session.execute(
@@ -306,5 +306,41 @@ class TestInfectionControlIntervention:
 
         response = _set_outcome(client, infection_controller_headers, id_intervention)
 
-        assert response.status_code == status.HTTP_200_OK
-        assert _stored_status(id_intervention) == "a"
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+        assert "segmento" in response.get_json()["message"]
+        assert _stored_status(id_intervention) == "s"
+
+    def test_infection_control_intervention_keeps_the_segment_for_the_screening(
+        self, client, analyst_headers
+    ):
+        """Farmacêutico fora do segmento não altera nem fecha intervenção do controle de infecção"""
+        id_intervention, id_prescription_drug = _open_on_drug(client, analyst_headers)
+        _move_drug(id_prescription_drug, UNAUTHORIZED_SEGMENT)
+        session.execute(
+            text(
+                "UPDATE demo.intervencao SET fkci_avaliacao_atm = :ev "
+                "WHERE idintervencao = :id"
+            ),
+            {"ev": MISSING_ID, "id": id_intervention},
+        )
+        session_commit()
+
+        response = _set_outcome(client, analyst_headers, id_intervention)
+
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+        assert "segmento" in response.get_json()["message"]
+        assert _stored_status(id_intervention) == "s"
+
+        # nor edits it
+        response = client.put(
+            INTERVENTION_URL,
+            json={
+                "idIntervention": id_intervention,
+                "idPrescriptionDrug": str(id_prescription_drug),
+                "observation": "fora do segmento",
+            },
+            headers=analyst_headers,
+        )
+
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+        assert "segmento" in response.get_json()["message"]

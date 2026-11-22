@@ -12,6 +12,7 @@ from models.enums import (
     DrugAlertLevelEnum,
     DrugAlertTypeEnum,
     DrugTypeEnum,
+    FrequencyEnum,
 )
 from models.main import Drug, DrugAttributes, Substance
 from models.prescription import PrescriptionDrug
@@ -48,6 +49,18 @@ def find_alerts(
     filtered_list = _filter_drug_list(drug_list=drug_list)
     resistant_cultures = _index_resistant_cultures(cultures=cultures)
     dose_total = _get_dose_total(drug_list=filtered_list, exams=exams)
+    # the max dose total leaves out the frequencies the schema chose (default
+    # NOW, the same sum as dose_total); the IRA alert keeps the sum without NOW
+    max_dose_plus_ignore = alert_config.types.maxDosePlus.ignoreFrequencies
+    max_dose_total = (
+        dose_total
+        if set(max_dose_plus_ignore) == set(_DOSE_TOTAL_IGNORE_FREQUENCIES)
+        else _get_dose_total(
+            drug_list=filtered_list,
+            exams=exams,
+            ignore_frequencies=max_dose_plus_ignore,
+        )
+    )
     alerts = {}
     stats = _get_empty_stats()
 
@@ -204,7 +217,8 @@ def find_alerts(
                 drug_attributes=drug_attributes,
                 exams=exams,
                 prescription_expire_date=prescription_expire_date,
-                dose_total=dose_total,
+                dose_total=max_dose_total,
+                ignore_frequencies=max_dose_plus_ignore,
             ),
             handling_types=handling_types,
         )
@@ -293,23 +307,33 @@ def _get_dose_conv(
         else prescription_drug.frequency
     )
 
-    if drug_attributes != None and drug_attributes.division != None:
-        return (
-            numberutils.none2zero(prescription_drug.dose)
-            * (
-                measure_unit_convert_factor
-                if measure_unit_convert_factor != None
-                else 1
-            )
-            * numberutils.none2zero(pd_frequency)
-        )
+    # without a factor the dose is taken as already in the default unit
+    converted_dose = prescriptionutils.get_converted_dose(
+        dose=prescription_drug.dose,
+        convert_factor=(
+            measure_unit_convert_factor if measure_unit_convert_factor != None else 1
+        ),
+        doseconv=prescription_drug.doseconv,
+        has_dose_ranges=drug_attributes != None and drug_attributes.division != None,
+    )
 
-    return numberutils.none2zero(prescription_drug.doseconv) * numberutils.none2zero(
-        pd_frequency
+    # rounded: what the max dose is compared with is what the alert prints
+    return numberutils.round_significant(
+        numberutils.none2zero(converted_dose) * numberutils.none2zero(pd_frequency)
     )
 
 
-def _get_dose_total(drug_list, exams: dict):
+# frequencies left out of the dose total by default (and always for IRA)
+_DOSE_TOTAL_IGNORE_FREQUENCIES = (FrequencyEnum.NOW.value,)
+
+
+def _get_dose_total(
+    drug_list, exams: dict, ignore_frequencies=_DOSE_TOTAL_IGNORE_FREQUENCIES
+):
+    """Daily dose of each drug summed per expire day (key idDrug_day) and per Kg
+    (key idDrug_daykg), with the number of items summed. Items whose frequency
+    is in ignore_frequencies (default NOW, 66) are left out; a special
+    frequency summed counts as one dose a day (_get_dose_conv)"""
     dose_total = {}
     for item in drug_list:
         prescription_drug: PrescriptionDrug = item[0]
@@ -327,8 +351,7 @@ def _get_dose_total(drug_list, exams: dict):
             measure_unit_convert_factor=measure_unit_convert_factor,
         )
 
-        if prescription_drug.frequency in [66]:
-            # do not sum some types of frequency
+        if prescription_drug.frequency in ignore_frequencies:
             continue
 
         idDrugAgg = str(prescription_drug.idDrug) + "_" + str(expireDay)
@@ -338,18 +361,24 @@ def _get_dose_total(drug_list, exams: dict):
         if idDrugAgg not in dose_total:
             dose_total[idDrugAgg] = {"value": pd_dose_conv, "count": 1}
         else:
-            dose_total[idDrugAgg]["value"] += pd_dose_conv
+            # rounded, or the sum brings the float noise back (0.1 + 0.2)
+            dose_total[idDrugAgg]["value"] = numberutils.round_significant(
+                dose_total[idDrugAgg]["value"] + pd_dose_conv
+            )
             dose_total[idDrugAgg]["count"] += 1
 
         # dose / kg
         weight = numberutils.none2zero(exams["weight"])
         weight = weight if weight > 0 else 1
-        doseWeight = round(pd_dose_conv / float(weight), 2)
+        # rounded as the dose is: 2 decimals would zero a small dose per Kg
+        doseWeight = numberutils.round_significant(pd_dose_conv / float(weight))
 
         if idDrugAggWeight not in dose_total:
             dose_total[idDrugAggWeight] = {"value": doseWeight, "count": 1}
         else:
-            dose_total[idDrugAggWeight]["value"] += doseWeight
+            dose_total[idDrugAggWeight]["value"] = numberutils.round_significant(
+                dose_total[idDrugAggWeight]["value"] + doseWeight
+            )
             dose_total[idDrugAggWeight]["count"] += 1
 
     return dose_total
@@ -434,7 +463,8 @@ def _alert_max_dose(
     if drug_attributes.useWeight and prescription_drug.dose:
         weight = numberutils.none2zero(exams["weight"])
         weight = weight if weight > 0 else 1
-        doseWeight = round(pd_dose_conv / float(weight), 2)
+        # rounded as the dose is: 2 decimals would zero a small dose per Kg
+        doseWeight = numberutils.round_significant(pd_dose_conv / float(weight))
 
         if drug_attributes.maxDose and drug_attributes.maxDose < doseWeight:
             if numberutils.none2zero(exams["weight"]) == 0:
@@ -443,9 +473,9 @@ def _alert_max_dose(
                 )
             else:
                 alert["text"] = f"""
-                    Dose diária prescrita ({stringutils.strFormatBR(doseWeight)} {str(drug_attributes.idMeasureUnit)}/Kg)
+                    Dose diária prescrita ({stringutils.format_number_br(doseWeight)} {str(drug_attributes.idMeasureUnit)}/Kg)
                      maior que a dose de alerta
-                    ({stringutils.strFormatBR(drug_attributes.maxDose)} {str(drug_attributes.idMeasureUnit)}/Kg)
+                    ({stringutils.format_number_br(drug_attributes.maxDose)} {str(drug_attributes.idMeasureUnit)}/Kg)
                      usualmente recomendada (considerada a dose diária independente da indicação).
                 """
 
@@ -454,8 +484,8 @@ def _alert_max_dose(
     else:
         if drug_attributes.maxDose and drug_attributes.maxDose < pd_dose_conv:
             alert["text"] = f"""
-                Dose diária prescrita ({str(pd_dose_conv)} {str(drug_attributes.idMeasureUnit)})
-                 maior que a dose de alerta ({str(drug_attributes.maxDose)} {str(drug_attributes.idMeasureUnit)})
+                Dose diária prescrita ({stringutils.format_number_br(pd_dose_conv)} {str(drug_attributes.idMeasureUnit)})
+                 maior que a dose de alerta ({stringutils.format_number_br(drug_attributes.maxDose)} {str(drug_attributes.idMeasureUnit)})
                  usualmente recomendada (considerada a dose diária independente da indicação).
             """
 
@@ -470,10 +500,15 @@ def _alert_max_dose_total(
     exams: dict,
     prescription_expire_date,
     dose_total,
+    ignore_frequencies=_DOSE_TOTAL_IGNORE_FREQUENCIES,
 ):
+    """Max dose total (maxDosePlus): the daily doses of the same drug, summed
+    (dose_total, from _get_dose_total with the same ignore_frequencies), above
+    the drug's max dose"""
     if not drug_attributes:
         return None
 
+    frequencies_note = _ignored_frequencies_note(ignore_frequencies)
     alert = _create_alert(
         id_prescription_drug=str(prescription_drug.id),
         key="",
@@ -503,10 +538,10 @@ def _alert_max_dose_total(
             else:
                 alert["text"] = f"""
                     Dose diária prescrita SOMADA (
-                    {str(dose_total[idDrugAggWeight]["value"])} {str(drug_attributes.idMeasureUnit)}/Kg) maior
+                    {stringutils.format_number_br(dose_total[idDrugAggWeight]["value"])} {str(drug_attributes.idMeasureUnit)}/Kg) maior
                     que a dose de alerta (
-                    {str(drug_attributes.maxDose)} {str(drug_attributes.idMeasureUnit)}/Kg)
-                    usualmente recomendada (Frequência "AGORA" não é considerada no cálculo)."
+                    {stringutils.format_number_br(drug_attributes.maxDose)} {str(drug_attributes.idMeasureUnit)}/Kg)
+                    usualmente recomendada{frequencies_note}.
                 """
 
             return alert
@@ -521,14 +556,37 @@ def _alert_max_dose_total(
         ):
             alert["text"] = f"""
                 Dose diária prescrita SOMADA (
-                {str(dose_total[idDrugAgg]["value"])} {str(drug_attributes.idMeasureUnit)}) maior que a
-                dose de alerta ({str(drug_attributes.maxDose)} {str(drug_attributes.idMeasureUnit)})
-                usualmente recomendada (Frequência "AGORA" não é considerada no cálculo).
+                {stringutils.format_number_br(dose_total[idDrugAgg]["value"])} {str(drug_attributes.idMeasureUnit)}) maior que a
+                dose de alerta ({stringutils.format_number_br(drug_attributes.maxDose)} {str(drug_attributes.idMeasureUnit)})
+                usualmente recomendada{frequencies_note}.
             """
 
             return alert
 
     return None
+
+
+def _ignored_frequencies_note(ignore_frequencies) -> str:
+    """What the max dose total text says about the frequencies left out of the
+    sum, e.g. ' (Frequência "AGORA" não é considerada no cálculo)'; empty when
+    every item is summed"""
+    if not ignore_frequencies:
+        return ""
+
+    labels = []
+    for frequency in ignore_frequencies:
+        label = prescriptionutils.freqValue(frequency)
+        if label == frequency:
+            label = f"{frequency:g}x/dia".replace(".", ",")
+        labels.append(f'"{label}"')
+
+    if len(labels) == 1:
+        return f" (Frequência {labels[0]} não é considerada no cálculo)"
+
+    return (
+        f" (Frequências {', '.join(labels[:-1])} e {labels[-1]}"
+        " não são consideradas no cálculo)"
+    )
 
 
 def _alert_max_time(

@@ -85,13 +85,11 @@ def set_intervention_outcome(
                 status.HTTP_400_BAD_REQUEST,
             )
 
-    # infection control interventions follow the admission, not the segment
-    if not intervention.id_infection_control_evaluation:
-        _validate_authorization(
-            id_prescription=intervention.idPrescription,
-            id_prescription_drug=intervention.id,
-            user=user_context,
-        )
+    _validate_authorization(
+        id_prescription=intervention.idPrescription,
+        id_prescription_drug=intervention.id,
+        user=user_context,
+    )
 
     if outcome not in ["a", "n", "x", "j", "s"]:
         raise ValidationError(
@@ -263,7 +261,7 @@ def get_outcome_data(id_intervention, user_context: User, edit=False):
 
     data = _get_outcome_data(record=record, user_context=user_context, edit=edit)
 
-    # who may change it: infection control keeps the ones its reviews recorded
+    # who may set the outcome: the ones infection control recorded are tagged
     intervention: Intervention = record[0]
     data["header"]["infectionControl"] = bool(
         intervention.id_infection_control_evaluation

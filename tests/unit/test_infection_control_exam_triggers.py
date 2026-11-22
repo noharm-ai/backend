@@ -286,6 +286,71 @@ def test_without_a_baseline():
     )
 
 
+PCT_UNLESS_FALLING = {
+    "id": "pct",
+    "name": "Procalcitonina",
+    "examRef": "procalcitonina_adult",
+    "valueAbove": 0.5,
+    "variationAbove": -50,
+    "variationOptional": True,
+    "fromCourseDay": None,
+}
+
+
+def test_an_optional_variation():
+    """PCT over 0.5 and, when there was a result at review time, a fall of
+    less than 50%: without a baseline the value decides alone"""
+    date = NOW - timedelta(hours=1)
+
+    def matched(trigger, value):
+        evaluation = _evaluation(trigger)
+        results = _results({"procalcitonina_adult": [(date, value)]})
+        return _match_ids(evaluation, results) == ["pct"]
+
+    without = {**PCT_UNLESS_FALLING, "baseline": None}
+    assert matched(without, 0.8)
+    assert not matched(without, 0.5)
+    [match] = exam_triggers.exam_matches(
+        evaluation=_evaluation(without),
+        course=_course(),
+        results=_results({"procalcitonina_adult": [(date, 0.8)]}),
+        now=NOW,
+    )
+    assert match["baseline"] is None and match["variation"] is None
+
+    # with one, the variation still counts: 2.0 -> 0.8 is a 60% fall
+    falling = {**PCT_UNLESS_FALLING, "baseline": _baseline(2.0)}
+    assert not matched(falling, 0.8)
+    assert matched(falling, 1.2)
+    # a zero baseline is a baseline: staying at zero is no variation, any rise
+    # is unbounded
+    assert matched({**PCT_UNLESS_FALLING, "baseline": _baseline(0.0)}, 0.8)
+
+    # not optional: never met without a baseline
+    assert not matched({**without, "variationOptional": False}, 0.8)
+    # evaluations saved before the flag existed keep the old behavior
+    old = {k: v for k, v in without.items() if k != "variationOptional"}
+    assert not matched(old, 0.8)
+
+
+def test_an_optional_variation_needs_a_value_condition():
+    """Without a value condition an optional variation would fire on any
+    result without a baseline; without a variation there is nothing to skip"""
+    with pytest.raises(ValidationError):
+        ExamTriggerRuleInput.model_validate(
+            {**PCT_UNLESS_FALLING, "id": None, "valueAbove": None}
+        )
+
+    no_variation = ExamTriggerRuleInput.model_validate(
+        {**PCT_UNLESS_FALLING, "id": None, "variationAbove": None}
+    )
+    assert no_variation.variationOptional is False
+    assert (
+        ExamTriggerRuleInput.model_validate({**PCR_RISE, "id": None}).variationOptional
+        is False
+    )
+
+
 def test_from_course_day():
     """Fever after D3: a result on D3 doesn't count, one on D4 does (D1 is the
     first 24 hours of the course)"""

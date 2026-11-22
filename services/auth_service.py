@@ -37,7 +37,13 @@ from repository import (
     user_repository,
 )
 from security.role import Role
-from services import memory_service, news_service, training_service, user_service
+from services import (
+    memory_service,
+    news_service,
+    organization_service,
+    training_service,
+    user_service,
+)
 from services.admin import admin_integration_status_service
 from utils import logger, status
 
@@ -91,7 +97,7 @@ def _prepare_user(user: User) -> User:
     extra = db.session.query(UserExtra).filter(UserExtra.idUser == user.id).first()
     if extra:
         extra_roles = extra.config.get("roles", [])
-        extra_schemas = extra.config.get("schemas", [])
+        extra_schemas = organization_service.get_extra_schemas(extra.config)
         user.config = dict(
             user.config,
             roles=user.config.get("roles", []) + extra_roles,
@@ -204,7 +210,11 @@ def _auth_user(
         .first()
     )
 
-    claims = {"schema": user_schema, "config": user_config}
+    # the extra schemas stay out of the tokens: the picker and the switch reload
+    # them from the database, and an organization's list (allSchemas) would grow
+    # the refresh token past the browser's 4KB cookie limit
+    token_config = {k: v for k, v in (user_config or {}).items() if k != "schemas"}
+    claims = {"schema": user_schema, "config": token_config}
     access_token = create_access_token(identity=str(user.id), additional_claims=claims)
     refresh_token = create_refresh_token(
         identity=str(user.id), additional_claims=claims
@@ -390,7 +400,7 @@ def get_switch_schema_data(user_permissions: list[Permission], user_context: Use
     )
     schemas = []
     if extra:
-        schemas = extra.config.get("schemas", [])
+        schemas = organization_service.get_extra_schemas(extra.config)
 
     return {"maintainer": False, "schemas": schemas}
 

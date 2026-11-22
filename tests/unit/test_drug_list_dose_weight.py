@@ -118,19 +118,29 @@ def _prescription_drug(**overrides):
     return SimpleNamespace(**prescription_drug)
 
 
+_SAME_AS_ID = object()  # _row: the unit's normalized name is its id
+
+
 def _row(
     prescription_drug=None,
     attributes=None,
     measure_unit="mg",
     prev_notes=None,
     convert_factor=None,
+    measure_unit_nh=_SAME_AS_ID,
+    default_measure_unit_nh=None,
 ):
-    """Build a prescription row shaped like the ones ``_process_drugs`` consumes."""
+    """Build a prescription row shaped like the ones ``_process_drugs`` consumes.
+    The prescribed unit's normalized name is its id unless given (None for none)."""
     items = [
         prescription_drug if prescription_drug is not None else _prescription_drug(),
         SimpleNamespace(name="Medicamento Teste", sctid=None),  # 1 Drug
         SimpleNamespace(  # 2 MeasureUnit
-            id=measure_unit, description=measure_unit, measureunit_nh=measure_unit
+            id=measure_unit,
+            description=measure_unit,
+            measureunit_nh=measure_unit
+            if measure_unit_nh is _SAME_AS_ID
+            else measure_unit_nh,
         )
         if measure_unit is not None
         else None,
@@ -147,10 +157,11 @@ def _row(
     ]
     return _FakeRow(
         items,
+        MeasureUnit=items[2],  # a Row names its entities too
         idDepartment=1,
         prescription_date=None,
         prescription_expire=None,
-        default_measure_unit_nh=None,
+        default_measure_unit_nh=default_measure_unit_nh,
         measure_unit_convert_factor=convert_factor,
         measure_unit_solution_convert_factor=None,
     )
@@ -276,6 +287,158 @@ class TestDosePerWeight:
         assert results[0]["doseWeight"] is None
 
 
+class TestConvertedDose:
+    """convertedDose: the item's dose in the drug's default unit, the value
+    the alerts read (doseconv is prescalc's score key)."""
+
+    def _converted(
+        self,
+        dose=100,
+        doseconv=None,
+        unit="mg",
+        default_unit="mcg",
+        convert_factor=None,
+        division=None,
+        unit_nh=_SAME_AS_ID,
+        default_unit_nh=None,
+    ):
+        """convertedDose of one item prescribed in ``unit``."""
+        results = _process(
+            [
+                _row(
+                    _prescription_drug(
+                        dose=dose, frequency=2, doseconv=doseconv, idMeasureUnit=unit
+                    ),
+                    attributes=_drug_attributes(
+                        idMeasureUnit=default_unit, division=division
+                    ),
+                    measure_unit=unit,
+                    convert_factor=convert_factor,
+                    measure_unit_nh=unit_nh,
+                    default_measure_unit_nh=default_unit_nh,
+                )
+            ]
+        )
+        return results[0]["convertedDose"]
+
+    def test_dose_times_the_current_factor(self):
+        """100 mg with mg -> mcg factor 1000"""
+        assert self._converted(convert_factor=1000) == 100000
+
+    def test_stored_doseconv_is_not_read(self):
+        """prescalc stored the 100 mg unconverted: the current factor converts it"""
+        assert self._converted(doseconv=100, convert_factor=1000) == 100000
+
+    def test_range_drug_converts_the_dose(self):
+        """A range drug's doseconv is the rounded range, not a dose"""
+        assert (
+            self._converted(doseconv=2010, convert_factor=1000, division=10) == 100000
+        )
+
+    def test_another_unit_without_a_factor_is_none(self):
+        """It can't be told"""
+        assert self._converted(doseconv=100) is None
+
+    def test_default_unit_needs_no_factor(self):
+        """Prescribed in the default unit, unidadeconverte may have no row"""
+        assert self._converted(unit="mcg") == 100
+
+    def test_same_normalized_unit_needs_no_factor(self):
+        """MILIGRAMA and mg are the same unit"""
+        assert (
+            self._converted(
+                unit="MILIGRAMA", default_unit="mg", unit_nh="mg", default_unit_nh="mg"
+            )
+            == 100
+        )
+
+    def test_differentiated_dose_is_the_stored_daily_total(self):
+        """Dose diferenciada: dose 0, doseconv the daily total"""
+        assert self._converted(dose=0, doseconv=30, convert_factor=1000) == 30
+
+    def test_differentiated_dose_of_a_range_drug_is_none(self):
+        """A range drug's doseconv is the rounded range"""
+        assert (
+            self._converted(dose=0, doseconv=30, convert_factor=1000, division=10)
+            is None
+        )
+
+
+class TestMissingConvertFactor:
+    """missingConvertFactor: the screen marks an item whose dose can't be
+    converted to the drug's default unit (no unidadeconverte factor)."""
+
+    def _flag(
+        self,
+        unit="mg",
+        default_unit="mcg",
+        convert_factor=None,
+        unit_nh=_SAME_AS_ID,
+        default_unit_nh=None,
+    ):
+        """missingConvertFactor of one item prescribed in ``unit``."""
+        results = _process(
+            [
+                _row(
+                    _prescription_drug(dose=100, frequency=2, idMeasureUnit=unit),
+                    attributes=_drug_attributes(idMeasureUnit=default_unit),
+                    measure_unit=unit,
+                    convert_factor=convert_factor,
+                    measure_unit_nh=unit_nh,
+                    default_measure_unit_nh=default_unit_nh,
+                )
+            ]
+        )
+        return results[0]["missingConvertFactor"]
+
+    def test_another_unit_without_a_factor_is_missing(self):
+        """Prescribed in mg, default mcg and no factor"""
+        assert self._flag() is True
+
+    def test_another_unit_with_a_factor_is_not_missing(self):
+        """The factor converts the dose"""
+        assert self._flag(convert_factor=1000) is False
+
+    def test_default_unit_needs_no_factor(self):
+        """Prescribed in the default unit there is nothing to convert"""
+        assert self._flag(unit="mcg") is False
+
+    def test_drug_without_a_default_unit_is_not_flagged(self):
+        """Without a default unit there is no unit to convert to"""
+        assert self._flag(default_unit=None) is False
+
+    def test_same_normalized_unit_is_not_flagged(self):
+        """MILIGRAMA and mg are the same unit (unidademedida_nh): nothing to convert"""
+        assert (
+            self._flag(
+                unit="MILIGRAMA", default_unit="mg", unit_nh="mg", default_unit_nh="mg"
+            )
+            is False
+        )
+
+    def test_different_normalized_units_are_flagged(self):
+        """Both units normalized, but to different ones"""
+        assert (
+            self._flag(
+                unit="COMPRIMIDO", default_unit="mg", unit_nh="un", default_unit_nh="mg"
+            )
+            is True
+        )
+
+    def test_prescribed_unit_without_normalized_name_is_flagged(self):
+        """Without unidademedida_nh on the prescribed unit it can't be told the same"""
+        assert (
+            self._flag(
+                unit="AMPOLA", default_unit="mg", unit_nh=None, default_unit_nh="mg"
+            )
+            is True
+        )
+
+    def test_item_without_a_unit_is_not_flagged(self):
+        """Without a prescribed unit there is nothing to convert from"""
+        assert self._flag(unit=None) is False
+
+
 class TestDosePerWeightConversion:
     """The "ou X unidade/Kg" suffix shown when the drug has a default unit."""
 
@@ -394,6 +557,27 @@ class TestDosePerWeightConversion:
         )
         assert results[0]["doseWeight"] == "2,00 mg/Kg"
         assert results[0]["doseWeightDay"] == "4,00 mg/Kg/Dia"
+
+    def test_same_unit_under_another_id_is_not_converted(self):
+        """MILIGRAMA and mg normalize to mg: the same unit, no "ou ..." part"""
+        attributes = _drug_attributes(idMeasureUnit="mg")
+        results = _process(
+            [
+                _row(
+                    _prescription_drug(
+                        dose=100, frequency=2, doseconv=100, idMeasureUnit="MILIGRAMA"
+                    ),
+                    attributes=attributes,
+                    measure_unit="MILIGRAMA",
+                    measure_unit_nh="mg",
+                    default_measure_unit_nh="mg",
+                    convert_factor=1,
+                )
+            ],
+            exams=_exams(weight=50),
+        )
+        assert results[0]["doseWeight"] == "2,00 MILIGRAMA/Kg"
+        assert results[0]["doseWeightDay"] == "4,00 MILIGRAMA/Kg/Dia"
 
     def test_same_unit_is_not_converted(self):
         """When the default unit equals the prescribed one there is nothing to show."""

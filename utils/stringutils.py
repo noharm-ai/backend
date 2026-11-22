@@ -1,10 +1,13 @@
 """Utils: string related functions"""
 
 import html
+import math
 import re
 import unicodedata
 from typing import Union
 from urllib.parse import unquote
+
+from utils import numberutils
 
 
 def strip_control_chars(text: str) -> str:
@@ -18,6 +21,26 @@ def strNone(s):
 
 def strFormatBR(s):
     return f"{s:_.2f}".replace(".", ",").replace("_", ".")
+
+
+def format_number_br(value) -> str:
+    """A number in the Brazilian format ("1.522,62"), without float noise (7
+    significant digits): 2 decimals from 1 up, and below 1 the decimals that 3
+    significant digits need, so a small dose isn't rounded away (0.375 reads
+    "0,375" and 0.0025 "0,0025", where strFormatBR gives "0,38" and "0,00").
+    None reads None."""
+    if value is None:
+        return str(value)
+    value = numberutils.round_significant(value)
+    decimals = 2
+    if 0 < abs(value) < 1:
+        decimals = max(2, 2 - math.floor(math.log10(abs(value))))
+    text = f"{value:_.{decimals}f}"
+    if decimals > 2:
+        # the decimals beyond the second only show significant digits
+        whole, fraction = text.split(".")
+        text = f"{whole}.{fraction[:2] + fraction[2:].rstrip('0')}"
+    return text.replace(".", ",").replace("_", ".")
 
 
 def remove_accents(text):
