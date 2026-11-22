@@ -612,7 +612,7 @@ def _get_configs(
     segment: Segment | None = None,
 ):
     """Configs of the prescription view: memory, features, segment, patient
-    and the schema params (noharm-store, written by admin).
+    and the schema params (a memory record, written by admin).
 
     segment: the prescription's segment, when the caller already has it"""
     data = {}
@@ -625,6 +625,7 @@ def _get_configs(
             MemoryEnum.ADMISSION_REPORTS.value,
             MemoryEnum.ADMISSION_REPORTS_INTERNAL.value,
             MemoryEnum.FEATURES.value,
+            MemoryEnum.SCHEMA_PARAMS.value,
         ]
     )
     data["schedules_fasting"] = memory_itens.get(
@@ -647,8 +648,10 @@ def _get_configs(
 
     data.update(_get_patient_configs(patient=patient))
 
-    # schema params (noharm-store, written by admin): code defaults without them
-    data["schema_params"] = schema_params_service.get_schema_params(schema=schema)
+    # schema params (written by admin): code defaults without them
+    data["schema_params"] = schema_params_service.from_memory(
+        memory_itens=memory_itens, schema=schema
+    )
 
     # previous admissions
     data["previous_admissions"] = patient_repository.get_previous_admissions(

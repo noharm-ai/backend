@@ -2,8 +2,9 @@
 user's schema, read only, for maintainers (the prescription screen shows them
 from the alerts card; the admin project edits them).
 
-The noharm-store is stubbed (tests never call AWS): the autouse fixture finds no
-item, and each test that needs one patches the read again.
+The params are the demo schema's memoria record (`schema-params`), written by
+the schema_params fixture as the admin project does; without it the code
+defaults apply.
 """
 
 import pytest
@@ -20,13 +21,6 @@ def maintainer_headers(client):
     return make_headers(get_access(client, roles=[Role.CURATOR.value]))
 
 
-def _store(monkeypatch, items: dict):
-    monkeypatch.setattr(
-        "repository.store_repository.get_item_data",
-        lambda pk, sk: items.get(sk) if pk == "schema_params" else None,
-    )
-
-
 def _view(client, headers) -> dict:
     response = client.get(_URL, headers=headers)
     assert response.status_code == 200, response.get_json()
@@ -40,8 +34,8 @@ def test_only_maintainers_can_see_the_schema_params(client, analyst_headers):
     assert response.status_code == 401
 
 
-def test_without_an_item_the_defaults_are_in_force(client, maintainer_headers):
-    """No item for the schema: the code defaults, and nothing custom"""
+def test_without_a_record_the_defaults_are_in_force(client, maintainer_headers):
+    """No record for the schema: the code defaults, and nothing custom"""
     data = _view(client, maintainer_headers)
 
     assert data["schema"] == "demo"
@@ -57,21 +51,17 @@ def test_without_an_item_the_defaults_are_in_force(client, maintainer_headers):
     assert data["params"]["alerts"]["interactions"] == {}
 
 
-def test_the_schema_item_is_shown_with_what_it_sets(
-    client, maintainer_headers, monkeypatch
+def test_the_schema_record_is_shown_with_what_it_sets(
+    client, maintainer_headers, schema_params
 ):
-    """params: in force (defaults filled in); custom: only what the item sets"""
-    _store(
-        monkeypatch,
+    """params: in force (defaults filled in); custom: only what the record sets"""
+    schema_params(
         {
-            "demo": {
-                "alerts": {
-                    "types": {"elderly": {"level": "medium"}},
-                    "interactions": {"iy": {"ignoreLevels": ["low"]}},
-                }
-            },
-            "other": {"alerts": {"types": {"kidney": {"enabled": False}}}},
-        },
+            "alerts": {
+                "types": {"elderly": {"level": "medium"}},
+                "interactions": {"iy": {"ignoreLevels": ["low"]}},
+            }
+        }
     )
 
     data = _view(client, maintainer_headers)
@@ -87,17 +77,13 @@ def test_the_schema_item_is_shown_with_what_it_sets(
         "enabled": True,
         "level": "medium",
     }
-    # another schema's item does not apply
     assert data["params"]["alerts"]["types"]["kidney"]["enabled"] is True
     assert data["params"]["alerts"]["interactions"]["iy"]["enabled"] is True
 
 
-def test_an_invalid_section_is_named(client, maintainer_headers, monkeypatch):
+def test_an_invalid_section_is_named(client, maintainer_headers, schema_params):
     """An invalid section is left out (defaults) and named for the maintainer"""
-    _store(
-        monkeypatch,
-        {"demo": {"alerts": {"types": {"kidney": {"enabled": "talvez"}}}}},
-    )
+    schema_params({"alerts": {"types": {"kidney": {"enabled": "talvez"}}}})
 
     data = _view(client, maintainer_headers)
 
@@ -106,35 +92,15 @@ def test_an_invalid_section_is_named(client, maintainer_headers, monkeypatch):
     assert data["custom"] == {}
 
 
-def test_a_read_failure_is_reported(client, maintainer_headers, monkeypatch):
-    """The table could not be read: the defaults are in force, and it says so"""
+def test_a_change_applies_on_the_next_request(
+    client, maintainer_headers, schema_params
+):
+    """No cache: a record admin saves is in force on the next request"""
+    schema_params({"alerts": {"types": {"kidney": {"enabled": False}}}})
+    before = _view(client, maintainer_headers)
 
-    def fail(pk, sk):
-        raise RuntimeError("timeout")
+    schema_params({"alerts": {"types": {"kidney": {"enabled": True}}}})
+    after = _view(client, maintainer_headers)
 
-    monkeypatch.setattr("repository.store_repository.get_item_data", fail)
-
-    data = _view(client, maintainer_headers)
-
-    assert data["status"] == "read_error"
-    assert data["custom"] == {}
-
-
-def test_the_view_skips_the_container_cache(client, maintainer_headers, monkeypatch):
-    """The prescription view caches the params per container; this view always
-    reads the table: after admin saves a change, it shows the new item while
-    the prescription view still has the cached params"""
-    from services import schema_params_service
-
-    monkeypatch.setattr(schema_params_service, "CACHE_TTL_SECONDS", 60)
-    _store(monkeypatch, {})
-    schema_params_service.get_schema_params(schema="demo")
-
-    _store(monkeypatch, {"demo": {"alerts": {"types": {"kidney": {"enabled": False}}}}})
-    data = _view(client, maintainer_headers)
-    # outside a request: only the container cache applies
-    cached = schema_params_service.get_schema_params(schema="demo")
-
-    assert data["status"] == "found"
-    assert data["custom"]["alerts"]["types"]["kidney"]["enabled"] is False
-    assert cached.alerts.alert_type("kidney").enabled is True
+    assert before["params"]["alerts"]["types"]["kidney"]["enabled"] is False
+    assert after["params"]["alerts"]["types"]["kidney"]["enabled"] is True

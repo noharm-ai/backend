@@ -361,8 +361,8 @@ class SchemaConfigAuditTypeEnum(Enum):
     CENTRAL_VPN = 7
     AWS_ACCESS_KEY = 8
     NOHARM_DB_USER = 9
-    # noharm-store `schema_params` item of the schema (extra.section names the
-    # section changed)
+    # the schema params (memoria `schema-params`; noharm-store until the move,
+    # hence the name) of the schema (extra.section names the section changed)
     STORE_SCHEMA_PARAMS = 10
 
 
