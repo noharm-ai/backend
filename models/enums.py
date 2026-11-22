@@ -28,6 +28,8 @@ class MemoryEnum(Enum):
     TRANSCRIPTION_REMOVE_FIELDS = "transcription-remove-fields"
     # the infection control exam trigger rules (models/infection_control_config.py)
     INFECTION_CONTROL_EXAM_TRIGGERS = "infection-control-exam-triggers"
+    # the schema params (models/schema_params.py): written only by admin
+    SCHEMA_PARAMS = "schema-params"
 
 
 class GlobalMemoryEnum(Enum):

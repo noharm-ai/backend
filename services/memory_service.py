@@ -126,7 +126,17 @@ def get_by_kind(kinds) -> dict:
 
 @has_permission(Permission.WRITE_CUSTOM_FORMS)
 def save_custom_form(id: int | None, value, user_context: User):
-    """Create or update a custom-forms memory record."""
+    """Create or update a custom-forms memory record (an update only reaches a
+    custom-forms record)."""
+    if id:
+        mem = db.session.get(Memory, id)
+        if mem is None or mem.kind != MemoryEnum.CUSTOM_FORMS.value:
+            raise ValidationError(
+                "Memória inexistente",
+                "errors.invalidRecord",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
     return save_memory(
         id=id,
         kind=MemoryEnum.CUSTOM_FORMS.value,
@@ -137,7 +147,19 @@ def save_custom_form(id: int | None, value, user_context: User):
 
 @has_permission(Permission.WRITE_BASIC_FEATURES)
 def save_memory(id, kind, value, user_context: User):
-    """Create or update a memory record. Admin kinds and unauthorized private records are rejected."""
+    """Create or update a memory record. Admin kinds and unauthorized private records are rejected.
+
+    An update may change the record's kind, so every check looks at both the
+    stored kind and the requested one: checking only the requested kind would
+    let a request rename (and then read or rewrite) an admin record, or someone
+    else's private one"""
+    if is_admin_memory(kind):
+        raise ValidationError(
+            "Usuário não possui permissão para alterar este registro",
+            "errors.unauthorizedUser",
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
     newMem = False
     if id:
         mem = db.session.get(Memory, id)
@@ -148,11 +170,31 @@ def save_memory(id, kind, value, user_context: User):
                 status.HTTP_400_BAD_REQUEST,
             )
 
-        if is_private(key=kind) and user_context.id != mem.user:
+        if is_admin_memory(mem.kind):
             raise ValidationError(
                 "Usuário não possui permissão para alterar este registro",
                 "errors.unauthorizedUser",
                 status.HTTP_401_UNAUTHORIZED,
+            )
+
+        if (
+            is_private(key=kind) or is_private(key=mem.kind)
+        ) and user_context.id != mem.user:
+            raise ValidationError(
+                "Usuário não possui permissão para alterar este registro",
+                "errors.unauthorizedUser",
+                status.HTTP_401_UNAUTHORIZED,
+            )
+
+        if (
+            mem.kind != kind
+            and kind in EDITABLE_KINDS
+            and get_memory(kind) is not None
+        ):
+            raise ValidationError(
+                "Já existe um registro com este tipo",
+                "errors.invalidParam",
+                status.HTTP_400_BAD_REQUEST,
             )
 
     else:
@@ -169,13 +211,6 @@ def save_memory(id, kind, value, user_context: User):
     mem.value = value
     mem.update = datetime.today()
     mem.user = user_context.id
-
-    if is_admin_memory(mem.kind):
-        raise ValidationError(
-            "Usuário não possui permissão para alterar este registro",
-            "errors.unauthorizedUser",
-            status.HTTP_401_UNAUTHORIZED,
-        )
 
     if newMem:
         db.session.add(mem)
@@ -243,6 +278,8 @@ def is_admin_memory(key):
         MemoryEnum.TRANSCRIPTION_FIELDS.value,
         # written only by its own endpoint, which validates it
         MemoryEnum.INFECTION_CONTROL_EXAM_TRIGGERS.value,
+        # written only by the admin project (services/schema_params_service.py)
+        MemoryEnum.SCHEMA_PARAMS.value,
     ]
 
 
