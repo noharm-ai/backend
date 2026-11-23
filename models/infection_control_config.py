@@ -178,8 +178,8 @@ def parse_review_exceptions(value) -> ReviewExceptionsData:
 
 # the exams the antimicrobial timeline opens with when the schema never chose
 # them, by reference (segmentoexame.tpexame_ref): CRP, CKD-EPI (or CKD-EPI
-# 2021, where configured instead) and leukocytes
-DEFAULT_TIMELINE_EXAMS = ["pcru", "ckd", "ckd21", "h_conleuc"]
+# 2021, where configured instead), leukocytes and the patient's temperature
+DEFAULT_TIMELINE_EXAMS = ["pcru", "ckd", "ckd21", "h_conleuc", "temp"]
 MAX_TIMELINE_EXAMS = 10
 
 

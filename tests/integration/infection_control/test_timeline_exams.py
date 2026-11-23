@@ -4,7 +4,7 @@ Each schema chooses the exams the infection control page plots under the
 courses, in order (GET/PUT /infection-control/timeline-exams, in its memoria,
 written only by WRITE_INFECTION_CONTROL), by reference
 (segmentoexame.tpexame_ref). Without a choice the timeline opens with the
-default ones (CRP, CKD-EPI or CKD-EPI 2021, leukocytes). The admission view
+default ones (CRP, CKD-EPI or CKD-EPI 2021, leukocytes, temperature). The admission view
 sends the list with the timeline. Saving a change keeps the version it
 replaced, with who saved each.
 """
@@ -23,7 +23,7 @@ from utils import status
 URL = "/infection-control/timeline-exams"
 KIND = MemoryEnum.INFECTION_CONTROL_TIMELINE_EXAMS.value
 PREVIOUS_KIND = MemoryEnum.INFECTION_CONTROL_TIMELINE_EXAMS_PREVIOUS.value
-DEFAULT = ["pcru", "ckd", "ckd21", "h_conleuc"]
+DEFAULT = ["pcru", "ckd", "ckd21", "h_conleuc", "temp"]
 
 # the schema's exams mapped to references: PCR and potassium; the global
 # catalog names PCR, the potassium keeps the schema's name
