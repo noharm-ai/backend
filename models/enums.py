@@ -38,6 +38,8 @@ class MemoryEnum(Enum):
     INFECTION_CONTROL_TIMELINE_EXAMS_PREVIOUS = (
         "infection-control-timeline-exams-previous"
     )
+    # the schema params (models/schema_params.py): written only by admin
+    SCHEMA_PARAMS = "schema-params"
 
 
 class GlobalMemoryEnum(Enum):
@@ -369,8 +371,8 @@ class SchemaConfigAuditTypeEnum(Enum):
     CENTRAL_VPN = 7
     AWS_ACCESS_KEY = 8
     NOHARM_DB_USER = 9
-    # noharm-store `schema_params` item of the schema (extra.section names the
-    # section changed)
+    # the schema params (memoria `schema-params`; noharm-store until the move,
+    # hence the name) of the schema (extra.section names the section changed)
     STORE_SCHEMA_PARAMS = 10
 
 

@@ -11,7 +11,6 @@ from config import Config
 from mobile import app
 from models.enums import FeatureEnum, NoHarmENV
 from models.main import User
-from services import schema_params_service
 
 
 def pytest_configure(config):  # noqa: ARG001
@@ -73,21 +72,27 @@ def _update_roles(email, roles):
         session_commit()
 
 
-@pytest.fixture(autouse=True)
-def no_noharm_store(monkeypatch):
-    """Tests never call AWS: the noharm-store reads find no item (the schema
-    params are the code defaults). A test that needs items patches it again.
-    The schema params container cache is off (read on every request, so a
-    test can patch the store between two views); its own tests turn it on"""
-    monkeypatch.setattr(
-        "repository.store_repository.get_item_data", lambda pk, sk: None
-    )
-    monkeypatch.setattr("services.schema_params_service.CACHE_TTL_SECONDS", 0)
-    monkeypatch.setattr("services.schema_params_service.ERROR_RETRY_SECONDS", 0)
-    monkeypatch.setattr("services.schema_params_service.STALE_MAX_SECONDS", 0)
-    schema_params_service.clear_cache()
-    yield
-    schema_params_service.clear_cache()
+def set_schema_params(value) -> None:
+    """Writes the demo schema params record (memoria `schema-params`), as the
+    admin project does; None removes it (the code defaults apply)"""
+    session.execute(text("DELETE FROM demo.memoria WHERE tipo = 'schema-params'"))
+    if value is not None:
+        session.execute(
+            text(
+                "INSERT INTO demo.memoria (tipo, valor, update_at, update_by) "
+                "VALUES ('schema-params', CAST(:value AS json), now(), 0)"
+            ),
+            {"value": json.dumps(value)},
+        )
+    session_commit()
+
+
+@pytest.fixture
+def schema_params():
+    """Sets the demo schema params for the test (set_schema_params) and removes
+    them afterwards: without this fixture the code defaults apply"""
+    yield set_schema_params
+    set_schema_params(None)
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -140,6 +145,9 @@ def _cleanup():
     session.execute(
         text("UPDATE demo.prescricao set status = '0' WHERE fkprescricao in (9199, 20)")
     )
+
+    # the schema params record (schema_params fixture)
+    session.execute(text("DELETE FROM demo.memoria WHERE tipo = 'schema-params'"))
 
     # every kind inserted by _setup_test_data, so a re-run does not stack duplicates
     session.execute(

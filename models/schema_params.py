@@ -1,9 +1,9 @@
-"""Schema params kept in the DynamoDB noharm-store (pk `schema_params`).
+"""Schema params kept in the schema's `memoria` (tipo `schema-params`).
 
-One item per schema (sk = the schema); whatever it does not set comes from the
-code defaults. The config sits in the item's `data`, one key per section; each
-section has its own model (e.g. models/alert_config.py) and is validated on its
-own, so an invalid section never takes the others down.
+One record per schema; whatever it does not set comes from the code defaults.
+The config sits in the record's `valor`, one key per section; each section has
+its own model (e.g. models/alert_config.py) and is validated on its own, so an
+invalid section never takes the others down.
 
 Written by the admin project, which validates it strictly; here it is only
 read, so the models are lenient (unknown keys and sections are ignored).

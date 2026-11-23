@@ -282,12 +282,12 @@ def test_the_trace_agrees_with_the_prescription_alerts(
 
 
 def test_the_schema_alert_config_hides_the_alert_and_the_trace_says_why(
-    client, analyst_headers, maintainer_headers, monkeypatch
+    client, analyst_headers, maintainer_headers, schema_params
 ):
-    """The schema params (noharm-store, section alerts) hides an ``iy`` with an
+    """The schema params (section alerts) hides an ``iy`` with an
     SN item from the view and its counts, and the trace names the config rule."""
-    store = {
-        "demo": {
+    schema_params(
+        {
             "alerts": {
                 "interactions": {
                     "iy": {
@@ -296,11 +296,7 @@ def test_the_schema_alert_config_hides_the_alert_and_the_trace_says_why(
                     }
                 }
             }
-        },
-    }
-    monkeypatch.setattr(
-        "repository.store_repository.get_item_data",
-        lambda pk, sk: store.get(sk) if pk == "schema_params" else None,
+        }
     )
     _add_relation(_SUBSTANCE_A[0], _SUBSTANCE_B[0], "iy", "high")
     intravenous = {"route": _IV_ROUTE, "interval": "08:00 20:00"}
@@ -343,15 +339,11 @@ def test_the_schema_alert_config_hides_the_alert_and_the_trace_says_why(
 
 
 def test_a_kind_disabled_by_the_schema_is_hidden_and_explained(
-    client, analyst_headers, maintainer_headers, monkeypatch
+    client, analyst_headers, maintainer_headers, schema_params
 ):
     """A relation kind turned off in the schema params (``dm``) is neither shown
     nor counted, and the trace names the config rule."""
-    store = {"demo": {"alerts": {"interactions": {"dm": {"enabled": False}}}}}
-    monkeypatch.setattr(
-        "repository.store_repository.get_item_data",
-        lambda pk, sk: store.get(sk) if pk == "schema_params" else None,
-    )
+    schema_params({"alerts": {"interactions": {"dm": {"enabled": False}}}})
     _add_relation(_SUBSTANCE_A[0], _SUBSTANCE_B[0], "dm", "high")
     id_prescription, (id_a, id_b) = _prescription(
         [{"idDrug": _DRUG_A[0]}, {"idDrug": _DRUG_B[0]}]
@@ -376,15 +368,11 @@ def test_a_kind_disabled_by_the_schema_is_hidden_and_explained(
 
 
 def test_a_level_ignored_by_the_schema_is_hidden_and_explained(
-    client, analyst_headers, maintainer_headers, monkeypatch
+    client, analyst_headers, maintainer_headers, schema_params
 ):
     """The schema params ignore low ``iy`` alerts: a low one (no shared time) is
     neither shown nor counted, and the trace names the level rule."""
-    store = {"demo": {"alerts": {"interactions": {"iy": {"ignoreLevels": ["low"]}}}}}
-    monkeypatch.setattr(
-        "repository.store_repository.get_item_data",
-        lambda pk, sk: store.get(sk) if pk == "schema_params" else None,
-    )
+    schema_params({"alerts": {"interactions": {"iy": {"ignoreLevels": ["low"]}}}})
     _add_relation(_SUBSTANCE_A[0], _SUBSTANCE_B[0], "iy", "low")
     id_prescription, (id_a, id_b) = _prescription(
         [

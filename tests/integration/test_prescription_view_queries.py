@@ -127,6 +127,23 @@ def test_the_segment_and_the_features_are_not_read_again(
     assert len(_reading(statements, "demo.memoria")) == 1
 
 
+@pytest.mark.usefixtures("seed_substances_and_drugs")
+def test_the_schema_params_come_with_the_other_memory_items(
+    client, analyst_headers, statements, schema_params
+):
+    """The schema params are a memory record, read with the others: they apply
+    (the interaction kind they turn off is not counted) at no query of their
+    own"""
+    id_prescription = _prescription_with_interaction_and_allergy()
+    schema_params({"alerts": {"interactions": {"it": {"enabled": False}}}})
+
+    payload = _view(client, analyst_headers, statements, id_prescription)
+
+    assert payload["alertStats"]["interactions"].get("it", 0) == 0
+    assert payload["alertStats"]["interactions"]["rx"] == 1
+    assert len(_reading(statements, "demo.memoria")) == 1
+
+
 def test_the_feature_flags_are_read_once(client, analyst_headers, statements):
     """Each cache of the view (clinical notes, exams) checks a feature flag:
     one read answers them all, also when no flag is set"""
