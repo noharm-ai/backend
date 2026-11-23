@@ -150,8 +150,8 @@ class ReviewExceptionsData(BaseModel):
     record; GET/PUT /infection-control/review-exceptions).
 
     A substance (public.substancia.sctid) covers every drug of it; a drug
-    (medicamento.fkmedicamento) is the fallback for the drugs without a
-    substance. A course is exempt when its drug or its substance is listed:
+    (medicamento.fkmedicamento, any antimicrobial, with a substance or not)
+    covers only itself. A course is exempt when its drug or its substance is listed:
     it still counts as antimicrobial therapy (timeline, DOT/LOT), but opens no
     pending reason and is left out of the review indicators. Empty (no record)
     reviews every antimicrobial, as before the list existed.

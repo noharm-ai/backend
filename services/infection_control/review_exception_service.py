@@ -5,8 +5,8 @@ list of exceptions (models/infection_control_config.py, ReviewExceptionsData)
 in its memoria (kind MemoryEnum.INFECTION_CONTROL_REVIEW_EXCEPTIONS, an admin
 kind: only this service writes it, and only for WRITE_INFECTION_CONTROL).
 
-A substance covers every drug of it; a drug is the fallback for the drugs
-without a substance. An exempt course is still antimicrobial therapy (the
+A substance covers every drug of it; a drug (any antimicrobial, with a
+substance or not) covers only itself. An exempt course is still antimicrobial therapy (the
 timeline, the summary, DOT/LOT), but the rule opens no reason for it and the
 report leaves it out of the review indicators (reviewRequired false on the
 summary course). The rule reads the list on every run (load), so a change
@@ -157,7 +157,8 @@ def get_review_exceptions():
 @has_permission(Permission.READ_INFECTION_CONTROL)
 def search_options(term: str | None):
     """What the list can hold, by name: the substances of the antimicrobial
-    drugs and the antimicrobial drugs without a substance"""
+    drugs and the antimicrobial drugs (flagged antimicro in some segment, with
+    a substance or not)"""
     _check_feature()
 
     term = (term or "").strip()
@@ -171,9 +172,7 @@ def search_options(term: str | None):
         ],
         "drugs": [
             {"id": str(i), "name": name}
-            for i, name in review_exception_repository.search_drugs_without_substance(
-                term=term
-            )
+            for i, name in infection_control_repository.search_antimicrobials(term=term)
         ],
     }
 

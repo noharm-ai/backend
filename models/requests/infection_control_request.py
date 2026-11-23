@@ -142,7 +142,7 @@ class ExamTriggersSaveRequest(BaseModel):
 
 class ReviewExceptionsSaveRequest(BaseModel):
     """The antimicrobials whose courses need no review, replacing those kept:
-    substances (sctid) and drugs without a substance (fkmedicamento)"""
+    substances (sctid) and drugs (fkmedicamento)"""
 
     substances: list[int] = Field(default=[], max_length=MAX_REVIEW_EXCEPTIONS)
     drugs: list[int] = Field(default=[], max_length=MAX_REVIEW_EXCEPTIONS)

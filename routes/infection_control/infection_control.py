@@ -137,8 +137,8 @@ def get_review_exceptions():
 )
 @api_endpoint()
 def search_review_exception_options():
-    """Substances of antimicrobials and antimicrobial drugs without a
-    substance, by name, for the review exceptions"""
+    """Substances of antimicrobials and antimicrobial drugs, by name, for the
+    review exceptions"""
     return review_exception_service.search_options(term=request.args.get("q", None))
 
 

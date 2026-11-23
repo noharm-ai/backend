@@ -2,8 +2,8 @@
 
 Each schema keeps a list of antimicrobials whose courses need no review
 (GET/PUT /infection-control/review-exceptions, in its memoria, written only by
-WRITE_INFECTION_CONTROL): a substance covers every drug of it, a drug is the
-fallback for the drugs without a substance. An exempt course opens no reason,
+WRITE_INFECTION_CONTROL): a substance covers every drug of it, a drug (any
+antimicrobial, with a substance or not) covers only itself. An exempt course opens no reason,
 its open ones are settled (NOT_REQUIRED), the record running only exempt
 courses is revised and hidden from the worklist unless asked, and the report
 summary marks the course reviewRequired false (it still counts in DOT/LOT).
@@ -173,16 +173,15 @@ def test_saves_substances_and_drugs_with_their_names(
     assert data["updatedAt"] is not None
 
 
-def test_options_offer_substances_of_antimicrobials_and_drugs_without_one(
+def test_options_offer_substances_and_drugs_of_antimicrobials(
     client,
     infection_controller_headers,
     infection_control,
     antimicrobial_substance,
     second_antimicrobial,
 ):
-    """The search offers the substances of antimicrobial drugs and the
-    antimicrobial drugs without a substance (the one with a substance is
-    listed by it)"""
+    """The search offers the substances of antimicrobial drugs and every
+    antimicrobial drug, with a substance or not; no drug that isn't one"""
     data = client.get(
         f"{URL}/options?q=ZZTEST", headers=infection_controller_headers
     ).get_json()["data"]
@@ -198,7 +197,18 @@ def test_options_offer_substances_of_antimicrobials_and_drugs_without_one(
     ampicilin = client.get(
         f"{URL}/options?q=AMPICILINA", headers=infection_controller_headers
     ).get_json()["data"]["drugs"]
-    assert str(ANTIMICROBIAL_DRUG) not in {d["id"] for d in ampicilin}
+    # the antimicrobial with a substance is offered by itself too
+    assert str(ANTIMICROBIAL_DRUG) in {d["id"] for d in ampicilin}
+
+
+def test_options_leave_out_drugs_that_are_not_antimicrobials(
+    client, infection_controller_headers, infection_control
+):
+    """Drug 4 (BISACODIL) is not an antimicrobial in the seed data"""
+    drugs = client.get(
+        f"{URL}/options?q=BISACODIL", headers=infection_controller_headers
+    ).get_json()["data"]["drugs"]
+    assert drugs == []
 
 
 def test_rejects_what_is_not_an_antimicrobial(
@@ -434,6 +444,26 @@ def test_exempt_by_substance(
 
     assert _record(admission)["tp_status"] == REVISED
     assert _open_pendings(admission) == []
+
+
+def test_exempt_by_drug_with_a_substance(
+    client,
+    infection_controller_headers,
+    infection_control,
+    admission,
+    antimicrobial_substance,
+):
+    """A drug with a substance may be listed by itself: it is exempt, its
+    substance stays reviewed for the other drugs of it"""
+    _saved(client, infection_controller_headers, drugs=[ANTIMICROBIAL_DRUG])
+
+    _prescribe_today(admission)
+
+    assert _record(admission)["tp_status"] == REVISED
+    assert _open_pendings(admission) == []
+    data = client.get(URL, headers=infection_controller_headers).get_json()["data"]
+    assert data["substances"] == []
+    assert [d["id"] for d in data["drugs"]] == [str(ANTIMICROBIAL_DRUG)]
 
 
 def test_only_the_reviewable_drug_opens_reasons(

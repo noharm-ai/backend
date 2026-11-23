@@ -39,21 +39,6 @@ def search_substances(
     return query.order_by(Substance.name, Substance.id).limit(limit).all()
 
 
-def search_drugs_without_substance(
-    term: str | None = None, limit: int = 50
-) -> list[tuple[int, str]]:
-    """Antimicrobial drugs without a substance (listed by drug), by name"""
-    query = (
-        db.session.query(Drug.id, Drug.name)
-        .filter(Drug.sctid == None)
-        .filter(_is_antimicrobial())
-    )
-    if term:
-        query = query.filter(Drug.name.ilike(f"%{term}%"))
-
-    return query.order_by(Drug.name, Drug.id).limit(limit).all()
-
-
 def get_substance_names(id_substances: set[int]) -> dict[int, str]:
     """Names of substances, by id"""
     if not id_substances:
