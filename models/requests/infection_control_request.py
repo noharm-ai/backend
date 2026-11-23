@@ -150,8 +150,10 @@ class ReviewExceptionsSaveRequest(BaseModel):
 
 class TimelineExamsSaveRequest(BaseModel):
     """The exams the antimicrobial timeline opens with, in order, replacing
-    those kept: references (segmentoexame.tpexame_ref)"""
+    those kept: references (segmentoexame.tpexame_ref); or, with `default`,
+    back to following the NoHarm default (exams ignored)"""
 
     exams: Annotated[list[str], AfterValidator(normalize_exam_refs)] = Field(
         default=[], max_length=MAX_TIMELINE_EXAMS
     )
+    default: bool = False

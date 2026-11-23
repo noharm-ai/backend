@@ -43,6 +43,8 @@ KIND = MemoryEnum.INFECTION_CONTROL_REVIEW_EXCEPTIONS.value
 PREVIOUS_KIND = MemoryEnum.INFECTION_CONTROL_REVIEW_EXCEPTIONS_PREVIOUS.value
 NOHARM_USER_EMAIL = "test-review-exceptions-noharm@example.com"
 SUBSTANCE = 9070101
+# a SNOMED extension id: more digits than a JavaScript number holds exactly
+LONG_SUBSTANCE = 9123456789012345678
 NOT_REQUIRED = InfectionControlResolutionEnum.NOT_REQUIRED.value
 
 
@@ -63,23 +65,22 @@ def no_exceptions():
     _delete_exceptions()
 
 
-@pytest.fixture
-def antimicrobial_substance():
-    """Give the antimicrobial drug a substance"""
+def _give_substance(sctid: int):
+    """Give the antimicrobial drug a substance, removing it afterwards"""
     session.execute(
         text(
             "INSERT INTO public.substancia (sctid, nome, ativo) "
             "VALUES (:sctid, 'ZZTEST SUBSTANCIA ISENTA', true)"
         ),
-        {"sctid": SUBSTANCE},
+        {"sctid": sctid},
     )
     session.execute(
         text("UPDATE demo.medicamento SET sctid = :sctid WHERE fkmedicamento = :id"),
-        {"sctid": SUBSTANCE, "id": ANTIMICROBIAL_DRUG},
+        {"sctid": sctid, "id": ANTIMICROBIAL_DRUG},
     )
     session_commit()
 
-    yield SUBSTANCE
+    yield sctid
 
     session.execute(
         text("UPDATE demo.medicamento SET sctid = NULL WHERE fkmedicamento = :id"),
@@ -87,9 +88,21 @@ def antimicrobial_substance():
     )
     session.execute(
         text("DELETE FROM public.substancia WHERE sctid = :sctid"),
-        {"sctid": SUBSTANCE},
+        {"sctid": sctid},
     )
     session_commit()
+
+
+@pytest.fixture
+def antimicrobial_substance():
+    """Give the antimicrobial drug a substance"""
+    yield from _give_substance(SUBSTANCE)
+
+
+@pytest.fixture
+def long_substance():
+    """Give the antimicrobial drug a substance with a long sctid"""
+    yield from _give_substance(LONG_SUBSTANCE)
 
 
 def _save(client, headers, substances=(), drugs=()):
@@ -171,6 +184,33 @@ def test_saves_substances_and_drugs_with_their_names(
     ]
     assert data["drugs"] == [{"id": str(OTHER_DRUG), "name": "BISACODIL 5 mg CP"}]
     assert data["updatedAt"] is not None
+
+
+def test_saves_ids_sent_as_strings(
+    client, infection_controller_headers, infection_control, long_substance, admission
+):
+    """The ids come as strings, as the GET and the search send them, so one
+    longer than a JavaScript number holds is saved exactly and exempts its
+    courses"""
+    data = _saved(
+        client,
+        infection_controller_headers,
+        substances=[str(long_substance)],
+        drugs=[str(ANTIMICROBIAL_DRUG)],
+    )
+
+    assert data["substances"] == [
+        {"id": str(LONG_SUBSTANCE), "name": "ZZTEST SUBSTANCIA ISENTA"}
+    ]
+    assert [d["id"] for d in data["drugs"]] == [str(ANTIMICROBIAL_DRUG)]
+    stored = session.execute(
+        text("SELECT valor FROM demo.memoria WHERE tipo = :kind"), {"kind": KIND}
+    ).scalar()
+    assert stored == {"substances": [LONG_SUBSTANCE], "drugs": [ANTIMICROBIAL_DRUG]}
+
+    _prescribe_today(admission)
+    assert _record(admission)["tp_status"] == REVISED
+    assert _open_pendings(admission) == []
 
 
 def test_options_offer_substances_and_drugs_of_antimicrobials(

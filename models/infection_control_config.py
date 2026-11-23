@@ -200,17 +200,20 @@ class TimelineExamsData(BaseModel):
 
     Each is a reference (segmentoexame.tpexame_ref, the same in every schema),
     plotted in this order when the patient has results of it; the others are
-    added from the timeline. Without a record, DEFAULT_TIMELINE_EXAMS.
+    added from the timeline. exams None follows DEFAULT_TIMELINE_EXAMS, as no
+    record does: a schema that went back to the default gets its later
+    changes too (an empty list is a choice: no exam).
     """
 
     model_config = ConfigDict(extra="ignore")
 
-    exams: list[str] = Field(default=[], max_length=MAX_TIMELINE_EXAMS)
+    exams: list[str] | None = Field(default=None, max_length=MAX_TIMELINE_EXAMS)
 
     @model_validator(mode="after")
     def _normalize(self):
         """References in lower case, each once"""
-        self.exams = normalize_exam_refs(self.exams)
+        if self.exams is not None:
+            self.exams = normalize_exam_refs(self.exams)
         return self
 
 

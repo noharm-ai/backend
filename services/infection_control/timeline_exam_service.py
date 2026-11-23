@@ -15,9 +15,12 @@ CKD-EPI 2021, the first the patient has). The settings
 offer the references the schema's active exams are mapped to; a reference
 kept from before, or one of the default list, may stay even if the schema
 maps no exam to it (shown unavailable: the timeline plots it only for a
-patient with results of it). Saving a change keeps the version it replaces
-(kind INFECTION_CONTROL_TIMELINE_EXAMS_PREVIOUS, see
-settings_version_service); a save that changes nothing writes nothing.
+patient with results of it). Going back to the default saves no copy of it:
+the record says it follows the default (exams None), so a later change of
+DEFAULT_TIMELINE_EXAMS reaches the schema, and the change is still a version
+with who made it. Saving a change keeps the version it replaces (kind
+INFECTION_CONTROL_TIMELINE_EXAMS_PREVIOUS, see settings_version_service); a
+save that changes nothing writes nothing.
 """
 
 from datetime import datetime
@@ -40,14 +43,21 @@ from services.infection_control.settings_version_service import SettingVersions
 from utils import status
 
 
-def load() -> list[str] | None:
-    """The references the timeline opens with, in order; None while the schema
-    never chose them, so the page keeps the default as it plots it (CKD-EPI or,
-    where configured instead, CKD-EPI 2021: one of them, never both). No
-    permission check: the admission view has one"""
-    record = settings_repository.get_record(MemoryEnum.INFECTION_CONTROL_TIMELINE_EXAMS)
+def _choice(record) -> list[str] | None:
+    """The references a record chose, in order; None when it follows the
+    default (no record, one saying so, or one that can't be read)"""
     data = parse_timeline_exams(record.value if record else None)
     return data.exams if data is not None else None
+
+
+def load() -> list[str] | None:
+    """The references the timeline opens with, in order; None while the schema
+    follows the default, so the page keeps the default as it plots it (CKD-EPI
+    or, where configured instead, CKD-EPI 2021: one of them, never both). No
+    permission check: the admission view has one"""
+    return _choice(
+        settings_repository.get_record(MemoryEnum.INFECTION_CONTROL_TIMELINE_EXAMS)
+    )
 
 
 def _versions() -> SettingVersions:
@@ -69,19 +79,17 @@ def _check_feature():
 
 
 def _view(versions: SettingVersions) -> dict:
-    """The exams in force (the default when the schema never chose them),
-    when and by whom they were saved, the version they replaced (previous,
-    None without one), the default list and the exams the schema offers
-    (options), each with its name"""
+    """The exams in force (the default while the schema follows it), when and
+    by whom they were saved, the version they replaced (previous, None without
+    one), the default list and the exams the schema offers (options), each
+    with its name"""
     catalog = exams_repository.get_schema_exam_refs()
     record, previous_record = versions.record, versions.previous
-    data = parse_timeline_exams(record.value if record else None)
-    previous = parse_timeline_exams(previous_record.value) if previous_record else None
-    in_force = data.exams if data is not None else list(DEFAULT_TIMELINE_EXAMS)
+    choice = _choice(record)
+    previous_choice = _choice(previous_record)
+    in_force = choice if choice is not None else list(DEFAULT_TIMELINE_EXAMS)
 
-    listed = set(in_force) | set(DEFAULT_TIMELINE_EXAMS)
-    if previous is not None:
-        listed |= set(previous.exams)
+    listed = set(in_force) | set(DEFAULT_TIMELINE_EXAMS) | set(previous_choice or [])
     names = {
         **exams_repository.get_global_exam_names(listed - set(catalog)),
         **catalog,
@@ -98,14 +106,19 @@ def _view(versions: SettingVersions) -> dict:
 
     return {
         "exams": exams(in_force),
-        "default": data is None,
+        "default": choice is None,
         **settings_version_service.saved_by(record, responsible),
         "previous": (
             {
-                "exams": exams(previous.exams),
+                "exams": exams(
+                    previous_choice
+                    if previous_choice is not None
+                    else list(DEFAULT_TIMELINE_EXAMS)
+                ),
+                "default": previous_choice is None,
                 **settings_version_service.saved_by(previous_record, responsible),
             }
-            if previous is not None
+            if previous_record is not None
             else None
         ),
         "defaultExams": exams(list(DEFAULT_TIMELINE_EXAMS)),
@@ -123,30 +136,33 @@ def get_timeline_exams():
 
 @has_permission(Permission.WRITE_INFECTION_CONTROL)
 def save_timeline_exams(request_data: TimelineExamsSaveRequest, user_context: User):
-    """Replace the exams the antimicrobial timeline opens with, keeping the
-    version replaced. An exam added must be one the schema offers or one of
-    the default list (one kept may stay, so the others can still be saved)"""
+    """Replace the exams the antimicrobial timeline opens with, or go back to
+    following the default (request `default`), keeping the version replaced.
+    An exam added must be one the schema offers or one of the default list
+    (one kept may stay, so the others can still be saved)"""
     _check_feature()
 
     versions = _versions()
-    data = parse_timeline_exams(versions.record.value if versions.record else None)
-    current = data.exams if data is not None else list(DEFAULT_TIMELINE_EXAMS)
+    current = _choice(versions.record)
+    requested = None if request_data.default else request_data.exams
 
-    added = set(request_data.exams) - set(current) - set(DEFAULT_TIMELINE_EXAMS)
-    if added - set(exams_repository.get_schema_exam_refs()):
-        raise ValidationError(
-            "Exame não configurado neste hospital",
-            "errors.invalidRecord",
-            status.HTTP_400_BAD_REQUEST,
-        )
+    if requested is not None:
+        in_force = current if current is not None else DEFAULT_TIMELINE_EXAMS
+        added = set(requested) - set(in_force) - set(DEFAULT_TIMELINE_EXAMS)
+        if added - set(exams_repository.get_schema_exam_refs()):
+            raise ValidationError(
+                "Exame não configurado neste hospital",
+                "errors.invalidRecord",
+                status.HTTP_400_BAD_REQUEST,
+            )
 
-    if request_data.exams == current:
+    if requested == current:
         # nothing changed: the previous version stays the one before
         return _view(versions)
 
     settings_version_service.save(
         versions,
-        value=TimelineExamsData(exams=request_data.exams).model_dump(),
+        value=TimelineExamsData(exams=requested).model_dump(),
         user_id=user_context.id,
         now=datetime.now(),
     )

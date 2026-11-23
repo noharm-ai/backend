@@ -173,8 +173,12 @@ def test_saves_the_exams_in_order_and_keeps_the_previous_version(
 def test_saving_no_change_writes_nothing(
     client, infection_controller_headers, infection_control, mapped_exams
 ):
-    """The default saved as it is creates no record"""
-    data = _saved(client, infection_controller_headers, DEFAULT)
+    """Following the default, as without a record, creates no record"""
+    response = client.put(
+        URL, json={"default": True}, headers=infection_controller_headers
+    )
+    assert response.status_code == status.HTTP_200_OK
+    data = response.get_json()["data"]
 
     assert data["default"] is True
     assert (
@@ -184,6 +188,56 @@ def test_saving_no_change_writes_nothing(
         ).scalar()
         == 0
     )
+
+
+def test_back_to_the_default_follows_its_changes(
+    client,
+    infection_controller_headers,
+    infection_control,
+    mapped_exams,
+    admission,
+    monkeypatch,
+):
+    """Going back to the default saves no copy of it: the schema follows the
+    default, later changes included, and the change is a version like any
+    other"""
+    _saved(client, infection_controller_headers, ["zz_k_tl"])
+
+    response = client.put(
+        URL, json={"default": True}, headers=infection_controller_headers
+    )
+    assert response.status_code == status.HTTP_200_OK, response.get_json()
+    data = response.get_json()["data"]
+
+    assert data["default"] is True
+    assert _refs(data["exams"]) == DEFAULT
+    assert data["updatedBy"] is not None
+    assert data["previous"]["default"] is False
+    assert _refs(data["previous"]["exams"]) == ["zz_k_tl"]
+    assert session.execute(
+        text("SELECT valor FROM demo.memoria WHERE tipo = :kind"), {"kind": KIND}
+    ).scalar() == {"exams": None}
+
+    _prescribe_today(admission)
+    view = client.get(
+        f"/infection-control/antimicrobial-timeline/{admission}",
+        headers=infection_controller_headers,
+    ).get_json()["data"]
+    assert view["timelineExams"] is None
+
+    # a later default reaches it
+    monkeypatch.setattr(
+        "services.infection_control.timeline_exam_service.DEFAULT_TIMELINE_EXAMS",
+        ["pcru", "zz_k_tl"],
+    )
+    data = _get(client, infection_controller_headers)
+    assert data["default"] is True
+    assert _refs(data["exams"]) == ["pcru", "zz_k_tl"]
+
+    # and a list chosen afterwards shows the default as the version replaced
+    data = _saved(client, infection_controller_headers, ["pcru"])
+    assert data["default"] is False
+    assert data["previous"]["default"] is True
 
 
 def test_an_empty_list_opens_the_timeline_without_exams(
