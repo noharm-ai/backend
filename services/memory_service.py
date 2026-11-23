@@ -254,6 +254,8 @@ def is_admin_memory(key):
         MemoryEnum.INFECTION_CONTROL_EXAM_TRIGGERS.value,
         MemoryEnum.INFECTION_CONTROL_REVIEW_EXCEPTIONS.value,
         MemoryEnum.INFECTION_CONTROL_REVIEW_EXCEPTIONS_PREVIOUS.value,
+        MemoryEnum.INFECTION_CONTROL_TIMELINE_EXAMS.value,
+        MemoryEnum.INFECTION_CONTROL_TIMELINE_EXAMS_PREVIOUS.value,
     ]
 
 

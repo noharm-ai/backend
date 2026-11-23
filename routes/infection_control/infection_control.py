@@ -12,11 +12,13 @@ from models.requests.infection_control_request import (
     InfectionControlListRequest,
     InfectionControlReviewRequest,
     ReviewExceptionsSaveRequest,
+    TimelineExamsSaveRequest,
 )
 from services.infection_control import (
     infection_control_service,
     recent_cultures_service,
     review_exception_service,
+    timeline_exam_service,
 )
 from utils import status
 
@@ -146,6 +148,22 @@ def save_review_exceptions():
     """Replace the antimicrobials whose courses need no review"""
     return review_exception_service.save_review_exceptions(
         request_data=ReviewExceptionsSaveRequest(**request.get_json())
+    )
+
+
+@app_infection_control.route("/infection-control/timeline-exams", methods=["GET"])
+@api_endpoint()
+def get_timeline_exams():
+    """The exams the antimicrobial timeline opens with"""
+    return timeline_exam_service.get_timeline_exams()
+
+
+@app_infection_control.route("/infection-control/timeline-exams", methods=["PUT"])
+@api_endpoint()
+def save_timeline_exams():
+    """Replace the exams the antimicrobial timeline opens with"""
+    return timeline_exam_service.save_timeline_exams(
+        request_data=TimelineExamsSaveRequest(**request.get_json())
     )
 
 

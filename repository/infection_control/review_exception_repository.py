@@ -1,26 +1,12 @@
-"""Repository: the infection control review exceptions (memoria) and the
-antimicrobials they can list"""
+"""Repository: the antimicrobials the infection control review exceptions can
+list (the list itself is a setting, see settings_repository)"""
 
 from sqlalchemy import BigInteger, column, func, or_
 from sqlalchemy.dialects.postgresql import JSONB
 
-from models.appendix import Memory
-from models.enums import InfectionControlStatusEnum, MemoryEnum
+from models.enums import InfectionControlStatusEnum
 from models.infection_control import InfectionControlAdmission
 from models.main import Drug, DrugAttributes, Substance, db
-
-
-def get_record(
-    kind: MemoryEnum = MemoryEnum.INFECTION_CONTROL_REVIEW_EXCEPTIONS,
-) -> Memory | None:
-    """The memoria record keeping the schema's review exceptions (or, by its
-    kind, the version they replaced)"""
-    return (
-        db.session.query(Memory)
-        .filter(Memory.kind == kind.value)
-        .order_by(Memory.key)
-        .first()
-    )
 
 
 def _is_antimicrobial():

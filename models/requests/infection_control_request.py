@@ -6,7 +6,9 @@ from pydantic import AfterValidator, BaseModel, Field
 
 from models.infection_control_config import (
     MAX_REVIEW_EXCEPTIONS,
+    MAX_TIMELINE_EXAMS,
     ExamTriggerRuleInput,
+    normalize_exam_refs,
 )
 
 # dates are stored as naive local (hospital) time
@@ -144,3 +146,12 @@ class ReviewExceptionsSaveRequest(BaseModel):
 
     substances: list[int] = Field(default=[], max_length=MAX_REVIEW_EXCEPTIONS)
     drugs: list[int] = Field(default=[], max_length=MAX_REVIEW_EXCEPTIONS)
+
+
+class TimelineExamsSaveRequest(BaseModel):
+    """The exams the antimicrobial timeline opens with, in order, replacing
+    those kept: references (segmentoexame.tpexame_ref)"""
+
+    exams: Annotated[list[str], AfterValidator(normalize_exam_refs)] = Field(
+        default=[], max_length=MAX_TIMELINE_EXAMS
+    )

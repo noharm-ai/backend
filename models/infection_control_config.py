@@ -174,3 +174,54 @@ def parse_review_exceptions(value) -> ReviewExceptionsData:
     except Exception:  # noqa: BLE001 - never break the rule on a bad record
         logger.backend_logger.warning("invalid infection control review exceptions")
         return ReviewExceptionsData()
+
+
+# the exams the antimicrobial timeline opens with when the schema never chose
+# them, by reference (segmentoexame.tpexame_ref): CRP, CKD-EPI (or CKD-EPI
+# 2021, where configured instead) and leukocytes
+DEFAULT_TIMELINE_EXAMS = ["pcru", "ckd", "ckd21", "h_conleuc"]
+MAX_TIMELINE_EXAMS = 10
+
+
+def normalize_exam_refs(refs: list[str]) -> list[str]:
+    """References in lower case, without blanks or repeats, in their order"""
+    normalized = []
+    for ref in refs:
+        ref = (ref or "").strip().lower()
+        if ref and ref not in normalized:
+            normalized.append(ref)
+    return normalized
+
+
+class TimelineExamsData(BaseModel):
+    """The exams the antimicrobial timeline of an admission opens with, kept in
+    the schema's memoria (kind MemoryEnum.INFECTION_CONTROL_TIMELINE_EXAMS,
+    one record; GET/PUT /infection-control/timeline-exams).
+
+    Each is a reference (segmentoexame.tpexame_ref, the same in every schema),
+    plotted in this order when the patient has results of it; the others are
+    added from the timeline. Without a record, DEFAULT_TIMELINE_EXAMS.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    exams: list[str] = Field(default=[], max_length=MAX_TIMELINE_EXAMS)
+
+    @model_validator(mode="after")
+    def _normalize(self):
+        """References in lower case, each once"""
+        self.exams = normalize_exam_refs(self.exams)
+        return self
+
+
+def parse_timeline_exams(value) -> TimelineExamsData | None:
+    """The timeline exams kept in memoria; None without a record or with one
+    that can't be read (the default exams then, logged)"""
+    if value is None:
+        return None
+
+    try:
+        return TimelineExamsData.model_validate(value)
+    except Exception:  # noqa: BLE001 - the timeline opens with the default
+        logger.backend_logger.warning("invalid infection control timeline exams")
+        return None

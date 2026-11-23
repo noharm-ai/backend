@@ -60,13 +60,13 @@ from services.infection_control import (
     antimicrobial_timeline_service,
     exam_trigger_service,
     review_exception_service,
+    timeline_exam_service,
 )
 from services.infection_control import (
     infection_control_status_service as rule,
 )
 from services.infection_control.antimicrobial_timeline_service import GAP_TOLERANCE
 from utils import dateutils, db_utils, logger, status
-
 
 # letters typed before the drugs are searched
 MIN_DRUG_SEARCH = 3
@@ -334,7 +334,12 @@ def get_admission_view(admission_number: int, user_context: User):
         )
         follow_up = None
 
-    return {**timeline, "followUp": follow_up}
+    return {
+        **timeline,
+        "followUp": follow_up,
+        # the exams the timeline opens with, chosen by the schema
+        "timelineExams": timeline_exam_service.load(),
+    }
 
 
 def _validate_indication(evaluation: AntimicrobialEvaluationRequest):

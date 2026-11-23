@@ -34,6 +34,10 @@ class MemoryEnum(Enum):
     INFECTION_CONTROL_REVIEW_EXCEPTIONS_PREVIOUS = (
         "infection-control-review-exceptions-previous"
     )
+    INFECTION_CONTROL_TIMELINE_EXAMS = "infection-control-timeline-exams"
+    INFECTION_CONTROL_TIMELINE_EXAMS_PREVIOUS = (
+        "infection-control-timeline-exams-previous"
+    )
 
 
 class GlobalMemoryEnum(Enum):
