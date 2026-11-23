@@ -148,6 +148,15 @@ def save_memory(id, kind, value, user_context: User):
                 status.HTTP_400_BAD_REQUEST,
             )
 
+        # the kind sent may differ from the record's: an admin record must not
+        # be rewritten by giving it another kind
+        if is_admin_memory(mem.kind):
+            raise ValidationError(
+                "Usuário não possui permissão para alterar este registro",
+                "errors.unauthorizedUser",
+                status.HTTP_401_UNAUTHORIZED,
+            )
+
         if is_private(key=kind) and user_context.id != mem.user:
             raise ValidationError(
                 "Usuário não possui permissão para alterar este registro",
@@ -243,6 +252,10 @@ def is_admin_memory(key):
         MemoryEnum.TRANSCRIPTION_FIELDS.value,
         # written only by its own endpoint, which validates it
         MemoryEnum.INFECTION_CONTROL_EXAM_TRIGGERS.value,
+        MemoryEnum.INFECTION_CONTROL_REVIEW_EXCEPTIONS.value,
+        MemoryEnum.INFECTION_CONTROL_REVIEW_EXCEPTIONS_PREVIOUS.value,
+        MemoryEnum.INFECTION_CONTROL_TIMELINE_EXAMS.value,
+        MemoryEnum.INFECTION_CONTROL_TIMELINE_EXAMS_PREVIOUS.value,
     ]
 
 

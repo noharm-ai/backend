@@ -4,7 +4,12 @@ from zoneinfo import ZoneInfo
 
 from pydantic import AfterValidator, BaseModel, Field
 
-from models.infection_control_config import ExamTriggerRuleInput
+from models.infection_control_config import (
+    MAX_REVIEW_EXCEPTIONS,
+    MAX_TIMELINE_EXAMS,
+    ExamTriggerRuleInput,
+    normalize_exam_refs,
+)
 
 # dates are stored as naive local (hospital) time
 LOCAL_TZ = ZoneInfo("America/Sao_Paulo")
@@ -104,6 +109,9 @@ class InfectionControlListRequest(BaseModel):
     awareLevels: list[int] = []
     # admissions with an evaluation in force judged non conforming
     nonConforming: bool = False
+    # also the admissions running only antimicrobials that need no review (the
+    # schema's review exceptions): hidden unless asked, or asked by number
+    includeNotRequired: bool = False
     # closed admissions are listed only within this many days of closing,
     # unless asked by admission number: they grow without end
     closedDays: int = Field(default=30, ge=1, le=365)
@@ -130,3 +138,22 @@ class ExamTriggersSaveRequest(BaseModel):
     no id; a kept one sends its own)"""
 
     rules: list[ExamTriggerRuleInput] = Field(max_length=50)
+
+
+class ReviewExceptionsSaveRequest(BaseModel):
+    """The antimicrobials whose courses need no review, replacing those kept:
+    substances (sctid) and drugs (fkmedicamento)"""
+
+    substances: list[int] = Field(default=[], max_length=MAX_REVIEW_EXCEPTIONS)
+    drugs: list[int] = Field(default=[], max_length=MAX_REVIEW_EXCEPTIONS)
+
+
+class TimelineExamsSaveRequest(BaseModel):
+    """The exams the antimicrobial timeline opens with, in order, replacing
+    those kept: references (segmentoexame.tpexame_ref); or, with `default`,
+    back to following the NoHarm default (exams ignored)"""
+
+    exams: Annotated[list[str], AfterValidator(normalize_exam_refs)] = Field(
+        default=[], max_length=MAX_TIMELINE_EXAMS
+    )
+    default: bool = False

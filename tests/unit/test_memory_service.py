@@ -20,6 +20,10 @@ class TestIsAdminMemory:
             MemoryEnum.PRESMED_FORM.value,
             MemoryEnum.SUMMARY_CONFIG.value,
             MemoryEnum.MAP_IV.value,
+            MemoryEnum.INFECTION_CONTROL_REVIEW_EXCEPTIONS.value,
+            MemoryEnum.INFECTION_CONTROL_REVIEW_EXCEPTIONS_PREVIOUS.value,
+            MemoryEnum.INFECTION_CONTROL_TIMELINE_EXAMS.value,
+            MemoryEnum.INFECTION_CONTROL_TIMELINE_EXAMS_PREVIOUS.value,
         ],
     )
     def test_admin_restricted_keys_return_true(self, key):

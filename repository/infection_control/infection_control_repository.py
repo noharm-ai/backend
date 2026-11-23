@@ -43,8 +43,11 @@ def create_admission(
     user_id: int,
     now: datetime,
     id_last_prescription: int | None = None,
+    status: int = InfectionControlStatusEnum.PENDING.value,
+    features: dict | None = None,
 ) -> bool:
-    """Create the admission record as pending, unless it already exists.
+    """Create the admission record (pending unless told otherwise), unless it
+    already exists.
 
     Returns True when it was created.
     """
@@ -52,13 +55,15 @@ def create_admission(
         insert(InfectionControlAdmission)
         .values(
             admission_number=admission_number,
-            status=InfectionControlStatusEnum.PENDING.value,
+            status=status,
             status_date=now,
             origin=origin,
             recalculated_at=now,
             id_last_prescription=id_last_prescription,
             created_at=now,
             created_by=user_id,
+            # a JSONB None would be stored as JSON null, not as no features
+            **({"features": features} if features is not None else {}),
         )
         .on_conflict_do_nothing(index_elements=["nratendimento"])
     )
@@ -127,8 +132,15 @@ def is_discharged(admission_number: int, now: datetime) -> bool:
     return discharge_date is not None and discharge_date <= now
 
 
-def reopen_admission(admission_number: int, user_id: int, now: datetime):
-    """Make a closed admission record pending again.
+def reopen_admission(
+    admission_number: int,
+    user_id: int,
+    now: datetime,
+    status: int = InfectionControlStatusEnum.PENDING.value,
+    features: dict | None = None,
+):
+    """Make a closed admission record pending (or `status`) again; with
+    `features`, they replace what the rule last kept (indicadores).
 
     Only a closed record is touched: a pending or revised one is left as is
     without waiting for its lock. Returns the reopened row (with its last
@@ -141,10 +153,11 @@ def reopen_admission(admission_number: int, user_id: int, now: datetime):
             InfectionControlAdmission.status == InfectionControlStatusEnum.CLOSED.value
         )
         .values(
-            status=InfectionControlStatusEnum.PENDING.value,
+            status=status,
             status_date=now,
             updated_at=now,
             updated_by=user_id,
+            **({"features": features} if features is not None else {}),
         )
         .returning(InfectionControlAdmission.id_last_review)
         .execution_options(synchronize_session=False)
@@ -516,6 +529,18 @@ def _filter_features(query, filters: InfectionControlListRequest, now: datetime)
     if filters.nonConforming:
         query = query.filter(
             InfectionControlAdmission.features["nonConforming"].as_boolean() == True
+        )
+
+    # a record running only antimicrobials exempt from review is hidden unless
+    # asked for (or asked by number); one the rule never ran on has no flag
+    # and is shown
+    if not filters.includeNotRequired and not filters.admissionNumbers:
+        query = query.filter(
+            func.coalesce(
+                InfectionControlAdmission.features["reviewRequired"].as_boolean(),
+                True,
+            )
+            == True
         )
 
     return query

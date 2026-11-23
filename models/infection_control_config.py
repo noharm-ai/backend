@@ -136,3 +136,95 @@ def parse_exam_trigger_rules(value) -> list[ExamTriggerRule]:
         rules.append(rule)
 
     return rules
+
+
+# --- review exceptions ---
+
+# bounds what one schema can keep: far more than any formulary needs
+MAX_REVIEW_EXCEPTIONS = 500
+
+
+class ReviewExceptionsData(BaseModel):
+    """The antimicrobials of a schema whose courses need no review, kept in the
+    schema's memoria (kind MemoryEnum.INFECTION_CONTROL_REVIEW_EXCEPTIONS, one
+    record; GET/PUT /infection-control/review-exceptions).
+
+    A substance (public.substancia.sctid) covers every drug of it; a drug
+    (medicamento.fkmedicamento, any antimicrobial, with a substance or not)
+    covers only itself. A course is exempt when its drug or its substance is listed:
+    it still counts as antimicrobial therapy (timeline, DOT/LOT), but opens no
+    pending reason and is left out of the review indicators. Empty (no record)
+    reviews every antimicrobial, as before the list existed.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    substances: list[int] = Field(default=[], max_length=MAX_REVIEW_EXCEPTIONS)
+    drugs: list[int] = Field(default=[], max_length=MAX_REVIEW_EXCEPTIONS)
+
+
+def parse_review_exceptions(value) -> ReviewExceptionsData:
+    """The review exceptions kept in memoria; a record that can't be read
+    reviews every antimicrobial (as with no record), and is logged"""
+    if value is None:
+        return ReviewExceptionsData()
+
+    try:
+        return ReviewExceptionsData.model_validate(value)
+    except Exception:  # noqa: BLE001 - never break the rule on a bad record
+        logger.backend_logger.warning("invalid infection control review exceptions")
+        return ReviewExceptionsData()
+
+
+# the exams the antimicrobial timeline opens with when the schema never chose
+# them, by reference (segmentoexame.tpexame_ref): CRP, CKD-EPI (or CKD-EPI
+# 2021, where configured instead), leukocytes and the patient's temperature
+DEFAULT_TIMELINE_EXAMS = ["pcru", "ckd", "ckd21", "h_conleuc", "temp"]
+MAX_TIMELINE_EXAMS = 10
+
+
+def normalize_exam_refs(refs: list[str]) -> list[str]:
+    """References in lower case, without blanks or repeats, in their order"""
+    normalized = []
+    for ref in refs:
+        ref = (ref or "").strip().lower()
+        if ref and ref not in normalized:
+            normalized.append(ref)
+    return normalized
+
+
+class TimelineExamsData(BaseModel):
+    """The exams the antimicrobial timeline of an admission opens with, kept in
+    the schema's memoria (kind MemoryEnum.INFECTION_CONTROL_TIMELINE_EXAMS,
+    one record; GET/PUT /infection-control/timeline-exams).
+
+    Each is a reference (segmentoexame.tpexame_ref, the same in every schema),
+    plotted in this order when the patient has results of it; the others are
+    added from the timeline. exams None follows DEFAULT_TIMELINE_EXAMS, as no
+    record does: a schema that went back to the default gets its later
+    changes too (an empty list is a choice: no exam).
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    exams: list[str] | None = Field(default=None, max_length=MAX_TIMELINE_EXAMS)
+
+    @model_validator(mode="after")
+    def _normalize(self):
+        """References in lower case, each once"""
+        if self.exams is not None:
+            self.exams = normalize_exam_refs(self.exams)
+        return self
+
+
+def parse_timeline_exams(value) -> TimelineExamsData | None:
+    """The timeline exams kept in memoria; None without a record or with one
+    that can't be read (the default exams then, logged)"""
+    if value is None:
+        return None
+
+    try:
+        return TimelineExamsData.model_validate(value)
+    except Exception:  # noqa: BLE001 - the timeline opens with the default
+        logger.backend_logger.warning("invalid infection control timeline exams")
+        return None

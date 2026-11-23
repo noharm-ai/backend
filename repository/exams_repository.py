@@ -138,6 +138,38 @@ def get_configured_exam_ref_types():
     ]
 
 
+def get_schema_exam_refs() -> dict[str, str]:
+    """The references (tpexame_ref, lower case) the active exams of the schema
+    are mapped to -> a name: the global exam's (public.exame), or the schema's
+    own when the catalog has none; by name"""
+    exam_ref = func.lower(func.trim(SegmentExam.tp_exam_ref))
+    rows = (
+        db.session.query(exam_ref, func.min(SegmentExam.name), GlobalExam.name)
+        .outerjoin(GlobalExam, func.lower(GlobalExam.tp_exam) == exam_ref)
+        .filter(SegmentExam.active == True)
+        .filter(SegmentExam.tp_exam_ref != None)
+        .filter(func.trim(SegmentExam.tp_exam_ref) != "")
+        .group_by(exam_ref, GlobalExam.name)
+        .all()
+    )
+    names = {ref: global_name or name for ref, name, global_name in rows}
+    return dict(sorted(names.items(), key=lambda item: (item[1].lower(), item[0])))
+
+
+def get_global_exam_names(exam_refs: set[str]) -> dict[str, str]:
+    """The names of the global exams (public.exame) of these references (lower
+    case)"""
+    if not exam_refs:
+        return {}
+
+    rows = (
+        db.session.query(GlobalExam.tp_exam, GlobalExam.name)
+        .filter(func.lower(GlobalExam.tp_exam).in_(list(exam_refs)))
+        .all()
+    )
+    return {tp_exam.lower(): name for tp_exam, name in rows}
+
+
 def get_exam_types_by_ref(exam_refs: set[str]) -> dict[str, str]:
     """The active exams of the schema mapped to these references
     (segmentoexame.tpexame_ref): tpexame -> its reference, both in lower case"""
