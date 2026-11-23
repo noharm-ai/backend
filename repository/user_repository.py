@@ -40,6 +40,22 @@ def get_user_names(user_ids: Iterable[int | None]) -> dict[int, str]:
     }
 
 
+def get_user_names_and_schemas(
+    user_ids: Iterable[int | None],
+) -> dict[int, tuple[str, str]]:
+    """Name and schema of the given users by id (None ids are ignored)"""
+    ids = [i for i in user_ids if i is not None]
+    if not ids:
+        return {}
+
+    return {
+        u.id: (u.name, u.schema)
+        for u in db.session.query(User.id, User.name, User.schema)
+        .filter(User.id.in_(ids))
+        .all()
+    }
+
+
 def get_users_by_role(schema: str, role: Union[Role, List[Role]]):
     """List users by role"""
     query = db.session.query(User).filter(User.schema == schema)

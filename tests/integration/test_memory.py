@@ -366,3 +366,136 @@ def test_navigation_viewer_cannot_save_memory(client, navigation_viewer_headers)
     response = client.put("/memory/", json=data, headers=navigation_viewer_headers)
 
     assert response.status_code == 401
+
+
+# --- an update is checked on the stored kind too ---
+
+
+def test_update_cannot_rename_an_admin_record(client, analyst_headers):
+    """Test put /memory/<id> - an admin record cannot be renamed to an editable
+    kind (and so rewritten, then read through GET /memory/<kind>) [401]"""
+    _delete_memory_by_kind("schema-params")
+    id_memory = _add_memory("schema-params", {"alerts": {}})
+
+    data = {"type": "renamed-kind", "value": {"x": 1}}
+    response = client.put(f"/memory/{id_memory}", json=data, headers=analyst_headers)
+
+    assert response.status_code == 401
+    session.expire_all()
+    mem = session.get(Memory, id_memory)
+    assert mem.kind == "schema-params"
+    assert mem.value == {"alerts": {}}
+
+    _delete_memory(id_memory)
+
+
+def test_update_cannot_rename_someone_elses_private_record(client, analyst_headers):
+    """Test put /memory/<id> - another user's private record cannot be made
+    public to rewrite it [401]"""
+    id_memory = _add_memory("filter-private-0", {"mine": True})
+
+    data = {"type": "filter-public", "value": {"x": 1}}
+    response = client.put(f"/memory/{id_memory}", json=data, headers=analyst_headers)
+
+    assert response.status_code == 401
+    session.expire_all()
+    assert session.get(Memory, id_memory).value == {"mine": True}
+
+    _delete_memory(id_memory)
+
+
+def test_update_cannot_rename_into_an_existing_editable_kind(client, analyst_headers):
+    """Test put /memory/<id> - renaming would duplicate an EDITABLE_KIND [400]"""
+    _delete_memory_by_kind("tpl-care-plan")
+    id_template = _add_memory("tpl-care-plan", 1)
+    id_memory = _add_memory("rename-memory", 2)
+
+    data = {"type": "tpl-care-plan", "value": 3}
+    response = client.put(f"/memory/{id_memory}", json=data, headers=analyst_headers)
+
+    assert response.status_code == 400
+
+    _delete_memory(id_memory)
+    _delete_memory(id_template)
+
+
+def test_custom_form_update_only_reaches_custom_forms(client, admin_headers):
+    """Test put /memory/custom-forms/<id> - the id of another kind is refused
+    and the record stays as it was [400]"""
+    id_memory = _add_memory("tpl-care-plan-other", {"old": True})
+
+    data = {"value": {"new": True}}
+    response = client.put(
+        f"/memory/custom-forms/{id_memory}", json=data, headers=admin_headers
+    )
+
+    assert response.status_code == 400
+    session.expire_all()
+    mem = session.get(Memory, id_memory)
+    assert mem.kind == "tpl-care-plan-other"
+    assert mem.value == {"old": True}
+
+    _delete_memory(id_memory)
+
+
+# --- schema params: written only by the admin project ---
+
+
+def test_schema_params_cannot_be_created(client, analyst_headers):
+    """Test put /memory/ and /memory/unique/schema-params - refused [401]"""
+    _delete_memory_by_kind("schema-params")
+    data = {"type": "schema-params", "value": {"alerts": {}}}
+
+    created = client.put("/memory/", json=data, headers=analyst_headers)
+    unique = client.put(
+        "/memory/unique/schema-params", json=data, headers=analyst_headers
+    )
+
+    assert created.status_code == 401
+    assert unique.status_code == 401
+    assert session.query(Memory).filter(Memory.kind == "schema-params").count() == 0
+
+
+def test_schema_params_cannot_be_updated(client, admin_headers):
+    """Test put /memory/<id> and /memory/unique/schema-params - the record
+    admin wrote stays as it was, whoever asks [401]"""
+    _delete_memory_by_kind("schema-params")
+    id_memory = _add_memory("schema-params", {"alerts": {}})
+    data = {"type": "schema-params", "value": {"x": 1}}
+
+    by_id = client.put(f"/memory/{id_memory}", json=data, headers=admin_headers)
+    unique = client.put(
+        "/memory/unique/schema-params", json={"value": {"x": 1}}, headers=admin_headers
+    )
+
+    assert by_id.status_code == 401
+    assert unique.status_code == 401
+    session.expire_all()
+    assert session.get(Memory, id_memory).value == {"alerts": {}}
+
+    _delete_memory(id_memory)
+
+
+def test_schema_params_cannot_be_read_as_memory(client, viewer_headers):
+    """Test get /memory/schema-params - refused (maintainers see it through
+    GET /schema-params) [400]"""
+    response = client.get("/memory/schema-params", headers=viewer_headers)
+
+    assert response.status_code == 400
+
+
+def test_put_memory_without_a_type_is_400(client, analyst_headers):
+    """Test put /memory/ and /memory/<id> - no type is a 400, not a 500"""
+    id_memory = _add_memory("typed-memory", 1)
+
+    created = client.put("/memory/", json={"value": 1}, headers=analyst_headers)
+    updated = client.put(
+        f"/memory/{id_memory}", json={"value": 2}, headers=analyst_headers
+    )
+
+    assert created.status_code == 400
+    assert updated.status_code == 400
+    session.expire_all()
+    assert session.get(Memory, id_memory).value == 1
+
+    _delete_memory(id_memory)

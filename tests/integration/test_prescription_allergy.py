@@ -127,19 +127,12 @@ def test_the_flag_stands_without_allergy_records(client, analyst_headers):
 
 
 def test_the_allergy_alert_type_turned_off_by_the_schema(
-    client, analyst_headers, monkeypatch
+    client, analyst_headers, schema_params
 ):
-    """The schema params (noharm-store, section alerts) turns the allergy alert
-    type off: no alert and no count. The item's allergy flag is patient
-    information and stays"""
-    monkeypatch.setattr(
-        "repository.store_repository.get_item_data",
-        lambda pk, sk: (
-            {"alerts": {"types": {"allergy": {"enabled": False}}}}
-            if pk == "schema_params" and sk == "demo"
-            else None
-        ),
-    )
+    """The schema params (section alerts) turns the allergy alert type off: no
+    alert and no count. The item's allergy flag is patient information and
+    stays"""
+    schema_params({"alerts": {"types": {"allergy": {"enabled": False}}}})
     id_prescription, (id_a,) = _create([{"idDrug": _DRUG_A[0], "allergy": "S"}])
 
     payload = _view(client, analyst_headers, id_prescription)
@@ -150,7 +143,7 @@ def test_the_allergy_alert_type_turned_off_by_the_schema(
 
 
 def test_the_allergy_alert_level_set_by_the_schema(
-    client, analyst_headers, monkeypatch
+    client, analyst_headers, schema_params
 ):
     """The schema params set the allergy alert to low: the alert and the
     prescription level (alertStats, read by the prioritization) follow it"""
@@ -158,14 +151,7 @@ def test_the_allergy_alert_level_set_by_the_schema(
 
     default = _view(client, analyst_headers, id_prescription)
 
-    monkeypatch.setattr(
-        "repository.store_repository.get_item_data",
-        lambda pk, sk: (
-            {"alerts": {"types": {"allergy": {"level": "low"}}}}
-            if pk == "schema_params" and sk == "demo"
-            else None
-        ),
-    )
+    schema_params({"alerts": {"types": {"allergy": {"level": "low"}}}})
     configured = _view(client, analyst_headers, id_prescription)
 
     def allergy_levels(payload):

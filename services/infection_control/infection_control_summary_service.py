@@ -14,9 +14,16 @@ kept at day precision (coveredUntil).
 Contract (v1), shared with InfectionControlReport in long-running-tasks:
 {v, savedAt, status, courses: [{n, idDrug, idSubstance, cpoe, start, ongoing,
 end, coveredUntil, plannedEnd, endedBy, treatmentDays, gaps, regimens,
-idEvaluations}], days: [{date, idDepartment, idSegment}]}. Summaries saved
-before the report dropped its microbiology tab may still carry a culture key,
-until they are next written; the report ignores it.
+idEvaluations, reviewRequired}], days: [{date, idDepartment, idSegment}]}.
+Summaries saved before the report dropped its microbiology tab may still carry
+a culture key, until they are next written; the report ignores it.
+
+reviewRequired (added within v1: a course without it needs review, as every
+course did before) is false for a course of a drug the schema exempted from
+review (review_exception_service): it counts in DOT/LOT, not in the review
+indicators. It follows the exceptions while the course runs; once it ended,
+the course keeps the value it had, so a later change of the exceptions doesn't
+rewrite what was measured.
 """
 
 from datetime import date, datetime, time
@@ -24,6 +31,10 @@ from datetime import date, datetime, time
 from models.enums import InfectionControlStatusEnum
 from models.infection_control import AntimicrobialEvaluation, InfectionControlAdmission
 from repository.infection_control import infection_control_repository
+from services.infection_control.review_exception_service import (
+    NO_EXCEPTIONS,
+    ReviewExceptions,
+)
 from services.infection_control.antimicrobial_timeline_service import (
     Course,
     course_regimens,
@@ -73,6 +84,7 @@ def serialize_course(
     evaluations: list,
     now: datetime,
     discharge_date: datetime | None = None,
+    review_required: bool = True,
 ) -> dict:
     """One course of the summary.
 
@@ -131,6 +143,7 @@ def serialize_course(
         "idEvaluations": [
             e.id for e in evaluations if evaluation_matches_course(e, course)
         ],
+        "reviewRequired": review_required,
     }
 
 
@@ -161,14 +174,33 @@ def summarize_days(admission_number: int, courses: list[dict]) -> list[dict]:
     return list(days.values())
 
 
+def _kept_review_required(previous: dict | None) -> dict[tuple, bool]:
+    """Whether each course of the previous summary needed review, by drug and
+    start (the key the timeline gives a course)"""
+    return {
+        (c.get("idDrug"), c.get("start")): c["reviewRequired"]
+        for c in (previous or {}).get("courses") or []
+        if isinstance(c, dict) and isinstance(c.get("reviewRequired"), bool)
+    }
+
+
 def build_summary(
     admission_number: int,
     admission_courses,
     status: InfectionControlStatusEnum,
     evaluations: list[AntimicrobialEvaluation] | None = None,
+    exceptions: ReviewExceptions = NO_EXCEPTIONS,
+    previous: dict | None = None,
 ) -> dict:
     """The summary of an admission from the courses (and the patient) the rule
-    loaded; every evaluation of the admission is read unless given"""
+    loaded; every evaluation of the admission is read unless given. Whether a
+    course needs review comes from the exceptions while it runs, and from the
+    previous summary once it ended (when it had one)"""
+    # deferred to avoid a circular import: the rule imports this module
+    from services.infection_control.infection_control_status_service import (
+        review_required,
+    )
+
     now = admission_courses.now
     if evaluations is None:
         evaluations = infection_control_repository.get_evaluations(
@@ -181,6 +213,15 @@ def build_summary(
     )
 
     ongoing = {id(c) for c in admission_courses.ongoing}
+    kept = _kept_review_required(previous)
+
+    def course_review_required(course) -> bool:
+        if id(course) not in ongoing:
+            key = (course.items[-1].id_drug, dateutils.to_iso(course.start))
+            if key in kept:
+                return kept[key]
+        return review_required(course, exceptions)
+
     courses = [
         serialize_course(
             n=n,
@@ -189,6 +230,7 @@ def build_summary(
             evaluations=evaluations,
             now=now,
             discharge_date=discharge_date,
+            review_required=course_review_required(course),
         )
         for n, course in enumerate(admission_courses.courses, start=1)
     ]
@@ -224,15 +266,18 @@ def update_summary(
     admission_courses,
     status: InfectionControlStatusEnum,
     evaluations: list[AntimicrobialEvaluation] | None = None,
+    exceptions: ReviewExceptions = NO_EXCEPTIONS,
 ) -> bool:
     """Bring the summary of a record up to date with the courses the rule
-    loaded (called by apply_rule, which passes every evaluation it read);
-    returns whether it was written"""
+    loaded (called by apply_rule, which passes every evaluation it read and
+    the review exceptions); returns whether it was written"""
     summary = build_summary(
         admission_number=admission.admission_number,
         admission_courses=admission_courses,
         status=status,
         evaluations=evaluations,
+        exceptions=exceptions,
+        previous=admission.summary,
     )
 
     return save_summary(admission=admission, summary=summary)

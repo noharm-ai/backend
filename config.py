@@ -9,7 +9,7 @@ from models.enums import NoHarmENV
 class Config:
     """Configuration class for the application."""
 
-    VERSION = "v6.87-beta"
+    VERSION = "v6.88-beta"
     FRONTEND_VERSION = "5.1.6"
     ENV = getenv("ENV") or NoHarmENV.DEVELOPMENT.value
     SECRET_KEY = getenv("SECRET_KEY") or "secret_key"
@@ -57,9 +57,6 @@ class Config:
     PRESCRIPTION_PRESENCE_TABLE_NAME = (
         getenv("PRESCRIPTION_PRESENCE_TABLE_NAME") or "noharm_prescription_presence"
     )
-    # generic DynamoDB store shared by NoHarm projects (pk = feature, sk = item);
-    # this project only reads it (e.g. the schema params written by admin)
-    NOHARM_STORE_TABLE = getenv("NOHARM_STORE_TABLE") or "noharm-store"
 
     ODOO_API_DB = getenv("ODOO_API_DB") or ""
     ODOO_API_KEY = getenv("ODOO_API_KEY") or ""
@@ -84,6 +81,10 @@ class Config:
     )
     PROTOCOL_AGENT_REGION = getenv("PROTOCOL_AGENT_REGION", "us-east-1")
     PROTOCOL_AGENT_MAX_TURNS = int(getenv("PROTOCOL_AGENT_MAX_TURNS", "8"))
+
+    # the schema of the NoHarm team: a change made by one of its users is shown
+    # as made by NoHarm, not by the person
+    NOHARM_SCHEMA = getenv("NOHARM_SCHEMA") or "hsc_test"
 
     FEATURE_CONCILIATION_ALGORITHM = getenv("FEATURE_CONCILIATION_ALGORITHM", "FUZZY")
     # enable only after the onboarding/training app version is released

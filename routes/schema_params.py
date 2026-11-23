@@ -1,4 +1,4 @@
-"""Routes: schema params (DynamoDB noharm-store), read only here: the admin
+"""Routes: schema params (a memoria record of the schema), read only here: the admin
 project edits them"""
 
 from flask import Blueprint
