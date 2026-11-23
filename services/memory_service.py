@@ -278,6 +278,10 @@ def is_admin_memory(key):
         MemoryEnum.TRANSCRIPTION_FIELDS.value,
         # written only by its own endpoint, which validates it
         MemoryEnum.INFECTION_CONTROL_EXAM_TRIGGERS.value,
+        MemoryEnum.INFECTION_CONTROL_REVIEW_EXCEPTIONS.value,
+        MemoryEnum.INFECTION_CONTROL_REVIEW_EXCEPTIONS_PREVIOUS.value,
+        MemoryEnum.INFECTION_CONTROL_TIMELINE_EXAMS.value,
+        MemoryEnum.INFECTION_CONTROL_TIMELINE_EXAMS_PREVIOUS.value,
         # written only by the admin project (services/schema_params_service.py)
         MemoryEnum.SCHEMA_PARAMS.value,
     ]
