@@ -104,3 +104,40 @@ def test_a_change_applies_on_the_next_request(
 
     assert before["params"]["alerts"]["types"]["kidney"]["enabled"] is False
     assert after["params"]["alerts"]["types"]["kidney"]["enabled"] is True
+
+
+def test_with_two_records_the_view_and_the_prescription_read_the_same(
+    client, maintainer_headers, schema_params
+):
+    """A second record (it should never happen: admin writes one under a
+    lock) never splits what maintainers see from what the view applies: both
+    read the oldest one"""
+    from sqlalchemy import text
+
+    from mobile import app
+    from models.main import db
+    from services import memory_service, schema_params_service
+    from tests.conftest import session, session_commit
+
+    schema_params({"alerts": {"types": {"kidney": {"enabled": False}}}})
+    session.execute(
+        text(
+            "INSERT INTO demo.memoria (tipo, valor, update_at, update_by) "
+            "VALUES ('schema-params', CAST(:value AS json), now(), 0)"
+        ),
+        {"value": '{"alerts": {"types": {"kidney": {"enabled": true}}}}'},
+    )
+    session_commit()
+
+    data = _view(client, maintainer_headers)
+    with app.test_request_context():
+        db.session.connection(
+            execution_options={"schema_translate_map": {None: "demo"}}
+        )
+        in_force = schema_params_service.from_memory(
+            memory_itens=memory_service.get_by_kind(["schema-params"]),
+            schema="demo",
+        )
+
+    assert data["params"]["alerts"]["types"]["kidney"]["enabled"] is False
+    assert in_force.alerts.alert_type("kidney").enabled is False

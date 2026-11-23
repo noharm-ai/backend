@@ -482,3 +482,20 @@ def test_schema_params_cannot_be_read_as_memory(client, viewer_headers):
     response = client.get("/memory/schema-params", headers=viewer_headers)
 
     assert response.status_code == 400
+
+
+def test_put_memory_without_a_type_is_400(client, analyst_headers):
+    """Test put /memory/ and /memory/<id> - no type is a 400, not a 500"""
+    id_memory = _add_memory("typed-memory", 1)
+
+    created = client.put("/memory/", json={"value": 1}, headers=analyst_headers)
+    updated = client.put(
+        f"/memory/{id_memory}", json={"value": 2}, headers=analyst_headers
+    )
+
+    assert created.status_code == 400
+    assert updated.status_code == 400
+    session.expire_all()
+    assert session.get(Memory, id_memory).value == 1
+
+    _delete_memory(id_memory)

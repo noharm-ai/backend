@@ -109,14 +109,27 @@ def has_feature_nouser(feature):
 
 
 def get_memory(key):
-    """Get the first memory record matching the given kind key."""
-    return db.session.query(Memory).filter(Memory.kind == key).first()
+    """Get the first (lowest idmemoria) memory record of the given kind."""
+    return (
+        db.session.query(Memory)
+        .filter(Memory.kind == key)
+        .order_by(Memory.key)
+        .first()
+    )
 
 
 def get_by_kind(kinds) -> dict:
-    """Get memory values indexed by kind for a list of kind keys."""
+    """Get memory values indexed by kind for a list of kind keys. With more
+    than one record of a kind, the oldest (lowest idmemoria) wins, the record
+    the admin project writes and get_memory reads"""
     memory_itens = {}
-    records = db.session.query(Memory).filter(Memory.kind.in_(kinds)).all()
+    # newest first: the oldest is the last one kept in the dict
+    records = (
+        db.session.query(Memory)
+        .filter(Memory.kind.in_(kinds))
+        .order_by(Memory.key.desc())
+        .all()
+    )
 
     for r in records:
         memory_itens[r.kind] = r.value
@@ -153,6 +166,7 @@ def save_memory(id, kind, value, user_context: User):
     stored kind and the requested one: checking only the requested kind would
     let a request rename (and then read or rewrite) an admin record, or someone
     else's private one"""
+    _validate_kind(kind)
     if is_admin_memory(kind):
         raise ValidationError(
             "Usuário não possui permissão para alterar este registro",
@@ -222,6 +236,7 @@ def save_memory(id, kind, value, user_context: User):
 @has_permission(Permission.WRITE_BASIC_FEATURES)
 def save_unique_memory(kind, value, user_context: User):
     """Create or update a memory record ensuring only one record exists per kind."""
+    _validate_kind(kind)
     if is_admin_memory(kind):
         raise ValidationError(
             "Usuário não possui permissão para alterar este registro",
@@ -253,6 +268,17 @@ def save_unique_memory(kind, value, user_context: User):
         db.session.flush()
 
     return mem
+
+
+def _validate_kind(kind) -> None:
+    """A memory record needs a kind: a request without one is a 400, not a
+    TypeError in is_private"""
+    if not isinstance(kind, str) or not kind.strip():
+        raise ValidationError(
+            "Tipo da memória inválido",
+            "errors.invalidParam",
+            status.HTTP_400_BAD_REQUEST,
+        )
 
 
 def is_admin_memory(key):
