@@ -60,6 +60,18 @@ def infection_control():
     _write_features(original)
 
 
+@pytest.fixture
+def infection_control_lite():
+    """Enable INFECTION_CONTROL_LITE alone for the demo schema (the lite mode)"""
+    original = _read_features()
+    _write_features(
+        [f for f in original if f != FeatureEnum.INFECTION_CONTROL.value]
+        + [FeatureEnum.INFECTION_CONTROL_LITE.value]
+    )
+    yield
+    _write_features(original)
+
+
 def _admit():
     """Admit a synthetic patient ten days ago, removing it (and its follow-up)
     afterwards"""
