@@ -10,7 +10,7 @@ the follow-up data.
 """
 
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from sqlalchemy.exc import OperationalError
 
@@ -65,7 +65,10 @@ from services.infection_control import (
 from services.infection_control import (
     infection_control_status_service as rule,
 )
-from services.infection_control.antimicrobial_timeline_service import GAP_TOLERANCE
+from services.infection_control.antimicrobial_timeline_service import (
+    GAP_TOLERANCE,
+    Course,
+)
 from utils import dateutils, db_utils, logger, status
 
 # letters typed before the drugs are searched
@@ -369,10 +372,114 @@ def _validate_indication(evaluation: AntimicrobialEvaluationRequest):
         )
 
 
+# how far before the live course start a start may be and still be taken as a
+# form loaded before the course changed (moved to the course start); a start
+# further back is a mistake and is rejected
+MAX_STALE_START = timedelta(days=7)
+
+
+def _check_start(
+    evaluation: AntimicrobialEvaluationRequest,
+    course: Course,
+    now: datetime,
+    admission_number: int,
+    user_context: User,
+) -> bool:
+    """Check where the evaluation starts: from the course start up to now (or up
+    to the course start when the course starts later than now, e.g. a
+    prescription dated ahead, so the form's default start is valid).
+
+    An empty start is the latest of now and the course start. A start slightly
+    before the live course start comes from a form loaded before the course
+    changed (its first prescriptions archived, the course rebuilt): it is moved
+    to the course start, since an evaluation never covers time before its
+    course; one further back than MAX_STALE_START, or after the limit, is
+    rejected. Moves and rejections are logged with the bound and the distance
+    in seconds (ids only). Returns whether the start was moved."""
+    latest = max(now, course.start)
+    if evaluation.validFrom is None:
+        evaluation.validFrom = latest
+        return False
+
+    if evaluation.validFrom < course.start:
+        # clients send the second of the course start, which keeps fractions:
+        # that is the course start itself, not worth a log
+        stale = evaluation.validFrom < course.start.replace(microsecond=0)
+        too_old = course.start - evaluation.validFrom > MAX_STALE_START
+        if stale or too_old:
+            _log_start_check(
+                "before_course_start",
+                evaluation,
+                course,
+                now,
+                admission_number,
+                user_context,
+                rejected=too_old,
+            )
+        if too_old:
+            raise ValidationError(
+                "O início da avaliação deve estar entre o início do tratamento e agora",
+                "errors.invalidParams",
+                status.HTTP_400_BAD_REQUEST,
+            )
+        evaluation.validFrom = course.start
+        moved = True
+    else:
+        moved = False
+
+    if evaluation.validFrom > latest:
+        _log_start_check(
+            "after_limit",
+            evaluation,
+            course,
+            now,
+            admission_number,
+            user_context,
+            rejected=True,
+        )
+        raise ValidationError(
+            "O início da avaliação deve estar entre o início do tratamento e agora",
+            "errors.invalidParams",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    return moved
+
+
+def _log_start_check(
+    bound: str,
+    evaluation: AntimicrobialEvaluationRequest,
+    course: Course,
+    now: datetime,
+    admission_number: int,
+    user_context: User,
+    rejected: bool,
+):
+    """Log which bound of the evaluation start failed and by how many seconds
+    (ids and distances only, no personal data)"""
+    limit = max(now, course.start) if bound == "after_limit" else course.start
+    logger.backend_logger.warning(
+        json.dumps(
+            {
+                "event": "infection_control_review_start",
+                "bound": bound,
+                "schema": user_context.schema,
+                "user": user_context.id,
+                "admission_number": admission_number,
+                "id_drug": evaluation.idDrug,
+                "seconds": round(abs((evaluation.validFrom - limit).total_seconds())),
+                "course_starts_after_now": course.start > now,
+                "rejected": rejected,
+            }
+        )
+    )
+
+
 def _validate_review(
     request_data: InfectionControlReviewRequest,
     admission_courses: rule.AdmissionCourses,
     now: datetime,
+    user_context: User,
 ) -> dict:
     """Check the review; returns the intervention reasons it uses, by id"""
     if request_data.nextReviewDate is not None and request_data.nextReviewDate <= now:
@@ -399,29 +506,29 @@ def _validate_review(
                 status.HTTP_400_BAD_REQUEST,
             )
 
-        # clients send the start at second precision, the course start keeps
-        # the fractional seconds of its prescription date: the start sent at
-        # the second of the course start is the course start. Done before the
-        # checks, so they and the saved row use the same value
-        if (
-            evaluation.validFrom is not None
-            and evaluation.validFrom < course.start
-            and evaluation.validFrom >= course.start.replace(microsecond=0)
-        ):
-            evaluation.validFrom = course.start
+        start_moved = _check_start(
+            evaluation=evaluation,
+            course=course,
+            now=now,
+            admission_number=request_data.admissionNumber,
+            user_context=user_context,
+        )
 
-        if evaluation.validFrom is not None and (
-            evaluation.validFrom > now or evaluation.validFrom < course.start
-        ):
+        # the validity may already be over (a retroactive record), but not
+        # before the evaluation starts
+        if evaluation.validUntil < course.start:
+            # a moved start means the form was loaded before the course
+            # changed: reloading fixes it; otherwise it is the user's validity
             raise ValidationError(
-                "O início da avaliação deve estar entre o início do tratamento e agora",
+                "A validade da avaliação termina antes do início do tratamento; "
+                "recarregue a revisão"
+                if start_moved
+                else "A validade da avaliação deve terminar depois do início do tratamento",
                 "errors.invalidParams",
                 status.HTTP_400_BAD_REQUEST,
             )
 
-        # the validity may already be over (a retroactive record), but not
-        # before the evaluation starts
-        if evaluation.validUntil < (evaluation.validFrom or now):
+        if evaluation.validUntil < evaluation.validFrom:
             raise ValidationError(
                 "A validade da avaliação deve ser posterior ao seu início",
                 "errors.invalidParams",
@@ -656,7 +763,10 @@ def save_review(request_data: InfectionControlReviewRequest, user_context: User)
     admission_number = request_data.admissionNumber
     admission_courses = rule.load_courses(admission_number=admission_number, now=now)
     reasons = _validate_review(
-        request_data=request_data, admission_courses=admission_courses, now=now
+        request_data=request_data,
+        admission_courses=admission_courses,
+        now=now,
+        user_context=user_context,
     )
     exam_trigger_rules = {
         r.id: r

@@ -372,7 +372,10 @@ def record_evaluation(
         if evaluation_matches_course(previous, course)
     ]
     retroactive = bool(in_force) and all(
-        evaluation_data.validUntil < previous.valid_from for previous in in_force
+        # an evaluation of a course not started yet starts in the future: it
+        # has been in force since it was saved
+        evaluation_data.validUntil < min(previous.valid_from, now)
+        for previous in in_force
     )
 
     evaluation = AntimicrobialEvaluation()
