@@ -46,9 +46,13 @@ def check_prescription(
     fast_check=False,
     concilia_list=None,
     concilia_relations=None,
+    skip_segment_authorization=False,
 ):
     """
     Check or uncheck a prescription.
+
+    skip_segment_authorization is set only by static_check, when the service
+    integrator checks as itself (no origin user): never from a request.
 
     The presmed "checado" marking is NOT done here: presmed rows are also
     written by the external integration process, so updating them inside
@@ -90,8 +94,11 @@ def check_prescription(
                 status.HTTP_400_BAD_REQUEST,
             )
 
-        if not data_authorization_service.has_segment_authorization(
-            id_segment=p.idSegment, user=user_context
+        if (
+            not skip_segment_authorization
+            and not data_authorization_service.has_segment_authorization(
+                id_segment=p.idSegment, user=user_context
+            )
         ):
             raise ValidationError(
                 "Usuário não autorizado neste segmento",
@@ -567,6 +574,26 @@ def static_check(
     user_context: User,
     user_permissions: list[Permission] = [],
 ):
+    """Check a prescription from an external system (service integrator).
+
+    With an origin user (its external id), the check is recorded as that user's.
+    Without one (an automatic check on the client's side, no person behind it),
+    the check is recorded as the integrator user's own, in any segment of its
+    schema. See docs/agents/static-check.md.
+    """
+    if id_origin_user is None or str(id_origin_user).strip() == "":
+        # never look the origin user up: external IS NULL would match any user
+        return check_prescription(
+            idPrescription=id_prescription,
+            p_status=p_status,
+            user_context=user_context,
+            evaluation_time=0,
+            alerts=[],
+            service_user=True,
+            user_permissions=user_permissions,
+            skip_segment_authorization=True,
+        )
+
     origin_user = (
         db.session.query(User)
         .filter(User.schema == user_context.schema)
