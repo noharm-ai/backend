@@ -3,7 +3,8 @@
 The endpoint an external system calls to check a prescription on behalf of one
 of its own users. The caller authenticates as a service integrator (RUN_AS) and
 identifies the real author by their external id; the check is then recorded as
-if that user had performed it.
+if that user had performed it. Without an origin user (an automatic check on
+the client's side, no person behind it), the check is the integrator's own.
 """
 
 import json
@@ -11,12 +12,13 @@ from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
-from sqlalchemy import func
+from sqlalchemy import func, text
 
 from config import Config
 from models.enums import PrescriptionAuditTypeEnum
 from models.main import User, UserAuthorization
 from models.prescription import Prescription, PrescriptionAudit
+from security.permission import Permission
 from security.role import Role
 from tests.conftest import get_access, make_headers, session, session_commit
 from tests.utils.utils_test_prescription import create_basic_prescription
@@ -39,6 +41,11 @@ UNAUTHORIZED_EXTERNAL = "ZZTEST-EXT-NOSEGMENT"
 # the demo schema runs with AUTHORIZATION_SEGMENT on, so an origin user only
 # reaches the check once it is authorized on the prescription's segment
 SEED_SEGMENT = 1
+# no user is authorized on it (the integrator, demo user, holds segments 1 and 2)
+UNAUTHORIZED_SEGMENT = 99
+
+# the integrator in these tests: get_access logs in as the demo user
+INTEGRATOR_EMAIL = "demo"
 
 TEST_EMAILS = (
     ANALYST_EMAIL,
@@ -55,6 +62,16 @@ def _payload(id_prescription, status="s", id_origin_user=ANALYST_EXTERNAL):
         "status": status,
         "idOriginUser": id_origin_user,
     }
+
+
+def _payload_without_origin_user(id_prescription, status="s"):
+    """The payload of an automatic check: no origin user"""
+    return {"idPrescription": id_prescription, "status": status}
+
+
+def _integrator_id():
+    """Id of the user the integrator headers authenticate as"""
+    return session.query(User.id).filter(User.email == INTEGRATOR_EMAIL).scalar()
 
 
 def _create_origin_user(
@@ -242,6 +259,200 @@ def test_static_check_undoes_a_previous_check(client, integrator_headers):
     response = client.post(
         STATIC_CHECK_URL,
         json=_payload(id_prescription, status="0"),
+        headers=integrator_headers,
+    )
+
+    assert response.status_code == 200
+
+    session.expire_all()
+    prescription = (
+        session.query(Prescription).filter(Prescription.id == id_prescription).first()
+    )
+    assert prescription.status == "0"
+
+
+def test_static_check_without_origin_user_is_the_integrators_own(
+    client, integrator_headers
+):
+    """POST /static/prescriptions/status - sem usuário de origem, checa em nome do próprio integrador"""
+    id_prescription = create_basic_prescription().id
+
+    response = client.post(
+        STATIC_CHECK_URL,
+        json=_payload_without_origin_user(id_prescription),
+        headers=integrator_headers,
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["data"] == [
+        {"idPrescription": str(id_prescription), "status": "s"}
+    ]
+
+    session.expire_all()
+    prescription = (
+        session.query(Prescription).filter(Prescription.id == id_prescription).first()
+    )
+    assert prescription.status == "s"
+    assert prescription.user == _integrator_id()
+
+
+def test_static_check_with_a_null_origin_user_is_the_integrators_own(
+    client, integrator_headers
+):
+    """POST /static/prescriptions/status - idOriginUser nulo é checagem automática, sem buscar usuário sem id externo
+
+    external IS NULL would match any user of the schema without an external id"""
+    id_prescription = create_basic_prescription().id
+
+    response = client.post(
+        STATIC_CHECK_URL,
+        json=_payload(id_prescription, id_origin_user=None),
+        headers=integrator_headers,
+    )
+
+    assert response.status_code == 200
+
+    session.expire_all()
+    prescription = (
+        session.query(Prescription).filter(Prescription.id == id_prescription).first()
+    )
+    assert prescription.user == _integrator_id()
+
+
+@pytest.mark.parametrize("id_origin_user", ["", "  "])
+def test_static_check_rejects_a_blank_origin_user(
+    client, integrator_headers, id_origin_user
+):
+    """POST /static/prescriptions/status - deve retornar erro [400] quando o idOriginUser vem em branco
+
+    a blank id is a broken mapping on the client's side, not an automatic check"""
+    id_prescription = create_basic_prescription().id
+
+    response = client.post(
+        STATIC_CHECK_URL,
+        json=_payload(id_prescription, id_origin_user=id_origin_user),
+        headers=integrator_headers,
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["message"] == "Usuário origem inválido"
+
+    session.expire_all()
+    prescription = (
+        session.query(Prescription).filter(Prescription.id == id_prescription).first()
+    )
+    assert prescription.status == "0"
+
+
+def test_static_check_without_origin_user_is_not_user_activity(
+    client, integrator_headers
+):
+    """POST /static/prescriptions/status - checagem automática não conta como atividade do integrador"""
+    id_prescription = create_basic_prescription().id
+    count_checks = text(
+        "SELECT COALESCE(SUM(checagens), 0) FROM public.usuario_atividade "
+        "WHERE idusuario = :id_user"
+    )
+    before = session.execute(count_checks, {"id_user": _integrator_id()}).scalar()
+
+    response = client.post(
+        STATIC_CHECK_URL,
+        json=_payload_without_origin_user(id_prescription),
+        headers=integrator_headers,
+    )
+
+    assert response.status_code == 200
+    session.expire_all()
+    after = session.execute(count_checks, {"id_user": _integrator_id()}).scalar()
+    assert after == before
+
+
+def test_static_check_without_origin_user_audits_the_integrator(
+    client, integrator_headers
+):
+    """POST /static/prescriptions/status - sem usuário de origem, a auditoria é do integrador como serviço"""
+    id_prescription = create_basic_prescription().id
+
+    client.post(
+        STATIC_CHECK_URL,
+        json=_payload_without_origin_user(id_prescription),
+        headers=integrator_headers,
+    )
+
+    session.expire_all()
+    audit = (
+        session.query(PrescriptionAudit)
+        .filter(PrescriptionAudit.idPrescription == id_prescription)
+        .filter(PrescriptionAudit.auditType == PrescriptionAuditTypeEnum.CHECK.value)
+        .first()
+    )
+
+    assert audit is not None
+    assert audit.createdBy == _integrator_id()
+    assert audit.extra["serviceUser"] is True
+
+
+def test_static_check_without_origin_user_dispatches_the_presmed_event_for_the_integrator(
+    client, integrator_headers
+):
+    """POST /static/prescriptions/status - sem usuário de origem, marca a presmed em nome do integrador"""
+    id_prescription = create_basic_prescription().id
+    lambda_client = MagicMock()
+
+    with patch.object(Config, "BACKEND_FUNCTION_NAME", "test-backend-function"), patch(
+        "services.prescription_check_service.aws.get_client",
+        return_value=lambda_client,
+    ):
+        response = client.post(
+            STATIC_CHECK_URL,
+            json=_payload_without_origin_user(id_prescription),
+            headers=integrator_headers,
+        )
+
+    assert response.status_code == 200
+    payload = json.loads(lambda_client.invoke.call_args.kwargs["Payload"])
+    assert payload["id_user"] == _integrator_id()
+    assert payload["id_prescription_list"] == [str(id_prescription)]
+
+
+def test_static_check_without_origin_user_skips_the_segment_authorization(
+    client, integrator_headers
+):
+    """POST /static/prescriptions/status - sem usuário de origem, o integrador checa em qualquer segmento"""
+    id_prescription = create_basic_prescription().id
+    session.query(Prescription).filter(Prescription.id == id_prescription).update(
+        {Prescription.idSegment: UNAUTHORIZED_SEGMENT}, synchronize_session=False
+    )
+    session_commit()
+
+    response = client.post(
+        STATIC_CHECK_URL,
+        json=_payload_without_origin_user(id_prescription),
+        headers=integrator_headers,
+    )
+
+    assert response.status_code == 200
+
+
+def test_the_integrator_role_does_not_skip_segments_elsewhere():
+    """SERVICE_INTEGRATOR - não tem CHECK_STATIC: somado a outro papel, não pularia segmento nos demais serviços"""
+    assert Permission.CHECK_STATIC not in Role.SERVICE_INTEGRATOR.permissions
+
+
+def test_static_check_without_origin_user_undoes_its_own_check(
+    client, integrator_headers
+):
+    """POST /static/prescriptions/status - sem usuário de origem, desfaz a própria checagem"""
+    id_prescription = create_basic_prescription().id
+
+    client.post(
+        STATIC_CHECK_URL,
+        json=_payload_without_origin_user(id_prescription),
+        headers=integrator_headers,
+    )
+    response = client.post(
+        STATIC_CHECK_URL,
+        json=_payload_without_origin_user(id_prescription, status="0"),
         headers=integrator_headers,
     )
 
