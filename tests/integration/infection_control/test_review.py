@@ -834,3 +834,23 @@ def test_review_start_log_has_schema_and_user(
     assert logged[0]["bound"] == "before_course_start"
     assert logged[0]["rejected"] is False
     assert logged[0]["schema"] and logged[0]["user"]
+
+
+def test_review_ending_before_a_course_not_started_yet_does_not_ask_to_reload(
+    client, infection_controller_headers, infection_control, admission
+):
+    """With the start not moved, reloading would give the same form: the
+    message names the validity, not a reload"""
+    course_start = _future_course(admission)
+
+    response = _review(
+        client,
+        infection_controller_headers,
+        admission,
+        evaluations=[ANTIMICROBIAL_DRUG],
+        valid_until=(course_start - timedelta(minutes=10)).isoformat(),
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "recarregue" not in response.get_json()["message"]
+    assert _evaluations(admission) == []

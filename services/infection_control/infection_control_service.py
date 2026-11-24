@@ -384,7 +384,7 @@ def _check_start(
     now: datetime,
     admission_number: int,
     user_context: User,
-):
+) -> bool:
     """Check where the evaluation starts: from the course start up to now (or up
     to the course start when the course starts later than now, e.g. a
     prescription dated ahead, so the form's default start is valid).
@@ -395,11 +395,11 @@ def _check_start(
     to the course start, since an evaluation never covers time before its
     course; one further back than MAX_STALE_START, or after the limit, is
     rejected. Moves and rejections are logged with the bound and the distance
-    in seconds (ids only)."""
+    in seconds (ids only). Returns whether the start was moved."""
     latest = max(now, course.start)
     if evaluation.validFrom is None:
         evaluation.validFrom = latest
-        return
+        return False
 
     if evaluation.validFrom < course.start:
         # clients send the second of the course start, which keeps fractions:
@@ -423,6 +423,9 @@ def _check_start(
                 status.HTTP_400_BAD_REQUEST,
             )
         evaluation.validFrom = course.start
+        moved = True
+    else:
+        moved = False
 
     if evaluation.validFrom > latest:
         _log_start_check(
@@ -439,6 +442,8 @@ def _check_start(
             "errors.invalidParams",
             status.HTTP_400_BAD_REQUEST,
         )
+
+    return moved
 
 
 def _log_start_check(
@@ -501,7 +506,7 @@ def _validate_review(
                 status.HTTP_400_BAD_REQUEST,
             )
 
-        _check_start(
+        start_moved = _check_start(
             evaluation=evaluation,
             course=course,
             now=now,
@@ -512,9 +517,13 @@ def _validate_review(
         # the validity may already be over (a retroactive record), but not
         # before the evaluation starts
         if evaluation.validUntil < course.start:
+            # a moved start means the form was loaded before the course
+            # changed: reloading fixes it; otherwise it is the user's validity
             raise ValidationError(
                 "A validade da avaliação termina antes do início do tratamento; "
-                "recarregue a revisão",
+                "recarregue a revisão"
+                if start_moved
+                else "A validade da avaliação deve terminar depois do início do tratamento",
                 "errors.invalidParams",
                 status.HTTP_400_BAD_REQUEST,
             )
