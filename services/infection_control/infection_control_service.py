@@ -10,7 +10,7 @@ the follow-up data.
 """
 
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from sqlalchemy.exc import OperationalError
 
@@ -372,36 +372,68 @@ def _validate_indication(evaluation: AntimicrobialEvaluationRequest):
         )
 
 
+# how far before the live course start a start may be and still be taken as a
+# form loaded before the course changed (moved to the course start); a start
+# further back is a mistake and is rejected
+MAX_STALE_START = timedelta(days=7)
+
+
 def _check_start(
     evaluation: AntimicrobialEvaluationRequest,
     course: Course,
     now: datetime,
     admission_number: int,
+    user_context: User,
 ):
     """Check where the evaluation starts: from the course start up to now (or up
     to the course start when the course starts later than now, e.g. a
     prescription dated ahead, so the form's default start is valid).
 
-    A start before the live course start comes from a form loaded before the
-    course changed (its first prescriptions archived, the course rebuilt): it
-    is moved to the course start, since an evaluation never covers time before
-    its course. A start after the limit is rejected; the failure is logged
-    with the bound and the distance in seconds (ids only)."""
+    An empty start is the latest of now and the course start. A start slightly
+    before the live course start comes from a form loaded before the course
+    changed (its first prescriptions archived, the course rebuilt): it is moved
+    to the course start, since an evaluation never covers time before its
+    course; one further back than MAX_STALE_START, or after the limit, is
+    rejected. Moves and rejections are logged with the bound and the distance
+    in seconds (ids only)."""
+    latest = max(now, course.start)
     if evaluation.validFrom is None:
+        evaluation.validFrom = latest
         return
 
     if evaluation.validFrom < course.start:
         # clients send the second of the course start, which keeps fractions:
         # that is the course start itself, not worth a log
-        if evaluation.validFrom < course.start.replace(microsecond=0):
+        stale = evaluation.validFrom < course.start.replace(microsecond=0)
+        too_old = course.start - evaluation.validFrom > MAX_STALE_START
+        if stale or too_old:
             _log_start_check(
-                "before_course_start", evaluation, course, now, admission_number
+                "before_course_start",
+                evaluation,
+                course,
+                now,
+                admission_number,
+                user_context,
+                rejected=too_old,
+            )
+        if too_old:
+            raise ValidationError(
+                "O início da avaliação deve estar entre o início do tratamento e agora",
+                "errors.invalidParams",
+                status.HTTP_400_BAD_REQUEST,
             )
         evaluation.validFrom = course.start
 
-    latest = max(now, course.start)
     if evaluation.validFrom > latest:
-        _log_start_check("after_limit", evaluation, course, now, admission_number)
+        _log_start_check(
+            "after_limit",
+            evaluation,
+            course,
+            now,
+            admission_number,
+            user_context,
+            rejected=True,
+        )
         raise ValidationError(
             "O início da avaliação deve estar entre o início do tratamento e agora",
             "errors.invalidParams",
@@ -415,6 +447,8 @@ def _log_start_check(
     course: Course,
     now: datetime,
     admission_number: int,
+    user_context: User,
+    rejected: bool,
 ):
     """Log which bound of the evaluation start failed and by how many seconds
     (ids and distances only, no personal data)"""
@@ -424,11 +458,13 @@ def _log_start_check(
             {
                 "event": "infection_control_review_start",
                 "bound": bound,
+                "schema": user_context.schema,
+                "user": user_context.id,
                 "admission_number": admission_number,
                 "id_drug": evaluation.idDrug,
                 "seconds": round(abs((evaluation.validFrom - limit).total_seconds())),
                 "course_starts_after_now": course.start > now,
-                "rejected": bound == "after_limit",
+                "rejected": rejected,
             }
         )
     )
@@ -438,6 +474,7 @@ def _validate_review(
     request_data: InfectionControlReviewRequest,
     admission_courses: rule.AdmissionCourses,
     now: datetime,
+    user_context: User,
 ) -> dict:
     """Check the review; returns the intervention reasons it uses, by id"""
     if request_data.nextReviewDate is not None and request_data.nextReviewDate <= now:
@@ -469,11 +506,20 @@ def _validate_review(
             course=course,
             now=now,
             admission_number=request_data.admissionNumber,
+            user_context=user_context,
         )
 
         # the validity may already be over (a retroactive record), but not
         # before the evaluation starts
-        if evaluation.validUntil < (evaluation.validFrom or now):
+        if evaluation.validUntil < course.start:
+            raise ValidationError(
+                "A validade da avaliação termina antes do início do tratamento; "
+                "recarregue a revisão",
+                "errors.invalidParams",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+        if evaluation.validUntil < evaluation.validFrom:
             raise ValidationError(
                 "A validade da avaliação deve ser posterior ao seu início",
                 "errors.invalidParams",
@@ -708,7 +754,10 @@ def save_review(request_data: InfectionControlReviewRequest, user_context: User)
     admission_number = request_data.admissionNumber
     admission_courses = rule.load_courses(admission_number=admission_number, now=now)
     reasons = _validate_review(
-        request_data=request_data, admission_courses=admission_courses, now=now
+        request_data=request_data,
+        admission_courses=admission_courses,
+        now=now,
+        user_context=user_context,
     )
     exam_trigger_rules = {
         r.id: r
