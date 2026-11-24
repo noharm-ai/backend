@@ -65,7 +65,10 @@ from services.infection_control import (
 from services.infection_control import (
     infection_control_status_service as rule,
 )
-from services.infection_control.antimicrobial_timeline_service import GAP_TOLERANCE
+from services.infection_control.antimicrobial_timeline_service import (
+    GAP_TOLERANCE,
+    Course,
+)
 from utils import dateutils, db_utils, logger, status
 
 # letters typed before the drugs are searched
@@ -369,6 +372,68 @@ def _validate_indication(evaluation: AntimicrobialEvaluationRequest):
         )
 
 
+def _check_start(
+    evaluation: AntimicrobialEvaluationRequest,
+    course: Course,
+    now: datetime,
+    admission_number: int,
+):
+    """Check where the evaluation starts: from the course start up to now (or up
+    to the course start when the course starts later than now, e.g. a
+    prescription dated ahead, so the form's default start is valid).
+
+    A start before the live course start comes from a form loaded before the
+    course changed (its first prescriptions archived, the course rebuilt): it
+    is moved to the course start, since an evaluation never covers time before
+    its course. A start after the limit is rejected; the failure is logged
+    with the bound and the distance in seconds (ids only)."""
+    if evaluation.validFrom is None:
+        return
+
+    if evaluation.validFrom < course.start:
+        # clients send the second of the course start, which keeps fractions:
+        # that is the course start itself, not worth a log
+        if evaluation.validFrom < course.start.replace(microsecond=0):
+            _log_start_check(
+                "before_course_start", evaluation, course, now, admission_number
+            )
+        evaluation.validFrom = course.start
+
+    latest = max(now, course.start)
+    if evaluation.validFrom > latest:
+        _log_start_check("after_limit", evaluation, course, now, admission_number)
+        raise ValidationError(
+            "O início da avaliação deve estar entre o início do tratamento e agora",
+            "errors.invalidParams",
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+
+def _log_start_check(
+    bound: str,
+    evaluation: AntimicrobialEvaluationRequest,
+    course: Course,
+    now: datetime,
+    admission_number: int,
+):
+    """Log which bound of the evaluation start failed and by how many seconds
+    (ids and distances only, no personal data)"""
+    limit = max(now, course.start) if bound == "after_limit" else course.start
+    logger.backend_logger.warning(
+        json.dumps(
+            {
+                "event": "infection_control_review_start",
+                "bound": bound,
+                "admission_number": admission_number,
+                "id_drug": evaluation.idDrug,
+                "seconds": round(abs((evaluation.validFrom - limit).total_seconds())),
+                "course_starts_after_now": course.start > now,
+                "rejected": bound == "after_limit",
+            }
+        )
+    )
+
+
 def _validate_review(
     request_data: InfectionControlReviewRequest,
     admission_courses: rule.AdmissionCourses,
@@ -399,25 +464,12 @@ def _validate_review(
                 status.HTTP_400_BAD_REQUEST,
             )
 
-        # clients send the start at second precision, the course start keeps
-        # the fractional seconds of its prescription date: the start sent at
-        # the second of the course start is the course start. Done before the
-        # checks, so they and the saved row use the same value
-        if (
-            evaluation.validFrom is not None
-            and evaluation.validFrom < course.start
-            and evaluation.validFrom >= course.start.replace(microsecond=0)
-        ):
-            evaluation.validFrom = course.start
-
-        if evaluation.validFrom is not None and (
-            evaluation.validFrom > now or evaluation.validFrom < course.start
-        ):
-            raise ValidationError(
-                "O início da avaliação deve estar entre o início do tratamento e agora",
-                "errors.invalidParams",
-                status.HTTP_400_BAD_REQUEST,
-            )
+        _check_start(
+            evaluation=evaluation,
+            course=course,
+            now=now,
+            admission_number=request_data.admissionNumber,
+        )
 
         # the validity may already be over (a retroactive record), but not
         # before the evaluation starts

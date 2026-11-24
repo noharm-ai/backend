@@ -1,6 +1,7 @@
 """Tests: infection control follow-up, the review save: permissions, evaluations,
 superseding, backdating and validation"""
 
+import json
 from datetime import datetime, timedelta
 
 import pytest
@@ -437,34 +438,9 @@ def test_evaluation_ending_within_the_second_of_the_course_start_is_not_inverted
     assert _evaluations(admission) == []
 
 
-def test_review_rejects_start_before_the_second_of_a_course_start(
-    client, infection_controller_headers, infection_control, admission
-):
-    """The tolerance is the fractional part of the course start second only"""
-    course_start = _day(-1).replace(microsecond=654321)
-    id_prescription = _prescribe(admission, course_start, _day(1))
-    _prescalc(id_prescription)
-    _run_job(admission)
-
-    response = _review(
-        client,
-        infection_controller_headers,
-        admission,
-        evaluations=[ANTIMICROBIAL_DRUG],
-        valid_from=(
-            course_start.replace(microsecond=0) - timedelta(seconds=1)
-        ).isoformat(),
-    )
-
-    assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert _evaluations(admission) == []
-
-
 @pytest.mark.parametrize(
     "valid_from",
     [
-        # before the course
-        lambda: _day(-2),
         # in the future
         lambda: datetime.now() + timedelta(hours=1),
     ],
@@ -623,3 +599,103 @@ def test_review_rejects_invalid_treatment_type_or_focus(
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.get_json()["code"] == "errors.invalidParams"
     assert _evaluations(admission) == []
+
+
+def test_review_accepts_start_at_the_start_of_a_course_not_started_yet(
+    client, infection_controller_headers, infection_control, admission
+):
+    """A prescription dated ahead (a clock or an order scheduled for later) makes
+    a running course whose start is still in the future: the form's default
+    start, the course start, must be accepted and recorded as sent"""
+    course_start = (datetime.now() + timedelta(hours=1)).replace(microsecond=654321)
+    id_prescription = _prescribe(admission, course_start, _day(2))
+    _prescalc(id_prescription)
+    _run_job(admission)
+
+    response = _review(
+        client,
+        infection_controller_headers,
+        admission,
+        evaluations=[ANTIMICROBIAL_DRUG],
+        valid_from=course_start.replace(microsecond=0).isoformat(),
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.get_json()
+    assert _evaluations(admission)[0]["dt_inicio_validade"] == course_start
+
+
+def test_review_rejects_start_after_a_course_not_started_yet(
+    client, infection_controller_headers, infection_control, admission
+):
+    """A course not started yet still can't be evaluated from after its start"""
+    course_start = datetime.now() + timedelta(hours=1)
+    id_prescription = _prescribe(admission, course_start, _day(2))
+    _prescalc(id_prescription)
+    _run_job(admission)
+
+    response = _review(
+        client,
+        infection_controller_headers,
+        admission,
+        evaluations=[ANTIMICROBIAL_DRUG],
+        valid_from=(course_start + timedelta(minutes=30)).isoformat(),
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert _evaluations(admission) == []
+
+
+def test_review_moves_a_start_before_the_live_course_start_to_it(
+    client, infection_controller_headers, infection_control, admission
+):
+    """The form may hold a course start older than the live one (the course
+    was rebuilt after the form loaded, e.g. its first prescriptions archived):
+    the evaluation starts at the live course start, never before the course"""
+    course_start = _day(-1).replace(microsecond=654321)
+    id_prescription = _prescribe(admission, course_start, _day(1))
+    _prescalc(id_prescription)
+    _run_job(admission)
+
+    response = _review(
+        client,
+        infection_controller_headers,
+        admission,
+        evaluations=[ANTIMICROBIAL_DRUG],
+        valid_from=(course_start - timedelta(hours=5))
+        .replace(microsecond=0)
+        .isoformat(),
+    )
+
+    assert response.status_code == status.HTTP_200_OK, response.get_json()
+    assert _evaluations(admission)[0]["dt_inicio_validade"] == course_start
+
+
+def test_review_start_rejection_is_logged_with_the_bound_and_seconds(
+    client, infection_controller_headers, infection_control, admission, caplog
+):
+    """The log tells which bound failed and by how many seconds, ids only"""
+    course_start = datetime.now() + timedelta(hours=1)
+    id_prescription = _prescribe(admission, course_start, _day(2))
+    _prescalc(id_prescription)
+    _run_job(admission)
+
+    with caplog.at_level("WARNING"):
+        response = _review(
+            client,
+            infection_controller_headers,
+            admission,
+            evaluations=[ANTIMICROBIAL_DRUG],
+            valid_from=(course_start + timedelta(minutes=30)).isoformat(),
+        )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    logged = [
+        json.loads(r.getMessage())
+        for r in caplog.records
+        if "infection_control_review_start" in r.getMessage()
+    ]
+    assert len(logged) == 1
+    assert logged[0]["bound"] == "after_limit"
+    assert 1799 <= logged[0]["seconds"] <= 1801
+    assert logged[0]["id_drug"] == ANTIMICROBIAL_DRUG
+    assert logged[0]["course_starts_after_now"] is True
