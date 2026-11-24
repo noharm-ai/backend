@@ -23,7 +23,9 @@ course did before) is false for a course of a drug the schema exempted from
 review (review_exception_service): it counts in DOT/LOT, not in the review
 indicators. It follows the exceptions while the course runs; once it ended,
 the course keeps the value it had, so a later change of the exceptions doesn't
-rewrite what was measured.
+rewrite what was measured. The lite mode (nothing reviewed) writes false for
+every course it sees running, so a schema moved up to the full mode later
+doesn't count its lite courses as needing review.
 """
 
 from datetime import date, datetime, time
@@ -191,11 +193,13 @@ def build_summary(
     evaluations: list[AntimicrobialEvaluation] | None = None,
     exceptions: ReviewExceptions = NO_EXCEPTIONS,
     previous: dict | None = None,
+    review: bool = True,
 ) -> dict:
     """The summary of an admission from the courses (and the patient) the rule
     loaded; every evaluation of the admission is read unless given. Whether a
-    course needs review comes from the exceptions while it runs, and from the
-    previous summary once it ended (when it had one)"""
+    course needs review comes from the exceptions while it runs (never without
+    `review`, the lite mode), and from the previous summary once it ended (when
+    it had one)"""
     # deferred to avoid a circular import: the rule imports this module
     from services.infection_control.infection_control_status_service import (
         review_required,
@@ -220,7 +224,7 @@ def build_summary(
             key = (course.items[-1].id_drug, dateutils.to_iso(course.start))
             if key in kept:
                 return kept[key]
-        return review_required(course, exceptions)
+        return review and review_required(course, exceptions)
 
     courses = [
         serialize_course(
@@ -267,10 +271,12 @@ def update_summary(
     status: InfectionControlStatusEnum,
     evaluations: list[AntimicrobialEvaluation] | None = None,
     exceptions: ReviewExceptions = NO_EXCEPTIONS,
+    review: bool = True,
 ) -> bool:
     """Bring the summary of a record up to date with the courses the rule
-    loaded (called by apply_rule, which passes every evaluation it read and
-    the review exceptions); returns whether it was written"""
+    loaded (called by apply_rule, which passes every evaluation it read, the
+    review exceptions and, in the lite mode, review False); returns whether it
+    was written"""
     summary = build_summary(
         admission_number=admission.admission_number,
         admission_courses=admission_courses,
@@ -278,6 +284,7 @@ def update_summary(
         evaluations=evaluations,
         exceptions=exceptions,
         previous=admission.summary,
+        review=review,
     )
 
     return save_summary(admission=admission, summary=summary)

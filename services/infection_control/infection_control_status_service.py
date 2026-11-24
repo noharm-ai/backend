@@ -943,6 +943,8 @@ def apply_rule(
             status=plan.status,
             evaluations=evaluations,
             exceptions=exceptions,
+            # nothing is reviewed in lite: its courses never need review
+            review=not lite,
         )
     db.session.flush()
 

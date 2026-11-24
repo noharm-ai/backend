@@ -31,6 +31,7 @@ from tests.integration.infection_control.helpers import (
     _prescribe_today,
     _queued,
     _record,
+    _set,
     _suspend,
     _day,
 )
@@ -54,6 +55,7 @@ def _sync(admission_number):
 
 
 def _summary(admission_number):
+    """The report summary kept on the admission record"""
     return _record(admission_number)["resumo_acompanhamento"]
 
 
@@ -100,6 +102,8 @@ def test_job_keeps_summary_without_reasons(infection_control_lite, admission):
     assert _pendings(admission) == []
     summary = _summary(admission)
     assert [c["ongoing"] for c in summary["courses"]] == [True]
+    # nothing is reviewed in lite: the report must not count it as missing a review
+    assert [c["reviewRequired"] for c in summary["courses"]] == [False]
     assert summary["days"]
 
 
@@ -206,3 +210,28 @@ def test_job_reads_no_exams_or_cultures(infection_control_lite, admission):
 
     load_results.assert_not_called()
     load_cultures.assert_not_called()
+
+
+def test_courses_ended_in_lite_keep_no_review_after_moving_up(
+    infection_control_lite, admission
+):
+    """A course that ended in the lite mode keeps reviewRequired false once the
+    schema moves up to the full mode, so its review indicators count only
+    what the full mode could review"""
+    # a course started a week ago (the record is created while it runs), then
+    # moved to end before today's one starts
+    _prescribe(admission, _day(-8), _day(1))
+    _sync(admission)
+    _set("prescricao", admission, dtvigencia=_day(-6))
+    _sync(admission)
+    assert [c["reviewRequired"] for c in _summary(admission)["courses"]] == [False]
+
+    _set_features(_read_features() + [FeatureEnum.INFECTION_CONTROL.value])
+    _prescribe_today(admission, job=False)
+    _sync(admission)
+
+    courses = _summary(admission)["courses"]
+    assert [(c["ongoing"], c["reviewRequired"]) for c in courses] == [
+        (False, False),
+        (True, True),
+    ]
