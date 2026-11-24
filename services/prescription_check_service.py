@@ -46,13 +46,14 @@ def check_prescription(
     fast_check=False,
     concilia_list=None,
     concilia_relations=None,
-    skip_segment_authorization=False,
+    automatic_check=False,
 ):
     """
     Check or uncheck a prescription.
 
-    skip_segment_authorization is set only by static_check, when the service
-    integrator checks as itself (no origin user): never from a request.
+    automatic_check is set only by static_check, when the service integrator
+    checks as itself (no origin user), never from a request: no segment
+    authorization and no user activity count.
 
     The presmed "checado" marking is NOT done here: presmed rows are also
     written by the external integration process, so updating them inside
@@ -95,7 +96,7 @@ def check_prescription(
             )
 
         if (
-            not skip_segment_authorization
+            not automatic_check
             and not data_authorization_service.has_segment_authorization(
                 id_segment=p.idSegment, user=user_context
             )
@@ -180,7 +181,8 @@ def check_prescription(
             if single:
                 results.append(single)
 
-        if p_status == "s":
+        if p_status == "s" and not automatic_check:
+            # an automatic check is no person's activity
             user_activity_repository.increment_checks(user_context.id)
 
         return results, presmed_mark_ids
@@ -577,11 +579,12 @@ def static_check(
     """Check a prescription from an external system (service integrator).
 
     With an origin user (its external id), the check is recorded as that user's.
-    Without one (an automatic check on the client's side, no person behind it),
-    the check is recorded as the integrator user's own, in any segment of its
-    schema. See docs/agents/static-check.md.
+    Without one (idOriginUser omitted or null: an automatic check on the
+    client's side, no person behind it), the check is recorded as the
+    integrator user's own, in any segment of its schema. A blank id is
+    rejected. See docs/agents/static-check.md.
     """
-    if id_origin_user is None or str(id_origin_user).strip() == "":
+    if id_origin_user is None:
         # never look the origin user up: external IS NULL would match any user
         return check_prescription(
             idPrescription=id_prescription,
@@ -591,7 +594,15 @@ def static_check(
             alerts=[],
             service_user=True,
             user_permissions=user_permissions,
-            skip_segment_authorization=True,
+            automatic_check=True,
+        )
+
+    if str(id_origin_user).strip() == "":
+        # a blank id is a broken mapping on the client's side, not an automatic check
+        raise ValidationError(
+            "Usuário origem inválido",
+            "errors.invalidRegister",
+            status.HTTP_400_BAD_REQUEST,
         )
 
     origin_user = (

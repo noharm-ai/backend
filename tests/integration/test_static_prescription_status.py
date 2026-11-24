@@ -12,7 +12,7 @@ from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
-from sqlalchemy import func
+from sqlalchemy import func, text
 
 from config import Config
 from models.enums import PrescriptionAuditTypeEnum
@@ -296,18 +296,17 @@ def test_static_check_without_origin_user_is_the_integrators_own(
     assert prescription.user == _integrator_id()
 
 
-@pytest.mark.parametrize("id_origin_user", [None, "", "  "])
-def test_static_check_with_a_blank_origin_user_never_looks_it_up(
-    client, integrator_headers, id_origin_user
+def test_static_check_with_a_null_origin_user_is_the_integrators_own(
+    client, integrator_headers
 ):
-    """POST /static/prescriptions/status - usuário de origem vazio não busca usuário sem id externo
+    """POST /static/prescriptions/status - idOriginUser nulo é checagem automática, sem buscar usuário sem id externo
 
     external IS NULL would match any user of the schema without an external id"""
     id_prescription = create_basic_prescription().id
 
     response = client.post(
         STATIC_CHECK_URL,
-        json=_payload(id_prescription, id_origin_user=id_origin_user),
+        json=_payload(id_prescription, id_origin_user=None),
         headers=integrator_headers,
     )
 
@@ -318,6 +317,54 @@ def test_static_check_with_a_blank_origin_user_never_looks_it_up(
         session.query(Prescription).filter(Prescription.id == id_prescription).first()
     )
     assert prescription.user == _integrator_id()
+
+
+@pytest.mark.parametrize("id_origin_user", ["", "  "])
+def test_static_check_rejects_a_blank_origin_user(
+    client, integrator_headers, id_origin_user
+):
+    """POST /static/prescriptions/status - deve retornar erro [400] quando o idOriginUser vem em branco
+
+    a blank id is a broken mapping on the client's side, not an automatic check"""
+    id_prescription = create_basic_prescription().id
+
+    response = client.post(
+        STATIC_CHECK_URL,
+        json=_payload(id_prescription, id_origin_user=id_origin_user),
+        headers=integrator_headers,
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["message"] == "Usuário origem inválido"
+
+    session.expire_all()
+    prescription = (
+        session.query(Prescription).filter(Prescription.id == id_prescription).first()
+    )
+    assert prescription.status == "0"
+
+
+def test_static_check_without_origin_user_is_not_user_activity(
+    client, integrator_headers
+):
+    """POST /static/prescriptions/status - checagem automática não conta como atividade do integrador"""
+    id_prescription = create_basic_prescription().id
+    count_checks = text(
+        "SELECT COALESCE(SUM(checagens), 0) FROM public.usuario_atividade "
+        "WHERE idusuario = :id_user"
+    )
+    before = session.execute(count_checks, {"id_user": _integrator_id()}).scalar()
+
+    response = client.post(
+        STATIC_CHECK_URL,
+        json=_payload_without_origin_user(id_prescription),
+        headers=integrator_headers,
+    )
+
+    assert response.status_code == 200
+    session.expire_all()
+    after = session.execute(count_checks, {"id_user": _integrator_id()}).scalar()
+    assert after == before
 
 
 def test_static_check_without_origin_user_audits_the_integrator(
