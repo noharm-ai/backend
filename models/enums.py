@@ -102,6 +102,10 @@ class FeatureEnum(Enum):
     CULTURE = "CULTURE"
     # infection control follow-up pages and reviews (ci_* tables);
     INFECTION_CONTROL = "INFECTION_CONTROL"
+    # only what the infection control report's DOT/LOT needs: prescalc follows
+    # the admissions and a nightly run keeps their summary, without reasons,
+    # reviews or worklist (InfectionControlModeEnum.LITE). INFECTION_CONTROL wins
+    INFECTION_CONTROL_LITE = "INFECTION_CONTROL_LITE"
     # maintainers create test case prescriptions (POST /prescriptions/test-case);
     # only in a schema they alone use, never a hospital's
     PRESCRIPTION_TEST_CASE = "PRESCRIPTION_TEST_CASE"
@@ -498,6 +502,18 @@ class InfectionControlStatusEnum(Enum):
     PENDING = 1
     REVISED = 2
     CLOSED = 3
+
+
+class InfectionControlModeEnum(Enum):
+    """Enum: how far the infection control runs in a schema (its features)
+
+    FULL (INFECTION_CONTROL) is the follow-up with reasons, reviews and the
+    worklist; LITE (INFECTION_CONTROL_LITE alone) keeps only the records and
+    their summary, which the report's DOT/LOT reads.
+    """
+
+    FULL = "full"
+    LITE = "lite"
 
 
 class InfectionControlOriginEnum(Enum):
