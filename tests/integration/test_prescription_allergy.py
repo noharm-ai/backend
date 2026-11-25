@@ -324,3 +324,68 @@ def test_a_substance_from_the_recorded_name_lists_that_name(client, analyst_head
 
     (listed,) = [a for a in payload["notesAllergies"] if a["text"] == _SUBSTANCE_A[1]]
     assert listed["drugNames"] == ["ZZTest Nome Registrado"]
+
+
+def _tag_no_allergy_alert(sctid: int) -> None:
+    """Tags the substance no_allergy_alert (removed with the substance by the
+    seed_substances_and_drugs teardown)"""
+    session.execute(
+        text(
+            "UPDATE public.substancia SET tags = ARRAY['no_allergy_alert'] "
+            "WHERE sctid = :sctid"
+        ),
+        {"sctid": sctid},
+    )
+    session_commit()
+
+
+def test_a_substance_tagged_no_allergy_alert_raises_no_allergy(client, analyst_headers):
+    """Neither the flag nor an active record raise the allergy of a substance
+    tagged no_allergy_alert; the payload tells the maintainers why"""
+    _tag_no_allergy_alert(_SUBSTANCE_A[0])
+    id_prescription, (id_a, id_b) = _create(
+        [{"idDrug": _DRUG_A[0], "allergy": "S"}, {"idDrug": _DRUG_B[0], "allergy": "S"}]
+    )
+    _register_allergy(_SEED_PATIENT, _DRUG_A[0])
+
+    payload = _view(client, analyst_headers, id_prescription)
+
+    assert _has_allergy_alert(payload, id_a) is False
+    assert _item(payload, id_a)["allergyAlertDisabled"] is True
+    assert _why(payload, id_a) == ("S", "active")
+    # another substance keeps its flag
+    assert _has_allergy_alert(payload, id_b) is True
+    assert _item(payload, id_b)["allergyAlertDisabled"] is False
+    assert payload["alertStats"]["allergy"] == 1
+
+
+def test_a_prescribed_substance_tagged_no_allergy_alert_raises_no_cross_reactivity(
+    client, analyst_headers
+):
+    """The tagged item is not compared with the patient's allergies"""
+    _tag_no_allergy_alert(_SUBSTANCE_A[0])
+    _register_allergy_by_substance(
+        _SEED_PATIENT, _UNMAPPED_CODE, _SUBSTANCE_ALLERGEN[0]
+    )
+    _add_relation(_SUBSTANCE_A[0], _SUBSTANCE_ALLERGEN[0], "rx", "high")
+    id_prescription, _ = _create([{"idDrug": _DRUG_A[0]}])
+
+    payload = _view(client, analyst_headers, id_prescription)
+
+    assert _count(payload, "rx") == 0
+
+
+def test_an_allergy_to_a_substance_tagged_no_allergy_alert_raises_no_cross_reactivity(
+    client, analyst_headers
+):
+    """An allergy to a tagged substance is left out of the cross reactivity"""
+    _tag_no_allergy_alert(_SUBSTANCE_ALLERGEN[0])
+    _register_allergy_by_substance(
+        _SEED_PATIENT, _UNMAPPED_CODE, _SUBSTANCE_ALLERGEN[0]
+    )
+    _add_relation(_SUBSTANCE_A[0], _SUBSTANCE_ALLERGEN[0], "rx", "high")
+    id_prescription, _ = _create([{"idDrug": _DRUG_A[0]}])
+
+    payload = _view(client, analyst_headers, id_prescription)
+
+    assert _count(payload, "rx") == 0

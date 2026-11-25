@@ -327,6 +327,8 @@ def _internal_get_prescription(
 
 @timed()
 def _get_last_dept(prescription: Prescription, is_complete: bool):
+    """The department of the admission's previous prescription: the highest id
+    below the viewed one, dated within a month of it (complete view only)"""
     if is_complete:
         return (
             db.session.query(Department.name)
@@ -344,7 +346,10 @@ def _get_last_dept(prescription: Prescription, is_complete: bool):
                 Prescription.date
                 > (func.date(prescription.date) - func.cast("1 month", INTERVAL))
             )
-            .order_by(desc(Prescription.id))
+            # same order as the bare id, but "+ 0" keeps the planner off a
+            # backward walk of the primary key (filtering every longer id of
+            # other admissions first): it uses the admission index instead
+            .order_by(desc(Prescription.id + 0))
             .first()
         )
 

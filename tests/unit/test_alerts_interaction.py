@@ -596,7 +596,9 @@ def test_build_alert_explains_level_adjustments():
 # --- the patient's allergies, resolved from the allergy records -----------------
 
 # the fields of allergy_repository.get_allergy_records that _get_allergies reads
-_AllergyRecord = namedtuple("_AllergyRecord", "sctid drugSctid active substance")
+_AllergyRecord = namedtuple(
+    "_AllergyRecord", "sctid drugSctid active substance substanceTags", defaults=(None,)
+)
 
 
 def _fail_on_read(*args, **kwargs):
@@ -721,6 +723,73 @@ def test_find_relations_uses_the_allergy_records_given(monkeypatch):
 
     assert results["stats"]["rx"] == 1
     assert results["alerts"]["2"][0]["key"] == "211111-111111-rx"
+
+
+def test_an_allergy_to_a_substance_tagged_no_allergy_alert_is_left_out():
+    """Alertas interação: alergia a substância com o marcador no_allergy_alert
+    não entra na reatividade cruzada"""
+    records = [
+        _AllergyRecord(
+            sctid=90301,
+            drugSctid=None,
+            active=True,
+            substance="A",
+            substanceTags=["no_allergy_alert"],
+        ),
+        _AllergyRecord(
+            sctid=90302,
+            drugSctid=None,
+            active=True,
+            substance="B",
+            substanceTags=["antimicro"],
+        ),
+    ]
+
+    assert _allergy_sctids(records) == [90302]
+
+
+def test_a_prescribed_substance_tagged_no_allergy_alert_raises_no_cross_reactivity(
+    monkeypatch,
+):
+    """Alertas interação: item com o marcador no_allergy_alert não é comparado
+    com as alergias, mas segue comparado com os outros itens"""
+    asked = []
+
+    def active_relations(pairs):
+        """The relation query, noting the pairs it was asked for"""
+        asked.extend(pairs)
+        return _mock_get_active_relations(kind="rx")(pairs)
+
+    monkeypatch.setattr(
+        "services.alert_interaction_service._get_active_relations", active_relations
+    )
+
+    tagged = utils_test_prescription.get_prescription_drug_mock_row(
+        id_prescription_drug=2, dose=10, drug_name="Drug A"
+    )
+    tagged.substance.tags = ["no_allergy_alert"]
+    other = utils_test_prescription.get_prescription_drug_mock_row(
+        id_prescription_drug=3, dose=10, drug_name="Drug B", sctid="311111"
+    )
+
+    results = find_relations(
+        [tagged, other],
+        id_patient=1,
+        is_cpoe=False,
+        allergy_records=[
+            _AllergyRecord(
+                sctid="111111", drugSctid=None, active=True, substance="Drug test RX"
+            )
+        ],
+    )
+
+    assert results["stats"]["rx"] == 0
+    assert "2" not in results["alerts"]
+    # the tagged item is still compared with the other item, only not with
+    # the allergies
+    assert ("211111", "311111") in asked
+    assert ("211111", "111111") not in asked
+    assert ("311111", "111111") in asked
 
 
 # --- the pairs sent to the relation query ---------------------------------------
