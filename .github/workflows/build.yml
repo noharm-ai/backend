@@ -56,12 +56,6 @@ jobs:
         run: |
           python mobile.py &
           sleep 10
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: sa-east-1
       - name: Run Tests
         env:
           CACHE_BUCKET_NAME: ${{ secrets.CACHE_BUCKET_NAME }}
