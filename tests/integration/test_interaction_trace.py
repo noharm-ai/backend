@@ -16,8 +16,10 @@ from datetime import datetime
 
 import pytest
 
+from sqlalchemy import text
+
 from security.role import Role
-from tests.conftest import get_access, make_headers
+from tests.conftest import get_access, make_headers, session, session_commit
 from tests.integration.test_prescription_interactions import (  # noqa: F401
     _DRUG_A,
     _DRUG_ALLERGEN,
@@ -232,6 +234,37 @@ def test_a_cross_reactivity_pair_with_an_allergy(client, maintainer_headers):
     assert trace["alerted"] is True
     assert [k["kind"] for k in trace["kinds"]] == ["rx"]
     assert trace["kinds"][0]["directions"][0]["alert"]["shownOn"] == [_DRUG_A[1]]
+
+
+def test_a_substance_tagged_no_allergy_alert_is_not_compared_with_allergies(
+    client, maintainer_headers
+):
+    """The prescribed substance is tagged no_allergy_alert: the trace says why
+    the cross reactivity was not evaluated"""
+    session.execute(
+        text(
+            "UPDATE public.substancia SET tags = ARRAY['no_allergy_alert'] "
+            "WHERE sctid = :sctid"
+        ),
+        {"sctid": _SUBSTANCE_A[0]},
+    )
+    session_commit()
+    _register_allergy(_SEED_PATIENT, _DRUG_ALLERGEN[0])
+    _add_relation(_SUBSTANCE_A[0], _SUBSTANCE_ALLERGEN[0], "rx", "high")
+    id_prescription, (id_a,) = _prescription([{"idDrug": _DRUG_A[0]}])
+
+    trace = _trace(
+        client,
+        maintainer_headers,
+        idPrescription=id_prescription,
+        idPrescriptionDrugFrom=id_a,
+        sctidAllergy=_SUBSTANCE_ALLERGEN[0],
+    )["trace"]
+
+    assert trace["compared"] is False
+    assert trace["alerted"] is False
+    assert trace["kinds"] == []
+    assert "Sem alerta de alergia" in trace["summary"]
 
 
 def test_a_cross_reactivity_registered_the_other_way_is_flagged(

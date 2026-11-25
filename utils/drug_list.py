@@ -270,7 +270,10 @@ class DrugList:
 
             # the same allergy the alert reports (flag confirmed by alergia)
             allergy = alert_service.is_allergic(
-                prescription_drug=pd[0], drug=pd[1], allergies=self.allergies
+                prescription_drug=pd[0],
+                drug=pd[1],
+                allergies=self.allergies,
+                substance=pd[11],
             )
             # why: the maintainers read the flag next to what the records said
             allergy_record = alert_service.get_allergy_record_status(
@@ -301,6 +304,12 @@ class DrugList:
                     "allergyFlag": pd[0].allergy,
                     "allergyRecord": (
                         allergy_record.value if allergy_record is not None else None
+                    ),
+                    # the substance is tagged no_allergy_alert: no allergy,
+                    # whatever the flag and the records say
+                    "allergyAlertDisabled": (
+                        pd[11] is not None
+                        and alert_service.is_allergy_alert_disabled(pd[11].tags)
                     ),
                     "whiteList": pdWhiteList,
                     "doseWeight": doseWeightStr,
