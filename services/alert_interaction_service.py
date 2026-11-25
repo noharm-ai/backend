@@ -10,6 +10,7 @@ from models.enums import DrugAlertLevelEnum, DrugTypeEnum, FrequencyEnum
 from models.main import Drug, DrugAttributes, db
 from models.prescription import PrescriptionDrug
 from repository import allergy_repository
+from services import alert_service
 from utils import dateutils, examutils, prescriptionutils, stringutils
 
 RELATION_KINDS = ["it", "dt", "dm", "iy", "sl", "rx"]
@@ -44,10 +45,17 @@ def find_relations(
     relation_items = []
     for item in filtered_list:
         relation_item = build_relation_item(item=item, is_cpoe=is_cpoe)
-        relation_items.append((item[0].id, relation_item, _period_dates(relation_item)))
+        relation_items.append(
+            (
+                item[0].id,
+                relation_item,
+                _period_dates(relation_item),
+                is_allergy_alert_disabled(item),
+            )
+        )
 
-    for id_from, drug_from, dates_from in relation_items:
-        for id_to, drug_to, dates_to in relation_items:
+    for id_from, drug_from, dates_from, allergy_disabled in relation_items:
+        for id_to, drug_to, dates_to, _ in relation_items:
             if id_from == id_to:
                 continue
 
@@ -57,6 +65,10 @@ def find_relations(
                 continue
 
             overlap_drugs.append({"from": drug_from, "to": drug_to})
+
+        # a substance tagged no_allergy_alert raises no cross reactivity
+        if allergy_disabled:
+            continue
 
         for a in allergies:
             overlap_drugs.append({"from": {**drug_from, "rx": True}, "to": a})
@@ -175,6 +187,17 @@ def _resolve_expire_date(prescription_date: datetime, expire_date: datetime):
         return prescription_date + timedelta(hours=24)
 
     return datetime.today()
+
+
+def is_allergy_alert_disabled(item) -> bool:
+    """Whether the prescribed item's substance (row from
+    find_drugs_by_prescription, the Substance at 11) is tagged no_allergy_alert:
+    it is not compared with the patient's allergies"""
+    substance = item[11]
+
+    return substance is not None and alert_service.is_allergy_alert_disabled(
+        substance.tags
+    )
 
 
 def build_relation_item(item, is_cpoe: bool) -> dict:
@@ -619,7 +642,10 @@ def _get_allergies(id_patient: int, allergy_records: list | None = None):
     Resolved from the patient's allergy records
     (allergy_repository.get_allergy_records, which joins the substance that
     way): the prescription view has already read them, so allergy_records
-    saves the query. None reads them here. Ordered by substance"""
+    saves the query. None reads them here. Ordered by substance.
+
+    A substance tagged no_allergy_alert is left out: it raises no cross
+    reactivity"""
     if allergy_records is None:
         allergy_records = allergy_repository.get_allergy_records(id_patient=id_patient)
 
@@ -628,6 +654,9 @@ def _get_allergies(id_patient: int, allergy_records: list | None = None):
         # substance: the name of the substance the record resolved to, None
         # when its sctid (or its drug's) is not a substance
         if record.active is not True or record.substance is None:
+            continue
+
+        if alert_service.is_allergy_alert_disabled(record.substanceTags):
             continue
 
         sctid = record.sctid if record.sctid is not None else record.drugSctid

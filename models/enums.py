@@ -308,6 +308,9 @@ class SubstanceTagEnum(Enum):
     NOT_VALIDATED = "not_validated"
     TUBE = "tube"
     NO_DOSEMAX = "no_dosemax"
+    # never raises the allergy alert nor the cross reactivity alert, for every
+    # client (alert_service.is_allergy_alert_disabled)
+    NO_ALLERGY_ALERT = "no_allergy_alert"
 
 
 class TagTypeEnum(Enum):

@@ -16,7 +16,11 @@ from datetime import datetime
 
 import pytest
 
-from models.enums import AllergyRecordStatusEnum, DrugAlertTypeEnum
+from models.enums import (
+    AllergyRecordStatusEnum,
+    DrugAlertTypeEnum,
+    SubstanceTagEnum,
+)
 from services import alert_service, prescription_view_service
 from tests.utils import utils_test_prescription
 
@@ -229,6 +233,69 @@ def test_find_alerts_without_records_keeps_the_flag():
     rows = [_row(allergy="S", id_prescription_drug=83)]
 
     assert len(_allergy_alerts(rows, None).get("83", [])) == 1
+
+
+def _tagged_row(allergy: str | None, id_prescription_drug: int = 71, tags=None):
+    """A prescribed item of drug 1 whose substance carries the given tags"""
+    row = _row(allergy=allergy, id_prescription_drug=id_prescription_drug)
+    row.substance.tags = (
+        tags if tags is not None else [SubstanceTagEnum.NO_ALLERGY_ALERT.value]
+    )
+    return row
+
+
+@pytest.mark.parametrize("flag", ["S", "N", None])
+@pytest.mark.parametrize(
+    "allergies",
+    [
+        None,
+        [],
+        [AllergyRecord(idDrug=_ID_DRUG, sctid=None, drugSctid=None, active=True)],
+        [AllergyRecord(idDrug=99001, sctid=_SCTID, drugSctid=None, active=True)],
+    ],
+    ids=["not_fetched", "no_records", "active_same_drug", "active_sctid"],
+)
+def test_a_substance_tagged_no_allergy_alert_is_never_allergic(flag, allergies):
+    """Neither the flag nor an active record raise the allergy for it"""
+    row = _tagged_row(allergy=flag)
+
+    assert (
+        alert_service.is_allergic(
+            prescription_drug=row[0],
+            drug=row[1],
+            allergies=allergies,
+            substance=row.substance,
+        )
+        is False
+    )
+
+
+def test_other_substance_tags_keep_the_allergy():
+    """Only no_allergy_alert drops it"""
+    row = _tagged_row(allergy="S", tags=["antimicro", "no_dosemax"])
+
+    assert (
+        alert_service.is_allergic(
+            prescription_drug=row[0], drug=row[1], allergies=None, substance=row[11]
+        )
+        is True
+    )
+
+
+def test_find_alerts_raises_no_allergy_alert_for_a_tagged_substance():
+    """The alert reads the item's substance from the row (no other query)"""
+    rows = [
+        _tagged_row(allergy="S", id_prescription_drug=84),
+        _row(allergy="S", id_prescription_drug=85),
+    ]
+    allergies = [
+        AllergyRecord(idDrug=99001, sctid=_SCTID, drugSctid=None, active=True),
+    ]
+
+    alerts = _allergy_alerts(rows, allergies)
+
+    assert alerts.get("84", []) == []
+    assert len(alerts.get("85", [])) == 1
 
 
 ListedRecord = namedtuple(

@@ -254,6 +254,17 @@ def _trace_allergy(
         "ineligibilityReason": None,
     }
     checks = _eligibility_checks(sides=[side_from])
+    if alert_interaction_service.is_allergy_alert_disabled(item_from):
+        checks.append(
+            {
+                "rule": "allergyAlertDisabled",
+                "passed": False,
+                "message": (
+                    f"{side_from['drug'] or '--'}: substância com o marcador "
+                    "'Sem alerta de alergia', não é comparada com as alergias."
+                ),
+            }
+        )
     compared = all(c["passed"] for c in checks)
 
     kinds = []
