@@ -32,7 +32,7 @@ from config import Config
 from exception.authorization_error import AuthorizationError
 from exception.validation_error import ValidationError
 from mobile import app
-from models.enums import NoHarmENV
+from models.enums import InfectionControlModeEnum, NoHarmENV
 from models.requests.reports_consolidated_request import (
     EconomyReportRequest,
     InfectionControlReportRequest,
@@ -523,11 +523,11 @@ class TestInfectionControlReport:
 
     @pytest.fixture(autouse=True)
     def feature_on(self):
-        """The schema has the INFECTION_CONTROL feature"""
+        """The schema has the INFECTION_CONTROL feature (the full mode)"""
         with patch.object(
-            reports_consolidated_service.feature_service,
-            "has_feature",
-            return_value=True,
+            reports_consolidated_service.infection_control_mode_service,
+            "get_mode",
+            return_value=InfectionControlModeEnum.FULL,
         ):
             yield
 
@@ -555,6 +555,7 @@ class TestInfectionControlReport:
             "day": None,
             "admissions_of": None,
             "courses_of": None,
+            "scope": "full",
         }
 
     def test_sends_the_day_of_the_day_view(self):
@@ -594,14 +595,29 @@ class TestInfectionControlReport:
 
         lambda_client.invoke.assert_not_called()
 
+    def test_sends_the_lite_scope(self):
+        """No modo lite (INFECTION_CONTROL_LITE) o escopo pede só os indicadores de uso"""
+        with lambda_answering({}) as lambda_client:
+            with acting_as([Role.PRESCRIPTION_ANALYST.value]):
+                with patch.object(
+                    reports_consolidated_service.infection_control_mode_service,
+                    "get_mode",
+                    return_value=InfectionControlModeEnum.LITE,
+                ):
+                    reports_consolidated_service.get_infection_control_report(
+                        request_data=self.request_data
+                    )
+
+        assert sent_payload(lambda_client)["scope"] == "lite"
+
     def test_requires_the_feature(self):
-        """Sem a feature INFECTION_CONTROL a chamada é recusada"""
+        """Sem INFECTION_CONTROL nem INFECTION_CONTROL_LITE a chamada é recusada"""
         with lambda_answering({}) as lambda_client:
             with acting_as([Role.INFECTION_CONTROLLER.value]):
                 with patch.object(
-                    reports_consolidated_service.feature_service,
-                    "has_feature",
-                    return_value=False,
+                    reports_consolidated_service.infection_control_mode_service,
+                    "get_mode",
+                    return_value=None,
                 ):
                     with pytest.raises(ValidationError):
                         reports_consolidated_service.get_infection_control_report(

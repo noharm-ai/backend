@@ -29,6 +29,13 @@ apply_rule writes the plan; a saved review also records its evaluations here
   unless asked (indicadores.reviewRequired);
 * with nothing running (or after discharge) the record is closed.
 
+A schema in the lite mode (INFECTION_CONTROL_LITE alone, see
+infection_control_mode_service) keeps only what the report's DOT/LOT needs:
+the rule runs with nothing to review (`lite`), so it opens no reason, resolves
+any left open (NOT_REQUIRED, or as the drug stopping or the discharge), keeps
+the record revised while a course runs and closed after, and reads no exams
+or cultures. Prescalc follows its admissions revised and queues nothing.
+
 Each time it also keeps on the record what it saw (admission_features): the
 worklist filters by it without going through the prescriptions. And it keeps
 the summary the infection control report reads (resumo_acompanhamento, see
@@ -52,7 +59,7 @@ from datetime import datetime
 from models.enums import (
     AntimicrobialEvaluationClosingEnum,
     AntimicrobialEvaluationStatusEnum,
-    FeatureEnum,
+    InfectionControlModeEnum,
     InfectionControlOriginEnum,
     InfectionControlPendingTypeEnum,
     InfectionControlResolutionEnum,
@@ -72,10 +79,10 @@ from repository.infection_control import (
     antimicrobial_repository,
     infection_control_repository,
 )
-from services import feature_service
 from services.infection_control import (
     culture_trigger_service,
     exam_trigger_service,
+    infection_control_mode_service,
     infection_control_summary_service,
     review_exception_service,
 )
@@ -365,7 +372,10 @@ def record_evaluation(
         if evaluation_matches_course(previous, course)
     ]
     retroactive = bool(in_force) and all(
-        evaluation_data.validUntil < previous.valid_from for previous in in_force
+        # an evaluation of a course not started yet starts in the future: it
+        # has been in force since it was saved
+        evaluation_data.validUntil < min(previous.valid_from, now)
+        for previous in in_force
     )
 
     evaluation = AntimicrobialEvaluation()
@@ -453,12 +463,14 @@ def sync_admission(
     user_id: int,
     now: datetime | None = None,
     lock_timeout_ms: int | None = None,
+    lite: bool = False,
 ) -> InfectionControlAdmission | None:
     """Bring an admission's record up to date with its antimicrobials.
 
     The record is created (as pending) when the admission has a running
     course and is not followed yet. Returns the record, or None when the
-    admission is not followed and has nothing running.
+    admission is not followed and has nothing running. `lite` runs the rule
+    of the lite mode (see apply_rule).
     """
     now = now or datetime.now()
     admission_courses = load_courses(admission_number=admission_number, now=now)
@@ -486,6 +498,7 @@ def sync_admission(
         schema=schema,
         origin=origin,
         user_id=user_id,
+        lite=lite,
     )
 
     return admission
@@ -569,15 +582,19 @@ def plan_rule(
     exam_results: exam_trigger_service.ExamResults | None = None,
     cultures: list[culture_trigger_service.CultureRelease] | None = None,
     exceptions: ReviewExceptions = NO_EXCEPTIONS,
+    review: bool = True,
 ) -> RulePlan:
     """Decide which evaluations close, which reasons open or resolve and the
     resulting status, without touching the database (the exam results the
     evaluations' exam triggers watch, the released cultures and the review
-    exceptions are read before)"""
+    exceptions are read before). Without `review` (the lite mode) nothing is
+    reviewable, as if every course were exempt"""
     plan = RulePlan()
     # only these open reasons; an exempt course still runs (its evaluation
     # stays in force, the record stays followed)
-    reviewable = [c for c in ongoing if review_required(c, exceptions)]
+    reviewable = (
+        [c for c in ongoing if review_required(c, exceptions)] if review else []
+    )
 
     # evaluations of courses that are over are no longer in force
     kept_evaluations = []
@@ -775,10 +792,16 @@ def apply_rule(
     schema: str,
     origin: InfectionControlOriginEnum,
     user_id: int,
+    lite: bool = False,
 ):
     """Plan the rule for a locked admission record and write the plan: close
     evaluations, open and resolve pending reasons, set the status and keep
-    what the worklist filters by"""
+    what the worklist filters by.
+
+    `lite` (the lite mode, only the report's DOT/LOT) plans with nothing to
+    review: no reason opens and the open ones are resolved, so the record is
+    revised while a course runs and closed after. It reads no exams, cultures
+    or last prescription-day (the worklist's), only what the summary needs"""
     now = admission_courses.now
     admission_number = admission.admission_number
     # every evaluation, for the summary; the rule judges the ones in force
@@ -803,11 +826,15 @@ def apply_rule(
         open_pendings=open_pendings,
         now=now,
         next_review_date=admission.next_review_date,
-        exam_results=exam_trigger_service.load_results(
-            admission_number=admission_number,
-            schema=schema,
-            evaluations=active_evaluations,
-            patient=admission_courses.patient,
+        exam_results=(
+            None
+            if lite
+            else exam_trigger_service.load_results(
+                admission_number=admission_number,
+                schema=schema,
+                evaluations=active_evaluations,
+                patient=admission_courses.patient,
+            )
         ),
         # read by the scheduled job only: a review save holds the record meanwhile, and a
         # culture it would see the next run sees (light runs follow the culture cache)
@@ -817,10 +844,11 @@ def apply_rule(
                 evaluations=active_evaluations,
                 patient=admission_courses.patient,
             )
-            if origin == InfectionControlOriginEnum.JOB
+            if origin == InfectionControlOriginEnum.JOB and not lite
             else None
         ),
         exceptions=exceptions,
+        review=not lite,
     )
 
     evaluations_by_id = {e.id: e for e in active_evaluations}
@@ -903,12 +931,13 @@ def apply_rule(
     # the record is written once, by the flush at the end
     with db.session.no_autoflush:
         # prescalc points a new record at its prescription-day; the patient
-        # changes department and bed after that
-        admission.id_last_prescription = (
-            infection_control_repository.get_last_prescription_day_id(
-                admission_number=admission_number
+        # changes department and bed after that (the worklist's: not in lite)
+        if not lite:
+            admission.id_last_prescription = (
+                infection_control_repository.get_last_prescription_day_id(
+                    admission_number=admission_number
+                )
             )
-        )
         admission.recalculated_at = now
         # what the infection control report reads of the admission
         infection_control_summary_service.update_summary(
@@ -917,6 +946,8 @@ def apply_rule(
             status=plan.status,
             evaluations=evaluations,
             exceptions=exceptions,
+            # nothing is reviewed in lite: its courses never need review
+            review=not lite,
         )
     db.session.flush()
 
@@ -951,7 +982,10 @@ def follow_from_prescalc(
     drug: prescalc queues it for the light run right after this hook when its
     antimicrobials can open a reason (admission_queue_service.notify,
     prescalc_needs_rule; a record created or reopened here always can). Only
-    for schemas with the INFECTION_CONTROL feature.
+    for schemas with the INFECTION_CONTROL feature, or the lite mode
+    (INFECTION_CONTROL_LITE alone): there the record is created or reopened
+    revised, without reasons, and nothing is queued (the queue's consumer is
+    the full mode's), since only the report's DOT/LOT reads it.
 
     Runs in a savepoint and never raises: the prescription-day is the core
     product and must be saved even if this step fails.
@@ -968,16 +1002,21 @@ def follow_from_prescalc(
             db.session.begin_nested(),
             infection_control_repository.lock_timeout(PRESCALC_LOCK_TIMEOUT_MS),
         ):
-            if not feature_service.has_feature(FeatureEnum.INFECTION_CONTROL):
+            mode = infection_control_mode_service.get_mode()
+            if mode is None:
                 return
 
+            lite = mode == InfectionControlModeEnum.LITE
             _follow_from_prescalc(
                 admission_number=admission_number,
                 user_id=user_id,
                 now=datetime.now(),
                 id_prescription_day=id_prescription_day,
                 id_prescription=id_prescription,
-                review_required=_prescalc_review_required(antimicrobials),
+                review_required=(
+                    False if lite else _prescalc_review_required(antimicrobials)
+                ),
+                lite=lite,
             )
     except Exception as e:  # noqa: BLE001 - must not break the prescription-day
         # same event as the static context's errors, which is the one monitored
@@ -1015,9 +1054,11 @@ def _follow_from_prescalc(
     id_prescription_day: int,
     id_prescription: int | None,
     review_required: bool = True,
+    lite: bool = False,
 ):
     """Create or reopen the record of an admission whose prescription-day has
-    an antimicrobial (see follow_from_prescalc)"""
+    an antimicrobial (see follow_from_prescalc); in the lite mode revised,
+    without reasons and without the worklist's indicadores"""
     # a discharged patient's prescriptions are still recalculated
     # (e.g. drugs suspended at discharge): they start nothing
     if infection_control_repository.is_discharged(
@@ -1032,7 +1073,8 @@ def _follow_from_prescalc(
         if review_required
         else InfectionControlStatusEnum.REVISED
     )
-    features = None if review_required else {"reviewRequired": False}
+    # the worklist's: the lite mode has none
+    features = None if review_required or lite else {"reviewRequired": False}
     created = infection_control_repository.create_admission(
         admission_number=admission_number,
         origin=InfectionControlOriginEnum.PRESCALC.value,

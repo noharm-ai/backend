@@ -3,7 +3,7 @@ import json
 from config import Config
 from decorators.has_permission_decorator import Permission, has_permission
 from exception.validation_error import ValidationError
-from models.enums import FeatureEnum, NoHarmENV
+from models.enums import NoHarmENV
 from models.main import User
 from models.requests.reports_consolidated_request import (
     EconomyReportRequest,
@@ -12,7 +12,7 @@ from models.requests.reports_consolidated_request import (
     PatientDayReportRequest,
     PrescriptionReportRequest,
 )
-from services import feature_service
+from services.infection_control import infection_control_mode_service
 from utils import aws, status
 
 
@@ -161,8 +161,11 @@ def get_infection_control_report(
 ):
     """The infection control report (indicators of a period, the view of a day,
     the admissions of a department or the courses of an admission), read by the
-    private backend from the files long-running-tasks builds"""
-    if not feature_service.has_feature(FeatureEnum.INFECTION_CONTROL):
+    private backend from the files long-running-tasks builds. A schema in the
+    lite mode (INFECTION_CONTROL_LITE alone) has no reviews: the private
+    backend leaves the review indicators out (scope lite)"""
+    mode = infection_control_mode_service.get_mode()
+    if mode is None:
         raise ValidationError(
             "Controle de infecção não habilitado",
             "errors.invalidParams",
@@ -192,6 +195,7 @@ def get_infection_control_report(
         "day": request_data.day.isoformat() if request_data.day else None,
         "admissions_of": request_data.admissions_of,
         "courses_of": request_data.courses_of,
+        "scope": mode.value,
     }
 
     return _invoke_report_lambda(payload=payload, report_name="infection-control")

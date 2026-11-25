@@ -10,6 +10,11 @@ The rule itself lives only in this repository.
 Either run dequeues the admission it applied the rule to, unless prescalc
 queued it again meanwhile: that change may have come after the rule read the
 prescriptions, so it stays for the next run.
+
+The schema's mode decides which rule runs (infection_control_mode_service):
+the full rule with INFECTION_CONTROL, the lite one (only the report's DOT/LOT,
+run by the nightly lite run of backend-private) with INFECTION_CONTROL_LITE
+alone. A schema with neither is skipped.
 """
 
 from datetime import datetime
@@ -17,9 +22,14 @@ from datetime import datetime
 from sqlalchemy.exc import OperationalError
 
 from decorators.has_permission_decorator import Permission, has_permission
-from models.enums import AdmissionQueueEnum, InfectionControlOriginEnum
+from models.enums import (
+    AdmissionQueueEnum,
+    InfectionControlModeEnum,
+    InfectionControlOriginEnum,
+)
 from models.main import User, db
 from repository import admission_queue_repository
+from services.infection_control import infection_control_mode_service
 from services.infection_control import infection_control_status_service as rule
 from utils import db_utils
 
@@ -37,10 +47,14 @@ def sync_followed_admission(
     user_context: User,
     lock_timeout_ms: int = JOB_LOCK_TIMEOUT_MS,
 ) -> str:
-    """Apply the rule to one followed admission, returning "processed",
-    "changed" or "skipped" (not followed, or held by a writer: the next run
-    tries again), and dequeue it"""
+    """Apply the rule of the schema's mode to one followed admission, returning
+    "processed", "changed" or "skipped" (not followed, held by a writer: the
+    next run tries again, or a schema with neither mode), and dequeue it"""
     db_utils.set_schema(schema)
+
+    mode = infection_control_mode_service.get_mode()
+    if mode is None:
+        return "skipped"
 
     now = datetime.now()
     # read before the rule reads the prescriptions: queued again after this,
@@ -57,6 +71,7 @@ def sync_followed_admission(
             user_id=JOB_USER_ID,
             now=now,
             lock_timeout_ms=lock_timeout_ms,
+            lite=mode == InfectionControlModeEnum.LITE,
         )
     except OperationalError as e:
         if getattr(e.orig, "pgcode", None) != LOCK_NOT_AVAILABLE:
