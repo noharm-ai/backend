@@ -427,14 +427,15 @@ def _config_rules(
         rules.append(
             {
                 "rule": "config_interval_intersection",
-                "passed": _has_interval_intersection(
-                    interval1=drug_from["interval"], interval2=drug_to["interval"]
+                "passed": _shares_administration_time(
+                    drug_from=drug_from, drug_to=drug_to
                 ),
                 "message": "Configuração da instituição: alertas de "
                 f"{examutils.typeRelations.get(kind, kind)} só são exibidos quando "
-                "os itens têm horário de administração em comum "
-                f"({drug_from['drug']}: {drug_from['interval'] or '--'}; "
-                f"{drug_to['drug']}: {drug_to['interval'] or '--'}).",
+                "os itens têm horário de administração em comum; um item contínuo "
+                "(CONT) coincide com todos os horários "
+                f"({drug_from['drug']}: {_interval_label(drug_from)}; "
+                f"{drug_to['drug']}: {_interval_label(drug_to)}).",
             }
         )
 
@@ -515,13 +516,16 @@ def build_alert(kind: str, relation: dict, drug_from: dict, drug_to: dict) -> di
                     """
 
         if kind == "iy":
-            if _has_interval_intersection(
-                interval1=drug_from["interval"],
-                interval2=drug_to["interval"],
-            ):
+            if _shares_administration_time(drug_from=drug_from, drug_to=drug_to):
                 level_notes.append(
-                    "Os itens têm horários de administração coincidentes: nível "
-                    f"definido como '{DrugAlertLevelEnum.MEDIUM.value}'."
+                    (
+                        "Um dos itens é contínuo (CONT), coincide com todos os "
+                        "horários"
+                        if _is_continuous(drug_from) or _is_continuous(drug_to)
+                        else "Os itens têm horários de administração coincidentes"
+                    )
+                    + ": nível definido como "
+                    f"'{DrugAlertLevelEnum.MEDIUM.value}'."
                 )
                 alert_level = DrugAlertLevelEnum.MEDIUM.value
     else:
@@ -554,6 +558,32 @@ def _reduce_alert_level(alert_level: str) -> str:
         return DrugAlertLevelEnum.MEDIUM.value
 
     return DrugAlertLevelEnum.LOW.value
+
+
+def _is_continuous(drug: dict) -> bool:
+    """A continuous item (frequency CONT, 55) is given at every hour"""
+    return drug.get("frequency") == FrequencyEnum.CONT.value
+
+
+def _interval_label(drug: dict) -> str:
+    """The item's administration times as shown in the rule messages"""
+    interval = drug["interval"] or "--"
+    if _is_continuous(drug):
+        return f"{interval} (contínuo)"
+
+    return interval
+
+
+def _shares_administration_time(drug_from: dict, drug_to: dict) -> bool:
+    """Two prescribed items share an administration time: a continuous item
+    (CONT) shares every hour, whatever the other item's times; otherwise their
+    intervals must have a time in common"""
+    if _is_continuous(drug_from) or _is_continuous(drug_to):
+        return True
+
+    return _has_interval_intersection(
+        interval1=drug_from["interval"], interval2=drug_to["interval"]
+    )
 
 
 def _has_interval_intersection(interval1: str, interval2: str) -> bool:

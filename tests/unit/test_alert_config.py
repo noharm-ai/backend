@@ -11,6 +11,7 @@ from tests.utils import utils_test_prescription
 
 SN = FrequencyEnum.SN.value
 ACM = FrequencyEnum.ACM.value
+CONT = FrequencyEnum.CONT.value
 
 
 # --- rules -----------------------------------------------------------------
@@ -115,6 +116,34 @@ def test_interval_intersection_rule(interval_from, interval_to, passed):
     )
 
     assert rules["config_interval_intersection"] is passed
+
+
+@pytest.mark.parametrize(
+    "freq_from,interval_from,freq_to,interval_to",
+    [
+        (CONT, "08:00", 2, "14:00 20:00"),
+        (2, "14:00", CONT, "08:00"),
+        (CONT, None, 2, "14:00"),
+        (2, "14:00", float(CONT), None),
+        (CONT, None, CONT, None),
+    ],
+)
+def test_interval_intersection_rule_continuous_matches_every_hour(
+    freq_from, interval_from, freq_to, interval_to
+):
+    """Item contínuo (CONT) coincide com todos os horários, com ou sem horário"""
+    rules = evaluate_kind_rules(
+        kind="iy",
+        drug_from=_relation_item(frequency=freq_from, interval=interval_from),
+        drug_to=_relation_item(
+            id="2", drug="Drug B", frequency=freq_to, interval=interval_to
+        ),
+        alert_config=_config(iy={"requireIntervalIntersection": True}),
+    )
+    rule = next(r for r in rules if r["rule"] == "config_interval_intersection")
+
+    assert rule["passed"] is True
+    assert "(contínuo)" in rule["message"]
 
 
 @pytest.mark.parametrize("kind", ["it", "dt", "dm", "iy", "sl"])
@@ -266,6 +295,32 @@ def test_find_relations_iy_requires_interval_intersection(iy_relation):
     assert no_intersection["stats"]["iy"] == 0
     assert intersection["stats"]["iy"] == 1
     assert intersection["alerts"]["1"][0]["level"] == "medium"
+
+
+def test_find_relations_iy_continuous_matches_every_hour(iy_relation):
+    """iy com item contínuo (CONT) e horários distintos continua, nível medium"""
+    config = _config(iy={"requireIntervalIntersection": True})
+
+    results = find_relations(
+        _iy_drug_list(frequency_b=CONT, interval_a="08:00", interval_b="14:00"),
+        id_patient=1,
+        is_cpoe=False,
+        alert_config=config,
+    )
+
+    assert results["stats"]["iy"] == 1
+    assert results["alerts"]["1"][0]["level"] == "medium"
+
+
+def test_find_relations_iy_continuous_raises_level_without_config(iy_relation):
+    """Sem config, o item contínuo também eleva o iy para medium"""
+    results = find_relations(
+        _iy_drug_list(frequency_b=CONT, interval_a="08:00", interval_b=None),
+        id_patient=1,
+        is_cpoe=False,
+    )
+
+    assert results["alerts"]["1"][0]["level"] == "medium"
 
 
 # --- alert_service types ---------------------------------------------------
