@@ -216,7 +216,7 @@ def test_frequency_rule_message_names_the_frequency():
 # --- find_relations --------------------------------------------------------
 
 
-def _mock_relations(kind: str):
+def _mock_relations(kind: str, level: str = "low"):
     def mock(*args, **kwargs):
         return {
             f"211111-111111-{kind}": {
@@ -224,7 +224,7 @@ def _mock_relations(kind: str):
                 "sctidb": "111111",
                 "kind": kind,
                 "text": "Drug A interacts with Drug B",
-                "level": "low",
+                "level": level,
             }
         }
 
@@ -321,6 +321,33 @@ def test_find_relations_iy_continuous_raises_level_without_config(iy_relation):
     )
 
     assert results["alerts"]["1"][0]["level"] == "medium"
+
+
+@pytest.mark.parametrize(
+    "frequency_b,interval_a,interval_b",
+    [(CONT, "08:00", None), (2, "08:00 20:00", "20:00")],
+)
+def test_find_relations_iy_shared_time_never_lowers_level(
+    monkeypatch, frequency_b, interval_a, interval_b
+):
+    """Horário em comum (ou item CONT) só eleva iy low: high continua high"""
+    monkeypatch.setattr(
+        "services.alert_interaction_service._get_allergies", lambda **kw: []
+    )
+    monkeypatch.setattr(
+        "services.alert_interaction_service._get_active_relations",
+        _mock_relations(kind="iy", level="high"),
+    )
+
+    results = find_relations(
+        _iy_drug_list(
+            frequency_b=frequency_b, interval_a=interval_a, interval_b=interval_b
+        ),
+        id_patient=1,
+        is_cpoe=False,
+    )
+
+    assert results["alerts"]["1"][0]["level"] == "high"
 
 
 # --- alert_service types ---------------------------------------------------

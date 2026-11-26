@@ -20,7 +20,7 @@
 - Service: `services/alert_interaction_service.py`
 - Checks drug-drug interactions
 - Multiple severity levels
-- **Shared administration time** (`_shares_administration_time`): the items have a time in common in their intervals (`presmed.horario`), or either is continuous (frequency CONT, 55), which shares every hour whatever the other's times (even none). Used by the schema param `requireIntervalIntersection` and by the iy (Y-site) level, raised to medium when the items share a time
+- **Shared administration time** (`_shares_administration_time`): the items have a time in common in their intervals (`presmed.horario`), or either is continuous (frequency CONT, 55), which shares every hour whatever the other's times (even none). Used by the schema param `requireIntervalIntersection` and by the iy (Y-site) level: a `low` iy is raised to `medium` when the items share a time; a shared time never lowers a `medium` or `high` iy
 - Every pair of items is compared (the work grows with the square of the items), so the pairs are deduplicated in a dict and the pairs without a relation are skipped with one lookup. The relations of the substance pairs are read in one statement that is the same for every prescription: the pairs go as two array parameters (`_get_active_relations`), not written into the SQL
 
 ## Allergy Alert

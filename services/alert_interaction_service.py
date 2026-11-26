@@ -515,19 +515,22 @@ def build_alert(kind: str, relation: dict, drug_from: dict, drug_to: dict) -> di
                         - {drug_to["drug"]} (Horários: {prescriptionutils.timeValue(drug_to["interval"]) if drug_to["interval"] else "--"})
                     """
 
-        if kind == "iy":
-            if _shares_administration_time(drug_from=drug_from, drug_to=drug_to):
-                level_notes.append(
-                    (
-                        "Um dos itens é contínuo (CONT), coincide com todos os "
-                        "horários"
-                        if _is_continuous(drug_from) or _is_continuous(drug_to)
-                        else "Os itens têm horários de administração coincidentes"
-                    )
-                    + ": nível definido como "
-                    f"'{DrugAlertLevelEnum.MEDIUM.value}'."
-                )
-                alert_level = DrugAlertLevelEnum.MEDIUM.value
+        # a shared administration time only raises a low iy, never lowers it
+        if (
+            kind == "iy"
+            and alert_level == DrugAlertLevelEnum.LOW.value
+            and _shares_administration_time(drug_from=drug_from, drug_to=drug_to)
+        ):
+            reason = (
+                "Um dos itens é contínuo (CONT), coincide com todos os horários"
+                if _is_continuous(drug_from) or _is_continuous(drug_to)
+                else "Os itens têm horários de administração coincidentes"
+            )
+            level_notes.append(
+                f"{reason}: nível elevado de '{alert_level}' para "
+                f"'{DrugAlertLevelEnum.MEDIUM.value}'."
+            )
+            alert_level = DrugAlertLevelEnum.MEDIUM.value
     else:
         alert_text += (
             " ("
