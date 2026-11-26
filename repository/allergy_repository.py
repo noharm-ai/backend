@@ -16,7 +16,9 @@ def get_allergy_records(id_patient: int):
     is outer joined: the record can still match a prescribed drug by sctid.
     name is what the screen lists: the substance (the record's sctid when it
     has one, as the alert resolves it) or the drug name as recorded. drugId
-    (the medicamento found, if any), drugName and substance tell which"""
+    (the medicamento found, if any), drugName and substance tell which.
+    substanceTags are the tags of that substance (a no_allergy_alert one is
+    left out of the cross reactivity)"""
 
     return (
         db.session.query(
@@ -29,6 +31,7 @@ def get_allergy_records(id_patient: int):
             Drug.id.label("drugId"),
             Allergy.drugName,
             Substance.name.label("substance"),
+            Substance.tags.label("substanceTags"),
         )
         .outerjoin(Drug, Allergy.idDrug == Drug.id)
         .outerjoin(Substance, Substance.id == func.coalesce(Allergy.sctid, Drug.sctid))

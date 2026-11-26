@@ -13,6 +13,7 @@ from models.enums import (
     DrugAlertTypeEnum,
     DrugTypeEnum,
     FrequencyEnum,
+    SubstanceTagEnum,
 )
 from models.main import Drug, DrugAttributes, Substance
 from models.prescription import PrescriptionDrug
@@ -161,7 +162,10 @@ def find_alerts(
         # allergy
         add_alert(
             _alert_allergy(
-                prescription_drug=prescription_drug, drug=drug, allergies=allergies
+                prescription_drug=prescription_drug,
+                drug=drug,
+                allergies=allergies,
+                substance=substance,
             ),
             handling_types=handling_types,
         )
@@ -683,10 +687,23 @@ def _alert_lactating(
     return None
 
 
+def is_allergy_alert_disabled(substance_tags: Union[list, None]) -> bool:
+    """Whether the substance is tagged to never raise allergy alerts
+    (SubstanceTagEnum.NO_ALLERGY_ALERT): neither the allergy alert of the item,
+    whatever its flag and records say, nor the cross reactivity, as the
+    prescribed item or as the patient's allergy. Substance tags are global, so
+    it holds for every client"""
+
+    return bool(
+        substance_tags and SubstanceTagEnum.NO_ALLERGY_ALERT.value in substance_tags
+    )
+
+
 def is_allergic(
     prescription_drug: PrescriptionDrug,
     drug: Union[Drug, None],
     allergies: Union[list, None],
+    substance: Union[Substance, None] = None,
 ) -> bool:
     """Whether the patient is allergic to the prescribed item.
 
@@ -701,7 +718,14 @@ def is_allergic(
     its substance is the item's: the record's sctid when it has one (trusted:
     resolved by a separate job, since fkmedicamento does not always reference a
     medicamento record), otherwise the substance of its fkmedicamento.
-    allergies is None when the records were not fetched: the flag stands"""
+    allergies is None when the records were not fetched: the flag stands.
+
+    A substance tagged no_allergy_alert (is_allergy_alert_disabled) is never
+    allergic, even with an active record: substance is the item's (the drug's
+    sctid), None when the drug has none"""
+
+    if substance is not None and is_allergy_alert_disabled(substance.tags):
+        return False
 
     status = get_allergy_record_status(
         prescription_drug=prescription_drug, drug=drug, allergies=allergies
@@ -757,6 +781,7 @@ def _alert_allergy(
     prescription_drug: PrescriptionDrug,
     drug: Union[Drug, None] = None,
     allergies: Union[list, None] = None,
+    substance: Union[Substance, None] = None,
 ):
     alert = _create_alert(
         id_prescription_drug=str(prescription_drug.id),
@@ -766,7 +791,12 @@ def _alert_allergy(
         text="",
     )
 
-    if is_allergic(prescription_drug=prescription_drug, drug=drug, allergies=allergies):
+    if is_allergic(
+        prescription_drug=prescription_drug,
+        drug=drug,
+        allergies=allergies,
+        substance=substance,
+    ):
         alert["text"] = "Paciente alérgico a este medicamento."
 
         return alert
