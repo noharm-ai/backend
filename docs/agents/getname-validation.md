@@ -1,0 +1,23 @@
+# Getname Validation (`/public/getname-validation/<token>`)
+
+A schema's getname usually lives in the hospital's network: only a browser inside it can tell whether the names will show up. The admin project generates a link, someone at the hospital opens it (public page `/validar-getname/<token>` of the frontend, **no login** — the schema may not have a user yet), the page tests the getname from that browser and posts the receipt here. `getname_validation_service` answers the page; it is deliberately undecorated (no `@has_permission`, no `@api_endpoint`): the token in the path is the credential.
+
+## Contract with admin (⚠ change together with `noharm-ai/admin`)
+
+Both sides meet in `public.schema_config_audit`, `tp_audit = 12` (`SchemaConfigAuditTypeEnum.GETNAME_VALIDATION`). No table of its own, no secret shared between the two backends.
+
+- **Link row**, written by admin (Integration Config → Getname → "Gerar link de validação"): `extra = {"action": "create_validation_link", "token_hash": <sha256 hex of the secret>, "expires_at": <ISO 8601 UTC>}`, `created_by` = the admin user
+- **Token** = `<id of the link row>-<secret>` (48 hex chars). Only the hash is stored; the id finds the row by primary key and the secret is compared in constant time. No dot in it: a static host takes a path with a dot for a file
+- **Result row**, written here on every run, read by admin ("Últimas validações"): `extra = {"action": "validation_result", "link_id", "status": passed|failed|not_applicable, "diagnosis", "getname_type", "base_url", "checks": [{"id", "status", "code", "http_status", "duration_ms", "detail"}], "environment", "ticket_id", "ticket_ref"}`, `created_by` = the link's (the run is anonymous and the column is not nullable)
+- The frontend path `/validar-getname/:token` is in the links admin hands out
+
+## Rules
+
+- **A link dies** when it expires (7 days, set by admin) or after `MAX_RUNS` (30) saved runs. Expired and spent are told apart (`reason`) only to who holds the right secret; anything else is `valid: false` with HTTP 200, one shape for junk and for a wrong secret
+- **What the page receives** (`_test_plan`) is what the logged-in app receives at login (`auth_service`): the getname type and the urls of the schema's `memoria` `getnameurl`. Never the custom `headers` of that memory nor the getname `secret`: they are credentials and the page is anonymous
+- **`mode`**: `browser` (types `default`/`auth`: the app calls the getname from the browser, so the page tests it), `backend` (`proxy`/`getname-proxy` or the memory's `proxy` flag: the names come through this backend, nothing for a browser to reach), `unconfigured` (no http(s) url, or the `http://localhost/` placeholder of `auth_service`)
+- **Getname token** (`POST .../auth-token`): only for type `auth`, the same token of `GET /names/auth-token` with 60s of life, for the page's lookup step. While a link is valid its holder can get one: the link is to be sent only to the hospital. The lookup asks for a patient id that does not exist and the page reads only the status code — don't add a step that brings a name to a page without login
+- **Schema of the memory**: the schema is known only after the link (a public table) was read, and a session's schema is set before its first query, so `_test_plan` translates that one query (`execution_options(schema_translate_map=...)`). Don't call `dbSession.setSchema` there
+- **Receipt**: everything in the result comes from an anonymous browser. The request model takes closed vocabularies and bounded strings, the verdict is recomputed (a run with a failed check is never `passed`) and the ticket HTML escapes every value
+- **Ticket** (ODOO helpdesk, type "Validação", requested by who generated the link): **one per link**. The first run opens it; the next ones add the receipt as a note and the title follows the latest result. The link row is locked (`FOR UPDATE`) while a run is saved, so two runs never open two tickets. The helpdesk failing never loses the run: it is saved without a ticket and the next run opens it
+- Tests: `tests/integration/test_getname_validation.py` (the helpdesk is patched in every test that saves a result); the page: `tests/mocked/getnameValidation/` in the frontend

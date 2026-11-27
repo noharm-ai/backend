@@ -372,7 +372,7 @@ class SchemaConfigAuditTypeEnum(Enum):
     GETNAME_DNS = 3
     SECURITY_GROUP = 4
     USER_SECURITY_GROUP = 5
-    # 6-10 are written by the admin project (same table): keep in step with its
+    # 6-11 are written by the admin project (same table): keep in step with its
     # SchemaConfigAuditTypeEnum so a code is never reused for something else
     CENTRAL_SECRETS = 6
     CENTRAL_VPN = 7
@@ -381,6 +381,13 @@ class SchemaConfigAuditTypeEnum(Enum):
     # the schema params (memoria `schema-params`; noharm-store until the move,
     # hence the name) of the schema (extra.section names the section changed)
     STORE_SCHEMA_PARAMS = 10
+    # written by the admin project (Gerar Scores): a segment's items linked to
+    # its new scores
+    SCORE_LINK = 11
+    # the getname validation link (the admin writes the link row) and the runs
+    # of the public validation page (written here: getname_validation_service);
+    # see docs/agents/getname-validation.md
+    GETNAME_VALIDATION = 12
 
 
 class InterventionAuditEnum(Enum):

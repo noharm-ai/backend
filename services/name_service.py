@@ -742,10 +742,14 @@ def update_patient_name(
 
 def generate_internal_token(user: User) -> str:
     """Generate internal JWT token for authentication"""
+    return generate_schema_token(schema=user.schema)
+
+
+def generate_schema_token(schema: str, seconds: int = 120) -> str:
+    """Short-lived JWT accepted by the getname of a schema (type "auth"),
+    signed with the secret of the schema's getname config"""
     schema_config = (
-        db.session.query(SchemaConfig)
-        .filter(SchemaConfig.schemaName == user.schema)
-        .first()
+        db.session.query(SchemaConfig).filter(SchemaConfig.schemaName == schema).first()
     )
 
     if not schema_config or not schema_config.config:
@@ -767,7 +771,7 @@ def generate_internal_token(user: User) -> str:
 
     token = encode(
         payload={
-            "exp": datetime.now(tz=timezone.utc) + timedelta(minutes=2),
+            "exp": datetime.now(tz=timezone.utc) + timedelta(seconds=seconds),
             "iss": "noharm",
         },
         key=key,

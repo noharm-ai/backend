@@ -23,6 +23,7 @@ from routes.knowledge_base import app_knowledge_base
 from routes.news import app_news
 from routes.lists import app_lists
 from routes.memory import app_mem
+from routes.getname_validation import app_getname_validation
 from routes.names import app_names
 from routes.navigation import app_navigation
 from routes.notes import app_note
@@ -84,6 +85,7 @@ def register_blueprints(app):
     app.register_blueprint(app_note)
     app.register_blueprint(app_drugs)
     app.register_blueprint(app_names)
+    app.register_blueprint(app_getname_validation)
     app.register_blueprint(app_summary)
     app.register_blueprint(app_support)
     app.register_blueprint(app_conciliation)
