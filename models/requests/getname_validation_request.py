@@ -1,8 +1,8 @@
 """Request models: getname validation page (public, see docs/agents/getname-validation.md)"""
 
-from typing import Literal, Optional
+from typing import Annotated, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 
 # everything here is typed by an anonymous browser: closed vocabularies where
 # there is one, short bounded strings where there is not
@@ -36,7 +36,12 @@ class GetnameValidationEnvironment(BaseModel):
         Literal["private", "loopback", "public", "hostname"]
     ] = None
     # state of the browser's local network permissions, by permission name
-    permissions: Optional[dict[str, str]] = Field(default=None, max_length=6)
+    permissions: Optional[
+        dict[
+            Annotated[str, StringConstraints(pattern=r"^[a-z-]{1,40}$")],
+            Literal["granted", "denied", "prompt"],
+        ]
+    ] = Field(default=None, max_length=6)
     getnameVersion: Optional[str] = Field(default=None, max_length=40)
     language: Optional[str] = Field(default=None, max_length=20)
 

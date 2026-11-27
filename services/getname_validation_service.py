@@ -16,6 +16,7 @@ below.
 import hashlib
 import hmac
 import ipaddress
+import time
 from datetime import datetime, timezone
 from urllib.parse import urlsplit
 
@@ -38,6 +39,10 @@ from utils import logger, status
 MAX_RUNS = 30
 # Life of the getname token handed to the page: one lookup, made right away.
 AUTH_TOKEN_SECONDS = 60
+# The helpdesk is called while the page waits, behind a gateway that gives up
+# at ~29s, and each call may take the client's own 15s timeout: past this many
+# seconds no new call is started, and the run is saved without the ticket.
+TICKET_BUDGET_SECONDS = 10
 # What the app receives before the getname of a schema is configured (the
 # default of auth_service is http://localhost/{idPatient}): localhost, no port.
 _PLACEHOLDER_HOST = "localhost"
@@ -81,6 +86,7 @@ _DIAGNOSIS_LABELS = {
     "not_configured": "URL do getname não configurada",
     "mixed_content": "Getname em http: o navegador bloqueia a chamada a partir de uma página https",
     "local_network_denied": "O navegador não permite que a NoHarm acesse a rede local",
+    "permission_pending": "Sem resposta enquanto o navegador aguardava a permissão de rede local",
     "unreachable_timeout": "Sem resposta do getname: a rede deste computador não chega até ele",
     "unreachable": "Getname inacessível (DNS, conexão recusada ou certificado inválido)",
     "certificate": "O navegador não aceita o certificado https do getname",
@@ -141,7 +147,13 @@ def _parse_token(token: str) -> tuple[int, str] | None:
     """Split a link token (``<id of the link row>-<secret>``)"""
     id_link, separator, secret = (token or "").partition("-")
 
-    if not separator or not id_link.isdigit() or len(id_link) > 18 or not secret:
+    # ascii decimal only: isdigit() also takes characters int() refuses ("²")
+    if (
+        not separator
+        or not (id_link.isascii() and id_link.isdecimal())
+        or len(id_link) > 18
+        or not secret
+    ):
         return None
 
     return int(id_link), secret
@@ -256,6 +268,9 @@ def _test_plan(schema: str) -> dict:
         "baseUrl": None,
         "nameUrl": None,
         "lookup": "skip",
+        # the app authenticates with headers of the memory (never handed out):
+        # the page cannot judge the getname's authentication by the type alone
+        "customHeaders": bool(name_memory.get("headers")),
     }
 
     # the names come through the NoHarm backend: nothing for a browser to reach
@@ -452,9 +467,55 @@ def _receipt_html(
     )
 
 
-def _ticket_title(schema: str, result_status: str) -> str:
+def _ticket_marker(link: SchemaConfigAudit) -> str:
+    """What ties a ticket to its link in the helpdesk itself, so the ticket is
+    found again even when no result row recorded it"""
+    return f"(link {link.id})"
+
+
+def _ticket_title(link: SchemaConfigAudit, result_status: str) -> str:
     """Title of the ticket of a link; follows the latest run"""
-    return f"[Validação] Getname {schema}: {_STATUS_LABELS.get(result_status, result_status)}"
+    return (
+        f"[Validação] Getname {link.schemaName} {_ticket_marker(link)}: "
+        f"{_STATUS_LABELS.get(result_status, result_status)}"
+    )
+
+
+def _within_budget(client, seconds: float):
+    """The helpdesk client, refusing to start a call once the time is spent"""
+    deadline = time.monotonic() + seconds
+
+    def execute(**kwargs):
+        """One helpdesk call, if there is still time for it"""
+        if time.monotonic() > deadline:
+            raise TimeoutError("helpdesk time budget spent")
+        return client(**kwargs)
+
+    return execute
+
+
+def _find_ticket(client, link: SchemaConfigAudit) -> dict | None:
+    """A ticket this link already opened that no result row knows about: the
+    request that opened it died before saving (a slow helpdesk, a timeout).
+    Without this the next run would open a second one."""
+    found = client(
+        model="helpdesk.ticket",
+        action="search_read",
+        payload=[
+            [
+                ["x_studio_schema_1", "=", link.schemaName],
+                ["name", "like", _ticket_marker(link)],
+            ]
+        ],
+        options={"fields": ["id", "ticket_ref"], "limit": 1},
+    )
+    if not found:
+        return None
+
+    return {
+        "ticket_id": found[0]["id"],
+        "ticket_ref": str(found[0].get("ticket_ref") or found[0]["id"]),
+    }
 
 
 def _open_ticket(client, link: SchemaConfigAudit, title: str, receipt: str) -> dict:
@@ -491,12 +552,17 @@ def _open_ticket(client, link: SchemaConfigAudit, title: str, receipt: str) -> d
         return {}
 
     id_ticket = created[0]["id"]
-    saved = client(
-        model="helpdesk.ticket",
-        action="search_read",
-        payload=[[["id", "=", id_ticket]]],
-        options={"fields": ["id", "ticket_ref"], "limit": 1},
-    )
+    # the ticket exists from here on: failing to read its reference must not
+    # leave it unrecorded
+    try:
+        saved = client(
+            model="helpdesk.ticket",
+            action="search_read",
+            payload=[[["id", "=", id_ticket]]],
+            options={"fields": ["id", "ticket_ref"], "limit": 1},
+        )
+    except Exception:  # pylint: disable=broad-exception-caught
+        saved = None
 
     return {
         "ticket_id": id_ticket,
@@ -534,7 +600,8 @@ def _register_ticket(
 ) -> dict:
     """One ticket per link: the first run opens it, the others add a note. The
     helpdesk failing never loses the run - it is saved without a ticket and the
-    next run tries to open one again."""
+    next run tries again, first looking in the helpdesk for a ticket of this
+    link that was opened and never recorded."""
     ticket = next(
         (
             {
@@ -552,6 +619,9 @@ def _register_ticket(
         if client is None:
             return ticket or {}
 
+        client = _within_budget(client, seconds=TICKET_BUDGET_SECONDS)
+        if ticket is None:
+            ticket = _find_ticket(client=client, link=link)
         if ticket is None:
             return _open_ticket(client=client, link=link, title=title, receipt=receipt)
 
@@ -605,7 +675,7 @@ def save_result(
     ticket = _register_ticket(
         link=link,
         previous=previous,
-        title=_ticket_title(schema=link.schemaName, result_status=result_status),
+        title=_ticket_title(link=link, result_status=result_status),
         receipt=_receipt_html(
             schema=link.schemaName,
             plan=plan,

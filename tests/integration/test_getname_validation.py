@@ -155,16 +155,26 @@ def _results() -> list[dict]:
     ]
 
 
-def _odoo(ticket_id: int = 4321, ticket_ref: str = "T4321"):
-    """A helpdesk that accepts everything, and the client to assert on"""
+def _is_search_by_link(payload) -> bool:
+    """Whether a helpdesk search is the one that looks for the ticket of a link
+    (by the marker in its title), not the one that reads a ticket by id"""
+    return any(condition[0] == "name" for condition in payload[0])
+
+
+def _odoo(ticket_id: int = 4321, ticket_ref: str = "T4321", existing: bool = False):
+    """A helpdesk that accepts everything, and the client to assert on.
+    ``existing``: it already holds a ticket of the link that no row recorded."""
     client = MagicMock()
 
     def execute(model, action, payload, options):  # noqa: ARG001
+        """Answer one helpdesk call"""
         if model == "res.partner":
             return []
         if model == "helpdesk.ticket" and action == "web_save":
             return [{"id": ticket_id}]
         if model == "helpdesk.ticket" and action == "search_read":
+            if _is_search_by_link(payload) and not existing:
+                return []
             return [{"id": ticket_id, "ticket_ref": ticket_ref}]
         return True
 
@@ -218,6 +228,7 @@ def test_link_needs_no_authentication(client, getname_setup):
     assert data["baseUrl"] == "https://getname.example.org/"
     assert data["nameUrl"] == NAME_URL
     assert data["lookup"] == "open"
+    assert data["customHeaders"] is False
     assert data["runs"] == 0
     assert data["maxRuns"] == getname_validation_service.MAX_RUNS
 
@@ -231,6 +242,9 @@ def test_link_needs_no_authentication(client, getname_setup):
         "-" + LINK_SECRET,
         "999999999-" + LINK_SECRET,
         "99999999999999999999999-" + LINK_SECRET,
+        # digits for isdigit() that int() refuses, and ones it accepts
+        "²-" + LINK_SECRET,
+        "٣-" + LINK_SECRET,
     ],
 )
 def test_unknown_or_malformed_token_is_not_valid(client, getname_setup, token):
@@ -360,6 +374,9 @@ def test_custom_headers_are_never_handed_out(client, getname_setup):
     response = client.get(f"/public/getname-validation/{token}")
 
     assert response.get_json()["data"]["lookup"] == "skip"
+    # the page is told they exist (it cannot judge the authentication without
+    # them), never what they are
+    assert response.get_json()["data"]["customHeaders"] is True
     assert "zztest-header" not in response.get_data(as_text=True)
 
 
@@ -460,7 +477,10 @@ def test_first_run_opens_the_ticket(client, getname_setup):
 
     [created] = _calls(odoo, "helpdesk.ticket", "web_save")
     ticket = created.kwargs["payload"][1]
-    assert ticket["name"] == "[Validação] Getname demo: Passou"
+    # the link's marker in the title is how the ticket is found again
+    assert ticket["name"] == (
+        f"[Validação] Getname demo (link {token.split('-')[0]}): Passou"
+    )
     assert ticket["x_studio_schema_1"] == "demo"
     assert ticket["x_studio_tipo_chamado"] == 5
     assert ticket["partner_email"] == "demo"
@@ -492,7 +512,7 @@ def test_next_runs_go_to_the_same_ticket(client, getname_setup):
     [renamed] = _calls(odoo, "helpdesk.ticket", "write")
     assert renamed.kwargs["payload"] == [
         [4321],
-        {"name": "[Validação] Getname demo: Falhou"},
+        {"name": f"[Validação] Getname demo (link {token.split('-')[0]}): Falhou"},
     ]
     assert [r["extra"]["ticket_id"] for r in _results()] == [4321, 4321]
 
@@ -678,6 +698,83 @@ def test_message_for_it_escapes_the_origin_the_page_sent(client, getname_setup):
     assert "&lt;b&gt;https://app.example.com" in description
 
 
+def test_ticket_opened_and_never_recorded_is_found_again(client, getname_setup):
+    """A request that died after opening the ticket (slow helpdesk, timeout)
+    saved no row: the next run looks for the link's ticket in the helpdesk
+    before opening one, so the link never gets a second ticket."""
+    token = _create_link()
+    odoo = _odoo(ticket_id=777, ticket_ref="T0777", existing=True)
+
+    response = _post_result(client, token, odoo=odoo)
+
+    assert response.get_json()["data"]["ticket"] == "T0777"
+    assert not _calls(odoo, "helpdesk.ticket", "web_save")
+    [searched] = [
+        call
+        for call in _calls(odoo, "helpdesk.ticket", "search_read")
+        if _is_search_by_link(call.kwargs["payload"])
+    ]
+    assert searched.kwargs["payload"][0] == [
+        ["x_studio_schema_1", "=", "demo"],
+        ["name", "like", f"(link {token.split('-')[0]})"],
+    ]
+    [note] = _calls(odoo, "mail.message", "create")
+    assert note.kwargs["payload"][0]["res_id"] == 777
+    assert _results()[0]["extra"]["ticket_id"] == 777
+
+    # once a row has it, the helpdesk is not searched again
+    odoo = _odoo(ticket_id=777, ticket_ref="T0777", existing=True)
+    _post_result(client, token, odoo=odoo)
+    assert not _calls(odoo, "helpdesk.ticket", "search_read")
+
+
+def test_ticket_is_recorded_even_if_its_reference_cannot_be_read(
+    client, getname_setup
+):
+    """The ticket exists once it was created: a failure right after must not
+    leave it unknown to the link."""
+    token = _create_link()
+    odoo = _odoo()
+    answer = odoo.side_effect
+
+    def execute(model, action, payload, options):
+        """The helpdesk, failing when a ticket is read by its id"""
+        if (
+            model == "helpdesk.ticket"
+            and action == "search_read"
+            and not _is_search_by_link(payload)
+        ):
+            raise ConnectionError("helpdesk down")
+        return answer(model=model, action=action, payload=payload, options=options)
+
+    odoo.side_effect = execute
+
+    response = _post_result(client, token, odoo=odoo)
+
+    assert response.get_json()["data"]["ticket"] == "4321"
+    assert _results()[0]["extra"]["ticket_id"] == 4321
+
+
+def test_helpdesk_is_not_called_past_its_time_budget(client, getname_setup):
+    """The page is waiting behind a gateway timeout: once the budget is spent
+    no helpdesk call is started and the run is saved without the ticket."""
+    token = _create_link()
+    odoo = _odoo()
+
+    with patch.object(getname_validation_service, "TICKET_BUDGET_SECONDS", -1):
+        response = _post_result(client, token, odoo=odoo)
+
+    assert response.status_code == 200
+    assert response.get_json()["data"] == {
+        "saved": True,
+        "status": "passed",
+        "ticket": None,
+        "runs": 1,
+        "maxRuns": getname_validation_service.MAX_RUNS,
+    }
+    assert not odoo.called
+
+
 def test_each_link_has_its_own_ticket(client, getname_setup):
     """Another link of the same schema does not reuse the ticket."""
     _post_result(client, _create_link(), odoo=_odoo())
@@ -762,6 +859,20 @@ def test_receipt_escapes_what_the_page_sent(client, getname_setup):
             "status": "passed",
             "checks": [{"id": "x", "status": "passed", "detail": "a" * 301}],
         },
+        # the permission map takes known states and short names only
+        {
+            "status": "passed",
+            "checks": [],
+            "environment": {"permissions": {"local-network": "a" * 5000}},
+        },
+        {
+            "status": "passed",
+            "checks": [],
+            "environment": {"permissions": {"a" * 5000: "granted"}},
+        },
+        # a body that is not an object
+        [1],
+        "text",
     ],
 )
 def test_invalid_result_is_refused(client, getname_setup, payload):

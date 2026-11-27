@@ -25,6 +25,7 @@ def _public_endpoint(f):
 
     @wraps(f)
     def decorated(*args, **kwargs):
+        """Answer with the endpoint's result, or with the error it raised"""
         try:
             result = f(*args, **kwargs)
         except ValidationError as e:
@@ -81,10 +82,13 @@ def get_auth_token(token: str):
 @_public_endpoint
 def save_result(token: str):
     """Save the receipt of a run and register it on the support ticket"""
+    body = request.get_json(silent=True)
+
     return getname_validation_service.save_result(
         token=token,
+        # anything that is not a JSON object is an empty one: invalid, not a crash
         request_data=GetnameValidationResultRequest(
-            **(request.get_json(silent=True) or {})
+            **(body if isinstance(body, dict) else {})
         ),
         # the address Zappa derives for the request (as the login audit uses),
         # not the leftmost X-Forwarded-For entry, which the caller writes
