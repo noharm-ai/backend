@@ -432,9 +432,13 @@ def _config_rules(
                 ),
                 "message": "Configuração da instituição: alertas de "
                 f"{examutils.typeRelations.get(kind, kind)} só são exibidos quando "
-                "os itens têm horário de administração em comum; um item contínuo "
-                "(CONT) coincide com todos os horários "
-                f"({drug_from['drug']}: {_interval_label(drug_from)}; "
+                "os itens têm horário de administração em comum"
+                + (
+                    "; um item contínuo (CONT) coincide com todos os horários"
+                    if _is_continuous(drug_from) or _is_continuous(drug_to)
+                    else ""
+                )
+                + f" ({drug_from['drug']}: {_interval_label(drug_from)}; "
                 f"{drug_to['drug']}: {_interval_label(drug_to)}).",
             }
         )
@@ -511,8 +515,8 @@ def build_alert(kind: str, relation: dict, drug_from: dict, drug_to: dict) -> di
     alert_text += stringutils.strNone(relation["text"])
 
     if kind in ["iy", "it"]:
-        alert_text += f"""- {drug_from["drug"]} (Horários: {prescriptionutils.timeValue(drug_from["interval"]) if drug_from["interval"] else "--"})
-                        - {drug_to["drug"]} (Horários: {prescriptionutils.timeValue(drug_to["interval"]) if drug_to["interval"] else "--"})
+        alert_text += f"""- {drug_from["drug"]} (Horários: {_alert_time_label(drug_from)})
+                        - {drug_to["drug"]} (Horários: {_alert_time_label(drug_to)})
                     """
 
         # a shared administration time only raises a low iy, never lowers it
@@ -575,6 +579,17 @@ def _interval_label(drug: dict) -> str:
         return f"{interval} (contínuo)"
 
     return interval
+
+
+def _alert_time_label(drug: dict) -> str:
+    """The item's administration times as shown in the iy/it alert text; a
+    continuous item says so, since it shares every hour"""
+    interval = drug["interval"]
+    label = prescriptionutils.timeValue(interval) if interval else "--"
+    if _is_continuous(drug):
+        return f"{label}, contínuo"
+
+    return label
 
 
 def _shares_administration_time(drug_from: dict, drug_to: dict) -> bool:

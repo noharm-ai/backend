@@ -146,6 +146,21 @@ def test_interval_intersection_rule_continuous_matches_every_hour(
     assert "(contínuo)" in rule["message"]
 
 
+def test_interval_intersection_message_names_cont_only_when_continuous():
+    """A frase do CONT só aparece quando um dos itens é contínuo"""
+    rules = evaluate_kind_rules(
+        kind="iy",
+        drug_from=_relation_item(interval="08:00"),
+        drug_to=_relation_item(id="2", drug="Drug B", interval="14:00"),
+        alert_config=_config(iy={"requireIntervalIntersection": True}),
+    )
+    rule = next(r for r in rules if r["rule"] == "config_interval_intersection")
+
+    assert rule["passed"] is False
+    assert "CONT" not in rule["message"]
+    assert "contínuo" not in rule["message"]
+
+
 @pytest.mark.parametrize("kind", ["it", "dt", "dm", "iy", "sl"])
 def test_interval_intersection_applies_to_every_drug_pair_kind(kind):
     """requireIntervalIntersection vale para todo tipo entre dois itens"""
@@ -310,6 +325,19 @@ def test_find_relations_iy_continuous_matches_every_hour(iy_relation):
 
     assert results["stats"]["iy"] == 1
     assert results["alerts"]["1"][0]["level"] == "medium"
+
+
+def test_find_relations_iy_text_marks_continuous_item(iy_relation):
+    """O texto do alerta iy mostra o item contínuo (o motivo do nível medium)"""
+    results = find_relations(
+        _iy_drug_list(frequency_b=CONT, interval_a="08:00", interval_b=None),
+        id_patient=1,
+        is_cpoe=False,
+    )
+    text = results["alerts"]["1"][0]["text"]
+
+    assert "Drug B (Horários: --, contínuo)" in text
+    assert "Drug A (Horários: 08:00)" in text
 
 
 def test_find_relations_iy_continuous_raises_level_without_config(iy_relation):
