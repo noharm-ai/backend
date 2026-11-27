@@ -369,9 +369,20 @@ def _it_message_html(plan: dict, extra: dict, client_ip: str | None) -> str:
         f"Site que faz as chamadas: {origin}",
         f"O que precisamos: {request}",
     ]
+    browser = " em ".join(
+        value
+        for value in (
+            extra["environment"].get("browser"),
+            extra["environment"].get("platform"),
+        )
+        if value
+    )
+    if browser or client_ip:
+        lines.append("")
+    if browser:
+        lines.append(f"Navegador usado no teste: {browser}.")
     if client_ip:
         lines += [
-            "",
             f"O teste saiu para a internet pelo IP público {client_ip} (o endereço "
             "interno do computador não é visível para a NoHarm).",
         ]
@@ -405,7 +416,9 @@ def _receipt_html(
         ("Versão do getname", environment.get("getnameVersion") or "-"),
         ("Origem da página", environment.get("pageOrigin") or "-"),
         ("IP público de quem testou", client_ip or "-"),
-        ("Navegador", environment.get("userAgent") or "-"),
+        ("Navegador", environment.get("browser") or "-"),
+        ("Sistema operacional", environment.get("platform") or "-"),
+        ("User agent", environment.get("userAgent") or "-"),
         ("Endereço do getname", environment.get("targetAddressSpace") or "-"),
         ("Permissões de rede local", permissions or "-"),
     ]

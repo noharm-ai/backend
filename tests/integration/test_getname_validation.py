@@ -39,6 +39,8 @@ PASSED_RESULT = {
     ],
     "environment": {
         "userAgent": "Mozilla/5.0 (test)",
+        "browser": "Google Chrome 142.0.7444.60",
+        "platform": "Windows 11",
         "pageOrigin": "https://app.example.com",
         "online": True,
         "targetAddressSpace": "hostname",
@@ -543,6 +545,38 @@ def test_ticket_carries_the_message_for_the_hospital_it(client, getname_setup):
     assert "Servidor do getname: getname.example.org, porta 443 (https)" in description
     assert "Site que faz as chamadas: https://app.example.com" in description
     assert "liberar o acesso da rede dos computadores" in description
+
+
+def test_ticket_names_the_browser_in_words(client, getname_setup):
+    """Name, version and system readable on the receipt and in the message for
+    IT (the version decides which browser protections apply); the raw user
+    agent stays next to them."""
+    token = _create_link()
+    odoo = _odoo()
+    payload = dict(
+        PASSED_RESULT,
+        status="failed",
+        diagnosis="local_network_denied",
+        checks=[
+            {"id": "reachability", "status": "failed", "code": "local_network_denied"}
+        ],
+    )
+
+    _post_result(client, token, payload=payload, odoo=odoo)
+
+    description = _calls(odoo, "helpdesk.ticket", "web_save")[0].kwargs["payload"][1][
+        "description"
+    ]
+    assert "Navegador</strong></td><td>Google Chrome 142.0.7444.60" in description
+    assert "Sistema operacional</strong></td><td>Windows 11" in description
+    assert "User agent</strong></td><td>Mozilla/5.0 (test)" in description
+    assert (
+        "Navegador usado no teste: Google Chrome 142.0.7444.60 em Windows 11."
+        in description
+    )
+    assert _results()[0]["extra"]["environment"]["browser"] == (
+        "Google Chrome 142.0.7444.60"
+    )
 
 
 def test_ticket_shows_where_the_test_came_from(client, getname_setup):

@@ -24,6 +24,10 @@ class GetnameValidationEnvironment(BaseModel):
     """Where the test ran: what tells a network problem from a browser one"""
 
     userAgent: Optional[str] = Field(default=None, max_length=400)
+    # the browser and the operating system in words ("Google Chrome 142.0.7444.60",
+    # "Windows 11"), as the page worked them out
+    browser: Optional[str] = Field(default=None, max_length=80)
+    platform: Optional[str] = Field(default=None, max_length=80)
     pageOrigin: Optional[str] = Field(default=None, max_length=200)
     online: Optional[bool] = None
     secureContext: Optional[bool] = None
