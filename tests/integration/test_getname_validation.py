@@ -515,6 +515,70 @@ def test_what_the_person_saw_names_the_cause_on_the_ticket(client, getname_setup
     assert _results()[0]["extra"]["checks"][0]["code"] == "saw_security_warning"
 
 
+def test_ticket_carries_the_message_for_the_hospital_it(client, getname_setup):
+    """The person who runs the test never contacts IT: when the cause is IT's
+    to fix, the ticket brings the message for the NoHarm staff to send."""
+    token = _create_link()
+    odoo = _odoo()
+    payload = dict(
+        PASSED_RESULT,
+        status="failed",
+        diagnosis="unreachable_timeout",
+        checks=[{"id": "reachability", "status": "failed", "code": "timeout"}],
+    )
+
+    _post_result(client, token, payload=payload, odoo=odoo)
+
+    description = _calls(odoo, "helpdesk.ticket", "web_save")[0].kwargs["payload"][1][
+        "description"
+    ]
+    assert "Mensagem sugerida para a TI do hospital" in description
+    assert "Servidor do getname: getname.example.org, porta 443 (https)" in description
+    assert "Site que faz as chamadas: https://app.example.com" in description
+    assert "liberar o acesso da rede dos computadores" in description
+
+
+def test_no_message_for_it_when_the_fix_is_not_theirs(client, getname_setup):
+    """A passed run, or a cause NoHarm fixes by itself, suggests no message."""
+    token = _create_link()
+    odoo = _odoo()
+    cors = dict(
+        PASSED_RESULT,
+        status="failed",
+        diagnosis="cors",
+        checks=[{"id": "reachability", "status": "failed", "code": "cors"}],
+    )
+
+    _post_result(client, token, odoo=odoo)
+    _post_result(client, token, payload=cors, odoo=odoo)
+
+    opened = _calls(odoo, "helpdesk.ticket", "web_save")[0].kwargs["payload"][1]
+    note = _calls(odoo, "mail.message", "create")[0].kwargs["payload"][0]
+    assert "Mensagem sugerida" not in opened["description"]
+    assert "Mensagem sugerida" not in note["body"]
+
+
+def test_message_for_it_escapes_the_origin_the_page_sent(client, getname_setup):
+    """The origin comes from an anonymous browser and lands in the helpdesk."""
+    token = _create_link()
+    odoo = _odoo()
+    payload = dict(
+        PASSED_RESULT,
+        status="failed",
+        diagnosis="dns",
+        checks=[{"id": "reachability", "status": "failed", "code": "unreachable"}],
+        environment={"pageOrigin": "<b>https://app.example.com</b>"},
+    )
+
+    _post_result(client, token, payload=payload, odoo=odoo)
+
+    description = _calls(odoo, "helpdesk.ticket", "web_save")[0].kwargs["payload"][1][
+        "description"
+    ]
+    assert "<b>https://app.example.com" not in description
+    assert "&lt;b&gt;https://app.example.com" in description
+
+
 def test_each_link_has_its_own_ticket(client, getname_setup):
     """Another link of the same schema does not reuse the ticket."""
     _post_result(client, _create_link(), odoo=_odoo())

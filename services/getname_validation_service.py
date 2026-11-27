@@ -97,6 +97,45 @@ _DIAGNOSIS_LABELS = {
 }
 
 
+# What to ask the hospital's IT for, by diagnosis: (problem, request). The
+# person running the test never contacts IT; the ticket carries the message for
+# the NoHarm staff to send. {origin} is the site the browser calls from.
+_IT_MESSAGES = {
+    "local_network_denied": (
+        "o navegador bloqueia o acesso de {origin} à rede local (Local Network Access).",
+        "liberar {origin} na política LocalNetworkAccessAllowedForUrls do Chrome/Edge "
+        "(LocalNetworkAllowedForUrls nas versões mais novas) nos computadores que usam a NoHarm.",
+    ),
+    "unreachable_timeout": (
+        "o computador não recebe resposta do servidor do getname (tempo esgotado).",
+        "liberar o acesso da rede dos computadores que usam a NoHarm ao servidor e à "
+        "porta abaixo (firewall / roteamento).",
+    ),
+    "connection_refused": (
+        "a conexão com o servidor do getname é recusada.",
+        "confirmar que nenhum firewall rejeita conexões da rede dos computadores que "
+        "usam a NoHarm para o servidor e a porta abaixo.",
+    ),
+    "dns": (
+        "o nome do servidor do getname não é resolvido (DNS).",
+        "fazer com que os computadores que usam a NoHarm resolvam o nome abaixo (DNS "
+        "interno ou liberação do DNS externo).",
+    ),
+    "blocked_by_browser": (
+        "o navegador bloqueia as chamadas de {origin} ao servidor do getname, embora o "
+        "servidor abra normalmente em uma aba.",
+        "verificar políticas do navegador, extensões ou antivírus que bloqueiem chamadas "
+        "de {origin} a endereços da rede interna.",
+    ),
+    "unhealthy_database": (
+        "o serviço de nomes da NoHarm (getname) não consegue conectar ao banco de dados "
+        "do hospital.",
+        "confirmar que o banco está no ar e que o usuário, a senha e a liberação de rede "
+        "usados pelo getname continuam válidos.",
+    ),
+}
+
+
 def _parse_token(token: str) -> tuple[int, str] | None:
     """Split a link token (``<id of the link row>-<secret>``)"""
     id_link, separator, secret = (token or "").partition("-")
@@ -297,6 +336,37 @@ def _check_extra(check: GetnameValidationCheck) -> dict:
     }
 
 
+def _it_message_html(plan: dict, extra: dict) -> str:
+    """The message the NoHarm staff can send to the hospital's IT, when the
+    diagnosis is something IT has to act on; empty otherwise. The person who
+    ran the test is not asked to contact anyone."""
+    message = _IT_MESSAGES.get(extra["diagnosis"])
+    if message is None or not plan["baseUrl"]:
+        return ""
+
+    server = urlsplit(plan["baseUrl"])
+    port = server.port or (443 if server.scheme == "https" else 80)
+    origin = extra["environment"].get("pageOrigin") or "o site da NoHarm"
+    problem, request = (text.format(origin=origin) for text in message)
+
+    lines = [
+        "Olá! Estamos validando o acesso ao serviço de nomes da NoHarm (getname) e o "
+        "teste feito em um computador do hospital falhou.",
+        "",
+        f"Problema: {problem}",
+        f"Servidor do getname: {server.hostname}, porta {port} ({server.scheme})",
+        f"Site que faz as chamadas: {origin}",
+        f"O que precisamos: {request}",
+    ]
+
+    return (
+        "<h4>Mensagem sugerida para a TI do hospital</h4>"
+        "<p>Quem executou o teste não foi orientado a procurar a TI: o contato é "
+        "nosso.</p>"
+        f"<blockquote>{'<br/>'.join(str(escape(line)) for line in lines)}</blockquote>"
+    )
+
+
 def _receipt_html(schema: str, plan: dict, extra: dict, run: int) -> str:
     """The receipt of a run, for the ticket. Every value typed by the page is
     escaped: the page is public and this is rendered by the helpdesk."""
@@ -345,6 +415,7 @@ def _receipt_html(schema: str, plan: dict, extra: dict, run: int) -> str:
         "<table><tr><th>Etapa</th><th>Resultado</th><th>Código</th>"
         "<th>HTTP</th><th>ms</th><th>Detalhe</th></tr>"
         f"{checks}</table>"
+        f"{_it_message_html(plan=plan, extra=extra)}"
     )
 
 
