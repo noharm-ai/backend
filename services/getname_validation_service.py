@@ -60,6 +60,18 @@ _CHECK_LABELS = {
     "database": "Banco de dados do hospital",
     "auth_config": "Autenticação configurada",
     "lookup": "Consulta de nome",
+    # what the person saw when the page asked them to open the getname in a tab
+    "manual": "O que apareceu ao abrir o getname em uma aba",
+}
+
+# The browser hides from the page why a connection failed and shows it in a
+# tab: after a run that could not connect, the page asks what showed up there.
+_OBSERVATION_LABELS = {
+    "saw_getname_page": "A página do getname abriu",
+    "saw_security_warning": "Aviso de segurança (certificado)",
+    "saw_refused": "Conexão recusada",
+    "saw_not_found": "Endereço não encontrado (DNS)",
+    "saw_timeout": "Não respondeu",
 }
 
 _DIAGNOSIS_LABELS = {
@@ -70,6 +82,11 @@ _DIAGNOSIS_LABELS = {
     "local_network_denied": "O navegador não permite que a NoHarm acesse a rede local",
     "unreachable_timeout": "Sem resposta do getname: a rede deste computador não chega até ele",
     "unreachable": "Getname inacessível (DNS, conexão recusada ou certificado inválido)",
+    "certificate": "O navegador não aceita o certificado https do getname",
+    "certificate_accepted": "Funciona, mas só depois de aceitar o aviso de certificado no navegador",
+    "connection_refused": "Conexão recusada: getname parado, em outra porta ou firewall rejeitando",
+    "dns": "O computador não resolve o nome do servidor do getname (DNS)",
+    "blocked_by_browser": "O getname abre em uma aba, mas o navegador bloqueia as chamadas da NoHarm",
     "cors": "Getname acessível, mas recusa chamadas da origem da NoHarm (CORS)",
     "http_error": "O getname respondeu com erro",
     "unhealthy_database": "O getname não consegue acessar o banco de dados do hospital",
@@ -311,7 +328,7 @@ def _receipt_html(schema: str, plan: dict, extra: dict, run: int) -> str:
         "<tr>"
         f"<td>{escape(_CHECK_LABELS.get(check['id'], check['id']))}</td>"
         f"<td>{escape(_STATUS_LABELS.get(check['status'], check['status']))}</td>"
-        f"<td>{escape(check['code'] or '-')}</td>"
+        f"<td>{escape(_OBSERVATION_LABELS.get(check['code'], check['code']) or '-')}</td>"
         f"<td>{escape(check['http_status'] if check['http_status'] is not None else '-')}</td>"
         f"<td>{escape(check['duration_ms'] if check['duration_ms'] is not None else '-')}</td>"
         f"<td>{escape(check['detail'] or '')}</td>"

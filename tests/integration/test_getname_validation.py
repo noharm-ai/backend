@@ -488,6 +488,33 @@ def test_next_runs_go_to_the_same_ticket(client, getname_setup):
     assert [r["extra"]["ticket_id"] for r in _results()] == [4321, 4321]
 
 
+def test_what_the_person_saw_names_the_cause_on_the_ticket(client, getname_setup):
+    """A failed connection has no reason for the page: the answer to "what
+    showed up in the tab" comes as a check and is readable on the ticket."""
+    token = _create_link()
+    odoo = _odoo()
+    payload = dict(
+        PASSED_RESULT,
+        status="failed",
+        diagnosis="certificate",
+        checks=[
+            {"id": "manual", "status": "warning", "code": "saw_security_warning"},
+            {"id": "reachability", "status": "failed", "code": "unreachable"},
+        ],
+    )
+
+    response = _post_result(client, token, payload=payload, odoo=odoo)
+
+    assert response.get_json()["data"]["status"] == "failed"
+    description = _calls(odoo, "helpdesk.ticket", "web_save")[0].kwargs["payload"][1][
+        "description"
+    ]
+    assert "O navegador não aceita o certificado https do getname" in description
+    assert "O que apareceu ao abrir o getname em uma aba" in description
+    assert "Aviso de segurança (certificado)" in description
+    assert _results()[0]["extra"]["checks"][0]["code"] == "saw_security_warning"
+
+
 def test_each_link_has_its_own_ticket(client, getname_setup):
     """Another link of the same schema does not reuse the ticket."""
     _post_result(client, _create_link(), odoo=_odoo())
