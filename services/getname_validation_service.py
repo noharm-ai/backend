@@ -15,6 +15,7 @@ below.
 
 import hashlib
 import hmac
+import ipaddress
 from datetime import datetime, timezone
 from urllib.parse import urlsplit
 
@@ -336,7 +337,17 @@ def _check_extra(check: GetnameValidationCheck) -> dict:
     }
 
 
-def _it_message_html(plan: dict, extra: dict) -> str:
+def _client_ip(value: str | None) -> str | None:
+    """The address a run was posted from, when it is one. It is the public
+    address the request left the hospital with (its internet link, usually a
+    NAT): the computer's address inside the hospital never reaches a server."""
+    try:
+        return str(ipaddress.ip_address((value or "").strip()))
+    except ValueError:
+        return None
+
+
+def _it_message_html(plan: dict, extra: dict, client_ip: str | None) -> str:
     """The message the NoHarm staff can send to the hospital's IT, when the
     diagnosis is something IT has to act on; empty otherwise. The person who
     ran the test is not asked to contact anyone."""
@@ -358,6 +369,12 @@ def _it_message_html(plan: dict, extra: dict) -> str:
         f"Site que faz as chamadas: {origin}",
         f"O que precisamos: {request}",
     ]
+    if client_ip:
+        lines += [
+            "",
+            f"O teste saiu para a internet pelo IP público {client_ip} (o endereço "
+            "interno do computador não é visível para a NoHarm).",
+        ]
 
     return (
         "<h4>Mensagem sugerida para a TI do hospital</h4>"
@@ -367,7 +384,9 @@ def _it_message_html(plan: dict, extra: dict) -> str:
     )
 
 
-def _receipt_html(schema: str, plan: dict, extra: dict, run: int) -> str:
+def _receipt_html(
+    schema: str, plan: dict, extra: dict, run: int, client_ip: str | None = None
+) -> str:
     """The receipt of a run, for the ticket. Every value typed by the page is
     escaped: the page is public and this is rendered by the helpdesk."""
     environment = extra["environment"]
@@ -385,6 +404,7 @@ def _receipt_html(schema: str, plan: dict, extra: dict, run: int) -> str:
         ("URL testada", plan["baseUrl"] or "-"),
         ("Versão do getname", environment.get("getnameVersion") or "-"),
         ("Origem da página", environment.get("pageOrigin") or "-"),
+        ("IP público de quem testou", client_ip or "-"),
         ("Navegador", environment.get("userAgent") or "-"),
         ("Endereço do getname", environment.get("targetAddressSpace") or "-"),
         ("Permissões de rede local", permissions or "-"),
@@ -415,7 +435,7 @@ def _receipt_html(schema: str, plan: dict, extra: dict, run: int) -> str:
         "<table><tr><th>Etapa</th><th>Resultado</th><th>Código</th>"
         "<th>HTTP</th><th>ms</th><th>Detalhe</th></tr>"
         f"{checks}</table>"
-        f"{_it_message_html(plan=plan, extra=extra)}"
+        f"{_it_message_html(plan=plan, extra=extra, client_ip=client_ip)}"
     )
 
 
@@ -533,8 +553,16 @@ def _register_ticket(
     return ticket or {}
 
 
-def save_result(token: str, request_data: GetnameValidationResultRequest) -> dict:
-    """Save the receipt of a run and put it on the ticket of the link"""
+def save_result(
+    token: str,
+    request_data: GetnameValidationResultRequest,
+    client_ip: str | None = None,
+) -> dict:
+    """Save the receipt of a run and put it on the ticket of the link.
+
+    ``client_ip`` (the address the run was posted from) goes to the ticket
+    only, for who talks to the hospital's IT: it is not kept in the result row,
+    which the admin project lists."""
     # the lock makes two runs of one link queue here, so a link never opens two
     # tickets and never goes past MAX_RUNS
     link = _require_link(token=token, lock=True)
@@ -566,7 +594,11 @@ def save_result(token: str, request_data: GetnameValidationResultRequest) -> dic
         previous=previous,
         title=_ticket_title(schema=link.schemaName, result_status=result_status),
         receipt=_receipt_html(
-            schema=link.schemaName, plan=plan, extra=extra, run=len(previous) + 1
+            schema=link.schemaName,
+            plan=plan,
+            extra=extra,
+            run=len(previous) + 1,
+            client_ip=_client_ip(client_ip),
         ),
     )
     extra["ticket_id"] = ticket.get("ticket_id")

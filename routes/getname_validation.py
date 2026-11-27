@@ -86,4 +86,7 @@ def save_result(token: str):
         request_data=GetnameValidationResultRequest(
             **(request.get_json(silent=True) or {})
         ),
+        # the address Zappa derives for the request (as the login audit uses),
+        # not the leftmost X-Forwarded-For entry, which the caller writes
+        client_ip=request.remote_addr,
     )

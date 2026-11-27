@@ -180,14 +180,21 @@ def _calls(client, model: str, action: str) -> list:
     ]
 
 
-def _post_result(client, token: str, payload: dict = None, odoo=None):
-    """Post a run with the helpdesk patched"""
+# TEST-NET-3 (RFC 5737): an address reserved for documentation
+CLIENT_IP = "203.0.113.7"
+
+
+def _post_result(
+    client, token: str, payload: dict = None, odoo=None, remote_addr: str = CLIENT_IP
+):
+    """Post a run with the helpdesk patched, as coming from an address"""
     with patch.object(
         getname_validation_service.odoo_client, "get_client", return_value=odoo
     ):
         return client.post(
             f"/public/getname-validation/{token}/result",
             json=PASSED_RESULT if payload is None else payload,
+            environ_base={"REMOTE_ADDR": remote_addr},
         )
 
 
@@ -536,6 +543,64 @@ def test_ticket_carries_the_message_for_the_hospital_it(client, getname_setup):
     assert "Servidor do getname: getname.example.org, porta 443 (https)" in description
     assert "Site que faz as chamadas: https://app.example.com" in description
     assert "liberar o acesso da rede dos computadores" in description
+
+
+def test_ticket_shows_where_the_test_came_from(client, getname_setup):
+    """The public address of who tested: on the receipt and in the message for
+    IT, and only there - the result row, which admin lists, does not keep it."""
+    token = _create_link()
+    odoo = _odoo()
+    payload = dict(
+        PASSED_RESULT,
+        status="failed",
+        diagnosis="unreachable_timeout",
+        checks=[{"id": "reachability", "status": "failed", "code": "timeout"}],
+    )
+
+    _post_result(client, token, payload=payload, odoo=odoo)
+
+    description = _calls(odoo, "helpdesk.ticket", "web_save")[0].kwargs["payload"][1][
+        "description"
+    ]
+    assert f"IP público de quem testou</strong></td><td>{CLIENT_IP}" in description
+    assert f"pelo IP público {CLIENT_IP}" in description
+    assert CLIENT_IP not in json.dumps(_results()[0]["extra"])
+
+
+def test_spoofed_forwarded_header_is_not_the_address(client, getname_setup):
+    """The leftmost X-Forwarded-For entry is whatever the caller wrote."""
+    token = _create_link()
+    odoo = _odoo()
+
+    with patch.object(
+        getname_validation_service.odoo_client, "get_client", return_value=odoo
+    ):
+        client.post(
+            f"/public/getname-validation/{token}/result",
+            json=PASSED_RESULT,
+            environ_base={"REMOTE_ADDR": CLIENT_IP},
+            headers={"X-Forwarded-For": "198.51.100.99"},
+        )
+
+    description = _calls(odoo, "helpdesk.ticket", "web_save")[0].kwargs["payload"][1][
+        "description"
+    ]
+    assert CLIENT_IP in description
+    assert "198.51.100.99" not in description
+
+
+def test_address_that_is_not_one_is_left_out(client, getname_setup):
+    """Nothing but an ip address is written as one."""
+    token = _create_link()
+    odoo = _odoo()
+
+    _post_result(client, token, odoo=odoo, remote_addr="<script>")
+
+    description = _calls(odoo, "helpdesk.ticket", "web_save")[0].kwargs["payload"][1][
+        "description"
+    ]
+    assert "IP público de quem testou</strong></td><td>-" in description
+    assert "script" not in description
 
 
 def test_no_message_for_it_when_the_fix_is_not_theirs(client, getname_setup):
