@@ -109,16 +109,16 @@ _IT_MESSAGES = {
     "unreachable_timeout": (
         "o computador não recebe resposta do servidor do getname (tempo esgotado).",
         "liberar o acesso da rede dos computadores que usam a NoHarm ao servidor e à "
-        "porta abaixo (firewall / roteamento).",
+        "porta acima (firewall / roteamento).",
     ),
     "connection_refused": (
         "a conexão com o servidor do getname é recusada.",
         "confirmar que nenhum firewall rejeita conexões da rede dos computadores que "
-        "usam a NoHarm para o servidor e a porta abaixo.",
+        "usam a NoHarm para o servidor e a porta acima.",
     ),
     "dns": (
         "o nome do servidor do getname não é resolvido (DNS).",
-        "fazer com que os computadores que usam a NoHarm resolvam o nome abaixo (DNS "
+        "fazer com que os computadores que usam a NoHarm resolvam o nome acima (DNS "
         "interno ou liberação do DNS externo).",
     ),
     "blocked_by_browser": (
