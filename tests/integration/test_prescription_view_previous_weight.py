@@ -62,6 +62,7 @@ def prescription():
     patient: every test records the ones it needs"""
 
     def _delete():
+        """Remove the test prescription and the patient's admissions"""
         session.execute(
             text("DELETE FROM demo.prescricao WHERE fkprescricao = :id"),
             {"id": PRESCRIPTION},

@@ -44,11 +44,40 @@ URL = f"/prescriptions/{SEED_PRESCRIPTION_ID}/cultures"
 DYNAMODB_READ = "repository.culture_repository.get_culture_summary_from_dynamodb"
 
 
+def _drug_sctid() -> int | None:
+    """The substance the seed drug is mapped to, leaving out this module's
+    own (a run killed before its teardown leaves the drug pointing at one)"""
+    sctid = session.execute(
+        text("SELECT sctid FROM demo.medicamento WHERE fkmedicamento = :id"),
+        {"id": PRESCRIBED_DRUG},
+    ).scalar()
+    return None if sctid in (PRESCRIBED_SUBSTANCE, OTHER_SUBSTANCE) else sctid
+
+
+def _set_drug_sctid(sctid: int | None):
+    """Map the seed drug to a substance (None for none)"""
+    session.execute(
+        text("UPDATE demo.medicamento SET sctid = :sctid WHERE fkmedicamento = :id"),
+        {"sctid": sctid, "id": PRESCRIBED_DRUG},
+    )
+
+
+def _delete_substances():
+    """Remove this module's substances"""
+    session.execute(
+        text("DELETE FROM public.substancia WHERE sctid IN (:prescribed, :other)"),
+        {"prescribed": PRESCRIBED_SUBSTANCE, "other": OTHER_SUBSTANCE},
+    )
+
+
 @pytest.fixture
 def substances():
     """Two antimicrobial substances: the prescribed one (Reserve) and one the
     prescription does not carry (never classified). The seed drug of the
-    prescription is mapped to the first one for the duration of the test."""
+    prescription is mapped to the first one for the duration of the test, and
+    then put back on the substance it had."""
+    original_sctid = _drug_sctid()
+    _delete_substances()
     session.execute(
         text(
             "INSERT INTO public.substancia (sctid, nome, ativo, tp_nivel_atb) "
@@ -61,38 +90,42 @@ def substances():
             "level": AntimicrobialLevelEnum.RESERVE.value,
         },
     )
-    session.execute(
-        text("UPDATE demo.medicamento SET sctid = :sctid WHERE fkmedicamento = :id"),
-        {"sctid": PRESCRIBED_SUBSTANCE, "id": PRESCRIBED_DRUG},
-    )
+    _set_drug_sctid(PRESCRIBED_SUBSTANCE)
     session_commit()
 
     yield
 
-    # the seed drug has no substance: put it back as it was
-    session.execute(
-        text("UPDATE demo.medicamento SET sctid = NULL WHERE fkmedicamento = :id"),
-        {"id": PRESCRIBED_DRUG},
-    )
-    session.execute(
-        text("DELETE FROM public.substancia WHERE sctid IN (:prescribed, :other)"),
-        {"prescribed": PRESCRIBED_SUBSTANCE, "other": OTHER_SUBSTANCE},
-    )
+    _set_drug_sctid(original_sctid)
+    _delete_substances()
     session_commit()
+
+
+def _patch_culture_feature(enabled: bool):
+    """Patch the CULTURE tenant feature on or off, leaving every other
+    feature as the schema has it"""
+    original = feature_service.has_feature
+
+    def has_feature(feature: FeatureEnum):
+        """CULTURE as asked, the schema's answer for any other feature"""
+        if feature == FeatureEnum.CULTURE:
+            return enabled
+        return original(feature)
+
+    return patch.object(feature_service, "has_feature", side_effect=has_feature)
 
 
 @pytest.fixture
 def culture_feature():
-    """Turn the CULTURE tenant feature on, leaving every other feature as the
-    schema has it"""
-    original = feature_service.has_feature
+    """Turn the CULTURE tenant feature on"""
+    with _patch_culture_feature(enabled=True):
+        yield
 
-    def has_feature(feature: FeatureEnum):
-        if feature == FeatureEnum.CULTURE:
-            return True
-        return original(feature)
 
-    with patch.object(feature_service, "has_feature", side_effect=has_feature):
+@pytest.fixture
+def no_culture_feature():
+    """Turn the CULTURE tenant feature off, whatever the schema's features
+    memory lists"""
+    with _patch_culture_feature(enabled=False):
         yield
 
 
@@ -261,7 +294,7 @@ def test_card_is_empty_when_dynamodb_fails(client, analyst_headers):
     assert response.get_json()["data"] == []
 
 
-@pytest.mark.usefixtures("substances")
+@pytest.mark.usefixtures("substances", "no_culture_feature")
 def test_card_skips_dynamodb_without_the_culture_feature(client, analyst_headers):
     """Without the CULTURE feature the summary is not even read"""
     with patch(DYNAMODB_READ, return_value=_summary()) as dynamodb_read:
